@@ -1,5 +1,4 @@
 import { EventEmitter } from "events";
-import { convertDateTo2001Time } from "@server/api/imessage/helpers/dateUtil";
 
 export abstract class ChangeListener extends EventEmitter {
     stopped: boolean;

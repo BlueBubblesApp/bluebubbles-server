@@ -1,10 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, PrimaryColumn } from "typeorm";
 
 @Entity()
 export class Config {
-    @PrimaryGeneratedColumn()
+    @PrimaryColumn("text", { name: "name" })
     name: string;
 
-    @Column("text", { nullable: true })
+    @Column("text", { name: "value", nullable: true })
     value: string;
 }

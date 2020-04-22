@@ -1,7 +1,6 @@
-import { ChangeListener } from "./changeListener";
-import { DEFAULT_POLL_FREQUENCY_MS } from "../helpers/constants";
 import { DatabaseRepository } from "@server/api/imessage";
 import { Message } from "@server/api/imessage/entity/Message";
+import { ChangeListener } from "./changeListener";
 
 export class MessageListener extends ChangeListener {
     repo: DatabaseRepository;
@@ -10,7 +9,7 @@ export class MessageListener extends ChangeListener {
 
     constructor(
         repo: DatabaseRepository,
-        pollFrequency = DEFAULT_POLL_FREQUENCY_MS
+        pollFrequency: number
     ) {
         super(pollFrequency);
 

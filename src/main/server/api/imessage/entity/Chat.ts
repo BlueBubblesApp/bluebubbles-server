@@ -4,12 +4,12 @@ import {
     PrimaryGeneratedColumn,
     Column,
     ManyToMany,
-    JoinTable,
+    JoinTable
 } from "typeorm";
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
-import { Handle, HandleNew } from "@server/api/imessage/entity/Handle";
-import { Message, MessageNew } from "@server/api/imessage/entity/Message";
+import { Handle } from "@server/api/imessage/entity/Handle";
+import { Message } from "@server/api/imessage/entity/Message";
 
 @Entity("chat")
 export class Chat {
@@ -30,7 +30,7 @@ export class Chat {
         joinColumns: [{ name: "chat_id" }],
         inverseJoinColumns: [{ name: "message_id" }]
     })
-    messages: Message[];
+    messages: typeof Message[];
 
     @Column({ type: "text", nullable: false })
     guid: string;
@@ -91,70 +91,4 @@ export class Chat {
         transformer: BooleanTransformer
     })
     successfulQuery: boolean;
-}
-
-export class ChatNew extends Chat {
-    @ManyToMany((type) => HandleNew)
-    @JoinTable({
-        name: "chat_handle_join",
-        joinColumns: [{ name: "chat_id" }],
-        inverseJoinColumns: [{ name: "handle_id" }]
-    })
-    participants: HandleNew[];
-
-    @ManyToMany((type) => MessageNew)
-    @JoinTable({
-        name: "chat_message_join",
-        joinColumns: [{ name: "chat_id" }],
-        inverseJoinColumns: [{ name: "message_id" }]
-    })
-    messages: MessageNew[];
-
-    @Column({ name: "engram_id", type: "text", nullable: true })
-    engramId: string;
-
-    @Column({ name: "server_change_token", type: "text", nullable: true })
-    serverChangeToken: string;
-
-    @Column({
-        name: "ck_sync_state",
-        type: "integer",
-        nullable: true,
-        transformer: BooleanTransformer
-    })
-    ckSyncState: boolean;
-
-    @Column({ name: "original_group_id", type: "text", nullable: true })
-    originalGroupId: string;
-
-    @Column({
-        name: "last_read_message_timestamp",
-        type: "integer",
-        nullable: true,
-        transformer: DateTransformer
-    })
-    lastReadMessageTimestamp: number;
-
-    @Column({ name: "sr_server_change_token", type: "text", nullable: true })
-    srServerChangeToken: string;
-
-    @Column({ name: "sr_ck_sync_state", type: "integer", nullable: true })
-    srCkSyncState: number;
-
-    @Column({ name: "cloudkit_record_id", type: "text", nullable: true })
-    cloudkitRecordId: string;
-
-    @Column({ name: "sr_cloudkit_record_id", type: "text", nullable: true })
-    srCloudkitRecordId: string;
-
-    @Column({ name: "last_addressed_sim_id", type: "text", nullable: true })
-    lastAddressedSimId: string;
-
-    @Column({
-        name: "is_blackholed",
-        type: "integer",
-        nullable: true,
-        transformer: BooleanTransformer
-    })
-    isBlackholed: boolean;
 }

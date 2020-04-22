@@ -1,13 +1,9 @@
 import "reflect-metadata";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain, ipcRenderer } from "electron";
 import * as path from "path";
 import * as url from "url";
 
-import { DatabaseRepository } from "@server/api/imessage";
-// import { MessageListener } from "@server/api/imessage/database/listeners";
-import { createDbConnection, createSockets } from "@server/index";
-import { MessageListener } from "@server/api/imessage/listeners/messageListener";
-import { Message } from "@server/api/imessage/entity/Message";
+import { BlueBubbleServer } from "@server/index";
 
 let win: BrowserWindow | null;
 
@@ -60,26 +56,25 @@ const createWindow = async () => {
         win = null;
     });
 
-    // Connect to the iMessage Chat Database
-    const repo = new DatabaseRepository();
-    await repo.initialize();
-
     /**
      * Create a connection to the config database and create the sockets
      */
-    const connection = await createDbConnection();
-    const server = createSockets(connection, repo);
+    const api = new BlueBubbleServer(win);
+    await api.setup();
+    api.startSockets();
+    api.startChatListener();
+    api.startIpcListener();
+    
+    // Tell the DOM we have a config update
+    win.webContents.send("config-update", api.config);
 
-    // Create a listener to listen for new messages
-    const listener = new MessageListener(repo, 1000);
-    listener.start();
-    listener.on("new-entry", (item: Message) => {
-        console.log(
-            `New message from ${item.from.id}, sent to ${item.chats[0].chatIdentifier}`
-        );
-
-        server.emit("new-message", item);
-    });
+    /**
+     * IPC Messaging
+     */
+    win.webContents.on("dom-ready", async () => {
+        // Handle if the DOM loads after the DB
+        win.webContents.send("config-update", api.config);
+    })
 };
 
 app.on("ready", createWindow);
