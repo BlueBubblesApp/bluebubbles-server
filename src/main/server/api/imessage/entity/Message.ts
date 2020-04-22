@@ -386,64 +386,6 @@ export class Message {
 
     @Column({ name: "message_summary_info", type: "blob", nullable: true })
     messageSummaryInfo: Blob;
-
-    @Column({
-        name: "ck_sync_state",
-        type: "integer",
-        transformer: BooleanTransformer,
-        default: 0
-    })
-    ckSyncState: boolean;
-
-    @Column({ name: "ck_record_id", type: "text", nullable: true })
-    ckRecordId: string;
-
-    @Column({ name: "ck_record_change_tag", type: "text", nullable: true })
-    ckRecordChangeTag: string;
-
-    @Column({ name: "destination_caller_id", type: "text", nullable: true })
-    destinationCallerId: string;
-
-    @Column({
-        name: "sr_ck_sync_state",
-        type: "integer",
-        transformer: BooleanTransformer,
-        default: 0
-    })
-    srCkSyncState: boolean;
-
-    @Column({ name: "sr_ck_record_id", type: "text", nullable: true })
-    srCkRecordId: string;
-
-    @Column({ name: "sr_ck_record_change_tag", type: "text", nullable: true })
-    srCkRecordChangeTag: string;
-
-    @Column({
-        name: "is_corrupt",
-        type: "integer",
-        transformer: BooleanTransformer,
-        default: 0
-    })
-    isCorrupt: boolean;
-
-    @Column({
-        name: "reply_to_guid",
-        type: "text",
-        nullable: true,
-        default: null
-    })
-    replyToGuid: string;
-
-    @Column({ name: "sort_id", type: "integer", default: 0 })
-    sortId: number;
-
-    @Column({
-        name: "is_spam",
-        type: "integer",
-        transformer: BooleanTransformer,
-        default: 0
-    })
-    isSpam: boolean;
 }
 
 @Entity("message")

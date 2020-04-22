@@ -2,7 +2,6 @@ import { app } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as io from "socket.io";
 
-import { Config } from "./entity/Config";
 import { DatabaseRepository } from "./api/imessage";
 
 // Create the database and the connection to it

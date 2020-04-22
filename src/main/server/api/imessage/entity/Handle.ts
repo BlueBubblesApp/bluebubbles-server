@@ -18,7 +18,7 @@ export class Handle {
 
     @OneToMany((type) => Message, (message) => message.from)
     @JoinColumn({ name: "ROWID", referencedColumnName: "handle_id" })
-    messages: typeof Message[];
+    messages: Message[];
 
     @ManyToMany((type) => Chat)
     @JoinTable({
@@ -44,7 +44,7 @@ export class Handle {
 export class HandleNew extends Handle {
     @OneToMany((type) => MessageNew, (message) => message.from)
     @JoinColumn({ name: "ROWID", referencedColumnName: "handle_id" })
-    messages: typeof MessageNew[];
+    messages: MessageNew[];
 
     @ManyToMany((type) => ChatNew)
     @JoinTable({
