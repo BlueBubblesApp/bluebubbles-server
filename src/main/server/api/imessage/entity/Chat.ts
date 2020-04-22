@@ -1,17 +1,15 @@
+/* eslint-disable max-classes-per-file */
 import {
     Entity,
     PrimaryGeneratedColumn,
     Column,
-    DatabaseType,
     ManyToMany,
     JoinTable,
-    OneToMany,
-    JoinColumn
 } from "typeorm";
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Message } from "@server/api/imessage/entity/Message";
+import { Handle, HandleNew } from "@server/api/imessage/entity/Handle";
+import { Message, MessageNew } from "@server/api/imessage/entity/Message";
 
 @Entity("chat")
 export class Chat {
@@ -93,6 +91,24 @@ export class Chat {
         transformer: BooleanTransformer
     })
     successfulQuery: boolean;
+}
+
+export class ChatNew extends Chat {
+    @ManyToMany((type) => HandleNew)
+    @JoinTable({
+        name: "chat_handle_join",
+        joinColumns: [{ name: "chat_id" }],
+        inverseJoinColumns: [{ name: "handle_id" }]
+    })
+    participants: HandleNew[];
+
+    @ManyToMany((type) => MessageNew)
+    @JoinTable({
+        name: "chat_message_join",
+        joinColumns: [{ name: "chat_id" }],
+        inverseJoinColumns: [{ name: "message_id" }]
+    })
+    messages: MessageNew[];
 
     @Column({ name: "engram_id", type: "text", nullable: true })
     engramId: string;

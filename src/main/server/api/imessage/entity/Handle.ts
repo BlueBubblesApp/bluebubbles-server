@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 import {
     Entity,
     PrimaryGeneratedColumn,
@@ -7,8 +8,8 @@ import {
     JoinTable,
     ManyToMany
 } from "typeorm";
-import { Message } from "@server/api/imessage/entity/Message";
-import { Chat } from "@server/api/imessage/entity/Chat";
+import { MessageNew, Message } from "@server/api/imessage/entity/Message";
+import { Chat, ChatNew } from "@server/api/imessage/entity/Chat";
 
 @Entity("handle")
 export class Handle {
@@ -17,7 +18,7 @@ export class Handle {
 
     @OneToMany((type) => Message, (message) => message.from)
     @JoinColumn({ name: "ROWID", referencedColumnName: "handle_id" })
-    messages: Message[];
+    messages: typeof Message[];
 
     @ManyToMany((type) => Chat)
     @JoinTable({
@@ -38,6 +39,20 @@ export class Handle {
 
     @Column({ name: "uncanonicalized_id", type: "text", nullable: true })
     uncanonicalizedId: string;
+}
+
+export class HandleNew extends Handle {
+    @OneToMany((type) => MessageNew, (message) => message.from)
+    @JoinColumn({ name: "ROWID", referencedColumnName: "handle_id" })
+    messages: typeof MessageNew[];
+
+    @ManyToMany((type) => ChatNew)
+    @JoinTable({
+        name: "chat_handle_join",
+        joinColumns: [{ name: "handle_id" }],
+        inverseJoinColumns: [{ name: "chat_id" }]
+    })
+    chats: ChatNew[];
 
     @Column({ name: "person_centric_id", type: "text", nullable: true })
     personCentricId: string;

@@ -2,9 +2,8 @@
 import { createConnection, Connection } from "typeorm";
 
 import { convertDateTo2001Time } from "@server/api/imessage/helpers/dateUtil";
+import { ChatEntity, HandleEntity, MessageEntity } from "@server/api/imessage/entity";
 import { Chat } from "@server/api/imessage/entity/Chat";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Message } from "@server/api/imessage/entity/Message";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -24,7 +23,7 @@ export class DatabaseRepository {
             name: "iMessage",
             type: "sqlite",
             database: `${process.env.HOME}/Library/Messages/chat.db`,
-            entities: [Chat, Handle, Message],
+            entities: [ChatEntity, HandleEntity, MessageEntity],
             synchronize: false,
             logging: false
         });
@@ -39,7 +38,7 @@ export class DatabaseRepository {
      * @param withParticipants Whether to include the participants or not
      */
     async getChats(identifier?: string, withParticipants = true) {
-        const query = this.db.getRepository(Chat).createQueryBuilder("chat");
+        const query = this.db.getRepository(ChatEntity).createQueryBuilder("chat");
 
         if (withParticipants)
             query.leftJoinAndSelect("chat.participants", "handle");
@@ -62,7 +61,7 @@ export class DatabaseRepository {
      * @param handle Get a specific handle from the DB
      */
     async getHandles(handle: string = null) {
-        const repo = this.db.getRepository(Handle);
+        const repo = this.db.getRepository(HandleEntity);
         let handles = [];
 
         // Get all handles or just get one handle
@@ -85,7 +84,7 @@ export class DatabaseRepository {
      * @param before The latest date to get messages from
      */
     async getMessages(
-        chat: Chat | null,
+        chat: Chat,
         offset = 0,
         limit = 100,
         after?: Date,
@@ -93,7 +92,7 @@ export class DatabaseRepository {
     ) {
         // Get messages with sender and the chat it's from
         const query = this.db
-            .getRepository(Message)
+            .getRepository(MessageEntity)
             .createQueryBuilder("message")
             .leftJoinAndSelect("message.from", "handle")
             .leftJoinAndSelect(

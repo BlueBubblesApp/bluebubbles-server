@@ -1,8 +1,8 @@
+/* eslint-disable max-classes-per-file */
 import {
     Entity,
     PrimaryGeneratedColumn,
     Column,
-    DatabaseType,
     ManyToOne,
     JoinTable,
     JoinColumn,
@@ -11,8 +11,8 @@ import {
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/api/imessage/transformers/MessageTypeTransformer";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Chat } from "@server/api/imessage/entity/Chat";
+import { Handle, HandleNew } from "@server/api/imessage/entity/Handle";
+import { Chat, ChatNew } from "@server/api/imessage/entity/Chat";
 
 @Entity("message")
 export class Message {
@@ -386,6 +386,79 @@ export class Message {
 
     @Column({ name: "message_summary_info", type: "blob", nullable: true })
     messageSummaryInfo: Blob;
+
+    @Column({
+        name: "ck_sync_state",
+        type: "integer",
+        transformer: BooleanTransformer,
+        default: 0
+    })
+    ckSyncState: boolean;
+
+    @Column({ name: "ck_record_id", type: "text", nullable: true })
+    ckRecordId: string;
+
+    @Column({ name: "ck_record_change_tag", type: "text", nullable: true })
+    ckRecordChangeTag: string;
+
+    @Column({ name: "destination_caller_id", type: "text", nullable: true })
+    destinationCallerId: string;
+
+    @Column({
+        name: "sr_ck_sync_state",
+        type: "integer",
+        transformer: BooleanTransformer,
+        default: 0
+    })
+    srCkSyncState: boolean;
+
+    @Column({ name: "sr_ck_record_id", type: "text", nullable: true })
+    srCkRecordId: string;
+
+    @Column({ name: "sr_ck_record_change_tag", type: "text", nullable: true })
+    srCkRecordChangeTag: string;
+
+    @Column({
+        name: "is_corrupt",
+        type: "integer",
+        transformer: BooleanTransformer,
+        default: 0
+    })
+    isCorrupt: boolean;
+
+    @Column({
+        name: "reply_to_guid",
+        type: "text",
+        nullable: true,
+        default: null
+    })
+    replyToGuid: string;
+
+    @Column({ name: "sort_id", type: "integer", default: 0 })
+    sortId: number;
+
+    @Column({
+        name: "is_spam",
+        type: "integer",
+        transformer: BooleanTransformer,
+        default: 0
+    })
+    isSpam: boolean;
+}
+
+@Entity("message")
+export class MessageNew extends Message {
+    @ManyToOne((type) => HandleNew)
+    @JoinColumn({ name: "handle_id", referencedColumnName: "ROWID" })
+    from: HandleNew;
+
+    @ManyToMany((type) => ChatNew)
+    @JoinTable({
+        name: "chat_message_join",
+        joinColumns: [{ name: "message_id" }],
+        inverseJoinColumns: [{ name: "chat_id" }]
+    })
+    chats: ChatNew[];
 
     @Column({
         name: "ck_sync_state",
