@@ -138,7 +138,7 @@ export class BlueBubbleServer {
                     true
                 );
 
-                if (send_response) send_response(null, chats);
+                if (send_response) send_response(chats);
                 else socket.emit("chats", chats);
             });
 
@@ -166,7 +166,7 @@ export class BlueBubbleServer {
                         params?.before
                     );
 
-                    if (send_response) send_response(null, messages);
+                    if (send_response) send_response(messages);
                     else socket.emit("messages", messages);
                 }
             );
@@ -193,7 +193,7 @@ export class BlueBubbleServer {
                         1
                     );
 
-                    if (send_response) send_response(null, messages);
+                    if (send_response) send_response(messages);
                     else socket.emit("last-chat-message", messages);
                 }
             );
@@ -206,7 +206,7 @@ export class BlueBubbleServer {
                 async (params, send_response) => {
                     if (!params?.identifier)
                         if (send_response)
-                            send_response(null, "ERROR: No Identifier");
+                            send_response("ERROR: No Identifier");
                         else
                             socket.emit("error", "ERROR: No Identifier");
 
@@ -216,7 +216,7 @@ export class BlueBubbleServer {
                     );
 
                     if (send_response)
-                        send_response(null, chats[0].participants);
+                        send_response(chats[0].participants);
                     else
                         socket.emit(
                             "participants",
@@ -261,7 +261,9 @@ export class BlueBubbleServer {
                 }
 
                 const chatGuid = await createChat(this.fs, participants);
-                socket.emit("new-chat", chatGuid);
+
+                if (send_response) send_response(chatGuid)
+                else socket.emit("new-chat", chatGuid);
             });
 
             // /**
