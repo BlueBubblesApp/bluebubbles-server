@@ -1,7 +1,8 @@
 import "reflect-metadata";
-import { app, BrowserWindow, ipcMain, ipcRenderer } from "electron";
+import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import * as url from "url";
+import * as fs from "fs";
 
 import { BlueBubbleServer } from "@server/index";
 

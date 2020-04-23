@@ -4,11 +4,14 @@ import * as io from "socket.io";
 import * as ngrok from "ngrok";
 
 import { Config } from "@server/entity/Config";
+import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_SOCKET_PORT } from "@server/constants";
 
-import { DatabaseRepository } from "./api/imessage";
-import { MessageListener } from "./api/imessage/listeners/messageListener";
-import { Message } from "./api/imessage/entity/Message";
+import { DatabaseRepository } from "@server/api/imessage";
+import { MessageListener } from "@server/api/imessage/listeners/messageListener";
+import { Message } from "@server/api/imessage/entity/Message";
+import { sendMessage, createChat } from "@server/api/imessage/helpers/actions";
+import { server } from "@renderer/variables/general";
 
 export class BlueBubbleServer {
     window: BrowserWindow;
@@ -23,6 +26,8 @@ export class BlueBubbleServer {
 
     config: { [key: string]: any };
 
+    fs: FileSystem;
+
     constructor(window: BrowserWindow) {
         this.window = window;
         this.db = null;
@@ -30,11 +35,13 @@ export class BlueBubbleServer {
         this.socketServer = null;
         this.ngrokServer = null;
         this.config = {};
+        this.fs = null;
     }
 
     async setup(): Promise<void> {
         await this.initializeDatabase();
         await this.setupDefaults();
+        this.setupFileSystem();
 
         // Load DB
         const cfg = await this.db.find();
@@ -72,6 +79,8 @@ export class BlueBubbleServer {
                     if (item === "socket_port") {
                         await this.disconnectFromNgrok();
                         await this.connectToNgrok();
+                        await this.socketServer.close();
+                        this.startSockets();
                     }
                 }
                 // Update in class
@@ -94,6 +103,15 @@ export class BlueBubbleServer {
         */
         this.socketServer.on("connection", async (socket) => {
             console.log("client connected");
+
+            socket.use((packet, next) => {
+                try {
+                    next()
+                } catch (ex) {
+                    console.error(ex);
+                    socket.error(ex);
+                }
+            });
 
             /**
             * Get all chats
@@ -194,8 +212,40 @@ export class BlueBubbleServer {
             /**
             * Send message
             */
-            socket.on("send-message", async (params, send_response) => {
-                console.warn("Not Implemented: Message send request");
+            socket.on("send-message", async (params, send_response): Promise<void> => {
+                const chatGuid = params?.guid;
+                const message = params?.message;
+
+                if (!chatGuid || !message) {
+                    socket.emit("error", "No chat GUID or message provided!");
+                    return;
+                }
+
+                await sendMessage(this.fs, chatGuid, message, params?.attachmentName, params?.attachment);
+            });
+
+            /**
+            * Send message
+            */
+            socket.on("start-chat", async (params, send_response): Promise<void> => {
+                let participants = params?.participants;
+
+                if (!participants || participants.length === 0) {
+                    socket.error("No participants specified");
+                    return;
+                }
+
+                if (typeof participants === "string") {
+                    participants = [participants];
+                }
+
+                if (!Array.isArray(participants)) {
+                    socket.error("Participants must be an array!");
+                    return;
+                }
+
+                const chatGuid = await createChat(this.fs, participants);
+                socket.emit("new-chat", chatGuid);
             });
 
             // /**
@@ -221,6 +271,11 @@ export class BlueBubbleServer {
         });
 
         this.db = connection.getRepository(Config);
+    }
+
+    setupFileSystem(): void {
+        this.fs = new FileSystem();
+        this.fs.setup();
     }
 
     async setupDefaults(): Promise<void> {
