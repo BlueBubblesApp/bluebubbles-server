@@ -12,6 +12,10 @@ import { Typography, Button } from "@material-ui/core";
 
 import { Config } from "@renderer/variables/types";
 import { TextField, LinearProgress } from "@material-ui/core";
+
+import Dropzone from "react-dropzone";
+import * as QRCode from "qrcode.react";
+
 interface Props {
     config: Config
     classes: any;
@@ -20,12 +24,16 @@ interface Props {
 interface State {
     port: string;
     frequency: string;
+    fcmClient: any;
+    fcmServer: any
 }
 
 class Dashboard extends React.Component<Props, State> {
     state: State = {
         port: String(this.props.config?.socket_port || ""),
-        frequency: String(this.props.config?.poll_frequency || "")
+        frequency: String(this.props.config?.poll_frequency || ""),
+        fcmClient: null,
+        fcmServer: null
     }
     
     componentWillReceiveProps(nextProps: Props) {
@@ -33,6 +41,13 @@ class Dashboard extends React.Component<Props, State> {
             port: String(nextProps.config?.socket_port || ""),
             frequency: String(nextProps.config?.poll_frequency || "")
         });
+    }
+
+    async componentDidMount() {
+        this.setState({
+            fcmClient: JSON.stringify(await ipcRenderer.invoke("get-fcm-client")),
+            fcmServer: JSON.stringify(await ipcRenderer.invoke("get-fcm-server"))
+        })
     }
 
     saveConfig = async () => {
@@ -48,6 +63,36 @@ class Dashboard extends React.Component<Props, State> {
         const id = e.target.id;
         if (id === "port") this.setState({ port: e.target.value });
         if (id === "frequency") this.setState({ frequency: e.target.value });
+    }
+
+    handleClientFile = (acceptedFiles: any) => {
+        const reader = new FileReader();
+
+        reader.onabort = () => console.log("file reading was aborted");
+        reader.onerror = () => console.log("file reading has failed");
+        reader.onload = () => {
+            // Do whatever you want with the file contents
+            const binaryStr = reader.result;
+            ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
+            this.setState({ fcmClient: binaryStr });
+        };
+
+        reader.readAsText(acceptedFiles[0]);
+    }
+
+    handleServerFile = (acceptedFiles: any) => {
+        const reader = new FileReader();
+
+        reader.onabort = () => console.log("file reading was aborted");
+        reader.onerror = () => console.log("file reading has failed");
+        reader.onload = () => {
+            // Do whatever you want with the file contents
+            const binaryStr = reader.result;
+            ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+            this.setState({ fcmServer: binaryStr });
+        };
+
+        reader.readAsText(acceptedFiles[0]);
     }
 
     render() {
@@ -96,8 +141,92 @@ class Dashboard extends React.Component<Props, State> {
                             helperText="How often should we check for new messages?"
                             onChange={(e) => this.handleChange(e)}
                         />
+                        <section className={classes.fcmConfig}>
+                            <section>
+                                <Typography
+                                    variant="h5"
+                                    className={classes.header}
+                                >
+                                    Google FCM Configurations
+                                </Typography>
+                                <Typography
+                                    variant="subtitle1"
+                                    className={classes.header}
+                                >
+                                    Service Config Status:{" "}
+                                    {this.state.fcmServer
+                                        ? "Loaded"
+                                        : "Not Set"}
+                                </Typography>
+                                <Dropzone
+                                    onDrop={(acceptedFiles) =>
+                                        this.handleServerFile(acceptedFiles)
+                                    }
+                                >
+                                    {({ getRootProps, getInputProps }) => (
+                                        <section className={classes.dropzone}>
+                                            <div {...getRootProps()}>
+                                                <input {...getInputProps()} />
+                                                <p className={classes.dzText}>
+                                                    Drag 'n' drop or click here
+                                                    to load your FCM service
+                                                    configuration
+                                                </p>
+                                            </div>
+                                        </section>
+                                    )}
+                                </Dropzone>
+                                <br />
+                                <Typography
+                                    variant="subtitle1"
+                                    className={classes.header}
+                                >
+                                    Client Config Status:{" "}
+                                    {this.state.fcmClient
+                                        ? "Loaded"
+                                        : "Not Set"}
+                                </Typography>
+                                <Dropzone
+                                    onDrop={(acceptedFiles) =>
+                                        this.handleClientFile(acceptedFiles)
+                                    }
+                                >
+                                    {({ getRootProps, getInputProps }) => (
+                                        <section className={classes.dropzone}>
+                                            <div {...getRootProps()}>
+                                                <input {...getInputProps()} />
+                                                <p className={classes.dzText}>
+                                                    Drag 'n' drop or click here
+                                                    to load your FCM client
+                                                    configuration
+                                                </p>
+                                            </div>
+                                        </section>
+                                    )}
+                                </Dropzone>
+                            </section>
+                            <section className={classes.qrCode}>
+                                <Typography
+                                    variant="subtitle1"
+                                    className={classes.header}
+                                >
+                                    Client Config QRCode:{" "}
+                                    {this.state.fcmClient ? "Valid" : "Invalid"}
+                                </Typography>
+                                <QRCode
+                                    size={252}
+                                    value={this.state.fcmClient || ""}
+                                />
+                            </section>
+                        </section>
+
                         <br />
-                        <Button onClick={() => this.saveConfig()} color="secondary">Save</Button>
+                        <Button
+                            onClick={() => this.saveConfig()}
+                            color="secondary"
+                        >
+                            Save
+                        </Button>
                     </form>
                 )}
             </section>
@@ -121,6 +250,23 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         },
         field: {
             marginBottom: "1.5em"
+        },
+        dropzone: {
+            border: "1px solid grey",
+            borderRadius: "15px",
+            padding: "1em"
+        },
+        dzText: {
+            textAlign: "center"
+        },
+        fcmConfig: {
+            display: "flex",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-end"
+        },
+        qrCode: {
+            marginLeft: "1em"
         }
     });
 

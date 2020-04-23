@@ -10,18 +10,20 @@ export class FileSystem {
 
     public attachmentsDir = `${app.getPath("userData")}/Attachments`;
 
-    async setup() {
+    public fcmDir = `${app.getPath("userData")}/FCM`;
+
+    async setup(): Promise<void> {
         this.setupDirectories();
         this.setupScripts();
     }
 
-    setupDirectories() {
+    setupDirectories(): void {
         if (!fs.existsSync(this.scriptDir)) fs.mkdirSync(this.scriptDir);
-        if (!fs.existsSync(this.attachmentsDir))
-            fs.mkdirSync(this.attachmentsDir);
+        if (!fs.existsSync(this.attachmentsDir)) fs.mkdirSync(this.attachmentsDir);
+        if (!fs.existsSync(this.fcmDir))fs.mkdirSync(this.fcmDir);
     }
 
-    setupScripts() {
+    setupScripts(): void {
         AppleScripts.forEach((script) => {
             // Remove each script, and re-write it (in case of update)
             const scriptPath = `${this.scriptDir}/${script.name}`;
@@ -30,11 +32,33 @@ export class FileSystem {
         });
     }
 
-    saveAttachment(name: string, buffer: Buffer) {
+    saveAttachment(name: string, buffer: Buffer): void {
         fs.writeFileSync(path.join(this.attachmentsDir, name), buffer);
     }
 
-    removeAttachment(name: string) {
+    saveFCMClient(contents: any): void {
+        fs.writeFileSync(path.join(this.fcmDir, "client.json"), JSON.stringify(contents));
+    }
+
+    saveFCMServer(contents: any): void {
+        fs.writeFileSync(path.join(this.fcmDir, "server.json"), JSON.stringify(contents));
+    }
+
+    getFCMClient(): any {
+        const filePath = path.join(this.fcmDir, "client.json");
+        if (!fs.existsSync(filePath)) return null;
+
+        return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    }
+
+    getFCMServer(): any {
+        const filePath = path.join(this.fcmDir, "server.json");
+        if (!fs.existsSync(filePath)) return null;
+
+        return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    }
+
+    removeAttachment(name: string): void {
         try {
             fs.unlinkSync(path.join(this.attachmentsDir, name));
         } catch (e) {
@@ -42,7 +66,7 @@ export class FileSystem {
         }
     }
 
-    purgeAttachments() {
+    purgeAttachments(): void {
         const files = fs.readdirSync(this.attachmentsDir);
         files.forEach(file => {
             this.removeAttachment(file);

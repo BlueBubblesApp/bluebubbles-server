@@ -93,6 +93,22 @@ export class BlueBubbleServer {
             this.window.webContents.send("config-update", this.config);
             return this.config;
         });
+
+        ipcMain.handle("set-fcm-server", (event, args) => {
+            this.fs.saveFCMServer(args);
+        });
+
+        ipcMain.handle("set-fcm-client", (event, args) => {
+            this.fs.saveFCMClient(args);
+        });
+
+        ipcMain.handle("get-fcm-server", (event, args) => {
+            return this.fs.getFCMServer();
+        });
+
+        ipcMain.handle("get-fcm-client", (event, args) => {
+            return this.fs.getFCMClient();
+        });
     }
 
     startSockets() {
