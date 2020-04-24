@@ -14,13 +14,17 @@ export class FCMService {
     start() {
         // Do nothing if the config doesn't exist
         const serverConfig = this.fs.getFCMServer();
-        if (!serverConfig) return;
+        const clientConfig = this.fs.getFCMClient();
+        if (!serverConfig || !clientConfig) return;
         
         // If the app exists, close it
         if (this.app) this.app.delete();
 
         // Re-instantiate the app
-        this.app = admin.initializeApp(serverConfig);
+        this.app = admin.initializeApp({
+            credential: admin.credential.cert(serverConfig),
+            databaseURL: clientConfig.project_info.firebase_url
+        });
     }
 
     async sendNotification(devices: string[], data: any) {

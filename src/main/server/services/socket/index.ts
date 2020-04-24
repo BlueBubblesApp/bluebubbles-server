@@ -76,7 +76,7 @@ export class SocketService {
         };
 
         /**
-        * Add Device ID to
+        * Add Device ID to the database
         */
         socket.on("add-fcm-device-id", async (params, cb): Promise<void> => {
             if (!params?.deviceId)

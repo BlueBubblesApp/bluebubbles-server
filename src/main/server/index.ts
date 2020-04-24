@@ -138,7 +138,7 @@ export class BlueBubbleServer {
         if (this.socketService)
             this.socketService.socketServer.emit("new-server", this.ngrokServer);
 
-        this.sendNotification("new-server", this.ngrokServer);
+        await this.sendNotification("new-server", this.ngrokServer);
     }
 
     // eslint-disable-next-line class-methods-use-this
@@ -152,7 +152,7 @@ export class BlueBubbleServer {
             const devices = await this.db.getRepository(Device).find();
             if (!devices || devices.length === 0) return;
 
-            this.fcmService.sendNotification(devices.map(device => device.identifier), {
+            await this.fcmService.sendNotification(devices.map(device => device.identifier), {
                 type,
                 data
             });
@@ -186,7 +186,7 @@ export class BlueBubbleServer {
 
             // Emit it to the socket
             this.socketService.socketServer.emit("new-message", msg);
-            this.sendNotification("new-message", msg);
+            await this.sendNotification("new-message", msg);
         });
     }
 
@@ -221,6 +221,11 @@ export class BlueBubbleServer {
 
         ipcMain.handle("set-fcm-client", (event, args) => {
             this.fs.saveFCMClient(args);
+        });
+
+        ipcMain.handle("get-devices", async (event, args) => {
+            const devices = await this.db.getRepository(Device).find();
+            return devices;
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {

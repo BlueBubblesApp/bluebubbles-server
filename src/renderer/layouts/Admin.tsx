@@ -30,14 +30,16 @@ import IconButton from "@material-ui/core/IconButton";
 // Material UI Icons
 import MenuIcon from "@material-ui/icons/Menu";
 import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
+import DeviceIcon from "@material-ui/icons/DeviceHub";
 import HomeIcon from "@material-ui/icons/Home";
 import SettingsIcon from "@material-ui/icons/Settings";
 
 // Custom Components
 import Configuration from "@renderer/views/Configuration";
+import Devices from "@renderer/views/Devices";
+import Dashboard from "@renderer/views/Dashboard";
 
 // Helpers
-import logo from "@renderer/assets/img/bb-logo.png";
 import { Config } from "@renderer/variables/types";
 
 const CustomMuiTheme = createMuiTheme({
@@ -55,7 +57,7 @@ interface State {
     config: Config
 }
 
-class Dashboard extends React.Component<Props, State> {
+class AdminLayout extends React.Component<Props, State> {
     state: State = {
         open: false,
         config: null
@@ -63,7 +65,6 @@ class Dashboard extends React.Component<Props, State> {
 
     componentDidMount() {
         ipcRenderer.on("config-update", (event, arg) => {
-            console.log("GOT CONFIG UPDATE");
             console.log(arg)
             this.setState({
                 config: arg
@@ -141,6 +142,19 @@ class Dashboard extends React.Component<Props, State> {
                                 </ListItemIcon>
                                 <ListItemText primary="Welcome" />
                             </ListItem>
+                            <ListItem
+                                component={Link}
+                                to="/devices"
+                                button
+                                className={clsx(classes.drawer, {
+                                    [classes.listItemOpen]: open,
+                                    [classes.listItemClosed]: !open
+                                })}>
+                                <ListItemIcon>
+                                    <DeviceIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Devices" />
+                            </ListItem>
                         </List>
                         <Divider />
                         <List>
@@ -164,12 +178,11 @@ class Dashboard extends React.Component<Props, State> {
                             <Route path="/configuration">
                                 <Configuration config={config} />
                             </Route>
+                            <Route path="/devices">
+                                <Devices />
+                            </Route>
                             <Route path="/">
-                                <Typography
-                                    variant="h3"
-                                    style={{ fontWeight: 300 }}>
-                                    Welcome to the BlueBubble App!
-                                </Typography>
+                                <Dashboard />
                             </Route>
                         </Switch>
                     </section>
@@ -259,4 +272,4 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         }
     });
 
-export default withStyles(styles)(Dashboard);
+export default withStyles(styles)(AdminLayout);
