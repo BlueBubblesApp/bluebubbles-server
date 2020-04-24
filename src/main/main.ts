@@ -26,8 +26,8 @@ const createWindow = async () => {
     }
 
     win = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 1080,
+        height: 920,
         webPreferences: {
             nodeIntegration: true // Required in new electron version
         }

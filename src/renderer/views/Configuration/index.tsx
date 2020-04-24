@@ -8,10 +8,17 @@ import {
     withStyles,
     StyleRules
 } from "@material-ui/core/styles";
-import { Typography, Button } from "@material-ui/core";
 
 import { Config } from "@renderer/variables/types";
-import { TextField, LinearProgress } from "@material-ui/core";
+import {
+    TextField,
+    LinearProgress,
+    Typography,
+    Button,
+    IconButton
+} from "@material-ui/core";
+
+import { GetApp } from "@material-ui/icons";
 
 import Dropzone from "react-dropzone";
 import * as QRCode from "qrcode.react";
@@ -95,9 +102,27 @@ class Dashboard extends React.Component<Props, State> {
         reader.readAsText(acceptedFiles[0]);
     }
 
+    buildQrData = (data: string | null): string => {
+        if (!data) return "";
+
+        const jsonData = JSON.parse(data);
+        const output = [this.props.config?.server_address || ""];
+
+        output.push(jsonData.project_info.project_id);
+        output.push(jsonData.project_info.storage_bucket);
+        output.push(jsonData.client[0].api_key[0].current_key);
+        output.push(jsonData.project_info.firebase_url);
+        const client_id = jsonData.client[0].oauth_client[0].client_id;
+        output.push(client_id.substr(0, client_id.indexOf("-")));
+        output.push(jsonData.client[0].client_info.mobilesdk_app_id);
+
+        return JSON.stringify(output);
+    }
+
     render() {
         const { classes, config } = this.props;
-        console.log(config)
+        const { fcmClient, port, frequency, fcmServer } = this.state;
+        const qrData = this.buildQrData(fcmClient);
 
         return (
             <section className={classes.root}>
@@ -128,7 +153,7 @@ class Dashboard extends React.Component<Props, State> {
                             id="port"
                             label="Socket Port"
                             variant="outlined"
-                            value={this.state.port}
+                            value={port}
                             onChange={(e) => this.handleChange(e)}
                         />
                         <TextField
@@ -136,7 +161,7 @@ class Dashboard extends React.Component<Props, State> {
                             id="frequency"
                             className={classes.field}
                             label="Poll Frequency (ms)"
-                            value={this.state.frequency}
+                            value={frequency}
                             variant="outlined"
                             helperText="How often should we check for new messages?"
                             onChange={(e) => this.handleChange(e)}
@@ -164,15 +189,17 @@ class Dashboard extends React.Component<Props, State> {
                                     }
                                 >
                                     {({ getRootProps, getInputProps }) => (
-                                        <section className={classes.dropzone}>
-                                            <div {...getRootProps()}>
-                                                <input {...getInputProps()} />
-                                                <p className={classes.dzText}>
-                                                    Drag 'n' drop or click here
-                                                    to load your FCM service
-                                                    configuration
-                                                </p>
-                                            </div>
+                                        <section
+                                            {...getRootProps()}
+                                            className={classes.dropzone}
+                                        >
+                                            <input {...getInputProps()}></input>
+                                            <GetApp />
+                                            <span className={classes.dzText}>
+                                                Drag 'n' drop or click here to
+                                                load your FCM service
+                                                configuration
+                                            </span>
                                         </section>
                                     )}
                                 </Dropzone>
@@ -182,9 +209,7 @@ class Dashboard extends React.Component<Props, State> {
                                     className={classes.header}
                                 >
                                     Client Config Status:{" "}
-                                    {this.state.fcmClient
-                                        ? "Loaded"
-                                        : "Not Set"}
+                                    {fcmClient ? "Loaded" : "Not Set"}
                                 </Typography>
                                 <Dropzone
                                     onDrop={(acceptedFiles) =>
@@ -192,15 +217,17 @@ class Dashboard extends React.Component<Props, State> {
                                     }
                                 >
                                     {({ getRootProps, getInputProps }) => (
-                                        <section className={classes.dropzone}>
-                                            <div {...getRootProps()}>
-                                                <input {...getInputProps()} />
-                                                <p className={classes.dzText}>
-                                                    Drag 'n' drop or click here
-                                                    to load your FCM client
-                                                    configuration
-                                                </p>
-                                            </div>
+                                        <section
+                                            {...getRootProps()}
+                                            className={classes.dropzone}
+                                        >
+                                            <input {...getInputProps()}></input>
+                                            <GetApp />
+                                            <span className={classes.dzText}>
+                                                Drag 'n' drop or click here to
+                                                load your FCM service
+                                                configuration
+                                            </span>
                                         </section>
                                     )}
                                 </Dropzone>
@@ -211,19 +238,19 @@ class Dashboard extends React.Component<Props, State> {
                                     className={classes.header}
                                 >
                                     Client Config QRCode:{" "}
-                                    {this.state.fcmClient ? "Valid" : "Invalid"}
+                                    {qrData ? "Valid" : "Invalid"}
                                 </Typography>
-                                <QRCode
-                                    size={252}
-                                    value={this.state.fcmClient || ""}
-                                />
+                                <section className={classes.qrContainer}>
+                                    <QRCode size={252} value={qrData} />
+                                </section>
                             </section>
                         </section>
 
                         <br />
                         <Button
+                            className={classes.saveBtn}
                             onClick={() => this.saveConfig()}
-                            color="secondary"
+                            variant="outlined"
                         >
                             Save
                         </Button>
@@ -236,11 +263,9 @@ class Dashboard extends React.Component<Props, State> {
 
 const styles = (theme: Theme): StyleRules<string, {}> =>
     createStyles({
-        root: {
-
-        },
+        root: {},
         header: {
-            fontWeight: 300,
+            fontWeight: 400,
             marginBottom: "1em"
         },
         form: {
@@ -253,8 +278,12 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         },
         dropzone: {
             border: "1px solid grey",
-            borderRadius: "15px",
-            padding: "1em"
+            borderRadius: "10px",
+            padding: "1em",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center"
         },
         dzText: {
             textAlign: "center"
@@ -267,6 +296,13 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         },
         qrCode: {
             marginLeft: "1em"
+        },
+        qrContainer: {
+            padding: "0.5em 0.5em 0.2em 0.5em",
+            backgroundColor: "white"
+        },
+        saveBtn: {
+            marginTop: "1em"
         }
     });
 
