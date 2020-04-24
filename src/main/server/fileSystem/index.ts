@@ -20,7 +20,7 @@ export class FileSystem {
     setupDirectories(): void {
         if (!fs.existsSync(this.scriptDir)) fs.mkdirSync(this.scriptDir);
         if (!fs.existsSync(this.attachmentsDir)) fs.mkdirSync(this.attachmentsDir);
-        if (!fs.existsSync(this.fcmDir))fs.mkdirSync(this.fcmDir);
+        if (!fs.existsSync(this.fcmDir)) fs.mkdirSync(this.fcmDir);
     }
 
     setupScripts(): void {
@@ -48,7 +48,21 @@ export class FileSystem {
         const filePath = path.join(this.fcmDir, "client.json");
         if (!fs.existsSync(filePath)) return null;
 
-        return JSON.parse(fs.readFileSync(filePath, "utf8"));
+        //Sorry zach, I've literally never touched typescript so you can fix this later, I just want a basic implementation
+
+        var jsonData = JSON.parse(fs.readFileSync(filePath, "utf8"));
+        var arrData = [];
+        arrData.push(jsonData.project_info.project_id);
+        arrData.push(jsonData.project_info.storage_bucket);
+        arrData.push(jsonData.client[0].api_key[0].current_key);
+        arrData.push(jsonData.project_info.firebase_url);
+        var client_id = jsonData.client[0].oauth_client[0].client_id;
+        arrData.push(client_id.substr(0, client_id.indexOf('-')));
+        arrData.push(jsonData.client[0].client_info.mobilesdk_app_id);
+
+
+        console.log(arrData.toString());
+        return arrData;
     }
 
     getFCMServer(): any {

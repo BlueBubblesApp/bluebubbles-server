@@ -35,7 +35,7 @@ class Dashboard extends React.Component<Props, State> {
         fcmClient: null,
         fcmServer: null
     }
-    
+
     componentWillReceiveProps(nextProps: Props) {
         this.setState({
             port: String(nextProps.config?.socket_port || ""),
@@ -44,8 +44,10 @@ class Dashboard extends React.Component<Props, State> {
     }
 
     async componentDidMount() {
+        var fcmClientData = await ipcRenderer.invoke("get-fcm-client");
+        // fcmClientData.push(config?.server_address);
         this.setState({
-            fcmClient: JSON.stringify(await ipcRenderer.invoke("get-fcm-client")),
+            fcmClient: JSON.stringify(fcmClientData),
             fcmServer: JSON.stringify(await ipcRenderer.invoke("get-fcm-server"))
         })
     }
@@ -70,11 +72,12 @@ class Dashboard extends React.Component<Props, State> {
 
         reader.onabort = () => console.log("file reading was aborted");
         reader.onerror = () => console.log("file reading has failed");
-        reader.onload = () => {
+        reader.onload = async () => {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
             ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-            this.setState({ fcmClient: binaryStr });
+            //this is def not the correct way to do it but i just need to test, sowwy
+            this.setState({ fcmClient: JSON.stringify(await ipcRenderer.invoke("get-fcm-client")), });
         };
 
         reader.readAsText(acceptedFiles[0]);
@@ -108,127 +111,128 @@ class Dashboard extends React.Component<Props, State> {
                 {!config ? (
                     <LinearProgress />
                 ) : (
-                    <form
-                        className={classes.form}
-                        noValidate
-                        autoComplete="off"
-                    >
-                        <TextField
-                            required
-                            className={classes.field}
-                            id="server-address"
-                            label="Current Server Address"
-                            variant="outlined"
-                            value={config?.server_address}
-                            disabled
-                        />
-                        <TextField
-                            required
-                            className={classes.field}
-                            id="port"
-                            label="Socket Port"
-                            variant="outlined"
-                            value={this.state.port}
-                            onChange={(e) => this.handleChange(e)}
-                        />
-                        <TextField
-                            required
-                            id="frequency"
-                            className={classes.field}
-                            label="Poll Frequency (ms)"
-                            value={this.state.frequency}
-                            variant="outlined"
-                            helperText="How often should we check for new messages?"
-                            onChange={(e) => this.handleChange(e)}
-                        />
-                        <section className={classes.fcmConfig}>
-                            <section>
-                                <Typography
-                                    variant="h5"
-                                    className={classes.header}
-                                >
-                                    Google FCM Configurations
-                                </Typography>
-                                <Typography
-                                    variant="subtitle1"
-                                    className={classes.header}
-                                >
-                                    Service Config Status:{" "}
-                                    {this.state.fcmServer
-                                        ? "Loaded"
-                                        : "Not Set"}
-                                </Typography>
-                                <Dropzone
-                                    onDrop={(acceptedFiles) =>
-                                        this.handleServerFile(acceptedFiles)
-                                    }
-                                >
-                                    {({ getRootProps, getInputProps }) => (
-                                        <section className={classes.dropzone}>
-                                            <div {...getRootProps()}>
-                                                <input {...getInputProps()} />
-                                                <p className={classes.dzText}>
-                                                    Drag 'n' drop or click here
-                                                    to load your FCM service
-                                                    configuration
-                                                </p>
-                                            </div>
-                                        </section>
-                                    )}
-                                </Dropzone>
-                                <br />
-                                <Typography
-                                    variant="subtitle1"
-                                    className={classes.header}
-                                >
-                                    Client Config Status:{" "}
-                                    {this.state.fcmClient
-                                        ? "Loaded"
-                                        : "Not Set"}
-                                </Typography>
-                                <Dropzone
-                                    onDrop={(acceptedFiles) =>
-                                        this.handleClientFile(acceptedFiles)
-                                    }
-                                >
-                                    {({ getRootProps, getInputProps }) => (
-                                        <section className={classes.dropzone}>
-                                            <div {...getRootProps()}>
-                                                <input {...getInputProps()} />
-                                                <p className={classes.dzText}>
-                                                    Drag 'n' drop or click here
-                                                    to load your FCM client
-                                                    configuration
-                                                </p>
-                                            </div>
-                                        </section>
-                                    )}
-                                </Dropzone>
-                            </section>
-                            <section className={classes.qrCode}>
-                                <Typography
-                                    variant="subtitle1"
-                                    className={classes.header}
-                                >
-                                    Client Config QRCode:{" "}
-                                    {this.state.fcmClient ? "Valid" : "Invalid"}
-                                </Typography>
-                                <QRCode
-                                    size={252}
-                                    value={this.state.fcmClient || ""}
-                                />
-                            </section>
-                        </section>
-
-                        <br />
-                        <Button
-                            onClick={() => this.saveConfig()}
-                            color="secondary"
+                        <form
+                            className={classes.form}
+                            noValidate
+                            autoComplete="off"
                         >
-                            Save
+                            <TextField
+                                required
+                                className={classes.field}
+                                id="server-address"
+                                label="Current Server Address"
+                                variant="outlined"
+                                value={config?.server_address}
+                                disabled
+                            />
+                            <TextField
+                                required
+                                className={classes.field}
+                                id="port"
+                                label="Socket Port"
+                                variant="outlined"
+                                value={this.state.port}
+                                onChange={(e) => this.handleChange(e)}
+                            />
+                            <TextField
+                                required
+                                id="frequency"
+                                className={classes.field}
+                                label="Poll Frequency (ms)"
+                                value={this.state.frequency}
+                                variant="outlined"
+                                helperText="How often should we check for new messages?"
+                                onChange={(e) => this.handleChange(e)}
+                            />
+                            <section className={classes.fcmConfig}>
+                                <section>
+                                    <Typography
+                                        variant="h5"
+                                        className={classes.header}
+                                    >
+                                        Google FCM Configurations
+                                </Typography>
+                                    <Typography
+                                        variant="subtitle1"
+                                        className={classes.header}
+                                    >
+                                        Service Config Status:{" "}
+                                        {this.state.fcmServer
+                                            ? "Loaded"
+                                            : "Not Set"}
+                                    </Typography>
+                                    <Dropzone
+                                        onDrop={(acceptedFiles) =>
+                                            this.handleServerFile(acceptedFiles)
+                                        }
+                                    >
+                                        {({ getRootProps, getInputProps }) => (
+                                            <section className={classes.dropzone}>
+                                                <div {...getRootProps()}>
+                                                    <input {...getInputProps()} />
+                                                    <p className={classes.dzText}>
+                                                        Drag 'n' drop or click here
+                                                        to load your FCM service
+                                                        configuration
+                                                </p>
+                                                </div>
+                                            </section>
+                                        )}
+                                    </Dropzone>
+                                    <br />
+                                    <Typography
+                                        variant="subtitle1"
+                                        className={classes.header}
+                                    >
+                                        Client Config Status:{" "}
+                                        {this.state.fcmClient
+                                            ? "Loaded"
+                                            : "Not Set"}
+                                    </Typography>
+                                    <Dropzone
+                                        onDrop={(acceptedFiles) =>
+                                            this.handleClientFile(acceptedFiles)
+                                        }
+                                    >
+                                        {({ getRootProps, getInputProps }) => (
+                                            <section className={classes.dropzone}>
+                                                <div {...getRootProps()}>
+                                                    <input {...getInputProps()} />
+                                                    <p className={classes.dzText}>
+                                                        Drag 'n' drop or click here
+                                                        to load your FCM client
+                                                        configuration
+                                                </p>
+                                                </div>
+                                            </section>
+                                        )}
+                                    </Dropzone>
+                                </section>
+                                <section className={classes.qrCode}>
+                                    <Typography
+                                        variant="subtitle1"
+                                        className={classes.header}
+                                    >
+                                        Client Config QRCode:{" "}
+                                        {this.state.fcmClient ? "Valid" : "Invalid"}
+                                    </Typography>
+                                    <div style={{ padding: "10px 10px 10px 10px", backgroundColor: "white" }}
+                                    ><QRCode
+                                            size={252}
+                                            value={this.state.fcmClient || ""}
+                                        /></div>
+                                </section>
+                            </section>
+
+                            <br />
+                            <Button
+                                onClick={() => this.saveConfig()}
+                                color="secondary"
+                            >
+                                Save
                         </Button>
-                    </form>
-                )}
+                        </form>
+                    )}
             </section>
         );
     }
