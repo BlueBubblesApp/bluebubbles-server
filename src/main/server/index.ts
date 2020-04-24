@@ -10,7 +10,7 @@ import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_SOCKET_PORT } from "@server/constant
 import { DatabaseRepository } from "@server/api/imessage";
 import { MessageListener } from "@server/api/imessage/listeners/messageListener";
 import { Message } from "@server/api/imessage/entity/Message";
-import { sendMessage, createChat } from "@server/helpers/actions";
+import { ActionHandler } from "@server/helpers/actions";
 import { server } from "@renderer/variables/general";
 
 export class BlueBubbleServer {
@@ -28,6 +28,8 @@ export class BlueBubbleServer {
 
     fs: FileSystem;
 
+    actionHandler: ActionHandler;
+
     constructor(window: BrowserWindow) {
         this.window = window;
         this.db = null;
@@ -36,6 +38,7 @@ export class BlueBubbleServer {
         this.ngrokServer = null;
         this.config = {};
         this.fs = null;
+        this.actionHandler = null;
     }
 
     async setup(): Promise<void> {
@@ -51,6 +54,8 @@ export class BlueBubbleServer {
 
         await this.connectToNgrok();
         await this.setupMessageRepo();
+
+        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo);
     }
 
     startChatListener() {
@@ -237,7 +242,7 @@ export class BlueBubbleServer {
                     return;
                 }
 
-                await sendMessage(this.fs, chatGuid, message, params?.attachmentName, params?.attachment);
+                await this.actionHandler.sendMessage(chatGuid, message, params?.attachmentName, params?.attachment);
             });
 
             /**
@@ -260,7 +265,7 @@ export class BlueBubbleServer {
                     return;
                 }
 
-                const chatGuid = await createChat(this.fs, participants);
+                const chatGuid = await this.actionHandler.createChat(this.fs, participants);
 
                 if (send_response) send_response(chatGuid)
                 else socket.emit("new-chat", chatGuid);
