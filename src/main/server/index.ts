@@ -152,9 +152,11 @@ export class BlueBubbleServer {
             const devices = await this.db.getRepository(Device).find();
             if (!devices || devices.length === 0) return;
 
+            const notifData = JSON.stringify(data);
+            console.log(notifData);
             await this.fcmService.sendNotification(devices.map(device => device.identifier), {
                 type,
-                data
+                data: notifData
             });
         }
     }
@@ -212,6 +214,21 @@ export class BlueBubbleServer {
 
             this.window.webContents.send("config-update", this.config);
             return this.config;
+        });
+
+        ipcMain.handle("get-message-count", async (event, args) => {
+            const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before);
+            return count;
+        });
+
+        ipcMain.handle("get-group-message-counts", async (event, args) => {
+            const count = await this.iMessageRepo.getChatMessageCounts("group");
+            return count;
+        });
+
+        ipcMain.handle("get-individual-message-counts", async (event, args) => {
+            const count = await this.iMessageRepo.getChatMessageCounts("individual");
+            return count;
         });
 
         ipcMain.handle("set-fcm-server", (event, args) => {

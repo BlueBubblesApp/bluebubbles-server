@@ -128,4 +128,72 @@ export class DatabaseRepository {
         const messages = await query.getMany();
         return messages;
     }
+
+    /**
+     * Gets all messages associated with a chat
+     *
+     * @param chat The chat to get the messages from
+     * @param offset The offset to start getting the messages from
+     * @param limit The max number of messages to return
+     * @param after The earliest date to get messages from
+     * @param before The latest date to get messages from
+     */
+    async getMessageCount(
+        after?: Date,
+        before?: Date
+    ) {
+        // Get messages with sender and the chat it's from
+        const query = this.db
+            .getRepository(Message)
+            .createQueryBuilder("message")
+
+        // Add default WHERE clauses
+        query
+            .andWhere("message.service == 'iMessage'")
+            .andWhere("message.text IS NOT NULL")
+            .andWhere("associated_message_type == 0");
+
+        // Add date restraints
+        if (after)
+            query.andWhere("message.date >= :after", {
+                after: convertDateTo2001Time(after)
+            });
+        if (before)
+            query.andWhere("message.date < :before", {
+                before: convertDateTo2001Time(before)
+            });
+
+        // Add pagination params
+        query.orderBy("message.date", "DESC");
+
+        const count = await query.getCount();
+        return count;
+    }
+
+    /**
+     * Gets all messages associated with a chat
+     *
+     * @param chat The chat to get the messages from
+     * @param offset The offset to start getting the messages from
+     * @param limit The max number of messages to return
+     * @param after The earliest date to get messages from
+     * @param before The latest date to get messages from
+     */
+    async getChatMessageCounts(chatStyle: "group" | "individual") {
+        // Get messages with sender and the chat it's from
+        const result = await this.db.getRepository(Chat).query(
+            `SELECT
+                chat.chat_identifier AS chat_identifier,
+                chat.display_name AS group_name,
+                COUNT(message.ROWID) AS message_count
+            FROM chat
+            JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
+            JOIN message ON message.ROWID = cmj.message_id
+            WHERE chat.style = ?
+            GROUP BY chat.guid;`,
+            [(chatStyle === "group" ? 43 : 45)]
+        );
+
+        return result;
+    }
 }
