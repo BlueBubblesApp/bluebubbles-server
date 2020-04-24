@@ -14,20 +14,53 @@ import {
     LinearProgress,
     Typography,
     Button,
-    IconButton
+    IconButton,
+    Icon,
+    Table
 } from "@material-ui/core";
+
+import {
+    Message,
+    DateRange,
+    Store,
+    LocalOffer,
+    Accessibility,
+    Update,
+    ArrowUpward,
+    AccessTime,
+    BugReport,
+    Code,
+    Cloud,
+    People,
+    Image,
+    PhotoAlbum,
+    RateReview
+} from "@material-ui/icons";
+import CardIcon from "@renderer/components/Card/CardIcon";
+import CardFooter from "@renderer/components/Card/CardFooter";
+import Card from "@renderer/components/Card/Card";
+import CardHeader from "@renderer/components/Card/CardHeader";
+import CardBody from "@renderer/components/Card/CardBody";
+import Danger from "@renderer/components/Typography/Danger";
+import { Warning } from "@material-ui/icons";
+import GridContainer from "@renderer/components/Grid/GridContainer";
+import GridItem from "@renderer/components/Grid/GridItem";
+import { dailySalesChart, emailsSubscriptionChart, completedTasksChart } from "@renderer/variables/charts";
+import CustomTabs from "@renderer/components/CustomTabs/CustomTabs";
+import Tasks from "@renderer/components/Tasks/Tasks";
+import { bugs, website, server } from "@renderer/variables/general";
 
 interface Props {
     classes: any;
 }
 
 interface State {
-    devices: any[];
+
 }
 
 class Dashboard extends React.Component<Props, State> {
     state: State = {
-        devices: []
+
     };
 
     async componentDidMount() {
@@ -42,17 +75,175 @@ class Dashboard extends React.Component<Props, State> {
 
     render() {
         const { classes } = this.props;
-        const { devices } = this.state;
 
         return (
             <section className={classes.root}>
-                <Typography variant="h3">
-                    Welcome!
-                </Typography>
+                <Typography variant="h3">Welcome!</Typography>
                 <Typography variant="subtitle2">
-                    This is the BlueBubble Dashboard. You'll be to see the status of your server,
-                    as well as some cool statistics about your iMessages!
+                    This is the BlueBubble Dashboard. You'll be to see the
+                    status of your server, as well as some cool statistics about
+                    your iMessages!
                 </Typography>
+                <br />
+                <Typography variant="h4">Stats</Typography>
+                <Typography variant="subtitle2">
+                    Don't worry, these stats do not leave your computer! They
+                    are derived from the chat database that iMessage uses
+                </Typography>
+                <section className={classes.widgetContainer}>
+                    <GridContainer>
+                        <GridItem xs={12} sm={6} md={4}>
+                            <Card>
+                                <CardHeader
+                                    color="warning"
+                                    stats={true}
+                                    icon={true}
+                                >
+                                    <CardIcon color="warning">
+                                        <Message />
+                                    </CardIcon>
+                                    <p className={classes.cardCategory}>
+                                        Messages
+                                    </p>
+                                    <h3 className={classes.cardTitle}>
+                                        1000000
+                                    </h3>
+                                </CardHeader>
+                                <CardFooter stats={true}>
+                                    <div className={classes.stats}>
+                                        <DateRange />
+                                        All Time
+                                    </div>
+                                </CardFooter>
+                            </Card>
+                        </GridItem>
+                        <GridItem xs={12} sm={6} md={4}>
+                            <Card>
+                                <CardHeader
+                                    color="info"
+                                    stats={true}
+                                    icon={true}
+                                >
+                                    <CardIcon color="info">
+                                        <Message />
+                                    </CardIcon>
+                                    <p className={classes.cardCategory}>
+                                        Recent Messages
+                                    </p>
+                                    <h3 className={classes.cardTitle}>123</h3>
+                                </CardHeader>
+                                <CardFooter stats={true}>
+                                    <div className={classes.stats}>
+                                        <DateRange />
+                                        Last 24 Hours
+                                    </div>
+                                </CardFooter>
+                            </Card>
+                        </GridItem>
+                        <GridItem xs={12} sm={6} md={4}>
+                            <Card>
+                                <CardHeader
+                                    color="danger"
+                                    stats={true}
+                                    icon={true}
+                                >
+                                    <CardIcon color="danger">
+                                        <People />
+                                    </CardIcon>
+                                    <p className={classes.cardCategory}>
+                                        Top Group
+                                    </p>
+                                    <h3 className={classes.cardTitle}>
+                                        Chat #1
+                                    </h3>
+                                </CardHeader>
+                                <CardFooter stats={true}>
+                                    <div className={classes.stats}>
+                                        <Update />
+                                        10,234 Messages
+                                    </div>
+                                </CardFooter>
+                            </Card>
+                        </GridItem>
+                    </GridContainer>
+                    <GridContainer>
+                        <GridItem xs={12} sm={6} md={4}>
+                            <Card>
+                                <CardHeader
+                                    color="warning"
+                                    stats={true}
+                                    icon={true}
+                                >
+                                    <CardIcon color="warning">
+                                        <Accessibility />
+                                    </CardIcon>
+                                    <p className={classes.cardCategory}>
+                                        Best Friend
+                                    </p>
+                                    <h3 className={classes.cardTitle}>
+                                        Tiger King
+                                    </h3>
+                                </CardHeader>
+                                <CardFooter stats={true}>
+                                    <div className={classes.stats}>
+                                        <Update />
+                                        2,345 Messages
+                                    </div>
+                                </CardFooter>
+                            </Card>
+                        </GridItem>
+                        <GridItem xs={12} sm={6} md={4}>
+                            <Card>
+                                <CardHeader
+                                    color="warning"
+                                    stats={true}
+                                    icon={true}
+                                >
+                                    <CardIcon color="info">
+                                        <PhotoAlbum />
+                                    </CardIcon>
+                                    <p className={classes.cardCategory}>
+                                        Media Gurus
+                                    </p>
+                                    <h3 className={classes.cardTitle}>
+                                        What do you Meme
+                                    </h3>
+                                </CardHeader>
+                                <CardFooter stats={true}>
+                                    <div className={classes.stats}>
+                                        <Image />
+                                        145 Images Shared
+                                    </div>
+                                </CardFooter>
+                            </Card>
+                        </GridItem>
+                        <GridItem xs={12} sm={6} md={4}>
+                            <Card>
+                                <CardHeader
+                                    color="danger"
+                                    stats={true}
+                                    icon={true}
+                                >
+                                    <CardIcon color="danger">
+                                        <RateReview />
+                                    </CardIcon>
+                                    <p className={classes.cardCategory}>
+                                        Textaholic
+                                    </p>
+                                    <h3 className={classes.cardTitle}>
+                                        435
+                                    </h3>
+                                </CardHeader>
+                                <CardFooter stats={true}>
+                                    <div className={classes.stats}>
+                                        <Update />
+                                        Messages you sent today!
+                                    </div>
+                                </CardFooter>
+                            </Card>
+                        </GridItem>
+                    </GridContainer>
+                </section>
             </section>
         );
     }
@@ -64,6 +255,35 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         header: {
             fontWeight: 400,
             marginBottom: "1em"
+        },
+        widgetContainer: {
+            marginTop: "1em"
+        },
+        cardCategory: {
+            color: "grey",
+            margin: "0",
+            fontSize: "16px",
+            marginTop: "0",
+            paddingTop: "10px",
+            marginBottom: "0"
+        },
+        cardTitle: {
+            color: "grey",
+            marginTop: "0px",
+            minHeight: "auto",
+            fontWeight: 400,
+            fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
+            marginBottom: "3px",
+            textDecoration: "none",
+            fontSize: "30px",
+            "& small": {
+                color: "grey",
+                fontWeight: 400,
+                lineHeight: 1
+            }
+        },
+        statCard: {
+            width: "250px"
         }
     });
 
