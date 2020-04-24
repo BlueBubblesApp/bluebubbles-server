@@ -1,4 +1,3 @@
-/* eslint-disable max-classes-per-file */
 import {
     Entity,
     PrimaryGeneratedColumn,
@@ -11,8 +10,9 @@ import {
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/api/imessage/transformers/MessageTypeTransformer";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Chat } from "@server/api/imessage/entity/Chat";
+import { MessageResponse } from "@server/helpers/dataTypes";
+import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
+import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
 
 @Entity("message")
 export class Message {
@@ -360,7 +360,7 @@ export class Message {
     payloadData: Blob;
 
     @Column({ name: "expressive_send_style_id", type: "text", nullable: true })
-    expressive_send_style_id: string;
+    expressiveSendStyleId: string;
 
     @Column({
         name: "associated_message_range_location",
@@ -386,4 +386,38 @@ export class Message {
 
     @Column({ name: "message_summary_info", type: "blob", nullable: true })
     messageSummaryInfo: Blob;
+}
+
+export const getMessageResponse = (tableData: Message): MessageResponse => {
+    return {
+        guid: tableData.guid,
+        text: tableData.text,
+        from: tableData.from ? getHandleResponse(tableData.from) : null,
+        chats: tableData.chats
+            ? tableData.chats.map((item) => getChatResponse(item))
+            : [],
+        subject: tableData.subject,
+        country: tableData.country,
+        error: tableData.error,
+        dateCreated: tableData.dateCreated,
+        dateRead: tableData.dateRead,
+        dateDelivered: tableData.dateDelivered,
+        isFromMe: tableData.isFromMe,
+        isDelayed: tableData.isDelayed,
+        isAutoReply: tableData.isAutoReply,
+        isSystemMessage: tableData.isSystemMessage,
+        isServiceMessage: tableData.isServiceMessage,
+        isForward: tableData.isForward,
+        isArchived: tableData.isArchived,
+        cacheRoomnames: tableData.cacheRoomnames,
+        isAudioMessage: tableData.isAudioMessage,
+        datePlayed: tableData.datePlayed,
+        itemType: tableData.itemType,
+        groupTitle: tableData.groupTitle,
+        isExpired: tableData.isExpirable,
+        associatedMessageGuid: tableData.associatedMessageGuid,
+        associatedMessageType: tableData.associatedMessageType,
+        expressiveSendStyleId: tableData.expressiveSendStyleId,
+        timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
+    };
 }

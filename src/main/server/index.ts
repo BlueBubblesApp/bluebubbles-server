@@ -10,7 +10,7 @@ import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_SOCKET_PORT } from "@server/constant
 import { DatabaseRepository } from "@server/api/imessage";
 import { MessageListener } from "@server/api/imessage/listeners/messageListener";
 import { Message } from "@server/api/imessage/entity/Message";
-import { sendMessage, createChat } from "@server/api/imessage/helpers/actions";
+import { sendMessage, createChat } from "@server/helpers/actions";
 import { server } from "@renderer/variables/general";
 
 export class BlueBubbleServer {

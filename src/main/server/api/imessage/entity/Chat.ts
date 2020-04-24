@@ -1,4 +1,3 @@
-/* eslint-disable max-classes-per-file */
 import {
     Entity,
     PrimaryGeneratedColumn,
@@ -7,9 +6,9 @@ import {
     JoinTable
 } from "typeorm";
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Message } from "@server/api/imessage/entity/Message";
+import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
+import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
+import { ChatResponse } from "@server/helpers/dataTypes";
 
 @Entity("chat")
 export class Chat {
@@ -30,7 +29,7 @@ export class Chat {
         joinColumns: [{ name: "chat_id" }],
         inverseJoinColumns: [{ name: "message_id" }]
     })
-    messages: typeof Message[];
+    messages: Message[];
 
     @Column({ type: "text", nullable: false })
     guid: string;
@@ -92,3 +91,20 @@ export class Chat {
     })
     successfulQuery: boolean;
 }
+
+export const getChatResponse = (tableData: Chat): ChatResponse => {
+    return {
+        guid: tableData.guid,
+        participants: tableData.participants
+            ? tableData.participants.map((item) => getHandleResponse(item))
+            : [],
+        messages: tableData.messages
+            ? tableData.messages.map((item) => getMessageResponse(item))
+            : [],
+        style: tableData.style,
+        chatIdentifier: tableData.chatIdentifier,
+        isArchived: tableData.isArchived,
+        displayName: tableData.displayName,
+        groupId: tableData.groupId
+    };
+};
