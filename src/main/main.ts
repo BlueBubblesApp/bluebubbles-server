@@ -61,10 +61,7 @@ const createWindow = async () => {
      * Create a connection to the config database and create the sockets
      */
     const api = new BlueBubbleServer(win);
-    await api.setup();
-    api.startSockets();
-    api.startChatListener();
-    api.startIpcListener();
+    await api.start();
     
     // Tell the DOM we have a config update
     win.webContents.send("config-update", api.config);

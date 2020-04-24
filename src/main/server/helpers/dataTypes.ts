@@ -1,16 +1,18 @@
 export type ValidStatuses = 200 | 201 | 400 | 401 | 403 | 404 | 500;
 
 export type Error = {
-    type: string;
+    type: ErrorTypes;
     message: string;
 };
 
+export type ResponseData = MessageResponse | HandleResponse | ChatResponse | (MessageResponse | HandleResponse | ChatResponse)[] | null;
+
 export type ResponseFormat = {
     status: ValidStatuses;
-    message: ResponseMessages;
+    message: ResponseMessages | string;
     error?: Error;
     // Single or list of database objects, or null
-    data: MessageResponse | HandleResponse | ChatResponse | (MessageResponse | HandleResponse | ChatResponse)[] | null
+    data?: ResponseData;
 };
 
 export type MessageResponse = {
@@ -68,8 +70,14 @@ export enum ResponseMessages {
     SERVER_ERROR = 'Server Error',
     UNAUTHORIZED = 'Unauthorized',
     FORBIDDEN = 'Forbidden',
-    VALIDATION_ERROR = 'Validation Error',
     NO_DATA = 'No Data'
 };
 
+export enum ErrorTypes {
+    SERVER_ERROR = "Server Error",
+    DATABSE_ERROR = "Database Error",
+    IMESSAGE_ERROR = "iMessage Error",
+    SOCKET_ERROR = "Socket Error",
+    VALIDATION_ERROR = "Validation Error"
+};
 

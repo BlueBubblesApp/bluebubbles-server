@@ -1,6 +1,5 @@
 import { app, ipcMain, BrowserWindow } from "electron";
-import { createConnection, Connection, Repository } from "typeorm";
-import * as io from "socket.io";
+import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
 
 import { Config } from "@server/entity/Config";
@@ -9,36 +8,43 @@ import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_SOCKET_PORT } from "@server/constant
 
 import { DatabaseRepository } from "@server/api/imessage";
 import { MessageListener } from "@server/api/imessage/listeners/messageListener";
-import { Message } from "@server/api/imessage/entity/Message";
-import { ActionHandler } from "@server/helpers/actions";
-import { server } from "@renderer/variables/general";
+import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
+
+// Service Imports
+import { SocketService, FCMService } from "@server/services";
+import { Device } from "./entity/Device";
 
 export class BlueBubbleServer {
     window: BrowserWindow;
     
-    db: Repository<Config>;
+    db: Connection;
 
     iMessageRepo: DatabaseRepository;
 
     ngrokServer: string;
 
-    socketServer: io.Server;
+    socketService: SocketService;
+
+    fcmService: FCMService;
 
     config: { [key: string]: any };
 
     fs: FileSystem;
 
-    actionHandler: ActionHandler;
-
     constructor(window: BrowserWindow) {
         this.window = window;
+
+        // Databases
         this.db = null;
         this.iMessageRepo = null;
-        this.socketServer = null;
+        
+        // Other helpers
         this.ngrokServer = null;
         this.config = {};
         this.fs = null;
-        this.actionHandler = null;
+
+        // Services
+        this.socketService = null;
     }
 
     async setup(): Promise<void> {
@@ -47,253 +53,44 @@ export class BlueBubbleServer {
         this.setupFileSystem();
 
         // Load DB
-        const cfg = await this.db.find();
+        const cfg = await this.db.getRepository(Config).find();
         cfg.forEach((item) => {
             this.config[item.name] = item.value;
         });
 
-        await this.connectToNgrok();
         await this.setupMessageRepo();
 
-        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo);
-    }
-
-    startChatListener() {
-        // Create a listener to listen for new messages
-        const listener = new MessageListener(
+        // Setup services
+        this.socketService = new SocketService(
+            this.db,
             this.iMessageRepo,
-            Number(this.config.poll_frequency)
+            this.fs,
+            this.config.socket_port
         );
-        listener.start();
-        listener.on("new-entry", (item: Message) => {
-            console.log(
-                `New message from ${item.from.id}, sent to ${item.chats[0].chatIdentifier}`
-            );
 
-            this.socketServer.emit("new-message", item);
-        });
+        this.fcmService = new FCMService(this.fs);
+
+        // Order matters
+        await this.connectToNgrok();
     }
 
-    startIpcListener() {
-        ipcMain.handle("set-config", (event, args) => {
-            Object.keys(args).forEach(async (item) => {
-                if (this.config[item] && this.config[item] !== args[item]) {
-                    this.config[item] = args[item];
+    async start(): Promise<void> {
+        await this.setup();
 
-                    // If the socket port changed, disconnect and reconnect
-                    if (item === "socket_port") {
-                        await this.disconnectFromNgrok();
-                        await this.connectToNgrok();
-                        await this.socketServer.close();
-                        this.startSockets();
-                    }
-                }
-                // Update in class
-                if (this.config[item]) 
-                
-                // Update in DB
-                await this.db.update({ name: item }, { value: args[item] })
-            })
-
-            this.window.webContents.send("config-update", this.config);
-            return this.config;
-        });
-
-        ipcMain.handle("set-fcm-server", (event, args) => {
-            this.fs.saveFCMServer(args);
-        });
-
-        ipcMain.handle("set-fcm-client", (event, args) => {
-            this.fs.saveFCMClient(args);
-        });
-
-        ipcMain.handle("get-fcm-server", (event, args) => {
-            return this.fs.getFCMServer();
-        });
-
-        ipcMain.handle("get-fcm-client", (event, args) => {
-            return this.fs.getFCMClient();
-        });
-    }
-
-    startSockets() {
-        this.socketServer = io(this.config.socket_port);
-
-        /**
-        * Handle all other data requests
-        */
-        this.socketServer.on("connection", async (socket) => {
-            console.log("client connected");
-
-            socket.use((packet, next) => {
-                try {
-                    next()
-                } catch (ex) {
-                    console.error(ex);
-                    socket.error(ex);
-                }
-            });
-
-            /**
-            * Get all chats
-            */
-            socket.on("get-chats", async (params, send_response) => {
-                const chats = await this.iMessageRepo.getChats(
-                    null,
-                    true
-                );
-
-                if (send_response) send_response(chats);
-                else socket.emit("chats", chats);
-            });
-
-            /**
-            * Get messages in a chat
-            */
-            socket.on(
-                "get-chat-messages",
-                async (params, send_response) => {
-                    if (!params?.identifier)
-                        if (send_response)
-                            send_response(null, "ERROR: No Identifier");
-                        else
-                            socket.emit("error", "ERROR: No Identifier");
-
-                    const chats = await this.iMessageRepo.getChats(
-                        params?.identifier,
-                        true
-                    );
-                    const messages = await this.iMessageRepo.getMessages(
-                        chats[0],
-                        params?.offset || 0,
-                        params?.limit || 100,
-                        params?.after,
-                        params?.before
-                    );
-
-                    if (send_response) send_response(messages);
-                    else socket.emit("messages", messages);
-                }
-            );
-
-            /**
-            * Get last message in a chat
-            */
-            socket.on(
-                "get-last-chat-message",
-                async (params, send_response) => {
-                    if (!params?.identifier)
-                        if (send_response)
-                            send_response(null, "ERROR: No Identifier");
-                        else
-                            socket.emit("error", "ERROR: No Identifier");
-
-                    const chats = await this.iMessageRepo.getChats(
-                        params?.identifier,
-                        true
-                    );
-                    const messages = await this.iMessageRepo.getMessages(
-                        chats[0],
-                        0,
-                        1
-                    );
-
-                    if (send_response) send_response(messages);
-                    else socket.emit("last-chat-message", messages);
-                }
-            );
-
-            // /**
-            //  * Get participants in a chat
-            //  */
-            socket.on(
-                "get-participants",
-                async (params, send_response) => {
-                    if (!params?.identifier)
-                        if (send_response)
-                            send_response("ERROR: No Identifier");
-                        else
-                            socket.emit("error", "ERROR: No Identifier");
-
-                    const chats = await this.iMessageRepo.getChats(
-                        params?.identifier,
-                        true
-                    );
-
-                    if (send_response)
-                        send_response(chats[0].participants);
-                    else
-                        socket.emit(
-                            "participants",
-                            chats[0].participants
-                        );
-                }
-            );
-
-            /**
-            * Send message
-            */
-            socket.on("send-message", async (params, send_response): Promise<void> => {
-                const chatGuid = params?.guid;
-                const message = params?.message;
-
-                if (!chatGuid || !message) {
-                    socket.emit("error", "No chat GUID or message provided!");
-                    return;
-                }
-
-                await this.actionHandler.sendMessage(chatGuid, message, params?.attachmentName, params?.attachment);
-            });
-
-            /**
-            * Send message
-            */
-            socket.on("start-chat", async (params, send_response): Promise<void> => {
-                let participants = params?.participants;
-
-                if (!participants || participants.length === 0) {
-                    socket.error("No participants specified");
-                    return;
-                }
-
-                if (typeof participants === "string") {
-                    participants = [participants];
-                }
-
-                if (!Array.isArray(participants)) {
-                    socket.error("Participants must be an array!");
-                    return;
-                }
-
-                const chatGuid = await this.actionHandler.createChat(this.fs, participants);
-
-                if (send_response) send_response(chatGuid)
-                else socket.emit("new-chat", chatGuid);
-            });
-
-            // /**
-            //  * Send reaction
-            //  */
-            socket.on("send-reaction", async (params, send_response) => {
-                console.warn("Not Implemented: Reaction send request");
-            });
-
-            socket.on("disconnect", () => {
-                console.log("Got disconnect!");
-            });
-        });
+        this.socketService.start();
+        this.fcmService.start();
+        this.startChatListener();
+        this.startIpcListener();
     }
 
     async initializeDatabase(): Promise<void> {
-        const connection = await createConnection({
+        this.db = await createConnection({
             type: "sqlite",
             database: `${app.getPath("userData")}/config.db`,
-            entities: [Config],
+            entities: [Config, Device],
             synchronize: true,
             logging: false
         });
-
-        this.db = connection.getRepository(Config);
     }
 
     setupFileSystem(): void {
@@ -302,7 +99,7 @@ export class BlueBubbleServer {
     }
 
     async setupDefaults(): Promise<void> {
-        const frequency = await this.db.findOne({
+        const frequency = await this.db.getRepository(Config).findOne({
             name: "poll_frequency"
         });
         if (!frequency)
@@ -311,13 +108,13 @@ export class BlueBubbleServer {
                 DEFAULT_POLL_FREQUENCY_MS
             );
 
-        const socketPort = await this.db.findOne({
+        const socketPort = await this.db.getRepository(Config).findOne({
             name: "socket_port"
         });
         if (!socketPort)
             await this.addConfigItem("socket_port", DEFAULT_SOCKET_PORT);
 
-        const serverAddress = await this.db.findOne({
+        const serverAddress = await this.db.getRepository(Config).findOne({
             name: "server_address"
         });
         if (!serverAddress)
@@ -332,15 +129,34 @@ export class BlueBubbleServer {
     async connectToNgrok(): Promise<void> {
         this.ngrokServer = await ngrok.connect(this.config.socket_port);
         this.config.server_address = this.ngrokServer;
-        await this.db.update(
+        await this.db.getRepository(Config).update(
             { name: "server_address" },
             { value: this.ngrokServer }
         );
+
+        // Emit this over the socket
+        if (this.socketService)
+            this.socketService.socketServer.emit("new-server", this.ngrokServer);
+
+        this.sendNotification("new-server", this.ngrokServer);
     }
 
     // eslint-disable-next-line class-methods-use-this
     async disconnectFromNgrok(): Promise<void> {
         await ngrok.disconnect();
+    }
+
+    async sendNotification(type: string, data: any) {
+        // Send notification to devices
+        if (this.fcmService.app) {
+            const devices = await this.db.getRepository(Device).find();
+            if (!devices || devices.length === 0) return;
+
+            this.fcmService.sendNotification(devices.map(device => device.identifier), {
+                type,
+                data
+            });
+        }
     }
 
     async addConfigItem(
@@ -350,7 +166,69 @@ export class BlueBubbleServer {
         const item = new Config();
         item.name = name;
         item.value = String(value);
-        await this.db.save(item);
+        await this.db.getRepository(Config).save(item);
         return item;
+    }
+
+    startChatListener() {
+        // Create a listener to listen for new messages
+        const listener = new MessageListener(
+            this.iMessageRepo,
+            Number(this.config.poll_frequency)
+        );
+        listener.start();
+        listener.on("new-entry", async (item: Message) => {
+            console.log(
+                `New message from ${item.from.id}, sent to ${item.chats[0].chatIdentifier}`
+            );
+
+            const msg = getMessageResponse(item);
+
+            // Emit it to the socket
+            this.socketService.socketServer.emit("new-message", msg);
+            this.sendNotification("new-message", msg);
+        });
+    }
+
+    startIpcListener() {
+        ipcMain.handle("set-config", (event, args) => {
+            Object.keys(args).forEach(async (item) => {
+                if (this.config[item] && this.config[item] !== args[item]) {
+                    this.config[item] = args[item];
+
+                    // If the socket port changed, disconnect and reconnect
+                    if (item === "socket_port") {
+                        await this.disconnectFromNgrok();
+                        await this.connectToNgrok();
+                        await this.socketService.restart(args[item]);
+                    }
+                }
+                // Update in class
+                if (this.config[item]) 
+                
+                // Update in DB
+                await this.db.getRepository(Config).update({ name: item }, { value: args[item] })
+            })
+
+            this.window.webContents.send("config-update", this.config);
+            return this.config;
+        });
+
+        ipcMain.handle("set-fcm-server", (event, args) => {
+            this.fs.saveFCMServer(args);
+            this.fcmService.start();
+        });
+
+        ipcMain.handle("set-fcm-client", (event, args) => {
+            this.fs.saveFCMClient(args);
+        });
+
+        ipcMain.handle("get-fcm-server", (event, args) => {
+            return this.fs.getFCMServer();
+        });
+
+        ipcMain.handle("get-fcm-client", (event, args) => {
+            return this.fs.getFCMClient();
+        });
     }
 }
