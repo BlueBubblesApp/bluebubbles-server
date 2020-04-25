@@ -38,7 +38,7 @@ export class DatabaseRepository {
      * @param identifier A specific chat identifier to get
      * @param withParticipants Whether to include the participants or not
      */
-    async getChats(identifier?: string, withParticipants = true) {
+    async getChats(chatGuid?: string, withParticipants = true) {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         if (withParticipants)
@@ -46,11 +46,8 @@ export class DatabaseRepository {
 
         // Add default WHERE clauses
         query.andWhere("chat.service_name == 'iMessage'");
-        if (identifier)
-            query.andWhere("chat.chat_identifier == :identifier", {
-                identifier
-            });
-        console.log(query.getSql());
+        if (chatGuid)
+            query.andWhere("chat.guid == :guid", { guid: chatGuid });
 
         const chats = await query.getMany();
         return chats;
@@ -85,7 +82,7 @@ export class DatabaseRepository {
      * @param before The latest date to get messages from
      */
     async getMessages(
-        chat: Chat,
+        chatGuid: string,
         offset = 0,
         limit = 100,
         after?: Date,
@@ -99,11 +96,11 @@ export class DatabaseRepository {
             .leftJoinAndSelect(
                 "message.chats",
                 "chat",
-                `message.ROWID == message_id AND chat.ROWID == chat_id${
-                    chat ? " AND chat.chat_identifier == :identifier" : ""
-                }`,
-                { identifier: chat?.chatIdentifier || null }
+                "message.ROWID == message_id AND chat.ROWID == chat_id"
             );
+
+        if (chatGuid)
+            query.andWhere("chat.guid = :guid", { guid: chatGuid });
 
         // Add default WHERE clauses
         query

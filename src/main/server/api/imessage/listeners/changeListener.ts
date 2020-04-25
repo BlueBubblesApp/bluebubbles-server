@@ -60,8 +60,10 @@ export abstract class ChangeListener extends EventEmitter {
 
         try {
             const beforeCheck = new Date();
-            await this.getEntries();
-            this.lastCheck = beforeCheck;
+            const count = await this.getEntries();
+
+            // Only set last check if messages were found
+            if (count > 0) this.lastCheck = beforeCheck;
         } catch (err) {
             this.stopped = true;
             super.emit("error", err);
@@ -71,7 +73,7 @@ export abstract class ChangeListener extends EventEmitter {
         setTimeout(() => this.checkForNewEntries(), this.pollFrequency);
     }
 
-    abstract getEntries(): void;
+    abstract async getEntries(): Promise<number>;
 
     abstract transformEntry(entry: any): any;
 }

@@ -105,6 +105,7 @@ export const getChatResponse = (tableData: Chat): ChatResponse => {
         chatIdentifier: tableData.chatIdentifier,
         isArchived: tableData.isArchived,
         displayName: tableData.displayName,
-        groupId: tableData.groupId
+        groupId: tableData.groupId,
+        lastMessageTimestamp: null // Placeholder
     };
 };

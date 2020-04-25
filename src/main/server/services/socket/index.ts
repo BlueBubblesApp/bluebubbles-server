@@ -102,12 +102,38 @@ export class SocketService {
         */
         socket.on("get-chats", async (params, cb) => {
             const chats = await this.iMessageRepo.getChats(null, true);
+            const chatRes = chats.map((item) => getChatResponse(item))
+
+            // Get the last message timestamp for each chat
+            for (let i = 0; i < chatRes.length; i += 1) {
+                // eslint-disable-next-line no-await-in-loop
+                const messages = await this.iMessageRepo.getMessages(chatRes[i].guid, 0, 1);
+
+                if (messages && messages.length > 0) {
+                    chatRes[i].lastMessageTimestamp = new Date(
+                        messages[0].dateCreated
+                    ).getTime();
+                }
+            }
+
+            // Sort the chats by message timestamp
+            chatRes.sort((chatA, chatB) => {
+                const valA = chatA.lastMessageTimestamp || 0;
+                const valB = chatB.lastMessageTimestamp || 0;
+
+                if (valA > valB) {
+                    return -1;
+                } if (valA < valB) {
+                    return 1;
+                }
+
+                return 0;
+            })
+
             respond(
                 cb,
                 "chats",
-                createSuccessResponse(
-                    chats.map((item) => getChatResponse(item))
-                )
+                createSuccessResponse(chatRes)
             );
         });
 
@@ -139,7 +165,7 @@ export class SocketService {
                     );
 
                 const messages = await this.iMessageRepo.getMessages(
-                    chats[0],
+                    chats[0].guid,
                     params?.offset || 0,
                     params?.limit || 100,
                     params?.after,
@@ -184,7 +210,7 @@ export class SocketService {
                     );
 
                 const messages = await this.iMessageRepo.getMessages(
-                    chats[0],
+                    chats[0].guid,
                     0,
                     1
                 );
