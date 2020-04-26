@@ -1,5 +1,6 @@
 /* eslint-disable */
 import * as React from "react";
+import * as numeral from "numeral";
 import { ipcRenderer } from "electron";
 
 import {
@@ -142,7 +143,7 @@ class Dashboard extends React.Component<Props, State> {
                                         Messages
                                     </p>
                                     <h3 className={classes.cardTitle}>
-                                        {this.state.totalMsgCount}
+                                        {numeral(this.state.totalMsgCount).format("0.0a")}
                                     </h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
@@ -167,7 +168,7 @@ class Dashboard extends React.Component<Props, State> {
                                         Recent Messages
                                     </p>
                                     <h3 className={classes.cardTitle}>
-                                        {this.state.recentMsgCount}
+                                        {numeral(this.state.recentMsgCount).format("0.0a")}
                                     </h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
@@ -226,7 +227,7 @@ class Dashboard extends React.Component<Props, State> {
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
                                         <Update />
-                                        {this.state.individualMsgCount.count} Messages
+                                        {numeral(this.state.individualMsgCount.count).format("0.0a")} Messages
                                     </div>
                                 </CardFooter>
                             </Card>
