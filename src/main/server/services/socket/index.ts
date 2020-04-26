@@ -102,22 +102,20 @@ export class SocketService {
         * Add Device ID to the database
         */
         socket.on("add-fcm-device-id", async (params, cb): Promise<void> => {
-            if (!params?.deviceId)
-                return respond(cb, "error", createBadRequestResponse("No device ID specified"));
+            if (!params?.deviceName || !params?.deviceId)
+                return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
-            const device = await this.db.getRepository(Device).findOne({ identifier: params.deviceId });
-            if (device)
-                return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Device ID already exists"))
-            
-            const item = new Device();
-            item.identifier = params.deviceId;
-            await this.db.getRepository(Device).save(item);
+            // If the device ID exists, update the identifier
+            const device = await this.db.getRepository(Device).findOne({ name: params.deviceName });
+            if (device) {
+                await this.db.getRepository(Device).update({ name: params.deviceName }, { identifier: params.deviceId });
+            } else {
+                const item = new Device();
+                item.identifier = params.deviceId;
+                await this.db.getRepository(Device).save(item);
+            }
 
-            return respond(
-                cb,
-                "fcm-device-id-added",
-                createSuccessResponse(null, "Successfully added device ID")
-            );
+            return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
         });
 
         /**

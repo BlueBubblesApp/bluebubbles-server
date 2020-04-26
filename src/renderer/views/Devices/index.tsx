@@ -66,7 +66,7 @@ class Devices extends React.Component<Props, State> {
                         </TableHead>
                         <TableBody>
                             {devices.map((row) => (
-                                <TableRow key={row.identifier}>
+                                <TableRow key={row.name}>
                                     <TableCell component="th" scope="row">
                                         {row.name || "N/A"}
                                     </TableCell>

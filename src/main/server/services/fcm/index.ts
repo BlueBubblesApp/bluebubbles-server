@@ -42,7 +42,8 @@ export class FCMService {
      * @param data The data to send
      */
     async sendNotification(devices: string[], data: any) {
-        const msg = { data, tokens: devices };
+        // Build out the notification message
+        const msg: admin.messaging.MulticastMessage = { data, tokens: devices };
         const res = await this.app.messaging().sendMulticast(msg);
         return res;
     }
