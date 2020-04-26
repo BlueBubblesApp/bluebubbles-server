@@ -1,12 +1,12 @@
 import "reflect-metadata";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import * as path from "path";
 import * as url from "url";
-import * as fs from "fs";
 
 import { BlueBubbleServer } from "@server/index";
 
 let win: BrowserWindow | null;
+const api = new BlueBubbleServer(win);
 
 const installExtensions = async () => {
     const installer = require("electron-devtools-installer");
@@ -19,6 +19,10 @@ const installExtensions = async () => {
         )
     ).catch(console.log); // eslint-disable-line no-console
 };
+
+
+// Start the API
+api.start();
 
 const createWindow = async () => {
     if (process.env.NODE_ENV !== "production") {
@@ -57,22 +61,14 @@ const createWindow = async () => {
         win = null;
     });
 
-    /**
-     * Create a connection to the config database and create the sockets
-     */
-    const api = new BlueBubbleServer(win);
-    await api.start();
-    
-    // Tell the DOM we have a config update
+    // Hook onto when we load the UI
     win.webContents.send("config-update", api.config);
-
-    /**
-     * IPC Messaging
-     */
     win.webContents.on("dom-ready", async () => {
-        // Handle if the DOM loads after the DB
         win.webContents.send("config-update", api.config);
-    })
+    });
+
+    // Set the new window in the API
+    api.window = win;
 };
 
 app.on("ready", createWindow);

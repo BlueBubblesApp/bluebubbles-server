@@ -51,10 +51,10 @@ class Dashboard extends React.Component<Props, State> {
     }
 
     async componentDidMount() {
-        this.setState({
-            fcmClient: JSON.stringify(await ipcRenderer.invoke("get-fcm-client")),
-            fcmServer: JSON.stringify(await ipcRenderer.invoke("get-fcm-server"))
-        })
+        const client = await ipcRenderer.invoke("get-fcm-client");
+        if (client) this.setState({ fcmClient: JSON.stringify(client) })
+        const server = await ipcRenderer.invoke("get-fcm-server");
+        if (server) this.setState({ fcmServer: JSON.stringify(server) });
     }
 
     saveConfig = async () => {
@@ -103,7 +103,7 @@ class Dashboard extends React.Component<Props, State> {
     }
 
     buildQrData = (data: string | null): string => {
-        if (!data) return "";
+        if (!data || data.length === 0) return "";
 
         const jsonData = JSON.parse(data);
         const output = [this.props.config?.server_address || ""];

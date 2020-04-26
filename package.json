@@ -52,17 +52,20 @@
     }
   },
   "build": {
-    "productName": "ProductName",
-    "appId": "org.your.productname",
+    "productName": "BlueBubble App",
+    "appId": "org.bluebubble.server",
     "mac": {
+      "icon": "./icons/regular/icon-512.png",
       "category": "your.app.category.type"
     },
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "icons"
     },
     "files": [
       "dist/",
       "node_modules/",
+      "icons/**/*",
       "package.json"
     ],
     "linux": {

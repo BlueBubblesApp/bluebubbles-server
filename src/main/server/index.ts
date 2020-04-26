@@ -83,7 +83,8 @@ export class BlueBubbleServer {
                 console.log(message);
         }
 
-        this.window.webContents.send("new-log", message);
+        if (this.window)
+            this.window.webContents.send("new-log", message);
     }
 
     /**
@@ -200,7 +201,11 @@ export class BlueBubbleServer {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async connectToNgrok(): Promise<void> {
-        this.ngrokServer = await ngrok.connect(this.config.socket_port);
+        this.ngrokServer = await ngrok.connect({
+            port: this.config.socket_port,
+            // This is required to run ngrok in production
+            binPath: (path) => path.replace("app.asar", "app.asar.unpacked")
+        });
         this.config.server_address = this.ngrokServer;
         await this.db.getRepository(Config).update(
             { name: "server_address" },
@@ -302,7 +307,10 @@ export class BlueBubbleServer {
                 await this.db.getRepository(Config).update({ name: item }, { value: args[item] })
             })
 
-            this.window.webContents.send("config-update", this.config);
+            if (this.window) {
+                this.window.webContents.send("config-update", this.config);
+            }
+            
             return this.config;
         });
 
