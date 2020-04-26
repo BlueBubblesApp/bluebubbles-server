@@ -10,7 +10,7 @@ import {
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
-import { AttachmentResponse } from "@server/helpers/dataTypes";
+import { AttachmentResponse } from "@server/types";
 
 @Entity("attachment")
 export class Attachment {

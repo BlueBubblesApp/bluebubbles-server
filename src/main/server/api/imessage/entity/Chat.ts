@@ -8,7 +8,7 @@ import {
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
-import { ChatResponse } from "@server/helpers/dataTypes";
+import { ChatResponse } from "@server/types";
 
 @Entity("chat")
 export class Chat {

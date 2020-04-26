@@ -1,6 +1,10 @@
 import * as admin from "firebase-admin";
 import { FileSystem } from "@server/fileSystem";
 
+/**
+ * This services manages the connection to the connected
+ * Google FCM server. This is used to handle/manage notifications
+ */
 export class FCMService {
     fs: FileSystem;
 
@@ -11,6 +15,10 @@ export class FCMService {
         this.app = null;
     }
 
+    /**
+     * Starts the FCM connection, depending if a user has it configured.
+     * Does not set it up if the required files are not present
+     */
     start() {
         // Do nothing if the config doesn't exist
         const serverConfig = this.fs.getFCMServer();
@@ -27,6 +35,12 @@ export class FCMService {
         });
     }
 
+    /**
+     * Sends a notification to all connected devices
+     *
+     * @param devices Devices to send the notification to
+     * @param data The data to send
+     */
     async sendNotification(devices: string[], data: any) {
         const msg = { data, tokens: devices };
         const res = await this.app.messaging().sendMulticast(msg);

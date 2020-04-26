@@ -1,3 +1,6 @@
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
 const sendMessage = {
     name: "sendMessage.scpt",
     contents: `on run argv
@@ -20,6 +23,9 @@ const sendMessage = {
 end run`
 };
 
+/**
+ * The AppleScript used to start a chat with some number of participants
+ */
 const startChat = {
     name: "startChat.scpt",
     contents: `on run argv

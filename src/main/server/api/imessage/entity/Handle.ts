@@ -10,7 +10,7 @@ import {
 
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
-import { HandleResponse } from "@server/helpers/dataTypes";
+import { HandleResponse } from "@server/types";
 
 @Entity("handle")
 export class Handle {

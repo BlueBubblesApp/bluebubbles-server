@@ -133,11 +133,8 @@ export class DatabaseRepository {
     }
 
     /**
-     * Gets all messages associated with a chat
+     * Gets message counts associated with a chat
      *
-     * @param chat The chat to get the messages from
-     * @param offset The offset to start getting the messages from
-     * @param limit The max number of messages to return
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
@@ -174,13 +171,9 @@ export class DatabaseRepository {
     }
 
     /**
-     * Gets all messages associated with a chat
+     * Count messages associated with different chats
      *
-     * @param chat The chat to get the messages from
-     * @param offset The offset to start getting the messages from
-     * @param limit The max number of messages to return
-     * @param after The earliest date to get messages from
-     * @param before The latest date to get messages from
+     * @param chatStyle Whether you are fetching the count for a group or individual chat
      */
     async getChatMessageCounts(chatStyle: "group" | "individual") {
         // Get messages with sender and the chat it's from

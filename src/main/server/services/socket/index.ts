@@ -6,7 +6,7 @@ import { ActionHandler } from "@server/helpers/actions";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ResponseFormat } from "@server/helpers/dataTypes";
+import { ResponseFormat } from "@server/types";
 import { createSuccessResponse, createServerErrorResponse, createBadRequestResponse, createNoDataResponse } from "@server/helpers/responses";
 
 // Entities
@@ -16,6 +16,10 @@ import { getMessageResponse } from "@server/api/imessage/entity/Message";
 import { Connection } from "typeorm";
 import { Device } from "@server/entity/Device";
 
+/**
+ * This service class handles all routing for incoming socket
+ * connections and requests.
+ */
 export class SocketService {
     db: Connection;
 
@@ -27,6 +31,15 @@ export class SocketService {
 
     actionHandler: ActionHandler;
 
+    /**
+     * Starts up the initial Socket.IO connection and initializes other
+     * required classes and variables
+     *
+     * @param db The configuration database
+     * @param iMessageRepo The iMessage database repository
+     * @param fs The filesystem class handler
+     * @param port The initial port for Socket.IO
+     */
     constructor(
         db: Connection,
         iMessageRepo: DatabaseRepository,
@@ -37,12 +50,12 @@ export class SocketService {
         this.socketServer = io(port);
         this.iMessageRepo = iMessageRepo;
         this.fs = fs;
-        this.actionHandler = new ActionHandler(
-            this.fs,
-            this.iMessageRepo
-        );
+        this.actionHandler = new ActionHandler(this.fs);
     }
 
+    /**
+     * Creates the initial connection handler for Socket.IO
+     */
     start() {
         /**
         * Handle all other data requests
@@ -50,7 +63,12 @@ export class SocketService {
         this.socketServer.on("connection", async (socket) => {
             console.log("client connected");
 
-            // Setup error handler middleware
+            /**
+             * Error handling middleware for all Socket.IO requests.
+             * If there are any errors in a socket event, they will be handled here.
+             * 
+             * A console message will be printed, and a socket error will be emitted
+             */
             socket.use((packet, next) => {
                 try {
                     next();
@@ -65,6 +83,11 @@ export class SocketService {
         });
     }
 
+    /**
+     * The rest of the socket event handlers
+     *
+     * @param socket The incoming socket connection
+     */
     routeSocket(socket: io.Socket) {
         const respond = (
             callback: Function | null,
@@ -128,11 +151,7 @@ export class SocketService {
                 return 0;
             })
 
-            respond(
-                cb,
-                "chats",
-                createSuccessResponse(chatRes)
-            );
+            respond(cb, "chats", createSuccessResponse(chatRes));
         });
 
         /**
@@ -142,25 +161,11 @@ export class SocketService {
             "get-chat-messages",
             async (params, cb): Promise<void> => {
                 if (!params?.identifier)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse(
-                            "No chat identifier provided"
-                        )
-                    );
+                    return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(
-                    params?.identifier,
-                    true
-                );
-
+                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
                 if (!chats || chats.length === 0)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse("Chat does not exist")
-                    );
+                    return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
                 const messages = await this.iMessageRepo.getMessages(
                     chats[0].guid,
@@ -170,13 +175,8 @@ export class SocketService {
                     params?.before
                 );
 
-                return respond(
-                    cb,
-                    "chat-messages",
-                    createSuccessResponse(
-                        messages.map((item) => getMessageResponse(item))
-                    )
-                );
+                return respond(cb, "chat-messages", createSuccessResponse(
+                    messages.map((item) => getMessageResponse(item))));
             }
         );
 
@@ -187,45 +187,18 @@ export class SocketService {
             "get-last-chat-message",
             async (params, cb): Promise<void> => {
                 if (!params?.identifier)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse(
-                            "No chat identifier provided"
-                        )
-                    );
+                    return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(
-                    params?.identifier,
-                    true
-                );
+                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
 
                 if (!chats || chats.length === 0)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse("Chat does not exist")
-                    );
+                    return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-                const messages = await this.iMessageRepo.getMessages(
-                    chats[0].guid,
-                    0,
-                    1
-                );
+                const messages = await this.iMessageRepo.getMessages(chats[0].guid, 0, 1);
                 if (!messages || messages.length === 0)
-                    return respond(
-                        cb,
-                        "last-chat-message",
-                        createNoDataResponse()
-                    );
+                    return respond(cb, "last-chat-message", createNoDataResponse());
 
-                return respond(
-                    cb,
-                    "last-chat-message",
-                    createSuccessResponse(
-                        getMessageResponse(messages[0])
-                    )
-                );
+                return respond(cb, "last-chat-message", createSuccessResponse(getMessageResponse(messages[0])));
             }
         );
 
@@ -236,35 +209,15 @@ export class SocketService {
             "get-participants",
             async (params, cb): Promise<void> => {
                 if (!params?.identifier)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse(
-                            "No chat identifier provided"
-                        )
-                    );
+                    return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(
-                    params?.identifier,
-                    true
-                );
+                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
 
                 if (!chats || chats.length === 0)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse("Chat does not exist")
-                    );
+                    return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-                return respond(
-                    cb,
-                    "participants",
-                    createSuccessResponse(
-                        chats[0].participants.map((item) =>
-                            getHandleResponse(item)
-                        )
-                    )
-                );
+                return respond(cb, "participants", createSuccessResponse(
+                    chats[0].participants.map((item) => getHandleResponse(item))));
             }
         );
 
@@ -278,13 +231,7 @@ export class SocketService {
                 const message = params?.message;
 
                 if (!chatGuid || !message)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse(
-                            "No chat GUID or message provided"
-                        )
-                    );
+                    return respond(cb, "error",createBadRequestResponse("No chat GUID or message provided"));
 
                 await this.actionHandler.sendMessage(
                     chatGuid,
@@ -293,11 +240,7 @@ export class SocketService {
                     params?.attachment
                 );
 
-                return respond(
-                    cb,
-                    "message-sent",
-                    createSuccessResponse(null)
-                );
+                return respond(cb, "message-sent", createSuccessResponse(null));
             }
         );
 
@@ -310,42 +253,20 @@ export class SocketService {
                 let participants = params?.participants;
 
                 if (!participants || participants.length === 0)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse(
-                            "No participants specified"
-                        )
-                    );
+                    return respond(cb, "error", createBadRequestResponse("No participants specified"));
 
                 if (typeof participants === "string") {
                     participants = [participants];
                 }
 
-                if (!Array.isArray(participants)) {
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse(
-                            "Participant list must be an array"
-                        )
-                    );
-                }
+                if (!Array.isArray(participants))
+                    return respond(cb, "error", createBadRequestResponse("Participant list must be an array"));
 
-                const chatGuid = await this.actionHandler.createChat(
-                    this.fs,
-                    participants
-                );
+                const chatGuid = await this.actionHandler.createChat(participants);
 
                 try {
-                    const newChat = await this.iMessageRepo.db
-                        .getRepository(Chat)
-                        .findOneOrFail({ guid: chatGuid });
-                    return respond(
-                        cb,
-                        "chat-started",
-                        createSuccessResponse(getChatResponse(newChat))
-                    );
+                    const newChat = await this.iMessageRepo.db.getRepository(Chat).findOneOrFail({ guid: chatGuid });
+                    return respond(cb, "chat-started", createSuccessResponse(getChatResponse(newChat)));
                 } catch (ex) {
                     throw new Error("Failed to create new chat!");
                 }
@@ -358,13 +279,7 @@ export class SocketService {
         socket.on(
             "send-reaction",
             async (params, cb): Promise<void> => {
-                respond(
-                    cb,
-                    "reaction-sent",
-                    createBadRequestResponse(
-                        "This action has not yet been implemented"
-                    )
-                );
+                respond(cb, "reaction-sent", createBadRequestResponse("This action has not yet been implemented"));
             }
         );
 
@@ -373,6 +288,11 @@ export class SocketService {
         });
     }
 
+    /**
+     * Restarts the Socket.IO connection with a new port
+     *
+     * @param port The new port to listen on
+     */
     restart(port: number) {
         this.socketServer.close();
         this.socketServer = io(port);

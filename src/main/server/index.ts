@@ -1,11 +1,14 @@
+// Dependency Imports
 import { app, ipcMain, BrowserWindow } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
 
+// Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
 import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_SOCKET_PORT } from "@server/constants";
 
+// Database Imports
 import { DatabaseRepository } from "@server/api/imessage";
 import { MessageListener } from "@server/api/imessage/listeners/messageListener";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
@@ -14,6 +17,11 @@ import { Message, getMessageResponse } from "@server/api/imessage/entity/Message
 import { SocketService, FCMService } from "@server/services";
 import { Device } from "./entity/Device";
 
+/**
+ * Main entry point for the back-end server
+ * This will handle all services and helpers that get spun
+ * up when running the application.
+ */
 export class BlueBubbleServer {
     window: BrowserWindow;
     
@@ -31,6 +39,11 @@ export class BlueBubbleServer {
 
     fs: FileSystem;
 
+    /**
+     * Constructor to just initialize everything to null pretty much
+     *
+     * @param window The browser window associated with the Electron app
+     */
     constructor(window: BrowserWindow) {
         this.window = window;
 
@@ -47,6 +60,29 @@ export class BlueBubbleServer {
         this.socketService = null;
     }
 
+    /**
+     * Officially starts the server. First, runs the setup,
+     * then starts all of the services required for the server
+     */
+    async start(): Promise<void> {
+        await this.setup();
+
+        console.log("Starting socket service...");
+        this.socketService.start();
+        this.fcmService.start();
+
+        console.log("Starting chat listener...");
+        this.startChatListener();
+        this.startIpcListener();
+
+        console.log("Connecting to Ngrok...");
+        await this.connectToNgrok();
+    }
+
+    /**
+     * Performs the initial setup for the server.
+     * Mainly, instantiation of a bunch of classes/handlers
+     */
     async setup(): Promise<void> {
         console.log("Performing initial setup...");
         await this.initializeDatabase();
@@ -74,21 +110,9 @@ export class BlueBubbleServer {
         this.fcmService = new FCMService(this.fs);
     }
 
-    async start(): Promise<void> {
-        await this.setup();
-
-        console.log("Starting socket service...");
-        this.socketService.start();
-        this.fcmService.start();
-
-        console.log("Starting chat listener...");
-        this.startChatListener();
-        this.startIpcListener();
-
-        console.log("Connecting to Ngrok...");
-        await this.connectToNgrok();
-    }
-
+    /**
+     * Initializes the connection to the configuration database
+     */
     async initializeDatabase(): Promise<void> {
         this.db = await createConnection({
             type: "sqlite",
@@ -99,11 +123,19 @@ export class BlueBubbleServer {
         });
     }
 
+    /**
+     * Sets up the "filsystem". This basically initializes
+     * the required directories for the app
+     */
     setupFileSystem(): void {
         this.fs = new FileSystem();
         this.fs.setup();
     }
 
+    /**
+     * This sets any default database values, if the database
+     * has not already been initialized
+     */
     async setupDefaults(): Promise<void> {
         const frequency = await this.db.getRepository(Config).findOne({
             name: "poll_frequency"
@@ -127,11 +159,20 @@ export class BlueBubbleServer {
             await this.addConfigItem("server_address", "");
     }
 
+    /**
+     * Initializes the connection to the iMessage
+     * chat database. This allows us to fetch data from
+     * the database and listen for new messages
+     */
     async setupMessageRepo(): Promise<void> {
         this.iMessageRepo = new DatabaseRepository();
         await this.iMessageRepo.initialize();
     }
 
+    /**
+     * Sets up a connection to the Ngrok servers, opening a secure
+     * tunnel between the internet and your Mac (iMessage server)
+     */
     async connectToNgrok(): Promise<void> {
         this.ngrokServer = await ngrok.connect(this.config.socket_port);
         this.config.server_address = this.ngrokServer;
@@ -147,12 +188,15 @@ export class BlueBubbleServer {
         await this.sendNotification("new-server", this.ngrokServer);
     }
 
-    // eslint-disable-next-line class-methods-use-this
-    async disconnectFromNgrok(): Promise<void> {
-        await ngrok.disconnect();
-    }
-
+    /**
+     * Emits a notification to to your connected devices over FCM
+     *
+     * @param type The type of notification
+     * @param data Associated data with the notification (as a string)
+     */
     async sendNotification(type: string, data: any) {
+        this.socketService.socketServer.emit("new-message", data);
+
         // Send notification to devices
         if (this.fcmService.app) {
             const devices = await this.db.getRepository(Device).find();
@@ -167,6 +211,13 @@ export class BlueBubbleServer {
         }
     }
 
+    /**
+     * Helper method for addind a new configuration item to the
+     * database.
+     *
+     * @param name The name of the config item
+     * @param value The initial value of the config item
+     */
     async addConfigItem(
         name: string,
         value: string | number
@@ -178,6 +229,11 @@ export class BlueBubbleServer {
         return item;
     }
 
+    /**
+     * Starts the chat listener service. This service will listen for new
+     * iMessages from your chat database. Anytime there is a new message,
+     * we will emit a message to the socket, as well as the FCM server
+     */
     startChatListener() {
         // Create a listener to listen for new messages
         const listener = new MessageListener(this.iMessageRepo, Number(this.config.poll_frequency));
@@ -192,12 +248,15 @@ export class BlueBubbleServer {
 
             const msg = getMessageResponse(item);
 
-            // Emit it to the socket
-            this.socketService.socketServer.emit("new-message", msg);
+            // Emit it to the socket and FCM devices
             await this.sendNotification("new-message", msg);
         });
     }
 
+    /**
+     * Starts the inter-process-communication handlers. Basically, a router
+     * for all requests sent by the Electron front-end
+     */
     startIpcListener() {
         ipcMain.handle("set-config", (event, args) => {
             Object.keys(args).forEach(async (item) => {
@@ -206,7 +265,7 @@ export class BlueBubbleServer {
 
                     // If the socket port changed, disconnect and reconnect
                     if (item === "socket_port") {
-                        await this.disconnectFromNgrok();
+                        await ngrok.disconnect();;
                         await this.connectToNgrok();
                         await this.socketService.restart(args[item]);
                     }

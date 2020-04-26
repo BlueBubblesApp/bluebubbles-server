@@ -3,11 +3,20 @@ import * as macosVersion from "macos-version";
 const osVersion = macosVersion();
 const MULTIPLIER = 10 ** 6;
 
+/**
+ * Gets the seconds since Jan 1st, 2001. We need this because apple uses this
+ * as their EPOCH time, rather than the true EPOCH
+ */
 export const get2001Time = (): number => {
     const appleEpoch = new Date("01-01-2001 00:00:00-0:00");
     return appleEpoch.getTime();
 };
 
+/**
+ * Converts a seconds-since-2001 timestamp to a date object
+ *
+ * @param timestamp The seconds-since-2001
+ */
 export const getDateUsing2001 = (timestamp: number): Date => {
     if (timestamp === 0) return null;
 
@@ -23,6 +32,11 @@ export const getDateUsing2001 = (timestamp: number): Date => {
     }
 };
 
+/**
+ * Converts a date object to a seconds-since-2001 timestamp
+ *
+ * @param timestamp The date object to convert
+ */
 export const convertDateTo2001Time = (date: Date): number => {
     if (date === null) return 0;
 

@@ -10,7 +10,7 @@ import {
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/api/imessage/transformers/MessageTypeTransformer";
-import { MessageResponse } from "@server/helpers/dataTypes";
+import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/api/imessage/entity/Attachment";

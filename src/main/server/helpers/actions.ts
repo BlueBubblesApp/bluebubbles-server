@@ -1,16 +1,32 @@
 import { FileSystem } from "@server/fileSystem";
-import { DatabaseRepository } from "../api/imessage";
 
+/**
+ * This class handles all actions that require an AppleScript execution.
+ * Pretty much, using command line to execute a script, passing any required
+ * variables
+ */
 export class ActionHandler {
     fs: FileSystem;
 
-    repo: DatabaseRepository;
-
-    constructor(fileSystem: FileSystem, repo: DatabaseRepository) {
+    /**
+     * Constructor to set some vars
+     *
+     * @param fileSystem The instance of the filesystem for the app
+     */
+    constructor(fileSystem: FileSystem) {
         this.fs = fileSystem;
-        this.repo = repo;
     }
 
+    /**
+     * Sends a message by executing the sendMessage AppleScript
+     * 
+     * @param chatGuid The GUID for the chat
+     * @param message The message to send
+     * @param attachmentName The name of the attachment to send (optional)
+     * @param attachment The bytes (buffer) for the attachment
+     * 
+     * @returns The command line response
+     */
     sendMessage = async (
         chatGuid: string,
         message: string,
@@ -34,15 +50,21 @@ export class ActionHandler {
         return ret;
     };
 
+    /**
+     * Creates a new chat using a list of participants (strings)
+     * 
+     * @param participants: The list of participants to include in the chat
+     * 
+     * @returns The GUID of the new chat
+     */
     createChat = async (
-        fs: FileSystem,
         participants: string[]
     ): Promise<string> => {
         if (participants.length === 0)
             throw new Error("No participants specified!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${fs.scriptDir}/startChat.scpt"`;
+        let baseCmd = `osascript "${this.fs.scriptDir}/startChat.scpt"`;
 
         // Add members to the chat
         participants.forEach((member) => {
@@ -50,7 +72,7 @@ export class ActionHandler {
         });
 
         // Execute the command
-        let ret = (await fs.execShellCommand(baseCmd)) as string;
+        let ret = (await this.fs.execShellCommand(baseCmd)) as string;
 
         try {
             // Get the chat GUID that was created
