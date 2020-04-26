@@ -30,6 +30,8 @@ const createWindow = async () => {
     }
 
     win = new BrowserWindow({
+        title: "BlueBubble App",
+        useContentSize: true,
         width: 1080,
         height: 920,
         webPreferences: {
@@ -59,6 +61,11 @@ const createWindow = async () => {
 
     win.on("closed", () => {
         win = null;
+    });
+
+    // Prevent the title from being changed from BlueBubble App
+    win.on("page-title-updated", (evt) => {
+        evt.preventDefault();
     });
 
     // Hook onto when we load the UI
