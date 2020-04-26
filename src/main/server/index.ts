@@ -61,21 +61,47 @@ export class BlueBubbleServer {
     }
 
     /**
+     * Handler for sending logs. This allows us to also route
+     * the logs to the main Electron window
+     *
+     * @param message The message to print
+     * @param type The log type
+     */
+    log(message: any, type?: "log" | "error" | "dir" | "warn") {
+        switch (type) {
+            case "error":
+                console.error(message);
+                break;
+            case "dir":
+                console.dir(message);
+                break;
+            case "warn":
+                console.warn(message);
+                break;
+            case "log":
+            default:
+                console.log(message);
+        }
+
+        this.window.webContents.send("new-log", message);
+    }
+
+    /**
      * Officially starts the server. First, runs the setup,
      * then starts all of the services required for the server
      */
     async start(): Promise<void> {
         await this.setup();
 
-        console.log("Starting socket service...");
+        this.log("Starting socket service...");
         this.socketService.start();
         this.fcmService.start();
 
-        console.log("Starting chat listener...");
+        this.log("Starting chat listener...");
         this.startChatListener();
         this.startIpcListener();
 
-        console.log("Connecting to Ngrok...");
+        this.log("Connecting to Ngrok...");
         await this.connectToNgrok();
     }
 
@@ -84,21 +110,21 @@ export class BlueBubbleServer {
      * Mainly, instantiation of a bunch of classes/handlers
      */
     async setup(): Promise<void> {
-        console.log("Performing initial setup...");
+        this.log("Performing initial setup...");
         await this.initializeDatabase();
         await this.setupDefaults();
         this.setupFileSystem();
 
-        console.log("Initializing configuration database...");
+        this.log("Initializing configuration database...");
         const cfg = await this.db.getRepository(Config).find();
         cfg.forEach((item) => {
             this.config[item.name] = item.value;
         });
 
-        console.log("Connecting to iMessage database...");
+        this.log("Connecting to iMessage database...");
         await this.setupMessageRepo();
 
-        console.log("Initializing up sockets...");
+        this.log("Initializing up sockets...");
         this.socketService = new SocketService(
             this.db,
             this.iMessageRepo,
@@ -106,7 +132,7 @@ export class BlueBubbleServer {
             this.config.socket_port
         );
 
-        console.log("Initializing connection to Google FCM...");
+        this.log("Initializing connection to Google FCM...");
         this.fcmService = new FCMService(this.fs);
     }
 
@@ -203,7 +229,7 @@ export class BlueBubbleServer {
             if (!devices || devices.length === 0) return;
 
             const notifData = JSON.stringify(data);
-            console.log(notifData);
+            this.log(notifData);
             await this.fcmService.sendNotification(devices.map(device => device.identifier), {
                 type,
                 data: notifData
@@ -242,9 +268,8 @@ export class BlueBubbleServer {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
             const from = (item.isFromMe) ? "yourself" : item.from?.id
-            console.log(
-                `New message from [${from}], sent to [${item.chats[0]?.displayName || item.chats[0]?.chatIdentifier}]`
-            );
+            const text = (item.cacheHasAttachments) ? `Image: ${item.text.slice(1, item.text.length) || "<No Text>"}` : item.text;
+            this.log(`New message from [${from}]: [${text.substring(0, 50)}]`);
 
             const msg = getMessageResponse(item);
 
@@ -282,7 +307,12 @@ export class BlueBubbleServer {
         });
 
         ipcMain.handle("get-message-count", async (event, args) => {
-            const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before);
+            const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
+            return count;
+        });
+
+        ipcMain.handle("get-chat-image-count", async (event, args) => {
+            const count = await this.iMessageRepo.getChatImageCounts();
             return count;
         });
 

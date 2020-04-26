@@ -46,18 +46,30 @@ interface State {
     recentMsgCount: number;
     groupMsgCount: { name: string, count: number };
     individualMsgCount: { name: string, count: number };
+    myMsgCount: number;
+    imageCount: { name: string, count: number };
 }
 
 class Dashboard extends React.Component<Props, State> {
     state: State = {
         totalMsgCount: 0,
         recentMsgCount: 0,
+        myMsgCount: 0,
         groupMsgCount: { name: "Loading...", count: 0 },
-        individualMsgCount: { name: "Loading...", count: 0 }
+        individualMsgCount: { name: "Loading...", count: 0 },
+        imageCount: { name: "Loading...", count: 0 }
     };
 
     async componentDidMount() {
         this.loadData();
+    }
+
+    formatNumber(value: number) {
+        if (value > 1000) {
+            return numeral(value).format("0.0a");
+        } else {
+            return value;
+        }
     }
 
     loadData() {
@@ -66,6 +78,8 @@ class Dashboard extends React.Component<Props, State> {
         this.loadRecentMessageCount();
         this.loadGroupChatCounts();
         this.loadIndividualChatCounts();
+        this.loadMyMessageCount();
+        this.loadChatImageCounts();
     }
 
     async loadGroupChatCounts() {
@@ -74,10 +88,10 @@ class Dashboard extends React.Component<Props, State> {
         res.forEach((item: any) => {
             if (item.message_count > top.count)
                 top = { name: item.group_name, count: item.message_count };
-        })
+        });
 
         this.setState({
-            groupMsgCount:top
+            groupMsgCount: top
         });
     }
 
@@ -100,12 +114,36 @@ class Dashboard extends React.Component<Props, State> {
         });
     }
 
+    async loadChatImageCounts() {
+        const res = await ipcRenderer.invoke("get-chat-image-count");
+        let top = this.state.imageCount;
+        res.forEach((item: any) => {
+            const identifier = (item.chat_identifier.startsWith("chat")) ? item.group_name : item.chat_identifier;
+            if (item.image_count > top.count)
+                top = { name: identifier, count: item.image_count };
+        });
+
+        this.setState({ imageCount: top });
+    }
+
     async loadRecentMessageCount() {
         const after = new Date();
         after.setDate(after.getDate() - 1);
         this.setState({
             recentMsgCount: await ipcRenderer.invoke("get-message-count", {
                 after
+            })
+        });
+    }
+
+    async loadMyMessageCount() {
+        const after = new Date();
+        after.setDate(after.getDate() - 1);
+        this.setState({
+            myMsgCount: await ipcRenderer.invoke("get-message-count", {
+                after,
+                before: null,
+                isFromMe: true
             })
         });
     }
@@ -143,7 +181,9 @@ class Dashboard extends React.Component<Props, State> {
                                         Messages
                                     </p>
                                     <h3 className={classes.cardTitle}>
-                                        {numeral(this.state.totalMsgCount).format("0.0a")}
+                                        {this.formatNumber(
+                                            this.state.totalMsgCount
+                                        )}
                                     </h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
@@ -168,7 +208,9 @@ class Dashboard extends React.Component<Props, State> {
                                         Recent Messages
                                     </p>
                                     <h3 className={classes.cardTitle}>
-                                        {numeral(this.state.recentMsgCount).format("0.0a")}
+                                        {this.formatNumber(
+                                            this.state.recentMsgCount
+                                        )}
                                     </h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
@@ -199,7 +241,9 @@ class Dashboard extends React.Component<Props, State> {
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
                                         <Update />
-                                        {this.state.groupMsgCount.count}{" "}
+                                        {this.formatNumber(
+                                            this.state.groupMsgCount.count
+                                        )}{" "}
                                         Messages
                                     </div>
                                 </CardFooter>
@@ -227,7 +271,10 @@ class Dashboard extends React.Component<Props, State> {
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
                                         <Update />
-                                        {numeral(this.state.individualMsgCount.count).format("0.0a")} Messages
+                                        {this.formatNumber(
+                                            this.state.individualMsgCount.count
+                                        )}{" "}
+                                        Messages
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -246,13 +293,13 @@ class Dashboard extends React.Component<Props, State> {
                                         Media Gurus
                                     </p>
                                     <h3 className={classes.cardTitle}>
-                                        What do you Meme
+                                        {this.state.imageCount.name}
                                     </h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
                                         <Image />
-                                        145 Images Shared
+                                        {this.formatNumber(this.state.imageCount.count)} Images Shared
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -270,7 +317,11 @@ class Dashboard extends React.Component<Props, State> {
                                     <p className={classes.cardCategory}>
                                         Textaholic
                                     </p>
-                                    <h3 className={classes.cardTitle}>435</h3>
+                                    <h3 className={classes.cardTitle}>
+                                        {this.formatNumber(
+                                            this.state.myMsgCount
+                                        )}
+                                    </h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>

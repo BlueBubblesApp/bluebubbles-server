@@ -140,7 +140,8 @@ export class DatabaseRepository {
      */
     async getMessageCount(
         after?: Date,
-        before?: Date
+        before?: Date,
+        isFromMe = false
     ) {
         // Get messages with sender and the chat it's from
         const query = this.db
@@ -152,6 +153,9 @@ export class DatabaseRepository {
             .andWhere("message.service == 'iMessage'")
             .andWhere("message.text IS NOT NULL")
             .andWhere("associated_message_type == 0");
+        
+        if (isFromMe)
+            query.andWhere("message.is_from_me = 1")
 
         // Add date restraints
         if (after)
@@ -191,5 +195,45 @@ export class DatabaseRepository {
         );
 
         return result;
+    }
+
+    /**
+     * Count messages associated with different chats
+     *
+     * @param chatStyle Whether you are fetching the count for a group or individual chat
+     */
+    async getChatImageCounts() {
+        // Get messages with sender and the chat it's from
+        const result = await this.db.getRepository(Chat).query(
+            `SELECT
+                chat.chat_identifier AS chat_identifier,
+                chat.display_name AS group_name,
+                COUNT(attachment.ROWID) AS image_count
+            FROM chat
+            JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
+            JOIN message ON message.ROWID = cmj.message_id
+            JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
+            JOIN attachment ON attachment.ROWID = maj.attachment_id
+            WHERE attachment.mime_type LIKE 'image%'
+            GROUP BY chat.guid;`
+        );
+
+        return result;
+    }
+
+    /**
+     * Gets message counts associated with a chat
+     *
+     * @param after The earliest date to get messages from
+     * @param before The latest date to get messages from
+     */
+    async getAttachmentCount() {
+        // Get messages with sender and the chat it's from
+        const query = this.db
+            .getRepository(Attachment)
+            .createQueryBuilder("attachment")
+
+        const count = await query.getCount();
+        return count;
     }
 }

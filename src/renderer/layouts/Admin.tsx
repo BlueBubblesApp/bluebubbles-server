@@ -33,11 +33,13 @@ import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
 import DeviceIcon from "@material-ui/icons/DeviceHub";
 import HomeIcon from "@material-ui/icons/Home";
 import SettingsIcon from "@material-ui/icons/Settings";
+import LogIcon from "@material-ui/icons/Receipt";
 
 // Custom Components
 import Configuration from "@renderer/views/Configuration";
 import Devices from "@renderer/views/Devices";
 import Dashboard from "@renderer/views/Dashboard";
+import Logs from "@renderer/views/Logs";
 
 // Helpers
 import { Config } from "@renderer/variables/types";
@@ -160,6 +162,19 @@ class AdminLayout extends React.Component<Props, State> {
                         <List>
                             <ListItem
                                 component={Link}
+                                to="/logs"
+                                button
+                                className={clsx(classes.drawer, {
+                                    [classes.listItemOpen]: open,
+                                    [classes.listItemClosed]: !open
+                                })}>
+                                <ListItemIcon>
+                                    <LogIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Server Logs" />
+                            </ListItem>
+                            <ListItem
+                                component={Link}
                                 to="/configuration"
                                 button
                                 className={clsx(classes.drawer, {
@@ -180,6 +195,9 @@ class AdminLayout extends React.Component<Props, State> {
                             </Route>
                             <Route path="/devices">
                                 <Devices />
+                            </Route>
+                            <Route path="/logs">
+                                <Logs />
                             </Route>
                             <Route path="/">
                                 <Dashboard />
