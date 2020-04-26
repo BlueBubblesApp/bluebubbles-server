@@ -110,9 +110,7 @@ export class SocketService {
                 const messages = await this.iMessageRepo.getMessages(chatRes[i].guid, 0, 1);
 
                 if (messages && messages.length > 0) {
-                    chatRes[i].lastMessageTimestamp = new Date(
-                        messages[0].dateCreated
-                    ).getTime();
+                    chatRes[i].lastMessageTimestamp = messages[0].dateCreated.getTime();
                 }
             }
 

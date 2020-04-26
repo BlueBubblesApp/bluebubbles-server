@@ -5,6 +5,7 @@ import { convertDateTo2001Time } from "@server/api/imessage/helpers/dateUtil";
 import { Chat } from "@server/api/imessage/entity/Chat";
 import { Handle } from "@server/api/imessage/entity/Handle";
 import { Message } from "@server/api/imessage/entity/Message";
+import { Attachment } from "./entity/Attachment";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -24,7 +25,7 @@ export class DatabaseRepository {
             name: "iMessage",
             type: "sqlite",
             database: `${process.env.HOME}/Library/Messages/chat.db`,
-            entities: [Chat, Handle, Message],
+            entities: [Chat, Handle, Message, Attachment],
             synchronize: false,
             logging: false
         });
@@ -96,7 +97,12 @@ export class DatabaseRepository {
             .leftJoinAndSelect(
                 "message.chats",
                 "chat",
-                "message.ROWID == message_id AND chat.ROWID == chat_id"
+                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+            )
+            .leftJoinAndSelect(
+                "message.attachments",
+                "attachment",
+                "message.ROWID == message_attachment.message_id AND attachment.ROWID == message_attachment.attachment_id"
             );
 
         if (chatGuid)

@@ -20,6 +20,7 @@ export type MessageResponse = {
     text: string;
     from?: HandleResponse | null;
     chats?: ChatResponse[];
+    attachments?: AttachmentResponse[];
     subject: string;
     country: string;
     error: boolean;
@@ -64,6 +65,20 @@ export type ChatResponse = {
     groupId: string;
     lastMessageTimestamp: number | null;
 }
+
+export type AttachmentResponse = {
+    guid: string;
+    messages: MessageResponse[];
+    data: Buffer;
+    uti: string;
+    mimeType: string;
+    transferState: number;
+    totalBytes: number;
+    isOutgoing: boolean;
+    transferName: string;
+    isSticker: boolean;
+    hideAttachment: boolean;
+};
 
 export enum ResponseMessages {
     SUCCESS = 'Success',

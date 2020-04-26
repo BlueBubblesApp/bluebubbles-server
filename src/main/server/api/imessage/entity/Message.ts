@@ -13,6 +13,7 @@ import { MessageTypeTransformer } from "@server/api/imessage/transformers/Messag
 import { MessageResponse } from "@server/helpers/dataTypes";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
+import { Attachment, getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 
 @Entity("message")
 export class Message {
@@ -46,6 +47,14 @@ export class Message {
         inverseJoinColumns: [{ name: "chat_id" }]
     })
     chats: Chat[];
+
+    @ManyToMany((type) => Attachment)
+    @JoinTable({
+        name: "message_attachment_join",
+        joinColumns: [{ name: "message_id" }],
+        inverseJoinColumns: [{ name: "attachment_id" }]
+    })
+    attachments: Attachment[];
 
     @Column({ name: "handle_id", type: "integer", nullable: true, default: 0 })
     handleId: number;
@@ -88,7 +97,7 @@ export class Message {
         nullable: true,
         transformer: DateTransformer
     })
-    dateCreated: number;
+    dateCreated: Date;
 
     @Column({
         name: "date_read",
@@ -96,7 +105,7 @@ export class Message {
         nullable: true,
         transformer: DateTransformer
     })
-    dateRead: number;
+    dateRead: Date;
 
     @Column({
         name: "date_delivered",
@@ -104,7 +113,7 @@ export class Message {
         nullable: true,
         transformer: DateTransformer
     })
-    dateDelivered: number;
+    dateDelivered: Date;
 
     @Column({
         name: "is_delivered",
@@ -283,7 +292,7 @@ export class Message {
         transformer: DateTransformer,
         default: 0
     })
-    datePlayed: number;
+    datePlayed: Date;
 
     @Column({ name: "item_type", type: "integer", default: 0 })
     itemType: number;
@@ -382,7 +391,7 @@ export class Message {
         transformer: DateTransformer,
         default: 0
     })
-    timeExpressiveSendStyleId: number;
+    timeExpressiveSendStyleId: Date;
 
     @Column({ name: "message_summary_info", type: "blob", nullable: true })
     messageSummaryInfo: Blob;
@@ -396,12 +405,15 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
         chats: tableData.chats
             ? tableData.chats.map((item) => getChatResponse(item))
             : [],
+        attachments: tableData.attachments
+            ? tableData.attachments.map((item) => getAttachmentResponse(item))
+            : [],
         subject: tableData.subject,
         country: tableData.country,
         error: tableData.error,
-        dateCreated: tableData.dateCreated,
-        dateRead: tableData.dateRead,
-        dateDelivered: tableData.dateDelivered,
+        dateCreated: (tableData.dateCreated) ? tableData.dateCreated.getTime() : null,
+        dateRead: (tableData.dateRead) ? tableData.dateRead.getTime() : null,
+        dateDelivered: (tableData.dateDelivered) ? tableData.dateDelivered.getTime() : null,
         isFromMe: tableData.isFromMe,
         isDelayed: tableData.isDelayed,
         isAutoReply: tableData.isAutoReply,
@@ -411,13 +423,13 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
         isArchived: tableData.isArchived,
         cacheRoomnames: tableData.cacheRoomnames,
         isAudioMessage: tableData.isAudioMessage,
-        datePlayed: tableData.datePlayed,
+        datePlayed: (tableData.datePlayed) ? tableData.datePlayed.getTime() : null,
         itemType: tableData.itemType,
         groupTitle: tableData.groupTitle,
         isExpired: tableData.isExpirable,
         associatedMessageGuid: tableData.associatedMessageGuid,
         associatedMessageType: tableData.associatedMessageType,
         expressiveSendStyleId: tableData.expressiveSendStyleId,
-        timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
+        timeExpressiveSendStyleId: (tableData.timeExpressiveSendStyleId) ? tableData.timeExpressiveSendStyleId.getTime() : null
     };
 }

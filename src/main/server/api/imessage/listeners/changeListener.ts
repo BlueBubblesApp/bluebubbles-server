@@ -55,15 +55,19 @@ export abstract class ChangeListener extends EventEmitter {
     async checkForNewEntries(): Promise<void> {
         if (this.stopped) return;
 
+        // Store the date when we started checking
+        const beforeCheck = new Date();
+
         // Check the cache and see if it needs to be purged
         this.purgeCache();
 
         try {
-            const beforeCheck = new Date();
-            const count = await this.getEntries();
+            // We pass the last check because we don't want it to change
+            // while we process asynchronously
+            this.getEntries(this.lastCheck);
 
-            // Only set last check if messages were found
-            if (count > 0) this.lastCheck = beforeCheck;
+            // Save the date for when we started checking
+            this.lastCheck = beforeCheck;
         } catch (err) {
             this.stopped = true;
             super.emit("error", err);
@@ -73,7 +77,7 @@ export abstract class ChangeListener extends EventEmitter {
         setTimeout(() => this.checkForNewEntries(), this.pollFrequency);
     }
 
-    abstract async getEntries(): Promise<number>;
+    abstract async getEntries(after: Date): Promise<void>;
 
     abstract transformEntry(entry: any): any;
 }

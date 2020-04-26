@@ -17,12 +17,12 @@ export class MessageListener extends ChangeListener {
         this.frequencyMs = pollFrequency;
     }
 
-    async getEntries(): Promise<number> {
+    async getEntries(after: Date): Promise<void> {
         const entries = await this.repo.getMessages(
             null,
             0,
             1000,
-            this.lastCheck
+            after
         );
         // Emit the new message
         entries.forEach((entry: any) => {
@@ -35,8 +35,6 @@ export class MessageListener extends ChangeListener {
             // Send the built message object
             super.emit("new-entry", this.transformEntry(entry));
         });
-
-        return entries.length;
     }
 
     // eslint-disable-next-line class-methods-use-this

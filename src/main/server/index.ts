@@ -48,19 +48,21 @@ export class BlueBubbleServer {
     }
 
     async setup(): Promise<void> {
+        console.log("Performing initial setup...");
         await this.initializeDatabase();
         await this.setupDefaults();
         this.setupFileSystem();
 
-        // Load DB
+        console.log("Initializing configuration database...");
         const cfg = await this.db.getRepository(Config).find();
         cfg.forEach((item) => {
             this.config[item.name] = item.value;
         });
 
+        console.log("Connecting to iMessage database...");
         await this.setupMessageRepo();
 
-        // Setup services
+        console.log("Initializing up sockets...");
         this.socketService = new SocketService(
             this.db,
             this.iMessageRepo,
@@ -68,19 +70,23 @@ export class BlueBubbleServer {
             this.config.socket_port
         );
 
+        console.log("Initializing connection to Google FCM...");
         this.fcmService = new FCMService(this.fs);
-
-        // Order matters
-        await this.connectToNgrok();
     }
 
     async start(): Promise<void> {
         await this.setup();
 
+        console.log("Starting socket service...");
         this.socketService.start();
         this.fcmService.start();
+
+        console.log("Starting chat listener...");
         this.startChatListener();
         this.startIpcListener();
+
+        console.log("Connecting to Ngrok...");
+        await this.connectToNgrok();
     }
 
     async initializeDatabase(): Promise<void> {
@@ -174,14 +180,14 @@ export class BlueBubbleServer {
 
     startChatListener() {
         // Create a listener to listen for new messages
-        const listener = new MessageListener(
-            this.iMessageRepo,
-            Number(this.config.poll_frequency)
-        );
+        const listener = new MessageListener(this.iMessageRepo, Number(this.config.poll_frequency));
         listener.start();
         listener.on("new-entry", async (item: Message) => {
+            // ATTENTION: If "from" is null, it means you sent the message from a group chat
+            // Check the isFromMe key prior to checking the "from" key
+            const from = (item.isFromMe) ? "yourself" : item.from?.id
             console.log(
-                `New message from ${item.from.id}, sent to ${item.chats[0].chatIdentifier}`
+                `New message from [${from}], sent to [${item.chats[0]?.displayName || item.chats[0]?.chatIdentifier}]`
             );
 
             const msg = getMessageResponse(item);
