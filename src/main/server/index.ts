@@ -60,6 +60,11 @@ export class BlueBubbleServer {
         this.socketService = null;
     }
 
+    emitToUI(event: string, data: any) {
+        if (this.window)
+            this.window.webContents.send(event, data);
+    }
+
     /**
      * Handler for sending logs. This allows us to also route
      * the logs to the main Electron window
@@ -83,8 +88,7 @@ export class BlueBubbleServer {
                 console.log(message);
         }
 
-        if (this.window)
-            this.window.webContents.send("new-log", message);
+        this.emitToUI("new-log", message);
     }
 
     /**
@@ -288,29 +292,31 @@ export class BlueBubbleServer {
      * for all requests sent by the Electron front-end
      */
     startIpcListener() {
-        ipcMain.handle("set-config", (event, args) => {
-            Object.keys(args).forEach(async (item) => {
+        ipcMain.handle("set-config", async (event, args) => {
+            for (const item of Object.keys(args)) {
                 if (this.config[item] && this.config[item] !== args[item]) {
                     this.config[item] = args[item];
 
                     // If the socket port changed, disconnect and reconnect
                     if (item === "socket_port") {
-                        await ngrok.disconnect();;
+                        console.log("changing port");
+                        await ngrok.disconnect();
+                        console.log("disconnected");
                         await this.connectToNgrok();
+                        console.log("connected");
                         await this.socketService.restart(args[item]);
                     }
                 }
-                // Update in class
-                if (this.config[item]) 
-                
-                // Update in DB
-                await this.db.getRepository(Config).update({ name: item }, { value: args[item] })
-            })
 
-            if (this.window) {
-                this.window.webContents.send("config-update", this.config);
+                // Update in class
+                if (this.config[item])
+                    // Update in DB
+                    await this.db
+                        .getRepository(Config)
+                        .update({ name: item }, { value: args[item] });
             }
-            
+
+            this.emitToUI("config-update", this.config);
             return this.config;
         });
 
