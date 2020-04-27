@@ -111,6 +111,7 @@ export class SocketService {
                 await this.db.getRepository(Device).update({ name: params.deviceName }, { identifier: params.deviceId });
             } else {
                 const item = new Device();
+                item.name = params.deviceName;
                 item.identifier = params.deviceId;
                 await this.db.getRepository(Device).save(item);
             }
