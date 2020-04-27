@@ -299,11 +299,8 @@ export class BlueBubbleServer {
 
                     // If the socket port changed, disconnect and reconnect
                     if (item === "socket_port") {
-                        console.log("changing port");
                         await ngrok.disconnect();
-                        console.log("disconnected");
                         await this.connectToNgrok();
-                        console.log("connected");
                         await this.socketService.restart(args[item]);
                     }
                 }
