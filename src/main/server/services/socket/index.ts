@@ -15,6 +15,7 @@ import { getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { getMessageResponse } from "@server/api/imessage/entity/Message";
 import { Connection } from "typeorm";
 import { Device } from "@server/entity/Device";
+import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 
 /**
  * This service class handles all routing for incoming socket
@@ -47,7 +48,12 @@ export class SocketService {
         port: number
     ) {
         this.db = db;
-        this.socketServer = io(port);
+
+        this.socketServer = io(port, {
+            // 5 Minute ping timeout
+            pingTimeout: 300000
+        });
+
         this.iMessageRepo = iMessageRepo;
         this.fs = fs;
         this.actionHandler = new ActionHandler(this.fs);
@@ -71,6 +77,7 @@ export class SocketService {
              */
             socket.use((packet, next) => {
                 try {
+                    // console.log(socket.request);
                     next();
                 } catch (ex) {
                     console.error(ex);
@@ -176,6 +183,23 @@ export class SocketService {
 
                 return respond(cb, "chat-messages", createSuccessResponse(
                     messages.map((item) => getMessageResponse(item))));
+            }
+        );
+
+        /**
+        * Get an attachment by guid
+        */
+        socket.on(
+            "get-attachment",
+            async (params, cb): Promise<void> => {
+                if (!params?.identifier)
+                    return respond(cb, "error", createBadRequestResponse("No attachment identifier provided"));
+
+                const attachment = await this.iMessageRepo.getAttachment(params?.identifier);
+                if (!attachment)
+                    return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
+
+                return respond(cb, "attachment", createSuccessResponse(getAttachmentResponse(attachment)));
             }
         );
 

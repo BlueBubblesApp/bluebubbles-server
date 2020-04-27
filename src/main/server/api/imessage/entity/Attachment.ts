@@ -115,7 +115,7 @@ export const getAttachmentResponse = (tableData: Attachment): AttachmentResponse
     return {
         guid: tableData.guid,
         messages: tableData.messages
-            ? tableData.messages.map((item) => getMessageResponse(item))
+            ? tableData.messages.map((item) => item.guid)
             : [],
         data,
         uti: tableData.uti,

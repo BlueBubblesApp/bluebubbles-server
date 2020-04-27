@@ -5,7 +5,7 @@ export type Error = {
     message: string;
 };
 
-export type ResponseData = MessageResponse | HandleResponse | ChatResponse | (MessageResponse | HandleResponse | ChatResponse)[] | null;
+export type ResponseData = MessageResponse | HandleResponse | ChatResponse | AttachmentResponse | (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[] | null;
 
 export type ResponseFormat = {
     status: ValidStatuses;
@@ -20,7 +20,7 @@ export type MessageResponse = {
     text: string;
     from?: HandleResponse | null;
     chats?: ChatResponse[];
-    attachments?: AttachmentResponse[];
+    attachments?: string[];
     subject: string;
     country: string;
     error: boolean;
@@ -68,7 +68,7 @@ export type ChatResponse = {
 
 export type AttachmentResponse = {
     guid: string;
-    messages: MessageResponse[];
+    messages: string[];
     data: Buffer;
     uti: string;
     mimeType: string;

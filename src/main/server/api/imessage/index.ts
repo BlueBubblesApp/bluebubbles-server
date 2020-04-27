@@ -55,6 +55,24 @@ export class DatabaseRepository {
     }
 
     /**
+     * Get all the chats from the DB
+     *
+     * @param attachmentGuid A specific attachment identifier to get
+     * @param withMessages Whether to include the participants or not
+     */
+    async getAttachment(attachmentGuid: string, withMessages = false) {
+        const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
+
+        if (withMessages)
+            query.leftJoinAndSelect("attachment.messages", "message");
+
+        query.andWhere("attachment.guid == :guid", { guid: attachmentGuid });
+
+        const attachment = await query.getOne();
+        return attachment;
+    }
+
+    /**
      * Get all the handles from the DB
      *
      * @param handle Get a specific handle from the DB
