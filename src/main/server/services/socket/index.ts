@@ -195,7 +195,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No attachment identifier provided"));
 
-                const attachment = await this.iMessageRepo.getAttachment(params?.identifier);
+                const attachment = await this.iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
                 if (!attachment)
                     return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
