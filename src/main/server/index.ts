@@ -15,7 +15,9 @@ import { Message, getMessageResponse } from "@server/api/imessage/entity/Message
 
 // Service Imports
 import { SocketService, FCMService } from "@server/services";
-import { Device } from "./entity/Device";
+import { Device } from "@server/entity/Device";
+
+import { generateUuid } from "@server/helpers/utils";
 
 /**
  * Main entry point for the back-end server
@@ -188,6 +190,11 @@ export class BlueBubbleServer {
         });
         if (!serverAddress)
             await this.addConfigItem("server_address", "");
+
+        const guid = await this.db.getRepository(Config).findOne({
+            name: "guid"
+        });
+        if (!guid) await this.addConfigItem("guid", generateUuid());
     }
 
     /**

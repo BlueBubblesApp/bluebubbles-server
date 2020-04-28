@@ -106,7 +106,10 @@ class Dashboard extends React.Component<Props, State> {
         if (!data || data.length === 0) return "";
 
         const jsonData = JSON.parse(data);
-        const output = [this.props.config?.server_address || ""];
+        const output = [
+            this.props.config?.guid,
+            this.props.config?.server_address || ""
+        ];
 
         output.push(jsonData.project_info.project_id);
         output.push(jsonData.project_info.storage_bucket);

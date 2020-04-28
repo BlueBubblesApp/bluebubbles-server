@@ -16,6 +16,7 @@ import { getMessageResponse } from "@server/api/imessage/entity/Message";
 import { Connection } from "typeorm";
 import { Device } from "@server/entity/Device";
 import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
+import { Config } from "@server/entity/Config";
 
 /**
  * This service class handles all routing for incoming socket
@@ -67,7 +68,16 @@ export class SocketService {
         * Handle all other data requests
         */
         this.socketServer.on("connection", async (socket) => {
-            console.log("client connected");
+            const guid = socket.handshake.query?.guid;
+            const cfg = await this.db.getRepository(Config).findOne({ name: "guid" });
+
+            // Basic authentication
+            if (guid === cfg.value) {
+                console.log("Client Authenticated Successfully")
+            } else {
+                socket.disconnect();
+                console.log("Closing client connection. Authentication failed.")
+            }
 
             /**
              * Error handling middleware for all Socket.IO requests.
