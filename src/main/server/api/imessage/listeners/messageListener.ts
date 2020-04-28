@@ -18,12 +18,14 @@ export class MessageListener extends ChangeListener {
     }
 
     async getEntries(after: Date): Promise<void> {
+        const offsetDate = new Date(after.getTime() - 5000);
         const entries = await this.repo.getMessages(
             null,
             0,
-            1000,
-            after
+            100,
+            offsetDate
         );
+
         // Emit the new message
         entries.forEach((entry: any) => {
             // Skip over any that we've finished
