@@ -20,7 +20,7 @@ export type MessageResponse = {
     text: string;
     from?: HandleResponse | null;
     chats?: ChatResponse[];
-    attachments?: string[];
+    attachments?: AttachmentResponse[];
     subject: string;
     country: string;
     error: boolean;

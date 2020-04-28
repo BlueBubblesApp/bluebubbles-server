@@ -36,6 +36,22 @@ export class FCMService {
     }
 
     /**
+     * Sets the ngrok server URL within firebase
+     *
+     * @param serverUrl The new server URL
+     */
+    async setServerUrl(serverUrl: string) {
+        if (!this.app) return;
+
+        const db = admin.database();
+        const config = db.ref("config");
+
+        config.once("value", (data) => {
+            config.update({ serverUrl });
+        });
+    }
+
+    /**
      * Sends a notification to all connected devices
      *
      * @param devices Devices to send the notification to

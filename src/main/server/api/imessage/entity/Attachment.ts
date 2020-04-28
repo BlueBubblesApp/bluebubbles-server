@@ -96,21 +96,24 @@ export class Attachment {
     hideAttachment: boolean;
 }
 
-export const getAttachmentResponse = (tableData: Attachment): AttachmentResponse => {
+export const getAttachmentResponse = (tableData: Attachment, withData = false): AttachmentResponse => {
     let data = null;
 
-    // Get the fully qualified path
-    let fPath = tableData.filePath;
-    if (fPath[0] === "~") {
-        fPath = path.join(process.env.HOME, fPath.slice(1));
-    }
+    if (withData) {
+        // Get the fully qualified path
+        let fPath = tableData.filePath;
+        if (fPath[0] === "~") {
+            fPath = path.join(process.env.HOME, fPath.slice(1));
+        }
 
-    try {
-        // Try to read the file
-        data = fs.readFileSync(fPath);
-    } catch (ex) {
-        console.error(`Could not read file [${fPath}]`);
+        try {
+            // Try to read the file
+            data = fs.readFileSync(fPath);
+        } catch (ex) {
+            console.error(`Could not read file [${fPath}]`);
+        }
     }
+    
 
     return {
         guid: tableData.guid,

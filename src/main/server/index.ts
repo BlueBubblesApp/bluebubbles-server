@@ -221,6 +221,7 @@ export class BlueBubbleServer {
             this.socketService.socketServer.emit("new-server", this.ngrokServer);
 
         await this.sendNotification("new-server", this.ngrokServer);
+        this.fcmService.setServerUrl(this.ngrokServer);
     }
 
     /**

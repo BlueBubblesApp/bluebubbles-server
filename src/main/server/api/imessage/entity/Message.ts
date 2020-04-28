@@ -406,7 +406,7 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
             ? tableData.chats.map((item) => getChatResponse(item))
             : [],
         attachments: tableData.attachments
-            ? tableData.attachments.map((item) => item.guid)
+            ? tableData.attachments.map((item) => getAttachmentResponse(item))
             : [],
         subject: tableData.subject,
         country: tableData.country,

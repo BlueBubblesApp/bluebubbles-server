@@ -199,7 +199,7 @@ export class SocketService {
                 if (!attachment)
                     return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
-                return respond(cb, "attachment", createSuccessResponse(getAttachmentResponse(attachment)));
+                return respond(cb, "attachment", createSuccessResponse(getAttachmentResponse(attachment, true)));
             }
         );
 
