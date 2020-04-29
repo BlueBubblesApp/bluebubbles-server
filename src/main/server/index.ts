@@ -113,6 +113,18 @@ export class BlueBubblesServer {
     }
 
     /**
+     * Sets a config value in the database and class
+     *
+     * @param name Name of the config item
+     * @param value Value of the config item
+     */
+    private async setConfig(name: string, value: string): Promise<void> {
+        await this.db.getRepository(Config).update({ name }, { value });
+        this.config[name] = value;
+        this.emitToUI("config-update", this.config);
+    }
+
+    /**
      * Performs the initial setup for the server.
      * Mainly, instantiation of a bunch of classes/handlers
      */
@@ -171,6 +183,11 @@ export class BlueBubblesServer {
      * has not already been initialized
      */
     private async setupDefaults(): Promise<void> {
+        const tutorialIsDone = await this.db.getRepository(Config).findOne({
+            name: "tutorial_is_done"
+        });
+        if (!tutorialIsDone)
+            await this.addConfigItem("tutorial_is_done", 0);
         const socketPort = await this.db.getRepository(Config).findOne({
             name: "socket_port"
         });
@@ -199,11 +216,8 @@ export class BlueBubblesServer {
             // This is required to run ngrok in production
             binPath: (path) => path.replace("app.asar", "app.asar.unpacked")
         });
-        this.config.server_address = this.ngrokServer;
-        await this.db.getRepository(Config).update(
-            { name: "server_address" },
-            { value: this.ngrokServer }
-        );
+
+        await this.setConfig("server_address", this.ngrokServer);
 
         // Emit this over the socket
         if (this.socketService)
@@ -295,14 +309,19 @@ export class BlueBubblesServer {
                 }
 
                 // Update in class
-                if (this.config[item])
-                    // Update in DB
-                    await this.db
-                        .getRepository(Config)
-                        .update({ name: item }, { value: args[item] });
+                if (this.config[item]) await this.setConfig(item, args[item]);
             }
 
             this.emitToUI("config-update", this.config);
+            return this.config;
+        });
+
+        ipcMain.handle("get-config", async (event, args) => {
+            const cfg = await this.db.getRepository(Config).find();
+            for (const i of cfg) {
+                this.config[i.name] = i.value;
+            }
+
             return this.config;
         });
 
@@ -346,6 +365,10 @@ export class BlueBubblesServer {
 
         ipcMain.handle("get-fcm-client", (event, args) => {
             return this.fs.getFCMClient();
+        });
+
+        ipcMain.handle("complete-tutorial", async (event, args) => {
+            await this.setConfig("tutorial_is_done", "1");
         });
     }
 }

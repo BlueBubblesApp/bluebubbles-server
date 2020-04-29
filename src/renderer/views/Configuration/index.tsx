@@ -55,7 +55,6 @@ class Dashboard extends React.Component<Props, State> {
     }
 
     saveConfig = async () => {
-        console.log("sending...")
         const res = await ipcRenderer.invoke("set-config", {
             socket_port: this.state.port
         });

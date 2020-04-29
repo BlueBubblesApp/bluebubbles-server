@@ -40,6 +40,7 @@ import Configuration from "@renderer/views/Configuration";
 import Devices from "@renderer/views/Devices";
 import Dashboard from "@renderer/views/Dashboard";
 import Logs from "@renderer/views/Logs";
+import Tutorial from "@renderer/views/Tutorial";
 
 // Helpers
 import { Config } from "@renderer/variables/types";
@@ -65,12 +66,12 @@ class AdminLayout extends React.Component<Props, State> {
         config: null
     }
 
-    componentDidMount() {
+    async componentDidMount() {
+        const config = await ipcRenderer.invoke("get-config");
+        if (config) this.setState({ config });
+
         ipcRenderer.on("config-update", (event, arg) => {
-            console.log(arg)
-            this.setState({
-                config: arg
-            })
+            this.setState({ config: arg })
         })
     }
 
@@ -107,7 +108,7 @@ class AdminLayout extends React.Component<Props, State> {
                                 <MenuIcon />
                             </IconButton>
                             <Typography variant="h6" noWrap>
-                                BlueBubble App
+                                BlueBubbles App
                             </Typography>
                         </Toolbar>
                     </AppBar>
@@ -190,6 +191,9 @@ class AdminLayout extends React.Component<Props, State> {
                     </Drawer>
                     <section className={classes.container}>
                         <Switch>
+                            <Route path="/tutorial">
+                                <Tutorial config={config} />
+                            </Route>
                             <Route path="/configuration">
                                 <Configuration config={config} />
                             </Route>
@@ -200,7 +204,7 @@ class AdminLayout extends React.Component<Props, State> {
                                 <Logs />
                             </Route>
                             <Route path="/">
-                                <Dashboard />
+                                <Dashboard config={config} />
                             </Route>
                         </Switch>
                     </section>

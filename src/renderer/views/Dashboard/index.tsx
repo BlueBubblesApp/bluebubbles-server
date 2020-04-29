@@ -1,5 +1,6 @@
 /* eslint-disable */
 import * as React from "react";
+import { Redirect } from "react-router-dom";
 import * as numeral from "numeral";
 import { ipcRenderer } from "electron";
 
@@ -39,6 +40,7 @@ import { bugs, website, server } from "@renderer/variables/general";
 
 interface Props {
     classes: any;
+    config: any;
 }
 
 interface State {
@@ -150,6 +152,11 @@ class Dashboard extends React.Component<Props, State> {
 
     render() {
         const { classes } = this.props;
+
+        let tutorialIsDone = this.props.config?.tutorial_is_done;
+        if (tutorialIsDone && !Boolean(Number(tutorialIsDone))) {
+            return <Redirect to="/tutorial" />
+        }
 
         return (
             <section className={classes.root}>

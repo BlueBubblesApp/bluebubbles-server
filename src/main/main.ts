@@ -33,7 +33,7 @@ const createWindow = async () => {
         title: "BlueBubble App",
         useContentSize: true,
         width: 1080,
-        height: 920,
+        height: 1030,
         webPreferences: {
             nodeIntegration: true // Required in new electron version
         }

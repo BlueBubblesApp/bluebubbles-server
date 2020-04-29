@@ -70,7 +70,7 @@ class Devices extends React.Component<Props, State> {
                         <TableBody>
                             {logs.map((row, index) => (
                                 <TableRow key={index}>
-                                    <TableCell component="th" scope="row">
+                                    <TableCell component="th" scope="row" className={classes.wrapText}>
                                         {row.log || "N/A"}
                                     </TableCell>
                                     <TableCell align="right">
@@ -98,6 +98,10 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         header: {
             fontWeight: 400,
             marginBottom: "1em"
+        },
+        wrapText: {
+            overflowWrap: "break-word",
+            maxWidth: "500px"
         }
     });
 

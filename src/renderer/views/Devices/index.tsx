@@ -70,7 +70,7 @@ class Devices extends React.Component<Props, State> {
                                     <TableCell component="th" scope="row">
                                         {row.name || "N/A"}
                                     </TableCell>
-                                    <TableCell align="right">
+                                    <TableCell align="right" className={classes.wrapText}>
                                         {row.identifier}
                                     </TableCell>
                                 </TableRow>
@@ -92,6 +92,10 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         header: {
             fontWeight: 400,
             marginBottom: "1em"
+        },
+        wrapText: {
+            overflowWrap: "break-word",
+            maxWidth: "500px"
         }
     });
 
