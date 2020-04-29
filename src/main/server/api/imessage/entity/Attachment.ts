@@ -108,7 +108,7 @@ export const getAttachmentResponse = (tableData: Attachment, withData = false): 
 
         try {
             // Try to read the file
-            data = fs.readFileSync(fPath);
+            data = Uint8Array.from(fs.readFileSync(fPath));
         } catch (ex) {
             console.error(`Could not read file [${fPath}]`);
         }

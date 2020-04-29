@@ -69,7 +69,7 @@ export type ChatResponse = {
 export type AttachmentResponse = {
     guid: string;
     messages: string[];
-    data: Buffer;
+    data: Uint8Array;
     uti: string;
     mimeType: string;
     transferState: number;
