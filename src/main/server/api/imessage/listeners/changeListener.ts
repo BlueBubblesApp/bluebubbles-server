@@ -27,8 +27,8 @@ export abstract class ChangeListener extends EventEmitter {
     purgeCache() {
         const now = new Date();
 
-        // Purge emitted messages every 30 minutes to save memory
-        if (now.getTime() - this.lastPurge.getTime() > 1800000) {
+        // Purge emitted messages every 30 minutes to save memory (or every 100 items)
+        if (this.emittedItems.length > 100 || now.getTime() - this.lastPurge.getTime() > 1800000) {
             if (this.emittedItems.length > 0) {
                 console.info(
                     `Purging ${this.emittedItems.length} emitted messages from cahche...`
