@@ -10,9 +10,12 @@ export class FCMService {
 
     app: admin.app.App;
 
+    lastRefresh: Date;
+
     constructor(fs: FileSystem) {
         this.fs = fs;
         this.app = null;
+        this.lastRefresh = null;
     }
 
     /**
@@ -20,19 +23,30 @@ export class FCMService {
      * Does not set it up if the required files are not present
      */
     start() {
+        // If the app exists, close it
+        if (this.app) this.app.delete();
+
+        // Force refresh a new connection
+        this.refresh(true);
+    }
+
+    private refresh(force = false): boolean {
         // Do nothing if the config doesn't exist
         const serverConfig = this.fs.getFCMServer();
         const clientConfig = this.fs.getFCMClient();
         if (!serverConfig || !clientConfig) return;
-        
-        // If the app exists, close it
-        if (this.app) this.app.delete();
 
-        // Re-instantiate the app
-        this.app = admin.initializeApp({
-            credential: admin.credential.cert(serverConfig),
-            databaseURL: clientConfig.project_info.firebase_url
-        });
+        const now = new Date();
+
+        // Refresh JWT every 60 minutes
+        if (force || !this.lastRefresh || now.getTime() - this.lastRefresh.getTime() > 3600000) {
+            // Re-instantiate the app
+            this.lastRefresh = new Date();
+            this.app = admin.initializeApp({
+                credential: admin.credential.cert(serverConfig),
+                databaseURL: clientConfig.project_info.firebase_url
+            });
+        }
     }
 
     /**
@@ -40,8 +54,8 @@ export class FCMService {
      *
      * @param serverUrl The new server URL
      */
-    async setServerUrl(serverUrl: string) {
-        if (!this.app) return;
+    setServerUrl(serverUrl: string): void {
+        if (!this.refresh()) return;
 
         const db = admin.database();
         const config = db.ref("config");
@@ -57,7 +71,9 @@ export class FCMService {
      * @param devices Devices to send the notification to
      * @param data The data to send
      */
-    async sendNotification(devices: string[], data: any) {
+    async sendNotification(devices: string[], data: any): Promise<admin.messaging.BatchResponse> {
+        if (!this.refresh()) return null;
+
         // Build out the notification message
         const msg: admin.messaging.MulticastMessage = { data, tokens: devices };
         const res = await this.app.messaging().sendMulticast(msg);

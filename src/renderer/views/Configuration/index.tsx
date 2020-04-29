@@ -30,7 +30,6 @@ interface Props {
 
 interface State {
     port: string;
-    frequency: string;
     fcmClient: any;
     fcmServer: any
 }
@@ -38,15 +37,13 @@ interface State {
 class Dashboard extends React.Component<Props, State> {
     state: State = {
         port: String(this.props.config?.socket_port || ""),
-        frequency: String(this.props.config?.poll_frequency || ""),
         fcmClient: null,
         fcmServer: null
     }
     
     componentWillReceiveProps(nextProps: Props) {
         this.setState({
-            port: String(nextProps.config?.socket_port || ""),
-            frequency: String(nextProps.config?.poll_frequency || "")
+            port: String(nextProps.config?.socket_port || "")
         });
     }
 
@@ -60,7 +57,6 @@ class Dashboard extends React.Component<Props, State> {
     saveConfig = async () => {
         console.log("sending...")
         const res = await ipcRenderer.invoke("set-config", {
-            poll_frequency: this.state.frequency,
             socket_port: this.state.port
         });
         console.log(res)
@@ -69,7 +65,6 @@ class Dashboard extends React.Component<Props, State> {
     handleChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
         const id = e.target.id;
         if (id === "port") this.setState({ port: e.target.value });
-        if (id === "frequency") this.setState({ frequency: e.target.value });
     }
 
     handleClientFile = (acceptedFiles: any) => {
@@ -124,7 +119,7 @@ class Dashboard extends React.Component<Props, State> {
 
     render() {
         const { classes, config } = this.props;
-        const { fcmClient, port, frequency, fcmServer } = this.state;
+        const { fcmClient, port, fcmServer } = this.state;
         const qrData = this.buildQrData(fcmClient);
 
         return (
@@ -159,16 +154,6 @@ class Dashboard extends React.Component<Props, State> {
                             value={port}
                             onChange={(e) => this.handleChange(e)}
                         />
-                        <TextField
-                            required
-                            id="frequency"
-                            className={classes.field}
-                            label="Poll Frequency (ms)"
-                            value={frequency}
-                            variant="outlined"
-                            helperText="How often should we check for new messages?"
-                            onChange={(e) => this.handleChange(e)}
-                        />
                         <section className={classes.fcmConfig}>
                             <section>
                                 <Typography
@@ -182,7 +167,7 @@ class Dashboard extends React.Component<Props, State> {
                                     className={classes.header}
                                 >
                                     Service Config Status:{" "}
-                                    {this.state.fcmServer
+                                    {fcmServer
                                         ? "Loaded"
                                         : "Not Set"}
                                 </Typography>

@@ -170,15 +170,6 @@ export class BlueBubbleServer {
      * has not already been initialized
      */
     async setupDefaults(): Promise<void> {
-        const frequency = await this.db.getRepository(Config).findOne({
-            name: "poll_frequency"
-        });
-        if (!frequency)
-            await this.addConfigItem(
-                "poll_frequency",
-                DEFAULT_POLL_FREQUENCY_MS
-            );
-
         const socketPort = await this.db.getRepository(Config).findOne({
             name: "socket_port"
         });
@@ -279,7 +270,7 @@ export class BlueBubbleServer {
      */
     startChatListener() {
         // Create a listener to listen for new messages
-        const listener = new MessageListener(this.iMessageRepo, Number(this.config.poll_frequency));
+        const listener = new MessageListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
         listener.start();
         listener.on("new-entry", async (item: Message) => {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
