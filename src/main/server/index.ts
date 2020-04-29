@@ -228,7 +228,6 @@ export class BlueBubblesServer {
             if (!devices || devices.length === 0) return;
 
             const notifData = JSON.stringify(data);
-            this.log(notifData);
             await this.fcmService.sendNotification(devices.map(device => device.identifier), {
                 type,
                 data: notifData
