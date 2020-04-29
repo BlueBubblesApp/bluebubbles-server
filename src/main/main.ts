@@ -3,10 +3,10 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import * as path from "path";
 import * as url from "url";
 
-import { BlueBubbleServer } from "@server/index";
+import { BlueBubblesServer } from "@server/index";
 
 let win: BrowserWindow | null;
-const api = new BlueBubbleServer(win);
+const api = new BlueBubblesServer(win);
 
 const installExtensions = async () => {
     const installer = require("electron-devtools-installer");

@@ -24,7 +24,7 @@ import { generateUuid } from "@server/helpers/utils";
  * This will handle all services and helpers that get spun
  * up when running the application.
  */
-export class BlueBubbleServer {
+export class BlueBubblesServer {
     window: BrowserWindow;
     
     db: Connection;
@@ -62,7 +62,7 @@ export class BlueBubbleServer {
         this.socketService = null;
     }
 
-    emitToUI(event: string, data: any) {
+    private emitToUI(event: string, data: any) {
         if (this.window)
             this.window.webContents.send(event, data);
     }
@@ -74,7 +74,7 @@ export class BlueBubbleServer {
      * @param message The message to print
      * @param type The log type
      */
-    log(message: any, type?: "log" | "error" | "dir" | "warn") {
+    private log(message: any, type?: "log" | "error" | "dir" | "warn") {
         switch (type) {
             case "error":
                 console.error(message);
@@ -116,7 +116,7 @@ export class BlueBubbleServer {
      * Performs the initial setup for the server.
      * Mainly, instantiation of a bunch of classes/handlers
      */
-    async setup(): Promise<void> {
+    private async setup(): Promise<void> {
         this.log("Performing initial setup...");
         await this.initializeDatabase();
         await this.setupDefaults();
@@ -129,7 +129,8 @@ export class BlueBubbleServer {
         });
 
         this.log("Connecting to iMessage database...");
-        await this.setupMessageRepo();
+        this.iMessageRepo = new DatabaseRepository();
+        await this.iMessageRepo.initialize();
 
         this.log("Initializing up sockets...");
         this.socketService = new SocketService(
@@ -146,7 +147,7 @@ export class BlueBubbleServer {
     /**
      * Initializes the connection to the configuration database
      */
-    async initializeDatabase(): Promise<void> {
+    private async initializeDatabase(): Promise<void> {
         this.db = await createConnection({
             type: "sqlite",
             database: `${app.getPath("userData")}/config.db`,
@@ -160,7 +161,7 @@ export class BlueBubbleServer {
      * Sets up the "filsystem". This basically initializes
      * the required directories for the app
      */
-    setupFileSystem(): void {
+    private setupFileSystem(): void {
         this.fs = new FileSystem();
         this.fs.setup();
     }
@@ -169,7 +170,7 @@ export class BlueBubbleServer {
      * This sets any default database values, if the database
      * has not already been initialized
      */
-    async setupDefaults(): Promise<void> {
+    private async setupDefaults(): Promise<void> {
         const socketPort = await this.db.getRepository(Config).findOne({
             name: "socket_port"
         });
@@ -186,16 +187,6 @@ export class BlueBubbleServer {
             name: "guid"
         });
         if (!guid) await this.addConfigItem("guid", generateUuid());
-    }
-
-    /**
-     * Initializes the connection to the iMessage
-     * chat database. This allows us to fetch data from
-     * the database and listen for new messages
-     */
-    async setupMessageRepo(): Promise<void> {
-        this.iMessageRepo = new DatabaseRepository();
-        await this.iMessageRepo.initialize();
     }
 
     /**
@@ -252,7 +243,7 @@ export class BlueBubbleServer {
      * @param name The name of the config item
      * @param value The initial value of the config item
      */
-    async addConfigItem(
+    private async addConfigItem(
         name: string,
         value: string | number
     ): Promise<Config> {
@@ -268,7 +259,7 @@ export class BlueBubbleServer {
      * iMessages from your chat database. Anytime there is a new message,
      * we will emit a message to the socket, as well as the FCM server
      */
-    startChatListener() {
+    private startChatListener() {
         // Create a listener to listen for new messages
         const listener = new MessageListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
         listener.start();
@@ -290,7 +281,7 @@ export class BlueBubbleServer {
      * Starts the inter-process-communication handlers. Basically, a router
      * for all requests sent by the Electron front-end
      */
-    startIpcListener() {
+    private startIpcListener() {
         ipcMain.handle("set-config", async (event, args) => {
             for (const item of Object.keys(args)) {
                 if (this.config[item] && this.config[item] !== args[item]) {
