@@ -50,7 +50,7 @@ export const getHandleResponse = (tableData: Handle): HandleResponse => {
         chats: tableData.chats
             ? tableData.chats.map((item) => getChatResponse(item))
             : [],
-        id: tableData.id,
+        address: tableData.id,
         country: tableData.country,
         uncanonicalizedId: tableData.uncanonicalizedId
     };

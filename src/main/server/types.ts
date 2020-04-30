@@ -49,7 +49,7 @@ export type MessageResponse = {
 export type HandleResponse = {
     messages?: MessageResponse[];
     chats?: ChatResponse[];
-    id: string;
+    address: string;
     country: string;
     uncanonicalizedId: string
 };
