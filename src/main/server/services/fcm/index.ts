@@ -39,7 +39,7 @@ export class FCMService {
         if (force || !this.lastRefresh || now.getTime() - this.lastRefresh.getTime() > 3600000) {
             // Re-instantiate the app
             this.lastRefresh = new Date();
-            this.app.delete(); // Kill the old connection
+            if (this.app) this.app.delete(); // Kill the old connection
             this.app = admin.initializeApp({
                 credential: admin.credential.cert(serverConfig),
                 databaseURL: clientConfig.project_info.firebase_url
