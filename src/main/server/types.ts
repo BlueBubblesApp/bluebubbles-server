@@ -5,7 +5,14 @@ export type Error = {
     message: string;
 };
 
-export type ResponseData = MessageResponse | HandleResponse | ChatResponse | AttachmentResponse | (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[] | null;
+export type ResponseData =
+    MessageResponse |
+    HandleResponse |
+    ChatResponse |
+    AttachmentResponse |
+    (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[] |
+    Uint8Array |
+    null;
 
 export type ResponseFormat = {
     status: ValidStatuses;

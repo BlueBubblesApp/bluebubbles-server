@@ -1,4 +1,5 @@
 import * as io from "socket.io";
+import * as path from "path";
 
 // Internal libraries
 import { DatabaseRepository } from "@server/api/imessage";
@@ -210,6 +211,33 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 return respond(cb, "attachment", createSuccessResponse(getAttachmentResponse(attachment, true)));
+            }
+        );
+
+        /**
+        * Get an attachment chunk by guid
+        */
+        socket.on(
+            "get-attachment-chunk",
+            async (params, cb): Promise<void> => {
+                if (!params?.identifier)
+                    return respond(cb, "error", createBadRequestResponse("No attachment identifier provided"));
+                if (!params?.start || params.start < 0)
+                    return respond(cb, "error", createBadRequestResponse("No starting point provided"));
+
+                // Get the corresponding attachment
+                const attachment = await this.iMessageRepo.getAttachment(params?.identifier, false);
+                if (!attachment)
+                    return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
+
+                // Get the fully qualified path
+                let fPath = attachment.filePath;
+                if (fPath[0] === "~") {
+                    fPath = path.join(process.env.HOME, fPath.slice(1));
+                }
+
+                return respond(cb, "attachment-chunk", createSuccessResponse(
+                    FileSystem.readFileChunk(fPath, params.start)));
             }
         );
 

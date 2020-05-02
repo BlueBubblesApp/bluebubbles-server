@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { app } from "electron";
 import * as child_process from "child_process";
-
+import { sync } from "read-chunk";
 import { AppleScripts } from "./scripts";
 
 /**
@@ -109,6 +109,16 @@ export class FileSystem {
         } catch (e) {
             console.warn(`Failed to remove attachment: ${name}`);
         }
+    }
+
+    static readFileChunk(filePath: string, start: number, chunkSize = 1024): Uint8Array {
+        // Get the file size
+        const stats = fs.statSync(filePath);
+        let fStart = start;
+
+        // Make sure the start are not bigger than the size
+        if (fStart > stats.size) fStart = stats.size;
+        return Uint8Array.from(sync(filePath, fStart, chunkSize));
     }
 
     /**
