@@ -225,6 +225,8 @@ export class SocketService {
                 if (!params?.start || params.start < 0)
                     return respond(cb, "error", createBadRequestResponse("No starting point provided"));
 
+                const chunkSize = params?.chunkSize || 1024
+
                 // Get the corresponding attachment
                 const attachment = await this.iMessageRepo.getAttachment(params?.identifier, false);
                 if (!attachment)
@@ -237,7 +239,7 @@ export class SocketService {
                 }
 
                 return respond(cb, "attachment-chunk", createSuccessResponse(
-                    FileSystem.readFileChunk(fPath, params.start)));
+                    FileSystem.readFileChunk(fPath, params.start, chunkSize)));
             }
         );
 
