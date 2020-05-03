@@ -18,6 +18,7 @@ import { SocketService, FCMService } from "@server/services";
 import { Device } from "@server/entity/Device";
 
 import { generateUuid } from "@server/helpers/utils";
+import { MessageUpdateListener } from "./api/imessage/listeners/messageUpdateListener";
 
 /**
  * Main entry point for the back-end server
@@ -273,10 +274,11 @@ export class BlueBubblesServer {
      * we will emit a message to the socket, as well as the FCM server
      */
     private startChatListener() {
-        // Create a listener to listen for new messages
-        const listener = new MessageListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
-        listener.start();
-        listener.on("new-entry", async (item: Message) => {
+        // Create a listener to listen for new/updated messages
+        const newMsgListener = new MessageListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
+        const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
+
+        newMsgListener.on("new-entry", async (item: Message) => {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
             const from = (item.isFromMe) ? "yourself" : item.from?.id
@@ -287,6 +289,20 @@ export class BlueBubblesServer {
 
             // Emit it to the socket and FCM devices
             await this.sendNotification("new-message", msg);
+        });
+
+        updatedMsgListener.on("updated-entry", async (item: Message) => {
+            // ATTENTION: If "from" is null, it means you sent the message from a group chat
+            // Check the isFromMe key prior to checking the "from" key
+            const from = (item.isFromMe) ? "yourself" : item.from?.id
+            const time = item.dateDelivered || item.dateRead;
+            const text = (item.dateRead) ? 'Text Read' : 'Text Delivered'
+            this.log(`Updated message from [${from}]: [${text} -> ${time.toLocaleString()}]`);
+
+            const msg = getMessageResponse(item);
+
+            // Emit it to the socket and FCM devices
+            await this.sendNotification("updated-message", msg);
         });
     }
 

@@ -40,16 +40,13 @@ export abstract class ChangeListener extends EventEmitter {
         }
     }
 
-    async start(): Promise<null> {
+    start() {
         this.emittedItems = [];
         this.lastCheck = new Date();
         this.lastPurge = new Date();
 
         // Start checking
         this.checkForNewEntries();
-
-        // So ESLint won't yell at us
-        return null;
     }
 
     async checkForNewEntries(): Promise<void> {

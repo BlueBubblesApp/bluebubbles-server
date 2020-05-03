@@ -2,7 +2,7 @@ import { DatabaseRepository } from "@server/api/imessage";
 import { Message } from "@server/api/imessage/entity/Message";
 import { ChangeListener } from "./changeListener";
 
-export class MessageListener extends ChangeListener {
+export class MessageUpdateListener extends ChangeListener {
     repo: DatabaseRepository;
 
     frequencyMs: number;
@@ -22,7 +22,7 @@ export class MessageListener extends ChangeListener {
 
     async getEntries(after: Date): Promise<void> {
         const offsetDate = new Date(after.getTime() - 5000);
-        const entries = await this.repo.getMessages(
+        const entries = await this.repo.getUpdatedMessages(
             null,
             0,
             100,
@@ -38,7 +38,7 @@ export class MessageListener extends ChangeListener {
             this.emittedItems.push(entry.ROWID);
 
             // Send the built message object
-            super.emit("new-entry", this.transformEntry(entry));
+            super.emit("updated-entry", this.transformEntry(entry));
         });
     }
 

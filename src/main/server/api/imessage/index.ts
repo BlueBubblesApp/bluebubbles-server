@@ -113,18 +113,18 @@ export class DatabaseRepository {
             .createQueryBuilder("message")
             .leftJoinAndSelect("message.from", "handle")
             .leftJoinAndSelect(
-                "message.chats",
-                "chat",
-                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
-            )
-            .leftJoinAndSelect(
                 "message.attachments",
                 "attachment",
                 "message.ROWID == message_attachment.message_id AND attachment.ROWID == message_attachment.attachment_id"
             );
 
-        if (chatGuid)
-            query.andWhere("chat.guid = :guid", { guid: chatGuid });
+        if (chatGuid) {
+            query.leftJoinAndSelect(
+                "message.chats",
+                "chat",
+                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+            ).andWhere("chat.guid = :guid", { guid: chatGuid });
+        }
 
         // Add default WHERE clauses
         query
@@ -138,6 +138,69 @@ export class DatabaseRepository {
             });
         if (before)
             query.andWhere("message.date < :before", {
+                before: convertDateTo2001Time(before)
+            });
+
+        // Add pagination params
+        query.orderBy("message.date", "DESC");
+        query.offset(offset);
+        query.limit(limit);
+
+        const messages = await query.getMany();
+        return messages;
+    }
+
+    /**
+     * Gets all messages that have been updated
+     *
+     * @param chat The chat to get the messages from
+     * @param offset The offset to start getting the messages from
+     * @param limit The max number of messages to return
+     * @param after The earliest date to get messages from
+     * @param before The latest date to get messages from
+     */
+    async getUpdatedMessages(
+        chatGuid: string,
+        offset = 0,
+        limit = 100,
+        after?: Date,
+        before?: Date
+    ) {
+        // Get messages with sender and the chat it's from
+        const query = this.db
+            .getRepository(Message)
+            .createQueryBuilder("message")
+            .leftJoinAndSelect("message.from", "handle");
+
+        // If a GUID is present, add to the search
+        if (chatGuid) {
+            query.leftJoinAndSelect(
+                "message.chats",
+                "chat",
+                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+            ).andWhere("chat.guid = :guid", { guid: chatGuid });
+        }
+
+        // Add default WHERE clauses
+        query.andWhere("message.service == 'iMessage'");
+
+        // Add date_delivered constraints
+        if (after)
+            query.andWhere("message.date_delivered >= :after", {
+                after: convertDateTo2001Time(after)
+            });
+        if (before)
+            query.andWhere("message.date_delivered < :before", {
+                before: convertDateTo2001Time(before)
+            });
+
+        // Add date_read constraints
+        if (after)
+            query.orWhere("message.date_read >= :after", {
+                after: convertDateTo2001Time(after)
+            });
+        if (before)
+            query.andWhere("message.date_read < :before", {
                 before: convertDateTo2001Time(before)
             });
 
