@@ -119,7 +119,7 @@ export class SocketService {
         /**
         * Add Device ID to the database
         */
-        socket.on("add-fcm-device-id", async (params, cb): Promise<void> => {
+        socket.on("add-fcm-device", async (params, cb): Promise<void> => {
             if (!params?.deviceName || !params?.deviceId)
                 return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
 

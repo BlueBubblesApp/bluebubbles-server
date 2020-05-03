@@ -71,7 +71,7 @@ export type ChatResponse = {
     displayName: string;
     groupId: string;
     lastMessageTimestamp: number | null;
-}
+};
 
 export type AttachmentResponse = {
     guid: string;
