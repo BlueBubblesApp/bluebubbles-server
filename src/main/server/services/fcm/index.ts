@@ -45,6 +45,8 @@ export class FCMService {
                 databaseURL: clientConfig.project_info.firebase_url
             });
         }
+
+        return true;
     }
 
     /**
