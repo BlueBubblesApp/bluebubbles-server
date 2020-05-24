@@ -222,7 +222,7 @@ export class SocketService {
             async (params, cb): Promise<void> => {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No attachment identifier provided"));
-                if (!params?.start || params.start < 0)
+                if (typeof(params?.start) === "undefined" || params.start < 0)
                     return respond(cb, "error", createBadRequestResponse("No starting point provided"));
 
                 const chunkSize = params?.chunkSize || 1024
