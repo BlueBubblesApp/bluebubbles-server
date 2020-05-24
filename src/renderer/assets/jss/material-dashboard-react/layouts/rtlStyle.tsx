@@ -1,38 +1,39 @@
+import { Theme, createStyles } from "@material-ui/core";
 import {
-  drawerWidth,
-  transition,
-  container
-} from '../../material-dashboard-react';
-import { Theme, createStyles } from '@material-ui/core';
+    drawerWidth,
+    transition,
+    container
+} from "../../material-dashboard-react";
 
-const appStyle = (theme: Theme) => createStyles({
-  wrapper: {
-    position: 'relative',
-    top: '0',
-    height: '100vh',
-    direction: 'rtl'
-  },
-  mainPanel: {
-    [theme.breakpoints.up('md')]: {
-      width: `calc(100% - ${drawerWidth}px)`
-    },
-    overflow: 'auto',
-    position: 'relative',
-    float: 'left',
-    ...transition,
-    maxHeight: '100%',
-    width: '100%',
-    overflowScrolling: 'touch'
-  },
-  content: {
-    marginTop: '70px',
-    padding: '30px 15px',
-    minHeight: 'calc(100vh - 123px)'
-  },
-  container,
-  map: {
-    marginTop: '70px'
-  }
-});
+const appStyle = (theme: Theme) =>
+    createStyles({
+        wrapper: {
+            position: "relative",
+            top: "0",
+            height: "100vh",
+            direction: "rtl"
+        },
+        mainPanel: {
+            [theme.breakpoints.up("md")]: {
+                width: `calc(100% - ${drawerWidth}px)`
+            },
+            overflow: "auto",
+            position: "relative",
+            float: "left",
+            ...transition,
+            maxHeight: "100%",
+            width: "100%",
+            overflowScrolling: "touch"
+        },
+        content: {
+            marginTop: "70px",
+            padding: "30px 15px",
+            minHeight: "calc(100vh - 123px)"
+        },
+        container,
+        map: {
+            marginTop: "70px"
+        }
+    });
 
 export default appStyle;
