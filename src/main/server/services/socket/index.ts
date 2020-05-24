@@ -1,5 +1,6 @@
 import * as io from "socket.io";
 import * as path from "path";
+import * as zlib from "zlib";
 
 // Internal libraries
 import { DatabaseRepository } from "@server/api/imessage";
@@ -306,6 +307,7 @@ export class SocketService {
 
                 // Pull out the chunk size, falling back to 1024
                 const chunkSize = params?.chunkSize ?? 1024;
+                const compress = params?.compress ?? false;
 
                 // Get the corresponding attachment
                 const attachment = await this.iMessageRepo.getAttachment(
@@ -325,12 +327,12 @@ export class SocketService {
                     fPath = path.join(process.env.HOME, fPath.slice(1));
                 }
 
+                let data = FileSystem.readFileChunk(fPath, start, chunkSize);
+                if (compress) data = zlib.deflateSync(data);
                 return respond(
                     cb,
                     "attachment-chunk",
-                    createSuccessResponse(
-                        FileSystem.readFileChunk(fPath, start, chunkSize)
-                    )
+                    createSuccessResponse(data)
                 );
             }
         );
