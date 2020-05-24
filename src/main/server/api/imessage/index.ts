@@ -47,8 +47,7 @@ export class DatabaseRepository {
 
         // Add default WHERE clauses
         query.andWhere("chat.service_name == 'iMessage'");
-        if (chatGuid)
-            query.andWhere("chat.guid == :guid", { guid: chatGuid });
+        if (chatGuid) query.andWhere("chat.guid == :guid", { guid: chatGuid });
 
         const chats = await query.getMany();
         return chats;
@@ -61,7 +60,9 @@ export class DatabaseRepository {
      * @param withMessages Whether to include the participants or not
      */
     async getAttachment(attachmentGuid: string, withMessages = false) {
-        const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
+        const query = this.db
+            .getRepository(Attachment)
+            .createQueryBuilder("attachment");
 
         if (withMessages)
             query.leftJoinAndSelect("attachment.messages", "message");
@@ -105,7 +106,8 @@ export class DatabaseRepository {
         offset = 0,
         limit = 100,
         after?: Date,
-        before?: Date
+        before?: Date,
+        withChats = false
     ) {
         // Get messages with sender and the chat it's from
         const query = this.db
@@ -119,11 +121,19 @@ export class DatabaseRepository {
             );
 
         if (chatGuid) {
+            query
+                .leftJoinAndSelect(
+                    "message.chats",
+                    "chat",
+                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                )
+                .andWhere("chat.guid = :guid", { guid: chatGuid });
+        } else if (withChats) {
             query.leftJoinAndSelect(
                 "message.chats",
                 "chat",
                 "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
-            ).andWhere("chat.guid = :guid", { guid: chatGuid });
+            );
         }
 
         // Add default WHERE clauses
@@ -164,7 +174,8 @@ export class DatabaseRepository {
         offset = 0,
         limit = 100,
         after?: Date,
-        before?: Date
+        before?: Date,
+        withChats = false
     ) {
         // Get messages with sender and the chat it's from
         const query = this.db
@@ -174,11 +185,19 @@ export class DatabaseRepository {
 
         // If a GUID is present, add to the search
         if (chatGuid) {
+            query
+                .leftJoinAndSelect(
+                    "message.chats",
+                    "chat",
+                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                )
+                .andWhere("chat.guid = :guid", { guid: chatGuid });
+        } else if (withChats) {
             query.leftJoinAndSelect(
                 "message.chats",
                 "chat",
                 "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
-            ).andWhere("chat.guid = :guid", { guid: chatGuid });
+            );
         }
 
         // Add default WHERE clauses
@@ -219,24 +238,19 @@ export class DatabaseRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getMessageCount(
-        after?: Date,
-        before?: Date,
-        isFromMe = false
-    ) {
+    async getMessageCount(after?: Date, before?: Date, isFromMe = false) {
         // Get messages with sender and the chat it's from
         const query = this.db
             .getRepository(Message)
-            .createQueryBuilder("message")
+            .createQueryBuilder("message");
 
         // Add default WHERE clauses
         query
             .andWhere("message.service == 'iMessage'")
             .andWhere("message.text IS NOT NULL")
             .andWhere("associated_message_type == 0");
-        
-        if (isFromMe)
-            query.andWhere("message.is_from_me = 1")
+
+        if (isFromMe) query.andWhere("message.is_from_me = 1");
 
         // Add date restraints
         if (after)
@@ -272,7 +286,7 @@ export class DatabaseRepository {
             JOIN message ON message.ROWID = cmj.message_id
             WHERE chat.style = ?
             GROUP BY chat.guid;`,
-            [(chatStyle === "group" ? 43 : 45)]
+            [chatStyle === "group" ? 43 : 45]
         );
 
         return result;
@@ -312,7 +326,7 @@ export class DatabaseRepository {
         // Get messages with sender and the chat it's from
         const query = this.db
             .getRepository(Attachment)
-            .createQueryBuilder("attachment")
+            .createQueryBuilder("attachment");
 
         const count = await query.getCount();
         return count;

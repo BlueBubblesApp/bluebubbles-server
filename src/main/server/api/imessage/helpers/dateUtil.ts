@@ -22,7 +22,7 @@ export const getDateUsing2001 = (timestamp: number): Date => {
 
     try {
         let ts = get2001Time();
-        if (osVersion >= "10.13.0") ts += timestamp / MULTIPLIER;
+        if (!osVersion || osVersion >= "10.13.0") ts += timestamp / MULTIPLIER;
         else ts += timestamp * 1000;
 
         return new Date(ts);
@@ -42,8 +42,8 @@ export const convertDateTo2001Time = (date: Date): number => {
 
     try {
         let ts = date.getTime() - get2001Time();
-         if (osVersion >= "10.13.0") ts *= MULTIPLIER;
-         else ts /= 1000;
+        if (!osVersion || osVersion >= "10.13.0") ts *= MULTIPLIER;
+        else ts /= 1000;
 
         return ts;
     } catch (e) {

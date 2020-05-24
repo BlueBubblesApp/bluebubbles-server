@@ -7,10 +7,7 @@ export class MessageListener extends ChangeListener {
 
     frequencyMs: number;
 
-    constructor(
-        repo: DatabaseRepository,
-        pollFrequency: number
-    ) {
+    constructor(repo: DatabaseRepository, pollFrequency: number) {
         super(pollFrequency);
 
         this.repo = repo;
@@ -26,7 +23,9 @@ export class MessageListener extends ChangeListener {
             null,
             0,
             100,
-            offsetDate
+            offsetDate,
+            null,
+            true
         );
 
         // Emit the new message
