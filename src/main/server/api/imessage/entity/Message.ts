@@ -13,7 +13,10 @@ import { MessageTypeTransformer } from "@server/api/imessage/transformers/Messag
 import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
-import { Attachment, getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
+import {
+    Attachment,
+    getAttachmentResponse
+} from "@server/api/imessage/entity/Attachment";
 
 @Entity("message")
 export class Message {
@@ -402,6 +405,7 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
         guid: tableData.guid,
         text: tableData.text,
         from: tableData.from ? getHandleResponse(tableData.from) : null,
+        handleId: tableData.handleId,
         chats: tableData.chats
             ? tableData.chats.map((item) => getChatResponse(item))
             : [],
@@ -411,9 +415,13 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
         subject: tableData.subject,
         country: tableData.country,
         error: tableData.error,
-        dateCreated: (tableData.dateCreated) ? tableData.dateCreated.getTime() : null,
-        dateRead: (tableData.dateRead) ? tableData.dateRead.getTime() : null,
-        dateDelivered: (tableData.dateDelivered) ? tableData.dateDelivered.getTime() : null,
+        dateCreated: tableData.dateCreated
+            ? tableData.dateCreated.getTime()
+            : null,
+        dateRead: tableData.dateRead ? tableData.dateRead.getTime() : null,
+        dateDelivered: tableData.dateDelivered
+            ? tableData.dateDelivered.getTime()
+            : null,
         isFromMe: tableData.isFromMe,
         isDelayed: tableData.isDelayed,
         isAutoReply: tableData.isAutoReply,
@@ -423,13 +431,17 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
         isArchived: tableData.isArchived,
         cacheRoomnames: tableData.cacheRoomnames,
         isAudioMessage: tableData.isAudioMessage,
-        datePlayed: (tableData.datePlayed) ? tableData.datePlayed.getTime() : null,
+        datePlayed: tableData.datePlayed
+            ? tableData.datePlayed.getTime()
+            : null,
         itemType: tableData.itemType,
         groupTitle: tableData.groupTitle,
         isExpired: tableData.isExpirable,
         associatedMessageGuid: tableData.associatedMessageGuid,
         associatedMessageType: tableData.associatedMessageType,
         expressiveSendStyleId: tableData.expressiveSendStyleId,
-        timeExpressiveSendStyleId: (tableData.timeExpressiveSendStyleId) ? tableData.timeExpressiveSendStyleId.getTime() : null
+        timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
+            ? tableData.timeExpressiveSendStyleId.getTime()
+            : null
     };
-}
+};

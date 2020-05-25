@@ -27,6 +27,7 @@ export type MessageResponse = {
     guid: string;
     text: string;
     from?: HandleResponse | null;
+    handleId: number;
     chats?: ChatResponse[];
     attachments?: AttachmentResponse[];
     subject: string;

@@ -105,7 +105,7 @@ export const getAttachmentResponse = (
     tableData: Attachment,
     withData = false
 ): AttachmentResponse => {
-    let data = null;
+    let data: Uint8Array | string = null;
 
     if (withData) {
         // Get the fully qualified path
@@ -117,6 +117,14 @@ export const getAttachmentResponse = (
         try {
             // Try to read the file
             data = Uint8Array.from(fs.readFileSync(fPath));
+
+            // If there is no data, return null for the data
+            // Otherwise, convert it to a base64 string
+            if (!data) {
+                data = null;
+            } else {
+                data = base64.bytesToBase64(data as Uint8Array);
+            }
         } catch (ex) {
             console.error(`Could not read file [${fPath}]`);
         }
@@ -127,7 +135,7 @@ export const getAttachmentResponse = (
         messages: tableData.messages
             ? tableData.messages.map((item) => item.guid)
             : [],
-        data: base64.bytesToBase64(data),
+        data: data as string,
         uti: tableData.uti,
         mimeType: tableData.mimeType,
         transferState: tableData.transferState,

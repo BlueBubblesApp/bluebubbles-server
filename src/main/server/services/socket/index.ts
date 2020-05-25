@@ -332,6 +332,15 @@ export class SocketService {
                 let data = FileSystem.readFileChunk(fPath, start, chunkSize);
                 if (compress) data = Uint8Array.from(zlib.deflateSync(data));
 
+                if (!data) {
+                    console.log("NO DATA");
+                    return respond(
+                        cb,
+                        "attachment-chunk",
+                        createNoDataResponse()
+                    );
+                }
+
                 return respond(
                     cb,
                     "attachment-chunk",
