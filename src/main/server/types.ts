@@ -6,13 +6,14 @@ export type Error = {
 };
 
 export type ResponseData =
-    MessageResponse |
-    HandleResponse |
-    ChatResponse |
-    AttachmentResponse |
-    (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[] |
-    Uint8Array |
-    null;
+    | MessageResponse
+    | HandleResponse
+    | ChatResponse
+    | AttachmentResponse
+    | (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[]
+    | Uint8Array
+    | string
+    | null;
 
 export type ResponseFormat = {
     status: ValidStatuses;
@@ -58,7 +59,7 @@ export type HandleResponse = {
     chats?: ChatResponse[];
     address: string;
     country: string;
-    uncanonicalizedId: string
+    uncanonicalizedId: string;
 };
 
 export type ChatResponse = {
@@ -76,7 +77,7 @@ export type ChatResponse = {
 export type AttachmentResponse = {
     guid: string;
     messages: string[];
-    data: Uint8Array;
+    data: string; // Base64 string
     uti: string;
     mimeType: string;
     transferState: number;
@@ -88,13 +89,13 @@ export type AttachmentResponse = {
 };
 
 export enum ResponseMessages {
-    SUCCESS = 'Success',
-    BAD_REQUEST = 'Bad Request',
-    SERVER_ERROR = 'Server Error',
-    UNAUTHORIZED = 'Unauthorized',
-    FORBIDDEN = 'Forbidden',
-    NO_DATA = 'No Data'
-};
+    SUCCESS = "Success",
+    BAD_REQUEST = "Bad Request",
+    SERVER_ERROR = "Server Error",
+    UNAUTHORIZED = "Unauthorized",
+    FORBIDDEN = "Forbidden",
+    NO_DATA = "No Data"
+}
 
 export enum ErrorTypes {
     SERVER_ERROR = "Server Error",
@@ -102,5 +103,4 @@ export enum ErrorTypes {
     IMESSAGE_ERROR = "iMessage Error",
     SOCKET_ERROR = "Socket Error",
     VALIDATION_ERROR = "Validation Error"
-};
-
+}

@@ -1,6 +1,7 @@
 import * as io from "socket.io";
 import * as path from "path";
 import * as zlib from "zlib";
+import * as base64 from "byte-base64";
 
 // Internal libraries
 import { DatabaseRepository } from "@server/api/imessage";
@@ -59,7 +60,7 @@ export class SocketService {
 
         this.socketServer = io(port, {
             // 5 Minute ping timeout
-            pingTimeout: 300000
+            pingTimeout: 60000
         });
 
         this.iMessageRepo = iMessageRepo;
@@ -327,12 +328,15 @@ export class SocketService {
                     fPath = path.join(process.env.HOME, fPath.slice(1));
                 }
 
+                // Get data as a Uint8Array
                 let data = FileSystem.readFileChunk(fPath, start, chunkSize);
-                if (compress) data = zlib.deflateSync(data);
+                if (compress) data = Uint8Array.from(zlib.deflateSync(data));
+
                 return respond(
                     cb,
                     "attachment-chunk",
-                    createSuccessResponse(data)
+                    // Convert data to a base64 string
+                    createSuccessResponse(base64.bytesToBase64(data))
                 );
             }
         );

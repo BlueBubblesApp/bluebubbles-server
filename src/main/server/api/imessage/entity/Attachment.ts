@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as base64 from "byte-base64";
 import {
     Entity,
     PrimaryGeneratedColumn,
@@ -7,9 +8,13 @@ import {
     ManyToMany,
     JoinTable
 } from "typeorm";
+
 import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
-import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
+import {
+    Message,
+    getMessageResponse
+} from "@server/api/imessage/entity/Message";
 import { AttachmentResponse } from "@server/types";
 
 @Entity("attachment")
@@ -96,7 +101,10 @@ export class Attachment {
     hideAttachment: boolean;
 }
 
-export const getAttachmentResponse = (tableData: Attachment, withData = false): AttachmentResponse => {
+export const getAttachmentResponse = (
+    tableData: Attachment,
+    withData = false
+): AttachmentResponse => {
     let data = null;
 
     if (withData) {
@@ -113,14 +121,13 @@ export const getAttachmentResponse = (tableData: Attachment, withData = false): 
             console.error(`Could not read file [${fPath}]`);
         }
     }
-    
 
     return {
         guid: tableData.guid,
         messages: tableData.messages
             ? tableData.messages.map((item) => item.guid)
             : [],
-        data,
+        data: base64.bytesToBase64(data),
         uti: tableData.uti,
         mimeType: tableData.mimeType,
         transferState: tableData.transferState,
