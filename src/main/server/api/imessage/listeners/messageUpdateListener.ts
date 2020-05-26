@@ -30,11 +30,16 @@ export class MessageUpdateListener extends ChangeListener {
 
         // Emit the new message
         entries.forEach((entry: any) => {
+            // Compile so it's unique based on dates as well as ROWID
+            const delivered = entry.dateDelivered ? entry.dateDelivered.getTime() : 0;
+            const read = entry.dateRead ? entry.dateRead.getTime() : 0;
+            const compiled = `${entry.ROWID}:${delivered}:${read}`;
+
             // Skip over any that we've finished
-            if (this.emittedItems.includes(entry.ROWID)) return;
+            if (this.emittedItems.includes(compiled)) return;
 
             // Add to cache
-            this.emittedItems.push(entry.ROWID);
+            this.emittedItems.push(compiled);
 
             // Send the built message object
             super.emit("updated-entry", this.transformEntry(entry));
