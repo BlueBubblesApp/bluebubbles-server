@@ -31,7 +31,7 @@ export class ActionHandler {
         chatGuid: string,
         message: string,
         attachmentName?: string,
-        attachment?: Buffer | string
+        attachment?: Uint8Array
     ): Promise<string> => {
         if (!chatGuid.startsWith("iMessage"))
             throw new Error("Invalid chat GUID!");
@@ -40,7 +40,7 @@ export class ActionHandler {
         let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message}"`;
 
         // Add attachment, if present
-        if (attachment && attachment instanceof Buffer) {
+        if (attachment) {
             this.fs.saveAttachment(attachmentName, attachment);
             baseCmd += ` "${this.fs.attachmentsDir}/${attachmentName}"`;
         }

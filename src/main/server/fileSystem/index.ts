@@ -3,6 +3,8 @@ import * as path from "path";
 import { app } from "electron";
 import * as child_process from "child_process";
 import { sync } from "read-chunk";
+
+import { concatUint8Arrays } from "@server/helpers/utils";
 import { AppleScripts } from "./scripts";
 
 /**
@@ -52,8 +54,52 @@ export class FileSystem {
      * @param name Name for the attachment
      * @param buffer The attachment bytes (buffer)
      */
-    saveAttachment(name: string, buffer: Buffer): void {
+    saveAttachment(name: string, buffer: Uint8Array): void {
         fs.writeFileSync(path.join(this.attachmentsDir, name), buffer);
+    }
+
+    /**
+     * Saves an attachment by chunk
+     *
+     * @param guid Unique identifier for the attachment
+     * @param chunkNumber The index of the chunk (for ordering/reassembling)
+     * @param buffer The attachment chunk bytes (buffer)
+     */
+    saveAttachmentChunk(guid: string, chunkNumber: number, buffer: Uint8Array): void {
+        const parent = path.join(this.attachmentsDir, guid)
+        if (!fs.existsSync(parent)) fs.mkdirSync(parent);
+        fs.writeFileSync(path.join(parent, `${chunkNumber}.chunk`), buffer);
+    }
+
+    /**
+     * Removes a chunk directory
+     *
+     * @param guid Unique identifier for the attachment
+     */
+    deleteChunks(guid: string): void {
+        const dir = path.join(this.attachmentsDir, guid)
+        if (fs.existsSync(dir)) fs.rmdirSync(dir, { recursive: true });
+    }
+
+    /**
+     * Builds an attachment by combining all chunks
+     *
+     * @param guid Unique identifier for the attachment
+     */
+    buildAttachmentChunks(guid: string): Uint8Array {
+        let chunks = new Uint8Array(0);
+
+        // Get the files in ascending order
+        const files = fs.readdirSync(path.join(this.attachmentsDir, guid));
+        files.sort((a, b) => Number(a.split('.')[0]) - Number(b.split('.')[0]));
+
+        // Read the files and append to chunks
+        for (const file of files) {
+            const fileData = fs.readFileSync(path.join(this.attachmentsDir, guid, file));
+            chunks = concatUint8Arrays(chunks, Uint8Array.from(fileData));
+        }
+
+        return chunks;
     }
 
     /**

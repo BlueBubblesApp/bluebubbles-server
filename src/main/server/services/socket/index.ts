@@ -442,22 +442,67 @@ export class SocketService {
                 const message = params?.message;
 
                 if (!chatGuid || !message)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse(
-                            "No chat GUID or message provided"
-                        )
-                    );
+                    return respond(cb, "error", createBadRequestResponse("No chat GUID or message provided"));
+
+                if (!params?.attachmentName && params?.attachment)
+                    return respond(cb, "error", createBadRequestResponse("No attachment name provided"));
 
                 await this.actionHandler.sendMessage(
                     chatGuid,
                     message,
                     params?.attachmentName,
-                    params?.attachment
+                    (params?.attachment) ? base64.base64ToBytes(params.attachment) : null
                 );
 
                 return respond(cb, "message-sent", createSuccessResponse(null));
+            }
+        );
+
+        /**
+         * Send message with chunked attachment
+         */
+        socket.on(
+            "send-message-chunk",
+            async (params, cb): Promise<void> => {
+                const chatGuid = params?.guid;
+                const message = params?.message;
+
+                if (!chatGuid)
+                    return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
+
+                // Attachment chunk parameters
+                const attachmentGuid = params?.attachmentGuid;
+                const attachmentChunkStart = params?.attachmentChunkStart;
+                const attachmentData = params?.attachmentData;
+                const hasMore = params?.hasMore;
+
+                // Save the attachment chunk if there is an attachment
+                if (attachmentGuid)
+                    this.fs.saveAttachmentChunk(
+                        attachmentGuid, attachmentChunkStart, base64.base64ToBytes(attachmentData));
+
+                // If it's the last chunk, make sure there is a message
+                if (!hasMore && !message)
+                    return respond(cb, "error", createBadRequestResponse("No message provided!"));
+
+                // If it's the last chunk, make sure there is a message
+                if (!hasMore && attachmentGuid && !params?.attachmentName)
+                    return respond(cb, "error", createBadRequestResponse("No attachment name provided"));
+
+                // If there are no more chunks, compile, save, and send
+                if (!hasMore) {
+                    await this.actionHandler.sendMessage(
+                        chatGuid,
+                        message,
+                        params?.attachmentName,
+                        (attachmentGuid) ? this.fs.buildAttachmentChunks(attachmentGuid) : null
+                    );
+
+                    this.fs.deleteChunks(attachmentGuid);
+                }
+
+                return respond(
+                    cb, !hasMore ? "message-chunk-sent" : "message-chunk-saved", createSuccessResponse(null));
             }
         );
 

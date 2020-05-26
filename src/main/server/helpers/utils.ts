@@ -6,3 +6,10 @@ export const generateUuid = () => {
         return v.toString(16);
     });
 };
+
+export const concatUint8Arrays = (a: Uint8Array, b: Uint8Array): Uint8Array => {
+    const newArr = new Uint8Array(a.length + b.length);
+    newArr.set(a, 0);
+    newArr.set(b, a.length);
+    return newArr;
+};
