@@ -87,6 +87,8 @@ export class SocketService {
                 console.log("Closing client connection. Authentication failed.");
             }
 
+            // Test
+
             /**
              * Error handling middleware for all Socket.IO requests.
              * If there are any errors in a socket event, they will be handled here.
