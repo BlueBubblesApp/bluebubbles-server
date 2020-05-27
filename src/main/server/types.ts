@@ -26,7 +26,7 @@ export type ResponseFormat = {
 export type MessageResponse = {
     guid: string;
     text: string;
-    from?: HandleResponse | null;
+    handle?: HandleResponse | null;
     handleId: number;
     chats?: ChatResponse[];
     attachments?: AttachmentResponse[];

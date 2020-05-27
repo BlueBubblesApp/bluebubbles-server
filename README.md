@@ -138,7 +138,7 @@ Within each response container, there is an optional `data` key that contains an
 type MessageResponse = {
     guid: string;
     text: string;
-    from?: HandleResponse | null;
+    handle?: HandleResponse | null;
     chats?: ChatResponse[];
     attachments?: AttachmentResponse[];
     subject: string;

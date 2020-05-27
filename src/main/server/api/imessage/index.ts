@@ -113,11 +113,14 @@ export class DatabaseRepository {
         const query = this.db
             .getRepository(Message)
             .createQueryBuilder("message")
-            .leftJoinAndSelect("message.from", "handle")
+            .leftJoinAndSelect("message.handle", "handle")
             .leftJoinAndSelect(
                 "message.attachments",
                 "attachment",
-                "message.ROWID == message_attachment.message_id AND attachment.ROWID == message_attachment.attachment_id"
+                (
+                    "message.ROWID == message_attachment.message_id AND " +
+                    "attachment.ROWID == message_attachment.attachment_id"
+                )
             );
 
         if (chatGuid) {
@@ -181,7 +184,7 @@ export class DatabaseRepository {
         const query = this.db
             .getRepository(Message)
             .createQueryBuilder("message")
-            .leftJoinAndSelect("message.from", "handle");
+            .leftJoinAndSelect("message.handle", "handle");
 
         // If a GUID is present, add to the search
         if (chatGuid) {

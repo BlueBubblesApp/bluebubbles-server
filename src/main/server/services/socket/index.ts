@@ -235,8 +235,8 @@ export class SocketService {
 
                 const messages = await this.iMessageRepo.getMessages(
                     chats[0].guid,
-                    params?.offset || 0,
-                    params?.limit || 100,
+                    params?.offset ?? 0,
+                    params?.limit ?? 100,
                     params?.after,
                     params?.before
                 );

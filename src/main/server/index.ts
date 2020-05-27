@@ -281,8 +281,9 @@ export class BlueBubblesServer {
         newMsgListener.on("new-entry", async (item: Message) => {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
-            const from = (item.isFromMe) ? "yourself" : item.from?.id
-            const text = (item.cacheHasAttachments) ? `Image: ${item.text.slice(1, item.text.length) || "<No Text>"}` : item.text;
+            const from = (item.isFromMe) ? "yourself" : item.handle?.id
+            const text = (item.cacheHasAttachments) ? (
+                `Image: ${item.text.slice(1, item.text.length) || "<No Text>"}`) : item.text;
             this.log(`New message from [${from}]: [${text.substring(0, 50)}]`);
 
             const msg = getMessageResponse(item);
@@ -294,7 +295,7 @@ export class BlueBubblesServer {
         updatedMsgListener.on("updated-entry", async (item: Message) => {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
-            const from = (item.isFromMe) ? "yourself" : item.from?.id
+            const from = (item.isFromMe) ? "yourself" : item.handle?.id
             const time = item.dateDelivered || item.dateRead;
             const text = (item.dateRead) ? 'Text Read' : 'Text Delivered'
             this.log(`Updated message from [${from}]: [${text} -> ${time.toLocaleString()}]`);

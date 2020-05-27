@@ -17,7 +17,7 @@ export class Handle {
     @PrimaryGeneratedColumn({ name: "ROWID" })
     ROWID: number;
 
-    @OneToMany((type) => Message, (message) => message.from)
+    @OneToMany((type) => Message, (message) => message.handle)
     @JoinColumn({ name: "ROWID", referencedColumnName: "handle_id" })
     messages: Message[];
 

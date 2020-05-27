@@ -41,7 +41,7 @@ export class Message {
 
     @ManyToOne((type) => Handle)
     @JoinColumn({ name: "handle_id", referencedColumnName: "ROWID" })
-    from: Handle;
+    handle: Handle;
 
     @ManyToMany((type) => Chat)
     @JoinTable({
@@ -404,7 +404,7 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
     return {
         guid: tableData.guid,
         text: tableData.text,
-        from: tableData.from ? getHandleResponse(tableData.from) : null,
+        handle: tableData.handle ? getHandleResponse(tableData.handle) : null,
         handleId: tableData.handleId,
         chats: tableData.chats
             ? tableData.chats.map((item) => getChatResponse(item))
