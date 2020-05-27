@@ -42,8 +42,9 @@ export class DatabaseRepository {
     async getChats(chatGuid?: string, withParticipants = true) {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
+        // Inner-join because a chat must have participants
         if (withParticipants)
-            query.leftJoinAndSelect("chat.participants", "handle");
+            query.innerJoinAndSelect("chat.participants", "handle");
 
         // Add default WHERE clauses
         query.andWhere("chat.service_name == 'iMessage'");
@@ -123,16 +124,16 @@ export class DatabaseRepository {
                 )
             );
 
+        // Inner-join because all messages will have a chat
         if (chatGuid) {
-            query
-                .leftJoinAndSelect(
-                    "message.chats",
-                    "chat",
-                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
-                )
-                .andWhere("chat.guid = :guid", { guid: chatGuid });
+            query.innerJoinAndSelect(
+                "message.chats",
+                "chat",
+                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+            )
+            .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
-            query.leftJoinAndSelect(
+            query.innerJoinAndSelect(
                 "message.chats",
                 "chat",
                 "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
@@ -186,17 +187,17 @@ export class DatabaseRepository {
             .createQueryBuilder("message")
             .leftJoinAndSelect("message.handle", "handle");
 
-        // If a GUID is present, add to the search
+        // Inner-join because all messages will have a chat
         if (chatGuid) {
             query
-                .leftJoinAndSelect(
+                .innerJoinAndSelect(
                     "message.chats",
                     "chat",
                     "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
                 )
                 .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
-            query.leftJoinAndSelect(
+            query.innerJoinAndSelect(
                 "message.chats",
                 "chat",
                 "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
