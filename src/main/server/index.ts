@@ -6,7 +6,7 @@ import * as ngrok from "ngrok";
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
 import { FileSystem } from "@server/fileSystem";
-import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_SOCKET_PORT } from "@server/constants";
+import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
 
 // Database Imports
 import { DatabaseRepository } from "@server/api/imessage";
@@ -16,8 +16,6 @@ import { Message, getMessageResponse } from "@server/api/imessage/entity/Message
 // Service Imports
 import { SocketService, FCMService } from "@server/services";
 import { Device } from "@server/entity/Device";
-
-import { generateUuid } from "@server/helpers/utils";
 import { MessageUpdateListener } from "./api/imessage/listeners/messageUpdateListener";
 
 /**
@@ -137,9 +135,7 @@ export class BlueBubblesServer {
 
         this.log("Initializing configuration database...");
         const cfg = await this.db.getRepository(Config).find();
-        cfg.forEach((item) => {
-            this.config[item.name] = item.value;
-        });
+        cfg.forEach((item) => { this.config[item.name] = item.value; });
 
         this.log("Connecting to iMessage database...");
         this.iMessageRepo = new DatabaseRepository();
@@ -184,27 +180,11 @@ export class BlueBubblesServer {
      * has not already been initialized
      */
     private async setupDefaults(): Promise<void> {
-        const tutorialIsDone = await this.db.getRepository(Config).findOne({
-            name: "tutorial_is_done"
-        });
-        if (!tutorialIsDone)
-            await this.addConfigItem("tutorial_is_done", 0);
-        const socketPort = await this.db.getRepository(Config).findOne({
-            name: "socket_port"
-        });
-        if (!socketPort)
-            await this.addConfigItem("socket_port", DEFAULT_SOCKET_PORT);
-
-        const serverAddress = await this.db.getRepository(Config).findOne({
-            name: "server_address"
-        });
-        if (!serverAddress)
-            await this.addConfigItem("server_address", "");
-
-        const guid = await this.db.getRepository(Config).findOne({
-            name: "guid"
-        });
-        if (!guid) await this.addConfigItem("guid", generateUuid());
+        const repo = this.db.getRepository(Config);
+        for (const key of Object.keys(DEFAULT_DB_ITEMS)) {
+            const item = await repo.findOne({ name: key })
+            if (!item) await this.addConfigItem(key, DEFAULT_DB_ITEMS[key]())
+        }
     }
 
     /**
@@ -243,10 +223,7 @@ export class BlueBubblesServer {
             if (!devices || devices.length === 0) return;
 
             const notifData = JSON.stringify(data);
-            await this.fcmService.sendNotification(devices.map(device => device.identifier), {
-                type,
-                data: notifData
-            });
+            await this.fcmService.sendNotification(devices.map(device => device.identifier), {type, data: notifData});
         }
     }
 
