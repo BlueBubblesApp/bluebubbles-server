@@ -58,7 +58,6 @@ export class ActionHandler {
             const matchingMessages = await this.repo.getMessages({
                 chatGuid,
                 limit: 1,
-                withAttachments: false,  // Exclude to speed up query
                 withHandle: false,  // Exclude to speed up query
                 where: [
                     {
