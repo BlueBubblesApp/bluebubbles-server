@@ -16,7 +16,7 @@ import { Message, getMessageResponse } from "@server/api/imessage/entity/Message
 // Service Imports
 import { SocketService, FCMService } from "@server/services";
 import { Device } from "@server/entity/Device";
-import { MessageUpdateListener } from "./api/imessage/listeners/messageUpdateListener";
+import { MessageUpdateListener } from "@server/api/imessage/listeners/messageUpdateListener";
 
 /**
  * Main entry point for the back-end server

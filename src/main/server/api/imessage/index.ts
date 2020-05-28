@@ -1,11 +1,12 @@
 /* eslint-disable no-param-reassign */
 import { createConnection, Connection } from "typeorm";
 
+import { DBMessageParams } from "@server/api/imessage/types";
 import { convertDateTo2001Time } from "@server/api/imessage/helpers/dateUtil";
 import { Chat } from "@server/api/imessage/entity/Chat";
 import { Handle } from "@server/api/imessage/entity/Handle";
 import { Message } from "@server/api/imessage/entity/Message";
-import { Attachment } from "./entity/Attachment";
+import { Attachment } from "@server/api/imessage/entity/Attachment";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -102,25 +103,42 @@ export class DatabaseRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getMessages(
-        chatGuid: string,
+    async getMessages({
+        chatGuid = null,
         offset = 0,
         limit = 100,
-        after?: Date,
-        before?: Date,
-        withChats = false
-    ) {
+        after = null,
+        before = null,
+        withChats = false,
+        withAttachments = true,
+        withHandle = true,
+        sort = "DESC",
+        where = [
+            {
+                statement: "message.service = 'iMessage'",
+                args: null
+            },
+            {
+                statement: "message.text IS NOT NULL",
+                args: null
+            }
+        ]
+    }: DBMessageParams) {
         // Get messages with sender and the chat it's from
         const query = this.db
             .getRepository(Message)
             .createQueryBuilder("message")
-            .leftJoinAndSelect("message.handle", "handle")
-            .leftJoinAndSelect(
+        
+        if (withHandle)
+            query.leftJoinAndSelect("message.handle", "handle")
+
+        if (withAttachments)
+            query.leftJoinAndSelect(
                 "message.attachments",
                 "attachment",
                 (
-                    "message.ROWID == message_attachment.message_id AND " +
-                    "attachment.ROWID == message_attachment.attachment_id"
+                    "message.ROWID = message_attachment.message_id AND " +
+                    "attachment.ROWID = message_attachment.attachment_id"
                 )
             );
 
@@ -129,21 +147,16 @@ export class DatabaseRepository {
             query.innerJoinAndSelect(
                 "message.chats",
                 "chat",
-                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
             )
             .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
             query.innerJoinAndSelect(
                 "message.chats",
                 "chat",
-                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
             );
         }
-
-        // Add default WHERE clauses
-        query
-            .andWhere("message.service == 'iMessage'")
-            .andWhere("message.text IS NOT NULL");
 
         // Add date restraints
         if (after)
@@ -155,8 +168,12 @@ export class DatabaseRepository {
                 before: convertDateTo2001Time(before)
             });
 
+        if (where && where.length > 0)
+            for (const item of where)
+                query.andWhere(item.statement, item.args)
+
         // Add pagination params
-        query.orderBy("message.date", "DESC");
+        query.orderBy("message.date", sort);
         query.offset(offset);
         query.limit(limit);
 
@@ -173,14 +190,15 @@ export class DatabaseRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getUpdatedMessages(
-        chatGuid: string,
+    async getUpdatedMessages({
+        chatGuid = null,
         offset = 0,
         limit = 100,
-        after?: Date,
-        before?: Date,
-        withChats = false
-    ) {
+        after = null,
+        before = null,
+        withChats = false,
+        sort = "DESC"
+    }: DBMessageParams) {
         // Get messages with sender and the chat it's from
         const query = this.db
             .getRepository(Message)
@@ -228,7 +246,7 @@ export class DatabaseRepository {
             });
 
         // Add pagination params
-        query.orderBy("message.date", "DESC");
+        query.orderBy("message.date", sort);
         query.offset(offset);
         query.limit(limit);
 

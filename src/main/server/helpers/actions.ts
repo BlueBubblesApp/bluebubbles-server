@@ -1,4 +1,6 @@
 import { FileSystem } from "@server/fileSystem";
+import { DatabaseRepository } from "@server/api/imessage";
+import { Message } from "@server/api/imessage/entity/Message";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -8,13 +10,16 @@ import { FileSystem } from "@server/fileSystem";
 export class ActionHandler {
     fs: FileSystem;
 
+    repo: DatabaseRepository;
+
     /**
      * Constructor to set some vars
      *
      * @param fileSystem The instance of the filesystem for the app
      */
-    constructor(fileSystem: FileSystem) {
+    constructor(fileSystem: FileSystem, repo: DatabaseRepository) {
         this.fs = fileSystem;
+        this.repo = repo;
     }
 
     /**
@@ -32,7 +37,7 @@ export class ActionHandler {
         message: string,
         attachmentName?: string,
         attachment?: Uint8Array
-    ): Promise<string> => {
+    ): Promise<Message> => {
         if (!chatGuid.startsWith("iMessage"))
             throw new Error("Invalid chat GUID!");
 
@@ -45,9 +50,35 @@ export class ActionHandler {
             baseCmd += ` "${this.fs.attachmentsDir}/${attachmentName}"`;
         }
 
-        // Execute the command
-        const ret = await this.fs.execShellCommand(baseCmd) as string;
-        return ret;
+        try {
+            // Track the time it takes to execute the function
+            const ret = await this.fs.execShellCommand(baseCmd) as string;
+
+            // Lookup the corresponding message in the DB
+            const matchingMessages = await this.repo.getMessages({
+                chatGuid,
+                limit: 1,
+                withAttachments: false,  // Exclude to speed up query
+                withHandle: false,  // Exclude to speed up query
+                where: [
+                    {
+                        // Text must match
+                        statement: "message.text = :text",
+                        args: { text: message }
+                    },
+                    {
+                        // Text must be from yourself
+                        statement: "message.is_from_me = :fromMe",
+                        args: { fromMe: 1 }
+                    }
+                ]
+            });
+            return matchingMessages.length === 0 ? null : matchingMessages[0];
+        } catch (ex) {
+            // Format the error a bit, and re-throw it
+            const msg = ex.message.split('execution error: ')[1];
+            throw new Error(msg.split('. (')[0]);
+        }
     };
 
     /**

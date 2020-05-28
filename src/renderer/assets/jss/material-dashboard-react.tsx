@@ -10,7 +10,8 @@
 
  =========================================================
 
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions
+ * of the Software.
 
  */
 
@@ -34,7 +35,7 @@ const hexToRgb = (data: any) => {
         const last = input[2];
         input = first + first + second + second + last + last;
     }
-    input = input.toUpperCase(input);
+    input = input.toUpperCase();
     const first = input[0] + input[1];
     const second = input[2] + input[3];
     const last = input[4] + input[5];

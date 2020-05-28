@@ -65,7 +65,7 @@ export class SocketService {
 
         this.iMessageRepo = iMessageRepo;
         this.fs = fs;
-        this.actionHandler = new ActionHandler(this.fs);
+        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo);
     }
 
     /**
@@ -164,13 +164,15 @@ export class SocketService {
             if (!chats || chats.length === 0)
                 return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-            const messages = await this.iMessageRepo.getMessages(
-                chats[0].guid,
-                params?.offset ?? 0,
-                params?.limit ?? 100,
-                params?.after,
-                params?.before
-            );
+            const messages = await this.iMessageRepo.getMessages({
+                chatGuid: chats[0].guid,
+                offset: params?.offset ?? 0,
+                limit: params?.limit ?? 100,
+                after: params?.after,
+                before: params?.before,
+                withChats: params?.withChats ?? false,
+                sort: params?.sort ?? "DESC"
+            });
 
             return respond(
                 cb, "chat-messages", createSuccessResponse(messages.map((item) => getMessageResponse(item))));
@@ -239,7 +241,7 @@ export class SocketService {
             if (!chats || chats.length === 0)
                 return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-            const messages = await this.iMessageRepo.getMessages(chats[0].guid, 0, 1);
+            const messages = await this.iMessageRepo.getMessages({ chatGuid: chats[0].guid, limit: 1});
             if (!messages || messages.length === 0)
                 return respond(cb, "last-chat-message", createNoDataResponse());
 
@@ -278,14 +280,18 @@ export class SocketService {
             if (!params?.attachmentName && params?.attachment)
                 return respond(cb, "error", createBadRequestResponse("No attachment name provided"));
 
-            await this.actionHandler.sendMessage(
-                chatGuid,
-                message,
-                params?.attachmentName,
-                (params?.attachment) ? base64.base64ToBytes(params.attachment) : null
-            );
+            try {
+                const msg = await this.actionHandler.sendMessage(
+                    chatGuid,
+                    message,
+                    params?.attachmentName,
+                    (params?.attachment) ? base64.base64ToBytes(params.attachment) : null
+                );
 
-            return respond(cb, "message-sent", createSuccessResponse(null));
+                return respond(cb, "message-sent", createSuccessResponse(getMessageResponse(msg)));
+            } catch (ex) {
+                return respond(cb, "send-message-error", createServerErrorResponse(ex.message));
+            }
         });
 
         /**
@@ -319,18 +325,22 @@ export class SocketService {
 
             // If there are no more chunks, compile, save, and send
             if (!hasMore) {
-                await this.actionHandler.sendMessage(
-                    chatGuid,
-                    message,
-                    params?.attachmentName,
-                    (attachmentGuid) ? this.fs.buildAttachmentChunks(attachmentGuid) : null
-                );
+                try {
+                    const msg = await this.actionHandler.sendMessage(
+                        chatGuid,
+                        message,
+                        params?.attachmentName,
+                        (attachmentGuid) ? this.fs.buildAttachmentChunks(attachmentGuid) : null
+                    );
 
-                this.fs.deleteChunks(attachmentGuid);
+                    this.fs.deleteChunks(attachmentGuid);
+                    return respond(cb, "message-sent", createSuccessResponse(getMessageResponse(msg)));
+                } catch (ex) {
+                    return respond(cb, "send-message--chunk-error", createServerErrorResponse(ex.message));
+                }
             }
 
-            return respond(
-                cb, !hasMore ? "message-chunk-sent" : "message-chunk-saved", createSuccessResponse(null));
+            return respond(cb, "message-chunk-saved", createSuccessResponse(null));
         });
 
         /**

@@ -19,14 +19,7 @@ export class MessageUpdateListener extends ChangeListener {
 
     async getEntries(after: Date): Promise<void> {
         const offsetDate = new Date(after.getTime() - 5000);
-        const entries = await this.repo.getUpdatedMessages(
-            null,
-            0,
-            100,
-            offsetDate,
-            null,
-            true
-        );
+        const entries = await this.repo.getUpdatedMessages({ after: offsetDate, withChats: true });
 
         // Emit the new message
         entries.forEach((entry: any) => {
