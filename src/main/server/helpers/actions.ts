@@ -52,6 +52,7 @@ export class ActionHandler {
 
         try {
             // Track the time it takes to execute the function
+            const start = new Date();
             const ret = await this.fs.execShellCommand(baseCmd) as string;
 
             // Lookup the corresponding message in the DB
@@ -59,6 +60,7 @@ export class ActionHandler {
                 chatGuid,
                 limit: 1,
                 withHandle: false,  // Exclude to speed up query
+                after: start,
                 where: [
                     {
                         // Text must match
