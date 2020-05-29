@@ -31,7 +31,7 @@ export abstract class ChangeListener extends EventEmitter {
         if (this.emittedItems.length > 100 || now.getTime() - this.lastPurge.getTime() > 1800000) {
             if (this.emittedItems.length > 0) {
                 console.info(
-                    `Purging ${this.emittedItems.length} emitted messages from cahche...`
+                    `Purging ${this.emittedItems.length} emitted messages from cache...`
                 );
                 this.emittedItems = [];
             }
