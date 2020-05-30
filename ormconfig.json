@@ -1,0 +1,14 @@
+{
+    "type": "sqlite",
+    "database": "~/Library/Application Support/BlueBubbles/config.sqlite",
+    "synchronize": true,
+    "logging": false,
+    "entities": ["src/main/server/entity/**/*.ts"],
+    "migrations": ["src/main/server/migration/**/*.ts"],
+    "subscribers": ["src/main/server/subscriber/**/*.ts"],
+    "cli": {
+        "entitiesDir": "src/main/server/entity",
+        "migrationsDir": "src/main/server/migration",
+        "subscribersDir": "src/main/server/subscriber"
+    }
+}

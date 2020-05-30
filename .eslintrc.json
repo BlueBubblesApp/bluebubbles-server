@@ -33,8 +33,11 @@
     },
     "plugins": ["react", "prettier", "@typescript-eslint"],
     "rules": {
+        "no-restricted-syntax": "off",
+        "no-await-in-loop": "off",
         "no-console": 0,
         "global-require": 0,
+        "max-len": ["error", { "code": 120 }],
         "import/prefer-default-export": 0,
         "import/no-useless-path-segments": 1,
         "import/no-unresolved": 0,
@@ -99,5 +102,6 @@
         "@typescript-eslint/no-param-reassign": 0,
         "@typescript-eslint/explicit-member-accessibility": 0,
         "@typescript-eslint/no-angle-bracket-type-assertion": 0
+
     }
 }
