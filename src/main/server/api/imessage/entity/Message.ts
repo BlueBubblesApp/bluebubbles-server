@@ -300,7 +300,7 @@ export class Message {
     @Column({ name: "item_type", type: "integer", default: 0 })
     itemType: number;
 
-    @Column({ name: "other_handle", type: "integer", default: 0 })
+    @Column({ name: "other_handle", type: "integer", nullable: true, default: 0 })
     otherHandle: number;
 
     @Column({ name: "group_title", type: "text" })
@@ -436,6 +436,7 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
             : null,
         itemType: tableData.itemType,
         groupTitle: tableData.groupTitle,
+        groupActionType: tableData.groupActionType,
         isExpired: tableData.isExpirable,
         associatedMessageGuid: tableData.associatedMessageGuid,
         associatedMessageType: tableData.associatedMessageType,
