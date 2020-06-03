@@ -70,8 +70,6 @@ export class MessageRepository {
         return query.filter((item: { chat_id: number, handle_id: number }) => item.chat_id === chatROWID);
     }
 
-
-
     /**
      * Get all the chats from the DB
      *

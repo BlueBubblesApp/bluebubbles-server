@@ -396,6 +396,8 @@ export class BlueBubblesServer {
 
         ipcMain.handle("complete-tutorial", async (event, args) => {
             await this.setConfig("tutorial_is_done", "1");
+            this.socketService.socketServer.close();
+            await this.setup();
         });
     }
 }
