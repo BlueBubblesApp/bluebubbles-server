@@ -367,7 +367,7 @@ export class SocketService {
             const chatGuid = await this.actionHandler.createChat(participants);
 
             try {
-                const newChat = await this.iMessageRepo.getChats(chatGuid);
+                const newChat = await this.iMessageRepo.getChats(chatGuid, true);
                 return respond(cb, "chat-started", createSuccessResponse(getChatResponse(newChat[0])));
             } catch (ex) {
                 throw new Error("Failed to create new chat!");
