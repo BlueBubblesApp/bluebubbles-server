@@ -107,4 +107,83 @@ on splitText(theText, theDelimiter)
 end splitText`
 };
 
-export const AppleScripts = [sendMessage, startChat, renameGroupChat];
+/**
+ * AppleScript to add a participant to a group
+ */
+const addParticipant = {
+    name: 'addParticipant.scpt',
+    contents: `on run {currentName, participant}
+    tell application "System Events"
+        tell process "Messages"
+            set groupMatch to -1
+            
+            (* Iterate over each chat row *)
+            repeat with chatRow in ((table 1 of scroll area 1 of splitter group 1 of window 1)'s entire contents as list)
+                if chatRow's class is row then
+                    
+                    (* Pull out the chat's name *)
+                    set fullName to (chatRow's UI element 1)'s description
+                    set nameSplit to my splitText(fullName, ". ")
+                    set chatName to item 1 of nameSplit
+                    
+                    (* Only pull out groups *)
+                    if chatName is equal to currentName then
+                        set groupMatch to chatRow
+                        exit repeat
+                    end if
+                end if
+            end repeat
+            
+            if groupMatch is equal to -1 then
+                tell me to error "Group chat does not exist"
+            end if
+            
+            select groupMatch
+            try
+                tell window 1 to tell splitter group 1 to tell button "Details"
+                    click
+                    tell pop over 1 to tell scroll area 1 to tell text field 2
+                        set value to participant
+                        set focused to true
+                        
+                        (* We have to activate the window so that we can hit enter *)
+                        tell application "Messages"
+                            reopen
+                            activate
+                        end tell
+                        key code 36 -- Enter
+                    end tell
+                end tell
+                
+                delay 1
+                set totalWindows to count windows
+                
+                if totalWindows is greater than 1 then
+                    repeat (totalWindows - 1) times
+                        try
+                            tell button 1 of window 1 to perform action "AXPress"
+                        on error
+                            exit repeat
+                        end try
+                    end repeat
+                    log "Error: Not an iMessage address"
+                end if
+            on error errorMessage
+                log errorMessage
+            end try
+            
+            key code 53 -- Escape
+            log "success"
+        end tell
+    end tell
+end run
+
+on splitText(theText, theDelimiter)
+	set AppleScript's text item delimiters to theDelimiter
+	set theTextItems to every text item of theText
+	set AppleScript's text item delimiters to ""
+	return theTextItems
+end splitText`
+};
+
+export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant];

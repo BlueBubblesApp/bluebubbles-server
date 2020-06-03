@@ -1,10 +1,10 @@
 /* eslint-disable no-bitwise */
-import * as fs from "fs";
-import { PhoneNumberUtil, PhoneNumberFormat } from "google-libphonenumber";
+import { PhoneNumberUtil } from "google-libphonenumber";
 import { FileSystem } from "@server/fileSystem";
 import { ContactRepository } from "@server/api/contacts";
 import { Handle } from "@server/api/imessage/entity/Handle";
 import { Chat } from "@server/api/imessage/entity/Chat";
+import { MessageRepository } from "@server/api/imessage";
 
 export const generateUuid = () => {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -68,4 +68,67 @@ export const getContactRecord = async (contactsRepo: ContactRepository, chat: Ch
         return { known: true, value: `${record.firstName} ${record.lastName}` };
 
     return { known: true, value: record.firstName };
+}
+
+export const generateChatNameList = async (
+    chatGuid: string,
+    iMessageRepo: MessageRepository,
+    contactsRepo: ContactRepository
+) => {
+    if (!chatGuid.startsWith("iMessage"))
+        throw new Error("Invalid chat GUID!");
+
+    // First, lets get the members of the chat
+    const chats = await iMessageRepo.getChats(chatGuid, true);
+
+    if (!chats || chats.length === 0)
+        throw new Error("Chat does not exist");
+
+    const chat = chats[0];
+    const order = await iMessageRepo.getParticipantOrder(chat.ROWID);
+
+    const names = [];
+    if (!chat.displayName) {
+        const knownInOrder = [];
+        const unknownInOrder = [];
+        const knownAsIs = [];
+        const unknownAsIs = [];
+
+        // Calculate as-is, returned from query
+        for (const member of chat.participants) {
+            const record = await getContactRecord(contactsRepo, chat, member);
+            if (record.known) {
+                knownAsIs.push(record.value);
+            } else {
+                unknownAsIs.push(record.value);
+            }
+        }
+
+        // Calculate in order of joining
+        for (const row of order) {
+            // Find the corresponding participant
+            const member = chat.participants.find((item) => item.ROWID === row.handle_id)
+            if (!member) continue;
+
+            const record = await getContactRecord(contactsRepo, chat, member);
+            if (record.known) {
+                knownInOrder.push(record.value);
+            } else {
+                unknownInOrder.push(record.value);
+            }
+        }
+
+        // Add some name backups to the list to try if one fails
+        names.push(formatAddressList([...knownInOrder, ...unknownInOrder]));
+        let next = formatAddressList([...knownAsIs, ...unknownAsIs]);
+        if (!names.includes(next)) names.push(next);
+        next = formatAddressList([...knownAsIs.reverse(), ...unknownAsIs]);
+        if (!names.includes(next)) names.push(next);
+        next = formatAddressList([...knownInOrder.reverse(), ...unknownInOrder]);
+        if (!names.includes(next)) names.push(next);
+    } else {
+        names.push(chat.displayName);
+    }
+
+    return names
 }

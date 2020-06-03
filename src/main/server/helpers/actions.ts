@@ -2,7 +2,7 @@ import { FileSystem } from "@server/fileSystem";
 import { MessageRepository } from "@server/api/imessage";
 import { ContactRepository } from "@server/api/contacts";
 import { Message } from "@server/api/imessage/entity/Message";
-import { getiMessageNumberFormat, formatAddressList, safeExecuteAppleScript, getContactRecord } from "./utils";
+import { safeExecuteAppleScript, generateChatNameList } from "./utils";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -96,60 +96,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
-        if (!chatGuid.startsWith("iMessage"))
-            throw new Error("Invalid chat GUID!");
-
-        // First, lets get the members of the chat
-        const chats = await this.iMessageRepo.getChats(chatGuid, true);
-
-        if (!chats || chats.length === 0)
-            throw new Error("Chat does not exist");
-
-        const chat = chats[0];
-        const order = await this.iMessageRepo.getParticipantOrder(chat.ROWID);
-
-        const names = [];
-        if (!chat.displayName) {
-            const knownInOrder = [];
-            const unknownInOrder = [];
-            const knownAsIs = [];
-            const unknownAsIs = [];
-
-            // Calculate as-is, returned from query
-            for (const member of chat.participants) {
-                const record = await getContactRecord(this.contactsRepo, chat, member);
-                if (record.known) {
-                    knownAsIs.push(record.value);
-                } else {
-                    unknownAsIs.push(record.value);
-                }
-            }
-
-            // Calculate in order of joining
-            for (const row of order) {
-                // Find the corresponding participant
-                const member = chat.participants.find((item) => item.ROWID === row.handle_id)
-                if (!member) continue;
-
-                const record = await getContactRecord(this.contactsRepo, chat, member);
-                if (record.known) {
-                    knownInOrder.push(record.value);
-                } else {
-                    unknownInOrder.push(record.value);
-                }
-            }
-
-            // Add some name backups to the list to try if one fails
-            names.push(formatAddressList([...knownInOrder, ...unknownInOrder]));
-            let next = formatAddressList([...knownAsIs, ...unknownAsIs]);
-            if (!names.includes(next)) names.push(next);
-            next = formatAddressList([...knownAsIs.reverse(), ...unknownAsIs]);
-            if (!names.includes(next)) names.push(next);
-            next = formatAddressList([...knownInOrder.reverse(), ...unknownInOrder]);
-            if (!names.includes(next)) names.push(next);
-        } else {
-            names.push(chat.displayName);
-        }
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -161,7 +108,7 @@ export class ActionHandler {
 
         let err = null;
         for (const oldName of names) {
-            console.warn(`Attempting rename group from [${oldName}] to [${newName}]`);
+            console.info(`Attempting rename group from [${oldName}] to [${newName}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
@@ -169,6 +116,43 @@ export class ActionHandler {
             } catch (ex) {
                 err = ex;
                 console.warn(`Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`);
+                continue;
+            }
+        }
+
+        // If we get here, there was an issue
+        throw err;
+    };
+
+    /**
+     * Renames a group chat via an AppleScript
+     * 
+     * @param chatGuid The GUID for the chat
+     * @param newName The new name for the group
+     * 
+     * @returns The command line response
+     */
+    addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+
+        /**
+         * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
+         * ordered by the chat_handle_join table insertions. Below, we try to try to find the
+         * corresponding chats, and rename them. If the first name fails to be found,
+         * we are going to try and use the backup (second) name. If both failed, we weren't able to
+         * calculate the correct chat name
+         */
+
+        let err = null;
+        for (const name of names) {
+            console.info(`Attempting add participant to group [${name}]`);
+            try {
+                // This needs await here, or else it will fail
+                return await safeExecuteAppleScript(
+                    this.fs, `osascript "${this.fs.scriptDir}/addParticipant.scpt" "${name}" "${participant}"`);
+            } catch (ex) {
+                err = ex;
+                console.warn(`Failed to add participant to group, [${name}]. Attempting the next name.`);
                 continue;
             }
         }

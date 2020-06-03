@@ -367,8 +367,8 @@ export class SocketService {
             const chatGuid = await this.actionHandler.createChat(participants);
 
             try {
-                const newChat = await this.iMessageRepo.db.getRepository(Chat).findOneOrFail({ guid: chatGuid });
-                return respond(cb, "chat-started", createSuccessResponse(getChatResponse(newChat)));
+                const newChat = await this.iMessageRepo.getChats(chatGuid);
+                return respond(cb, "chat-started", createSuccessResponse(getChatResponse(newChat[0])));
             } catch (ex) {
                 throw new Error("Failed to create new chat!");
             }
@@ -388,6 +388,26 @@ export class SocketService {
                 return respond(cb, "group-renamed", createSuccessResponse(null));
             } catch (ex) {
                 return respond(cb, "rename-group-error", createServerErrorResponse(ex.message));
+            }
+        });
+
+        /**
+         * Renames a group chat
+         */
+        socket.on("add-participant", async (params, cb): Promise<void> => {
+            if (!params?.identifier)
+                return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
+            if (!params?.address)
+                return respond(cb, "error", createBadRequestResponse("No participant address specified"));
+
+            try {
+                const result = await this.actionHandler.addParticipant(params.identifier, params.address);
+                if (result.trim() !== "success")
+                    return respond(cb, "error", createBadRequestResponse(result));
+
+                return respond(cb, "participant-added", createSuccessResponse(null));
+            } catch (ex) {
+                return respond(cb, "add-participant-error", createServerErrorResponse(ex.message));
             }
         });
 
