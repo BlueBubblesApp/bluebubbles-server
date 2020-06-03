@@ -405,7 +405,8 @@ export class SocketService {
                 if (result.trim() !== "success")
                     return respond(cb, "error", createBadRequestResponse(result));
 
-                return respond(cb, "participant-added", createSuccessResponse(null));
+                const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                return respond(cb, "participant-added", createSuccessResponse(getChatResponse(chats[0])));
             } catch (ex) {
                 return respond(cb, "add-participant-error", createServerErrorResponse(ex.message));
             }
