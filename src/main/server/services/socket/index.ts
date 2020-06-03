@@ -4,7 +4,7 @@ import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 
 // Internal libraries
-import { DatabaseRepository } from "@server/api/imessage";
+import { MessageRepository } from "@server/api/imessage";
 import { ActionHandler } from "@server/helpers/actions";
 import { FileSystem } from "@server/fileSystem";
 
@@ -25,6 +25,7 @@ import { Connection } from "typeorm";
 import { Device } from "@server/entity/Device";
 import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 import { Config } from "@server/entity/Config";
+import { ContactRepository } from "@server/api/contacts";
 
 /**
  * This service class handles all routing for incoming socket
@@ -35,7 +36,9 @@ export class SocketService {
 
     socketServer: io.Server;
 
-    iMessageRepo: DatabaseRepository;
+    iMessageRepo: MessageRepository;
+
+    contactsRepo: ContactRepository;
 
     fs: FileSystem;
 
@@ -52,7 +55,8 @@ export class SocketService {
      */
     constructor(
         db: Connection,
-        iMessageRepo: DatabaseRepository,
+        iMessageRepo: MessageRepository,
+        contactsRepo: ContactRepository,
         fs: FileSystem,
         port: number
     ) {
@@ -64,8 +68,9 @@ export class SocketService {
         });
 
         this.iMessageRepo = iMessageRepo;
+        this.contactsRepo = contactsRepo;
         this.fs = fs;
-        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo);
+        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo, this.contactsRepo);
     }
 
     /**
@@ -336,7 +341,7 @@ export class SocketService {
                     this.fs.deleteChunks(attachmentGuid);
                     return respond(cb, "message-sent", createSuccessResponse(getMessageResponse(msg)));
                 } catch (ex) {
-                    return respond(cb, "send-message--chunk-error", createServerErrorResponse(ex.message));
+                    return respond(cb, "send-message-chunk-error", createServerErrorResponse(ex.message));
                 }
             }
 
@@ -366,6 +371,23 @@ export class SocketService {
                 return respond(cb, "chat-started", createSuccessResponse(getChatResponse(newChat)));
             } catch (ex) {
                 throw new Error("Failed to create new chat!");
+            }
+        });
+        
+        /**
+         * Renames a group chat
+         */
+        socket.on("rename-group", async (params, cb): Promise<void> => {
+            if (!params?.identifier)
+                return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
+            if (!params?.newName)
+                return respond(cb, "error", createBadRequestResponse("No new group name provided"));
+
+            try {
+                await this.actionHandler.renameGroupChat(params.identifier, params.newName);
+                return respond(cb, "group-renamed", createSuccessResponse(null));
+            } catch (ex) {
+                return respond(cb, "rename-group-error", createServerErrorResponse(ex.message));
             }
         });
 

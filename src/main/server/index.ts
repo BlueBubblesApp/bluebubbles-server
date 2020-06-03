@@ -9,7 +9,8 @@ import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
 
 // Database Imports
-import { DatabaseRepository } from "@server/api/imessage";
+import { MessageRepository } from "@server/api/imessage";
+import { ContactRepository } from "@server/api/contacts";
 import { MessageListener } from "@server/api/imessage/listeners/messageListener";
 import { MessageUpdateListener } from "@server/api/imessage/listeners/messageUpdateListener";
 import { GroupChangeListener } from "@server/api/imessage/listeners/groupChangeListener";
@@ -30,7 +31,9 @@ export class BlueBubblesServer {
     
     db: Connection;
 
-    iMessageRepo: DatabaseRepository;
+    iMessageRepo: MessageRepository;
+
+    contactsRepo: ContactRepository;
 
     ngrokServer: string;
 
@@ -53,6 +56,7 @@ export class BlueBubblesServer {
         // Databases
         this.db = null;
         this.iMessageRepo = null;
+        this.contactsRepo = null;
         
         // Other helpers
         this.ngrokServer = null;
@@ -140,13 +144,18 @@ export class BlueBubblesServer {
         cfg.forEach((item) => { this.config[item.name] = item.value; });
 
         this.log("Connecting to iMessage database...");
-        this.iMessageRepo = new DatabaseRepository();
+        this.iMessageRepo = new MessageRepository();
         await this.iMessageRepo.initialize();
+
+        this.log("Connecting to Contacts database...");
+        this.contactsRepo = new ContactRepository();
+        await this.contactsRepo.initialize();
 
         this.log("Initializing up sockets...");
         this.socketService = new SocketService(
             this.db,
             this.iMessageRepo,
+            this.contactsRepo,
             this.fs,
             this.config.socket_port
         );

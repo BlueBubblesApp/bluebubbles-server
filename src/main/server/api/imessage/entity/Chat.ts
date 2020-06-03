@@ -5,7 +5,7 @@ import {
     ManyToMany,
     JoinTable
 } from "typeorm";
-import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
+import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 import { ChatResponse } from "@server/types";

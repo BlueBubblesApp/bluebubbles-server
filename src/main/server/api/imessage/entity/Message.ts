@@ -7,9 +7,9 @@ import {
     JoinColumn,
     ManyToMany
 } from "typeorm";
-import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
-import { MessageTypeTransformer } from "@server/api/imessage/transformers/MessageTypeTransformer";
+import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
+import { DateTransformer } from "@server/api/transformers/DateTransformer";
+import { MessageTypeTransformer } from "@server/api/transformers/MessageTypeTransformer";
 import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
