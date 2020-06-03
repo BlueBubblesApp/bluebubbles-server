@@ -385,7 +385,9 @@ export class SocketService {
 
             try {
                 await this.actionHandler.renameGroupChat(params.identifier, params.newName);
-                return respond(cb, "group-renamed", createSuccessResponse(null));
+
+                const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                return respond(cb, "group-renamed", createSuccessResponse(getChatResponse(chats[0])));
             } catch (ex) {
                 return respond(cb, "rename-group-error", createServerErrorResponse(ex.message));
             }
