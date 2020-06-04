@@ -394,7 +394,7 @@ export class SocketService {
         });
 
         /**
-         * Renames a group chat
+         * Adds a participant to a chat
          */
         socket.on("add-participant", async (params, cb): Promise<void> => {
             if (!params?.identifier)
@@ -411,6 +411,27 @@ export class SocketService {
                 return respond(cb, "participant-added", createSuccessResponse(getChatResponse(chats[0])));
             } catch (ex) {
                 return respond(cb, "add-participant-error", createServerErrorResponse(ex.message));
+            }
+        });
+
+        /**
+         * Removes a participant from a chat
+         */
+        socket.on("remove-participant", async (params, cb): Promise<void> => {
+            if (!params?.identifier)
+                return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
+            if (!params?.address)
+                return respond(cb, "error", createBadRequestResponse("No participant address specified"));
+
+            try {
+                const result = await this.actionHandler.removeParticipant(params.identifier, params.address);
+                if (result.trim() !== "success")
+                    return respond(cb, "error", createBadRequestResponse(result));
+
+                const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                return respond(cb, "participant-removed", createSuccessResponse(getChatResponse(chats[0])));
+            } catch (ex) {
+                return respond(cb, "remove-participant-error", createServerErrorResponse(ex.message));
             }
         });
 

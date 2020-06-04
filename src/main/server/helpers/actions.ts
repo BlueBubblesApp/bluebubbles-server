@@ -2,7 +2,7 @@ import { FileSystem } from "@server/fileSystem";
 import { MessageRepository } from "@server/api/imessage";
 import { ContactRepository } from "@server/api/contacts";
 import { Message } from "@server/api/imessage/entity/Message";
-import { safeExecuteAppleScript, generateChatNameList } from "./utils";
+import { safeExecuteAppleScript, generateChatNameList, getiMessageNumberFormat } from "./utils";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -125,10 +125,10 @@ export class ActionHandler {
     };
 
     /**
-     * Renames a group chat via an AppleScript
+     * Adds a participant using an AppleScript
      * 
      * @param chatGuid The GUID for the chat
-     * @param newName The new name for the group
+     * @param participant The paticipant to add
      * 
      * @returns The command line response
      */
@@ -145,7 +145,7 @@ export class ActionHandler {
 
         let err = null;
         for (const name of names) {
-            console.info(`Attempting add participant to group [${name}]`);
+            console.info(`Attempting to add participant to group [${name}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
@@ -153,6 +153,49 @@ export class ActionHandler {
             } catch (ex) {
                 err = ex;
                 console.warn(`Failed to add participant to group, [${name}]. Attempting the next name.`);
+                continue;
+            }
+        }
+
+        // If we get here, there was an issue
+        throw err;
+    };
+
+    /**
+     * Removes a participant using an AppleScript
+     * 
+     * @param chatGuid The GUID for the chat
+     * @param participant The paticipant to remove
+     * 
+     * @returns The command line response
+     */
+    removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+        let address = participant;
+        if (!address.includes("@")) {
+            address = getiMessageNumberFormat(address);
+        }
+
+        console.log(address);
+
+        /**
+         * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
+         * ordered by the chat_handle_join table insertions. Below, we try to try to find the
+         * corresponding chats, and rename them. If the first name fails to be found,
+         * we are going to try and use the backup (second) name. If both failed, we weren't able to
+         * calculate the correct chat name
+         */
+
+        let err = null;
+        for (const name of names) {
+            console.info(`Attempting to remove participant from group [${name}]`);
+            try {
+                // This needs await here, or else it will fail
+                return await safeExecuteAppleScript(
+                    this.fs, `osascript "${this.fs.scriptDir}/removeParticipant.scpt" "${name}" "${address}"`);
+            } catch (ex) {
+                err = ex;
+                console.warn(`Failed to remove participant from group, [${name}]. Attempting the next name.`);
                 continue;
             }
         }
