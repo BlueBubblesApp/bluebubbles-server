@@ -179,7 +179,6 @@ type ChatResponse = {
     isArchived: boolean;
     displayName: string;
     groupId: string;
-    lastMessageTimestamp: number | null;
 };
 ```
 

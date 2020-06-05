@@ -106,6 +106,5 @@ export const getChatResponse = (tableData: Chat): ChatResponse => {
         isArchived: tableData.isArchived,
         displayName: tableData.displayName,
         groupId: tableData.groupId,
-        lastMessageTimestamp: null // Placeholder
     };
 };
