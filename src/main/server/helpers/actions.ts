@@ -47,7 +47,7 @@ export class ActionHandler {
             throw new Error("Invalid chat GUID!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message}"`;
+        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message.replace(/"/g, '\\"')}"`;
 
         // Add attachment, if present
         if (attachment) {
