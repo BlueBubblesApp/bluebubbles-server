@@ -57,7 +57,7 @@ export class ActionHandler {
 
         try {
             // Track the time it takes to execute the function
-            const start = new Date();
+            const start = new Date(new Date().getTime() - 1000);
             const ret = await this.fs.execShellCommand(baseCmd) as string;
 
             // Lookup the corresponding message in the DB
