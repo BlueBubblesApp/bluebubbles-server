@@ -85,69 +85,93 @@ class Dashboard extends React.Component<Props, State> {
     }
 
     async loadGroupChatCounts() {
-        const res = await ipcRenderer.invoke("get-group-message-counts");
-        let top = this.state.groupMsgCount;
-        res.forEach((item: any) => {
-            if (item.message_count > top.count)
-                top = { name: item.group_name, count: item.message_count };
-        });
+        try {
+            const res = await ipcRenderer.invoke("get-group-message-counts");
+            let top = this.state.groupMsgCount;
+            res.forEach((item: any) => {
+                if (item.message_count > top.count)
+                    top = { name: item.group_name, count: item.message_count };
+            });
 
-        this.setState({
-            groupMsgCount: top
-        });
+            this.setState({
+                groupMsgCount: top
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadIndividualChatCounts() {
-        const res = await ipcRenderer.invoke("get-individual-message-counts");
-        let top = this.state.individualMsgCount;
-        res.forEach((item: any) => {
-            if (item.message_count > top.count)
-                top = { name: item.chat_identifier, count: item.message_count };
-        });
+        try {
+            const res = await ipcRenderer.invoke("get-individual-message-counts");
+            let top = this.state.individualMsgCount;
+            res.forEach((item: any) => {
+                if (item.message_count > top.count)
+                    top = { name: item.chat_identifier, count: item.message_count };
+            });
 
-        this.setState({
-            individualMsgCount: top
-        });
+            this.setState({
+                individualMsgCount: top
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadTotalMessageCount() {
-        this.setState({
-            totalMsgCount: await ipcRenderer.invoke("get-message-count")
-        });
+        try {
+            this.setState({
+                totalMsgCount: await ipcRenderer.invoke("get-message-count")
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadChatImageCounts() {
-        const res = await ipcRenderer.invoke("get-chat-image-count");
-        let top = this.state.imageCount;
-        res.forEach((item: any) => {
-            const identifier = (item.chat_identifier.startsWith("chat")) ? item.group_name : item.chat_identifier;
-            if (item.image_count > top.count)
-                top = { name: identifier, count: item.image_count };
-        });
+        try {
+            const res = await ipcRenderer.invoke("get-chat-image-count");
+            let top = this.state.imageCount;
+            res.forEach((item: any) => {
+                const identifier = (item.chat_identifier.startsWith("chat")) ? item.group_name : item.chat_identifier;
+                if (item.image_count > top.count)
+                    top = { name: identifier, count: item.image_count };
+            });
 
-        this.setState({ imageCount: top });
+            this.setState({ imageCount: top });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadRecentMessageCount() {
-        const after = new Date();
-        after.setDate(after.getDate() - 1);
-        this.setState({
-            recentMsgCount: await ipcRenderer.invoke("get-message-count", {
-                after
-            })
-        });
+        try {
+            const after = new Date();
+            after.setDate(after.getDate() - 1);
+            this.setState({
+                recentMsgCount: await ipcRenderer.invoke("get-message-count", {
+                    after
+                })
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadMyMessageCount() {
-        const after = new Date();
-        after.setDate(after.getDate() - 1);
-        this.setState({
-            myMsgCount: await ipcRenderer.invoke("get-message-count", {
-                after,
-                before: null,
-                isFromMe: true
-            })
-        });
+        try {
+            const after = new Date();
+            after.setDate(after.getDate() - 1);
+            this.setState({
+                myMsgCount: await ipcRenderer.invoke("get-message-count", {
+                    after,
+                    before: null,
+                    isFromMe: true
+                })
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     render() {

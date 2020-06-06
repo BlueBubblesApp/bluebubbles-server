@@ -5,6 +5,8 @@ import * as ngrok from "ngrok";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
+import { Alert } from "@server/entity/Alert";
+import { Device } from "@server/entity/Device";
 import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
 
@@ -17,8 +19,8 @@ import { GroupChangeListener } from "@server/api/imessage/listeners/groupChangeL
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 
 // Service Imports
-import { SocketService, FCMService } from "@server/services";
-import { Device } from "@server/entity/Device";
+import { SocketService, FCMService, AlertService } from "@server/services";
+
 
 
 /**
@@ -40,6 +42,8 @@ export class BlueBubblesServer {
     socketService: SocketService;
 
     fcmService: FCMService;
+
+    alertService: AlertService;
 
     config: { [key: string]: any };
 
@@ -65,6 +69,8 @@ export class BlueBubblesServer {
 
         // Services
         this.socketService = null;
+        this.alertService = null;
+        this.fcmService = null;
     }
 
     private emitToUI(event: string, data: any) {
@@ -83,12 +89,14 @@ export class BlueBubblesServer {
         switch (type) {
             case "error":
                 console.error(message);
+                this.alertService.create("error", message);
                 break;
             case "dir":
                 console.dir(message);
                 break;
             case "warn":
                 console.warn(message);
+                this.alertService.create("warn", message);
                 break;
             case "log":
             default:
@@ -137,53 +145,74 @@ export class BlueBubblesServer {
         this.log("Performing initial setup...");
         await this.initializeDatabase();
         await this.setupDefaults();
-        this.setupFileSystem();
+
+        this.log("Initializing alert service...");
+        this.alertService = new AlertService(this.db, this.window);
+
+        try {
+            this.log("Initializing filesystem...");
+            this.fs = new FileSystem();
+            this.fs.setup();
+        } catch (ex) {
+            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
+        }
 
         this.log("Initializing configuration database...");
         const cfg = await this.db.getRepository(Config).find();
         cfg.forEach((item) => { this.config[item.name] = item.value; });
 
-        this.log("Connecting to iMessage database...");
-        this.iMessageRepo = new MessageRepository();
-        await this.iMessageRepo.initialize();
+        try {
+            this.log("Connecting to iMessage database...");
+            this.iMessageRepo = new MessageRepository();
+            await this.iMessageRepo.initialize();
+        } catch (ex) {
+            this.log(`Failed to connect to iMessage database! Please enable Full Disk Access!`, "error");
+        }
 
-        this.log("Connecting to Contacts database...");
-        this.contactsRepo = new ContactRepository();
-        await this.contactsRepo.initialize();
+        try {
+            this.log("Connecting to Contacts database...");
+            this.contactsRepo = new ContactRepository();
+            await this.contactsRepo.initialize();
+        } catch (ex) {
+            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
+        }
 
-        this.log("Initializing up sockets...");
-        this.socketService = new SocketService(
-            this.db,
-            this.iMessageRepo,
-            this.contactsRepo,
-            this.fs,
-            this.config.socket_port
-        );
+        try {
+            this.log("Initializing up sockets...");
+            this.socketService = new SocketService(
+                this.db,
+                this.iMessageRepo,
+                this.contactsRepo,
+                this.fs,
+                this.config.socket_port
+            );
+        } catch (ex) {
+            this.log(`Failed to setup socket service! ${ex.message}`, "error");
+        }
 
-        this.log("Initializing connection to Google FCM...");
-        this.fcmService = new FCMService(this.fs);
+        try {
+            this.log("Initializing connection to Google FCM...");
+            this.fcmService = new FCMService(this.fs);
+        } catch (ex) {
+            this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
+        }
     }
 
     /**
      * Initializes the connection to the configuration database
      */
     private async initializeDatabase(): Promise<void> {
-        this.db = await createConnection({
-            type: "sqlite",
-            database: `${app.getPath("userData")}/config.db`,
-            entities: [Config, Device],
-            synchronize: true,
-            logging: false
-        });
-    }
-
-    /**
-     * Sets up the "filsystem". This basically initializes
-     * the required directories for the app
-     */
-    private setupFileSystem(): void {
-        this.fs = new FileSystem();
-        this.fs.setup();
+        try {
+            this.db = await createConnection({
+                type: "sqlite",
+                database: `${app.getPath("userData")}/config.db`,
+                entities: [Config, Device, Alert],
+                synchronize: true,
+                logging: false
+            });
+        } catch (ex) {
+            this.log(`Failed to connect to configuration database! ${ex.message}`, "error");
+        }
     }
 
     /**
@@ -191,10 +220,14 @@ export class BlueBubblesServer {
      * has not already been initialized
      */
     private async setupDefaults(): Promise<void> {
-        const repo = this.db.getRepository(Config);
-        for (const key of Object.keys(DEFAULT_DB_ITEMS)) {
-            const item = await repo.findOne({ name: key })
-            if (!item) await this.addConfigItem(key, DEFAULT_DB_ITEMS[key]())
+        try {
+            const repo = this.db.getRepository(Config);
+            for (const key of Object.keys(DEFAULT_DB_ITEMS)) {
+                const item = await repo.findOne({ name: key })
+                if (!item) await this.addConfigItem(key, DEFAULT_DB_ITEMS[key]())
+            }
+        } catch (ex) {
+            this.log(`Failed to setup default configurations! ${ex.message}`, "error");
         }
     }
 
@@ -203,20 +236,24 @@ export class BlueBubblesServer {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async connectToNgrok(): Promise<void> {
-        this.ngrokServer = await ngrok.connect({
-            port: this.config.socket_port,
-            // This is required to run ngrok in production
-            binPath: (path) => path.replace("app.asar", "app.asar.unpacked")
-        });
+        try {
+            this.ngrokServer = await ngrok.connect({
+                port: this.config.socket_port,
+                // This is required to run ngrok in production
+                binPath: (path) => path.replace("app.asar", "app.asar.unpacked")
+            });
 
-        await this.setConfig("server_address", this.ngrokServer);
+            await this.setConfig("server_address", this.ngrokServer);
 
-        // Emit this over the socket
-        if (this.socketService)
-            this.socketService.socketServer.emit("new-server", this.ngrokServer);
+            // Emit this over the socket
+            if (this.socketService)
+                this.socketService.socketServer.emit("new-server", this.ngrokServer);
 
-        await this.sendNotification("new-server", this.ngrokServer);
-        this.fcmService.setServerUrl(this.ngrokServer);
+            await this.sendNotification("new-server", this.ngrokServer);
+            this.fcmService.setServerUrl(this.ngrokServer);
+        } catch (ex) {
+            this.log(`Failed to connect to ngrok! ${ex.message}`, "error");
+        }
     }
 
     /**
@@ -262,6 +299,12 @@ export class BlueBubblesServer {
      * we will emit a message to the socket, as well as the FCM server
      */
     private startChatListener() {
+        if (!this.iMessageRepo.db) {
+            this.alertService.create(
+                "info", "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled");
+            return;
+        }
+
         // Create a listener to listen for new/updated messages
         const newMsgListener = new MessageListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
         const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
@@ -344,6 +387,8 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("get-config", async (event, args) => {
+            if (!this.db) return {};
+
             const cfg = await this.db.getRepository(Config).find();
             for (const i of cfg) {
                 this.config[i.name] = i.value;
@@ -353,21 +398,25 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("get-message-count", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
             const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
             return count;
         });
 
         ipcMain.handle("get-chat-image-count", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
             const count = await this.iMessageRepo.getChatImageCounts();
             return count;
         });
 
         ipcMain.handle("get-group-message-counts", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("group");
             return count;
         });
 
         ipcMain.handle("get-individual-message-counts", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("individual");
             return count;
         });
@@ -398,6 +447,18 @@ export class BlueBubblesServer {
             await this.setConfig("tutorial_is_done", "1");
             this.socketService.socketServer.close();
             await this.setup();
+        });
+
+        ipcMain.handle("get-alerts", async (event, args) => {
+            const alerts = await this.alertService.find();
+            return alerts;
+        });
+
+        ipcMain.handle("mark-alert-as-read", async (event, args) => {
+            const alertIds = args ?? [];
+            for (const id of alertIds) {
+                await this.alertService.markAsRead(id);
+            }
         });
     }
 }
