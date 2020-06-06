@@ -112,7 +112,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs, `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName}" "${newName}"`);
+                    this.fs, `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName.replace(/"/g, '\\"')}" "${newName.replace(/"/g, '\\"')}"`);
             } catch (ex) {
                 err = ex;
                 console.warn(`Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`);
