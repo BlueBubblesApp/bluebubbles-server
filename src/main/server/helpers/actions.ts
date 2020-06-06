@@ -47,7 +47,7 @@ export class ActionHandler {
             throw new Error("Invalid chat GUID!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message}"`;
+        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message.replace(/"/g, '\\"')}"`;
 
         // Add attachment, if present
         if (attachment) {
@@ -57,7 +57,7 @@ export class ActionHandler {
 
         try {
             // Track the time it takes to execute the function
-            const start = new Date();
+            const start = new Date(new Date().getTime() - 1000);
             const ret = await this.fs.execShellCommand(baseCmd) as string;
 
             // Lookup the corresponding message in the DB
@@ -112,7 +112,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs, `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName}" "${newName}"`);
+                    this.fs, `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName.replace(/"/g, '\\"')}" "${newName.replace(/"/g, '\\"')}"`);
             } catch (ex) {
                 err = ex;
                 console.warn(`Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`);
