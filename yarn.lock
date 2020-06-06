@@ -1590,6 +1590,11 @@
     "@types/minimatch" "*"
     "@types/node" "*"
 
+"@types/google-libphonenumber@^7.4.18":
+  version "7.4.18"
+  resolved "https://registry.yarnpkg.com/@types/google-libphonenumber/-/google-libphonenumber-7.4.18.tgz#8066e2fa505c1e5490ea3524cb8ae4ac693d77c2"
+  integrity sha512-sXkLBpseVM5YeUwvxGjb2lkowZlSqazBnETiRSlvIWHw9ZOe0sTJiYzOSfSf40LQzEv/q5c8dvrH0rNOJFuxkw==
+
 "@types/history@*", "@types/history@^4.7.5":
   version "4.7.5"
   resolved "https://registry.yarnpkg.com/@types/history/-/history-4.7.5.tgz#527d20ef68571a4af02ed74350164e7a67544860"
@@ -6429,6 +6434,11 @@ google-gax@^1.13.0:
     retry-request "^4.0.0"
     semver "^6.0.0"
     walkdir "^0.4.0"
+
+google-libphonenumber@^3.2.10:
+  version "3.2.10"
+  resolved "https://registry.yarnpkg.com/google-libphonenumber/-/google-libphonenumber-3.2.10.tgz#021a314652747d736a39e2e60dc670f0431425ad"
+  integrity sha512-TsckE9O8QgqaIeaOXPjcJa4/kX3BzFdO1oCbMfmUpRZckml4xJhjJVxaT9Mdt/VrZZkT9lX44eHAEWfJK1tHtw==
 
 google-p12-pem@^2.0.0:
   version "2.0.4"

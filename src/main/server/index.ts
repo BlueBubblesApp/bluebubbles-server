@@ -9,14 +9,17 @@ import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
 
 // Database Imports
-import { DatabaseRepository } from "@server/api/imessage";
+import { MessageRepository } from "@server/api/imessage";
+import { ContactRepository } from "@server/api/contacts";
 import { MessageListener } from "@server/api/imessage/listeners/messageListener";
+import { MessageUpdateListener } from "@server/api/imessage/listeners/messageUpdateListener";
+import { GroupChangeListener } from "@server/api/imessage/listeners/groupChangeListener";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 
 // Service Imports
 import { SocketService, FCMService } from "@server/services";
 import { Device } from "@server/entity/Device";
-import { MessageUpdateListener } from "@server/api/imessage/listeners/messageUpdateListener";
+
 
 /**
  * Main entry point for the back-end server
@@ -28,7 +31,9 @@ export class BlueBubblesServer {
     
     db: Connection;
 
-    iMessageRepo: DatabaseRepository;
+    iMessageRepo: MessageRepository;
+
+    contactsRepo: ContactRepository;
 
     ngrokServer: string;
 
@@ -51,6 +56,7 @@ export class BlueBubblesServer {
         // Databases
         this.db = null;
         this.iMessageRepo = null;
+        this.contactsRepo = null;
         
         // Other helpers
         this.ngrokServer = null;
@@ -138,13 +144,18 @@ export class BlueBubblesServer {
         cfg.forEach((item) => { this.config[item.name] = item.value; });
 
         this.log("Connecting to iMessage database...");
-        this.iMessageRepo = new DatabaseRepository();
+        this.iMessageRepo = new MessageRepository();
         await this.iMessageRepo.initialize();
+
+        this.log("Connecting to Contacts database...");
+        this.contactsRepo = new ContactRepository();
+        await this.contactsRepo.initialize();
 
         this.log("Initializing up sockets...");
         this.socketService = new SocketService(
             this.db,
             this.iMessageRepo,
+            this.contactsRepo,
             this.fs,
             this.config.socket_port
         );
@@ -255,32 +266,54 @@ export class BlueBubblesServer {
         const newMsgListener = new MessageListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
         const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
 
+        // No real rhyme or reason to multiply this by 2. It's just not as much a priority
+        const groupChangeListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
+
         newMsgListener.on("new-entry", async (item: Message) => {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
-            const from = (item.isFromMe) ? "yourself" : item.handle?.id
+            const from = (item.isFromMe) ? "You" : item.handle?.id
             const text = (item.cacheHasAttachments) ? (
                 `Image: ${item.text.slice(1, item.text.length) || "<No Text>"}`) : item.text;
             this.log(`New message from [${from}]: [${text.substring(0, 50)}]`);
 
-            const msg = getMessageResponse(item);
-
             // Emit it to the socket and FCM devices
-            await this.sendNotification("new-message", msg);
+            await this.sendNotification("new-message", getMessageResponse(item));
         });
 
         updatedMsgListener.on("updated-entry", async (item: Message) => {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
-            const from = (item.isFromMe) ? "yourself" : item.handle?.id
+            const from = (item.isFromMe) ? "You" : item.handle?.id
             const time = item.dateDelivered || item.dateRead;
             const text = (item.dateRead) ? 'Text Read' : 'Text Delivered'
             this.log(`Updated message from [${from}]: [${text} -> ${time.toLocaleString()}]`);
 
-            const msg = getMessageResponse(item);
-
             // Emit it to the socket and FCM devices
-            await this.sendNotification("updated-message", msg);
+            await this.sendNotification("updated-message", getMessageResponse(item));
+        });
+
+        groupChangeListener.on("name-change", async (item: Message) => {
+            this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
+            await this.sendNotification("group-name-change", getMessageResponse(item));
+        });
+
+        groupChangeListener.on("participant-removed", async (item: Message) => {
+            const from = (item.isFromMe || item.handleId === 0) ? "You" : item.handle?.id
+            this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
+            await this.sendNotification("participant-removed", getMessageResponse(item));
+        });
+
+        groupChangeListener.on("participant-added", async (item: Message) => {
+            const from = (item.isFromMe || item.handleId === 0) ? "You" : item.handle?.id
+            this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
+            await this.sendNotification("participant-added", getMessageResponse(item));
+        });
+
+        groupChangeListener.on("participant-left", async (item: Message) => {
+            const from = (item.isFromMe || item.handleId === 0) ? "You" : item.handle?.id
+            this.log(`[${from}] left [${item.cacheRoomnames}]`);
+            await this.sendNotification("participant-left", getMessageResponse(item));
         });
     }
 
@@ -363,6 +396,8 @@ export class BlueBubblesServer {
 
         ipcMain.handle("complete-tutorial", async (event, args) => {
             await this.setConfig("tutorial_is_done", "1");
+            this.socketService.socketServer.close();
+            await this.setup();
         });
     }
 }

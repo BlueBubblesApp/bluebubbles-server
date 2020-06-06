@@ -11,7 +11,7 @@ import { Attachment } from "@server/api/imessage/entity/Attachment";
 /**
  * A repository class to facilitate pulling information from the iMessage database
  */
-export class DatabaseRepository {
+export class MessageRepository {
     db: Connection = null;
 
     constructor() {
@@ -49,10 +49,25 @@ export class DatabaseRepository {
 
         // Add default WHERE clauses
         query.andWhere("chat.service_name == 'iMessage'");
-        if (chatGuid) query.andWhere("chat.guid == :guid", { guid: chatGuid });
+        if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
 
         const chats = await query.getMany();
+        
         return chats;
+    }
+
+    /**
+     * Get participants of a chat, in order of being added.
+     * This is a weird method because of the way SQLite will auto-sort
+     *
+     * @param identifier A specific chat identifier to get
+     */
+    async getParticipantOrder(chatROWID: number) {
+        const query = await this.db.query("SELECT * FROM chat_handle_join");
+
+        // We have to do manual filtering in order to maintain the order
+        // SQLite will auto-sort results if there is no Primary Key (which there isn't)
+        return query.filter((item: { chat_id: number, handle_id: number }) => item.chat_id === chatROWID);
     }
 
     /**

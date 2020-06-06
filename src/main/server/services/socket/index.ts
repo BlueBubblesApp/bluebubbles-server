@@ -4,7 +4,7 @@ import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 
 // Internal libraries
-import { DatabaseRepository } from "@server/api/imessage";
+import { MessageRepository } from "@server/api/imessage";
 import { ActionHandler } from "@server/helpers/actions";
 import { FileSystem } from "@server/fileSystem";
 
@@ -25,6 +25,7 @@ import { Connection } from "typeorm";
 import { Device } from "@server/entity/Device";
 import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 import { Config } from "@server/entity/Config";
+import { ContactRepository } from "@server/api/contacts";
 
 /**
  * This service class handles all routing for incoming socket
@@ -35,7 +36,9 @@ export class SocketService {
 
     socketServer: io.Server;
 
-    iMessageRepo: DatabaseRepository;
+    iMessageRepo: MessageRepository;
+
+    contactsRepo: ContactRepository;
 
     fs: FileSystem;
 
@@ -52,7 +55,8 @@ export class SocketService {
      */
     constructor(
         db: Connection,
-        iMessageRepo: DatabaseRepository,
+        iMessageRepo: MessageRepository,
+        contactsRepo: ContactRepository,
         fs: FileSystem,
         port: number
     ) {
@@ -64,8 +68,9 @@ export class SocketService {
         });
 
         this.iMessageRepo = iMessageRepo;
+        this.contactsRepo = contactsRepo;
         this.fs = fs;
-        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo);
+        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo, this.contactsRepo);
     }
 
     /**
@@ -336,7 +341,7 @@ export class SocketService {
                     this.fs.deleteChunks(attachmentGuid);
                     return respond(cb, "message-sent", createSuccessResponse(getMessageResponse(msg)));
                 } catch (ex) {
-                    return respond(cb, "send-message--chunk-error", createServerErrorResponse(ex.message));
+                    return respond(cb, "send-message-chunk-error", createServerErrorResponse(ex.message));
                 }
             }
 
@@ -362,10 +367,71 @@ export class SocketService {
             const chatGuid = await this.actionHandler.createChat(participants);
 
             try {
-                const newChat = await this.iMessageRepo.db.getRepository(Chat).findOneOrFail({ guid: chatGuid });
-                return respond(cb, "chat-started", createSuccessResponse(getChatResponse(newChat)));
+                const newChat = await this.iMessageRepo.getChats(chatGuid, true);
+                return respond(cb, "chat-started", createSuccessResponse(getChatResponse(newChat[0])));
             } catch (ex) {
                 throw new Error("Failed to create new chat!");
+            }
+        });
+        
+        /**
+         * Renames a group chat
+         */
+        socket.on("rename-group", async (params, cb): Promise<void> => {
+            if (!params?.identifier)
+                return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
+            if (!params?.newName)
+                return respond(cb, "error", createBadRequestResponse("No new group name provided"));
+
+            try {
+                await this.actionHandler.renameGroupChat(params.identifier, params.newName);
+
+                const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                return respond(cb, "group-renamed", createSuccessResponse(getChatResponse(chats[0])));
+            } catch (ex) {
+                return respond(cb, "rename-group-error", createServerErrorResponse(ex.message));
+            }
+        });
+
+        /**
+         * Adds a participant to a chat
+         */
+        socket.on("add-participant", async (params, cb): Promise<void> => {
+            if (!params?.identifier)
+                return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
+            if (!params?.address)
+                return respond(cb, "error", createBadRequestResponse("No participant address specified"));
+
+            try {
+                const result = await this.actionHandler.addParticipant(params.identifier, params.address);
+                if (result.trim() !== "success")
+                    return respond(cb, "error", createBadRequestResponse(result));
+
+                const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                return respond(cb, "participant-added", createSuccessResponse(getChatResponse(chats[0])));
+            } catch (ex) {
+                return respond(cb, "add-participant-error", createServerErrorResponse(ex.message));
+            }
+        });
+
+        /**
+         * Removes a participant from a chat
+         */
+        socket.on("remove-participant", async (params, cb): Promise<void> => {
+            if (!params?.identifier)
+                return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
+            if (!params?.address)
+                return respond(cb, "error", createBadRequestResponse("No participant address specified"));
+
+            try {
+                const result = await this.actionHandler.removeParticipant(params.identifier, params.address);
+                if (result.trim() !== "success")
+                    return respond(cb, "error", createBadRequestResponse(result));
+
+                const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                return respond(cb, "participant-removed", createSuccessResponse(getChatResponse(chats[0])));
+            } catch (ex) {
+                return respond(cb, "remove-participant-error", createServerErrorResponse(ex.message));
             }
         });
 

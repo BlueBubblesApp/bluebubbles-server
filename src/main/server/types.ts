@@ -23,6 +23,14 @@ export type ResponseFormat = {
     data?: ResponseData;
 };
 
+/**
+ * ITEM TYPES:
+ * 0: Text
+ * 1: Removal of person from conversation (groupActionType == 1)
+ * 1: Adding of person to conversation (groupActionType == 0)
+ * 2: Group Name Change
+ * 3: Someone left the conversation (handle_id shows who)
+ */
 export type MessageResponse = {
     guid: string;
     text: string;
@@ -48,6 +56,7 @@ export type MessageResponse = {
     datePlayed: number | null;
     itemType: number;
     groupTitle: string | null;
+    groupActionType: number;
     isExpired: boolean;
     associatedMessageGuid: string | null;
     associatedMessageType: number | null;
@@ -72,7 +81,6 @@ export type ChatResponse = {
     isArchived: boolean;
     displayName: string;
     groupId: string;
-    lastMessageTimestamp: number | null;
 };
 
 export type AttachmentResponse = {

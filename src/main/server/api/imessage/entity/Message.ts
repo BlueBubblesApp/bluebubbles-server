@@ -7,9 +7,9 @@ import {
     JoinColumn,
     ManyToMany
 } from "typeorm";
-import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
-import { MessageTypeTransformer } from "@server/api/imessage/transformers/MessageTypeTransformer";
+import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
+import { DateTransformer } from "@server/api/transformers/DateTransformer";
+import { MessageTypeTransformer } from "@server/api/transformers/MessageTypeTransformer";
 import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
@@ -300,7 +300,7 @@ export class Message {
     @Column({ name: "item_type", type: "integer", default: 0 })
     itemType: number;
 
-    @Column({ name: "other_handle", type: "integer", default: 0 })
+    @Column({ name: "other_handle", type: "integer", nullable: true, default: 0 })
     otherHandle: number;
 
     @Column({ name: "group_title", type: "text" })
@@ -436,6 +436,7 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
             : null,
         itemType: tableData.itemType,
         groupTitle: tableData.groupTitle,
+        groupActionType: tableData.groupActionType,
         isExpired: tableData.isExpirable,
         associatedMessageGuid: tableData.associatedMessageGuid,
         associatedMessageType: tableData.associatedMessageType,

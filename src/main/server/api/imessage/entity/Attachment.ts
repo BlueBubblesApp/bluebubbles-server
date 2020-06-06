@@ -9,8 +9,8 @@ import {
     JoinTable
 } from "typeorm";
 
-import { BooleanTransformer } from "@server/api/imessage/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/api/imessage/transformers/DateTransformer";
+import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
+import { DateTransformer } from "@server/api/transformers/DateTransformer";
 import {
     Message,
     getMessageResponse

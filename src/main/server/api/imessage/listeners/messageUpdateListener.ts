@@ -1,13 +1,13 @@
-import { DatabaseRepository } from "@server/api/imessage";
+import { MessageRepository } from "@server/api/imessage";
 import { Message } from "@server/api/imessage/entity/Message";
 import { ChangeListener } from "./changeListener";
 
 export class MessageUpdateListener extends ChangeListener {
-    repo: DatabaseRepository;
+    repo: MessageRepository;
 
     frequencyMs: number;
 
-    constructor(repo: DatabaseRepository, pollFrequency: number) {
+    constructor(repo: MessageRepository, pollFrequency: number) {
         super(pollFrequency);
 
         this.repo = repo;
