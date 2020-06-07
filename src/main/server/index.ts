@@ -333,7 +333,9 @@ export class BlueBubblesServer {
             this.log(`Message match found for text, [${item.message.text}]`);
             const resp = getMessageResponse(item.message);
             resp.tempGuid = item.tempGuid;
-            await this.sendNotification("message-match", resp);
+
+            // We are emitting this as a new message, the only difference being the included tempGuid
+            await this.sendNotification("new-message", resp);
         });
 
         // Create a listener to listen for new/updated messages
