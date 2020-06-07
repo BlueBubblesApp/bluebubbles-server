@@ -29,6 +29,9 @@ export class MessageListener extends ChangeListener {
             // Skip over any that we've finished
             if (this.cache.find(entry.guid)) return;
 
+            console.log("new-entry for:")
+            console.log(entry.guid);
+
             // Add to cache
             this.cache.add(entry.guid);
             super.emit("new-entry", this.transformEntry(entry));

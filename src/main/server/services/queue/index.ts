@@ -57,6 +57,7 @@ export class QueueService extends ChangeListener {
 
             // If we have matches, emit it and delete it from the Queue
             if (matches && matches.length > 0) {
+                this.cache.add(matches[0].guid);
                 super.emit("message-match", {tempGuid: entry.tempGuid, message: matches[0]});
                 await repo.remove(entry);
             }
