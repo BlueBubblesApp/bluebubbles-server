@@ -32,6 +32,7 @@ export type ResponseFormat = {
  * 3: Someone left the conversation (handle_id shows who)
  */
 export type MessageResponse = {
+    tempGuid?: string;
     guid: string;
     text: string;
     handle?: HandleResponse | null;

@@ -1,17 +1,16 @@
 import { MessageRepository } from "@server/api/imessage";
 import { Message } from "@server/api/imessage/entity/Message";
+import { EventCache } from "@server/eventCache";
 import { ChangeListener } from "./changeListener";
+
 
 export class MessageListener extends ChangeListener {
     repo: MessageRepository;
 
-    frequencyMs: number;
-
-    constructor(repo: MessageRepository, pollFrequency: number) {
-        super(pollFrequency);
+    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
+        super({ cache, pollFrequency });
 
         this.repo = repo;
-        this.frequencyMs = pollFrequency;
 
         // Start the listener
         this.start();
@@ -22,14 +21,16 @@ export class MessageListener extends ChangeListener {
         const entries = await this.repo.getMessages({ after: offsetDate, withChats: true });
 
         // Emit the new message
-        entries.forEach((entry: any) => {
+        entries.forEach(async (entry: any) => {
+            // If from me, wait 1 second before doing anything
+            if (entry.isFromMe)
+                await new Promise((resolve, _) => setTimeout(() => resolve(), 1000));
+
             // Skip over any that we've finished
-            if (this.emittedItems.includes(entry.ROWID)) return;
+            if (this.cache.find(entry.guid)) return;
 
             // Add to cache
-            this.emittedItems.push(entry.ROWID);
-
-            // Send the built message object
+            this.cache.add(entry.guid);
             super.emit("new-entry", this.transformEntry(entry));
         });
     }

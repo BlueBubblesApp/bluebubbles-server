@@ -8,7 +8,7 @@ export class GroupChangeListener extends ChangeListener {
     frequencyMs: number;
 
     constructor(repo: MessageRepository, pollFrequency: number) {
-        super(pollFrequency);
+        super({ pollFrequency });
 
         this.repo = repo;
         this.frequencyMs = pollFrequency;
@@ -37,10 +37,10 @@ export class GroupChangeListener extends ChangeListener {
         // Emit the new message
         entries.forEach((entry: any) => {
             // Skip over any that we've finished
-            if (this.emittedItems.includes(entry.ROWID)) return;
+            if (this.cache.find(entry.ROWID)) return;
 
             // Add to cache
-            this.emittedItems.push(entry.ROWID);
+            this.cache.add(entry.ROWID);
 
             // Send the built message object
             if (entry.itemType === 1 && entry.groupActionType === 0) {

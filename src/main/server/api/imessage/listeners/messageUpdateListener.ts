@@ -5,13 +5,10 @@ import { ChangeListener } from "./changeListener";
 export class MessageUpdateListener extends ChangeListener {
     repo: MessageRepository;
 
-    frequencyMs: number;
-
     constructor(repo: MessageRepository, pollFrequency: number) {
-        super(pollFrequency);
+        super({ pollFrequency });
 
         this.repo = repo;
-        this.frequencyMs = pollFrequency;
 
         // Start the listener
         this.start();
@@ -29,10 +26,10 @@ export class MessageUpdateListener extends ChangeListener {
             const compiled = `${entry.ROWID}:${delivered}:${read}`;
 
             // Skip over any that we've finished
-            if (this.emittedItems.includes(compiled)) return;
+            if (this.cache.find(compiled)) return;
 
             // Add to cache
-            this.emittedItems.push(compiled);
+            this.cache.add(compiled);
 
             // Send the built message object
             super.emit("updated-entry", this.transformEntry(entry));

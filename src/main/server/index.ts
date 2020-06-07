@@ -7,6 +7,7 @@ import * as ngrok from "ngrok";
 import { Config } from "@server/entity/Config";
 import { Alert } from "@server/entity/Alert";
 import { Device } from "@server/entity/Device";
+import { Queue } from "@server/entity/Queue";
 import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
 
@@ -19,8 +20,8 @@ import { GroupChangeListener } from "@server/api/imessage/listeners/groupChangeL
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 
 // Service Imports
-import { SocketService, FCMService, AlertService } from "@server/services";
-
+import { SocketService, FCMService, AlertService, QueueService } from "@server/services";
+import { EventCache } from "@server/eventCache";
 
 
 /**
@@ -45,9 +46,13 @@ export class BlueBubblesServer {
 
     alertService: AlertService;
 
+    queueService: QueueService;
+
     config: { [key: string]: any };
 
     fs: FileSystem;
+
+    eventCache: EventCache;
 
     /**
      * Constructor to just initialize everything to null pretty much
@@ -66,11 +71,13 @@ export class BlueBubblesServer {
         this.ngrokServer = null;
         this.config = {};
         this.fs = null;
+        this.eventCache = null;
 
         // Services
         this.socketService = null;
         this.alertService = null;
         this.fcmService = null;
+        this.queueService = null;
     }
 
     private emitToUI(event: string, data: any) {
@@ -146,6 +153,9 @@ export class BlueBubblesServer {
         await this.initializeDatabase();
         await this.setupDefaults();
 
+        // Setup lightweight message cache
+        this.eventCache = new EventCache();
+
         this.log("Initializing alert service...");
         this.alertService = new AlertService(this.db, this.window);
 
@@ -191,6 +201,14 @@ export class BlueBubblesServer {
         }
 
         try {
+            this.log("Initializing queue service...");
+            this.queueService = new QueueService(
+                this.db, this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS);
+        } catch (ex) {
+            this.log(`Failed to setup queue service! ${ex.message}`, "error");
+        }
+
+        try {
             this.log("Initializing connection to Google FCM...");
             this.fcmService = new FCMService(this.fs);
         } catch (ex) {
@@ -206,7 +224,7 @@ export class BlueBubblesServer {
             this.db = await createConnection({
                 type: "sqlite",
                 database: `${app.getPath("userData")}/config.db`,
-                entities: [Config, Device, Alert],
+                entities: [Config, Device, Alert, Queue],
                 synchronize: true,
                 logging: false
             });
@@ -263,7 +281,7 @@ export class BlueBubblesServer {
      * @param data Associated data with the notification (as a string)
      */
     async sendNotification(type: string, data: any) {
-        this.socketService.socketServer.emit("new-message", data);
+        this.socketService.socketServer.emit(type, data);
 
         // Send notification to devices
         if (this.fcmService.app) {
@@ -305,8 +323,21 @@ export class BlueBubblesServer {
             return;
         }
 
+        // Start the queue service
+        this.queueService.start();
+        this.queueService.on("message-timeout", async (item: Queue) => {
+            this.log(`Message send timeout for text, [${item.text}]`, "warn");
+            await this.sendNotification("message-timeout", item);
+        });
+        this.queueService.on("message-match", async (item: { tempGuid: string, message: Message }) => {
+            this.log(`Message match found for text, [${item.message.text}]`);
+            const resp = getMessageResponse(item.message);
+            resp.tempGuid = item.tempGuid;
+            await this.sendNotification("message-match", resp);
+        });
+
         // Create a listener to listen for new/updated messages
-        const newMsgListener = new MessageListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
+        const newMsgListener = new MessageListener(this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS);
         const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority

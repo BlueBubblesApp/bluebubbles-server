@@ -84,7 +84,14 @@ const renameGroupChat = {
             select groupMatch
             try
                 tell window 1 to tell splitter group 1 to tell button "Details"
-                    click
+                    try
+                        (* If the popover is open, don't re-click Details *)
+                        set popover to pop over 1
+                    on error notOpen
+                        (* If the popover is not open, click Details *)
+                        click
+                    end try
+
                     tell pop over 1 to tell scroll area 1 to tell text field 1
                         set value to newName
                         confirm
@@ -141,16 +148,24 @@ const addParticipant = {
             select groupMatch
             try
                 tell window 1 to tell splitter group 1 to tell button "Details"
-                    click
+                    try
+                        (* If the popover is open, don't re-click Details *)
+                        set popover to pop over 1
+                    on error notOpen
+                        (* If the popover is not open, click Details *)
+                        click
+                    end try
+
                     tell pop over 1 to tell scroll area 1 to tell text field 2
                         set value to participant
                         set focused to true
-                        
+
                         (* We have to activate the window so that we can hit enter *)
                         tell application "Messages"
                             reopen
                             activate
                         end tell
+
                         key code 36 -- Enter
                     end tell
                 end tell
@@ -222,7 +237,14 @@ const removeParticipant = {
             select groupMatch
             try
                 tell window 1 to tell splitter group 1 to tell button "Details"
-                    click
+                    try
+                        (* If the popover is open, don't re-click Details *)
+                        set popover to pop over 1
+                    on error notOpen
+                        (* If the popover is not open, click Details *)
+                        click
+                    end try
+
                     tell pop over 1 to tell scroll area 1
                         set contactRow to -1
                         repeat with participant in (table 1's entire contents) as list

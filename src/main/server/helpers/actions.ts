@@ -1,7 +1,10 @@
+import { Connection } from "typeorm";
 import { FileSystem } from "@server/fileSystem";
 import { MessageRepository } from "@server/api/imessage";
 import { ContactRepository } from "@server/api/contacts";
-import { Message } from "@server/api/imessage/entity/Message";
+import { EventCache } from "@server/eventCache";
+import { Queue } from "@server/entity/Queue";
+
 import { safeExecuteAppleScript, generateChatNameList, getiMessageNumberFormat } from "./utils";
 
 /**
@@ -10,6 +13,8 @@ import { safeExecuteAppleScript, generateChatNameList, getiMessageNumberFormat }
  * variables
  */
 export class ActionHandler {
+    db: Connection;
+
     fs: FileSystem;
 
     iMessageRepo: MessageRepository;
@@ -21,7 +26,13 @@ export class ActionHandler {
      *
      * @param fileSystem The instance of the filesystem for the app
      */
-    constructor(fileSystem: FileSystem, iMessageRepo: MessageRepository, contactsRepo: ContactRepository) {
+    constructor(
+        db: Connection,
+        fileSystem: FileSystem,
+        iMessageRepo: MessageRepository,
+        contactsRepo: ContactRepository
+    ) {
+        this.db = db;
         this.fs = fileSystem;
         this.iMessageRepo = iMessageRepo;
         this.contactsRepo = contactsRepo;
@@ -38,16 +49,18 @@ export class ActionHandler {
      * @returns The command line response
      */
     sendMessage = async (
+        tempGuid: string,
         chatGuid: string,
         message: string,
         attachmentName?: string,
         attachment?: Uint8Array
-    ): Promise<Message> => {
+    ): Promise<void> => {
         if (!chatGuid.startsWith("iMessage"))
             throw new Error("Invalid chat GUID!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message.replace(/"/g, '\\"')}"`;
+        let baseCmd = `osascript "${
+            this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message.replace(/"/g, '\\"')}"`;
 
         // Add attachment, if present
         if (attachment) {
@@ -56,30 +69,15 @@ export class ActionHandler {
         }
 
         try {
-            // Track the time it takes to execute the function
-            const start = new Date(new Date().getTime() - 1000);
-            const ret = await this.fs.execShellCommand(baseCmd) as string;
+            await this.fs.execShellCommand(baseCmd);
 
-            // Lookup the corresponding message in the DB
-            const matchingMessages = await this.iMessageRepo.getMessages({
-                chatGuid,
-                limit: 1,
-                withHandle: false,  // Exclude to speed up query
-                after: start,
-                where: [
-                    {
-                        // Text must match
-                        statement: "message.text = :text",
-                        args: { text: message }
-                    },
-                    {
-                        // Text must be from yourself
-                        statement: "message.is_from_me = :fromMe",
-                        args: { fromMe: 1 }
-                    }
-                ]
-            });
-            return matchingMessages.length === 0 ? null : matchingMessages[0];
+            // Add queued item
+            const item = new Queue();
+            item.tempGuid = tempGuid;
+            item.chatGuid = chatGuid;
+            item.dateCreated = new Date(new Date().getTime() - 1000).getTime();
+            item.text = message;
+            await this.db.getRepository(Queue).manager.save(item);
         } catch (ex) {
             // Format the error a bit, and re-throw it
             const msg = ex.message.split('execution error: ')[1];
@@ -112,7 +110,8 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs, `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName.replace(/"/g, '\\"')}" "${newName.replace(/"/g, '\\"')}"`);
+                    this.fs, `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${
+                        oldName.replace(/"/g, '\\"')}" "${newName.replace(/"/g, '\\"')}"`);
             } catch (ex) {
                 err = ex;
                 console.warn(`Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`);

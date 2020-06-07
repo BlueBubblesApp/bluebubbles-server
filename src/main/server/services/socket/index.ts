@@ -70,7 +70,7 @@ export class SocketService {
         this.iMessageRepo = iMessageRepo;
         this.contactsRepo = contactsRepo;
         this.fs = fs;
-        this.actionHandler = new ActionHandler(this.fs, this.iMessageRepo, this.contactsRepo);
+        this.actionHandler = new ActionHandler(this.db, this.fs, this.iMessageRepo, this.contactsRepo);
     }
 
     /**
@@ -276,24 +276,29 @@ export class SocketService {
          * Send message
          */
         socket.on("send-message", async (params, cb): Promise<void> => {
+            const tempGuid = params?.tempGuid;
             const chatGuid = params?.guid;
             const message = params?.message;
 
             if (!chatGuid || !message)
                 return respond(cb, "error", createBadRequestResponse("No chat GUID or message provided"));
 
+            if (!tempGuid)
+                return respond(cb, "error", createBadRequestResponse("No temporary GUID provided"));
+
             if (!params?.attachmentName && params?.attachment)
                 return respond(cb, "error", createBadRequestResponse("No attachment name provided"));
 
             try {
-                const msg = await this.actionHandler.sendMessage(
+                await this.actionHandler.sendMessage(
+                    tempGuid,
                     chatGuid,
                     message,
                     params?.attachmentName,
                     (params?.attachment) ? base64.base64ToBytes(params.attachment) : null
                 );
 
-                return respond(cb, "message-sent", createSuccessResponse(getMessageResponse(msg)));
+                return respond(cb, "message-sent", createSuccessResponse(null));
             } catch (ex) {
                 return respond(cb, "send-message-error", createServerErrorResponse(ex.message));
             }
@@ -304,10 +309,13 @@ export class SocketService {
          */
         socket.on("send-message-chunk", async (params, cb): Promise<void> => {
             const chatGuid = params?.guid;
+            const tempGuid = params?.tempGuid;
             const message = params?.message;
 
             if (!chatGuid)
                 return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
+            if (!tempGuid)
+                return respond(cb, "error", createBadRequestResponse("No temporary GUID provided"));
 
             // Attachment chunk parameters
             const attachmentGuid = params?.attachmentGuid;
@@ -331,7 +339,8 @@ export class SocketService {
             // If there are no more chunks, compile, save, and send
             if (!hasMore) {
                 try {
-                    const msg = await this.actionHandler.sendMessage(
+                    await this.actionHandler.sendMessage(
+                        tempGuid,
                         chatGuid,
                         message,
                         params?.attachmentName,
@@ -339,7 +348,7 @@ export class SocketService {
                     );
 
                     this.fs.deleteChunks(attachmentGuid);
-                    return respond(cb, "message-sent", createSuccessResponse(getMessageResponse(msg)));
+                    return respond(cb, "message-sent", createSuccessResponse(null));
                 } catch (ex) {
                     return respond(cb, "send-message-chunk-error", createServerErrorResponse(ex.message));
                 }
