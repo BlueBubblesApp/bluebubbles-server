@@ -22,9 +22,9 @@ export class MessageListener extends ChangeListener {
 
         // Emit the new message
         entries.forEach(async (entry: any) => {
-            // If from me, wait 3 second before doing anything
+            // If from me, wait 1 second before doing anything
             if (entry.isFromMe)
-                await new Promise((resolve, _) => setTimeout(() => resolve(), 5000));
+                await new Promise((resolve, _) => setTimeout(() => resolve(), 1000));
 
             // Skip over any that we've finished
             if (this.cache.find(entry.guid)) return;

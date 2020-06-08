@@ -75,7 +75,7 @@ export class ActionHandler {
             const item = new Queue();
             item.tempGuid = tempGuid;
             item.chatGuid = chatGuid;
-            item.dateCreated = new Date(new Date().getTime() - 1000).getTime();
+            item.dateCreated = new Date().getTime();
             item.text = message;
             await this.db.getRepository(Queue).manager.save(item);
         } catch (ex) {
@@ -174,8 +174,6 @@ export class ActionHandler {
         if (!address.includes("@")) {
             address = getiMessageNumberFormat(address);
         }
-
-        console.log(address);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one

@@ -194,7 +194,7 @@ class AdminLayout extends React.Component<Props, State> {
                                         style={{ textDecoration: (item.isRead) ? 'none' : 'underline' }}>
                                             {(item.isRead) ? 'Already read' : 'Mark as read'}
                                     </span>
-                                    <span>{item.created.toLocaleString()}</span>
+                                    <span>{item.created ? item.created.toLocaleString() : "N/A"}</span>
                                 </section>
                             </section>
                         </StyledMenuItem>

@@ -17,7 +17,8 @@ export class EventCache {
     }
 
     add(item: string) {
-        this.items.push(item);
+        if (!this.items.includes(item))
+            this.items.push(item);
     }
 
     find(item: string) {

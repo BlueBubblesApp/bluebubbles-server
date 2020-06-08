@@ -38,9 +38,13 @@ export class QueueService extends ChangeListener {
             // Check if the entry exists in the messages DB
             const matches = await this.repo.getMessages({
                 chatGuid: entry.chatGuid,
-                limit: 1,
+                // The limit is 2 because we need to be able to take into
+                // account when a user tries to spam. Using a limit of 1
+                // will not cut it
+                limit: 2,
                 withHandle: false,  // Exclude to speed up query
                 after: new Date(entry.dateCreated),
+                sort: "ASC",
                 where: [
                     {
                         // Text must match
@@ -55,12 +59,13 @@ export class QueueService extends ChangeListener {
                 ]
             });
 
-            // If we have matches, emit it and delete it from the Queue
-            if (matches && matches.length > 0) {
-                this.cache.add(matches[0].guid);
-                super.emit("message-match", {tempGuid: entry.tempGuid, message: matches[0]});
-                await repo.remove(entry);
-            }
+            matches.forEach(async (match) => {
+                if (!this.cache.find(match.guid)) {
+                    this.cache.add(match.guid);
+                    super.emit("message-match", {tempGuid: entry.tempGuid, message: matches[0]});
+                    await repo.remove(entry);
+                }
+            });
         });
     }
 
