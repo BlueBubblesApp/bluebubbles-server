@@ -448,11 +448,16 @@ export class SocketService {
                         createBadRequestResponse("No temporary GUID provided")
                     );
 
-                if (!params?.attachmentName && params?.attachment)
+                if (
+                    params?.attachment &&
+                    (!params.attachmentName || !params.attachmentGuid)
+                )
                     return respond(
                         cb,
                         "error",
-                        createBadRequestResponse("No attachment name provided")
+                        createBadRequestResponse(
+                            "No attachment name or GUID provided"
+                        )
                     );
 
                 try {
@@ -460,6 +465,7 @@ export class SocketService {
                         tempGuid,
                         chatGuid,
                         message,
+                        params?.attachmentGuid,
                         params?.attachmentName,
                         params?.attachment
                             ? base64.base64ToBytes(params.attachment)
@@ -536,6 +542,7 @@ export class SocketService {
                             tempGuid,
                             chatGuid,
                             message,
+                            attachmentGuid,
                             params?.attachmentName,
                             attachmentGuid
                                 ? this.fs.buildAttachmentChunks(attachmentGuid)

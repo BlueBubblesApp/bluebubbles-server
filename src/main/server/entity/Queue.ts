@@ -1,12 +1,7 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
 
 @Entity()
-export class Queue
- {
+export class Queue {
     @PrimaryGeneratedColumn({ name: "id" })
     id: number;
 
@@ -21,7 +16,4 @@ export class Queue
 
     @Column("integer", { name: "date_created", nullable: false })
     dateCreated: number;
-
-    @Column("integer", { name: "date_finished", nullable: false })
-    dateFinished: number;
 }

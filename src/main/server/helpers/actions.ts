@@ -56,6 +56,7 @@ export class ActionHandler {
         tempGuid: string,
         chatGuid: string,
         message: string,
+        attachmentGuid?: string,
         attachmentName?: string,
         attachment?: Uint8Array
     ): Promise<void> => {
@@ -77,16 +78,24 @@ export class ActionHandler {
             // We need offsets here due to iMessage's save times being a bit off for some reason
             const now = new Date(new Date().getTime() - 1000).getTime(); // With 1 second offset
             await this.fs.execShellCommand(baseCmd);
-            const later = new Date(new Date().getTime() + 1000).getTime(); // With 1 second offset
 
             // Add queued item
             const item = new Queue();
             item.tempGuid = tempGuid;
             item.chatGuid = chatGuid;
             item.dateCreated = now;
-            item.dateFinished = later;
             item.text = message;
             await this.db.getRepository(Queue).manager.save(item);
+
+            // If there is an attachment, add that to the queue too
+            if (attachment && attachmentName) {
+                const attachmentItem = new Queue();
+                attachmentItem.tempGuid = attachmentGuid;
+                attachmentItem.chatGuid = chatGuid;
+                attachmentItem.dateCreated = now;
+                attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
+                await this.db.getRepository(Queue).manager.save(attachmentItem);
+            }
         } catch (ex) {
             // Format the error a bit, and re-throw it
             const msg = ex.message.split("execution error: ")[1];
