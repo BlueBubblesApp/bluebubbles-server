@@ -69,7 +69,7 @@ export class ActionHandler {
         }
 
         try {
-            const now = new Date().getTime();
+            const now = new Date(new Date().getTime() - 1000).getTime();  // With 1 second offset
             await this.fs.execShellCommand(baseCmd);
             const later = new Date(new Date().getTime() + 1000).getTime();  // With 1 second offset
 
