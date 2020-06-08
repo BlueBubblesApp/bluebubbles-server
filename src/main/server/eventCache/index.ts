@@ -16,9 +16,10 @@ export class EventCache {
         return this.items.length;
     }
 
-    add(item: string) {
-        if (!this.items.includes(item))
-            this.items.push(item);
+    add(item: string): boolean {
+        if (this.items.includes(item)) return false;
+        this.items.push(item);
+        return true;
     }
 
     find(item: string) {

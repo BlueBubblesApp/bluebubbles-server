@@ -69,13 +69,16 @@ export class ActionHandler {
         }
 
         try {
+            const now = new Date().getTime();
             await this.fs.execShellCommand(baseCmd);
+            const later = new Date(new Date().getTime() + 1000).getTime();  // With 1 second offset
 
             // Add queued item
             const item = new Queue();
             item.tempGuid = tempGuid;
             item.chatGuid = chatGuid;
-            item.dateCreated = new Date().getTime();
+            item.dateCreated = now;
+            item.dateFinished = later;
             item.text = message;
             await this.db.getRepository(Queue).manager.save(item);
         } catch (ex) {

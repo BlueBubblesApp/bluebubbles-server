@@ -38,12 +38,10 @@ export class QueueService extends ChangeListener {
             // Check if the entry exists in the messages DB
             const matches = await this.repo.getMessages({
                 chatGuid: entry.chatGuid,
-                // The limit is 2 because we need to be able to take into
-                // account when a user tries to spam. Using a limit of 1
-                // will not cut it
-                limit: 2,
+                limit: 3,  // Limit to 3 to get any edge cases (possibly when spamming)
                 withHandle: false,  // Exclude to speed up query
                 after: new Date(entry.dateCreated),
+                before: new Date(entry.dateFinished),
                 sort: "ASC",
                 where: [
                     {
@@ -60,11 +58,9 @@ export class QueueService extends ChangeListener {
             });
 
             matches.forEach(async (match) => {
-                if (!this.cache.find(match.guid)) {
-                    this.cache.add(match.guid);
-                    super.emit("message-match", {tempGuid: entry.tempGuid, message: matches[0]});
-                    await repo.remove(entry);
-                }
+                this.cache.add(match.guid);
+                super.emit("message-match", {tempGuid: entry.tempGuid, message: match});
+                await repo.remove(entry);
             });
         });
     }

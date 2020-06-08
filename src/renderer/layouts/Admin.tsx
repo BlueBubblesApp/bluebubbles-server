@@ -125,7 +125,6 @@ class AdminLayout extends React.Component<Props, State> {
 
             // Set the state
             this.setState({ alerts });
-            console.log(alerts);
         })
     }
 
