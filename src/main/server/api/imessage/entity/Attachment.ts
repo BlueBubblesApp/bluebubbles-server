@@ -109,7 +109,8 @@ const handledImageMimes = [
 ];
 export const getAttachmentResponse = async (
     tableData: Attachment,
-    withData = false
+    withData = false,
+    withBlurhash = true
 ): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
     let blurhash: string = null;
@@ -127,7 +128,10 @@ export const getAttachmentResponse = async (
         // If we want data, get the data
         if (withData) {
             data = Uint8Array.from(fopen);
-        } else if (handledImageMimes.includes(tableData.mimeType)) {
+        } else if (
+            withBlurhash &&
+            handledImageMimes.includes(tableData.mimeType)
+        ) {
             blurhash = await getBlurHash(fPath);
         }
 

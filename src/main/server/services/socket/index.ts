@@ -231,9 +231,10 @@ export class SocketService {
                     sort: params?.sort ?? "DESC"
                 });
 
+                const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
                 for (const msg of messages) {
-                    const msgRes = await getMessageResponse(msg);
+                    const msgRes = await getMessageResponse(msg, withBlurhash);
                     results.push(msgRes);
                 }
 
