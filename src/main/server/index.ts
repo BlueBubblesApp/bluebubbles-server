@@ -299,7 +299,7 @@ export class BlueBubblesServer {
                 );
 
             await this.sendNotification("new-server", this.ngrokServer);
-            this.fcmService.setServerUrl(this.ngrokServer);
+            await this.fcmService.setServerUrl(this.ngrokServer);
         } catch (ex) {
             this.log(`Failed to connect to ngrok! ${ex.message}`, "error");
         }

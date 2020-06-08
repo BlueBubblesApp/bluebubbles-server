@@ -58,13 +58,27 @@ export class FCMService {
      *
      * @param serverUrl The new server URL
      */
-    setServerUrl(serverUrl: string): void {
+    async setServerUrl(serverUrl: string): Promise<void> {
         if (!this.refresh()) return;
 
+        // Set the rules
+        const source = JSON.stringify(
+            {
+                rules: {
+                    ".read": true,
+                    ".write": false
+                }
+            },
+            null,
+            4
+        );
+        await admin.database().setRules(source);
+
+        // Add the config value
         const db = admin.database();
         const config = db.ref("config");
 
-        config.once("value", (data) => {
+        config.once("value", (_) => {
             config.update({ serverUrl });
         });
     }
