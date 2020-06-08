@@ -517,13 +517,9 @@ export class SocketService {
                         base64.base64ToBytes(attachmentData)
                     );
 
-                // If it's the last chunk, make sure there is a message
+                // If it's the last chunk, but no message, default it to an empty string
                 if (!hasMore && !message)
-                    return respond(
-                        cb,
-                        "error",
-                        createBadRequestResponse("No message provided!")
-                    );
+                    message = "";
 
                 // If it's the last chunk, make sure there is a message
                 if (!hasMore && attachmentGuid && !params?.attachmentName)
