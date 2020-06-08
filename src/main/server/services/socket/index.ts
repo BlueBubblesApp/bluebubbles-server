@@ -489,7 +489,7 @@ export class SocketService {
             async (params, cb): Promise<void> => {
                 const chatGuid = params?.guid;
                 const tempGuid = params?.tempGuid;
-                const message = params?.message;
+                let message = params?.message;
 
                 if (!chatGuid)
                     return respond(
@@ -519,8 +519,7 @@ export class SocketService {
                     );
 
                 // If it's the last chunk, but no message, default it to an empty string
-                if (!hasMore && !message)
-                    message = "";
+                if (!hasMore && !message) message = "";
 
                 // If it's the last chunk, make sure there is a message
                 if (!hasMore && attachmentGuid && !params?.attachmentName)
