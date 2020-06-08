@@ -11,10 +11,8 @@ import {
 
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/transformers/DateTransformer";
-import {
-    Message,
-    getMessageResponse
-} from "@server/api/imessage/entity/Message";
+import { Message } from "@server/api/imessage/entity/Message";
+import { getBlurHash } from "@server/api/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 
 @Entity("attachment")
@@ -101,33 +99,48 @@ export class Attachment {
     hideAttachment: boolean;
 }
 
-export const getAttachmentResponse = (
+const handledImageMimes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/bmp",
+    "image/tiff",
+    "image/gif"
+];
+export const getAttachmentResponse = async (
     tableData: Attachment,
     withData = false
-): AttachmentResponse => {
+): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
+    let blurhash: string = null;
 
-    if (withData) {
-        // Get the fully qualified path
-        let fPath = tableData.filePath;
-        if (fPath[0] === "~") {
-            fPath = path.join(process.env.HOME, fPath.slice(1));
+    // Get the fully qualified path
+    let fPath = tableData.filePath;
+    if (fPath[0] === "~") {
+        fPath = path.join(process.env.HOME, fPath.slice(1));
+    }
+
+    try {
+        // Try to read the file
+        const fopen = fs.readFileSync(fPath);
+
+        // If we want data, get the data
+        if (withData) {
+            data = Uint8Array.from(fopen);
+        } else if (handledImageMimes.includes(tableData.mimeType)) {
+            blurhash = await getBlurHash(fPath);
         }
 
-        try {
-            // Try to read the file
-            data = Uint8Array.from(fs.readFileSync(fPath));
-
-            // If there is no data, return null for the data
-            // Otherwise, convert it to a base64 string
-            if (!data) {
-                data = null;
-            } else {
-                data = base64.bytesToBase64(data as Uint8Array);
-            }
-        } catch (ex) {
-            console.error(`Could not read file [${fPath}]`);
+        // If there is no data, return null for the data
+        // Otherwise, convert it to a base64 string
+        if (!data) {
+            data = null;
+        } else {
+            data = base64.bytesToBase64(data as Uint8Array);
         }
+    } catch (ex) {
+        console.log(ex);
+        console.error(`Could not read file [${fPath}]`);
     }
 
     return {
@@ -136,6 +149,7 @@ export const getAttachmentResponse = (
             ? tableData.messages.map((item) => item.guid)
             : [],
         data: data as string,
+        blurhash,
         uti: tableData.uti,
         mimeType: tableData.mimeType,
         transferState: tableData.transferState,

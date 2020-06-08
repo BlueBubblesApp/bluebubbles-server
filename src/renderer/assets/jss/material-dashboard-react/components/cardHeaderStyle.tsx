@@ -16,6 +16,7 @@ const cardHeaderStyle = createStyles({
         borderBottom: "none",
         background: "transparent",
         zIndex: 3, // zIndex: "3 !important",
+        // eslint-disable-next-line max-len
         "&$cardHeaderPlain,&$cardHeaderIcon,&$cardHeaderStats,&$warningCardHeader,&$successCardHeader,&$dangerCardHeader,&$infoCardHeader,&$primaryCardHeader,&$roseCardHeader": {
             margin: "0 15px",
             padding: "0",
@@ -25,6 +26,7 @@ const cardHeaderStyle = createStyles({
         "&:first-child": {
             borderRadius: "calc(.25rem - 1px) calc(.25rem - 1px) 0 0"
         },
+        // eslint-disable-next-line max-len
         "&$warningCardHeader,&$successCardHeader,&$dangerCardHeader,&$infoCardHeader,&$primaryCardHeader,&$roseCardHeader": {
             "&:not($cardHeaderIcon)": {
                 borderRadius: "3px",
@@ -66,6 +68,7 @@ const cardHeaderStyle = createStyles({
         }
     },
     cardHeaderIcon: {
+        // eslint-disable-next-line max-len
         "&$warningCardHeader,&$successCardHeader,&$dangerCardHeader,&$infoCardHeader,&$primaryCardHeader,&$roseCardHeader": {
             background: "transparent",
             boxShadow: "none"

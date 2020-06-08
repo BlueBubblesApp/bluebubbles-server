@@ -8,7 +8,10 @@ import {
     ManyToMany
 } from "typeorm";
 
-import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
+import {
+    Message,
+    getMessageResponse
+} from "@server/api/imessage/entity/Message";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
 import { HandleResponse } from "@server/types";
 
@@ -42,16 +45,26 @@ export class Handle {
     uncanonicalizedId: string;
 }
 
-export const getHandleResponse = (tableData: Handle): HandleResponse => {
+export const getHandleResponse = async (
+    tableData: Handle
+): Promise<HandleResponse> => {
+    const messages = [];
+    for (const msg of tableData?.messages ?? []) {
+        const msgRes = await getMessageResponse(msg);
+        messages.push(msgRes);
+    }
+
+    const chats = [];
+    for (const chat of tableData?.chats ?? []) {
+        const chatRes = await getChatResponse(chat);
+        chats.push(chatRes);
+    }
+
     return {
-        messages: tableData.messages
-            ? tableData.messages.map((item) => getMessageResponse(item))
-            : [],
-        chats: tableData.chats
-            ? tableData.chats.map((item) => getChatResponse(item))
-            : [],
+        messages,
+        chats,
         address: tableData.id,
         country: tableData.country,
         uncanonicalizedId: tableData.uncanonicalizedId
     };
-}
+};

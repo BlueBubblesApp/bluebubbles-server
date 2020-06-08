@@ -300,7 +300,12 @@ export class Message {
     @Column({ name: "item_type", type: "integer", default: 0 })
     itemType: number;
 
-    @Column({ name: "other_handle", type: "integer", nullable: true, default: 0 })
+    @Column({
+        name: "other_handle",
+        type: "integer",
+        nullable: true,
+        default: 0
+    })
     otherHandle: number;
 
     @Column({ name: "group_title", type: "text" })
@@ -400,18 +405,31 @@ export class Message {
     messageSummaryInfo: Blob;
 }
 
-export const getMessageResponse = (tableData: Message): MessageResponse => {
+export const getMessageResponse = async (
+    tableData: Message
+): Promise<MessageResponse> => {
+    // Load attachments
+    const attachments = [];
+    for (const attachment of tableData?.attachments ?? []) {
+        const resData = await getAttachmentResponse(attachment, false);
+        attachments.push(resData);
+    }
+
+    const chats = [];
+    for (const chat of tableData?.chats ?? []) {
+        const chatRes = await getChatResponse(chat);
+        chats.push(chatRes);
+    }
+
     return {
         guid: tableData.guid,
         text: tableData.text,
-        handle: tableData.handle ? getHandleResponse(tableData.handle) : null,
+        handle: tableData.handle
+            ? await getHandleResponse(tableData.handle)
+            : null,
         handleId: tableData.handleId,
-        chats: tableData.chats
-            ? tableData.chats.map((item) => getChatResponse(item))
-            : [],
-        attachments: tableData.attachments
-            ? tableData.attachments.map((item) => getAttachmentResponse(item))
-            : [],
+        chats,
+        attachments,
         subject: tableData.subject,
         country: tableData.country,
         error: tableData.error,

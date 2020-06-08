@@ -11,6 +11,7 @@ import {
 
 const cardIconStyle = createStyles({
     cardIcon: {
+        // eslint-disable-next-line max-len
         "&$warningCardHeader,&$successCardHeader,&$dangerCardHeader,&$infoCardHeader,&$primaryCardHeader,&$roseCardHeader": {
             borderRadius: "3px",
             backgroundColor: grayColor[0],

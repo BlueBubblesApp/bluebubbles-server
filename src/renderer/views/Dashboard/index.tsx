@@ -11,9 +11,7 @@ import {
     StyleRules
 } from "@material-ui/core/styles";
 
-import {
-    Typography,
-} from "@material-ui/core";
+import { Typography } from "@material-ui/core";
 
 import {
     Message,
@@ -29,14 +27,8 @@ import CardIcon from "@renderer/components/Card/CardIcon";
 import CardFooter from "@renderer/components/Card/CardFooter";
 import Card from "@renderer/components/Card/Card";
 import CardHeader from "@renderer/components/Card/CardHeader";
-import CardBody from "@renderer/components/Card/CardBody";
-import Danger from "@renderer/components/Typography/Danger";
-import { Warning } from "@material-ui/icons";
 import GridContainer from "@renderer/components/Grid/GridContainer";
 import GridItem from "@renderer/components/Grid/GridItem";
-import CustomTabs from "@renderer/components/CustomTabs/CustomTabs";
-import Tasks from "@renderer/components/Tasks/Tasks";
-import { bugs, website, server } from "@renderer/variables/general";
 
 interface Props {
     classes: any;
@@ -46,10 +38,10 @@ interface Props {
 interface State {
     totalMsgCount: number;
     recentMsgCount: number;
-    groupMsgCount: { name: string, count: number };
-    individualMsgCount: { name: string, count: number };
+    groupMsgCount: { name: string; count: number };
+    individualMsgCount: { name: string; count: number };
     myMsgCount: number;
-    imageCount: { name: string, count: number };
+    imageCount: { name: string; count: number };
 }
 
 class Dashboard extends React.Component<Props, State> {
@@ -103,11 +95,16 @@ class Dashboard extends React.Component<Props, State> {
 
     async loadIndividualChatCounts() {
         try {
-            const res = await ipcRenderer.invoke("get-individual-message-counts");
+            const res = await ipcRenderer.invoke(
+                "get-individual-message-counts"
+            );
             let top = this.state.individualMsgCount;
             res.forEach((item: any) => {
                 if (item.message_count > top.count)
-                    top = { name: item.chat_identifier, count: item.message_count };
+                    top = {
+                        name: item.chat_identifier,
+                        count: item.message_count
+                    };
             });
 
             this.setState({
@@ -133,7 +130,9 @@ class Dashboard extends React.Component<Props, State> {
             const res = await ipcRenderer.invoke("get-chat-image-count");
             let top = this.state.imageCount;
             res.forEach((item: any) => {
-                const identifier = (item.chat_identifier.startsWith("chat")) ? item.group_name : item.chat_identifier;
+                const identifier = item.chat_identifier.startsWith("chat")
+                    ? item.group_name
+                    : item.chat_identifier;
                 if (item.image_count > top.count)
                     top = { name: identifier, count: item.image_count };
             });
@@ -179,7 +178,7 @@ class Dashboard extends React.Component<Props, State> {
 
         let tutorialIsDone = this.props.config?.tutorial_is_done;
         if (tutorialIsDone && !Boolean(Number(tutorialIsDone))) {
-            return <Redirect to="/tutorial" />
+            return <Redirect to="/tutorial" />;
         }
 
         return (
@@ -330,7 +329,10 @@ class Dashboard extends React.Component<Props, State> {
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
                                         <Image />
-                                        {this.formatNumber(this.state.imageCount.count)} Images Shared
+                                        {this.formatNumber(
+                                            this.state.imageCount.count
+                                        )}{" "}
+                                        Images Shared
                                     </div>
                                 </CardFooter>
                             </Card>

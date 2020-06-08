@@ -7,7 +7,10 @@ import {
 } from "typeorm";
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
-import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
+import {
+    Message,
+    getMessageResponse
+} from "@server/api/imessage/entity/Message";
 import { ChatResponse } from "@server/types";
 
 @Entity("chat")
@@ -92,19 +95,29 @@ export class Chat {
     successfulQuery: boolean;
 }
 
-export const getChatResponse = (tableData: Chat): ChatResponse => {
+export const getChatResponse = async (
+    tableData: Chat
+): Promise<ChatResponse> => {
+    const messages = [];
+    for (const msg of tableData?.messages ?? []) {
+        const msgRes = await getMessageResponse(msg);
+        messages.push(msgRes);
+    }
+
+    const participants = [];
+    for (const handle of tableData?.participants ?? []) {
+        const handleRes = await getHandleResponse(handle);
+        participants.push(handleRes);
+    }
+
     return {
         guid: tableData.guid,
-        participants: tableData.participants
-            ? tableData.participants.map((item) => getHandleResponse(item))
-            : [],
-        messages: tableData.messages
-            ? tableData.messages.map((item) => getMessageResponse(item))
-            : [],
+        participants,
+        messages,
         style: tableData.style,
         chatIdentifier: tableData.chatIdentifier,
         isArchived: tableData.isArchived,
         displayName: tableData.displayName,
-        groupId: tableData.groupId,
+        groupId: tableData.groupId
     };
 };
