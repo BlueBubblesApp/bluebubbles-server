@@ -4,7 +4,6 @@ import { Alert } from "@server/entity/Alert";
 
 import { AlertTypes } from "./types";
 
-
 /**
  * This services manages alerts to the server dashboard
  */
@@ -20,12 +19,20 @@ export class AlertService {
 
     async find(): Promise<Alert[]> {
         const repo = this.db.getRepository(Alert);
-        const query = repo.createQueryBuilder("alert").orderBy("created", "DESC").limit(10);
+        const query = repo
+            .createQueryBuilder("alert")
+            .orderBy("created", "DESC")
+            .limit(10);
         return query.getMany();
     }
 
-    async create(type: AlertTypes, message: string, isRead = false): Promise<Alert> {
+    async create(
+        type: AlertTypes,
+        message: string,
+        isRead = false
+    ): Promise<Alert> {
         const repo = this.db.getRepository(Alert);
+        if (!message) return null;
 
         // Create the alert based on parameters
         const alert = new Alert();
@@ -35,8 +42,7 @@ export class AlertService {
 
         // Save and emit the alert to the UI
         const saved = await repo.manager.save(alert);
-        if (this.window)
-            this.window.webContents.send("new-alert", saved)
+        if (this.window) this.window.webContents.send("new-alert", saved);
 
         // Save and return the alert
         return saved;
