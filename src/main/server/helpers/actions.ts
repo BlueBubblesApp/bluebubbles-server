@@ -80,12 +80,14 @@ export class ActionHandler {
             await this.fs.execShellCommand(baseCmd);
 
             // Add queued item
-            const item = new Queue();
-            item.tempGuid = tempGuid;
-            item.chatGuid = chatGuid;
-            item.dateCreated = now;
-            item.text = message;
-            await this.db.getRepository(Queue).manager.save(item);
+            if (message && message.length > 0) {
+                const item = new Queue();
+                item.tempGuid = tempGuid;
+                item.chatGuid = chatGuid;
+                item.dateCreated = now;
+                item.text = message;
+                await this.db.getRepository(Queue).manager.save(item);
+            }
 
             // If there is an attachment, add that to the queue too
             if (attachment && attachmentName) {

@@ -11,7 +11,9 @@ const sendMessage = {
 
         tell application "Messages"
             set targetChat to a reference to text chat id chatGuid
-            send message to targetChat
+            if message is not equal to "" then
+                send message to targetChat
+            end if
 
             if (count of argv) > 2 then
                 set theAttachment to (item 3 of argv) as POSIX file
@@ -52,7 +54,7 @@ end run`
  * The AppleScript used to rename a group chat
  */
 const renameGroupChat = {
-    name: 'renameGroupChat.scpt',
+    name: "renameGroupChat.scpt",
     contents: `on run {currentName, newName}
     tell application "System Events"
         tell process "Messages"
@@ -118,7 +120,7 @@ end splitText`
  * AppleScript to add a participant to a group
  */
 const addParticipant = {
-    name: 'addParticipant.scpt',
+    name: "addParticipant.scpt",
     contents: `on run {currentName, participant}
     tell application "System Events"
         tell process "Messages"
@@ -207,7 +209,7 @@ end splitText`
  * AppleScript to add a participant to a group
  */
 const removeParticipant = {
-    name: 'removeParticipant.scpt',
+    name: "removeParticipant.scpt",
     contents: `on run {currentName, address}
     tell application "System Events"
         tell process "Messages"
@@ -293,4 +295,10 @@ on splitText(theText, theDelimiter)
 end splitText`
 };
 
-export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant, removeParticipant];
+export const AppleScripts = [
+    sendMessage,
+    startChat,
+    renameGroupChat,
+    addParticipant,
+    removeParticipant
+];
