@@ -441,11 +441,13 @@ export class SocketService {
                         )
                     );
 
-                if (!tempGuid)
+                if (!tempGuid && (!message || message.length === 0))
                     return respond(
                         cb,
                         "error",
-                        createBadRequestResponse("No temporary GUID provided")
+                        createBadRequestResponse(
+                            "No temporary GUID provided with message"
+                        )
                     );
 
                 if (
@@ -526,6 +528,14 @@ export class SocketService {
 
                 // If it's the last chunk, but no message, default it to an empty string
                 if (!hasMore && !message) message = "";
+                if (!hasMore && !tempGuid && (!message || message.length === 0))
+                    return respond(
+                        cb,
+                        "error",
+                        createBadRequestResponse(
+                            "No temp GUID provided with message!"
+                        )
+                    );
 
                 // If it's the last chunk, make sure there is a message
                 if (!hasMore && attachmentGuid && !params?.attachmentName)
