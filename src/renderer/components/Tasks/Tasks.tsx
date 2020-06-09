@@ -73,7 +73,7 @@ class Tasks extends React.Component<Props, State> {
                                         checked: classes.checked,
                                         root: classes.root
                                     }}
-                                    />
+                                />
                             </TableCell>
                             <TableCell className={tableCellClasses}>{tasks[value]}</TableCell>
                             <TableCell className={classes.tableActions}>

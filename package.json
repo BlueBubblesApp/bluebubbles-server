@@ -27,10 +27,10 @@
   },
   "lint-staged": {
     "{src,test,mocks}/**/*.{json,css,scss,md}": [
-      "prettier --config ./.prettierrc --write"
+      "prettier --config ./.prettierrc --ignore-path ./.prettierignore --write"
     ],
     "{src,test,mocks}/**/*.{js,ts,tsx}": [
-      "prettier --config ./.prettierrc --write",
+      "prettier --config ./.prettierrc --ignore-path ./.prettierignore --write",
       "eslint --ext=jsx,js,ts,tsx --fix src"
     ]
   },

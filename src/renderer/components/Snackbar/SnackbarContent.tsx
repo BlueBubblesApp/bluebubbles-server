@@ -38,7 +38,7 @@ function SnackbarContent({ ...props }: any) {
                 action: classNames({ [classes.actionRTL]: rtlActive })
             }}
             action={action}
-            />
+        />
     );
 }
 

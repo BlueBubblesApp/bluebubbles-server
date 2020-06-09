@@ -59,7 +59,7 @@ class HeaderLinks extends React.Component<Props, {}> {
                                 "aria-label": "Search"
                             }
                         }}
-                        />
+                    />
                     <Button color="white" aria-label="edit" justIcon={true} round={true}>
                         <Search />
                     </Button>

@@ -68,7 +68,7 @@
         "react/jsx-closing-bracket-location": [
             2,
             {
-                "selfClosing": "props-aligned",
+                "selfClosing": "line-aligned",
                 "nonEmpty": "line-aligned"
             }
         ],

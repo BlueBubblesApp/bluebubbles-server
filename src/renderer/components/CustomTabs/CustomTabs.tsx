@@ -81,7 +81,7 @@ class CustomTabs extends React.Component<Props, State> {
                                     key={key}
                                     label={prop.tabName}
                                     {...icon}
-                                    />
+                                />
                             );
                         })}
                     </Tabs>

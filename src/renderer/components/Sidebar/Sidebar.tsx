@@ -62,7 +62,7 @@ const Sidebar = ({ ...props }) => {
                                     className={classNames(classes.itemIcon, whiteFontClasses, {
                                         [classes.itemIconRTL]: props.rtlActive
                                     })}
-                                    />
+                                />
                             )}
                             <ListItemText
                                 primary={props.rtlActive ? prop.rtlName : prop.name}
@@ -70,7 +70,7 @@ const Sidebar = ({ ...props }) => {
                                     [classes.itemTextRTL]: props.rtlActive
                                 })}
                                 disableTypography={true}
-                                />
+                            />
                         </ListItem>
                     </NavLink>
                 );

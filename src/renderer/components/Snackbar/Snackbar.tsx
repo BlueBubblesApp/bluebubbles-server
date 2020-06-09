@@ -53,7 +53,7 @@ function Snackbar({ ...props }: any) {
                     action: classNames({ [classes.actionRTL]: rtlActive })
                 }
             }}
-            />
+        />
     );
 }
 
