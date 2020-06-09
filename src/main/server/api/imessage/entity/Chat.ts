@@ -1,16 +1,7 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToMany,
-    JoinTable
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
-import {
-    Message,
-    getMessageResponse
-} from "@server/api/imessage/entity/Message";
+import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 import { ChatResponse } from "@server/types";
 
 @Entity("chat")
@@ -18,7 +9,7 @@ export class Chat {
     @PrimaryGeneratedColumn({ name: "ROWID" })
     ROWID: number;
 
-    @ManyToMany((type) => Handle)
+    @ManyToMany(type => Handle)
     @JoinTable({
         name: "chat_handle_join",
         joinColumns: [{ name: "chat_id" }],
@@ -26,7 +17,7 @@ export class Chat {
     })
     participants: Handle[];
 
-    @ManyToMany((type) => Message)
+    @ManyToMany(type => Message)
     @JoinTable({
         name: "chat_message_join",
         joinColumns: [{ name: "chat_id" }],
@@ -95,9 +86,7 @@ export class Chat {
     successfulQuery: boolean;
 }
 
-export const getChatResponse = async (
-    tableData: Chat
-): Promise<ChatResponse> => {
+export const getChatResponse = async (tableData: Chat): Promise<ChatResponse> => {
     const messages = [];
     for (const msg of tableData?.messages ?? []) {
         const msgRes = await getMessageResponse(msg);

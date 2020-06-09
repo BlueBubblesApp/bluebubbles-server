@@ -1,12 +1,7 @@
 /* eslint-disable */
 import * as React from "react";
 
-import {
-    createStyles,
-    Theme,
-    withStyles,
-    StyleRules
-} from "@material-ui/core/styles";
+import { createStyles, Theme, withStyles, StyleRules } from "@material-ui/core/styles";
 
 import { Typography } from "@material-ui/core";
 import * as QRCodeComponent from "qrcode.react";
@@ -29,11 +24,11 @@ class QRCode extends React.Component<Props, State> {
 
     async componentDidMount() {
         const client = await ipcRenderer.invoke("get-fcm-client");
-        console.log(client)
+        console.log(client);
         if (client) this.setState({ fcmClient: JSON.stringify(client) });
 
         const config = await ipcRenderer.invoke("get-config");
-        console.log(config)
+        console.log(config);
         if (config) this.setState({ config });
     }
 
@@ -41,10 +36,7 @@ class QRCode extends React.Component<Props, State> {
         if (!data || data.length === 0) return "";
 
         const jsonData = JSON.parse(data);
-        const output = [
-            this.state.config?.guid,
-            this.state.config?.server_address || ""
-        ];
+        const output = [this.state.config?.guid, this.state.config?.server_address || ""];
 
         output.push(jsonData.project_info.project_id);
         output.push(jsonData.project_info.storage_bucket);
@@ -67,17 +59,14 @@ class QRCode extends React.Component<Props, State> {
                     QRCode
                 </Typography>
                 <Typography variant="subtitle2" className={classes.subtitle}>
-                    Now that you've saved your configuration, all that is left
-                    to do is load the configuration onto your phone! Below is a
-                    QRCode that you can load onto your phone and will auto
-                    configure your app to your BlueBubbles Server. Don't worry,
-                    if you do not scan now, you can scan it again via the
-                    settings page within the server.
+                    Now that you've saved your configuration, all that is left to do is load the configuration onto your
+                    phone! Below is a QRCode that you can load onto your phone and will auto configure your app to your
+                    BlueBubbles Server. Don't worry, if you do not scan now, you can scan it again via the settings page
+                    within the server.
                 </Typography>
                 <br />
                 <Typography variant="subtitle2" className={classes.subtitle}>
-                    Open your BlueBubbles App and use the built-in QRCode
-                    scanner to scan the QRCode below:
+                    Open your BlueBubbles App and use the built-in QRCode scanner to scan the QRCode below:
                 </Typography>
                 <br />
                 <section className={classes.qrContainer}>

@@ -295,10 +295,4 @@ on splitText(theText, theDelimiter)
 end splitText`
 };
 
-export const AppleScripts = [
-    sendMessage,
-    startChat,
-    renameGroupChat,
-    addParticipant,
-    removeParticipant
-];
+export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant, removeParticipant];

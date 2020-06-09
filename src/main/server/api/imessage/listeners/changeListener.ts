@@ -12,13 +12,7 @@ export abstract class ChangeListener extends EventEmitter {
 
     pollFrequency: number;
 
-    constructor({
-        cache = new EventCache(),
-        pollFrequency = 1000
-    }: {
-        cache?: EventCache,
-        pollFrequency?: number
-    }) {
+    constructor({ cache = new EventCache(), pollFrequency = 1000 }: { cache?: EventCache; pollFrequency?: number }) {
         super();
 
         this.cache = cache;

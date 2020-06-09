@@ -1,13 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as base64 from "byte-base64";
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToMany,
-    JoinTable
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/transformers/DateTransformer";
@@ -20,7 +14,7 @@ export class Attachment {
     @PrimaryGeneratedColumn({ name: "ROWID" })
     ROWID: number;
 
-    @ManyToMany((type) => Message)
+    @ManyToMany(type => Message)
     @JoinTable({
         name: "message_attachment_join",
         joinColumns: [{ name: "attachment_id" }],
@@ -99,14 +93,7 @@ export class Attachment {
     hideAttachment: boolean;
 }
 
-const handledImageMimes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/bmp",
-    "image/tiff",
-    "image/gif"
-];
+const handledImageMimes = ["image/jpeg", "image/jpg", "image/png", "image/bmp", "image/tiff", "image/gif"];
 export const getAttachmentResponse = async (
     tableData: Attachment,
     withData = false,
@@ -128,10 +115,7 @@ export const getAttachmentResponse = async (
         // If we want data, get the data
         if (withData) {
             data = Uint8Array.from(fopen);
-        } else if (
-            withBlurhash &&
-            handledImageMimes.includes(tableData.mimeType)
-        ) {
+        } else if (withBlurhash && handledImageMimes.includes(tableData.mimeType)) {
             blurhash = await getBlurHash(fPath);
         }
 
@@ -149,9 +133,7 @@ export const getAttachmentResponse = async (
 
     return {
         guid: tableData.guid,
-        messages: tableData.messages
-            ? tableData.messages.map((item) => item.guid)
-            : [],
+        messages: tableData.messages ? tableData.messages.map(item => item.guid) : [],
         data: data as string,
         blurhash,
         uti: tableData.uti,

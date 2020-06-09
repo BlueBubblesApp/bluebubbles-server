@@ -1,15 +1,8 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from "typeorm";
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 
 @Entity()
-export class Alert
- {
+export class Alert {
     @PrimaryGeneratedColumn({ name: "id" })
     id: number;
 

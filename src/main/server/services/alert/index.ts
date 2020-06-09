@@ -19,18 +19,11 @@ export class AlertService {
 
     async find(): Promise<Alert[]> {
         const repo = this.db.getRepository(Alert);
-        const query = repo
-            .createQueryBuilder("alert")
-            .orderBy("created", "DESC")
-            .limit(10);
+        const query = repo.createQueryBuilder("alert").orderBy("created", "DESC").limit(10);
         return query.getMany();
     }
 
-    async create(
-        type: AlertTypes,
-        message: string,
-        isRead = false
-    ): Promise<Alert> {
+    async create(type: AlertTypes, message: string, isRead = false): Promise<Alert> {
         const repo = this.db.getRepository(Alert);
         if (!message) return null;
 

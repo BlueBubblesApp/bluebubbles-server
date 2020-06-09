@@ -13,12 +13,7 @@ export class QueueService extends ChangeListener {
 
     frequencyMs: number;
 
-    constructor(
-        db: Connection,
-        repo: MessageRepository,
-        cache: EventCache,
-        pollFrequency: number
-    ) {
+    constructor(db: Connection, repo: MessageRepository, cache: EventCache, pollFrequency: number) {
         super({ cache, pollFrequency });
 
         this.db = db;
@@ -87,7 +82,7 @@ export class QueueService extends ChangeListener {
                 where
             });
 
-            matches.forEach(async (match) => {
+            matches.forEach(async match => {
                 this.cache.add(match.guid);
                 super.emit("message-match", {
                     tempGuid: entry.tempGuid,

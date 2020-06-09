@@ -19,11 +19,7 @@ function SnackbarContent({ ...props }: any) {
     if (close !== undefined) {
         action = [
             // tslint:disable-next-line: jsx-wrap-multiline
-            <IconButton
-                className={classes.iconButton}
-                key="close"
-                aria-label="Close"
-                color="inherit">
+            <IconButton className={classes.iconButton} key="close" aria-label="Close" color="inherit">
                 <Close className={classes.close} />
             </IconButton>
         ];
@@ -32,14 +28,12 @@ function SnackbarContent({ ...props }: any) {
         <Snack
             message={
                 <div>
-                    {icon !== undefined ? (
-                        <props.icon className={classes.icon} />
-                    ) : null}
+                    {icon !== undefined ? <props.icon className={classes.icon} /> : null}
                     <span className={messageClasses}>{message}</span>
                 </div>
             }
             classes={{
-                root: `${classes.root  } ${  classes[color]}`,
+                root: `${classes.root} ${classes[color]}`,
                 message: classes.message,
                 action: classNames({ [classes.actionRTL]: rtlActive })
             }}

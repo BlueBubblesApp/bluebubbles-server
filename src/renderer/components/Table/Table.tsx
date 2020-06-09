@@ -17,14 +17,11 @@ function CustomTable({ ...props }: any) {
         <div className={classes.tableResponsive}>
             <Table className={classes.table}>
                 {tableHead !== undefined ? (
-                    <TableHead
-                        className={classes[`${tableHeaderColor}TableHeader`]}>
+                    <TableHead className={classes[`${tableHeaderColor}TableHeader`]}>
                         <TableRow>
                             {tableHead.map((prop: any, key: any) => {
                                 return (
-                                    <TableCell
-                                        className={`${classes.tableCell} ${classes.tableHeadCell}`}
-                                        key={key}>
+                                    <TableCell className={`${classes.tableCell} ${classes.tableHeadCell}`} key={key}>
                                         {prop}
                                     </TableCell>
                                 );
@@ -38,9 +35,7 @@ function CustomTable({ ...props }: any) {
                             <TableRow key={key}>
                                 {prop.map((p: any, k: any) => {
                                     return (
-                                        <TableCell
-                                            className={classes.tableCell}
-                                            key={k}>
+                                        <TableCell className={classes.tableCell} key={k}>
                                             {p}
                                         </TableCell>
                                     );

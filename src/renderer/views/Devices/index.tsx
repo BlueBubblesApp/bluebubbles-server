@@ -2,12 +2,7 @@
 import * as React from "react";
 import { ipcRenderer } from "electron";
 
-import {
-    createStyles,
-    Theme,
-    withStyles,
-    StyleRules
-} from "@material-ui/core/styles";
+import { createStyles, Theme, withStyles, StyleRules } from "@material-ui/core/styles";
 
 import {
     TextField,
@@ -25,7 +20,7 @@ import {
 } from "@material-ui/core";
 
 interface Props {
-    classes: any
+    classes: any;
 }
 
 interface State {
@@ -35,7 +30,7 @@ interface State {
 class Devices extends React.Component<Props, State> {
     state: State = {
         devices: []
-    }
+    };
 
     async componentDidMount() {
         await this.refreshDevices();
@@ -65,7 +60,7 @@ class Devices extends React.Component<Props, State> {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {devices.map((row) => (
+                            {devices.map(row => (
                                 <TableRow key={row.name}>
                                     <TableCell component="th" scope="row">
                                         {row.name || "N/A"}
@@ -77,9 +72,7 @@ class Devices extends React.Component<Props, State> {
                             ))}
                         </TableBody>
                     </Table>
-                    {devices.length === 0 ? (
-                        <p style={{ textAlign: "center" }}>No devices registered!</p>
-                    ) : null}
+                    {devices.length === 0 ? <p style={{ textAlign: "center" }}>No devices registered!</p> : null}
                 </TableContainer>
             </section>
         );

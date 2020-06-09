@@ -1,10 +1,5 @@
 import { createStyles } from "@material-ui/core";
-import {
-    defaultFont,
-    primaryColor,
-    dangerColor,
-    grayColor
-} from "../../material-dashboard-react";
+import { defaultFont, primaryColor, dangerColor, grayColor } from "../../material-dashboard-react";
 import tooltipStyle from "../tooltipStyle";
 import checkboxAdnRadioStyle from "../checkboxAdnRadioStyle";
 

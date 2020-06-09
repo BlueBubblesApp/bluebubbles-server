@@ -8,17 +8,10 @@ export const getBlurHash = async (fPath: string) => {
         const image = await Jimp.read(fPath);
 
         // If the image is "too big", rescale it so blurhash is computed faster
-        if (image.getWidth() > 320)
-            image.scaleToFit(320, Jimp.AUTO, Jimp.RESIZE_BEZIER);
+        if (image.getWidth() > 320) image.scaleToFit(320, Jimp.AUTO, Jimp.RESIZE_BEZIER);
 
         // Compute blurhash
-        blurhash = blurHashEncode(
-            Uint8ClampedArray.from(image.bitmap.data),
-            image.getWidth(),
-            image.getHeight(),
-            4,
-            4
-        );
+        blurhash = blurHashEncode(Uint8ClampedArray.from(image.bitmap.data), image.getWidth(), image.getHeight(), 4, 4);
     } catch (ex) {
         console.log(ex);
         console.log(`Could not compute blurhash for [${fPath}]`);

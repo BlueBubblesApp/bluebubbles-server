@@ -1,10 +1,4 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    JoinColumn,
-    ManyToOne
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, ManyToOne } from "typeorm";
 
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { Record } from "@server/api/contacts/entity/Record";
@@ -19,11 +13,11 @@ export class PhoneNumber {
         type: "integer",
         transformer: BooleanTransformer,
         nullable: false,
-        default: 0 
+        default: 0
     })
     isPrimary: boolean;
 
-    @ManyToOne((type) => Record)
+    @ManyToOne(type => Record)
     @JoinColumn({ name: "ZOWNER", referencedColumnName: "id" })
     record: Record;
 

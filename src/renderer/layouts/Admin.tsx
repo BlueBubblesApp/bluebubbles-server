@@ -37,11 +37,11 @@ import DeviceIcon from "@material-ui/icons/DeviceHub";
 import HomeIcon from "@material-ui/icons/Home";
 import SettingsIcon from "@material-ui/icons/Settings";
 import LogIcon from "@material-ui/icons/Receipt";
-import NotificationsIcon from '@material-ui/icons/Notifications';
-import WarningIcon from '@material-ui/icons/Warning';
-import InfoIcon from '@material-ui/icons/Help';
-import SuccessIcon from '@material-ui/icons/CheckCircle';
-import ErrorIcon from '@material-ui/icons/Error';
+import NotificationsIcon from "@material-ui/icons/Notifications";
+import WarningIcon from "@material-ui/icons/Warning";
+import InfoIcon from "@material-ui/icons/Help";
+import SuccessIcon from "@material-ui/icons/CheckCircle";
+import ErrorIcon from "@material-ui/icons/Error";
 
 // Custom Components
 import Configuration from "@renderer/views/Configuration";
@@ -64,10 +64,10 @@ const StyledMenuItem = withStyles(theme => ({
         borderBottom: "1px solid grey",
         paddingTop: "5px",
         paddingBottom: "5px",
-        '&:first-child': {
+        "&:first-child": {
             paddingTop: 0
         },
-        '&:last-child': {
+        "&:last-child": {
             borderBottom: 0,
             paddingBottom: 0
         },
@@ -80,17 +80,17 @@ const alertIconMap: { [key: string]: JSX.Element } = {
     warn: <WarningIcon />,
     error: <ErrorIcon />,
     success: <SuccessIcon />
-}
+};
 
 interface Props {
     classes: any;
 }
 
 interface State {
-    open: boolean
-    config: Config,
-    alerts: any[],
-    alertElement: HTMLElement
+    open: boolean;
+    config: Config;
+    alerts: any[];
+    alertElement: HTMLElement;
 }
 
 class AdminLayout extends React.Component<Props, State> {
@@ -99,7 +99,7 @@ class AdminLayout extends React.Component<Props, State> {
         config: null,
         alerts: [],
         alertElement: null
-    }
+    };
 
     async componentDidMount() {
         try {
@@ -112,20 +112,19 @@ class AdminLayout extends React.Component<Props, State> {
         }
 
         ipcRenderer.on("config-update", (event, arg) => {
-            this.setState({ config: arg })
-        })
+            this.setState({ config: arg });
+        });
 
         ipcRenderer.on("new-alert", (event, arg) => {
             const { alerts } = this.state;
 
             // Insert at index 0, then concatenate to 10 items
             alerts.splice(0, 0, alert);
-            if (alerts.length > 10)
-                alerts.slice(0, 10);
+            if (alerts.length > 10) alerts.slice(0, 10);
 
             // Set the state
             this.setState({ alerts });
-        })
+        });
     }
 
     handleDrawerOpen = () => {
@@ -133,18 +132,19 @@ class AdminLayout extends React.Component<Props, State> {
     };
 
     handleDrawerClose = () => {
-;        this.setState({ open: false });
+        this.setState({ open: false });
     };
 
     handleAlertClose = async () => {
         this.setState({ alertElement: null });
         await ipcRenderer.invoke(
-            "mark-alert-as-read", this.state.alerts.filter((item) => !item.isRead).map((item) => item.id));
+            "mark-alert-as-read",
+            this.state.alerts.filter(item => !item.isRead).map(item => item.id)
+        );
 
         // Mark all as read
         const newAlerts = this.state.alerts;
-        for (const i of newAlerts)
-            i.isRead = true;
+        for (const i of newAlerts) i.isRead = true;
         this.setState({ alerts: newAlerts });
     };
 
@@ -153,9 +153,7 @@ class AdminLayout extends React.Component<Props, State> {
 
         // Mark individual as read
         const newAlerts = this.state.alerts;
-        for (const i of newAlerts)
-            if (i.id === id)
-                i.isRead = true;
+        for (const i of newAlerts) if (i.id === id) i.isRead = true;
         this.setState({ alerts: newAlerts });
     };
 
@@ -170,28 +168,29 @@ class AdminLayout extends React.Component<Props, State> {
                 anchorEl={this.state.alertElement}
                 getContentAnchorEl={null}
                 elevation={0}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                id='alert-menu'
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                id="alert-menu"
                 keepMounted
-                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                transformOrigin={{ vertical: "top", horizontal: "center" }}
                 open={Boolean(this.state.alertElement)}
-                onClose={() => this.handleAlertClose()}>
-                {this.state.alerts.map((item) => {
+                onClose={() => this.handleAlertClose()}
+            >
+                {this.state.alerts.map(item => {
                     const typeIcon = alertIconMap[item.type];
                     return (
                         <StyledMenuItem key={item.id} onClick={() => this.markAlertAsRead(item.id)}>
                             <section className={classes.alertBlock}>
                                 <section className={classes.alertBody}>
                                     <section
-                                        style={{ wordBreak: "break-word", whiteSpace: "normal", maxWidth: "425px" }}>
-                                            <span>{item.value}</span>
+                                        style={{ wordBreak: "break-word", whiteSpace: "normal", maxWidth: "425px" }}
+                                    >
+                                        <span>{item.value}</span>
                                     </section>
                                     <span>{typeIcon}</span>
                                 </section>
                                 <section className={classes.alertFooter}>
-                                    <span
-                                        style={{ textDecoration: (item.isRead) ? 'none' : 'underline' }}>
-                                            {(item.isRead) ? 'Already read' : 'Mark as read'}
+                                    <span style={{ textDecoration: item.isRead ? "none" : "underline" }}>
+                                        {item.isRead ? "Already read" : "Mark as read"}
                                     </span>
                                     <span>{item.created ? item.created.toLocaleString() : "N/A"}</span>
                                 </section>
@@ -200,7 +199,7 @@ class AdminLayout extends React.Component<Props, State> {
                     );
                 })}
             </Menu>
-        )
+        );
     };
 
     render() {
@@ -215,7 +214,8 @@ class AdminLayout extends React.Component<Props, State> {
                         position="fixed"
                         className={clsx(classes.appBar, {
                             [classes.appBarShift]: open
-                        })}>
+                        })}
+                    >
                         <Toolbar>
                             <IconButton
                                 color="inherit"
@@ -224,7 +224,8 @@ class AdminLayout extends React.Component<Props, State> {
                                 edge="start"
                                 className={clsx(classes.menuButton, {
                                     [classes.hide]: open
-                                })}>
+                                })}
+                            >
                                 <MenuIcon />
                             </IconButton>
                             <Typography variant="h6" noWrap>
@@ -234,14 +235,13 @@ class AdminLayout extends React.Component<Props, State> {
                             <IconButton
                                 color="inherit"
                                 aria-label={`show ${alerts.length} alerts`}
-                                aria-controls='alert-menu'
+                                aria-controls="alert-menu"
                                 aria-haspopup="true"
-                                onClick={this.handleAlertOpen}>
-                                    <Badge
-                                        badgeContent={alerts.filter((item) => !item.isRead).length}
-                                        color="secondary">
-                                            <NotificationsIcon />
-                                    </Badge>
+                                onClick={this.handleAlertOpen}
+                            >
+                                <Badge badgeContent={alerts.filter(item => !item.isRead).length} color="secondary">
+                                    <NotificationsIcon />
+                                </Badge>
                             </IconButton>
                         </Toolbar>
                     </AppBar>
@@ -256,10 +256,10 @@ class AdminLayout extends React.Component<Props, State> {
                                 [classes.drawerOpen]: open,
                                 [classes.drawerClose]: !open
                             })
-                        }}>
+                        }}
+                    >
                         <div className={classes.toolbar}>
-                            <IconButton
-                                onClick={() => this.handleDrawerClose()}>
+                            <IconButton onClick={() => this.handleDrawerClose()}>
                                 <ChevronLeftIcon />
                             </IconButton>
                         </div>
@@ -272,7 +272,8 @@ class AdminLayout extends React.Component<Props, State> {
                                 className={clsx(classes.drawer, {
                                     [classes.listItemOpen]: open,
                                     [classes.listItemClosed]: !open
-                                })}>
+                                })}
+                            >
                                 <ListItemIcon>
                                     <HomeIcon />
                                 </ListItemIcon>
@@ -285,7 +286,8 @@ class AdminLayout extends React.Component<Props, State> {
                                 className={clsx(classes.drawer, {
                                     [classes.listItemOpen]: open,
                                     [classes.listItemClosed]: !open
-                                })}>
+                                })}
+                            >
                                 <ListItemIcon>
                                     <DeviceIcon />
                                 </ListItemIcon>
@@ -301,7 +303,8 @@ class AdminLayout extends React.Component<Props, State> {
                                 className={clsx(classes.drawer, {
                                     [classes.listItemOpen]: open,
                                     [classes.listItemClosed]: !open
-                                })}>
+                                })}
+                            >
                                 <ListItemIcon>
                                     <LogIcon />
                                 </ListItemIcon>
@@ -314,7 +317,8 @@ class AdminLayout extends React.Component<Props, State> {
                                 className={clsx(classes.drawer, {
                                     [classes.listItemOpen]: open,
                                     [classes.listItemClosed]: !open
-                                })}>
+                                })}
+                            >
                                 <ListItemIcon>
                                     <SettingsIcon />
                                 </ListItemIcon>
@@ -352,7 +356,7 @@ const drawerWidth = 240;
 const styles = (theme: Theme): StyleRules<string, {}> =>
     createStyles({
         grow: {
-            flexGrow: 1,
+            flexGrow: 1
         },
         root: {
             display: "flex"
@@ -430,24 +434,24 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
             marginRight: "2em"
         },
         alertBlock: {
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%'
+            display: "flex",
+            flexDirection: "column",
+            width: "100%"
         },
         alertBody: {
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between'
+            width: "100%",
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between"
         },
         alertFooter: {
-            marginTop: '10px',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
+            marginTop: "10px",
+            width: "100%",
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
             fontSize: "14px",
             color: "lightgrey"
         }

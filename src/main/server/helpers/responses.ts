@@ -5,13 +5,10 @@ export const createSuccessResponse = (data: ResponseData, message?: string): Res
         status: 200,
         message: message || ResponseMessages.SUCCESS,
         data
-    }
+    };
 };
 
-export const createServerErrorResponse = (
-    errorMessage: string,
-    errorType?: ErrorTypes,
-): ResponseFormat => {
+export const createServerErrorResponse = (errorMessage: string, errorType?: ErrorTypes): ResponseFormat => {
     return {
         status: 500,
         message: ResponseMessages.SERVER_ERROR,
@@ -22,9 +19,7 @@ export const createServerErrorResponse = (
     };
 };
 
-export const createBadRequestResponse = (
-    message: string
-): ResponseFormat => {
+export const createBadRequestResponse = (message: string): ResponseFormat => {
     return {
         status: 400,
         message: ResponseMessages.BAD_REQUEST,

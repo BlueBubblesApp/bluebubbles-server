@@ -1,22 +1,11 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToOne,
-    JoinTable,
-    JoinColumn,
-    ManyToMany
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/api/transformers/MessageTypeTransformer";
 import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
-import {
-    Attachment,
-    getAttachmentResponse
-} from "@server/api/imessage/entity/Attachment";
+import { Attachment, getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 
 @Entity("message")
 export class Message {
@@ -39,11 +28,11 @@ export class Message {
     })
     serviceCenter: string;
 
-    @ManyToOne((type) => Handle)
+    @ManyToOne(type => Handle)
     @JoinColumn({ name: "handle_id", referencedColumnName: "ROWID" })
     handle: Handle;
 
-    @ManyToMany((type) => Chat)
+    @ManyToMany(type => Chat)
     @JoinTable({
         name: "chat_message_join",
         joinColumns: [{ name: "message_id" }],
@@ -51,7 +40,7 @@ export class Message {
     })
     chats: Chat[];
 
-    @ManyToMany((type) => Attachment)
+    @ManyToMany(type => Attachment)
     @JoinTable({
         name: "message_attachment_join",
         joinColumns: [{ name: "message_id" }],
@@ -405,18 +394,11 @@ export class Message {
     messageSummaryInfo: Blob;
 }
 
-export const getMessageResponse = async (
-    tableData: Message,
-    withBlurhash = true
-): Promise<MessageResponse> => {
+export const getMessageResponse = async (tableData: Message, withBlurhash = true): Promise<MessageResponse> => {
     // Load attachments
     const attachments = [];
     for (const attachment of tableData?.attachments ?? []) {
-        const resData = await getAttachmentResponse(
-            attachment,
-            false,
-            withBlurhash
-        );
+        const resData = await getAttachmentResponse(attachment, false, withBlurhash);
         attachments.push(resData);
     }
 
@@ -429,22 +411,16 @@ export const getMessageResponse = async (
     return {
         guid: tableData.guid,
         text: tableData.text,
-        handle: tableData.handle
-            ? await getHandleResponse(tableData.handle)
-            : null,
+        handle: tableData.handle ? await getHandleResponse(tableData.handle) : null,
         handleId: tableData.handleId,
         chats,
         attachments,
         subject: tableData.subject,
         country: tableData.country,
         error: tableData.error,
-        dateCreated: tableData.dateCreated
-            ? tableData.dateCreated.getTime()
-            : null,
+        dateCreated: tableData.dateCreated ? tableData.dateCreated.getTime() : null,
         dateRead: tableData.dateRead ? tableData.dateRead.getTime() : null,
-        dateDelivered: tableData.dateDelivered
-            ? tableData.dateDelivered.getTime()
-            : null,
+        dateDelivered: tableData.dateDelivered ? tableData.dateDelivered.getTime() : null,
         isFromMe: tableData.isFromMe,
         isDelayed: tableData.isDelayed,
         isAutoReply: tableData.isAutoReply,
@@ -454,9 +430,7 @@ export const getMessageResponse = async (
         isArchived: tableData.isArchived,
         cacheRoomnames: tableData.cacheRoomnames,
         isAudioMessage: tableData.isAudioMessage,
-        datePlayed: tableData.datePlayed
-            ? tableData.datePlayed.getTime()
-            : null,
+        datePlayed: tableData.datePlayed ? tableData.datePlayed.getTime() : null,
         itemType: tableData.itemType,
         groupTitle: tableData.groupTitle,
         groupActionType: tableData.groupActionType,

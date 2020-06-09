@@ -5,11 +5,7 @@ import { ContactRepository } from "@server/api/contacts";
 import { EventCache } from "@server/eventCache";
 import { Queue } from "@server/entity/Queue";
 
-import {
-    safeExecuteAppleScript,
-    generateChatNameList,
-    getiMessageNumberFormat
-} from "./utils";
+import { safeExecuteAppleScript, generateChatNameList, getiMessageNumberFormat } from "./utils";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -60,13 +56,13 @@ export class ActionHandler {
         attachmentName?: string,
         attachment?: Uint8Array
     ): Promise<void> => {
-        if (!chatGuid.startsWith("iMessage"))
-            throw new Error("Invalid chat GUID!");
+        if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${
-            this.fs.scriptDir
-        }/sendMessage.scpt" "${chatGuid}" "${message.replace(/"/g, '\\"')}"`;
+        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message.replace(
+            /"/g,
+            '\\"'
+        )}"`;
 
         // Add attachment, if present
         if (attachment) {
@@ -113,15 +109,8 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    renameGroupChat = async (
-        chatGuid: string,
-        newName: string
-    ): Promise<string> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            this.iMessageRepo,
-            this.contactsRepo
-        );
+    renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -133,25 +122,19 @@ export class ActionHandler {
 
         let err = null;
         for (const oldName of names) {
-            console.info(
-                `Attempting rename group from [${oldName}] to [${newName}]`
-            );
+            console.info(`Attempting rename group from [${oldName}] to [${newName}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
                     this.fs,
-                    `osascript "${
-                        this.fs.scriptDir
-                    }/renameGroupChat.scpt" "${oldName.replace(
+                    `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName.replace(
                         /"/g,
                         '\\"'
                     )}" "${newName.replace(/"/g, '\\"')}"`
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(
-                    `Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`
-                );
+                console.warn(`Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`);
                 continue;
             }
         }
@@ -168,15 +151,8 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    addParticipant = async (
-        chatGuid: string,
-        participant: string
-    ): Promise<string> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            this.iMessageRepo,
-            this.contactsRepo
-        );
+    addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -197,9 +173,7 @@ export class ActionHandler {
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(
-                    `Failed to add participant to group, [${name}]. Attempting the next name.`
-                );
+                console.warn(`Failed to add participant to group, [${name}]. Attempting the next name.`);
                 continue;
             }
         }
@@ -216,15 +190,8 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    removeParticipant = async (
-        chatGuid: string,
-        participant: string
-    ): Promise<string> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            this.iMessageRepo,
-            this.contactsRepo
-        );
+    removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
         let address = participant;
         if (!address.includes("@")) {
             address = getiMessageNumberFormat(address);
@@ -240,9 +207,7 @@ export class ActionHandler {
 
         let err = null;
         for (const name of names) {
-            console.info(
-                `Attempting to remove participant from group [${name}]`
-            );
+            console.info(`Attempting to remove participant from group [${name}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
@@ -251,9 +216,7 @@ export class ActionHandler {
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(
-                    `Failed to remove participant from group, [${name}]. Attempting the next name.`
-                );
+                console.warn(`Failed to remove participant from group, [${name}]. Attempting the next name.`);
                 continue;
             }
         }
@@ -270,14 +233,13 @@ export class ActionHandler {
      * @returns The GUID of the new chat
      */
     createChat = async (participants: string[]): Promise<string> => {
-        if (participants.length === 0)
-            throw new Error("No participants specified!");
+        if (participants.length === 0) throw new Error("No participants specified!");
 
         // Create the base command to execute
         let baseCmd = `osascript "${this.fs.scriptDir}/startChat.scpt"`;
 
         // Add members to the chat
-        participants.forEach((member) => {
+        participants.forEach(member => {
             baseCmd += ` "${member}"`;
         });
 

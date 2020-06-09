@@ -11,16 +11,7 @@ import Close from "@material-ui/icons/Close";
 import snackbarContentStyle from "../../assets/jss/material-dashboard-react/components/snackbarContentStyle";
 
 function Snackbar({ ...props }: any) {
-    const {
-        classes,
-        message,
-        color,
-        close,
-        icon,
-        place,
-        open,
-        rtlActive
-    } = props;
+    const { classes, message, color, close, icon, place, open, rtlActive } = props;
     let action: any[] = [];
     const messageClasses = classNames({
         [classes.iconMessage]: icon !== undefined
@@ -33,7 +24,8 @@ function Snackbar({ ...props }: any) {
                 key="close"
                 aria-label="Close"
                 color="inherit"
-                onClick={() => props.closeNotification()}>
+                onClick={() => props.closeNotification()}
+            >
                 <Close className={classes.close} />
             </IconButton>
         ];
@@ -44,18 +36,12 @@ function Snackbar({ ...props }: any) {
                 vertical: place.indexOf("t") === -1 ? "bottom" : "top",
                 horizontal:
                     // eslint-disable-next-line no-nested-ternary
-                    place.indexOf("l") !== -1
-                        ? "left"
-                        : place.indexOf("c") !== -1
-                        ? "center"
-                        : "right"
+                    place.indexOf("l") !== -1 ? "left" : place.indexOf("c") !== -1 ? "center" : "right"
             }}
             open={open}
             message={
                 <div>
-                    {icon !== undefined ? (
-                        <props.icon className={classes.icon} />
-                    ) : null}
+                    {icon !== undefined ? <props.icon className={classes.icon} /> : null}
                     <span className={messageClasses}>{message}</span>
                 </div>
             }

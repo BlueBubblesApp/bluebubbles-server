@@ -197,64 +197,48 @@ const sidebarStyle = (theme: Theme) =>
         },
         blue: {
             backgroundColor: infoColor[0],
-            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                infoColor[0]
-            )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(infoColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                 blackColor
             )},.12), 0 7px 8px -5px rgba(${hexToRgb(infoColor[0])},.2)`,
             "&:hover": {
                 backgroundColor: infoColor[0],
-                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                    infoColor[0]
-                )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(infoColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                     blackColor
                 )},.12), 0 7px 8px -5px rgba(${hexToRgb(infoColor[0])},.2)`
             }
         },
         green: {
             backgroundColor: successColor[0],
-            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                successColor[0]
-            )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(successColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                 blackColor
             )},.12), 0 7px 8px -5px rgba(${hexToRgb(successColor[0])},.2)`,
             "&:hover": {
                 backgroundColor: successColor[0],
-                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                    successColor[0]
-                )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(successColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                     blackColor
                 )},.12), 0 7px 8px -5px rgba(${hexToRgb(successColor[0])},.2)`
             }
         },
         orange: {
             backgroundColor: warningColor[0],
-            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                warningColor[0]
-            )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(warningColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                 blackColor
             )},.12), 0 7px 8px -5px rgba(${hexToRgb(warningColor[0])},.2)`,
             "&:hover": {
                 backgroundColor: warningColor[0],
-                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                    warningColor[0]
-                )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(warningColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                     blackColor
                 )},.12), 0 7px 8px -5px rgba(${hexToRgb(warningColor[0])},.2)`
             }
         },
         red: {
             backgroundColor: dangerColor[0],
-            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                dangerColor[0]
-            )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+            boxShadow: `0 12px 20px -10px rgba(${hexToRgb(dangerColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                 blackColor
             )},.12), 0 7px 8px -5px rgba(${hexToRgb(dangerColor[0])},.2)`,
             "&:hover": {
                 backgroundColor: dangerColor[0],
-                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(
-                    dangerColor[0]
-                )},.28), 0 4px 20px 0 rgba(${hexToRgb(
+                boxShadow: `0 12px 20px -10px rgba(${hexToRgb(dangerColor[0])},.28), 0 4px 20px 0 rgba(${hexToRgb(
                     blackColor
                 )},.12), 0 7px 8px -5px rgba(${hexToRgb(dangerColor[0])},.2)`
             }

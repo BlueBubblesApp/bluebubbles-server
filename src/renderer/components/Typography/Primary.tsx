@@ -7,11 +7,7 @@ import typographyStyle from "../../assets/jss/material-dashboard-react/component
 
 function Primary({ ...props }: any) {
     const { classes, children } = props;
-    return (
-        <div className={`${classes.defaultFontStyle} ${classes.primaryText}`}>
-            {children}
-        </div>
-    );
+    return <div className={`${classes.defaultFontStyle} ${classes.primaryText}`}>{children}</div>;
 }
 
 // Primary.propTypes = {

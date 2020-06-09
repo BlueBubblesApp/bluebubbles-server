@@ -1,10 +1,5 @@
 import { createStyles } from "@material-ui/core";
-import {
-    defaultFont,
-    container,
-    primaryColor,
-    grayColor
-} from "../../material-dashboard-react";
+import { defaultFont, container, primaryColor, grayColor } from "../../material-dashboard-react";
 
 const footerStyle = createStyles({
     block: {

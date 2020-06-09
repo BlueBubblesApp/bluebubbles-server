@@ -33,14 +33,14 @@ export class FileSystem {
     setupDirectories(): void {
         if (!fs.existsSync(this.scriptDir)) fs.mkdirSync(this.scriptDir);
         if (!fs.existsSync(this.attachmentsDir)) fs.mkdirSync(this.attachmentsDir);
-        if (!fs.existsSync(this.fcmDir))fs.mkdirSync(this.fcmDir);
+        if (!fs.existsSync(this.fcmDir)) fs.mkdirSync(this.fcmDir);
     }
 
     /**
      * Creates required scripts
      */
     setupScripts(): void {
-        AppleScripts.forEach((script) => {
+        AppleScripts.forEach(script => {
             // Remove each script, and re-write it (in case of update)
             const scriptPath = `${this.scriptDir}/${script.name}`;
             if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
@@ -66,7 +66,7 @@ export class FileSystem {
      * @param buffer The attachment chunk bytes (buffer)
      */
     saveAttachmentChunk(guid: string, chunkNumber: number, buffer: Uint8Array): void {
-        const parent = path.join(this.attachmentsDir, guid)
+        const parent = path.join(this.attachmentsDir, guid);
         if (!fs.existsSync(parent)) fs.mkdirSync(parent);
         fs.writeFileSync(path.join(parent, `${chunkNumber}.chunk`), buffer);
     }
@@ -77,7 +77,7 @@ export class FileSystem {
      * @param guid Unique identifier for the attachment
      */
     deleteChunks(guid: string): void {
-        const dir = path.join(this.attachmentsDir, guid)
+        const dir = path.join(this.attachmentsDir, guid);
         if (fs.existsSync(dir)) fs.rmdirSync(dir, { recursive: true });
     }
 
@@ -91,7 +91,7 @@ export class FileSystem {
 
         // Get the files in ascending order
         const files = fs.readdirSync(path.join(this.attachmentsDir, guid));
-        files.sort((a, b) => Number(a.split('.')[0]) - Number(b.split('.')[0]));
+        files.sort((a, b) => Number(a.split(".")[0]) - Number(b.split(".")[0]));
 
         // Read the files and append to chunks
         for (const file of files) {
@@ -122,7 +122,7 @@ export class FileSystem {
 
     /**
      * Gets the FCM client data
-     * 
+     *
      * @returns The parsed FCM client data
      */
     getFCMClient(): any {
@@ -134,7 +134,7 @@ export class FileSystem {
 
     /**
      * Gets the FCM server data
-     * 
+     *
      * @returns The parsed FCM server data
      */
     getFCMServer(): any {

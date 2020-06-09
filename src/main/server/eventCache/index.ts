@@ -23,6 +23,6 @@ export class EventCache {
     }
 
     find(item: string) {
-        return this.items.find((i) => i === item);
+        return this.items.find(i => i === item);
     }
 }

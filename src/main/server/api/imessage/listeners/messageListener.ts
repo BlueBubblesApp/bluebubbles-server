@@ -3,7 +3,6 @@ import { Message } from "@server/api/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
 import { ChangeListener } from "./changeListener";
 
-
 export class MessageListener extends ChangeListener {
     repo: MessageRepository;
 
@@ -24,8 +23,7 @@ export class MessageListener extends ChangeListener {
         entries.forEach(async (entry: any) => {
             // If from me, wait 3 seconds before doing anything so spam doesn't
             // cause duplicates
-            if (entry.isFromMe)
-                await new Promise((resolve, _) => setTimeout(() => resolve(), 3000));
+            if (entry.isFromMe) await new Promise((resolve, _) => setTimeout(() => resolve(), 3000));
 
             // Skip over any that we've finished
             if (this.cache.find(entry.guid)) return;

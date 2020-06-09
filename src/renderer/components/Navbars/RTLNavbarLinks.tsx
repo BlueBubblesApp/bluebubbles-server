@@ -51,7 +51,7 @@ class HeaderLinks extends React.Component<Props, {}> {
                 <div className={classes.searchWrapper}>
                     <CustomInput
                         formControlProps={{
-                            className: `${classes.margin  } ${  classes.search}`
+                            className: `${classes.margin} ${classes.search}`
                         }}
                         inputProps={{
                             placeholder: "جستجو...",
@@ -60,11 +60,7 @@ class HeaderLinks extends React.Component<Props, {}> {
                             }
                         }}
                         />
-                    <Button
-                        color="white"
-                        aria-label="edit"
-                        justIcon={true}
-                        round={true}>
+                    <Button color="white" aria-label="edit" justIcon={true} round={true}>
                         <Search />
                     </Button>
                 </div>
@@ -73,7 +69,8 @@ class HeaderLinks extends React.Component<Props, {}> {
                     justIcon={window.innerWidth > 959}
                     simple={!(window.innerWidth > 959)}
                     aria-label="Dashboard"
-                    className={classes.buttonLink}>
+                    className={classes.buttonLink}
+                >
                     <Dashboard className={classes.icons} />
                     <Hidden mdUp={true} implementation="css">
                         <p className={classes.linkText}>آمارها</p>
@@ -84,15 +81,14 @@ class HeaderLinks extends React.Component<Props, {}> {
                         buttonRef={(node: any) => {
                             this.anchorEl = node;
                         }}
-                        color={
-                            window.innerWidth > 959 ? "transparent" : "white"
-                        }
+                        color={window.innerWidth > 959 ? "transparent" : "white"}
                         justIcon={window.innerWidth > 959}
                         simple={!(window.innerWidth > 959)}
                         aria-owns={open ? "menu-list-grow" : null}
                         aria-haspopup="true"
                         onClick={this.handleToggle}
-                        className={classes.buttonLink}>
+                        className={classes.buttonLink}
+                    >
                         <Notifications className={classes.icons} />
                         <span className={classes.notifications}>۵</span>
                         <Hidden mdUp={true} implementation="css">
@@ -107,48 +103,32 @@ class HeaderLinks extends React.Component<Props, {}> {
                         anchorEl={this.anchorEl}
                         transition={true}
                         disablePortal={true}
-                        className={
-                            `${classNames({ [classes.popperClose]: !open }) 
-                            } ${ 
-                            classes.pooperNav}`
-                        }>
+                        className={`${classNames({ [classes.popperClose]: !open })} ${classes.pooperNav}`}
+                    >
                         {({ TransitionProps, placement }) => (
                             <Grow
                                 {...TransitionProps}
                                 // id="menu-list-grow"
                                 style={{
-                                    transformOrigin:
-                                        placement === "bottom"
-                                            ? "center top"
-                                            : "center bottom"
-                                }}>
+                                    transformOrigin: placement === "bottom" ? "center top" : "center bottom"
+                                }}
+                            >
                                 <Paper>
-                                    <ClickAwayListener
-                                        onClickAway={this.handleClose}>
+                                    <ClickAwayListener onClickAway={this.handleClose}>
                                         <MenuList role="menu">
-                                            <MenuItem
-                                                onClick={this.handleClose}
-                                                className={classes.dropdownItem}>
+                                            <MenuItem onClick={this.handleClose} className={classes.dropdownItem}>
                                                 محمدرضا به ایمیل شما پاسخ داد
                                             </MenuItem>
-                                            <MenuItem
-                                                onClick={this.handleClose}
-                                                className={classes.dropdownItem}>
+                                            <MenuItem onClick={this.handleClose} className={classes.dropdownItem}>
                                                 شما ۵ وظیفه جدید دارید
                                             </MenuItem>
-                                            <MenuItem
-                                                onClick={this.handleClose}
-                                                className={classes.dropdownItem}>
+                                            <MenuItem onClick={this.handleClose} className={classes.dropdownItem}>
                                                 از حالا شما با علیرضا دوست هستید
                                             </MenuItem>
-                                            <MenuItem
-                                                onClick={this.handleClose}
-                                                className={classes.dropdownItem}>
+                                            <MenuItem onClick={this.handleClose} className={classes.dropdownItem}>
                                                 اعلان دیگر
                                             </MenuItem>
-                                            <MenuItem
-                                                onClick={this.handleClose}
-                                                className={classes.dropdownItem}>
+                                            <MenuItem onClick={this.handleClose} className={classes.dropdownItem}>
                                                 اعلان دیگر
                                             </MenuItem>
                                         </MenuList>
@@ -163,7 +143,8 @@ class HeaderLinks extends React.Component<Props, {}> {
                     justIcon={window.innerWidth > 959}
                     simple={!(window.innerWidth > 959)}
                     aria-label="Person"
-                    className={classes.buttonLink}>
+                    className={classes.buttonLink}
+                >
                     <Person className={classes.icons} />
                     <Hidden mdUp={true} implementation="css">
                         <p className={classes.linkText}>حساب کاربری</p>

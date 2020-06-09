@@ -36,11 +36,7 @@ export class FCMService {
         const now = new Date();
 
         // Refresh JWT every 60 minutes
-        if (
-            force ||
-            !this.lastRefresh ||
-            now.getTime() - this.lastRefresh.getTime() > 3600000
-        ) {
+        if (force || !this.lastRefresh || now.getTime() - this.lastRefresh.getTime() > 3600000) {
             // Re-instantiate the app
             this.lastRefresh = new Date();
             if (this.app) this.app.delete(); // Kill the old connection
@@ -78,7 +74,7 @@ export class FCMService {
         const db = admin.database();
         const config = db.ref("config");
 
-        config.once("value", (_) => {
+        config.once("value", _ => {
             config.update({ serverUrl });
         });
     }
@@ -89,10 +85,7 @@ export class FCMService {
      * @param devices Devices to send the notification to
      * @param data The data to send
      */
-    async sendNotification(
-        devices: string[],
-        data: any
-    ): Promise<admin.messaging.BatchResponse> {
+    async sendNotification(devices: string[], data: any): Promise<admin.messaging.BatchResponse> {
         if (!this.refresh()) return null;
 
         // Build out the notification message

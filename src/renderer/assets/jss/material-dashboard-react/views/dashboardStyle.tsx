@@ -1,10 +1,5 @@
 import { createStyles } from "@material-ui/core";
-import {
-    successColor,
-    whiteColor,
-    grayColor,
-    hexToRgb
-} from "../../material-dashboard-react";
+import { successColor, whiteColor, grayColor, hexToRgb } from "../../material-dashboard-react";
 
 const dashboardStyle = createStyles({
     successText: {

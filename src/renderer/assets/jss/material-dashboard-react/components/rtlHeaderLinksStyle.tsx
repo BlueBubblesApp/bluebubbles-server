@@ -1,9 +1,5 @@
 import { createStyles, Theme } from "@material-ui/core";
-import {
-    defaultFont,
-    dangerColor,
-    whiteColor
-} from "../../material-dashboard-react";
+import { defaultFont, dangerColor, whiteColor } from "../../material-dashboard-react";
 
 import dropdownStyle from "../dropdownStyle";
 

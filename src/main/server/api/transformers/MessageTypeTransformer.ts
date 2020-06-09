@@ -31,6 +31,6 @@ export const ReactionStringToId: { [key: string]: number } = {
 };
 
 export const MessageTypeTransformer: ValueTransformer = {
-    from: (dbValue) => ReactionIdToString[dbValue] || null,
-    to: (entityValue) => ReactionStringToId[entityValue] || null
+    from: dbValue => ReactionIdToString[dbValue] || null,
+    to: entityValue => ReactionStringToId[entityValue] || null
 };
