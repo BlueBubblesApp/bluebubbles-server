@@ -17,6 +17,7 @@ import { ContactRepository } from "@server/api/contacts";
 import { MessageListener } from "@server/api/imessage/listeners/messageListener";
 import { MessageUpdateListener } from "@server/api/imessage/listeners/messageUpdateListener";
 import { GroupChangeListener } from "@server/api/imessage/listeners/groupChangeListener";
+import { MyMessageListener } from "@server/api/imessage/listeners/myMessageListener";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 
 // Service Imports
@@ -331,11 +332,16 @@ export class BlueBubblesServer {
         // Start the queue service
         this.queueService.start();
         this.queueService.on("message-timeout", async (item: Queue) => {
-            this.log(`Message send timeout for text, [${item.text}]`, "warn");
+            const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
+            this.log(`Message send timeout for ${text}`, "warn");
             await this.sendNotification("message-timeout", item);
         });
         this.queueService.on("message-match", async (item: { tempGuid: string; message: Message }) => {
-            this.log(`Message match found for text, [${item.message.text}]`);
+            const text = item.message.cacheHasAttachments
+                ? `Image: ${item.message.text.slice(1, item.message.text.length) || "<No Text>"}`
+                : item.message.text;
+
+            this.log(`Message match found for text, [${text}]`);
             const resp = await getMessageResponse(item.message);
             resp.tempGuid = item.tempGuid;
 
@@ -345,24 +351,63 @@ export class BlueBubblesServer {
 
         // Create a listener to listen for new/updated messages
         const newMsgListener = new MessageListener(this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS);
+        const myMsgListener = new MyMessageListener(this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS * 2);
         const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority
         const groupChangeListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
 
-        newMsgListener.on("new-entry", async (item: Message) => {
-            // ATTENTION: If "from" is null, it means you sent the message from a group chat
-            // Check the isFromMe key prior to checking the "from" key
-            const from = item.isFromMe ? "You" : item.handle?.id;
+        /**
+         * Message listener for my messages only. We need this because messages from ourselves
+         * need to be fully sent before forwarding to any clients. If we emit a notification
+         * before the message is sent, it will cause a duplicate.
+         */
+        myMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments
-                ? `Image: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
-            this.log(`New message from [${from}]: [${text.substring(0, 50)}]`);
+            this.log(`New message from [You]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
             await this.sendNotification("new-message", await getMessageResponse(item));
         });
 
+        /**
+         * Message listener for messages that have errored out
+         */
+        myMsgListener.on("message-send-error", async (item: Message) => {
+            const text = item.cacheHasAttachments
+                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                : item.text;
+            this.log(`Failed to send message: [${text.substring(0, 50)}]`);
+
+            // Emit it to the socket and FCM devices
+
+            /**
+             * ERROR CODES:
+             * 4: Message Timeout
+             */
+            await this.sendNotification("message-send-error", await getMessageResponse(item));
+        });
+
+        /**
+         * Message listener for new messages not from yourself. See 'myMsgListener' comment
+         * for why we separate them out into two separate listeners.
+         */
+        newMsgListener.on("new-entry", async (item: Message) => {
+            const text = item.cacheHasAttachments
+                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                : item.text;
+            this.log(`New message from [${item.handle?.id}]: [${text.substring(0, 50)}]`);
+
+            // Emit it to the socket and FCM devices
+            await this.sendNotification("new-message", await getMessageResponse(item));
+        });
+
+        /**
+         * Message listener checking for updated messages. This means either the message's
+         * delivered date or read date have changed since the last time we checked the database.
+         */
         updatedMsgListener.on("updated-entry", async (item: Message) => {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key

@@ -78,10 +78,9 @@ export class Message {
     @Column({
         type: "integer",
         nullable: true,
-        transformer: BooleanTransformer,
         default: 0
     })
-    error: boolean;
+    error: number;
 
     @Column({
         name: "date",

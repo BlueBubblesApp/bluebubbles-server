@@ -41,7 +41,7 @@ export type MessageResponse = {
     attachments?: AttachmentResponse[];
     subject: string;
     country: string;
-    error: boolean;
+    error: number;
     dateCreated: number;
     dateRead: number | null;
     dateDelivered: number | null;
