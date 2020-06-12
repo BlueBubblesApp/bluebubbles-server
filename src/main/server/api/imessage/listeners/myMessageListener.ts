@@ -112,6 +112,9 @@ export class MyMessageListener extends ChangeListener {
         for (const i of unsent) // Add newly unsent to
             if (!this.notSent.includes(i)) this.notSent.push(i);
 
+        // Add 2 second artificial delay to help eliminate duplicates
+        await new Promise((resolve, _) => setTimeout(() => resolve(), 2000));
+
         // Emit the sent messages
         const entries = [...newSent, ...lookbackSent.filter(item => item.isSent)];
         entries.forEach(async (entry: any) => {
