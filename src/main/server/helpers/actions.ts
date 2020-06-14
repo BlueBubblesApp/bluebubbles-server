@@ -59,7 +59,7 @@ export class ActionHandler {
         if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${message.replace(
+        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${(message ?? "").replace(
             /"/g,
             '\\"'
         )}"`;
