@@ -74,11 +74,13 @@ const renameGroupChat = {
         (* Check if messages was in the foreground *)
         set isForeground to false
         tell application "Finder"
-            set frontApp to window 1 of (first application process whose frontmost is true)
-            set winName to name of frontApp
-            if winName is equal to "Messages" then
-                set isForeground to true
-            end if
+            try
+                set frontApp to window 1 of (first application process whose frontmost is true)
+                set winName to name of frontApp
+                if winName is equal to "Messages" then
+                    set isForeground to true
+                end if
+            end try
         end tell
 
         tell process "Messages"
@@ -108,6 +110,7 @@ const renameGroupChat = {
 
             (* We have to activate the window so that we can hit enter *)
             tell application "Messages" to activate
+            delay 1
             
             (* Select the chat and rename it *)
             select groupMatch
@@ -160,11 +163,13 @@ const addParticipant = {
         (* Check if messages was in the foreground *)
         set isForeground to false
         tell application "Finder"
-            set frontApp to window 1 of (first application process whose frontmost is true)
-            set winName to name of frontApp
-            if winName is equal to "Messages" then
-                set isForeground to true
-            end if
+            try
+                set frontApp to window 1 of (first application process whose frontmost is true)
+                set winName to name of frontApp
+                if winName is equal to "Messages" then
+                    set isForeground to true
+                end if
+            end try
         end tell
 
         tell process "Messages"
@@ -193,6 +198,7 @@ const addParticipant = {
 
             (* We have to activate the window so that we can hit enter *)
             tell application "Messages" to activate
+            delay 1
             
             select groupMatch
             try
@@ -262,11 +268,13 @@ const removeParticipant = {
         (* Check if messages was in the foreground *)
         set isForeground to false
         tell application "Finder"
-            set frontApp to window 1 of (first application process whose frontmost is true)
-            set winName to name of frontApp
-            if winName is equal to "Messages" then
-                set isForeground to true
-            end if
+            try
+                set frontApp to window 1 of (first application process whose frontmost is true)
+                set winName to name of frontApp
+                if winName is equal to "Messages" then
+                    set isForeground to true
+                end if
+            end try
         end tell
 
         tell process "Messages"
@@ -295,6 +303,7 @@ const removeParticipant = {
 
             (* We have to activate the window so that we can hit enter *)
             tell application "Messages" to activate
+            delay 1
             
             select groupMatch
             try
