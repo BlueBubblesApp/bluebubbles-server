@@ -48,9 +48,11 @@ export const safeExecuteAppleScript = async (fileSystem: FileSystem, command: st
         // Execute the command
         return (await fileSystem.execShellCommand(command)) as string;
     } catch (ex) {
-        // Format the error a bit, and re-throw it
-        const msg = ex.message.split("execution error: ")[1];
-        throw new Error(msg.split(". (")[0]);
+        let msg = ex.message;
+        if (msg instanceof String) [, msg] = msg.split("execution error: ");
+        [msg] = msg.split(". (");
+
+        throw new Error(msg);
     }
 };
 

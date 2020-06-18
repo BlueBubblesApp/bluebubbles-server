@@ -71,6 +71,9 @@ export class ActionHandler {
         }
 
         try {
+            // Make sure messages is open
+            await this.fs.startMessages();
+
             // We need offsets here due to iMessage's save times being a bit off for some reason
             const now = new Date(new Date().getTime() - 1000).getTime(); // With 1 second offset
             await this.fs.execShellCommand(baseCmd);
@@ -95,9 +98,11 @@ export class ActionHandler {
                 await this.db.getRepository(Queue).manager.save(attachmentItem);
             }
         } catch (ex) {
-            // Format the error a bit, and re-throw it
-            const msg = ex.message.split("execution error: ")[1];
-            throw new Error(msg.split(". (")[0]);
+            let msg = ex.message;
+            if (msg instanceof String) [, msg] = msg.split("execution error: ");
+            [msg] = msg.split(". (");
+
+            throw new Error(msg);
         }
     };
 
@@ -119,6 +124,9 @@ export class ActionHandler {
          * we are going to try and use the backup (second) name. If both failed, we weren't able to
          * calculate the correct chat name
          */
+
+        // Make sure messages is open
+        await this.fs.startMessages();
 
         let err = null;
         for (const oldName of names) {
@@ -161,6 +169,9 @@ export class ActionHandler {
          * we are going to try and use the backup (second) name. If both failed, we weren't able to
          * calculate the correct chat name
          */
+
+        // Make sure messages is open
+        await this.fs.startMessages();
 
         let err = null;
         for (const name of names) {
@@ -205,6 +216,9 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
+        // Make sure messages is open
+        await this.fs.startMessages();
+
         let err = null;
         for (const name of names) {
             console.info(`Attempting to remove participant from group [${name}]`);
@@ -242,6 +256,9 @@ export class ActionHandler {
         participants.forEach(member => {
             baseCmd += ` "${member}"`;
         });
+
+        // Make sure messages is open
+        await this.fs.startMessages();
 
         // Execute the command
         let ret = (await this.fs.execShellCommand(baseCmd)) as string;

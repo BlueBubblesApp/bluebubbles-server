@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
-import { app } from "electron";
 import * as child_process from "child_process";
+import { app } from "electron";
 import { sync } from "read-chunk";
 
 import { concatUint8Arrays } from "@server/helpers/utils";
@@ -192,5 +192,12 @@ export class FileSystem {
                 resolve(stdout || stderr);
             });
         });
+    };
+
+    /**
+     * Makes sure that Messages is running
+     */
+    startMessages = async () => {
+        await this.execShellCommand(`osascript "${this.scriptDir}/startMessages.scpt"`);
     };
 }

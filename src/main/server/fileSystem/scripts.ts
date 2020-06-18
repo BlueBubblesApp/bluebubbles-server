@@ -1,4 +1,18 @@
 /* eslint-disable max-len */
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+const startMessages = {
+    name: "startMessages.scpt",
+    contents: `set appName to "Messages"
+    if application appName is running then
+        return 0
+    else
+        tell application appName to reopen
+    end if`
+};
+
 /**
  * The AppleScript used to send a message with or without an attachment
  */
@@ -57,6 +71,16 @@ const renameGroupChat = {
     name: "renameGroupChat.scpt",
     contents: `on run {currentName, newName}
     tell application "System Events"
+        (* Check if messages was in the foreground *)
+        set isForeground to false
+        tell application "Finder"
+            set frontApp to window 1 of (first application process whose frontmost is true)
+            set winName to name of frontApp
+            if winName is equal to "Messages" then
+                set isForeground to true
+            end if
+        end tell
+
         tell process "Messages"
             set groupMatch to -1
             
@@ -83,10 +107,7 @@ const renameGroupChat = {
             end if
 
             (* We have to activate the window so that we can hit enter *)
-            tell application "Messages"
-                reopen
-                activate
-            end tell
+            tell application "Messages" to activate
             
             (* Select the chat and rename it *)
             select groupMatch
@@ -111,6 +132,13 @@ const renameGroupChat = {
                 key code 53
             end try
         end tell
+
+        (* If the window was not in the foreground originally, hide it *)
+        if isForeground is equal to false then
+            tell application "Finder"
+                set visible of process "Messages" to false
+            end tell
+        end if
     end tell
 end run
 
@@ -129,6 +157,16 @@ const addParticipant = {
     name: "addParticipant.scpt",
     contents: `on run {currentName, participant}
     tell application "System Events"
+        (* Check if messages was in the foreground *)
+        set isForeground to false
+        tell application "Finder"
+            set frontApp to window 1 of (first application process whose frontmost is true)
+            set winName to name of frontApp
+            if winName is equal to "Messages" then
+                set isForeground to true
+            end if
+        end tell
+
         tell process "Messages"
             set groupMatch to -1
             
@@ -154,10 +192,7 @@ const addParticipant = {
             end if
 
             (* We have to activate the window so that we can hit enter *)
-            tell application "Messages"
-                reopen
-                activate
-            end tell
+            tell application "Messages" to activate
             
             select groupMatch
             try
@@ -199,6 +234,13 @@ const addParticipant = {
             key code 53 -- Escape
             log "success"
         end tell
+
+        (* If the window was not in the foreground originally, hide it *)
+        if isForeground is equal to false then
+            tell application "Finder"
+                set visible of process "Messages" to false
+            end tell
+        end if
     end tell
 end run
 
@@ -217,6 +259,16 @@ const removeParticipant = {
     name: "removeParticipant.scpt",
     contents: `on run {currentName, address}
     tell application "System Events"
+        (* Check if messages was in the foreground *)
+        set isForeground to false
+        tell application "Finder"
+            set frontApp to window 1 of (first application process whose frontmost is true)
+            set winName to name of frontApp
+            if winName is equal to "Messages" then
+                set isForeground to true
+            end if
+        end tell
+
         tell process "Messages"
             set groupMatch to -1
             
@@ -242,10 +294,7 @@ const removeParticipant = {
             end if
 
             (* We have to activate the window so that we can hit enter *)
-            tell application "Messages"
-                reopen
-                activate
-            end tell
+            tell application "Messages" to activate
             
             select groupMatch
             try
@@ -289,6 +338,13 @@ const removeParticipant = {
         
             log "success"
         end tell
+
+        (* If the window was not in the foreground originally, hide it *)
+        if isForeground is equal to false then
+            tell application "Finder"
+                set visible of process "Messages" to false
+            end tell
+        end if
     end tell
 end run
 
@@ -300,4 +356,4 @@ on splitText(theText, theDelimiter)
 end splitText`
 };
 
-export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant, removeParticipant];
+export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant, removeParticipant, startMessages];
