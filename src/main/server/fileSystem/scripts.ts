@@ -109,7 +109,10 @@ const renameGroupChat = {
             end if
 
             (* We have to activate the window so that we can hit enter *)
-            tell application "Messages" to activate
+            tell application "Messages"
+                reopen
+                activate
+            end tell
             delay 1
             
             (* Select the chat and rename it *)
@@ -197,7 +200,10 @@ const addParticipant = {
             end if
 
             (* We have to activate the window so that we can hit enter *)
-            tell application "Messages" to activate
+            tell application "Messages"
+                reopen
+                activate
+            end tell
             delay 1
             
             select groupMatch
@@ -302,7 +308,10 @@ const removeParticipant = {
             end if
 
             (* We have to activate the window so that we can hit enter *)
-            tell application "Messages" to activate
+            tell application "Messages"
+                reopen
+                activate
+            end tell
             delay 1
             
             select groupMatch
