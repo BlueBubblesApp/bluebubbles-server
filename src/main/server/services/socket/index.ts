@@ -167,6 +167,19 @@ export class SocketService {
         });
 
         /**
+         * Get single chat
+         */
+        socket.on("get-chat", async (params, cb) => {
+            const chatGuid = params?.chatGuid;
+            const withParticipants = params?.withParticipants ?? true;
+
+            if (!chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
+
+            const chats = await this.iMessageRepo.getChats(chatGuid, withParticipants);
+            return respond(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
+        });
+
+        /**
          * Get messages in a chat
          */
         socket.on(
@@ -315,10 +328,9 @@ export class SocketService {
                 const chatGuid = params?.guid;
                 const message = params?.message;
 
-                if (!chatGuid || !message)
-                    return respond(cb, "error", createBadRequestResponse("No chat GUID or message provided"));
+                if (!chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
-                if (!tempGuid && (!message || message.length === 0))
+                if ((tempGuid && (!message || message.length === 0)) || (!tempGuid && message))
                     return respond(cb, "error", createBadRequestResponse("No temporary GUID provided with message"));
 
                 if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))

@@ -19,7 +19,7 @@ export class MessageUpdateListener extends ChangeListener {
         const entries = await this.repo.getUpdatedMessages({ after: offsetDate, withChats: true });
 
         // Emit the new message
-        entries.forEach((entry: any) => {
+        entries.forEach(async (entry: any) => {
             // Compile so it's unique based on dates as well as ROWID
             const delivered = entry.dateDelivered ? entry.dateDelivered.getTime() : 0;
             const read = entry.dateRead ? entry.dateRead.getTime() : 0;
@@ -33,6 +33,9 @@ export class MessageUpdateListener extends ChangeListener {
 
             // Send the built message object
             super.emit("updated-entry", this.transformEntry(entry));
+
+            // Add artificial delay so we don't overwhelm any listeners
+            await new Promise((resolve, _) => setTimeout(() => resolve(), 500));
         });
     }
 

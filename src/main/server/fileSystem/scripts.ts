@@ -81,6 +81,12 @@ const renameGroupChat = {
             if groupMatch is equal to -1 then
                 tell me to error "Group chat does not exist"
             end if
+
+            (* We have to activate the window so that we can hit enter *)
+            tell application "Messages"
+                reopen
+                activate
+            end tell
             
             (* Select the chat and rename it *)
             select groupMatch
@@ -146,6 +152,12 @@ const addParticipant = {
             if groupMatch is equal to -1 then
                 tell me to error "Group chat does not exist"
             end if
+
+            (* We have to activate the window so that we can hit enter *)
+            tell application "Messages"
+                reopen
+                activate
+            end tell
             
             select groupMatch
             try
@@ -161,13 +173,6 @@ const addParticipant = {
                     tell pop over 1 to tell scroll area 1 to tell text field 2
                         set value to participant
                         set focused to true
-
-                        (* We have to activate the window so that we can hit enter *)
-                        tell application "Messages"
-                            reopen
-                            activate
-                        end tell
-
                         key code 36 -- Enter
                     end tell
                 end tell
@@ -235,6 +240,12 @@ const removeParticipant = {
             if groupMatch is equal to -1 then
                 tell me to error "Group chat does not exist"
             end if
+
+            (* We have to activate the window so that we can hit enter *)
+            tell application "Messages"
+                reopen
+                activate
+            end tell
             
             select groupMatch
             try
@@ -257,12 +268,6 @@ const removeParticipant = {
                                 end if
                             end if
                         end repeat
-
-                        (* We have to activate the window so that we can hit enter *)
-                        tell application "Messages"
-                            reopen
-                            activate
-                        end tell
                         
                         if contactRow is equal to -1 then
                             key code 53
