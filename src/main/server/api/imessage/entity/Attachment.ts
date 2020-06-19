@@ -117,9 +117,13 @@ export const getAttachmentResponse = async (
         // If we want data, get the data
         if (withData) {
             data = Uint8Array.from(fopen);
-        } else if (withBlurhash && handledImageMimes.includes(tableData.mimeType)) {
+        }
+
+        if (handledImageMimes.includes(tableData.mimeType)) {
             image = await Jimp.read(fPath);
-            blurhash = await getBlurHash(image);
+            if (withBlurhash) {
+                blurhash = await getBlurHash(image);
+            }
         }
 
         // If there is no data, return null for the data
