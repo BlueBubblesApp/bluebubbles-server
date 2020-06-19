@@ -2,6 +2,7 @@
 import { app, ipcMain, BrowserWindow } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
+import * as util from "util";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
@@ -186,6 +187,13 @@ export class BlueBubblesServer {
             await this.contactsRepo.initialize();
         } catch (ex) {
             this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
+        }
+
+        try {
+            this.log("Activating the Messages app...");
+            await this.messageAppActivate();
+        } catch (ex) {
+            this.log("Message app failed to start properly.", "error");
         }
 
         try {
@@ -544,5 +552,17 @@ export class BlueBubblesServer {
                 await this.alertService.markAsRead(id);
             }
         });
+    }
+
+    /**
+     * Activates the iMessage app on MacOS
+     */
+    private async messageAppActivate(): Promise<void> {
+        const exec = util.promisify(require("child_process").exec);
+        const { stdout, stderr } = await exec("osascript -e 'tell application \"Messages\" to activate'");
+        if (stderr) {
+            this.log(`Failed to setup Filesystem! ${stderr}`, "error");
+        }
+        this.log("Activated iMessage App...");
     }
 }
