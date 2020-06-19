@@ -122,7 +122,12 @@ export const getAttachmentResponse = async (
         if (handledImageMimes.includes(tableData.mimeType)) {
             image = await Jimp.read(fPath);
             if (withBlurhash) {
+                const now = new Date().getTime();
                 blurhash = await getBlurHash(image);
+                const later = new Date().getTime();
+                console.log(
+                    `Calculated blurhash for image (${image.getHeight()}x${image.getWidth()}) in ${later - now} ms`
+                );
             }
         }
 
