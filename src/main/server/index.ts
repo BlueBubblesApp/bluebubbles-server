@@ -561,7 +561,7 @@ export class BlueBubblesServer {
         const exec = util.promisify(require("child_process").exec);
         const { stdout, stderr } = await exec("osascript -e 'tell application \"Messages\" to activate'");
         if (stderr) {
-            this.log(`Failed to setup Filesystem! ${stderr}`, "error");
+            this.log(`Failed to activate the Messages App! ${stderr}`, "error");
         }
         this.log("Activated iMessage App...");
     }
