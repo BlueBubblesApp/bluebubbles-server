@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as base64 from "byte-base64";
+import * as Jimp from "jimp";
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
@@ -101,6 +102,7 @@ export const getAttachmentResponse = async (
 ): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
     let blurhash: string = null;
+    let image: Jimp = null;
 
     // Get the fully qualified path
     let fPath = tableData.filePath;
@@ -116,7 +118,8 @@ export const getAttachmentResponse = async (
         if (withData) {
             data = Uint8Array.from(fopen);
         } else if (withBlurhash && handledImageMimes.includes(tableData.mimeType)) {
-            blurhash = await getBlurHash(fPath);
+            image = await Jimp.read(fPath);
+            blurhash = await getBlurHash(image);
         }
 
         // If there is no data, return null for the data
@@ -135,6 +138,8 @@ export const getAttachmentResponse = async (
         guid: tableData.guid,
         messages: tableData.messages ? tableData.messages.map(item => item.guid) : [],
         data: data as string,
+        height: image ? image.getHeight() : 0,
+        width: image ? image.getWidth() : 0,
         blurhash,
         uti: tableData.uti,
         mimeType: tableData.mimeType,

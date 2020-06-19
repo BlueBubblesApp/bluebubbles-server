@@ -89,6 +89,8 @@ export type AttachmentResponse = {
     messages: string[];
     data: string; // Base64 string
     blurhash: string;
+    height?: number;
+    width?: number;
     uti: string;
     mimeType: string;
     transferState: number;

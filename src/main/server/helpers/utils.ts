@@ -79,7 +79,6 @@ export const generateChatNameList = async (
 
     // First, lets get the members of the chat
     const chats = await iMessageRepo.getChats(chatGuid, true);
-
     if (!chats || chats.length === 0) throw new Error("Chat does not exist");
 
     const chat = chats[0];
