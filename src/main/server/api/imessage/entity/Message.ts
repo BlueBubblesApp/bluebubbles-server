@@ -1,22 +1,11 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToOne,
-    JoinTable,
-    JoinColumn,
-    ManyToMany
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/api/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/api/transformers/MessageTypeTransformer";
 import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
-import {
-    Attachment,
-    getAttachmentResponse
-} from "@server/api/imessage/entity/Attachment";
+import { Attachment, getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 
 @Entity("message")
 export class Message {
@@ -39,11 +28,11 @@ export class Message {
     })
     serviceCenter: string;
 
-    @ManyToOne((type) => Handle)
+    @ManyToOne(type => Handle)
     @JoinColumn({ name: "handle_id", referencedColumnName: "ROWID" })
     handle: Handle;
 
-    @ManyToMany((type) => Chat)
+    @ManyToMany(type => Chat)
     @JoinTable({
         name: "chat_message_join",
         joinColumns: [{ name: "message_id" }],
@@ -51,7 +40,7 @@ export class Message {
     })
     chats: Chat[];
 
-    @ManyToMany((type) => Attachment)
+    @ManyToMany(type => Attachment)
     @JoinTable({
         name: "message_attachment_join",
         joinColumns: [{ name: "message_id" }],
@@ -89,10 +78,9 @@ export class Message {
     @Column({
         type: "integer",
         nullable: true,
-        transformer: BooleanTransformer,
         default: 0
     })
-    error: boolean;
+    error: number;
 
     @Column({
         name: "date",
@@ -300,7 +288,12 @@ export class Message {
     @Column({ name: "item_type", type: "integer", default: 0 })
     itemType: number;
 
-    @Column({ name: "other_handle", type: "integer", nullable: true, default: 0 })
+    @Column({
+        name: "other_handle",
+        type: "integer",
+        nullable: true,
+        default: 0
+    })
     otherHandle: number;
 
     @Column({ name: "group_title", type: "text" })
@@ -400,28 +393,33 @@ export class Message {
     messageSummaryInfo: Blob;
 }
 
-export const getMessageResponse = (tableData: Message): MessageResponse => {
+export const getMessageResponse = async (tableData: Message, withBlurhash = true): Promise<MessageResponse> => {
+    // Load attachments
+    const attachments = [];
+    for (const attachment of tableData?.attachments ?? []) {
+        const resData = await getAttachmentResponse(attachment, false, withBlurhash);
+        attachments.push(resData);
+    }
+
+    const chats = [];
+    for (const chat of tableData?.chats ?? []) {
+        const chatRes = await getChatResponse(chat);
+        chats.push(chatRes);
+    }
+
     return {
         guid: tableData.guid,
         text: tableData.text,
-        handle: tableData.handle ? getHandleResponse(tableData.handle) : null,
+        handle: tableData.handle ? await getHandleResponse(tableData.handle) : null,
         handleId: tableData.handleId,
-        chats: tableData.chats
-            ? tableData.chats.map((item) => getChatResponse(item))
-            : [],
-        attachments: tableData.attachments
-            ? tableData.attachments.map((item) => getAttachmentResponse(item))
-            : [],
+        chats,
+        attachments,
         subject: tableData.subject,
         country: tableData.country,
         error: tableData.error,
-        dateCreated: tableData.dateCreated
-            ? tableData.dateCreated.getTime()
-            : null,
+        dateCreated: tableData.dateCreated ? tableData.dateCreated.getTime() : null,
         dateRead: tableData.dateRead ? tableData.dateRead.getTime() : null,
-        dateDelivered: tableData.dateDelivered
-            ? tableData.dateDelivered.getTime()
-            : null,
+        dateDelivered: tableData.dateDelivered ? tableData.dateDelivered.getTime() : null,
         isFromMe: tableData.isFromMe,
         isDelayed: tableData.isDelayed,
         isAutoReply: tableData.isAutoReply,
@@ -431,9 +429,7 @@ export const getMessageResponse = (tableData: Message): MessageResponse => {
         isArchived: tableData.isArchived,
         cacheRoomnames: tableData.cacheRoomnames,
         isAudioMessage: tableData.isAudioMessage,
-        datePlayed: tableData.datePlayed
-            ? tableData.datePlayed.getTime()
-            : null,
+        datePlayed: tableData.datePlayed ? tableData.datePlayed.getTime() : null,
         itemType: tableData.itemType,
         groupTitle: tableData.groupTitle,
         groupActionType: tableData.groupActionType,

@@ -49,10 +49,9 @@ class FixedPlugin extends React.Component<Props, State> {
             <div
                 className={classnames("fixed-plugin", {
                     "rtl-fixed-plugin": this.props.rtlActive
-                })}>
-                <div
-                    id="fixedPluginClasses"
-                    className={this.props.fixedClasses}>
+                })}
+            >
+                <div id="fixedPluginClasses" className={this.props.fixedClasses}>
                     <div onClick={this.handleClick}>
                         <i className="fa fa-cog fa-2x" />
                     </div>

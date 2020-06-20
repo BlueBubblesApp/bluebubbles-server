@@ -1,9 +1,5 @@
 import { Theme, createStyles } from "@material-ui/core";
-import {
-    drawerWidth,
-    transition,
-    container
-} from "../../material-dashboard-react";
+import { drawerWidth, transition, container } from "../../material-dashboard-react";
 
 const appStyle = (theme: Theme) =>
     createStyles({

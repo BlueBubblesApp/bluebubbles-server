@@ -7,11 +7,7 @@ import typographyStyle from "../../assets/jss/material-dashboard-react/component
 
 function Info({ ...props }: any) {
     const { classes, children } = props;
-    return (
-        <div className={`${classes.defaultFontStyle  } ${  classes.infoText}`}>
-            {children}
-        </div>
-    );
+    return <div className={`${classes.defaultFontStyle} ${classes.infoText}`}>{children}</div>;
 }
 
 // Info.propTypes = {

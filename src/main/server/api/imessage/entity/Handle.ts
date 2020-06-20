@@ -1,12 +1,4 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    OneToMany,
-    JoinColumn,
-    JoinTable,
-    ManyToMany
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, JoinColumn, JoinTable, ManyToMany } from "typeorm";
 
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
@@ -17,11 +9,11 @@ export class Handle {
     @PrimaryGeneratedColumn({ name: "ROWID" })
     ROWID: number;
 
-    @OneToMany((type) => Message, (message) => message.handle)
+    @OneToMany(type => Message, message => message.handle)
     @JoinColumn({ name: "ROWID", referencedColumnName: "handle_id" })
     messages: Message[];
 
-    @ManyToMany((type) => Chat)
+    @ManyToMany(type => Chat)
     @JoinTable({
         name: "chat_handle_join",
         joinColumns: [{ name: "handle_id" }],
@@ -42,16 +34,24 @@ export class Handle {
     uncanonicalizedId: string;
 }
 
-export const getHandleResponse = (tableData: Handle): HandleResponse => {
+export const getHandleResponse = async (tableData: Handle): Promise<HandleResponse> => {
+    const messages = [];
+    for (const msg of tableData?.messages ?? []) {
+        const msgRes = await getMessageResponse(msg);
+        messages.push(msgRes);
+    }
+
+    const chats = [];
+    for (const chat of tableData?.chats ?? []) {
+        const chatRes = await getChatResponse(chat);
+        chats.push(chatRes);
+    }
+
     return {
-        messages: tableData.messages
-            ? tableData.messages.map((item) => getMessageResponse(item))
-            : [],
-        chats: tableData.chats
-            ? tableData.chats.map((item) => getChatResponse(item))
-            : [],
+        messages,
+        chats,
         address: tableData.id,
         country: tableData.country,
         uncanonicalizedId: tableData.uncanonicalizedId
     };
-}
+};

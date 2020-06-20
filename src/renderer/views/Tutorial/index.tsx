@@ -3,17 +3,9 @@ import * as React from "react";
 import { ipcRenderer } from "electron";
 import { withRouter, Redirect } from "react-router-dom";
 
-import {
-    createStyles,
-    Theme,
-    withStyles,
-    StyleRules
-} from "@material-ui/core/styles";
+import { createStyles, Theme, withStyles, StyleRules } from "@material-ui/core/styles";
 
-import {
-    Typography,
-    Button
-} from "@material-ui/core";
+import { Typography, Button } from "@material-ui/core";
 
 import HowItWorks from "./steps/HowItWorks";
 import Permissions from "./steps/Permissions";
@@ -63,11 +55,11 @@ class Tutorial extends React.Component<Props, State> {
 
     completeTutorial() {
         ipcRenderer.invoke("complete-tutorial");
-        this.props.history.push("/welcome")
+        this.props.history.push("/welcome");
     }
 
     nextStep() {
-        this.setState({step: this.state.step + 1});
+        this.setState({ step: this.state.step + 1 });
     }
 
     lastStep() {
@@ -92,25 +84,20 @@ class Tutorial extends React.Component<Props, State> {
                     Tutorial
                 </Typography>
                 <Typography variant="subtitle1">
-                    Welcome to the BlueBubbles Tutorial! Follow these steps to
-                    learn how the server and ecosystem work!
+                    Welcome to the BlueBubbles Tutorial! Follow these steps to learn how the server and ecosystem work!
                 </Typography>
                 <CurrentStep />
                 <section className={classes.footer}>
                     {step < Object.keys(stepMap).length - 1 ? (
-                        <Button
-                            variant="outlined"
-                            onClick={() => this.completeTutorial()}
-                        >
+                        <Button variant="outlined" onClick={() => this.completeTutorial()}>
                             Skip Tutorial
                         </Button>
                     ) : null}
                     <section>
                         {step > 0 ? (
-                            <Button
-                                variant="outlined"
-                                onClick={() => this.lastStep()}
-                            >{`Previous: ${stepMap[step - 1].text}`}</Button>
+                            <Button variant="outlined" onClick={() => this.lastStep()}>{`Previous: ${
+                                stepMap[step - 1].text
+                            }`}</Button>
                         ) : null}
 
                         {step < Object.keys(stepMap).length - 1 ? (

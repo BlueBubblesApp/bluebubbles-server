@@ -1,10 +1,5 @@
 import { createStyles } from "@material-ui/core";
-import {
-    boxShadow,
-    whiteColor,
-    grayColor,
-    hexToRgb
-} from "../../material-dashboard-react";
+import { boxShadow, whiteColor, grayColor, hexToRgb } from "../../material-dashboard-react";
 
 const iconsStyle = createStyles({
     iframe: {

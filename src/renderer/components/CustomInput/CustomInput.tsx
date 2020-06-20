@@ -13,20 +13,11 @@ import Check from "@material-ui/icons/Check";
 import customInputStyle from "../../assets/jss/material-dashboard-react/components/customInputStyle";
 
 function CustomInput({ ...props }: any) {
-    const {
-        classes,
-        formControlProps,
-        labelText,
-        id,
-        labelProps,
-        inputProps,
-        error,
-        success
-    } = props;
+    const { classes, formControlProps, labelText, id, labelProps, inputProps, error, success } = props;
 
     const labelClasses = classNames({
-        [` ${  classes.labelRootError}`]: error,
-        [` ${  classes.labelRootSuccess}`]: success && !error
+        [` ${classes.labelRootError}`]: error,
+        [` ${classes.labelRootSuccess}`]: success && !error
     });
 
     const underlineClasses = classNames({
@@ -40,14 +31,9 @@ function CustomInput({ ...props }: any) {
     });
 
     return (
-        <FormControl
-            {...formControlProps}
-            className={`${formControlProps.className  } ${  classes.formControl}`}>
+        <FormControl {...formControlProps} className={`${formControlProps.className} ${classes.formControl}`}>
             {labelText !== undefined ? (
-                <InputLabel
-                    className={classes.labelRoot + labelClasses}
-                    htmlFor={id}
-                    {...labelProps}>
+                <InputLabel className={classes.labelRoot + labelClasses} htmlFor={id} {...labelProps}>
                     {labelText}
                 </InputLabel>
             ) : null}
@@ -59,17 +45,11 @@ function CustomInput({ ...props }: any) {
                 }}
                 id={id}
                 {...inputProps}
-                />
+            />
             {error ? (
-                <Clear
-                    className={`${classes.feedback  } ${  classes.labelRootError}`}
-                    />
+                <Clear className={`${classes.feedback} ${classes.labelRootError}`} />
             ) : success ? (
-                <Check
-                    className={
-                        `${classes.feedback  } ${  classes.labelRootSuccess}`
-                    }
-                    />
+                <Check className={`${classes.feedback} ${classes.labelRootSuccess}`} />
             ) : null}
         </FormControl>
     );

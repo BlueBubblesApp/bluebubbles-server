@@ -42,14 +42,7 @@ class CustomTabs extends React.Component<Props, State> {
     };
 
     render() {
-        const {
-            classes,
-            headerColor,
-            plainTabs,
-            tabs,
-            title,
-            rtlActive
-        } = this.props;
+        const { classes, headerColor, plainTabs, tabs, title, rtlActive } = this.props;
         const cardTitle = classNames({
             [classes.cardTitle]: true,
             [classes.cardTitleRTL]: rtlActive
@@ -57,9 +50,7 @@ class CustomTabs extends React.Component<Props, State> {
         return (
             <Card plain={plainTabs}>
                 <CardHeader color={headerColor} plain={plainTabs}>
-                    {title !== undefined ? (
-                        <div className={cardTitle}>{title}</div>
-                    ) : null}
+                    {title !== undefined ? <div className={cardTitle}>{title}</div> : null}
                     <Tabs
                         value={this.state.value}
                         onChange={this.handleChange}
@@ -69,7 +60,8 @@ class CustomTabs extends React.Component<Props, State> {
                             scrollButtons: classes.displayNone
                         }}
                         variant="scrollable"
-                        scrollButtons="auto">
+                        scrollButtons="auto"
+                    >
                         {tabs.map((prop: any, key: any) => {
                             let icon = {};
                             if (prop.tabIcon) {
@@ -89,7 +81,7 @@ class CustomTabs extends React.Component<Props, State> {
                                     key={key}
                                     label={prop.tabName}
                                     {...icon}
-                                    />
+                                />
                             );
                         })}
                     </Tabs>

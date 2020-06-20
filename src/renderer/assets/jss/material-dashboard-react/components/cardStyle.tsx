@@ -1,9 +1,5 @@
 import { createStyles } from "@material-ui/core";
-import {
-    blackColor,
-    whiteColor,
-    hexToRgb
-} from "../../material-dashboard-react";
+import { blackColor, whiteColor, hexToRgb } from "../../material-dashboard-react";
 
 const cardStyle = createStyles({
     card: {

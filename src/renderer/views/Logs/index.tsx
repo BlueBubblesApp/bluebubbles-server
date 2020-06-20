@@ -2,12 +2,7 @@
 import * as React from "react";
 import { ipcRenderer } from "electron";
 
-import {
-    createStyles,
-    Theme,
-    withStyles,
-    StyleRules
-} from "@material-ui/core/styles";
+import { createStyles, Theme, withStyles, StyleRules } from "@material-ui/core/styles";
 
 import {
     TextField,
@@ -25,7 +20,7 @@ import {
 } from "@material-ui/core";
 
 interface Props {
-    classes: any
+    classes: any;
 }
 
 interface State {
@@ -35,19 +30,19 @@ interface State {
 class Devices extends React.Component<Props, State> {
     state: State = {
         logs: []
-    }
+    };
 
     async componentDidMount() {
         ipcRenderer.on("new-log", (event: any, data: any) => {
             // Build the new log
-            let newLog = [...this.state.logs, {log: data, timestamp: new Date().toLocaleTimeString()}];
+            let newLog = [...this.state.logs, { log: data, timestamp: new Date().toLocaleTimeString() }];
 
             // Make sure there are only 10 logs in the list
-            newLog = newLog.slice((newLog.length - 10 < 0) ? 0 : newLog.length - 10, newLog.length);
+            newLog = newLog.slice(newLog.length - 10 < 0 ? 0 : newLog.length - 10, newLog.length);
 
             // Set the new logs
-            this.setState({ logs: newLog })
-        })
+            this.setState({ logs: newLog });
+        });
     }
 
     render() {
@@ -73,17 +68,14 @@ class Devices extends React.Component<Props, State> {
                                     <TableCell component="th" scope="row" className={classes.wrapText}>
                                         {row.log || "N/A"}
                                     </TableCell>
-                                    <TableCell align="right">
-                                        {row.timestamp}
-                                    </TableCell>
+                                    <TableCell align="right">{row.timestamp}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                     {logs.length === 0 ? (
                         <p style={{ textAlign: "center" }}>
-                            No logs. This page only shows logs while this page
-                            is open!
+                            No logs. This page only shows logs while this page is open!
                         </p>
                     ) : null}
                 </TableContainer>

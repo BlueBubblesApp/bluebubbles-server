@@ -1,9 +1,10 @@
 import { EventEmitter } from "events";
+import { EventCache } from "@server/eventCache";
 
 export abstract class ChangeListener extends EventEmitter {
     stopped: boolean;
 
-    emittedItems: string[];
+    cache: EventCache;
 
     lastCheck: Date;
 
@@ -11,9 +12,10 @@ export abstract class ChangeListener extends EventEmitter {
 
     pollFrequency: number;
 
-    constructor(pollFrequency = 1000) {
+    constructor({ cache = new EventCache(), pollFrequency = 1000 }: { cache?: EventCache; pollFrequency?: number }) {
         super();
 
+        this.cache = cache;
         this.stopped = false;
         this.pollFrequency = pollFrequency;
         this.lastCheck = new Date();
@@ -28,12 +30,10 @@ export abstract class ChangeListener extends EventEmitter {
         const now = new Date();
 
         // Purge emitted messages every 30 minutes to save memory (or every 100 items)
-        if (this.emittedItems.length > 100 || now.getTime() - this.lastPurge.getTime() > 1800000) {
-            if (this.emittedItems.length > 0) {
-                console.info(
-                    `Purging ${this.emittedItems.length} emitted messages from cache...`
-                );
-                this.emittedItems = [];
+        if (this.cache.size() > 100 || now.getTime() - this.lastPurge.getTime() > 1800000) {
+            if (this.cache.size() > 0) {
+                console.info(`Purging ${this.cache.size()} emitted messages from cache...`);
+                this.cache.purge();
             }
 
             this.lastPurge = new Date();
@@ -41,7 +41,7 @@ export abstract class ChangeListener extends EventEmitter {
     }
 
     start() {
-        this.emittedItems = [];
+        this.cache.purge();
         this.lastCheck = new Date();
         this.lastPurge = new Date();
 

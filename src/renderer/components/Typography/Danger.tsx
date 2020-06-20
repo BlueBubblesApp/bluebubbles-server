@@ -6,11 +6,7 @@ import typographyStyle from "../../assets/jss/material-dashboard-react/component
 
 function Danger({ ...props }: any) {
     const { classes, children } = props;
-    return (
-        <div className={`${classes.defaultFontStyle} ${classes.dangerText}`}>
-            {children}
-        </div>
-    );
+    return <div className={`${classes.defaultFontStyle} ${classes.dangerText}`}>{children}</div>;
 }
 
 export default withStyles(typographyStyle)(Danger);

@@ -1,4 +1,18 @@
 /* eslint-disable max-len */
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+const startMessages = {
+    name: "startMessages.scpt",
+    contents: `set appName to "Messages"
+    if application appName is running then
+        return 0
+    else
+        tell application appName to reopen
+    end if`
+};
+
 /**
  * The AppleScript used to send a message with or without an attachment
  */
@@ -11,7 +25,9 @@ const sendMessage = {
 
         tell application "Messages"
             set targetChat to a reference to text chat id chatGuid
-            send message to targetChat
+            if message is not equal to "" then
+                send message to targetChat
+            end if
 
             if (count of argv) > 2 then
                 set theAttachment to (item 3 of argv) as POSIX file
@@ -52,9 +68,21 @@ end run`
  * The AppleScript used to rename a group chat
  */
 const renameGroupChat = {
-    name: 'renameGroupChat.scpt',
+    name: "renameGroupChat.scpt",
     contents: `on run {currentName, newName}
     tell application "System Events"
+        (* Check if messages was in the foreground *)
+        set isForeground to false
+        tell application "Finder"
+            try
+                set frontApp to window 1 of (first application process whose frontmost is true)
+                set winName to name of frontApp
+                if winName is equal to "Messages" then
+                    set isForeground to true
+                end if
+            end try
+        end tell
+
         tell process "Messages"
             set groupMatch to -1
             
@@ -79,12 +107,26 @@ const renameGroupChat = {
             if groupMatch is equal to -1 then
                 tell me to error "Group chat does not exist"
             end if
+
+            (* We have to activate the window so that we can hit enter *)
+            tell application "Messages"
+                reopen
+                activate
+            end tell
+            delay 1
             
             (* Select the chat and rename it *)
             select groupMatch
             try
                 tell window 1 to tell splitter group 1 to tell button "Details"
-                    click
+                    try
+                        (* If the popover is open, don't re-click Details *)
+                        set popover to pop over 1
+                    on error notOpen
+                        (* If the popover is not open, click Details *)
+                        click
+                    end try
+
                     tell pop over 1 to tell scroll area 1 to tell text field 1
                         set value to newName
                         confirm
@@ -96,6 +138,13 @@ const renameGroupChat = {
                 key code 53
             end try
         end tell
+
+        (* If the window was not in the foreground originally, hide it *)
+        if isForeground is equal to false then
+            tell application "Finder"
+                set visible of process "Messages" to false
+            end tell
+        end if
     end tell
 end run
 
@@ -111,9 +160,21 @@ end splitText`
  * AppleScript to add a participant to a group
  */
 const addParticipant = {
-    name: 'addParticipant.scpt',
+    name: "addParticipant.scpt",
     contents: `on run {currentName, participant}
     tell application "System Events"
+        (* Check if messages was in the foreground *)
+        set isForeground to false
+        tell application "Finder"
+            try
+                set frontApp to window 1 of (first application process whose frontmost is true)
+                set winName to name of frontApp
+                if winName is equal to "Messages" then
+                    set isForeground to true
+                end if
+            end try
+        end tell
+
         tell process "Messages"
             set groupMatch to -1
             
@@ -137,20 +198,28 @@ const addParticipant = {
             if groupMatch is equal to -1 then
                 tell me to error "Group chat does not exist"
             end if
+
+            (* We have to activate the window so that we can hit enter *)
+            tell application "Messages"
+                reopen
+                activate
+            end tell
+            delay 1
             
             select groupMatch
             try
                 tell window 1 to tell splitter group 1 to tell button "Details"
-                    click
+                    try
+                        (* If the popover is open, don't re-click Details *)
+                        set popover to pop over 1
+                    on error notOpen
+                        (* If the popover is not open, click Details *)
+                        click
+                    end try
+
                     tell pop over 1 to tell scroll area 1 to tell text field 2
                         set value to participant
                         set focused to true
-                        
-                        (* We have to activate the window so that we can hit enter *)
-                        tell application "Messages"
-                            reopen
-                            activate
-                        end tell
                         key code 36 -- Enter
                     end tell
                 end tell
@@ -177,6 +246,13 @@ const addParticipant = {
             key code 53 -- Escape
             log "success"
         end tell
+
+        (* If the window was not in the foreground originally, hide it *)
+        if isForeground is equal to false then
+            tell application "Finder"
+                set visible of process "Messages" to false
+            end tell
+        end if
     end tell
 end run
 
@@ -192,9 +268,21 @@ end splitText`
  * AppleScript to add a participant to a group
  */
 const removeParticipant = {
-    name: 'removeParticipant.scpt',
+    name: "removeParticipant.scpt",
     contents: `on run {currentName, address}
     tell application "System Events"
+        (* Check if messages was in the foreground *)
+        set isForeground to false
+        tell application "Finder"
+            try
+                set frontApp to window 1 of (first application process whose frontmost is true)
+                set winName to name of frontApp
+                if winName is equal to "Messages" then
+                    set isForeground to true
+                end if
+            end try
+        end tell
+
         tell process "Messages"
             set groupMatch to -1
             
@@ -218,11 +306,25 @@ const removeParticipant = {
             if groupMatch is equal to -1 then
                 tell me to error "Group chat does not exist"
             end if
+
+            (* We have to activate the window so that we can hit enter *)
+            tell application "Messages"
+                reopen
+                activate
+            end tell
+            delay 1
             
             select groupMatch
             try
                 tell window 1 to tell splitter group 1 to tell button "Details"
-                    click
+                    try
+                        (* If the popover is open, don't re-click Details *)
+                        set popover to pop over 1
+                    on error notOpen
+                        (* If the popover is not open, click Details *)
+                        click
+                    end try
+
                     tell pop over 1 to tell scroll area 1
                         set contactRow to -1
                         repeat with participant in (table 1's entire contents) as list
@@ -233,12 +335,6 @@ const removeParticipant = {
                                 end if
                             end if
                         end repeat
-
-                        (* We have to activate the window so that we can hit enter *)
-                        tell application "Messages"
-                            reopen
-                            activate
-                        end tell
                         
                         if contactRow is equal to -1 then
                             key code 53
@@ -260,6 +356,13 @@ const removeParticipant = {
         
             log "success"
         end tell
+
+        (* If the window was not in the foreground originally, hide it *)
+        if isForeground is equal to false then
+            tell application "Finder"
+                set visible of process "Messages" to false
+            end tell
+        end if
     end tell
 end run
 
@@ -271,4 +374,4 @@ on splitText(theText, theDelimiter)
 end splitText`
 };
 
-export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant, removeParticipant];
+export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant, removeParticipant, startMessages];

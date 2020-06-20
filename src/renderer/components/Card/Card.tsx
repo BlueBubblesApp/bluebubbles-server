@@ -11,15 +11,7 @@ import withStyles from "@material-ui/core/styles/withStyles";
 import cardStyle from "../../assets/jss/material-dashboard-react/components/cardStyle";
 
 function Card({ ...props }: any) {
-    const {
-        classes,
-        className,
-        children,
-        plain,
-        profile,
-        chart,
-        ...rest
-    } = props;
+    const { classes, className, children, plain, profile, chart, ...rest } = props;
     const cardClasses = classNames({
         [classes.card]: true,
         [classes.cardPlain]: plain,

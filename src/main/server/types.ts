@@ -32,6 +32,7 @@ export type ResponseFormat = {
  * 3: Someone left the conversation (handle_id shows who)
  */
 export type MessageResponse = {
+    tempGuid?: string;
     guid: string;
     text: string;
     handle?: HandleResponse | null;
@@ -40,7 +41,7 @@ export type MessageResponse = {
     attachments?: AttachmentResponse[];
     subject: string;
     country: string;
-    error: boolean;
+    error: number;
     dateCreated: number;
     dateRead: number | null;
     dateDelivered: number | null;
@@ -87,6 +88,9 @@ export type AttachmentResponse = {
     guid: string;
     messages: string[];
     data: string; // Base64 string
+    blurhash: string;
+    height?: number;
+    width?: number;
     uti: string;
     mimeType: string;
     transferState: number;

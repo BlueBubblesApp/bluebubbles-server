@@ -28,21 +28,17 @@ const Sidebar = ({ ...props }) => {
                 let activePro = " ";
                 let listItemClasses;
                 if (prop.path === "/upgrade-to-pro") {
-                    activePro = `${classes.activePro  } `;
+                    activePro = `${classes.activePro} `;
                     listItemClasses = classNames({
-                        [` ${  classes[color]}`]: true
+                        [` ${classes[color]}`]: true
                     });
                 } else {
                     listItemClasses = classNames({
-                        [` ${  classes[color]}`]: activeRoute(
-                            prop.layout + prop.path
-                        )
+                        [` ${classes[color]}`]: activeRoute(prop.layout + prop.path)
                     });
                 }
                 const whiteFontClasses = classNames({
-                    [` ${  classes.whiteFont}`]: activeRoute(
-                        prop.layout + prop.path
-                    )
+                    [` ${classes.whiteFont}`]: activeRoute(prop.layout + prop.path)
                 });
                 return (
                     <NavLink
@@ -50,47 +46,31 @@ const Sidebar = ({ ...props }) => {
                         className={activePro + classes.item}
                         activeClassName="active"
                         // eslint-disable-next-line react/no-array-index-key
-                        key={key}>
-                        <ListItem
-                            button={true}
-                            className={classes.itemLink + listItemClasses}>
+                        key={key}
+                    >
+                        <ListItem button={true} className={classes.itemLink + listItemClasses}>
                             {typeof prop.icon === "string" ? (
                                 <Icon
-                                    className={classNames(
-                                        classes.itemIcon,
-                                        whiteFontClasses,
-                                        {
-                                            [classes.itemIconRTL]:
-                                                props.rtlActive
-                                        }
-                                    )}>
+                                    className={classNames(classes.itemIcon, whiteFontClasses, {
+                                        [classes.itemIconRTL]: props.rtlActive
+                                    })}
+                                >
                                     {prop.icon}
                                 </Icon>
                             ) : (
                                 <prop.icon
-                                    className={classNames(
-                                        classes.itemIcon,
-                                        whiteFontClasses,
-                                        {
-                                            [classes.itemIconRTL]:
-                                                props.rtlActive
-                                        }
-                                    )}
-                                    />
+                                    className={classNames(classes.itemIcon, whiteFontClasses, {
+                                        [classes.itemIconRTL]: props.rtlActive
+                                    })}
+                                />
                             )}
                             <ListItemText
-                                primary={
-                                    props.rtlActive ? prop.rtlName : prop.name
-                                }
-                                className={classNames(
-                                    classes.itemText,
-                                    whiteFontClasses,
-                                    {
-                                        [classes.itemTextRTL]: props.rtlActive
-                                    }
-                                )}
+                                primary={props.rtlActive ? prop.rtlName : prop.name}
+                                className={classNames(classes.itemText, whiteFontClasses, {
+                                    [classes.itemTextRTL]: props.rtlActive
+                                })}
                                 disableTypography={true}
-                                />
+                            />
                         </ListItem>
                     </NavLink>
                 );
@@ -103,7 +83,8 @@ const Sidebar = ({ ...props }) => {
                 href="https://www.creative-tim.com"
                 className={classNames(classes.logoLink, {
                     [classes.logoLinkRTL]: props.rtlActive
-                })}>
+                })}
+            >
                 <div className={classes.logoImage}>
                     <img src={logo} alt="logo" className={classes.img} />
                 </div>
@@ -126,21 +107,15 @@ const Sidebar = ({ ...props }) => {
                     onClose={props.handleDrawerToggle}
                     ModalProps={{
                         keepMounted: true // Better open performance on mobile.
-                    }}>
+                    }}
+                >
                     {brand}
                     <div className={classes.sidebarWrapper}>
-                        {props.rtlActive ? (
-                            <RTLNavbarLinks />
-                        ) : (
-                            <AdminNavbarLinks />
-                        )}
+                        {props.rtlActive ? <RTLNavbarLinks /> : <AdminNavbarLinks />}
                         {links}
                     </div>
                     {image !== undefined ? (
-                        <div
-                            className={classes.background}
-                            style={{ backgroundImage: `url(${  image  })` }}
-                            />
+                        <div className={classes.background} style={{ backgroundImage: `url(${image})` }} />
                     ) : null}
                 </Drawer>
             </Hidden>
@@ -153,14 +128,12 @@ const Sidebar = ({ ...props }) => {
                         paper: classNames(classes.drawerPaper, {
                             [classes.drawerPaperRTL]: props.rtlActive
                         })
-                    }}>
+                    }}
+                >
                     {brand}
                     <div className={classes.sidebarWrapper}>{links}</div>
                     {image !== undefined ? (
-                        <div
-                            className={classes.background}
-                            style={{ backgroundImage: `url(${  image  })` }}
-                            />
+                        <div className={classes.background} style={{ backgroundImage: `url(${image})` }} />
                     ) : null}
                 </Drawer>
             </Hidden>

@@ -7,9 +7,9 @@ import * as Chartist from "chartist";
 // // // variables used to create animation on charts
 // #############################
 const delays = 80;
-    const durations = 500;
+const durations = 500;
 const delays2 = 80;
-    const durations2 = 500;
+const durations2 = 500;
 
 // ##############################
 // // // Daily Sales
@@ -41,11 +41,7 @@ export const dailySalesChart = {
                     d: {
                         begin: 600,
                         dur: 700,
-                        from: data.path
-                            .clone()
-                            .scale(1, 0)
-                            .translate(0, data.chartRect.height())
-                            .stringify(),
+                        from: data.path.clone().scale(1, 0).translate(0, data.chartRect.height()).stringify(),
                         to: data.path.clone().stringify(),
                         easing: Chartist.Svg.Easing.easeOutQuint
                     }
@@ -71,20 +67,7 @@ export const dailySalesChart = {
 
 export const emailsSubscriptionChart = {
     data: {
-        labels: [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "Mai",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec"
-        ],
+        labels: ["Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
         series: [[542, 443, 320, 780, 553, 453, 326, 434, 568, 610, 756, 895]]
     },
     options: {
@@ -106,7 +89,7 @@ export const emailsSubscriptionChart = {
             {
                 seriesBarDistance: 5,
                 axisX: {
-                    labelInterpolationFnc (value: any) {
+                    labelInterpolationFnc(value: any) {
                         return value[0];
                     }
                 }
@@ -114,7 +97,7 @@ export const emailsSubscriptionChart = {
         ]
     ],
     animation: {
-        draw (data: any) {
+        draw(data: any) {
             if (data.type === "bar") {
                 data.element.animate({
                     opacity: {
@@ -153,17 +136,13 @@ export const completedTasksChart = {
         }
     },
     animation: {
-        draw (data: any) {
+        draw(data: any) {
             if (data.type === "line" || data.type === "area") {
                 data.element.animate({
                     d: {
                         begin: 600,
                         dur: 700,
-                        from: data.path
-                            .clone()
-                            .scale(1, 0)
-                            .translate(0, data.chartRect.height())
-                            .stringify(),
+                        from: data.path.clone().scale(1, 0).translate(0, data.chartRect.height()).stringify(),
                         to: data.path.clone().stringify(),
                         easing: Chartist.Svg.Easing.easeOutQuint
                     }

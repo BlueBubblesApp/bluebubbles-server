@@ -4,39 +4,17 @@ import { Redirect } from "react-router-dom";
 import * as numeral from "numeral";
 import { ipcRenderer } from "electron";
 
-import {
-    createStyles,
-    Theme,
-    withStyles,
-    StyleRules
-} from "@material-ui/core/styles";
+import { createStyles, Theme, withStyles, StyleRules } from "@material-ui/core/styles";
 
-import {
-    Typography,
-} from "@material-ui/core";
+import { Typography } from "@material-ui/core";
 
-import {
-    Message,
-    DateRange,
-    Accessibility,
-    Update,
-    People,
-    Image,
-    PhotoAlbum,
-    RateReview
-} from "@material-ui/icons";
+import { Message, DateRange, Accessibility, Update, People, Image, PhotoAlbum, RateReview } from "@material-ui/icons";
 import CardIcon from "@renderer/components/Card/CardIcon";
 import CardFooter from "@renderer/components/Card/CardFooter";
 import Card from "@renderer/components/Card/Card";
 import CardHeader from "@renderer/components/Card/CardHeader";
-import CardBody from "@renderer/components/Card/CardBody";
-import Danger from "@renderer/components/Typography/Danger";
-import { Warning } from "@material-ui/icons";
 import GridContainer from "@renderer/components/Grid/GridContainer";
 import GridItem from "@renderer/components/Grid/GridItem";
-import CustomTabs from "@renderer/components/CustomTabs/CustomTabs";
-import Tasks from "@renderer/components/Tasks/Tasks";
-import { bugs, website, server } from "@renderer/variables/general";
 
 interface Props {
     classes: any;
@@ -46,10 +24,10 @@ interface Props {
 interface State {
     totalMsgCount: number;
     recentMsgCount: number;
-    groupMsgCount: { name: string, count: number };
-    individualMsgCount: { name: string, count: number };
+    groupMsgCount: { name: string; count: number };
+    individualMsgCount: { name: string; count: number };
     myMsgCount: number;
-    imageCount: { name: string, count: number };
+    imageCount: { name: string; count: number };
 }
 
 class Dashboard extends React.Component<Props, State> {
@@ -85,69 +63,94 @@ class Dashboard extends React.Component<Props, State> {
     }
 
     async loadGroupChatCounts() {
-        const res = await ipcRenderer.invoke("get-group-message-counts");
-        let top = this.state.groupMsgCount;
-        res.forEach((item: any) => {
-            if (item.message_count > top.count)
-                top = { name: item.group_name, count: item.message_count };
-        });
+        try {
+            const res = await ipcRenderer.invoke("get-group-message-counts");
+            let top = this.state.groupMsgCount;
+            res.forEach((item: any) => {
+                if (item.message_count > top.count) top = { name: item.group_name, count: item.message_count };
+            });
 
-        this.setState({
-            groupMsgCount: top
-        });
+            this.setState({
+                groupMsgCount: top
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadIndividualChatCounts() {
-        const res = await ipcRenderer.invoke("get-individual-message-counts");
-        let top = this.state.individualMsgCount;
-        res.forEach((item: any) => {
-            if (item.message_count > top.count)
-                top = { name: item.chat_identifier, count: item.message_count };
-        });
+        try {
+            const res = await ipcRenderer.invoke("get-individual-message-counts");
+            let top = this.state.individualMsgCount;
+            res.forEach((item: any) => {
+                if (item.message_count > top.count)
+                    top = {
+                        name: item.chat_identifier,
+                        count: item.message_count
+                    };
+            });
 
-        this.setState({
-            individualMsgCount: top
-        });
+            this.setState({
+                individualMsgCount: top
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadTotalMessageCount() {
-        this.setState({
-            totalMsgCount: await ipcRenderer.invoke("get-message-count")
-        });
+        try {
+            this.setState({
+                totalMsgCount: await ipcRenderer.invoke("get-message-count")
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadChatImageCounts() {
-        const res = await ipcRenderer.invoke("get-chat-image-count");
-        let top = this.state.imageCount;
-        res.forEach((item: any) => {
-            const identifier = (item.chat_identifier.startsWith("chat")) ? item.group_name : item.chat_identifier;
-            if (item.image_count > top.count)
-                top = { name: identifier, count: item.image_count };
-        });
+        try {
+            const res = await ipcRenderer.invoke("get-chat-image-count");
+            let top = this.state.imageCount;
+            res.forEach((item: any) => {
+                const identifier = item.chat_identifier.startsWith("chat") ? item.group_name : item.chat_identifier;
+                if (item.image_count > top.count) top = { name: identifier, count: item.image_count };
+            });
 
-        this.setState({ imageCount: top });
+            this.setState({ imageCount: top });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadRecentMessageCount() {
-        const after = new Date();
-        after.setDate(after.getDate() - 1);
-        this.setState({
-            recentMsgCount: await ipcRenderer.invoke("get-message-count", {
-                after
-            })
-        });
+        try {
+            const after = new Date();
+            after.setDate(after.getDate() - 1);
+            this.setState({
+                recentMsgCount: await ipcRenderer.invoke("get-message-count", {
+                    after
+                })
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     async loadMyMessageCount() {
-        const after = new Date();
-        after.setDate(after.getDate() - 1);
-        this.setState({
-            myMsgCount: await ipcRenderer.invoke("get-message-count", {
-                after,
-                before: null,
-                isFromMe: true
-            })
-        });
+        try {
+            const after = new Date();
+            after.setDate(after.getDate() - 1);
+            this.setState({
+                myMsgCount: await ipcRenderer.invoke("get-message-count", {
+                    after,
+                    before: null,
+                    isFromMe: true
+                })
+            });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
     }
 
     render() {
@@ -155,43 +158,32 @@ class Dashboard extends React.Component<Props, State> {
 
         let tutorialIsDone = this.props.config?.tutorial_is_done;
         if (tutorialIsDone && !Boolean(Number(tutorialIsDone))) {
-            return <Redirect to="/tutorial" />
+            return <Redirect to="/tutorial" />;
         }
 
         return (
             <section className={classes.root}>
                 <Typography variant="h3">Welcome!</Typography>
                 <Typography variant="subtitle2">
-                    This is the BlueBubble Dashboard. You'll be to see the
-                    status of your server, as well as some cool statistics about
-                    your iMessages!
+                    This is the BlueBubble Dashboard. You'll be to see the status of your server, as well as some cool
+                    statistics about your iMessages!
                 </Typography>
                 <br />
                 <Typography variant="h4">Stats</Typography>
                 <Typography variant="subtitle2">
-                    Don't worry, these stats do not leave your computer! They
-                    are derived from the chat database that iMessage uses
+                    Don't worry, these stats do not leave your computer! They are derived from the chat database that
+                    iMessage uses
                 </Typography>
                 <section className={classes.widgetContainer}>
                     <GridContainer>
                         <GridItem xs={12} sm={6} md={4}>
                             <Card>
-                                <CardHeader
-                                    color="warning"
-                                    stats={true}
-                                    icon={true}
-                                >
+                                <CardHeader color="warning" stats={true} icon={true}>
                                     <CardIcon color="warning">
                                         <Message />
                                     </CardIcon>
-                                    <p className={classes.cardCategory}>
-                                        Messages
-                                    </p>
-                                    <h3 className={classes.cardTitle}>
-                                        {this.formatNumber(
-                                            this.state.totalMsgCount
-                                        )}
-                                    </h3>
+                                    <p className={classes.cardCategory}>Messages</p>
+                                    <h3 className={classes.cardTitle}>{this.formatNumber(this.state.totalMsgCount)}</h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
@@ -203,21 +195,13 @@ class Dashboard extends React.Component<Props, State> {
                         </GridItem>
                         <GridItem xs={12} sm={6} md={4}>
                             <Card>
-                                <CardHeader
-                                    color="info"
-                                    stats={true}
-                                    icon={true}
-                                >
+                                <CardHeader color="info" stats={true} icon={true}>
                                     <CardIcon color="info">
                                         <Message />
                                     </CardIcon>
-                                    <p className={classes.cardCategory}>
-                                        Recent Messages
-                                    </p>
+                                    <p className={classes.cardCategory}>Recent Messages</p>
                                     <h3 className={classes.cardTitle}>
-                                        {this.formatNumber(
-                                            this.state.recentMsgCount
-                                        )}
+                                        {this.formatNumber(this.state.recentMsgCount)}
                                     </h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
@@ -230,28 +214,17 @@ class Dashboard extends React.Component<Props, State> {
                         </GridItem>
                         <GridItem xs={12} sm={6} md={4}>
                             <Card>
-                                <CardHeader
-                                    color="danger"
-                                    stats={true}
-                                    icon={true}
-                                >
+                                <CardHeader color="danger" stats={true} icon={true}>
                                     <CardIcon color="danger">
                                         <People />
                                     </CardIcon>
-                                    <p className={classes.cardCategory}>
-                                        Top Group
-                                    </p>
-                                    <h3 className={classes.cardTitle}>
-                                        {this.state.groupMsgCount.name}
-                                    </h3>
+                                    <p className={classes.cardCategory}>Top Group</p>
+                                    <h3 className={classes.cardTitle}>{this.state.groupMsgCount.name}</h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
                                         <Update />
-                                        {this.formatNumber(
-                                            this.state.groupMsgCount.count
-                                        )}{" "}
-                                        Messages
+                                        {this.formatNumber(this.state.groupMsgCount.count)} Messages
                                     </div>
                                 </CardFooter>
                             </Card>
@@ -260,48 +233,29 @@ class Dashboard extends React.Component<Props, State> {
                     <GridContainer>
                         <GridItem xs={12} sm={6} md={4}>
                             <Card>
-                                <CardHeader
-                                    color="warning"
-                                    stats={true}
-                                    icon={true}
-                                >
+                                <CardHeader color="warning" stats={true} icon={true}>
                                     <CardIcon color="warning">
                                         <Accessibility />
                                     </CardIcon>
-                                    <p className={classes.cardCategory}>
-                                        Best Friend
-                                    </p>
-                                    <h3 className={classes.cardTitle}>
-                                        {this.state.individualMsgCount.name}
-                                    </h3>
+                                    <p className={classes.cardCategory}>Best Friend</p>
+                                    <h3 className={classes.cardTitle}>{this.state.individualMsgCount.name}</h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
                                         <Update />
-                                        {this.formatNumber(
-                                            this.state.individualMsgCount.count
-                                        )}{" "}
-                                        Messages
+                                        {this.formatNumber(this.state.individualMsgCount.count)} Messages
                                     </div>
                                 </CardFooter>
                             </Card>
                         </GridItem>
                         <GridItem xs={12} sm={6} md={4}>
                             <Card>
-                                <CardHeader
-                                    color="warning"
-                                    stats={true}
-                                    icon={true}
-                                >
+                                <CardHeader color="warning" stats={true} icon={true}>
                                     <CardIcon color="info">
                                         <PhotoAlbum />
                                     </CardIcon>
-                                    <p className={classes.cardCategory}>
-                                        Media Gurus
-                                    </p>
-                                    <h3 className={classes.cardTitle}>
-                                        {this.state.imageCount.name}
-                                    </h3>
+                                    <p className={classes.cardCategory}>Media Gurus</p>
+                                    <h3 className={classes.cardTitle}>{this.state.imageCount.name}</h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>
@@ -313,22 +267,12 @@ class Dashboard extends React.Component<Props, State> {
                         </GridItem>
                         <GridItem xs={12} sm={6} md={4}>
                             <Card>
-                                <CardHeader
-                                    color="danger"
-                                    stats={true}
-                                    icon={true}
-                                >
+                                <CardHeader color="danger" stats={true} icon={true}>
                                     <CardIcon color="danger">
                                         <RateReview />
                                     </CardIcon>
-                                    <p className={classes.cardCategory}>
-                                        Textaholic
-                                    </p>
-                                    <h3 className={classes.cardTitle}>
-                                        {this.formatNumber(
-                                            this.state.myMsgCount
-                                        )}
-                                    </h3>
+                                    <p className={classes.cardCategory}>Textaholic</p>
+                                    <h3 className={classes.cardTitle}>{this.formatNumber(this.state.myMsgCount)}</h3>
                                 </CardHeader>
                                 <CardFooter stats={true}>
                                     <div className={classes.stats}>

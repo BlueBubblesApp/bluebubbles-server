@@ -1,10 +1,4 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToMany,
-    JoinTable
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
 import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
@@ -15,7 +9,7 @@ export class Chat {
     @PrimaryGeneratedColumn({ name: "ROWID" })
     ROWID: number;
 
-    @ManyToMany((type) => Handle)
+    @ManyToMany(type => Handle)
     @JoinTable({
         name: "chat_handle_join",
         joinColumns: [{ name: "chat_id" }],
@@ -23,7 +17,7 @@ export class Chat {
     })
     participants: Handle[];
 
-    @ManyToMany((type) => Message)
+    @ManyToMany(type => Message)
     @JoinTable({
         name: "chat_message_join",
         joinColumns: [{ name: "chat_id" }],
@@ -92,19 +86,27 @@ export class Chat {
     successfulQuery: boolean;
 }
 
-export const getChatResponse = (tableData: Chat): ChatResponse => {
+export const getChatResponse = async (tableData: Chat): Promise<ChatResponse> => {
+    const messages = [];
+    for (const msg of tableData?.messages ?? []) {
+        const msgRes = await getMessageResponse(msg);
+        messages.push(msgRes);
+    }
+
+    const participants = [];
+    for (const handle of tableData?.participants ?? []) {
+        const handleRes = await getHandleResponse(handle);
+        participants.push(handleRes);
+    }
+
     return {
         guid: tableData.guid,
-        participants: tableData.participants
-            ? tableData.participants.map((item) => getHandleResponse(item))
-            : [],
-        messages: tableData.messages
-            ? tableData.messages.map((item) => getMessageResponse(item))
-            : [],
+        participants,
+        messages,
         style: tableData.style,
         chatIdentifier: tableData.chatIdentifier,
         isArchived: tableData.isArchived,
         displayName: tableData.displayName,
-        groupId: tableData.groupId,
+        groupId: tableData.groupId
     };
 };

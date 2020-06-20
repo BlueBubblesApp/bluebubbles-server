@@ -4,6 +4,7 @@ import * as path from "path";
 import * as url from "url";
 
 import { BlueBubblesServer } from "@server/index";
+import { UpdateService } from "@server/services";
 
 let win: BrowserWindow | null;
 const api = new BlueBubblesServer(win);
@@ -12,14 +13,8 @@ const installExtensions = async () => {
     const installer = require("electron-devtools-installer");
     const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
     const extensions = ["REACT_DEVELOPER_TOOLS", "REDUX_DEVTOOLS"];
-
-    return Promise.all(
-        extensions.map((name) =>
-            installer.default(installer[name], forceDownload)
-        )
-    ).catch(console.log); // eslint-disable-line no-console
+    return Promise.all(extensions.map(name => installer.default(installer[name], forceDownload))).catch(console.log);
 };
-
 
 // Start the API
 api.start();
@@ -64,7 +59,7 @@ const createWindow = async () => {
     });
 
     // Prevent the title from being changed from BlueBubble App
-    win.on("page-title-updated", (evt) => {
+    win.on("page-title-updated", evt => {
         evt.preventDefault();
     });
 
@@ -76,6 +71,11 @@ const createWindow = async () => {
 
     // Set the new window in the API
     api.window = win;
+
+    // Start the update service
+    const updateService = new UpdateService();
+    updateService.start();
+    updateService.checkForUpdate();
 };
 
 app.on("ready", createWindow);

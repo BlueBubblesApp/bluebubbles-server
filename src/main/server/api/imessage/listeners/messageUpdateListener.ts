@@ -5,13 +5,10 @@ import { ChangeListener } from "./changeListener";
 export class MessageUpdateListener extends ChangeListener {
     repo: MessageRepository;
 
-    frequencyMs: number;
-
     constructor(repo: MessageRepository, pollFrequency: number) {
-        super(pollFrequency);
+        super({ pollFrequency });
 
         this.repo = repo;
-        this.frequencyMs = pollFrequency;
 
         // Start the listener
         this.start();
@@ -22,20 +19,23 @@ export class MessageUpdateListener extends ChangeListener {
         const entries = await this.repo.getUpdatedMessages({ after: offsetDate, withChats: true });
 
         // Emit the new message
-        entries.forEach((entry: any) => {
+        entries.forEach(async (entry: any) => {
             // Compile so it's unique based on dates as well as ROWID
             const delivered = entry.dateDelivered ? entry.dateDelivered.getTime() : 0;
             const read = entry.dateRead ? entry.dateRead.getTime() : 0;
             const compiled = `${entry.ROWID}:${delivered}:${read}`;
 
             // Skip over any that we've finished
-            if (this.emittedItems.includes(compiled)) return;
+            if (this.cache.find(compiled)) return;
 
             // Add to cache
-            this.emittedItems.push(compiled);
+            this.cache.add(compiled);
 
             // Send the built message object
             super.emit("updated-entry", this.transformEntry(entry));
+
+            // Add artificial delay so we don't overwhelm any listeners
+            await new Promise((resolve, _) => setTimeout(() => resolve(), 500));
         });
     }
 

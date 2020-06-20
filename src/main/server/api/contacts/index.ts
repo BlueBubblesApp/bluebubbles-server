@@ -23,7 +23,7 @@ export class ContactRepository {
             name: "Contacts",
             type: "sqlite",
             database: `${process.env.HOME}/Library/Application Support/AddressBook/AddressBook-v22.abcddb`,
-            entities: [PhoneNumber, Record,],
+            entities: [PhoneNumber, Record],
             synchronize: false,
             logging: false
         });
@@ -48,7 +48,7 @@ export class ContactRepository {
         const records = await query.getMany();
 
         // Find real phone number matches
-        const output = []
+        const output = [];
         for (const record of records) {
             // Filter out numbers that don't have an exact match
             const numbers = record.phoneNumbers.filter(item => ContactRepository.sameAddress(address, item.address));
@@ -62,11 +62,11 @@ export class ContactRepository {
         const phoneUtil = PhoneNumberUtil.getInstance();
 
         // Using national format to strip out international prefix
-        let number = phoneUtil.parseAndKeepRawInput(first, 'US');
+        let number = phoneUtil.parseAndKeepRawInput(first, "US");
         const firstFormatted = phoneUtil.format(number, PhoneNumberFormat.NATIONAL);
-        number = phoneUtil.parseAndKeepRawInput(second, 'US');
+        number = phoneUtil.parseAndKeepRawInput(second, "US");
         const secondFormatted = phoneUtil.format(number, PhoneNumberFormat.NATIONAL);
 
-        return (firstFormatted === secondFormatted)
+        return firstFormatted === secondFormatted;
     }
 }

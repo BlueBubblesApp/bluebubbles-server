@@ -1,12 +1,7 @@
 /* eslint-disable */
 import * as React from "react";
 
-import {
-    createStyles,
-    Theme,
-    withStyles,
-    StyleRules
-} from "@material-ui/core/styles";
+import { createStyles, Theme, withStyles, StyleRules } from "@material-ui/core/styles";
 
 import { Typography } from "@material-ui/core";
 
@@ -29,25 +24,21 @@ class Permissions extends React.Component<Props, State> {
                     Permissions
                 </Typography>
                 <Typography variant="subtitle2" className={classes.subtitle}>
-                    In order for this server to work, it needs{" "}
-                    <i>Full Disk Access</i> as well as <i>Accessibility Access</i>.
-                    This is because it needs to be able to access both the iMessage chat
-                    database, as well as use accessibility features to interact with chats
-                    via the iMessage Application. Without these permissions, the server will
-                    not be able to function fully.
+                    In order for this server to work, it needs <i>Full Disk Access</i> as well as{" "}
+                    <i>Accessibility Access</i>. This is because it needs to be able to access both the iMessage chat
+                    database, as well as use accessibility features to interact with chats via the iMessage Application.
+                    Without these permissions, the server will not be able to function fully.
                 </Typography>
                 <Typography variant="h5" className={classes.subtitle}>
                     Steps
                 </Typography>
                 <Typography variant="subtitle2" className={classes.subtitle}>
-                    <strong>1.</strong> Open up System Preferences, and then
-                    open "Security &amp; Privacy"
+                    <strong>1.</strong> Open up System Preferences, and then open "Security &amp; Privacy"
                 </Typography>
                 <img src={SecurityImage} width="600px" alt="" />
                 <Typography variant="subtitle2" className={classes.subtitle}>
-                    <strong>2.</strong> Unlock your settings, and add Full Disk Access
-                    permissions for the BlueBubbles App. You can do this by clicking the '+'
-                    button and then selecting the BlueBubbles App.
+                    <strong>2.</strong> Unlock your settings, and add Full Disk Access permissions for the BlueBubbles
+                    App. You can do this by clicking the '+' button and then selecting the BlueBubbles App.
                 </Typography>
                 <Typography variant="subtitle2" className={classes.subtitle}>
                     <strong>3.</strong> Repeat <i>Step 2</i>, but for Accessibility

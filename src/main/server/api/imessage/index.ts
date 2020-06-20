@@ -44,15 +44,14 @@ export class MessageRepository {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
-        if (withParticipants)
-            query.innerJoinAndSelect("chat.participants", "handle");
+        if (withParticipants) query.innerJoinAndSelect("chat.participants", "handle");
 
         // Add default WHERE clauses
         query.andWhere("chat.service_name == 'iMessage'");
         if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
 
         const chats = await query.getMany();
-        
+
         return chats;
     }
 
@@ -67,7 +66,7 @@ export class MessageRepository {
 
         // We have to do manual filtering in order to maintain the order
         // SQLite will auto-sort results if there is no Primary Key (which there isn't)
-        return query.filter((item: { chat_id: number, handle_id: number }) => item.chat_id === chatROWID);
+        return query.filter((item: { chat_id: number; handle_id: number }) => item.chat_id === chatROWID);
     }
 
     /**
@@ -77,12 +76,9 @@ export class MessageRepository {
      * @param withMessages Whether to include the participants or not
      */
     async getAttachment(attachmentGuid: string, withMessages = false) {
-        const query = this.db
-            .getRepository(Attachment)
-            .createQueryBuilder("attachment");
+        const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
 
-        if (withMessages)
-            query.leftJoinAndSelect("attachment.messages", "message");
+        if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
 
         query.andWhere("attachment.guid == :guid", { guid: attachmentGuid });
 
@@ -140,31 +136,27 @@ export class MessageRepository {
         ]
     }: DBMessageParams) {
         // Get messages with sender and the chat it's from
-        const query = this.db
-            .getRepository(Message)
-            .createQueryBuilder("message")
-        
-        if (withHandle)
-            query.leftJoinAndSelect("message.handle", "handle")
+        const query = this.db.getRepository(Message).createQueryBuilder("message");
+
+        if (withHandle) query.leftJoinAndSelect("message.handle", "handle");
 
         if (withAttachments)
             query.leftJoinAndSelect(
                 "message.attachments",
                 "attachment",
-                (
-                    "message.ROWID = message_attachment.message_id AND " +
+                "message.ROWID = message_attachment.message_id AND " +
                     "attachment.ROWID = message_attachment.attachment_id"
-                )
             );
 
         // Inner-join because all messages will have a chat
         if (chatGuid) {
-            query.innerJoinAndSelect(
-                "message.chats",
-                "chat",
-                "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
-            )
-            .andWhere("chat.guid = :guid", { guid: chatGuid });
+            query
+                .innerJoinAndSelect(
+                    "message.chats",
+                    "chat",
+                    "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
+                )
+                .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
             query.innerJoinAndSelect(
                 "message.chats",
@@ -183,9 +175,7 @@ export class MessageRepository {
                 before: convertDateTo2001Time(before)
             });
 
-        if (where && where.length > 0)
-            for (const item of where)
-                query.andWhere(item.statement, item.args)
+        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
 
         // Add pagination params
         query.orderBy("message.date", sort);
@@ -277,9 +267,7 @@ export class MessageRepository {
      */
     async getMessageCount(after?: Date, before?: Date, isFromMe = false) {
         // Get messages with sender and the chat it's from
-        const query = this.db
-            .getRepository(Message)
-            .createQueryBuilder("message");
+        const query = this.db.getRepository(Message).createQueryBuilder("message");
 
         // Add default WHERE clauses
         query
@@ -361,9 +349,7 @@ export class MessageRepository {
      */
     async getAttachmentCount() {
         // Get messages with sender and the chat it's from
-        const query = this.db
-            .getRepository(Attachment)
-            .createQueryBuilder("attachment");
+        const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
 
         const count = await query.getCount();
         return count;

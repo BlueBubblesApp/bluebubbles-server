@@ -1,11 +1,5 @@
 import { createStyles } from "@material-ui/core";
-import {
-    primaryColor,
-    dangerColor,
-    successColor,
-    grayColor,
-    defaultFont
-} from "../../material-dashboard-react";
+import { primaryColor, dangerColor, successColor, grayColor, defaultFont } from "../../material-dashboard-react";
 
 const customInputStyle = createStyles({
     disabled: {
