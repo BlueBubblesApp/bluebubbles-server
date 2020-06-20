@@ -6,5 +6,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
     tutorial_is_done: () => 0,
     socket_port: () => DEFAULT_SOCKET_PORT,
     server_address: () => "",
-    guid: () => generateUuid()
+    guid: () => generateUuid(),
+    auto_caffeinate: () => 0
 };
