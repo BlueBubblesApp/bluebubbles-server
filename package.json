@@ -1,5 +1,5 @@
 {
-  "name": "bluebubble-server",
+  "name": "bluebubbles-server",
   "version": "0.0.1",
   "description": "",
   "main": "./dist/main.js",
@@ -53,7 +53,7 @@
   },
   "build": {
     "productName": "BlueBubbles",
-    "appId": "org.bluebubble.server",
+    "appId": "org.bluebubbles.server",
     "mac": {
       "icon": "./icons/regular/icon-512.png",
       "category": "your.app.category.type"
@@ -80,7 +80,7 @@
     "url": "https://www.github.com/BlueBubblesApp/BlueBubbles-Server"
   },
   "author": {
-    "name": "BlueBubble Development Team",
+    "name": "BlueBubbles Development Team",
     "email": "bluebubblesapp@gmail.com"
   },
   "license": "APACHE",
