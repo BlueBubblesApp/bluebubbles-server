@@ -25,7 +25,7 @@ const createWindow = async () => {
     }
 
     win = new BrowserWindow({
-        title: "BlueBubble App",
+        title: "BlueBubbles",
         useContentSize: true,
         width: 1080,
         height: 1030,
@@ -58,7 +58,7 @@ const createWindow = async () => {
         win = null;
     });
 
-    // Prevent the title from being changed from BlueBubble App
+    // Prevent the title from being changed from BlueBubbles
     win.on("page-title-updated", evt => {
         evt.preventDefault();
     });

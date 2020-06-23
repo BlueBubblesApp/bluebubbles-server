@@ -52,7 +52,7 @@
     }
   },
   "build": {
-    "productName": "BlueBubble App",
+    "productName": "BlueBubbles",
     "appId": "org.bluebubble.server",
     "mac": {
       "icon": "./icons/regular/icon-512.png",
