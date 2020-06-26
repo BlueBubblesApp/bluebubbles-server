@@ -57,7 +57,9 @@
     "appId": "org.bluebubbles.server",
     "mac": {
       "icon": "./icons/regular/icon-512.png",
-      "category": "your.app.category.type"
+	  "category": "your.app.category.type",
+	  "target": "dmg",
+	  "publish": ["github"]
     },
     "directories": {
       "output": "release",
