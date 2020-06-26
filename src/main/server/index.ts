@@ -22,7 +22,7 @@ import { MyMessageListener } from "@server/api/imessage/listeners/myMessageListe
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 
 // Service Imports
-import { SocketService, FCMService, AlertService, QueueService } from "@server/services";
+import { SocketService, FCMService, AlertService, QueueService, CaffeinateService } from "@server/services";
 import { EventCache } from "@server/eventCache";
 
 /**
@@ -48,6 +48,8 @@ export class BlueBubblesServer {
     alertService: AlertService;
 
     queueService: QueueService;
+
+    caffeinateService: CaffeinateService;
 
     config: { [key: string]: any };
 
@@ -85,6 +87,7 @@ export class BlueBubblesServer {
         this.alertService = null;
         this.fcmService = null;
         this.queueService = null;
+        this.caffeinateService = null;
 
         this.hasProperPermissions = false;
         this.hasSetup = false;
@@ -184,6 +187,8 @@ export class BlueBubblesServer {
             this.config[item.name] = item.value;
         });
 
+        await this.setupCaffeinate();
+
         try {
             this.log("Initializing connection to Google FCM...");
             this.fcmService = new FCMService(this.fs);
@@ -241,6 +246,20 @@ export class BlueBubblesServer {
             }
         } catch (ex) {
             this.log(`Failed to setup default configurations! ${ex.message}`, "error");
+        }
+    }
+
+    /**
+     * Sets up the caffeinate service
+     */
+    private async setupCaffeinate(): Promise<void> {
+        try {
+            this.caffeinateService = new CaffeinateService();
+            if (this.config.auto_caffeinate === "1") {
+                this.caffeinateService.start();
+            }
+        } catch (ex) {
+            this.log(`Failed to setup caffeinate service! ${ex.message}`, "error");
         }
     }
 
@@ -554,6 +573,23 @@ export class BlueBubblesServer {
                 abPerms: permissions.getAuthStatus("accessibility"),
                 fdPerms: permissions.getAuthStatus("full-disk-access")
             };
+        });
+
+        ipcMain.handle("toggle-caffeinate", async (event, toggle) => {
+            if (this.caffeinateService && toggle) {
+                this.caffeinateService.start();
+            } else if (this.caffeinateService && !toggle) {
+                this.caffeinateService.stop();
+            }
+
+            const cfgVal = toggle ? "1" : "0";
+            this.config.auto_caffeinate = cfgVal;
+            await this.setConfig("auto_caffeinate", cfgVal);
+        });
+
+        ipcMain.handle("get-caffeinate-status", async (event, args) => {
+            const autoCaffeinate = this.config.auto_caffeinate === "1";
+            return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
         });
     }
 
