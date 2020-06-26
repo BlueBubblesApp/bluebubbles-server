@@ -29,6 +29,7 @@ import IconButton from "@material-ui/core/IconButton";
 import Badge from "@material-ui/core/Badge";
 import Menu from "@material-ui/core/Menu";
 import MenuItem from "@material-ui/core/MenuItem";
+import ListSubheader from "@material-ui/core/ListSubheader";
 
 // Material UI Icons
 import MenuIcon from "@material-ui/icons/Menu";
@@ -42,6 +43,9 @@ import WarningIcon from "@material-ui/icons/Warning";
 import InfoIcon from "@material-ui/icons/Help";
 import SuccessIcon from "@material-ui/icons/CheckCircle";
 import ErrorIcon from "@material-ui/icons/Error";
+import CachedIcon from "@material-ui/icons/Cached";
+import DiscFullIcon from "@material-ui/icons/DiscFull";
+import AccessibilityNewIcon from "@material-ui/icons/AccessibilityNew";
 
 // Custom Components
 import Configuration from "@renderer/views/Configuration";
@@ -91,6 +95,8 @@ interface State {
     config: Config;
     alerts: any[];
     alertElement: HTMLElement;
+    fdPerms: string;
+    abPerms: string;
 }
 
 class AdminLayout extends React.Component<Props, State> {
@@ -98,10 +104,13 @@ class AdminLayout extends React.Component<Props, State> {
         open: false,
         config: null,
         alerts: [],
-        alertElement: null
+        alertElement: null,
+        fdPerms: "denied",
+        abPerms: "denied"
     };
 
     async componentDidMount() {
+        this.checkPermissions();
         try {
             const config = await ipcRenderer.invoke("get-config");
             if (config) this.setState({ config });
@@ -125,7 +134,26 @@ class AdminLayout extends React.Component<Props, State> {
             // Set the state
             this.setState({ alerts });
         });
+
+        // Check for permissions every minute until we have permissions.. maybe?
+        let interval: NodeJS.Timeout = null;
+        if (this.state.abPerms !== "authorized" && this.state.fdPerms !== "authorized") {
+            interval = setInterval(() => {
+                this.checkPermissions();
+                if (this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
+                    clearInterval(interval);
+                }
+            }, 60000);
+        }
     }
+
+    checkPermissions = async () => {
+        const res = await ipcRenderer.invoke("check_perms");
+        this.setState({
+            abPerms: res.abPerms,
+            fdPerms: res.fdPerms
+        });
+    };
 
     handleDrawerOpen = () => {
         this.setState({ open: true });
@@ -205,6 +233,8 @@ class AdminLayout extends React.Component<Props, State> {
     render() {
         const { classes } = this.props;
         const { open, config, alerts } = this.state;
+        const abColor = this.state.abPerms !== "authorized" ? classes.iconRed : classes.iconGreen;
+        const fdColor = this.state.fdPerms !== "authorized" ? classes.iconRed : classes.iconGreen;
 
         return (
             <MuiThemeProvider theme={CustomMuiTheme}>
@@ -323,6 +353,53 @@ class AdminLayout extends React.Component<Props, State> {
                                     <SettingsIcon />
                                 </ListItemIcon>
                                 <ListItemText primary="Configuration" />
+                            </ListItem>
+                        </List>
+                        <section className={classes.content}>&nbsp;</section>
+                        <Divider />
+                        <List
+                            subheader={
+                                <ListSubheader inset className={classes.header}>
+                                    Permissions
+                                </ListSubheader>
+                            }
+                        >
+                            <ListItem
+                                button
+                                className={clsx(classes.drawer, {
+                                    [classes.listItemOpen]: open,
+                                    [classes.listItemClosed]: !open
+                                })}
+                            >
+                                <ListItemIcon>
+                                    <DiscFullIcon className={fdColor} />
+                                </ListItemIcon>
+                                <ListItemText primary="Full Disk" />
+                            </ListItem>
+                            <ListItem
+                                button
+                                className={clsx(classes.drawer, {
+                                    [classes.listItemOpen]: open,
+                                    [classes.listItemClosed]: !open
+                                })}
+                            >
+                                <ListItemIcon>
+                                    <AccessibilityNewIcon className={abColor} />
+                                </ListItemIcon>
+                                <ListItemText primary="Accessibility" />
+                            </ListItem>
+                            <ListItem
+                                button
+                                onClick={this.checkPermissions}
+                                className={clsx(classes.drawer, {
+                                    [classes.listItemOpen]: open,
+                                    [classes.listItemClosed]: !open
+                                })}
+                            >
+                                <ListItemIcon>
+                                    <CachedIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Refresh" />
                             </ListItem>
                         </List>
                     </Drawer>
@@ -454,6 +531,16 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
             justifyContent: "space-between",
             fontSize: "14px",
             color: "lightgrey"
+        },
+        iconRed: {
+            fill: "red"
+        },
+        iconGreen: {
+            fill: "green"
+        },
+        header: {
+            fontSize: "20px",
+            color: "white"
         }
     });
 
