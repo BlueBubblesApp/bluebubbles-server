@@ -2,6 +2,7 @@
 import { app, ipcMain, BrowserWindow } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
+import * as permissions from "node-mac-permissions";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
@@ -56,6 +57,12 @@ export class BlueBubblesServer {
 
     eventCache: EventCache;
 
+    hasProperPermissions: boolean;
+
+    hasSetup: boolean;
+
+    hasStarted: boolean;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -81,6 +88,10 @@ export class BlueBubblesServer {
         this.fcmService = null;
         this.queueService = null;
         this.caffeinateService = null;
+
+        this.hasProperPermissions = false;
+        this.hasSetup = false;
+        this.hasStarted = false;
     }
 
     private emitToUI(event: string, data: any) {
@@ -122,16 +133,17 @@ export class BlueBubblesServer {
     async start(): Promise<void> {
         await this.setup();
 
-        this.log("Starting socket service...");
-        this.socketService.start();
         this.fcmService.start();
 
-        this.log("Starting chat listener...");
-        this.startChatListener();
-        this.startIpcListener();
+        if (this.hasProperPermissions === true) await this.startServices();
 
-        this.log("Connecting to Ngrok...");
-        await this.connectToNgrok();
+        this.log("Starting Configuration IPC Listeners..");
+        this.startConfigIpcListeners();
+
+        if (this.hasStarted === false) {
+            this.log("Connecting to Ngrok...");
+            await this.connectToNgrok();
+        }
     }
 
     /**
@@ -178,51 +190,29 @@ export class BlueBubblesServer {
         await this.setupCaffeinate();
 
         try {
-            this.log("Connecting to iMessage database...");
-            this.iMessageRepo = new MessageRepository();
-            await this.iMessageRepo.initialize();
-        } catch (ex) {
-            this.log(`Failed to connect to iMessage database! Please enable Full Disk Access!`, "error");
-        }
-
-        try {
-            this.log("Connecting to Contacts database...");
-            this.contactsRepo = new ContactRepository();
-            await this.contactsRepo.initialize();
-        } catch (ex) {
-            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
-        }
-
-        try {
-            this.log("Initializing up sockets...");
-            this.socketService = new SocketService(
-                this.db,
-                this.iMessageRepo,
-                this.contactsRepo,
-                this.fs,
-                this.config.socket_port
-            );
-        } catch (ex) {
-            this.log(`Failed to setup socket service! ${ex.message}`, "error");
-        }
-
-        try {
-            this.log("Initializing queue service...");
-            this.queueService = new QueueService(
-                this.db,
-                this.iMessageRepo,
-                this.eventCache,
-                DEFAULT_POLL_FREQUENCY_MS
-            );
-        } catch (ex) {
-            this.log(`Failed to setup queue service! ${ex.message}`, "error");
-        }
-
-        try {
             this.log("Initializing connection to Google FCM...");
             this.fcmService = new FCMService(this.fs);
         } catch (ex) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
+        }
+
+        // Also check accessibility permissions
+        this.log("Checking Permissions..");
+        const fdPerms: string = permissions.getAuthStatus("full-disk-access");
+        const abPerms: string = permissions.getAuthStatus("accessibility");
+
+        if (fdPerms !== "authorized" || abPerms !== "authorized") {
+            this.log("The proper permissions have not been set.", "error");
+            return;
+        }
+
+        this.hasProperPermissions = true;
+
+        try {
+            this.log("Launching Services..");
+            await this.setupServices();
+        } catch (ex) {
+            this.log("There was a problem launching the Server listeners.", "error");
         }
     }
 
@@ -290,7 +280,7 @@ export class BlueBubblesServer {
             // Emit this over the socket
             if (this.socketService) this.socketService.socketServer.emit("new-server", this.ngrokServer);
 
-            await this.sendNotification("new-server", this.ngrokServer);
+            if (this.socketService) await this.sendNotification("new-server", this.ngrokServer);
             await this.fcmService.setServerUrl(this.ngrokServer);
         } catch (ex) {
             this.log(`Failed to connect to ngrok! ${ex.message}`, "error");
@@ -468,13 +458,55 @@ export class BlueBubblesServer {
      * for all requests sent by the Electron front-end
      */
     private startIpcListener() {
+        ipcMain.handle("get-message-count", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
+            const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
+            return count;
+        });
+
+        ipcMain.handle("get-chat-image-count", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
+            const count = await this.iMessageRepo.getChatImageCounts();
+            return count;
+        });
+
+        ipcMain.handle("get-group-message-counts", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
+            const count = await this.iMessageRepo.getChatMessageCounts("group");
+            return count;
+        });
+
+        ipcMain.handle("get-individual-message-counts", async (event, args) => {
+            if (!this.iMessageRepo.db) return 0;
+            const count = await this.iMessageRepo.getChatMessageCounts("individual");
+            return count;
+        });
+
+        ipcMain.handle("get-devices", async (event, args) => {
+            const devices = await this.db.getRepository(Device).find();
+            return devices;
+        });
+
+        ipcMain.handle("get-fcm-server", (event, args) => {
+            return this.fs.getFCMServer();
+        });
+
+        ipcMain.handle("get-fcm-client", (event, args) => {
+            return this.fs.getFCMClient();
+        });
+    }
+
+    /**
+     * Starts configuration related inter-process-communication handlers.
+     */
+    private startConfigIpcListeners() {
         ipcMain.handle("set-config", async (event, args) => {
             for (const item of Object.keys(args)) {
                 if (this.config[item] && this.config[item] !== args[item]) {
                     this.config[item] = args[item];
 
                     // If the socket port changed, disconnect and reconnect
-                    if (item === "socket_port") {
+                    if (item === "socket_port" && this.hasProperPermissions === true) {
                         await ngrok.disconnect();
                         await this.connectToNgrok();
                         await this.socketService.restart(args[item]);
@@ -500,28 +532,16 @@ export class BlueBubblesServer {
             return this.config;
         });
 
-        ipcMain.handle("get-message-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
-            const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
-            return count;
+        ipcMain.handle("get-alerts", async (event, args) => {
+            const alerts = await this.alertService.find();
+            return alerts;
         });
 
-        ipcMain.handle("get-chat-image-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
-            const count = await this.iMessageRepo.getChatImageCounts();
-            return count;
-        });
-
-        ipcMain.handle("get-group-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
-            const count = await this.iMessageRepo.getChatMessageCounts("group");
-            return count;
-        });
-
-        ipcMain.handle("get-individual-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
-            const count = await this.iMessageRepo.getChatMessageCounts("individual");
-            return count;
+        ipcMain.handle("mark-alert-as-read", async (event, args) => {
+            const alertIds = args ?? [];
+            for (const id of alertIds) {
+                await this.alertService.markAsRead(id);
+            }
         });
 
         ipcMain.handle("set-fcm-server", (event, args) => {
@@ -533,35 +553,26 @@ export class BlueBubblesServer {
             this.fs.saveFCMClient(args);
         });
 
-        ipcMain.handle("get-devices", async (event, args) => {
-            const devices = await this.db.getRepository(Device).find();
-            return devices;
-        });
-
-        ipcMain.handle("get-fcm-server", (event, args) => {
-            return this.fs.getFCMServer();
-        });
-
-        ipcMain.handle("get-fcm-client", (event, args) => {
-            return this.fs.getFCMClient();
-        });
-
         ipcMain.handle("complete-tutorial", async (event, args) => {
             await this.setConfig("tutorial_is_done", "1");
-            this.socketService.socketServer.close();
-            await this.setup();
+
+            await this.setupServices();
+            await this.startServices();
         });
 
-        ipcMain.handle("get-alerts", async (event, args) => {
-            const alerts = await this.alertService.find();
-            return alerts;
+        ipcMain.handle("open_perms_prompt", async (event, args) => {
+            permissions.askForFullDiskAccess();
         });
 
-        ipcMain.handle("mark-alert-as-read", async (event, args) => {
-            const alertIds = args ?? [];
-            for (const id of alertIds) {
-                await this.alertService.markAsRead(id);
-            }
+        ipcMain.handle("prompt_accessibility_perms", async (event, args) => {
+            permissions.askForAccessibilityAccess();
+        });
+
+        ipcMain.handle("check_perms", async (event, args) => {
+            return {
+                abPerms: permissions.getAuthStatus("accessibility"),
+                fdPerms: permissions.getAuthStatus("full-disk-access")
+            };
         });
 
         ipcMain.handle("toggle-caffeinate", async (event, toggle) => {
@@ -580,5 +591,78 @@ export class BlueBubblesServer {
             const autoCaffeinate = this.config.auto_caffeinate === "1";
             return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
         });
+    }
+
+    /**
+     * Helper method for running setup on the message services
+     *
+     */
+    private async setupServices() {
+        if (this.hasSetup) return;
+
+        try {
+            this.log("Connecting to iMessage database...");
+            this.iMessageRepo = new MessageRepository();
+            await this.iMessageRepo.initialize();
+        } catch (ex) {
+            this.log(`Failed to connect to iMessage database! Please enable Full Disk Access!`, "error");
+        }
+
+        try {
+            this.log("Connecting to Contacts database...");
+            this.contactsRepo = new ContactRepository();
+            await this.contactsRepo.initialize();
+        } catch (ex) {
+            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
+        }
+
+        try {
+            this.log("Initializing up sockets...");
+            this.socketService = new SocketService(
+                this.db,
+                this.iMessageRepo,
+                this.contactsRepo,
+                this.fs,
+                this.config.socket_port
+            );
+        } catch (ex) {
+            this.log(`Failed to setup socket service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Initializing queue service...");
+            this.queueService = new QueueService(
+                this.db,
+                this.iMessageRepo,
+                this.eventCache,
+                DEFAULT_POLL_FREQUENCY_MS
+            );
+        } catch (ex) {
+            this.log(`Failed to setup queue service! ${ex.message}`, "error");
+        }
+
+        this.hasSetup = true;
+    }
+
+    /**
+     * Helper method for starting the message services
+     *
+     */
+    private async startServices() {
+        await ngrok.disconnect();
+
+        this.log("Connecting to Ngrok...");
+        await this.connectToNgrok();
+
+        if (this.hasStarted === false) {
+            this.log("Starting socket service...");
+            this.socketService.start();
+
+            this.log("Starting chat listener...");
+            this.startChatListener();
+            this.startIpcListener();
+        }
+
+        this.hasStarted = true;
     }
 }
