@@ -9827,6 +9827,11 @@ no-case@^3.0.3:
     lower-case "^2.0.1"
     tslib "^1.10.0"
 
+node-addon-api@^2.0.0:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-2.0.1.tgz#4fd0931bf6d7e48b219ff3e6abc73cbb0252b7a3"
+  integrity sha512-2WVfwRfIr1AVn3dRq4yRc2Hn35ND+mPJH6inC6bjpYCZVrpXPB4j3T6i//OGVfqVsR1t/X/axRulDsheq4F0LQ==
+
 node-fetch@^2.2.0, node-fetch@^2.3.0, node-fetch@^2.6.0:
   version "2.6.0"
   resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.0.tgz#e633456386d4aa55863f676a7ab0daa8fdecb0fd"
@@ -9898,6 +9903,14 @@ node-libs-browser@^2.2.1:
     url "^0.11.0"
     util "^0.11.0"
     vm-browserify "^1.0.1"
+
+node-mac-permissions@^2.1.3:
+  version "2.1.3"
+  resolved "https://registry.yarnpkg.com/node-mac-permissions/-/node-mac-permissions-2.1.3.tgz#8c3ba38bf92b09642cd310585bdf23daadd6732f"
+  integrity sha512-smfUZuCmdq2Tvxyo7bNedNvpbwJV9C5qNeKj4ATMzsBE+p0cPEeGub+uD3iU8XOOVl5YHMiduf2IKGqJi9dprg==
+  dependencies:
+    bindings "^1.5.0"
+    node-addon-api "^2.0.0"
 
 node-modules-regexp@^1.0.0:
   version "1.0.0"
