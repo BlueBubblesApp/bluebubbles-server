@@ -374,4 +374,163 @@ on splitText(theText, theDelimiter)
 end splitText`
 };
 
-export const AppleScripts = [sendMessage, startChat, renameGroupChat, addParticipant, removeParticipant, startMessages];
+/**
+ * AppleScript to send a tap-back
+ */
+const toggleTapback = {
+    name: "toggleTapback.scpt",
+    contents: `on run {realChatName, messageText, reactionIndex}
+	tell application "System Events"
+		tell process "Messages"
+			set groupMatch to -1
+			
+			(* Iterate over each chat row *)
+			repeat with chatRow in ((table 1 of scroll area 1 of splitter group 1 of window 1)'s entire contents as list)
+				if chatRow's class is row then
+					
+					(* Pull out the chat's name *)
+					set fullName to (chatRow's UI element 1)'s description
+					set nameSplit to my splitText(fullName, ". ")
+					set chatName to item 1 of nameSplit
+					
+					(* Only pull out groups *)
+					if chatName is equal to realChatName then
+						set groupMatch to chatRow
+						exit repeat
+					end if
+				end if
+			end repeat
+			
+			(* If no match, exit *)
+			if groupMatch is equal to -1 then
+				tell me to error "Group chat does not exist"
+			end if
+			
+			(* We have to activate the window so that we can hit enter *)
+			tell application "Messages"
+				reopen
+				activate
+			end tell
+			delay 1
+			
+			(* Select the chat and rename it *)
+			select groupMatch
+			tell window 1 to tell splitter group 1
+				set previousRow to null
+				(* Get the text messages as a list and reverse it to get newest first *)
+				set chatItems to reverse of (entire contents of scroll area 2 as list)
+				
+				(* Iterate over all the messages *)
+				repeat with n from 1 to count of chatItems
+					set chatRow to (item n of chatItems)
+					
+					(* Check the types of the current row and previous row *)
+					if chatRow's class is static text and previousRow's class is group then
+						set textValue to chatRow's value
+						log textValue
+						(* Compare the text with what we are looking for *)
+						if textValue is equal to messageText then
+							select chatRow
+							tell previousRow to perform action "AXShowMenu"
+							delay 0.5
+							key code 125
+							keystroke return
+							delay 2.0
+							
+							(* Re-fetch the rows so we can get the tapback row *)
+							set newRows to reverse of (entire contents of scroll area 2 as list)
+							set tapBack to item (n + 1) of newRows
+							tell radio button reactionIndex of tapBack to perform action "AXPress"
+							delay 0.5
+							keystroke return
+							
+							return
+						end if
+					end if
+					
+					set previousRow to chatRow
+				end repeat
+			end tell
+		end tell
+	end tell
+end run
+
+on splitText(theText, theDelimiter)
+	set AppleScript's text item delimiters to theDelimiter
+	set theTextItems to every text item of theText
+	set AppleScript's text item delimiters to ""
+	return theTextItems
+end splitText`
+};
+
+/**
+ * Checks if a typing indicator is present
+ */
+const checkTypingIndicator = {
+    name: "checkTypingIndicator.scpt",
+    conents: `on run {realChatName}
+	tell application "System Events"
+		set isTyping to false
+		tell process "Messages"
+			set groupMatch to -1
+			
+			(* Iterate over each chat row *)
+			repeat with chatRow in ((table 1 of scroll area 1 of splitter group 1 of window 1)'s entire contents as list)
+				if chatRow's class is row then
+					
+					(* Pull out the chat's name *)
+					set fullName to (chatRow's UI element 1)'s description
+					set nameSplit to my splitText(fullName, ". ")
+					set chatName to item 1 of nameSplit
+					
+					(* Only pull out groups *)
+					if chatName is equal to realChatName then
+						set groupMatch to chatRow
+						exit repeat
+					end if
+				end if
+			end repeat
+			
+			(* If no match, exit *)
+			if groupMatch is equal to -1 then
+				tell me to error "Group chat does not exist"
+			end if
+			
+			(* Select the chat and rename it *)
+			select groupMatch
+			tell window 1 to tell splitter group 1
+				set previousRow to null
+				(* Get the text messages as a list and reverse it to get newest first *)
+				set chatItems to reverse of (entire contents of scroll area 2 as list)
+				
+				(* Check the 7th item. If it's an image, then it's the typing indicator *)
+				set typingEl to (item 7 of chatItems)
+				if typingEl's class is image then
+					set isTyping to true
+				end if
+			end tell
+		end tell
+		
+		(* Return true/false *)
+		log isTyping
+	end tell
+end run
+
+on splitText(theText, theDelimiter)
+	set AppleScript's text item delimiters to theDelimiter
+	set theTextItems to every text item of theText
+	set AppleScript's text item delimiters to ""
+	return theTextItems
+end splitText`
+};
+
+export const AppleScripts = [
+    sendMessage,
+    startChat,
+    renameGroupChat,
+    addParticipant,
+    removeParticipant,
+    startMessages,
+    toggleTapback,
+    checkTypingIndicator
+];

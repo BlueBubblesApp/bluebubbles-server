@@ -359,8 +359,8 @@ class AdminLayout extends React.Component<Props, State> {
                         <Divider />
                         <List
                             subheader={
-                                <ListSubheader inset className={classes.header}>
-                                    Permissions
+                                <ListSubheader style={{ display: open ? "block" : "none" }} className={classes.header}>
+                                    MacOS Permissions
                                 </ListSubheader>
                             }
                         >
