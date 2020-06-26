@@ -1,5 +1,5 @@
 {
-  "name": "bluebubble-server",
+  "name": "bluebubbles-server",
   "version": "0.0.1",
   "description": "",
   "main": "./dist/main.js",
@@ -52,8 +52,8 @@
     }
   },
   "build": {
-    "productName": "BlueBubble App",
-    "appId": "org.bluebubble.server",
+    "productName": "BlueBubbles",
+    "appId": "org.bluebubbles.server",
     "mac": {
       "icon": "./icons/regular/icon-512.png",
       "category": "your.app.category.type"
@@ -80,7 +80,7 @@
     "url": "https://www.github.com/BlueBubblesApp/BlueBubbles-Server"
   },
   "author": {
-    "name": "BlueBubble Development Team",
+    "name": "BlueBubbles Development Team",
     "email": "bluebubblesapp@gmail.com"
   },
   "license": "APACHE",
@@ -110,8 +110,8 @@
     "babel-loader": "^8.1.0",
     "cross-env": "^7.0.2",
     "css-loader": "^3.5.2",
-    "electron": "^8.2.3",
-    "electron-builder": "^22.5.1",
+    "electron": "^9.0.5",
+    "electron-builder": "^22.7.0",
     "electron-devtools-installer": "^3.0.0",
     "eslint": "^6.8.0",
     "eslint-config-airbnb": "^18.1.0",
