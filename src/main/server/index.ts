@@ -170,6 +170,8 @@ export class BlueBubblesServer {
         await this.initializeDatabase();
         await this.setupDefaults();
 
+        this.setConfig("tutorial_is_done", false);
+
         // Setup lightweight message cache
         this.eventCache = new EventCache();
 
@@ -656,7 +658,7 @@ export class BlueBubblesServer {
      */
     private async startServices() {
         // Start the IPC listener first for the UI
-        if (this.hasDiskAccess) this.startIpcListener();
+        if (this.hasDiskAccess && !this.hasStarted) this.startIpcListener();
 
         // Disconnect from ngrok in case we are connected
         await ngrok.disconnect();
