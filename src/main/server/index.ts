@@ -170,8 +170,6 @@ export class BlueBubblesServer {
         await this.initializeDatabase();
         await this.setupDefaults();
 
-        this.setConfig("tutorial_is_done", false);
-
         // Setup lightweight message cache
         this.eventCache = new EventCache();
 
