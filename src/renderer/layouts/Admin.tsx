@@ -1,6 +1,7 @@
 // React imports
 import * as React from "react";
 import { Switch, Route, Link } from "react-router-dom";
+import * as Ago from "s-ago";
 
 // Other imports
 import clsx from "clsx";
@@ -124,8 +125,9 @@ class AdminLayout extends React.Component<Props, State> {
             this.setState({ config: arg });
         });
 
-        ipcRenderer.on("new-alert", (event, arg) => {
+        ipcRenderer.on("new-alert", (event, alert) => {
             const { alerts } = this.state;
+            if (!alert?.text || !alert?.type) return;
 
             // Insert at index 0, then concatenate to 10 items
             alerts.splice(0, 0, alert);
@@ -135,7 +137,7 @@ class AdminLayout extends React.Component<Props, State> {
             this.setState({ alerts });
         });
 
-        // Check for permissions every minute until we have permissions.. maybe?
+        // Check for permissions every 10 seconds until we have permissions.. maybe?
         let interval: NodeJS.Timeout = null;
         if (this.state.abPerms !== "authorized" && this.state.fdPerms !== "authorized") {
             interval = setInterval(() => {
@@ -143,7 +145,7 @@ class AdminLayout extends React.Component<Props, State> {
                 if (this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
                     clearInterval(interval);
                 }
-            }, 60000);
+            }, 10000);
         }
     }
 
@@ -205,6 +207,7 @@ class AdminLayout extends React.Component<Props, State> {
             >
                 {this.state.alerts.map(item => {
                     const typeIcon = alertIconMap[item.type];
+                    const time = item.created ? Ago(item.created) : "N/A";
                     return (
                         <StyledMenuItem key={item.id} onClick={() => this.markAlertAsRead(item.id)}>
                             <section className={classes.alertBlock}>
@@ -220,7 +223,7 @@ class AdminLayout extends React.Component<Props, State> {
                                     <span style={{ textDecoration: item.isRead ? "none" : "underline" }}>
                                         {item.isRead ? "Already read" : "Mark as read"}
                                     </span>
-                                    <span>{item.created ? item.created.toLocaleString() : "N/A"}</span>
+                                    <span>{time}</span>
                                 </section>
                             </section>
                         </StyledMenuItem>

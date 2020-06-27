@@ -129,3 +129,12 @@ export const generateChatNameList = async (
 
     return names;
 };
+
+export const toBoolean = (input: string) => {
+    if (!input || input === "0" || input === "false" || input === "no") return false;
+    return true;
+};
+
+export const boolToString = (input: boolean) => {
+    return input ? "1" : "0";
+};

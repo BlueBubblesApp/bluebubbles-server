@@ -24,6 +24,7 @@ import { Message, getMessageResponse } from "@server/api/imessage/entity/Message
 // Service Imports
 import { SocketService, FCMService, AlertService, QueueService, CaffeinateService } from "@server/services";
 import { EventCache } from "@server/eventCache";
+import { boolToString, toBoolean } from "./helpers/utils";
 
 /**
  * Main entry point for the back-end server
@@ -57,7 +58,9 @@ export class BlueBubblesServer {
 
     eventCache: EventCache;
 
-    hasProperPermissions: boolean;
+    hasDiskAccess: boolean;
+
+    hasAccessibilityAccess: boolean;
 
     hasSetup: boolean;
 
@@ -89,7 +92,8 @@ export class BlueBubblesServer {
         this.queueService = null;
         this.caffeinateService = null;
 
-        this.hasProperPermissions = false;
+        this.hasDiskAccess = false;
+        this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
     }
@@ -135,15 +139,9 @@ export class BlueBubblesServer {
 
         this.fcmService.start();
 
-        if (this.hasProperPermissions === true) await this.startServices();
-
         this.log("Starting Configuration IPC Listeners..");
         this.startConfigIpcListeners();
-
-        if (this.hasStarted === false) {
-            this.log("Connecting to Ngrok...");
-            await this.connectToNgrok();
-        }
+        await this.startServices();
     }
 
     /**
@@ -152,9 +150,14 @@ export class BlueBubblesServer {
      * @param name Name of the config item
      * @param value Value of the config item
      */
-    private async setConfig(name: string, value: string): Promise<void> {
+    private async setConfig(name: string, value: any): Promise<void> {
         await this.db.getRepository(Config).update({ name }, { value });
-        this.config[name] = value;
+        if (value instanceof Boolean) {
+            this.config[name] = boolToString(value as boolean);
+        } else {
+            this.config[name] = String(value);
+        }
+
         this.emitToUI("config-update", this.config);
     }
 
@@ -201,12 +204,15 @@ export class BlueBubblesServer {
         const fdPerms: string = permissions.getAuthStatus("full-disk-access");
         const abPerms: string = permissions.getAuthStatus("accessibility");
 
-        if (fdPerms !== "authorized" || abPerms !== "authorized") {
-            this.log("The proper permissions have not been set.", "error");
+        // Only return out if we don't have disk access
+        this.hasAccessibilityAccess = abPerms === "authorized";
+        if (!this.hasAccessibilityAccess)
+            this.log("Accessibility permissions are required for certain actions!", "error");
+        this.hasDiskAccess = fdPerms === "authorized";
+        if (!this.hasDiskAccess) {
+            this.log("Full Disk Access permissions are required!", "error");
             return;
         }
-
-        this.hasProperPermissions = true;
 
         try {
             this.log("Launching Services..");
@@ -330,7 +336,7 @@ export class BlueBubblesServer {
      * we will emit a message to the socket, as well as the FCM server
      */
     private startChatListener() {
-        if (!this.iMessageRepo.db) {
+        if (!this.iMessageRepo?.db) {
             this.alertService.create(
                 "info",
                 "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled"
@@ -459,25 +465,25 @@ export class BlueBubblesServer {
      */
     private startIpcListener() {
         ipcMain.handle("get-message-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
             return count;
         });
 
         ipcMain.handle("get-chat-image-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatImageCounts();
             return count;
         });
 
         ipcMain.handle("get-group-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("group");
             return count;
         });
 
         ipcMain.handle("get-individual-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("individual");
             return count;
         });
@@ -506,7 +512,7 @@ export class BlueBubblesServer {
                     this.config[item] = args[item];
 
                     // If the socket port changed, disconnect and reconnect
-                    if (item === "socket_port" && this.hasProperPermissions === true) {
+                    if (item === "socket_port") {
                         await ngrok.disconnect();
                         await this.connectToNgrok();
                         await this.socketService.restart(args[item]);
@@ -553,11 +559,13 @@ export class BlueBubblesServer {
             this.fs.saveFCMClient(args);
         });
 
-        ipcMain.handle("complete-tutorial", async (event, args) => {
-            await this.setConfig("tutorial_is_done", "1");
+        ipcMain.handle("toggle-tutorial", async (event, toggle) => {
+            await this.setConfig("tutorial_is_done", boolToString(toggle));
 
-            await this.setupServices();
-            await this.startServices();
+            if (toggle) {
+                await this.setupServices();
+                await this.startServices();
+            }
         });
 
         ipcMain.handle("open_perms_prompt", async (event, args) => {
@@ -582,13 +590,11 @@ export class BlueBubblesServer {
                 this.caffeinateService.stop();
             }
 
-            const cfgVal = toggle ? "1" : "0";
-            this.config.auto_caffeinate = cfgVal;
-            await this.setConfig("auto_caffeinate", cfgVal);
+            await this.setConfig("auto_caffeinate", toggle);
         });
 
         ipcMain.handle("get-caffeinate-status", async (event, args) => {
-            const autoCaffeinate = this.config.auto_caffeinate === "1";
+            const autoCaffeinate = toBoolean(this.config.auto_caffeinate);
             return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
         });
     }
@@ -649,18 +655,21 @@ export class BlueBubblesServer {
      *
      */
     private async startServices() {
+        // Start the IPC listener first for the UI
+        if (this.hasDiskAccess) this.startIpcListener();
+
+        // Disconnect from ngrok in case we are connected
         await ngrok.disconnect();
 
         this.log("Connecting to Ngrok...");
         await this.connectToNgrok();
 
-        if (this.hasStarted === false) {
+        if (!this.hasStarted) {
             this.log("Starting socket service...");
             this.socketService.start();
 
             this.log("Starting chat listener...");
-            this.startChatListener();
-            this.startIpcListener();
+            if (this.hasDiskAccess) this.startChatListener();
         }
 
         this.hasStarted = true;
