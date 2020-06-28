@@ -593,9 +593,18 @@ export class BlueBubblesServer {
             await this.setConfig("auto_caffeinate", toggle);
         });
 
-        ipcMain.handle("get-caffeinate-status", async (event, args) => {
+        ipcMain.handle("get-caffeinate-status", (event, args) => {
             const autoCaffeinate = toBoolean(this.config.auto_caffeinate);
             return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
+        });
+
+        ipcMain.handle("purge-event-cache", (_, __) => {
+            if (this.eventCache.size() === 0) {
+                this.log("No events to purge from event cache!");
+            } else {
+                this.log(`Purging ${this.eventCache.size()} items from the event cache!`);
+                this.eventCache.purge();
+            }
         });
     }
 

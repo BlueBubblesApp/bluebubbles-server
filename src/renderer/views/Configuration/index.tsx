@@ -58,7 +58,6 @@ class Dashboard extends React.Component<Props, State> {
 
     getCaffeinateStatus = async () => {
         const caffeinateStatus = await ipcRenderer.invoke("get-caffeinate-status");
-        console.log(caffeinateStatus);
         this.setState({
             isCaffeinated: caffeinateStatus.isCaffeinated,
             autoCaffeinate: caffeinateStatus.autoCaffeinate
@@ -69,7 +68,6 @@ class Dashboard extends React.Component<Props, State> {
         const res = await ipcRenderer.invoke("set-config", {
             socket_port: this.state.port
         });
-        console.log(res);
     };
 
     handleChange = async (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {

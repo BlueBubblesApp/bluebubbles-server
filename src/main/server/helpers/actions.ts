@@ -2,10 +2,17 @@ import { Connection } from "typeorm";
 import { FileSystem } from "@server/fileSystem";
 import { MessageRepository } from "@server/api/imessage";
 import { ContactRepository } from "@server/api/contacts";
-import { EventCache } from "@server/eventCache";
 import { Queue } from "@server/entity/Queue";
+import { ValidTapback } from "@server/types";
 
-import { safeExecuteAppleScript, generateChatNameList, getiMessageNumberFormat } from "./utils";
+import {
+    safeExecuteAppleScript,
+    generateChatNameList,
+    getiMessageNumberFormat,
+    cliSanitize,
+    tapbackUIMap,
+    toBoolean
+} from "./utils";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -59,10 +66,7 @@ export class ActionHandler {
         if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${(message ?? "").replace(
-            /"/g,
-            '\\"'
-        )}"`;
+        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${cliSanitize(message ?? "")}"`;
 
         // Add attachment, if present
         if (attachment) {
@@ -135,10 +139,9 @@ export class ActionHandler {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
                     this.fs,
-                    `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName.replace(
-                        /"/g,
-                        '\\"'
-                    )}" "${newName.replace(/"/g, '\\"')}"`
+                    `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${cliSanitize(oldName)}" "${cliSanitize(
+                        newName
+                    )}"`
                 );
             } catch (ex) {
                 err = ex;
@@ -231,6 +234,98 @@ export class ActionHandler {
             } catch (ex) {
                 err = ex;
                 console.warn(`Failed to remove participant from group, [${name}]. Attempting the next name.`);
+                continue;
+            }
+        }
+
+        // If we get here, there was an issue
+        throw err;
+    };
+
+    /**
+     * Toggles a tapback to specific message in a chat
+     *
+     * @param chatGuid The GUID for the chat
+     * @param text The message text
+     * @param tapback The tapback to send (as a strong)
+     *
+     * @returns The command line response
+     */
+    toggleTapback = async (chatGuid: string, text: string, tapback: ValidTapback): Promise<string> => {
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+
+        /**
+         * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
+         * ordered by the chat_handle_join table insertions. Below, we try to try to find the
+         * corresponding chats, and rename them. If the first name fails to be found,
+         * we are going to try and use the backup (second) name. If both failed, we weren't able to
+         * calculate the correct chat name
+         */
+
+        const tapbackId = tapbackUIMap[tapback];
+        const friendlyMsg = text.substring(0, 50);
+
+        // Make sure messages is open
+        await this.fs.startMessages();
+
+        let err = null;
+        for (const name of names) {
+            console.info(`Attempting to toggle tapback for message [${friendlyMsg}]`);
+            try {
+                // This needs await here, or else it will fail
+                return await safeExecuteAppleScript(
+                    this.fs,
+                    `osascript "${this.fs.scriptDir}/toggleTapback.scpt" "${name}" "${cliSanitize(
+                        text
+                    )}" "${tapbackId}"`
+                );
+            } catch (ex) {
+                err = ex;
+                console.warn(`Failed to toggle tapback on message, [${friendlyMsg}]. Attempting the next group name.`);
+                continue;
+            }
+        }
+
+        // If we get here, there was an issue
+        throw err;
+    };
+
+    /**
+     * Checks to see if a typing indicator is present
+     *
+     * @param chatGuid The GUID for the chat
+     *
+     * @returns Boolean on whether a typing indicator was present
+     */
+    checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
+        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+
+        /**
+         * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
+         * ordered by the chat_handle_join table insertions. Below, we try to try to find the
+         * corresponding chats, and rename them. If the first name fails to be found,
+         * we are going to try and use the backup (second) name. If both failed, we weren't able to
+         * calculate the correct chat name
+         */
+
+        // Make sure messages is open
+        await this.fs.startMessages();
+
+        let err = null;
+        for (const name of names) {
+            console.info(`Attempting to check for a typing indicator for chat, [${name}]`);
+            try {
+                // This needs await here, or else it will fail
+                const output = await safeExecuteAppleScript(
+                    this.fs,
+                    `osascript "${this.fs.scriptDir}/checkTypingIndicator.scpt" "${name}"`
+                );
+                return toBoolean(output.trim());
+            } catch (ex) {
+                err = ex;
+                console.warn(
+                    `Failed to check for typing indicators for chat, [${name}]. Attempting the next group name.`
+                );
                 continue;
             }
         }

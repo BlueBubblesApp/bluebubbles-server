@@ -117,3 +117,5 @@ export enum ErrorTypes {
     SOCKET_ERROR = "Socket Error",
     VALIDATION_ERROR = "Validation Error"
 }
+
+export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";

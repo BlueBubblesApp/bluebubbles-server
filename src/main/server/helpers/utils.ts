@@ -138,3 +138,16 @@ export const toBoolean = (input: string) => {
 export const boolToString = (input: boolean) => {
     return input ? "1" : "0";
 };
+
+export const cliSanitize = (input: string) => {
+    return input.replace(/"/g, '\\"');
+};
+
+export const tapbackUIMap = {
+    love: 1,
+    like: 2,
+    dislike: 3,
+    laugh: 4,
+    emphasize: 5,
+    question: 6
+};

@@ -45,6 +45,14 @@ class Devices extends React.Component<Props, State> {
         });
     }
 
+    purgeEventCache() {
+        ipcRenderer.invoke("purge-event-cache");
+    }
+
+    resetTutorial() {
+        ipcRenderer.invoke("toggle-tutorial", false);
+    }
+
     render() {
         const { classes } = this.props;
         const { logs } = this.state;
@@ -54,6 +62,17 @@ class Devices extends React.Component<Props, State> {
                 <Typography variant="h3" className={classes.header}>
                     Server Logs
                 </Typography>
+                <br />
+                <section className={classes.debugRow}>
+                    <Button variant="outlined" onClick={this.purgeEventCache}>
+                        Purge Event Cache
+                    </Button>
+                    <Button variant="outlined" onClick={this.resetTutorial}>
+                        Reset Tutorial
+                    </Button>
+                </section>
+                <br />
+                <br />
                 <TableContainer component={Paper}>
                     <Table className={classes.table} aria-label="simple table">
                         <TableHead>
@@ -88,12 +107,16 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
     createStyles({
         root: {},
         header: {
-            fontWeight: 400,
-            marginBottom: "1em"
+            fontWeight: 400
         },
         wrapText: {
             overflowWrap: "break-word",
             maxWidth: "500px"
+        },
+        debugRow: {
+            display: "flex",
+            flexDirection: "row",
+            justifyContent: "space-around"
         }
     });
 

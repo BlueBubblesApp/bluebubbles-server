@@ -468,7 +468,7 @@ end splitText`
  */
 const checkTypingIndicator = {
     name: "checkTypingIndicator.scpt",
-    conents: `on run {realChatName}
+    contents: `on run {realChatName}
 	tell application "System Events"
 		set isTyping to false
 		tell process "Messages"

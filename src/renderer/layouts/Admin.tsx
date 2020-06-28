@@ -1,6 +1,7 @@
 // React imports
 import * as React from "react";
-import { Switch, Route, Link } from "react-router-dom";
+import * as PropTypes from "prop-types";
+import { Switch, Route, Link, withRouter, RouteComponentProps } from "react-router-dom";
 import * as Ago from "s-ago";
 
 // Other imports
@@ -100,7 +101,7 @@ interface State {
     abPerms: string;
 }
 
-class AdminLayout extends React.Component<Props, State> {
+class AdminLayout extends React.Component<Props & RouteComponentProps, State> {
     state: State = {
         open: false,
         config: null,
@@ -146,6 +147,16 @@ class AdminLayout extends React.Component<Props, State> {
                     clearInterval(interval);
                 }
             }, 10000);
+        }
+    }
+
+    componentDidUpdate() {
+        if (this.props.location.pathname === "/tutorial") return;
+
+        // Check if the tutorial is done
+        const tutorialIsDone = this.state.config?.tutorial_is_done;
+        if (tutorialIsDone && !Number(tutorialIsDone)) {
+            this.props.history.push("/tutorial");
         }
     }
 
@@ -421,7 +432,7 @@ class AdminLayout extends React.Component<Props, State> {
                                 <Logs />
                             </Route>
                             <Route path="/">
-                                <Dashboard config={config} />
+                                <Dashboard />
                             </Route>
                         </Switch>
                     </section>
@@ -439,7 +450,8 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
             flexGrow: 1
         },
         root: {
-            display: "flex"
+            display: "flex",
+            marginBottom: "2em"
         },
         appBar: {
             zIndex: theme.zIndex.drawer + 1,
@@ -547,4 +559,4 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         }
     });
 
-export default withStyles(styles)(AdminLayout);
+export default withStyles(styles)(withRouter(AdminLayout));
