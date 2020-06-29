@@ -1,6 +1,5 @@
 // React imports
 import * as React from "react";
-import * as PropTypes from "prop-types";
 import { Switch, Route, Link, withRouter, RouteComponentProps } from "react-router-dom";
 import * as Ago from "s-ago";
 
@@ -34,26 +33,28 @@ import MenuItem from "@material-ui/core/MenuItem";
 import ListSubheader from "@material-ui/core/ListSubheader";
 
 // Material UI Icons
-import MenuIcon from "@material-ui/icons/Menu";
-import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
-import DeviceIcon from "@material-ui/icons/DeviceHub";
-import HomeIcon from "@material-ui/icons/Home";
-import SettingsIcon from "@material-ui/icons/Settings";
-import LogIcon from "@material-ui/icons/Receipt";
-import NotificationsIcon from "@material-ui/icons/Notifications";
-import WarningIcon from "@material-ui/icons/Warning";
-import InfoIcon from "@material-ui/icons/Help";
-import SuccessIcon from "@material-ui/icons/CheckCircle";
-import ErrorIcon from "@material-ui/icons/Error";
-import CachedIcon from "@material-ui/icons/Cached";
-import DiscFullIcon from "@material-ui/icons/DiscFull";
-import AccessibilityNewIcon from "@material-ui/icons/AccessibilityNew";
+import {
+    Menu as MenuIcon,
+    ChevronLeft as ChevronLeftIcon,
+    DeviceHub as DeviceIcon,
+    Home as HomeIcon,
+    Settings as SettingsIcon,
+    BugReport as BugIcon,
+    Notifications as NotificationsIcon,
+    Warning as WarningIcon,
+    Help as InfoIcon,
+    CheckCircle as SuccessIcon,
+    Error as ErrorIcon,
+    Cached as CachedIcon,
+    DiscFull as DiscFullIcon,
+    AccessibilityNew as AccessibilityNewIcon
+} from "@material-ui/icons";
 
 // Custom Components
 import Configuration from "@renderer/views/Configuration";
 import Devices from "@renderer/views/Devices";
 import Dashboard from "@renderer/views/Dashboard";
-import Logs from "@renderer/views/Logs";
+import Logs from "@renderer/views/Debug";
 import Tutorial from "@renderer/views/Tutorial";
 
 // Helpers
@@ -342,7 +343,7 @@ class AdminLayout extends React.Component<Props & RouteComponentProps, State> {
                         <List>
                             <ListItem
                                 component={Link}
-                                to="/logs"
+                                to="/debug"
                                 button
                                 className={clsx(classes.drawer, {
                                     [classes.listItemOpen]: open,
@@ -350,9 +351,9 @@ class AdminLayout extends React.Component<Props & RouteComponentProps, State> {
                                 })}
                             >
                                 <ListItemIcon>
-                                    <LogIcon />
+                                    <BugIcon />
                                 </ListItemIcon>
-                                <ListItemText primary="Server Logs" />
+                                <ListItemText primary="Server Debugger" />
                             </ListItem>
                             <ListItem
                                 component={Link}
@@ -428,7 +429,7 @@ class AdminLayout extends React.Component<Props & RouteComponentProps, State> {
                             <Route path="/devices">
                                 <Devices />
                             </Route>
-                            <Route path="/logs">
+                            <Route path="/debug">
                                 <Logs />
                             </Route>
                             <Route path="/">

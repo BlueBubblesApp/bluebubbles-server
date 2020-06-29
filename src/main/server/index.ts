@@ -25,6 +25,7 @@ import { Message, getMessageResponse } from "@server/api/imessage/entity/Message
 import { SocketService, FCMService, AlertService, QueueService, CaffeinateService } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { boolToString, toBoolean } from "./helpers/utils";
+import { ChangeListener } from "./api/imessage/listeners/changeListener";
 
 /**
  * Main entry point for the back-end server
@@ -51,6 +52,8 @@ export class BlueBubblesServer {
     queueService: QueueService;
 
     caffeinateService: CaffeinateService;
+
+    chatListeners: ChangeListener[];
 
     config: { [key: string]: any };
 
@@ -91,6 +94,7 @@ export class BlueBubblesServer {
         this.fcmService = null;
         this.queueService = null;
         this.caffeinateService = null;
+        this.chatListeners = [];
 
         this.hasDiskAccess = false;
         this.hasAccessibilityAccess = false;
@@ -139,8 +143,11 @@ export class BlueBubblesServer {
 
         this.fcmService.start();
 
-        this.log("Starting Configuration IPC Listeners..");
-        this.startConfigIpcListeners();
+        if (!this.hasStarted) {
+            this.log("Starting Configuration IPC Listeners..");
+            this.startConfigIpcListeners();
+        }
+
         await this.startServices();
     }
 
@@ -226,6 +233,8 @@ export class BlueBubblesServer {
      * Initializes the connection to the configuration database
      */
     private async initializeDatabase(): Promise<void> {
+        if (this.db) return;
+
         try {
             this.db = await createConnection({
                 type: "sqlite",
@@ -372,6 +381,9 @@ export class BlueBubblesServer {
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority
         const groupChangeListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
 
+        // Add to listeners
+        this.chatListeners = [newMsgListener, myMsgListener, updatedMsgListener, groupChangeListener];
+
         /**
          * Message listener for my messages only. We need this because messages from ourselves
          * need to be fully sent before forwarding to any clients. If we emit a notification
@@ -506,7 +518,7 @@ export class BlueBubblesServer {
      * Starts configuration related inter-process-communication handlers.
      */
     private startConfigIpcListeners() {
-        ipcMain.handle("set-config", async (event, args) => {
+        ipcMain.handle("set-config", async (_, args) => {
             for (const item of Object.keys(args)) {
                 if (this.config[item] && this.config[item] !== args[item]) {
                     this.config[item] = args[item];
@@ -527,7 +539,7 @@ export class BlueBubblesServer {
             return this.config;
         });
 
-        ipcMain.handle("get-config", async (event, args) => {
+        ipcMain.handle("get-config", async (_, __) => {
             if (!this.db) return {};
 
             const cfg = await this.db.getRepository(Config).find();
@@ -538,28 +550,28 @@ export class BlueBubblesServer {
             return this.config;
         });
 
-        ipcMain.handle("get-alerts", async (event, args) => {
+        ipcMain.handle("get-alerts", async (_, __) => {
             const alerts = await this.alertService.find();
             return alerts;
         });
 
-        ipcMain.handle("mark-alert-as-read", async (event, args) => {
+        ipcMain.handle("mark-alert-as-read", async (_, args) => {
             const alertIds = args ?? [];
             for (const id of alertIds) {
                 await this.alertService.markAsRead(id);
             }
         });
 
-        ipcMain.handle("set-fcm-server", (event, args) => {
+        ipcMain.handle("set-fcm-server", (_, args) => {
             this.fs.saveFCMServer(args);
             this.fcmService.start();
         });
 
-        ipcMain.handle("set-fcm-client", (event, args) => {
+        ipcMain.handle("set-fcm-client", (_, args) => {
             this.fs.saveFCMClient(args);
         });
 
-        ipcMain.handle("toggle-tutorial", async (event, toggle) => {
+        ipcMain.handle("toggle-tutorial", async (_, toggle) => {
             await this.setConfig("tutorial_is_done", boolToString(toggle));
 
             if (toggle) {
@@ -568,22 +580,22 @@ export class BlueBubblesServer {
             }
         });
 
-        ipcMain.handle("open_perms_prompt", async (event, args) => {
+        ipcMain.handle("open_perms_prompt", async (_, __) => {
             permissions.askForFullDiskAccess();
         });
 
-        ipcMain.handle("prompt_accessibility_perms", async (event, args) => {
+        ipcMain.handle("prompt_accessibility_perms", async (_, __) => {
             permissions.askForAccessibilityAccess();
         });
 
-        ipcMain.handle("check_perms", async (event, args) => {
+        ipcMain.handle("check_perms", async (_, __) => {
             return {
                 abPerms: permissions.getAuthStatus("accessibility"),
                 fdPerms: permissions.getAuthStatus("full-disk-access")
             };
         });
 
-        ipcMain.handle("toggle-caffeinate", async (event, toggle) => {
+        ipcMain.handle("toggle-caffeinate", async (_, toggle) => {
             if (this.caffeinateService && toggle) {
                 this.caffeinateService.start();
             } else if (this.caffeinateService && !toggle) {
@@ -593,7 +605,7 @@ export class BlueBubblesServer {
             await this.setConfig("auto_caffeinate", toggle);
         });
 
-        ipcMain.handle("get-caffeinate-status", (event, args) => {
+        ipcMain.handle("get-caffeinate-status", (_, __) => {
             const autoCaffeinate = toBoolean(this.config.auto_caffeinate);
             return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
         });
@@ -607,15 +619,18 @@ export class BlueBubblesServer {
             }
         });
 
-        ipcMain.handle("toggle-auto-start", async (event, toggle) => {
+        ipcMain.handle("toggle-auto-start", async (_, toggle) => {
             await this.setConfig("auto_start", toggle);
             app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
+        });
+
+        ipcMain.handle("restart-server", async (_, __) => {
+            await this.restart();
         });
     }
 
     /**
      * Helper method for running setup on the message services
-     *
      */
     private async setupServices() {
         if (this.hasSetup) return;
@@ -678,14 +693,38 @@ export class BlueBubblesServer {
         this.log("Connecting to Ngrok...");
         await this.connectToNgrok();
 
-        if (!this.hasStarted) {
-            this.log("Starting socket service...");
-            this.socketService.start();
+        this.log("Starting socket service...");
+        this.socketService.start();
 
+        if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");
-            if (this.hasDiskAccess) this.startChatListener();
+            this.startChatListener();
         }
 
         this.hasStarted = true;
+    }
+
+    /**
+     * Restarts the server
+     */
+    async restart() {
+        this.log("Restarting the server...");
+
+        // Remove all listeners
+        this.queueService.removeAllListeners();
+        for (const i of this.chatListeners) i.stop();
+        this.chatListeners = [];
+
+        // Disconnect & reconnect to the iMessage DB
+        if (this.iMessageRepo.db.isConnected) {
+            await this.iMessageRepo.db.close();
+            await this.iMessageRepo.db.connect();
+        }
+
+        // Remove the FCM connection (this will reconnect in `start`)
+        if (this.fcmService.app) await this.fcmService.app.delete();
+
+        // Start the server up again
+        await this.start();
     }
 }

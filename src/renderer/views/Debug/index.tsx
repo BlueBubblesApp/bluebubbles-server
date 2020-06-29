@@ -1,15 +1,13 @@
 /* eslint-disable */
 import * as React from "react";
 import { ipcRenderer } from "electron";
+import * as Ago from "s-ago";
 
 import { createStyles, Theme, withStyles, StyleRules } from "@material-ui/core/styles";
 
 import {
-    TextField,
-    LinearProgress,
     Typography,
     Button,
-    IconButton,
     TableContainer,
     Paper,
     Table,
@@ -27,7 +25,7 @@ interface State {
     logs: any[];
 }
 
-class Devices extends React.Component<Props, State> {
+class Debug extends React.Component<Props, State> {
     state: State = {
         logs: []
     };
@@ -35,7 +33,7 @@ class Devices extends React.Component<Props, State> {
     async componentDidMount() {
         ipcRenderer.on("new-log", (event: any, data: any) => {
             // Build the new log
-            let newLog = [...this.state.logs, { log: data, timestamp: new Date().toLocaleTimeString() }];
+            let newLog = [...this.state.logs, { log: data, timestamp: new Date() }];
 
             // Make sure there are only 10 logs in the list
             newLog = newLog.slice(newLog.length - 10 < 0 ? 0 : newLog.length - 10, newLog.length);
@@ -45,12 +43,8 @@ class Devices extends React.Component<Props, State> {
         });
     }
 
-    purgeEventCache() {
-        ipcRenderer.invoke("purge-event-cache");
-    }
-
-    resetTutorial() {
-        ipcRenderer.invoke("toggle-tutorial", false);
+    invokeMain(event: string, args: any) {
+        ipcRenderer.invoke(event, args);
     }
 
     render() {
@@ -60,15 +54,18 @@ class Devices extends React.Component<Props, State> {
         return (
             <section className={classes.root}>
                 <Typography variant="h3" className={classes.header}>
-                    Server Logs
+                    Server Debugger
                 </Typography>
                 <br />
                 <section className={classes.debugRow}>
-                    <Button variant="outlined" onClick={this.purgeEventCache}>
+                    <Button variant="outlined" onClick={() => this.invokeMain("purge-event-cache", null)}>
                         Purge Event Cache
                     </Button>
-                    <Button variant="outlined" onClick={this.resetTutorial}>
+                    <Button variant="outlined" onClick={() => this.invokeMain("toggle-tutorial", false)}>
                         Reset Tutorial
+                    </Button>
+                    <Button variant="outlined" onClick={() => this.invokeMain("restart-server", null)}>
+                        Restart Server
                     </Button>
                 </section>
                 <br />
@@ -87,7 +84,7 @@ class Devices extends React.Component<Props, State> {
                                     <TableCell component="th" scope="row" className={classes.wrapText}>
                                         {row.log || "N/A"}
                                     </TableCell>
-                                    <TableCell align="right">{row.timestamp}</TableCell>
+                                    <TableCell align="right">{Ago(row.timestamp)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -120,4 +117,4 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         }
     });
 
-export default withStyles(styles)(Devices);
+export default withStyles(styles)(Debug);

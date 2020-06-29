@@ -24,6 +24,7 @@ export abstract class ChangeListener extends EventEmitter {
 
     stop() {
         this.stopped = true;
+        this.removeAllListeners();
     }
 
     purgeCache() {
