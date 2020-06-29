@@ -152,7 +152,7 @@ export class BlueBubblesServer {
      */
     private async setConfig(name: string, value: any): Promise<void> {
         await this.db.getRepository(Config).update({ name }, { value });
-        if (value instanceof Boolean) {
+        if (typeof value === "boolean") {
             this.config[name] = boolToString(value as boolean);
         } else {
             this.config[name] = String(value);
@@ -605,6 +605,11 @@ export class BlueBubblesServer {
                 this.log(`Purging ${this.eventCache.size()} items from the event cache!`);
                 this.eventCache.purge();
             }
+        });
+
+        ipcMain.handle("toggle-auto-start", async (event, toggle) => {
+            await this.setConfig("auto_start", toggle);
+            app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
         });
     }
 

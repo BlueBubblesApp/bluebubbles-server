@@ -3,4 +3,5 @@ export type Config = {
     server_address: string;
     guid: string;
     tutorial_is_done: string;
+    auto_start: string;
 };
