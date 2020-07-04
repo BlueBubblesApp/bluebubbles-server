@@ -5,6 +5,7 @@ import * as url from "url";
 
 import { BlueBubblesServer } from "@server/index";
 import { UpdateService } from "@server/services";
+import trayIcon from "./assets/img/tray-icon.png";
 
 let win: BrowserWindow | null;
 let tray: Tray | null;
@@ -67,7 +68,7 @@ const buildTray = () => {
 };
 
 const createTray = () => {
-    tray = new Tray(path.join(__dirname, "tray-icon.png"));
+    tray = new Tray(path.join(__dirname, trayIcon));
     tray.setToolTip("BlueBubbles");
     tray.setContextMenu(buildTray());
 
