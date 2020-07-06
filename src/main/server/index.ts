@@ -2,7 +2,6 @@
 import { app, ipcMain, BrowserWindow } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
-import * as permissions from "node-mac-permissions";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
@@ -207,19 +206,20 @@ export class BlueBubblesServer {
         }
 
         // Also check accessibility permissions
-        this.log("Checking Permissions..");
-        const fdPerms: string = permissions.getAuthStatus("full-disk-access");
-        const abPerms: string = permissions.getAuthStatus("accessibility");
-
-        // Only return out if we don't have disk access
-        this.hasAccessibilityAccess = abPerms === "authorized";
-        if (!this.hasAccessibilityAccess)
-            this.log("Accessibility permissions are required for certain actions!", "error");
-        this.hasDiskAccess = fdPerms === "authorized";
-        if (!this.hasDiskAccess) {
-            this.log("Full Disk Access permissions are required!", "error");
-            return;
-        }
+        this.log("Bypassing permissions temporarily..");
+        // this.log("Checking Permissions..");
+        // const fdPerms: string = permissions.getAuthStatus("full-disk-access");
+        // const abPerms: string = permissions.getAuthStatus("accessibility");
+        //
+        // // Only return out if we don't have disk access
+        // this.hasAccessibilityAccess = abPerms === "authorized";
+        // if (!this.hasAccessibilityAccess)
+        //     this.log("Accessibility permissions are required for certain actions!", "error");
+        // this.hasDiskAccess = fdPerms === "authorized";
+        // if (!this.hasDiskAccess) {
+        //     this.log("Full Disk Access permissions are required!", "error");
+        //     return;
+        // }
 
         try {
             this.log("Launching Services..");
@@ -581,18 +581,21 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("open_perms_prompt", async (_, __) => {
-            permissions.askForFullDiskAccess();
+            // permissions.askForFullDiskAccess();
+            
         });
 
         ipcMain.handle("prompt_accessibility_perms", async (_, __) => {
-            permissions.askForAccessibilityAccess();
+            // permissions.askForAccessibilityAccess();
+            
         });
 
         ipcMain.handle("check_perms", async (_, __) => {
-            return {
-                abPerms: permissions.getAuthStatus("accessibility"),
-                fdPerms: permissions.getAuthStatus("full-disk-access")
-            };
+            return { abPerms: "authorized", fdPerms: "authorized" };
+            // return {
+            //     abPerms: permissions.getAuthStatus("accessibility"),
+            //     fdPerms: permissions.getAuthStatus("full-disk-access")
+            // };
         });
 
         ipcMain.handle("toggle-caffeinate", async (_, toggle) => {
