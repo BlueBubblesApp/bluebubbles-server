@@ -26,6 +26,7 @@ import { Device } from "@server/entity/Device";
 import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 import { Config } from "@server/entity/Config";
 import { ContactRepository } from "@server/api/contacts";
+import { DBMessageParams } from "@server/api/imessage/types";
 
 /**
  * This service class handles all routing for incoming socket
@@ -192,7 +193,7 @@ export class SocketService {
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-                const messages = await this.iMessageRepo.getMessages({
+                const dbParams: DBMessageParams = {
                     chatGuid: chats[0].guid,
                     offset: params?.offset ?? 0,
                     limit: params?.limit ?? 100,
@@ -200,7 +201,11 @@ export class SocketService {
                     before: params?.before,
                     withChats: params?.withChats ?? false,
                     sort: params?.sort ?? "DESC"
-                });
+                };
+
+                if (params?.where) dbParams.where = params.where;
+
+                const messages = await this.iMessageRepo.getMessages(dbParams);
 
                 const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
