@@ -24,13 +24,13 @@ interface Props {
     config: Config;
     classes: any;
 }
-
 interface State {
     port: string;
     fcmClient: any;
     fcmServer: any;
     autoCaffeinate: boolean;
     isCaffeinated: boolean;
+    autoStart: boolean;
 }
 
 class Dashboard extends React.Component<Props, State> {
@@ -39,12 +39,14 @@ class Dashboard extends React.Component<Props, State> {
         fcmClient: null,
         fcmServer: null,
         autoCaffeinate: false,
-        isCaffeinated: false
+        isCaffeinated: false,
+        autoStart: false
     };
 
     componentWillReceiveProps(nextProps: Props) {
         this.setState({
-            port: String(nextProps.config?.socket_port || "")
+            port: String(nextProps.config?.socket_port || ""),
+            autoStart: Boolean(Number(nextProps.config?.auto_start || "0"))
         });
     }
 
@@ -58,7 +60,6 @@ class Dashboard extends React.Component<Props, State> {
 
     getCaffeinateStatus = async () => {
         const caffeinateStatus = await ipcRenderer.invoke("get-caffeinate-status");
-        console.log(caffeinateStatus);
         this.setState({
             isCaffeinated: caffeinateStatus.isCaffeinated,
             autoCaffeinate: caffeinateStatus.autoCaffeinate
@@ -69,7 +70,6 @@ class Dashboard extends React.Component<Props, State> {
         const res = await ipcRenderer.invoke("set-config", {
             socket_port: this.state.port
         });
-        console.log(res);
     };
 
     handleChange = async (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
@@ -80,6 +80,10 @@ class Dashboard extends React.Component<Props, State> {
             this.setState({ autoCaffeinate: target.checked });
             await ipcRenderer.invoke("toggle-caffeinate", target.checked);
             await this.getCaffeinateStatus();
+        } else if (id === "toggleAutoStart") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ autoStart: target.checked });
+            await ipcRenderer.invoke("toggle-auto-start", target.checked);
         }
     };
 
@@ -132,7 +136,7 @@ class Dashboard extends React.Component<Props, State> {
 
     render() {
         const { classes, config } = this.props;
-        const { fcmClient, port, fcmServer, autoCaffeinate, isCaffeinated } = this.state;
+        const { fcmClient, port, fcmServer, autoCaffeinate, isCaffeinated, autoStart } = this.state;
         const qrData = this.buildQrData(fcmClient);
 
         let caffeinateString = isCaffeinated ? "Currently caffeinated" : "Not currently caffeinated";
@@ -176,6 +180,18 @@ class Dashboard extends React.Component<Props, State> {
                                 />
                             }
                             label={`Keep MacOS Awake (${caffeinateString})`}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={autoStart}
+                                    onChange={this.handleChange}
+                                    id="toggleAutoStart"
+                                    name="toggleAutoStart"
+                                    color="primary"
+                                />
+                            }
+                            label="Startup with MacOS"
                         />
                         <br />
                         <section className={classes.fcmConfig}>

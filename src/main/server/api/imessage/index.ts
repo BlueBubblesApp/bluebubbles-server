@@ -135,6 +135,10 @@ export class MessageRepository {
             }
         ]
     }: DBMessageParams) {
+        // Sanitize some params
+        if (after && typeof after === "number") after = new Date(after);
+        if (before && typeof before === "number") before = new Date(before);
+
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Message).createQueryBuilder("message");
 
@@ -168,11 +172,11 @@ export class MessageRepository {
         // Add date restraints
         if (after)
             query.andWhere("message.date >= :after", {
-                after: convertDateTo2001Time(after)
+                after: convertDateTo2001Time(after as Date)
             });
         if (before)
             query.andWhere("message.date < :before", {
-                before: convertDateTo2001Time(before)
+                before: convertDateTo2001Time(before as Date)
             });
 
         if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
@@ -204,6 +208,10 @@ export class MessageRepository {
         withChats = false,
         sort = "DESC"
     }: DBMessageParams) {
+        // Sanitize some params
+        if (after && typeof after === "number") after = new Date(after);
+        if (before && typeof before === "number") before = new Date(before);
+
         // Get messages with sender and the chat it's from
         const query = this.db
             .getRepository(Message)
@@ -233,21 +241,21 @@ export class MessageRepository {
         // Add date_delivered constraints
         if (after)
             query.andWhere("message.date_delivered >= :after", {
-                after: convertDateTo2001Time(after)
+                after: convertDateTo2001Time(after as Date)
             });
         if (before)
             query.andWhere("message.date_delivered < :before", {
-                before: convertDateTo2001Time(before)
+                before: convertDateTo2001Time(before as Date)
             });
 
         // Add date_read constraints
         if (after)
             query.orWhere("message.date_read >= :after", {
-                after: convertDateTo2001Time(after)
+                after: convertDateTo2001Time(after as Date)
             });
         if (before)
             query.andWhere("message.date_read < :before", {
-                before: convertDateTo2001Time(before)
+                before: convertDateTo2001Time(before as Date)
             });
 
         // Add pagination params

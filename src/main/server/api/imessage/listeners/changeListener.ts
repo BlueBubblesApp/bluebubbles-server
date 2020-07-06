@@ -24,6 +24,7 @@ export abstract class ChangeListener extends EventEmitter {
 
     stop() {
         this.stopped = true;
+        this.removeAllListeners();
     }
 
     purgeCache() {
@@ -32,7 +33,6 @@ export abstract class ChangeListener extends EventEmitter {
         // Purge emitted messages every 30 minutes to save memory (or every 100 items)
         if (this.cache.size() > 100 || now.getTime() - this.lastPurge.getTime() > 1800000) {
             if (this.cache.size() > 0) {
-                console.info(`Purging ${this.cache.size()} emitted messages from cache...`);
                 this.cache.purge();
             }
 

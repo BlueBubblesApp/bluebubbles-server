@@ -24,6 +24,8 @@ import { Message, getMessageResponse } from "@server/api/imessage/entity/Message
 // Service Imports
 import { SocketService, FCMService, AlertService, QueueService, CaffeinateService } from "@server/services";
 import { EventCache } from "@server/eventCache";
+import { boolToString, toBoolean } from "./helpers/utils";
+import { ChangeListener } from "./api/imessage/listeners/changeListener";
 
 /**
  * Main entry point for the back-end server
@@ -51,13 +53,17 @@ export class BlueBubblesServer {
 
     caffeinateService: CaffeinateService;
 
+    chatListeners: ChangeListener[];
+
     config: { [key: string]: any };
 
     fs: FileSystem;
 
     eventCache: EventCache;
 
-    hasProperPermissions: boolean;
+    hasDiskAccess: boolean;
+
+    hasAccessibilityAccess: boolean;
 
     hasSetup: boolean;
 
@@ -88,8 +94,10 @@ export class BlueBubblesServer {
         this.fcmService = null;
         this.queueService = null;
         this.caffeinateService = null;
+        this.chatListeners = [];
 
-        this.hasProperPermissions = false;
+        this.hasDiskAccess = false;
+        this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
     }
@@ -135,15 +143,12 @@ export class BlueBubblesServer {
 
         this.fcmService.start();
 
-        if (this.hasProperPermissions === true) await this.startServices();
-
-        this.log("Starting Configuration IPC Listeners..");
-        this.startConfigIpcListeners();
-
-        if (this.hasStarted === false) {
-            this.log("Connecting to Ngrok...");
-            await this.connectToNgrok();
+        if (!this.hasStarted) {
+            this.log("Starting Configuration IPC Listeners..");
+            this.startConfigIpcListeners();
         }
+
+        await this.startServices();
     }
 
     /**
@@ -152,9 +157,14 @@ export class BlueBubblesServer {
      * @param name Name of the config item
      * @param value Value of the config item
      */
-    private async setConfig(name: string, value: string): Promise<void> {
+    private async setConfig(name: string, value: any): Promise<void> {
         await this.db.getRepository(Config).update({ name }, { value });
-        this.config[name] = value;
+        if (typeof value === "boolean") {
+            this.config[name] = boolToString(value as boolean);
+        } else {
+            this.config[name] = String(value);
+        }
+
         this.emitToUI("config-update", this.config);
     }
 
@@ -201,12 +211,15 @@ export class BlueBubblesServer {
         const fdPerms: string = permissions.getAuthStatus("full-disk-access");
         const abPerms: string = permissions.getAuthStatus("accessibility");
 
-        if (fdPerms !== "authorized" || abPerms !== "authorized") {
-            this.log("The proper permissions have not been set.", "error");
+        // Only return out if we don't have disk access
+        this.hasAccessibilityAccess = abPerms === "authorized";
+        if (!this.hasAccessibilityAccess)
+            this.log("Accessibility permissions are required for certain actions!", "error");
+        this.hasDiskAccess = fdPerms === "authorized";
+        if (!this.hasDiskAccess) {
+            this.log("Full Disk Access permissions are required!", "error");
             return;
         }
-
-        this.hasProperPermissions = true;
 
         try {
             this.log("Launching Services..");
@@ -220,6 +233,8 @@ export class BlueBubblesServer {
      * Initializes the connection to the configuration database
      */
     private async initializeDatabase(): Promise<void> {
+        if (this.db) return;
+
         try {
             this.db = await createConnection({
                 type: "sqlite",
@@ -330,7 +345,7 @@ export class BlueBubblesServer {
      * we will emit a message to the socket, as well as the FCM server
      */
     private startChatListener() {
-        if (!this.iMessageRepo.db) {
+        if (!this.iMessageRepo?.db) {
             this.alertService.create(
                 "info",
                 "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled"
@@ -365,6 +380,9 @@ export class BlueBubblesServer {
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority
         const groupChangeListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
+
+        // Add to listeners
+        this.chatListeners = [newMsgListener, myMsgListener, updatedMsgListener, groupChangeListener];
 
         /**
          * Message listener for my messages only. We need this because messages from ourselves
@@ -459,25 +477,25 @@ export class BlueBubblesServer {
      */
     private startIpcListener() {
         ipcMain.handle("get-message-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
             return count;
         });
 
         ipcMain.handle("get-chat-image-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatImageCounts();
             return count;
         });
 
         ipcMain.handle("get-group-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("group");
             return count;
         });
 
         ipcMain.handle("get-individual-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("individual");
             return count;
         });
@@ -500,13 +518,13 @@ export class BlueBubblesServer {
      * Starts configuration related inter-process-communication handlers.
      */
     private startConfigIpcListeners() {
-        ipcMain.handle("set-config", async (event, args) => {
+        ipcMain.handle("set-config", async (_, args) => {
             for (const item of Object.keys(args)) {
                 if (this.config[item] && this.config[item] !== args[item]) {
                     this.config[item] = args[item];
 
                     // If the socket port changed, disconnect and reconnect
-                    if (item === "socket_port" && this.hasProperPermissions === true) {
+                    if (item === "socket_port") {
                         await ngrok.disconnect();
                         await this.connectToNgrok();
                         await this.socketService.restart(args[item]);
@@ -521,7 +539,7 @@ export class BlueBubblesServer {
             return this.config;
         });
 
-        ipcMain.handle("get-config", async (event, args) => {
+        ipcMain.handle("get-config", async (_, __) => {
             if (!this.db) return {};
 
             const cfg = await this.db.getRepository(Config).find();
@@ -532,70 +550,87 @@ export class BlueBubblesServer {
             return this.config;
         });
 
-        ipcMain.handle("get-alerts", async (event, args) => {
+        ipcMain.handle("get-alerts", async (_, __) => {
             const alerts = await this.alertService.find();
             return alerts;
         });
 
-        ipcMain.handle("mark-alert-as-read", async (event, args) => {
+        ipcMain.handle("mark-alert-as-read", async (_, args) => {
             const alertIds = args ?? [];
             for (const id of alertIds) {
                 await this.alertService.markAsRead(id);
             }
         });
 
-        ipcMain.handle("set-fcm-server", (event, args) => {
+        ipcMain.handle("set-fcm-server", (_, args) => {
             this.fs.saveFCMServer(args);
             this.fcmService.start();
         });
 
-        ipcMain.handle("set-fcm-client", (event, args) => {
+        ipcMain.handle("set-fcm-client", (_, args) => {
             this.fs.saveFCMClient(args);
         });
 
-        ipcMain.handle("complete-tutorial", async (event, args) => {
-            await this.setConfig("tutorial_is_done", "1");
+        ipcMain.handle("toggle-tutorial", async (_, toggle) => {
+            await this.setConfig("tutorial_is_done", boolToString(toggle));
 
-            await this.setupServices();
-            await this.startServices();
+            if (toggle) {
+                await this.setupServices();
+                await this.startServices();
+            }
         });
 
-        ipcMain.handle("open_perms_prompt", async (event, args) => {
+        ipcMain.handle("open_perms_prompt", async (_, __) => {
             permissions.askForFullDiskAccess();
         });
 
-        ipcMain.handle("prompt_accessibility_perms", async (event, args) => {
+        ipcMain.handle("prompt_accessibility_perms", async (_, __) => {
             permissions.askForAccessibilityAccess();
         });
 
-        ipcMain.handle("check_perms", async (event, args) => {
+        ipcMain.handle("check_perms", async (_, __) => {
             return {
                 abPerms: permissions.getAuthStatus("accessibility"),
                 fdPerms: permissions.getAuthStatus("full-disk-access")
             };
         });
 
-        ipcMain.handle("toggle-caffeinate", async (event, toggle) => {
+        ipcMain.handle("toggle-caffeinate", async (_, toggle) => {
             if (this.caffeinateService && toggle) {
                 this.caffeinateService.start();
             } else if (this.caffeinateService && !toggle) {
                 this.caffeinateService.stop();
             }
 
-            const cfgVal = toggle ? "1" : "0";
-            this.config.auto_caffeinate = cfgVal;
-            await this.setConfig("auto_caffeinate", cfgVal);
+            await this.setConfig("auto_caffeinate", toggle);
         });
 
-        ipcMain.handle("get-caffeinate-status", async (event, args) => {
-            const autoCaffeinate = this.config.auto_caffeinate === "1";
+        ipcMain.handle("get-caffeinate-status", (_, __) => {
+            const autoCaffeinate = toBoolean(this.config.auto_caffeinate);
             return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
+        });
+
+        ipcMain.handle("purge-event-cache", (_, __) => {
+            if (this.eventCache.size() === 0) {
+                this.log("No events to purge from event cache!");
+            } else {
+                this.log(`Purging ${this.eventCache.size()} items from the event cache!`);
+                this.eventCache.purge();
+            }
+        });
+
+        ipcMain.handle("toggle-auto-start", async (_, toggle) => {
+            await this.setConfig("auto_start", toggle);
+            app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
+        });
+
+        ipcMain.handle("restart-server", async (_, __) => {
+            await this.restart();
         });
     }
 
     /**
      * Helper method for running setup on the message services
-     *
      */
     private async setupServices() {
         if (this.hasSetup) return;
@@ -649,20 +684,47 @@ export class BlueBubblesServer {
      *
      */
     private async startServices() {
+        // Start the IPC listener first for the UI
+        if (this.hasDiskAccess && !this.hasStarted) this.startIpcListener();
+
+        // Disconnect from ngrok in case we are connected
         await ngrok.disconnect();
 
         this.log("Connecting to Ngrok...");
         await this.connectToNgrok();
 
-        if (this.hasStarted === false) {
-            this.log("Starting socket service...");
-            this.socketService.start();
+        this.log("Starting socket service...");
+        this.socketService.start();
 
+        if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");
             this.startChatListener();
-            this.startIpcListener();
         }
 
         this.hasStarted = true;
+    }
+
+    /**
+     * Restarts the server
+     */
+    async restart() {
+        this.log("Restarting the server...");
+
+        // Remove all listeners
+        this.queueService.removeAllListeners();
+        for (const i of this.chatListeners) i.stop();
+        this.chatListeners = [];
+
+        // Disconnect & reconnect to the iMessage DB
+        if (this.iMessageRepo.db.isConnected) {
+            await this.iMessageRepo.db.close();
+            await this.iMessageRepo.db.connect();
+        }
+
+        // Remove the FCM connection (this will reconnect in `start`)
+        if (this.fcmService.app) await this.fcmService.app.delete();
+
+        // Start the server up again
+        await this.start();
     }
 }

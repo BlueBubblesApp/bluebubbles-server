@@ -2,8 +2,8 @@ export type DBMessageParams = {
     chatGuid?: string;
     offset?: number;
     limit?: number;
-    after?: Date;
-    before?: Date;
+    after?: Date | number;
+    before?: Date | number;
     withChats?: boolean;
     withAttachments?: boolean;
     withHandle?: boolean;

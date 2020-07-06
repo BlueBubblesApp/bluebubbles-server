@@ -1,29 +1,84 @@
 import "reflect-metadata";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, Tray, Menu } from "electron";
 import * as path from "path";
 import * as url from "url";
 
 import { BlueBubblesServer } from "@server/index";
 import { UpdateService } from "@server/services";
+import trayIcon from "./assets/img/tray-icon.png";
 
 let win: BrowserWindow | null;
+let tray: Tray | null;
 const api = new BlueBubblesServer(win);
-
-const installExtensions = async () => {
-    const installer = require("electron-devtools-installer");
-    const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
-    const extensions = ["REACT_DEVELOPER_TOOLS", "REDUX_DEVTOOLS"];
-    return Promise.all(extensions.map(name => installer.default(installer[name], forceDownload))).catch(console.log);
-};
 
 // Start the API
 api.start();
 
-const createWindow = async () => {
-    if (process.env.NODE_ENV !== "production") {
-        await installExtensions();
-    }
+const buildTray = () => {
+    return Menu.buildFromTemplate([
+        {
+            label: "BlueBubbles Server",
+            enabled: false
+        },
+        {
+            label: "Open",
+            type: "normal",
+            click: () => {
+                if (win) {
+                    win.show();
+                } else {
+                    createWindow();
+                }
+            }
+        },
+        {
+            label: "Restart",
+            type: "normal",
+            click: () => {
+                app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
+                app.exit(0);
+            }
+        },
+        {
+            type: "separator"
+        },
+        {
+            label: `Server Address: ${api.config?.server_address}`,
+            enabled: false
+        },
+        {
+            label: `Socket Connections: ${api.socketService?.socketServer.sockets.sockets.length ?? 0}`,
+            enabled: false
+        },
+        {
+            label: `Caffeinated: ${api.caffeinateService?.isCaffeinated}`,
+            enabled: false
+        },
+        {
+            type: "separator"
+        },
+        {
+            label: "Close",
+            type: "normal",
+            click: () => {
+                app.quit();
+            }
+        }
+    ]);
+};
 
+const createTray = () => {
+    tray = new Tray(path.join(__dirname, trayIcon));
+    tray.setToolTip("BlueBubbles");
+    tray.setContextMenu(buildTray());
+
+    // Rebuild the tray each time it's clicked
+    tray.on("click", () => {
+        tray.setContextMenu(buildTray());
+    });
+};
+
+const createWindow = async () => {
     win = new BrowserWindow({
         title: "BlueBubbles",
         useContentSize: true,
@@ -78,7 +133,10 @@ const createWindow = async () => {
     updateService.checkForUpdate();
 };
 
-app.on("ready", createWindow);
+app.on("ready", () => {
+    createTray();
+    createWindow();
+});
 
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin") {
