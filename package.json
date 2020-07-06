@@ -17,7 +17,8 @@
     "pretest:e2e": "npm run build",
     "test:e2e": "jest '(\\/test\\/e2e/).*'",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
+	"dist": "npm run build && electron-builder --publish never",
+	"release": "npm run build && electron-builder --publish always",
     "postinstall": "electron-builder install-app-deps"
   },
   "husky": {
@@ -56,7 +57,9 @@
     "appId": "org.bluebubbles.server",
     "mac": {
       "icon": "./icons/regular/icon-512.png",
-      "category": "your.app.category.type"
+	  "category": "your.app.category.type",
+	  "target": "dmg",
+	  "publish": ["github"]
     },
     "directories": {
       "output": "release",

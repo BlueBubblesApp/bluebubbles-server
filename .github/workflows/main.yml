@@ -1,0 +1,27 @@
+name: Build-BlueBubbles-Server
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macOS-10.15]
+
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+      - name: Use Node.js 14
+        uses: actions/setup-node@v1
+        with:
+          node-version: '14'
+      - name: Install Dependencies
+        run: yarn
+      - name: Build/Publish BlueBubbles
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: yarn release
