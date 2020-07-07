@@ -18,7 +18,7 @@ import {
 } from "@server/helpers/responses";
 
 // Entities
-import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
+import { getChatResponse } from "@server/api/imessage/entity/Chat";
 import { getHandleResponse } from "@server/api/imessage/entity/Handle";
 import { getMessageResponse } from "@server/api/imessage/entity/Message";
 import { Connection } from "typeorm";
@@ -35,7 +35,7 @@ import { DBMessageParams } from "@server/api/imessage/types";
 export class SocketService {
     db: Connection;
 
-    socketServer: io.Server;
+    server: io.Server;
 
     iMessageRepo: MessageRepository;
 
@@ -63,7 +63,7 @@ export class SocketService {
     ) {
         this.db = db;
 
-        this.socketServer = io(port, {
+        this.server = io(port, {
             // 5 Minute ping timeout
             pingTimeout: 60000
         });
@@ -81,7 +81,7 @@ export class SocketService {
         /**
          * Handle all other data requests
          */
-        this.socketServer.on("connection", async socket => {
+        this.server.on("connection", async socket => {
             const guid = socket.handshake.query?.guid;
             const cfg = await this.db.getRepository(Config).findOne({ name: "guid" });
 
@@ -537,8 +537,13 @@ export class SocketService {
      * @param port The new port to listen on
      */
     restart(port: number) {
-        this.socketServer.close();
-        this.socketServer = io(port);
+        if (this.server) {
+            this.server.close();
+            this.server = io(port, {
+                // 5 Minute ping timeout
+                pingTimeout: 60000
+            });
+        }
         this.start();
     }
 }
