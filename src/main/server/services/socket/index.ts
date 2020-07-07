@@ -200,6 +200,8 @@ export class SocketService {
                     after: params?.after,
                     before: params?.before,
                     withChats: params?.withChats ?? false,
+                    withAttachments: params?.withAttachments ?? true,
+                    withHandle: params?.withHandle ?? true,
                     sort: params?.sort ?? "DESC"
                 };
 

@@ -1,8 +1,9 @@
 // Dependency Imports
-import { app, ipcMain, BrowserWindow } from "electron";
+import { app, ipcMain, BrowserWindow, nativeImage } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
 import * as permissions from "node-mac-permissions";
+import * as Jimp from "jimp";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
