@@ -140,15 +140,15 @@ class AdminLayout extends React.Component<Props & RouteComponentProps, State> {
         });
 
         // Check for permissions every 10 seconds until we have permissions.. maybe?
-        let interval: NodeJS.Timeout = null;
-        if (this.state.abPerms !== "authorized" && this.state.fdPerms !== "authorized") {
-            interval = setInterval(() => {
-                this.checkPermissions();
-                if (this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
-                    clearInterval(interval);
-                }
-            }, 10000);
-        }
+        // let interval: NodeJS.Timeout = null;
+        // if (this.state.abPerms !== "authorized" && this.state.fdPerms !== "authorized") {
+        //     interval = setInterval(() => {
+        //         this.checkPermissions();
+        //         if (this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
+        //             clearInterval(interval);
+        //         }
+        //     }, 10000);
+        // }
     }
 
     componentDidUpdate() {
