@@ -80,7 +80,7 @@ const createTray = () => {
 
 const createWindow = async () => {
     win = new BrowserWindow({
-        title: "BlueBubbles",
+        title: "BlueBubbles Server",
         useContentSize: true,
         width: 1080,
         height: 1030,
