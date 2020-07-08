@@ -526,6 +526,31 @@ export class SocketService {
             }
         );
 
+        /**
+         * Gets a contact (or contacts) for a given list of handles
+         */
+        socket.on(
+            "get-contacts",
+            async (params, cb): Promise<void> => {
+                if (!this.contactsRepo || !this.contactsRepo.db.isConnected) {
+                    respond(cb, "contacts", createServerErrorResponse("Contacts repository is disconnected!"));
+                    return;
+                }
+
+                const handles = params;
+                for (let i = 0; i <= handles.length; i += 1) {
+                    if (!handles[i] || !handles[i].address) continue;
+                    const contact = await this.contactsRepo.getContactByAddress(handles[i].address);
+                    if (contact) {
+                        handles[i].firstName = contact.firstName;
+                        handles[i].lastName = contact.lastName;
+                    }
+                }
+
+                respond(cb, "contacts", createSuccessResponse(handles));
+            }
+        );
+
         socket.on("disconnect", () => {
             console.log(`Client ${socket.id} disconnected!`);
         });
