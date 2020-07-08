@@ -1,8 +1,7 @@
 // Dependency Imports
-import { app, ipcMain, BrowserWindow, nativeImage } from "electron";
+import { app, ipcMain, BrowserWindow } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
-import * as Jimp from "jimp";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
@@ -583,12 +582,10 @@ export class BlueBubblesServer {
 
         ipcMain.handle("open_perms_prompt", async (_, __) => {
             // permissions.askForFullDiskAccess();
-            
         });
 
         ipcMain.handle("prompt_accessibility_perms", async (_, __) => {
             // permissions.askForAccessibilityAccess();
-            
         });
 
         ipcMain.handle("check_perms", async (_, __) => {
