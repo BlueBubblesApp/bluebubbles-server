@@ -95,7 +95,7 @@ export class BlueBubblesServer {
         this.caffeinateService = null;
         this.chatListeners = [];
 
-        this.hasDiskAccess = false;
+        this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
