@@ -1,7 +1,8 @@
 // Dependency Imports
-import { app, ipcMain, BrowserWindow } from "electron";
+import { app, ipcMain, BrowserWindow, nativeImage } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
+import * as Jimp from "jimp";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
@@ -293,7 +294,7 @@ export class BlueBubblesServer {
             await this.setConfig("server_address", this.ngrokServer);
 
             // Emit this over the socket
-            if (this.socketService) this.socketService.socketServer.emit("new-server", this.ngrokServer);
+            if (this.socketService) this.socketService.server.emit("new-server", this.ngrokServer);
 
             if (this.socketService) await this.sendNotification("new-server", this.ngrokServer);
             await this.fcmService.setServerUrl(this.ngrokServer);
@@ -309,7 +310,7 @@ export class BlueBubblesServer {
      * @param data Associated data with the notification (as a string)
      */
     async sendNotification(type: string, data: any) {
-        this.socketService.socketServer.emit(type, data);
+        this.socketService.server.emit(type, data);
 
         // Send notification to devices
         if (this.fcmService.app) {
@@ -697,7 +698,7 @@ export class BlueBubblesServer {
         await this.connectToNgrok();
 
         this.log("Starting socket service...");
-        this.socketService.start();
+        this.socketService.restart(this.config.socket_port);
 
         if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");

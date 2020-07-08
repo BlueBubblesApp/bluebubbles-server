@@ -1,7 +1,7 @@
+import { nativeImage, NativeImage } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import * as base64 from "byte-base64";
-import * as Jimp from "jimp";
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 
 import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
@@ -102,7 +102,7 @@ export const getAttachmentResponse = async (
 ): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
     let blurhash: string = null;
-    let image: Jimp = null;
+    let image: NativeImage = null;
 
     // Get the fully qualified path
     let fPath = tableData.filePath;
@@ -120,14 +120,13 @@ export const getAttachmentResponse = async (
         }
 
         if (handledImageMimes.includes(tableData.mimeType)) {
-            image = await Jimp.read(fPath);
+            image = nativeImage.createFromPath(fPath);
             if (withBlurhash) {
                 const now = new Date().getTime();
+                const size = image.getSize();
                 blurhash = await getBlurHash(image);
                 const later = new Date().getTime();
-                console.log(
-                    `Calculated blurhash for image (${image.getHeight()}x${image.getWidth()}) in ${later - now} ms`
-                );
+                console.log(`Calculated blurhash for image (${size.height}x${size.width}) in ${later - now} ms`);
             }
         }
 
@@ -147,8 +146,8 @@ export const getAttachmentResponse = async (
         guid: tableData.guid,
         messages: tableData.messages ? tableData.messages.map(item => item.guid) : [],
         data: data as string,
-        height: image ? image.getHeight() : 0,
-        width: image ? image.getWidth() : 0,
+        height: image ? image.getSize().height : 0,
+        width: image ? image.getSize().width : 0,
         blurhash,
         uti: tableData.uti,
         mimeType: tableData.mimeType,
