@@ -1,5 +1,7 @@
+import { app } from "electron";
 import * as io from "socket.io";
 import * as path from "path";
+import * as fslib from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 
@@ -527,10 +529,10 @@ export class SocketService {
         );
 
         /**
-         * Gets a contact (or contacts) for a given list of handles
+         * Gets a contact (or contacts) for a given list of handles, from the database
          */
         socket.on(
-            "get-contacts",
+            "get-contacts-from-db",
             async (params, cb): Promise<void> => {
                 if (!this.contactsRepo || !this.contactsRepo.db.isConnected) {
                     respond(cb, "contacts", createServerErrorResponse("Contacts repository is disconnected!"));
@@ -547,7 +549,31 @@ export class SocketService {
                     }
                 }
 
-                respond(cb, "contacts", createSuccessResponse(handles));
+                respond(cb, "contacts-from-disk", createSuccessResponse(handles));
+            }
+        );
+
+        /**
+         * Gets a contacts
+         */
+        socket.on(
+            "get-contacts-from-vcf",
+            async (_, cb): Promise<void> => {
+                try {
+                    // Export the contacts
+                    await this.actionHandler.exportContacts();
+
+                    // Check if the contacts export exists, and respond back with it
+                    const contactsPath = `${app.getPath("userData")}/Contacts/AddressBook.vcf`;
+                    if (fslib.existsSync(contactsPath)) {
+                        const data = fslib.readFileSync(contactsPath).toString("utf-8");
+                        respond(cb, "contacts-from-vcf", createSuccessResponse(data));
+                    } else {
+                        respond(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));
+                    }
+                } catch (ex) {
+                    respond(cb, "contacts-from-vcf", createServerErrorResponse(ex.message));
+                }
             }
         );
 

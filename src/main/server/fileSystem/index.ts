@@ -16,6 +16,8 @@ export class FileSystem {
 
     public attachmentsDir = `${app.getPath("userData")}/Attachments`;
 
+    public contactsDir = `${app.getPath("userData")}/Contacts`;
+
     public fcmDir = `${app.getPath("userData")}/FCM`;
 
     /**
@@ -33,6 +35,7 @@ export class FileSystem {
     setupDirectories(): void {
         if (!fs.existsSync(this.scriptDir)) fs.mkdirSync(this.scriptDir);
         if (!fs.existsSync(this.attachmentsDir)) fs.mkdirSync(this.attachmentsDir);
+        if (!fs.existsSync(this.contactsDir)) fs.mkdirSync(this.contactsDir);
         if (!fs.existsSync(this.fcmDir)) fs.mkdirSync(this.fcmDir);
     }
 

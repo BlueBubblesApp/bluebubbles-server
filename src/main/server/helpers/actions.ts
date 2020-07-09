@@ -367,4 +367,24 @@ export class ActionHandler {
 
         return ret;
     };
+
+    /**
+     * Exports contacts from the Contacts app, into a VCF file
+     *
+     * @returns The command line response
+     */
+    exportContacts = async (): Promise<void> => {
+        // Create the base command to execute
+        const baseCmd = `osascript "${this.fs.scriptDir}/exportContacts.scpt"`;
+
+        try {
+            await this.fs.execShellCommand(baseCmd);
+        } catch (ex) {
+            let msg = ex.message;
+            if (msg instanceof String) [, msg] = msg.split("execution error: ");
+            [msg] = msg.split(". (");
+
+            throw new Error(msg);
+        }
+    };
 }

@@ -1,4 +1,9 @@
 /* eslint-disable max-len */
+import { app } from "electron";
+import * as macosVersion from "macos-version";
+import * as compareVersions from "compare-versions";
+
+const osVersion = macosVersion();
 
 /**
  * The AppleScript used to send a message with or without an attachment
@@ -524,6 +529,42 @@ on splitText(theText, theDelimiter)
 end splitText`
 };
 
+let contactsApp = "Contacts";
+// If the OS Version is earlier than or equal to 10.7.0, use "Address Book"
+if (osVersion && compareVersions(osVersion, "10.7.0") <= 0) contactsApp = "Address Book";
+const contactsDir = `${app.getPath("userData")}/Contacts`;
+
+/**
+ * Export contacts to a VCF file
+ */
+const exportContacts = {
+    name: "exportContacts.scpt",
+    contents: `set contactsPath to POSIX file "${contactsDir}/AddressBook.vcf" as string
+    
+    -- Remove any existing back up file (if any)
+    tell application "Finder"
+        if exists (file contactsPath) then
+            delete file contactsPath -- move to trash
+        end if
+    end tell
+    
+    tell application "${contactsApp}"
+        reopen
+
+        -- Create an empty file
+        set contactsFile to (open for access file contactsPath with write permission)
+        
+        try
+            repeat with per in people
+                write ((vcard of per as text) & linefeed) to contactsFile
+            end repeat
+            close access contactsFile
+        on error
+            close access contactsFile
+        end try
+    end tell`
+};
+
 export const AppleScripts = [
     sendMessage,
     startChat,
@@ -532,5 +573,6 @@ export const AppleScripts = [
     removeParticipant,
     startMessages,
     toggleTapback,
-    checkTypingIndicator
+    checkTypingIndicator,
+    exportContacts
 ];
