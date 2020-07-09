@@ -47,7 +47,7 @@ const buildTray = () => {
             enabled: false
         },
         {
-            label: `Socket Connections: ${api.socketService?.socketServer.sockets.sockets.length ?? 0}`,
+            label: `Socket Connections: ${api.socketService?.server.sockets.sockets.length ?? 0}`,
             enabled: false
         },
         {
