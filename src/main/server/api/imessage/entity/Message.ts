@@ -352,11 +352,11 @@ export class Message {
 
     @Column({
         name: "associated_message_type",
-        type: "integer",
+        type: "text",
         transformer: MessageTypeTransformer,
-        default: 0
+        nullable: true
     })
-    associatedMessageType: number;
+    associatedMessageType: string;
 
     @Column({ name: "balloon_bundle_id", type: "text", nullable: true })
     balloonBundleId: string;
