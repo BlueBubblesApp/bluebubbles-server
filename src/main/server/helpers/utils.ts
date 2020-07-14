@@ -31,7 +31,9 @@ export const getiMessageNumberFormat = (address: string) => {
 export const formatAddressList = (addresses: string[]) => {
     let name = null;
 
-    if (addresses.length <= 4) {
+    if (addresses.length === 1) {
+        [name] = addresses;
+    } else if (addresses.length <= 4) {
         name = addresses.join(", ");
         const pos = name.lastIndexOf(", ");
         name = `${name.substring(0, pos)} & ${name.substring(pos + 2)}`;

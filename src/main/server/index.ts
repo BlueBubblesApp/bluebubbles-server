@@ -14,10 +14,12 @@ import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
 // Database Imports
 import { MessageRepository } from "@server/api/imessage";
 import { ContactRepository } from "@server/api/contacts";
-import { MessageListener } from "@server/api/imessage/listeners/messageListener";
-import { MessageUpdateListener } from "@server/api/imessage/listeners/messageUpdateListener";
-import { GroupChangeListener } from "@server/api/imessage/listeners/groupChangeListener";
-import { MyMessageListener } from "@server/api/imessage/listeners/myMessageListener";
+import {
+    IncomingMessageListener,
+    OutgoingMessageListener,
+    MessageUpdateListener,
+    GroupChangeListener
+} from "@server/api/imessage/listeners";
 import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
 
 // Service Imports
@@ -374,8 +376,16 @@ export class BlueBubblesServer {
         });
 
         // Create a listener to listen for new/updated messages
-        const newMsgListener = new MessageListener(this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS);
-        const myMsgListener = new MyMessageListener(this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS * 2);
+        const newMsgListener = new IncomingMessageListener(
+            this.iMessageRepo,
+            this.eventCache,
+            DEFAULT_POLL_FREQUENCY_MS
+        );
+        const myMsgListener = new OutgoingMessageListener(
+            this.iMessageRepo,
+            this.eventCache,
+            DEFAULT_POLL_FREQUENCY_MS * 2
+        );
         const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority

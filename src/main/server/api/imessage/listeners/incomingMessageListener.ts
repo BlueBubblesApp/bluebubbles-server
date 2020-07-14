@@ -3,7 +3,7 @@ import { Message } from "@server/api/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
 import { ChangeListener } from "./changeListener";
 
-export class MessageListener extends ChangeListener {
+export class IncomingMessageListener extends ChangeListener {
     repo: MessageRepository;
 
     constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {

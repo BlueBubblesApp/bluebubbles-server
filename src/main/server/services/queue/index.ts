@@ -1,7 +1,7 @@
 import { Connection } from "typeorm";
 import { EventCache } from "@server/eventCache";
 import { Queue } from "@server/entity/Queue";
-import { ChangeListener } from "@server/api/imessage/listeners/changeListener";
+import { ChangeListener } from "@server/api/imessage/listeners";
 import { MessageRepository } from "@server/api/imessage";
 import { Message } from "@server/api/imessage/entity/Message";
 import { DBWhereItem } from "@server/api/imessage/types";

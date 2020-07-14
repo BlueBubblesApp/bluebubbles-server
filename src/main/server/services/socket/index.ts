@@ -11,7 +11,7 @@ import { ActionHandler } from "@server/helpers/actions";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ResponseFormat } from "@server/types";
+import { ResponseFormat, ValidTapback } from "@server/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
@@ -29,6 +29,7 @@ import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
 import { Config } from "@server/entity/Config";
 import { ContactRepository } from "@server/api/contacts";
 import { DBMessageParams } from "@server/api/imessage/types";
+import { Queue } from "@server/entity/Queue";
 
 /**
  * This service class handles all routing for incoming socket
@@ -524,7 +525,27 @@ export class SocketService {
         socket.on(
             "send-reaction",
             async (params, cb): Promise<void> => {
-                respond(cb, "reaction-sent", createBadRequestResponse("This action has not yet been implemented"));
+                if (!params?.chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+                if (!params?.message) return respond(cb, "error", createBadRequestResponse("No message provided!"));
+                if (!params?.actionMessage)
+                    return respond(cb, "error", createBadRequestResponse("No action message provided!"));
+                if (!params?.tapback || !["love", "like", "dislike", "question", "emphasize"].includes(params.tapback))
+                    return respond(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
+
+                // Add the reaction to the match queue
+                const item = new Queue();
+                item.tempGuid = params.message.guid;
+                item.chatGuid = params.chatGuid;
+                item.dateCreated = new Date().getTime();
+                item.text = params.message.text;
+                await this.db.getRepository(Queue).manager.save(item);
+
+                try {
+                    await this.actionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
+                    return respond(cb, "tapback-sent", createNoDataResponse());
+                } catch (ex) {
+                    return respond(cb, "send-tapback-error", createServerErrorResponse(ex.message));
+                }
             }
         );
 

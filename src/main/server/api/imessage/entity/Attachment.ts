@@ -106,40 +106,46 @@ export const getAttachmentResponse = async (
 
     // Get the fully qualified path
     let fPath = tableData.filePath;
-    if (fPath[0] === "~") {
-        fPath = path.join(process.env.HOME, fPath.slice(1));
-    }
 
-    try {
-        // Try to read the file
-        const fopen = fs.readFileSync(fPath);
-
-        // If we want data, get the data
-        if (withData) {
-            data = Uint8Array.from(fopen);
+    // If the attachment isn't finished downloading, the path will be null
+    if (fPath) {
+        if (fPath[0] === "~") {
+            fPath = path.join(process.env.HOME, fPath.slice(1));
         }
 
-        if (handledImageMimes.includes(tableData.mimeType)) {
-            image = nativeImage.createFromPath(fPath);
-            if (withBlurhash) {
-                const now = new Date().getTime();
-                const size = image.getSize();
-                blurhash = await getBlurHash(image);
-                const later = new Date().getTime();
-                console.log(`Calculated blurhash for image (${size.height}x${size.width}) in ${later - now} ms`);
+        try {
+            // Try to read the file
+            const fopen = fs.readFileSync(fPath);
+
+            // If we want data, get the data
+            if (withData) {
+                data = Uint8Array.from(fopen);
             }
-        }
 
-        // If there is no data, return null for the data
-        // Otherwise, convert it to a base64 string
-        if (!data) {
-            data = null;
-        } else {
-            data = base64.bytesToBase64(data as Uint8Array);
+            if (handledImageMimes.includes(tableData.mimeType)) {
+                image = nativeImage.createFromPath(fPath);
+                if (withBlurhash) {
+                    const now = new Date().getTime();
+                    const size = image.getSize();
+                    blurhash = await getBlurHash(image);
+                    const later = new Date().getTime();
+                    console.log(`Calculated blurhash for image (${size.height}x${size.width}) in ${later - now} ms`);
+                }
+            }
+
+            // If there is no data, return null for the data
+            // Otherwise, convert it to a base64 string
+            if (!data) {
+                data = null;
+            } else {
+                data = base64.bytesToBase64(data as Uint8Array);
+            }
+        } catch (ex) {
+            console.log(ex);
+            console.error(`Could not read file [${fPath}]`);
         }
-    } catch (ex) {
-        console.log(ex);
-        console.error(`Could not read file [${fPath}]`);
+    } else {
+        console.warn("Attachment hasn't been downloaded yet!");
     }
 
     return {

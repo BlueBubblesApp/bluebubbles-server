@@ -3,7 +3,7 @@ import { Message } from "@server/api/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
 import { ChangeListener } from "./changeListener";
 
-export class MyMessageListener extends ChangeListener {
+export class OutgoingMessageListener extends ChangeListener {
     repo: MessageRepository;
 
     notSent: number[];

@@ -1,4 +1,7 @@
-// import { ChangeListener } from "./changeListener";
-// import { MessageListener } from "./messageListener";
+import { ChangeListener } from "./changeListener";
+import { OutgoingMessageListener } from "./outgoingMessageListener";
+import { IncomingMessageListener } from "./incomingMessageListener";
+import { MessageUpdateListener } from "./messageUpdateListener";
+import { GroupChangeListener } from "./groupChangeListener";
 
-// export { ChangeListener, MessageListener };
+export { ChangeListener, OutgoingMessageListener, IncomingMessageListener, MessageUpdateListener, GroupChangeListener };

@@ -271,6 +271,7 @@ export class ActionHandler {
         let err = null;
         for (const name of names) {
             console.info(`Attempting to toggle tapback for message [${friendlyMsg}]`);
+
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(

@@ -30,13 +30,15 @@ const sendMessage = {
 
         tell application "Messages"
             set targetChat to a reference to text chat id chatGuid
-            if message is not equal to "" then
-                send message to targetChat
-            end if
 
+            (* Send the attachment first *)
             if (count of argv) > 2 then
                 set theAttachment to (item 3 of argv) as POSIX file
                 send theAttachment to targetChat
+            end if
+
+            if message is not equal to "" then
+                send message to targetChat
             end if
         end tell
 
@@ -444,8 +446,11 @@ const toggleTapback = {
 							
 							(* Re-fetch the rows so we can get the tapback row *)
 							set newRows to reverse of (entire contents of scroll area 2 as list)
-							set tapBack to item (n + 1) of newRows
-							tell radio button reactionIndex of tapBack to perform action "AXPress"
+                            set tapBack to item (n + 1) of newRows
+                            if tapBack's class is not radio group then
+                                set tapBack to item (n - 1) of newRows
+                            end if
+							tell radio button (reactionIndex as number) of tapBack to perform action "AXPress"
 							delay 0.5
 							keystroke return
 							
