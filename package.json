@@ -72,10 +72,12 @@
       "package.json"
     ],
     "linux": {
-      "target": "deb"
+      "target": "deb",
+      "icon": "./resources/icon1024.png"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "./resources/icon1024.png"
     }
   },
   "repository": {

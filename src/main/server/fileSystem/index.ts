@@ -5,52 +5,53 @@ import { app } from "electron";
 import { sync } from "read-chunk";
 
 import { concatUint8Arrays } from "@server/helpers/utils";
-import { AppleScripts } from "./scripts";
+import { getAppleScripts } from "./scripts";
 
 let subdir = "";
-if (process.env.NODE_ENV !== "production") subdir = "BlueBubbles-Desktop-App";
+if (process.env.NODE_ENV !== "production") subdir = "bluebubbles-server";
 
 /**
  * The class used to handle all communications to the App's "filesystem".
  * The filesystem is the directory dedicated to the app-specific files
  */
 export class FileSystem {
-    public baseDir = path.join(app.getPath("userData"), subdir);
-    
-    public attachmentsDir = path.join(this.baseDir, "Attachments");
-    
-    public contactsDir = path.join(this.baseDir, "Contacts");
-    
-    public scriptDir = path.join(this.baseDir, "Scripts");
-    
-    public fcmDir = path.join(this.baseDir, "FCM");
+    public static baseDir = path.join(app.getPath("userData"), subdir);
+
+    public static attachmentsDir = path.join(FileSystem.baseDir, "Attachments");
+
+    public static contactsDir = path.join(FileSystem.baseDir, "Contacts");
+
+    public static scriptDir = path.join(FileSystem.baseDir, "Scripts");
+
+    public static fcmDir = path.join(FileSystem.baseDir, "FCM");
 
     /**
      * Sets up all required directories and then, writes the scripts
      * to the scripts directory
      */
-    async setup(): Promise<void> {
-        this.setupDirectories();
-        this.setupScripts();
+    static async setup(): Promise<void> {
+        FileSystem.setupDirectories();
+        FileSystem.setupScripts();
     }
 
     /**
      * Creates required directories
      */
-    setupDirectories(): void {
-        if (!fs.existsSync(this.scriptDir)) fs.mkdirSync(this.scriptDir);
-        if (!fs.existsSync(this.attachmentsDir)) fs.mkdirSync(this.attachmentsDir);
-        if (!fs.existsSync(this.contactsDir)) fs.mkdirSync(this.contactsDir);
-        if (!fs.existsSync(this.fcmDir)) fs.mkdirSync(this.fcmDir);
+    static setupDirectories(): void {
+        if (!fs.existsSync(FileSystem.baseDir)) fs.mkdirSync(FileSystem.baseDir);
+        if (!fs.existsSync(FileSystem.scriptDir)) fs.mkdirSync(FileSystem.scriptDir);
+        if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
+        if (!fs.existsSync(FileSystem.contactsDir)) fs.mkdirSync(FileSystem.contactsDir);
+        if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
     }
 
     /**
      * Creates required scripts
      */
-    setupScripts(): void {
-        AppleScripts.forEach(script => {
+    static setupScripts(): void {
+        getAppleScripts().forEach(script => {
             // Remove each script, and re-write it (in case of update)
-            const scriptPath = `${this.scriptDir}/${script.name}`;
+            const scriptPath = `${FileSystem.scriptDir}/${script.name}`;
             if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
             fs.writeFileSync(scriptPath, script.contents);
         });
@@ -62,8 +63,8 @@ export class FileSystem {
      * @param name Name for the attachment
      * @param buffer The attachment bytes (buffer)
      */
-    saveAttachment(name: string, buffer: Uint8Array): void {
-        fs.writeFileSync(path.join(this.attachmentsDir, name), buffer);
+    static saveAttachment(name: string, buffer: Uint8Array): void {
+        fs.writeFileSync(path.join(FileSystem.attachmentsDir, name), buffer);
     }
 
     /**
@@ -73,8 +74,8 @@ export class FileSystem {
      * @param chunkNumber The index of the chunk (for ordering/reassembling)
      * @param buffer The attachment chunk bytes (buffer)
      */
-    saveAttachmentChunk(guid: string, chunkNumber: number, buffer: Uint8Array): void {
-        const parent = path.join(this.attachmentsDir, guid);
+    static saveAttachmentChunk(guid: string, chunkNumber: number, buffer: Uint8Array): void {
+        const parent = path.join(FileSystem.attachmentsDir, guid);
         if (!fs.existsSync(parent)) fs.mkdirSync(parent);
         fs.writeFileSync(path.join(parent, `${chunkNumber}.chunk`), buffer);
     }
@@ -84,8 +85,8 @@ export class FileSystem {
      *
      * @param guid Unique identifier for the attachment
      */
-    deleteChunks(guid: string): void {
-        const dir = path.join(this.attachmentsDir, guid);
+    static deleteChunks(guid: string): void {
+        const dir = path.join(FileSystem.attachmentsDir, guid);
         if (fs.existsSync(dir)) fs.rmdirSync(dir, { recursive: true });
     }
 
@@ -94,16 +95,16 @@ export class FileSystem {
      *
      * @param guid Unique identifier for the attachment
      */
-    buildAttachmentChunks(guid: string): Uint8Array {
+    static buildAttachmentChunks(guid: string): Uint8Array {
         let chunks = new Uint8Array(0);
 
         // Get the files in ascending order
-        const files = fs.readdirSync(path.join(this.attachmentsDir, guid));
+        const files = fs.readdirSync(path.join(FileSystem.attachmentsDir, guid));
         files.sort((a, b) => Number(a.split(".")[0]) - Number(b.split(".")[0]));
 
         // Read the files and append to chunks
         for (const file of files) {
-            const fileData = fs.readFileSync(path.join(this.attachmentsDir, guid, file));
+            const fileData = fs.readFileSync(path.join(FileSystem.attachmentsDir, guid, file));
             chunks = concatUint8Arrays(chunks, Uint8Array.from(fileData));
         }
 
@@ -115,8 +116,8 @@ export class FileSystem {
      *
      * @param contents The object data for the FCM client
      */
-    saveFCMClient(contents: any): void {
-        fs.writeFileSync(path.join(this.fcmDir, "client.json"), JSON.stringify(contents));
+    static saveFCMClient(contents: any): void {
+        fs.writeFileSync(path.join(FileSystem.fcmDir, "client.json"), JSON.stringify(contents));
     }
 
     /**
@@ -124,8 +125,8 @@ export class FileSystem {
      *
      * @param contents The object data for the FCM server
      */
-    saveFCMServer(contents: any): void {
-        fs.writeFileSync(path.join(this.fcmDir, "server.json"), JSON.stringify(contents));
+    static saveFCMServer(contents: any): void {
+        fs.writeFileSync(path.join(FileSystem.fcmDir, "server.json"), JSON.stringify(contents));
     }
 
     /**
@@ -133,8 +134,8 @@ export class FileSystem {
      *
      * @returns The parsed FCM client data
      */
-    getFCMClient(): any {
-        const filePath = path.join(this.fcmDir, "client.json");
+    static getFCMClient(): any {
+        const filePath = path.join(FileSystem.fcmDir, "client.json");
         if (!fs.existsSync(filePath)) return null;
 
         return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -145,8 +146,8 @@ export class FileSystem {
      *
      * @returns The parsed FCM server data
      */
-    getFCMServer(): any {
-        const filePath = path.join(this.fcmDir, "server.json");
+    static getFCMServer(): any {
+        const filePath = path.join(FileSystem.fcmDir, "server.json");
         if (!fs.existsSync(filePath)) return null;
 
         return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -157,9 +158,9 @@ export class FileSystem {
      *
      * @param name The name of the attachment to delete
      */
-    removeAttachment(name: string): void {
+    static removeAttachment(name: string): void {
         try {
-            fs.unlinkSync(path.join(this.attachmentsDir, name));
+            fs.unlinkSync(path.join(FileSystem.attachmentsDir, name));
         } catch (e) {
             console.warn(`Failed to remove attachment: ${name}`);
         }
@@ -179,17 +180,17 @@ export class FileSystem {
      * Loops over all the files in the attachments directory,
      * then call the delete method
      */
-    purgeAttachments(): void {
-        const files = fs.readdirSync(this.attachmentsDir);
+    static purgeAttachments(): void {
+        const files = fs.readdirSync(FileSystem.attachmentsDir);
         files.forEach(file => {
-            this.removeAttachment(file);
+            FileSystem.removeAttachment(file);
         });
     }
 
     /**
      * Asynchronously executes a shell command
      */
-    execShellCommand = async (cmd: string) => {
+    static async execShellCommand(cmd: string) {
         const { exec } = child_process;
         return new Promise((resolve, reject) => {
             exec(cmd, (error, stdout, stderr) => {
@@ -200,12 +201,12 @@ export class FileSystem {
                 resolve(stdout || stderr);
             });
         });
-    };
+    }
 
     /**
      * Makes sure that Messages is running
      */
-    startMessages = async () => {
-        await this.execShellCommand(`osascript "${this.scriptDir}/startMessages.scpt"`);
-    };
+    static async startMessages() {
+        await FileSystem.execShellCommand(`osascript "${FileSystem.scriptDir}/startMessages.scpt"`);
+    }
 }

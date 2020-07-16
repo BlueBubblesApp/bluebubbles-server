@@ -45,10 +45,10 @@ export const formatAddressList = (addresses: string[]) => {
     return name;
 };
 
-export const safeExecuteAppleScript = async (fileSystem: FileSystem, command: string) => {
+export const safeExecuteAppleScript = async (command: string) => {
     try {
         // Execute the command
-        return (await fileSystem.execShellCommand(command)) as string;
+        return (await FileSystem.execShellCommand(command)) as string;
     } catch (ex) {
         let msg = ex.message;
         if (msg instanceof String) [, msg] = msg.split("execution error: ");

@@ -22,8 +22,6 @@ import {
 export class ActionHandler {
     db: Connection;
 
-    fs: FileSystem;
-
     iMessageRepo: MessageRepository;
 
     contactsRepo: ContactRepository;
@@ -33,14 +31,8 @@ export class ActionHandler {
      *
      * @param fileSystem The instance of the filesystem for the app
      */
-    constructor(
-        db: Connection,
-        fileSystem: FileSystem,
-        iMessageRepo: MessageRepository,
-        contactsRepo: ContactRepository
-    ) {
+    constructor(db: Connection, iMessageRepo: MessageRepository, contactsRepo: ContactRepository) {
         this.db = db;
-        this.fs = fileSystem;
         this.iMessageRepo = iMessageRepo;
         this.contactsRepo = contactsRepo;
     }
@@ -66,21 +58,23 @@ export class ActionHandler {
         if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${cliSanitize(message ?? "")}"`;
+        let baseCmd = `osascript "${FileSystem.scriptDir}/sendMessage.scpt" "${chatGuid}" "${cliSanitize(
+            message ?? ""
+        )}"`;
 
         // Add attachment, if present
         if (attachment) {
-            this.fs.saveAttachment(attachmentName, attachment);
-            baseCmd += ` "${this.fs.attachmentsDir}/${attachmentName}"`;
+            FileSystem.saveAttachment(attachmentName, attachment);
+            baseCmd += ` "${FileSystem.attachmentsDir}/${attachmentName}"`;
         }
 
         try {
             // Make sure messages is open
-            await this.fs.startMessages();
+            await FileSystem.startMessages();
 
             // We need offsets here due to iMessage's save times being a bit off for some reason
             const now = new Date(new Date().getTime() - 1000).getTime(); // With 1 second offset
-            await this.fs.execShellCommand(baseCmd);
+            await FileSystem.execShellCommand(baseCmd);
 
             // Add queued item
             if (message && message.length > 0) {
@@ -130,7 +124,7 @@ export class ActionHandler {
          */
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const oldName of names) {
@@ -138,8 +132,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${cliSanitize(oldName)}" "${cliSanitize(
+                    `osascript "${FileSystem.scriptDir}/renameGroupChat.scpt" "${cliSanitize(oldName)}" "${cliSanitize(
                         newName
                     )}"`
                 );
@@ -174,7 +167,7 @@ export class ActionHandler {
          */
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const name of names) {
@@ -182,8 +175,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/addParticipant.scpt" "${name}" "${participant}"`
+                    `osascript "${FileSystem.scriptDir}/addParticipant.scpt" "${name}" "${participant}"`
                 );
             } catch (ex) {
                 err = ex;
@@ -220,7 +212,7 @@ export class ActionHandler {
          */
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const name of names) {
@@ -228,8 +220,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/removeParticipant.scpt" "${name}" "${address}"`
+                    `osascript "${FileSystem.scriptDir}/removeParticipant.scpt" "${name}" "${address}"`
                 );
             } catch (ex) {
                 err = ex;
@@ -266,7 +257,7 @@ export class ActionHandler {
         const friendlyMsg = text.substring(0, 50);
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const name of names) {
@@ -275,8 +266,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/toggleTapback.scpt" "${name}" "${cliSanitize(
+                    `osascript "${FileSystem.scriptDir}/toggleTapback.scpt" "${name}" "${cliSanitize(
                         text
                     )}" "${tapbackId}"`
                 );
@@ -310,7 +300,7 @@ export class ActionHandler {
          */
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const name of names) {
@@ -318,8 +308,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 const output = await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/checkTypingIndicator.scpt" "${name}"`
+                    `osascript "${FileSystem.scriptDir}/checkTypingIndicator.scpt" "${name}"`
                 );
                 return toBoolean(output.trim());
             } catch (ex) {
@@ -346,7 +335,7 @@ export class ActionHandler {
         if (participants.length === 0) throw new Error("No participants specified!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/startChat.scpt"`;
+        let baseCmd = `osascript "${FileSystem.scriptDir}/startChat.scpt"`;
 
         // Add members to the chat
         participants.forEach(member => {
@@ -354,10 +343,10 @@ export class ActionHandler {
         });
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         // Execute the command
-        let ret = (await this.fs.execShellCommand(baseCmd)) as string;
+        let ret = (await FileSystem.execShellCommand(baseCmd)) as string;
 
         try {
             // Get the chat GUID that was created
@@ -376,10 +365,13 @@ export class ActionHandler {
      */
     exportContacts = async (): Promise<void> => {
         // Create the base command to execute
-        const baseCmd = `osascript "${this.fs.scriptDir}/exportContacts.scpt"`;
+        const baseCmd = `osascript "${FileSystem.scriptDir}/exportContacts.scpt"`;
 
         try {
-            await this.fs.execShellCommand(baseCmd);
+            const now = new Date().getTime();
+            await FileSystem.execShellCommand(baseCmd);
+            const later = new Date().getTime();
+            console.log(`WEIRD: ${later - now} ms`);
         } catch (ex) {
             let msg = ex.message;
             if (msg instanceof String) [, msg] = msg.split("execution error: ");

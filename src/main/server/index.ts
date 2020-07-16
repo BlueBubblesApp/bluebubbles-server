@@ -2,6 +2,7 @@
 import { app, ipcMain, BrowserWindow } from "electron";
 import { createConnection, Connection } from "typeorm";
 import * as ngrok from "ngrok";
+import * as path from "path";
 
 // Configuration/Filesytem Imports
 import { Config } from "@server/entity/Config";
@@ -58,8 +59,6 @@ export class BlueBubblesServer {
 
     config: { [key: string]: any };
 
-    fs: FileSystem;
-
     eventCache: EventCache;
 
     hasDiskAccess: boolean;
@@ -86,7 +85,6 @@ export class BlueBubblesServer {
         // Other helpers
         this.ngrokServer = null;
         this.config = {};
-        this.fs = null;
         this.eventCache = null;
 
         // Services
@@ -186,8 +184,7 @@ export class BlueBubblesServer {
 
         try {
             this.log("Initializing filesystem...");
-            this.fs = new FileSystem();
-            this.fs.setup();
+            FileSystem.setup();
         } catch (ex) {
             this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
         }
@@ -202,7 +199,7 @@ export class BlueBubblesServer {
 
         try {
             this.log("Initializing connection to Google FCM...");
-            this.fcmService = new FCMService(this.fs);
+            this.fcmService = new FCMService(FileSystem);
         } catch (ex) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
         }
@@ -240,7 +237,7 @@ export class BlueBubblesServer {
         try {
             this.db = await createConnection({
                 type: "sqlite",
-                database: `${app.getPath("userData")}/config.db`,
+                database: path.join(FileSystem.baseDir, "config.db"),
                 entities: [Config, Device, Alert, Queue],
                 synchronize: true,
                 logging: false
@@ -289,7 +286,7 @@ export class BlueBubblesServer {
             this.ngrokServer = await ngrok.connect({
                 port: this.config.socket_port,
                 // This is required to run ngrok in production
-                binPath: path => path.replace("app.asar", "app.asar.unpacked")
+                binPath: bPath => bPath.replace("app.asar", "app.asar.unpacked")
             });
 
             await this.setConfig("server_address", this.ngrokServer);
@@ -516,11 +513,11 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {
-            return this.fs.getFCMServer();
+            return FileSystem.getFCMServer();
         });
 
         ipcMain.handle("get-fcm-client", (event, args) => {
-            return this.fs.getFCMClient();
+            return FileSystem.getFCMClient();
         });
     }
 
@@ -573,12 +570,12 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("set-fcm-server", (_, args) => {
-            this.fs.saveFCMServer(args);
+            FileSystem.saveFCMServer(args);
             this.fcmService.start();
         });
 
         ipcMain.handle("set-fcm-client", (_, args) => {
-            this.fs.saveFCMClient(args);
+            FileSystem.saveFCMClient(args);
         });
 
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {
@@ -668,7 +665,6 @@ export class BlueBubblesServer {
                 this.db,
                 this.iMessageRepo,
                 this.contactsRepo,
-                this.fs,
                 this.config.socket_port
             );
         } catch (ex) {

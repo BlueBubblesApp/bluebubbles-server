@@ -1,4 +1,3 @@
-import { app } from "electron";
 import * as io from "socket.io";
 import * as path from "path";
 import * as fslib from "fs";
@@ -11,7 +10,7 @@ import { ActionHandler } from "@server/helpers/actions";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ResponseFormat, ValidTapback } from "@server/types";
+import { ResponseFormat } from "@server/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
@@ -44,8 +43,6 @@ export class SocketService {
 
     contactsRepo: ContactRepository;
 
-    fs: FileSystem;
-
     actionHandler: ActionHandler;
 
     /**
@@ -57,13 +54,7 @@ export class SocketService {
      * @param fs The filesystem class handler
      * @param port The initial port for Socket.IO
      */
-    constructor(
-        db: Connection,
-        iMessageRepo: MessageRepository,
-        contactsRepo: ContactRepository,
-        fs: FileSystem,
-        port: number
-    ) {
+    constructor(db: Connection, iMessageRepo: MessageRepository, contactsRepo: ContactRepository, port: number) {
         this.db = db;
 
         this.server = io(port, {
@@ -73,8 +64,7 @@ export class SocketService {
 
         this.iMessageRepo = iMessageRepo;
         this.contactsRepo = contactsRepo;
-        this.fs = fs;
-        this.actionHandler = new ActionHandler(this.db, this.fs, this.iMessageRepo, this.contactsRepo);
+        this.actionHandler = new ActionHandler(this.db, this.iMessageRepo, this.contactsRepo);
     }
 
     /**
@@ -384,7 +374,7 @@ export class SocketService {
 
                 // Save the attachment chunk if there is an attachment
                 if (attachmentGuid)
-                    this.fs.saveAttachmentChunk(
+                    FileSystem.saveAttachmentChunk(
                         attachmentGuid,
                         attachmentChunkStart,
                         base64.base64ToBytes(attachmentData)
@@ -408,10 +398,10 @@ export class SocketService {
                             message,
                             attachmentGuid,
                             params?.attachmentName,
-                            attachmentGuid ? this.fs.buildAttachmentChunks(attachmentGuid) : null
+                            attachmentGuid ? FileSystem.buildAttachmentChunks(attachmentGuid) : null
                         );
 
-                        this.fs.deleteChunks(attachmentGuid);
+                        FileSystem.deleteChunks(attachmentGuid);
                         return respond(cb, "message-sent", createSuccessResponse(null));
                     } catch (ex) {
                         return respond(cb, "send-message-chunk-error", createServerErrorResponse(ex.message));
@@ -582,12 +572,18 @@ export class SocketService {
             async (_, cb): Promise<void> => {
                 try {
                     // Export the contacts
+                    let now = new Date().getTime();
                     await this.actionHandler.exportContacts();
+                    let later = new Date().getTime();
+                    console.log(`Export took ${later - now} ms`);
 
                     // Check if the contacts export exists, and respond back with it
-                    const contactsPath = path.join(this.fs.contactsDir, "AddressBook.vcf");
+                    const contactsPath = path.join(FileSystem.contactsDir, "AddressBook.vcf");
                     if (fslib.existsSync(contactsPath)) {
+                        now = new Date().getTime();
                         const data = fslib.readFileSync(contactsPath).toString("utf-8");
+                        later = new Date().getTime();
+                        console.log(`Read took ${later - now} ms`);
                         respond(cb, "contacts-from-vcf", createSuccessResponse(data));
                     } else {
                         respond(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));
