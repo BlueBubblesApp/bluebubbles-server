@@ -7,18 +7,23 @@ import { sync } from "read-chunk";
 import { concatUint8Arrays } from "@server/helpers/utils";
 import { AppleScripts } from "./scripts";
 
+let subdir = "";
+if (process.env.NODE_ENV !== "production") subdir = "BlueBubbles-Desktop-App";
+
 /**
  * The class used to handle all communications to the App's "filesystem".
  * The filesystem is the directory dedicated to the app-specific files
  */
 export class FileSystem {
-    public scriptDir = `${app.getPath("userData")}/Scripts`;
-
-    public attachmentsDir = `${app.getPath("userData")}/Attachments`;
-
-    public contactsDir = `${app.getPath("userData")}/Contacts`;
-
-    public fcmDir = `${app.getPath("userData")}/FCM`;
+    public baseDir = path.join(app.getPath("userData"), subdir);
+    
+    public attachmentsDir = path.join(this.baseDir, "Attachments");
+    
+    public contactsDir = path.join(this.baseDir, "Contacts");
+    
+    public scriptDir = path.join(this.baseDir, "Scripts");
+    
+    public fcmDir = path.join(this.baseDir, "FCM");
 
     /**
      * Sets up all required directories and then, writes the scripts
