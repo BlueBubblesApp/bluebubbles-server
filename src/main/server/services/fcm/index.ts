@@ -6,14 +6,11 @@ import { FileSystem } from "@server/fileSystem";
  * Google FCM server. This is used to handle/manage notifications
  */
 export class FCMService {
-    fs: FileSystem;
-
     app: admin.app.App;
 
     lastRefresh: Date;
 
-    constructor(fs: FileSystem) {
-        this.fs = fs;
+    constructor() {
         this.app = null;
         this.lastRefresh = null;
     }
@@ -29,8 +26,8 @@ export class FCMService {
 
     private refresh(force = false): boolean {
         // Do nothing if the config doesn't exist
-        const serverConfig = this.fs.getFCMServer();
-        const clientConfig = this.fs.getFCMClient();
+        const serverConfig = FileSystem.getFCMServer();
+        const clientConfig = FileSystem.getFCMClient();
         if (!serverConfig || !clientConfig) return false;
 
         const now = new Date();
@@ -85,12 +82,16 @@ export class FCMService {
      * @param devices Devices to send the notification to
      * @param data The data to send
      */
-    async sendNotification(devices: string[], data: any): Promise<admin.messaging.BatchResponse> {
+    async sendNotification(devices: string[], data: any): Promise<admin.messaging.MessagingDevicesResponse[]> {
         if (!this.refresh()) return null;
 
         // Build out the notification message
-        const msg: admin.messaging.MulticastMessage = { data, tokens: devices };
-        const res = await this.app.messaging().sendMulticast(msg);
-        return res;
+        const msg: admin.messaging.DataMessagePayload = { data };
+        const options: admin.messaging.MessagingOptions = { priority: "high" };
+
+        const responses: admin.messaging.MessagingDevicesResponse[] = [];
+        for (const device of devices) responses.push(await this.app.messaging().sendToDevice(device, msg, options));
+
+        return responses;
     }
 }

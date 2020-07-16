@@ -199,7 +199,7 @@ export class BlueBubblesServer {
 
         try {
             this.log("Initializing connection to Google FCM...");
-            this.fcmService = new FCMService(FileSystem);
+            this.fcmService = new FCMService();
         } catch (ex) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
         }
