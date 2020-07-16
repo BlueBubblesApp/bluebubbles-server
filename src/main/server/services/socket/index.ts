@@ -585,7 +585,7 @@ export class SocketService {
                     await this.actionHandler.exportContacts();
 
                     // Check if the contacts export exists, and respond back with it
-                    const contactsPath = `${app.getPath("userData")}/Contacts/AddressBook.vcf`;
+                    const contactsPath = path.join(this.fs.contactsDir, "AddressBook.vcf");
                     if (fslib.existsSync(contactsPath)) {
                         const data = fslib.readFileSync(contactsPath).toString("utf-8");
                         respond(cb, "contacts-from-vcf", createSuccessResponse(data));
