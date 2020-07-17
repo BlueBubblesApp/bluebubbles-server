@@ -1,8 +1,6 @@
-import { Connection } from "typeorm";
+import { ServerSingleton } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { MessageRepository } from "@server/api/imessage";
-import { ContactRepository } from "@server/api/contacts";
-import { Queue } from "@server/entity/Queue";
+import { Queue } from "@server/databases/server/entity/Queue";
 import { ValidTapback } from "@server/types";
 
 import {
@@ -20,23 +18,6 @@ import {
  * variables
  */
 export class ActionHandler {
-    db: Connection;
-
-    iMessageRepo: MessageRepository;
-
-    contactsRepo: ContactRepository;
-
-    /**
-     * Constructor to set some vars
-     *
-     * @param fileSystem The instance of the filesystem for the app
-     */
-    constructor(db: Connection, iMessageRepo: MessageRepository, contactsRepo: ContactRepository) {
-        this.db = db;
-        this.iMessageRepo = iMessageRepo;
-        this.contactsRepo = contactsRepo;
-    }
-
     /**
      * Sends a message by executing the sendMessage AppleScript
      *
@@ -47,7 +28,7 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    sendMessage = async (
+    static sendMessage = async (
         tempGuid: string,
         chatGuid: string,
         message: string,
@@ -83,7 +64,7 @@ export class ActionHandler {
                 item.chatGuid = chatGuid;
                 item.dateCreated = now;
                 item.text = message;
-                await this.db.getRepository(Queue).manager.save(item);
+                await ServerSingleton().repo.queue().manager.save(item);
             }
 
             // If there is an attachment, add that to the queue too
@@ -93,7 +74,7 @@ export class ActionHandler {
                 attachmentItem.chatGuid = chatGuid;
                 attachmentItem.dateCreated = now;
                 attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
-                await this.db.getRepository(Queue).manager.save(attachmentItem);
+                await ServerSingleton().repo.queue().manager.save(attachmentItem);
             }
         } catch (ex) {
             let msg = ex.message;
@@ -112,8 +93,12 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
+        const names = await generateChatNameList(
+            chatGuid,
+            ServerSingleton().iMessageRepo,
+            ServerSingleton().contactsRepo
+        );
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -155,8 +140,12 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        const names = await generateChatNameList(
+            chatGuid,
+            ServerSingleton().iMessageRepo,
+            ServerSingleton().contactsRepo
+        );
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -196,8 +185,12 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        const names = await generateChatNameList(
+            chatGuid,
+            ServerSingleton().iMessageRepo,
+            ServerSingleton().contactsRepo
+        );
         let address = participant;
         if (!address.includes("@")) {
             address = getiMessageNumberFormat(address);
@@ -242,8 +235,12 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    toggleTapback = async (chatGuid: string, text: string, tapback: ValidTapback): Promise<string> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static toggleTapback = async (chatGuid: string, text: string, tapback: ValidTapback): Promise<string> => {
+        const names = await generateChatNameList(
+            chatGuid,
+            ServerSingleton().iMessageRepo,
+            ServerSingleton().contactsRepo
+        );
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -288,8 +285,12 @@ export class ActionHandler {
      *
      * @returns Boolean on whether a typing indicator was present
      */
-    checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
+        const names = await generateChatNameList(
+            chatGuid,
+            ServerSingleton().iMessageRepo,
+            ServerSingleton().contactsRepo
+        );
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -331,7 +332,7 @@ export class ActionHandler {
      *
      * @returns The GUID of the new chat
      */
-    createChat = async (participants: string[]): Promise<string> => {
+    static createChat = async (participants: string[]): Promise<string> => {
         if (participants.length === 0) throw new Error("No participants specified!");
 
         // Create the base command to execute
@@ -363,7 +364,7 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    exportContacts = async (): Promise<void> => {
+    static exportContacts = async (): Promise<void> => {
         // Create the base command to execute
         const baseCmd = `osascript "${FileSystem.scriptDir}/exportContacts.scpt"`;
 

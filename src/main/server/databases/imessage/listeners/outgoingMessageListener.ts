@@ -1,5 +1,5 @@
-import { MessageRepository } from "@server/api/imessage";
-import { Message } from "@server/api/imessage/entity/Message";
+import { MessageRepository } from "@server/databases/imessage";
+import { Message } from "@server/databases/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
 import { ChangeListener } from "./changeListener";
 

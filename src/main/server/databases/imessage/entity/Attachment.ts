@@ -4,10 +4,10 @@ import * as path from "path";
 import * as base64 from "byte-base64";
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 
-import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/api/transformers/DateTransformer";
-import { Message } from "@server/api/imessage/entity/Message";
-import { getBlurHash } from "@server/api/imessage/helpers/utils";
+import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
+import { DateTransformer } from "@server/databases/transformers/DateTransformer";
+import { Message } from "@server/databases/imessage/entity/Message";
+import { getBlurHash } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 
 @Entity("attachment")

@@ -1,43 +1,64 @@
 // Dependency Imports
 import { app, ipcMain, BrowserWindow } from "electron";
-import { createConnection, Connection } from "typeorm";
-import * as ngrok from "ngrok";
-import * as path from "path";
 
 // Configuration/Filesytem Imports
-import { Config } from "@server/entity/Config";
-import { Alert } from "@server/entity/Alert";
-import { Device } from "@server/entity/Device";
-import { Queue } from "@server/entity/Queue";
+import { Queue } from "@server/databases/server/entity/Queue";
 import { FileSystem } from "@server/fileSystem";
-import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
+import { DEFAULT_POLL_FREQUENCY_MS } from "@server/constants";
 
 // Database Imports
-import { MessageRepository } from "@server/api/imessage";
-import { ContactRepository } from "@server/api/contacts";
+import { ServerRepository } from "@server/databases/server";
+import { MessageRepository } from "@server/databases/imessage";
+import { ContactRepository } from "@server/databases/contacts";
 import {
     IncomingMessageListener,
     OutgoingMessageListener,
     MessageUpdateListener,
     GroupChangeListener
-} from "@server/api/imessage/listeners";
-import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
+} from "@server/databases/imessage/listeners";
+import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
 
 // Service Imports
-import { SocketService, FCMService, AlertService, QueueService, CaffeinateService } from "@server/services";
+import {
+    SocketService,
+    FCMService,
+    AlertService,
+    QueueService,
+    CaffeinateService,
+    NgrokService
+} from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { boolToString, toBoolean } from "./helpers/utils";
-import { ChangeListener } from "./api/imessage/listeners/changeListener";
+
+import { ActionHandler } from "./helpers/actions";
+
+/**
+ * Create a singleton for the server so that it can be referenced everywhere.
+ * Plus, we only want one instance of it running at all times.
+ */
+let server: BlueBubblesServer = null;
+export const ServerSingleton = (win: BrowserWindow = null) => {
+    // If we already have a server, update the window (if not null) and return
+    // the same instance
+    if (server) {
+        if (win) server.window = win;
+        return server;
+    }
+
+    server = new BlueBubblesServer(win);
+    return server;
+};
 
 /**
  * Main entry point for the back-end server
  * This will handle all services and helpers that get spun
  * up when running the application.
  */
-export class BlueBubblesServer {
+class BlueBubblesServer {
     window: BrowserWindow;
 
-    db: Connection;
+    repo: ServerRepository;
 
     iMessageRepo: MessageRepository;
 
@@ -45,19 +66,21 @@ export class BlueBubblesServer {
 
     ngrokServer: string;
 
-    socketService: SocketService;
+    socket: SocketService;
 
-    fcmService: FCMService;
+    fcm: FCMService;
 
-    alertService: AlertService;
+    alerter: AlertService;
 
-    queueService: QueueService;
+    queue: QueueService;
 
-    caffeinateService: CaffeinateService;
+    caffeinate: CaffeinateService;
+
+    ngrokService: NgrokService;
+
+    actionHandler: ActionHandler;
 
     chatListeners: ChangeListener[];
-
-    config: { [key: string]: any };
 
     eventCache: EventCache;
 
@@ -78,22 +101,20 @@ export class BlueBubblesServer {
         this.window = window;
 
         // Databases
-        this.db = null;
+        this.repo = null;
         this.iMessageRepo = null;
         this.contactsRepo = null;
 
         // Other helpers
-        this.ngrokServer = null;
-        this.config = {};
         this.eventCache = null;
+        this.chatListeners = [];
+        this.actionHandler = null;
 
         // Services
-        this.socketService = null;
-        this.alertService = null;
-        this.fcmService = null;
-        this.queueService = null;
-        this.caffeinateService = null;
-        this.chatListeners = [];
+        this.socket = null;
+        this.fcm = null;
+        this.queue = null;
+        this.caffeinate = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -101,7 +122,7 @@ export class BlueBubblesServer {
         this.hasStarted = false;
     }
 
-    private emitToUI(event: string, data: any) {
+    emitToUI(event: string, data: any) {
         if (this.window) this.window.webContents.send(event, data);
     }
 
@@ -112,18 +133,18 @@ export class BlueBubblesServer {
      * @param message The message to print
      * @param type The log type
      */
-    private log(message: any, type?: "log" | "error" | "dir" | "warn") {
+    log(message: any, type?: "log" | "error" | "dir" | "warn") {
         switch (type) {
             case "error":
                 console.error(message);
-                this.alertService.create("error", message);
+                AlertService.create("error", message);
                 break;
             case "dir":
                 console.dir(message);
                 break;
             case "warn":
                 console.warn(message);
-                this.alertService.create("warn", message);
+                AlertService.create("warn", message);
                 break;
             case "log":
             default:
@@ -140,7 +161,7 @@ export class BlueBubblesServer {
     async start(): Promise<void> {
         await this.setup();
 
-        this.fcmService.start();
+        this.fcm.start();
 
         if (!this.hasStarted) {
             this.log("Starting Configuration IPC Listeners..");
@@ -151,36 +172,17 @@ export class BlueBubblesServer {
     }
 
     /**
-     * Sets a config value in the database and class
-     *
-     * @param name Name of the config item
-     * @param value Value of the config item
-     */
-    private async setConfig(name: string, value: any): Promise<void> {
-        await this.db.getRepository(Config).update({ name }, { value });
-        if (typeof value === "boolean") {
-            this.config[name] = boolToString(value as boolean);
-        } else {
-            this.config[name] = String(value);
-        }
-
-        this.emitToUI("config-update", this.config);
-    }
-
-    /**
      * Performs the initial setup for the server.
      * Mainly, instantiation of a bunch of classes/handlers
      */
     private async setup(): Promise<void> {
         this.log("Performing initial setup...");
-        await this.initializeDatabase();
-        await this.setupDefaults();
+        this.log("Initializing server database...");
+        this.repo = new ServerRepository();
+        await this.repo.initialize();
 
         // Setup lightweight message cache
         this.eventCache = new EventCache();
-
-        this.log("Initializing alert service...");
-        this.alertService = new AlertService(this.db, this.window);
 
         try {
             this.log("Initializing filesystem...");
@@ -189,17 +191,11 @@ export class BlueBubblesServer {
             this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
         }
 
-        this.log("Initializing configuration database...");
-        const cfg = await this.db.getRepository(Config).find();
-        cfg.forEach(item => {
-            this.config[item.name] = item.value;
-        });
-
         await this.setupCaffeinate();
 
         try {
             this.log("Initializing connection to Google FCM...");
-            this.fcmService = new FCMService();
+            this.fcm = new FCMService();
         } catch (ex) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
         }
@@ -229,75 +225,16 @@ export class BlueBubblesServer {
     }
 
     /**
-     * Initializes the connection to the configuration database
-     */
-    private async initializeDatabase(): Promise<void> {
-        if (this.db) return;
-
-        try {
-            this.db = await createConnection({
-                type: "sqlite",
-                database: path.join(FileSystem.baseDir, "config.db"),
-                entities: [Config, Device, Alert, Queue],
-                synchronize: true,
-                logging: false
-            });
-        } catch (ex) {
-            this.log(`Failed to connect to configuration database! ${ex.message}`, "error");
-        }
-    }
-
-    /**
-     * This sets any default database values, if the database
-     * has not already been initialized
-     */
-    private async setupDefaults(): Promise<void> {
-        try {
-            const repo = this.db.getRepository(Config);
-            for (const key of Object.keys(DEFAULT_DB_ITEMS)) {
-                const item = await repo.findOne({ name: key });
-                if (!item) await this.addConfigItem(key, DEFAULT_DB_ITEMS[key]());
-            }
-        } catch (ex) {
-            this.log(`Failed to setup default configurations! ${ex.message}`, "error");
-        }
-    }
-
-    /**
      * Sets up the caffeinate service
      */
     private async setupCaffeinate(): Promise<void> {
         try {
-            this.caffeinateService = new CaffeinateService();
-            if (this.config.auto_caffeinate === "1") {
-                this.caffeinateService.start();
+            this.caffeinate = new CaffeinateService();
+            if (this.repo.getConfig("auto_caffeinate")) {
+                this.caffeinate.start();
             }
         } catch (ex) {
             this.log(`Failed to setup caffeinate service! ${ex.message}`, "error");
-        }
-    }
-
-    /**
-     * Sets up a connection to the Ngrok servers, opening a secure
-     * tunnel between the internet and your Mac (iMessage server)
-     */
-    async connectToNgrok(): Promise<void> {
-        try {
-            this.ngrokServer = await ngrok.connect({
-                port: this.config.socket_port,
-                // This is required to run ngrok in production
-                binPath: bPath => bPath.replace("app.asar", "app.asar.unpacked")
-            });
-
-            await this.setConfig("server_address", this.ngrokServer);
-
-            // Emit this over the socket
-            if (this.socketService) this.socketService.server.emit("new-server", this.ngrokServer);
-
-            if (this.socketService) await this.sendNotification("new-server", this.ngrokServer);
-            await this.fcmService.setServerUrl(this.ngrokServer);
-        } catch (ex) {
-            this.log(`Failed to connect to ngrok! ${ex.message}`, "error");
         }
     }
 
@@ -308,34 +245,19 @@ export class BlueBubblesServer {
      * @param data Associated data with the notification (as a string)
      */
     async sendNotification(type: string, data: any) {
-        this.socketService.server.emit(type, data);
+        this.socket.server.emit(type, data);
 
         // Send notification to devices
-        if (this.fcmService.app) {
-            const devices = await this.db.getRepository(Device).find();
+        if (this.fcm.app) {
+            const devices = await this.repo.devices().find();
             if (!devices || devices.length === 0) return;
 
             const notifData = JSON.stringify(data);
-            await this.fcmService.sendNotification(
+            await this.fcm.sendNotification(
                 devices.map(device => device.identifier),
                 { type, data: notifData }
             );
         }
-    }
-
-    /**
-     * Helper method for addind a new configuration item to the
-     * database.
-     *
-     * @param name The name of the config item
-     * @param value The initial value of the config item
-     */
-    private async addConfigItem(name: string, value: string | number): Promise<Config> {
-        const item = new Config();
-        item.name = name;
-        item.value = String(value);
-        await this.db.getRepository(Config).save(item);
-        return item;
     }
 
     /**
@@ -345,7 +267,7 @@ export class BlueBubblesServer {
      */
     private startChatListener() {
         if (!this.iMessageRepo?.db) {
-            this.alertService.create(
+            AlertService.create(
                 "info",
                 "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled"
             );
@@ -353,13 +275,13 @@ export class BlueBubblesServer {
         }
 
         // Start the queue service
-        this.queueService.start();
-        this.queueService.on("message-timeout", async (item: Queue) => {
+        this.queue.start();
+        this.queue.on("message-timeout", async (item: Queue) => {
             const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
             this.log(`Message send timeout for ${text}`, "warn");
             await this.sendNotification("message-timeout", item);
         });
-        this.queueService.on("message-match", async (item: { tempGuid: string; message: Message }) => {
+        this.queue.on("message-match", async (item: { tempGuid: string; message: Message }) => {
             const text = item.message.cacheHasAttachments
                 ? `Image: ${item.message.text.slice(1, item.message.text.length) || "<No Text>"}`
                 : item.message.text;
@@ -508,8 +430,8 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("get-devices", async (event, args) => {
-            const devices = await this.db.getRepository(Device).find();
-            return devices;
+            // eslint-disable-next-line no-return-await
+            return await this.repo.devices().find();
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {
@@ -527,51 +449,41 @@ export class BlueBubblesServer {
     private startConfigIpcListeners() {
         ipcMain.handle("set-config", async (_, args) => {
             for (const item of Object.keys(args)) {
-                if (this.config[item] && this.config[item] !== args[item]) {
-                    this.config[item] = args[item];
+                if (this.repo.hasConfig(item) && this.repo.getConfig(item) !== args[item]) {
+                    this.repo.setConfig(item, args[item]);
 
                     // If the socket port changed, disconnect and reconnect
                     if (item === "socket_port") {
-                        await ngrok.disconnect();
-                        await this.connectToNgrok();
-                        await this.socketService.restart(args[item]);
+                        await this.ngrokService.restart();
+                        await this.socket.restart();
                     }
                 }
-
-                // Update in class
-                if (this.config[item]) await this.setConfig(item, args[item]);
             }
 
-            this.emitToUI("config-update", this.config);
-            return this.config;
+            this.emitToUI("config-update", this.repo.config);
+            return this.repo.config;
         });
 
         ipcMain.handle("get-config", async (_, __) => {
-            if (!this.db) return {};
-
-            const cfg = await this.db.getRepository(Config).find();
-            for (const i of cfg) {
-                this.config[i.name] = i.value;
-            }
-
-            return this.config;
+            if (!this.repo.db) return {};
+            return this.repo.config;
         });
 
         ipcMain.handle("get-alerts", async (_, __) => {
-            const alerts = await this.alertService.find();
+            const alerts = await AlertService.find();
             return alerts;
         });
 
         ipcMain.handle("mark-alert-as-read", async (_, args) => {
             const alertIds = args ?? [];
             for (const id of alertIds) {
-                await this.alertService.markAsRead(id);
+                await AlertService.markAsRead(id);
             }
         });
 
         ipcMain.handle("set-fcm-server", (_, args) => {
             FileSystem.saveFCMServer(args);
-            this.fcmService.start();
+            this.fcm.start();
         });
 
         ipcMain.handle("set-fcm-client", (_, args) => {
@@ -579,7 +491,7 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {
-            await this.setConfig("tutorial_is_done", boolToString(toggle));
+            await this.repo.setConfig("tutorial_is_done", toggle);
 
             if (toggle) {
                 await this.setupServices();
@@ -604,18 +516,20 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("toggle-caffeinate", async (_, toggle) => {
-            if (this.caffeinateService && toggle) {
-                this.caffeinateService.start();
-            } else if (this.caffeinateService && !toggle) {
-                this.caffeinateService.stop();
+            if (this.caffeinate && toggle) {
+                this.caffeinate.start();
+            } else if (this.caffeinate && !toggle) {
+                this.caffeinate.stop();
             }
 
-            await this.setConfig("auto_caffeinate", toggle);
+            await this.repo.setConfig("auto_caffeinate", toggle);
         });
 
         ipcMain.handle("get-caffeinate-status", (_, __) => {
-            const autoCaffeinate = toBoolean(this.config.auto_caffeinate);
-            return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
+            return {
+                isCaffeinated: this.caffeinate.isCaffeinated,
+                autoCaffeinate: this.repo.getConfig("auto_caffeinate")
+            };
         });
 
         ipcMain.handle("purge-event-cache", (_, __) => {
@@ -628,7 +542,7 @@ export class BlueBubblesServer {
         });
 
         ipcMain.handle("toggle-auto-start", async (_, toggle) => {
-            await this.setConfig("auto_start", toggle);
+            await this.repo.setConfig("auto_start", toggle);
             app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
         });
 
@@ -661,24 +575,14 @@ export class BlueBubblesServer {
 
         try {
             this.log("Initializing up sockets...");
-            this.socketService = new SocketService(
-                this.db,
-                this.iMessageRepo,
-                this.contactsRepo,
-                this.config.socket_port
-            );
+            this.socket = new SocketService();
         } catch (ex) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
         try {
             this.log("Initializing queue service...");
-            this.queueService = new QueueService(
-                this.db,
-                this.iMessageRepo,
-                this.eventCache,
-                DEFAULT_POLL_FREQUENCY_MS
-            );
+            this.queue = new QueueService(this.eventCache, DEFAULT_POLL_FREQUENCY_MS);
         } catch (ex) {
             this.log(`Failed to setup queue service! ${ex.message}`, "error");
         }
@@ -694,14 +598,16 @@ export class BlueBubblesServer {
         // Start the IPC listener first for the UI
         if (this.hasDiskAccess && !this.hasStarted) this.startIpcListener();
 
-        // Disconnect from ngrok in case we are connected
-        await ngrok.disconnect();
-
-        this.log("Connecting to Ngrok...");
-        await this.connectToNgrok();
+        try {
+            this.log("Connecting to Ngrok...");
+            this.ngrokService = new NgrokService();
+            await this.ngrokService.restart();
+        } catch (ex) {
+            this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
+        }
 
         this.log("Starting socket service...");
-        this.socketService.restart(this.config.socket_port);
+        this.socket.restart();
 
         if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");
@@ -718,7 +624,7 @@ export class BlueBubblesServer {
         this.log("Restarting the server...");
 
         // Remove all listeners
-        this.queueService.removeAllListeners();
+        this.queue.removeAllListeners();
         for (const i of this.chatListeners) i.stop();
         this.chatListeners = [];
 
@@ -729,7 +635,7 @@ export class BlueBubblesServer {
         }
 
         // Remove the FCM connection (this will reconnect in `start`)
-        if (this.fcmService.app) await this.fcmService.app.delete();
+        if (this.fcm.app) await this.fcm.app.delete();
 
         // Start the server up again
         await this.start();

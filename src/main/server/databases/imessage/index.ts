@@ -1,12 +1,12 @@
 /* eslint-disable no-param-reassign */
 import { createConnection, Connection } from "typeorm";
 
-import { DBMessageParams } from "@server/api/imessage/types";
-import { convertDateTo2001Time } from "@server/api/imessage/helpers/dateUtil";
-import { Chat } from "@server/api/imessage/entity/Chat";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Message } from "@server/api/imessage/entity/Message";
-import { Attachment } from "@server/api/imessage/entity/Attachment";
+import { DBMessageParams } from "@server/databases/imessage/types";
+import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
+import { Chat } from "@server/databases/imessage/entity/Chat";
+import { Handle } from "@server/databases/imessage/entity/Handle";
+import { Message } from "@server/databases/imessage/entity/Message";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database

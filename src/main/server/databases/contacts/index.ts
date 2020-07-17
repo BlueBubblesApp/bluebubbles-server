@@ -3,9 +3,9 @@ import * as fs from "fs";
 import { createConnection, Connection } from "typeorm";
 import { PhoneNumberUtil, PhoneNumberFormat } from "google-libphonenumber";
 
-import { Record } from "@server/api/contacts/entity/Record";
-import { PhoneNumber } from "@server/api/contacts/entity/PhoneNumber";
-import { Email } from "@server/api/contacts/entity/Email";
+import { Record } from "@server/databases/contacts/entity/Record";
+import { PhoneNumber } from "@server/databases/contacts/entity/PhoneNumber";
+import { Email } from "@server/databases/contacts/entity/Email";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database

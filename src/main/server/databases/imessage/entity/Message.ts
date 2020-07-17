@@ -1,11 +1,11 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
-import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/api/transformers/DateTransformer";
-import { MessageTypeTransformer } from "@server/api/transformers/MessageTypeTransformer";
+import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
+import { DateTransformer } from "@server/databases/transformers/DateTransformer";
+import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
 import { MessageResponse } from "@server/types";
-import { Handle, getHandleResponse } from "@server/api/imessage/entity/Handle";
-import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
-import { Attachment, getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
+import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
+import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 
 @Entity("message")
 export class Message {

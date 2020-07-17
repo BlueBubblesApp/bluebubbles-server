@@ -3,13 +3,13 @@ import { app, BrowserWindow, Tray, Menu } from "electron";
 import * as path from "path";
 import * as url from "url";
 
-import { BlueBubblesServer } from "@server/index";
+import { ServerSingleton } from "@server/index";
 import { UpdateService } from "@server/services";
 import trayIcon from "./assets/img/tray-icon.png";
 
 let win: BrowserWindow | null;
 let tray: Tray | null;
-const api = new BlueBubblesServer(win);
+let api = ServerSingleton(win);
 
 // Start the API
 api.start();
@@ -43,15 +43,15 @@ const buildTray = () => {
             type: "separator"
         },
         {
-            label: `Server Address: ${api.config?.server_address}`,
+            label: `Server Address: ${api.repo.getConfig("server_address")}`,
             enabled: false
         },
         {
-            label: `Socket Connections: ${api.socketService?.server.sockets.sockets.length ?? 0}`,
+            label: `Socket Connections: ${api.socket?.server.sockets.sockets.length ?? 0}`,
             enabled: false
         },
         {
-            label: `Caffeinated: ${api.caffeinateService?.isCaffeinated}`,
+            label: `Caffeinated: ${api.caffeinate?.isCaffeinated}`,
             enabled: false
         },
         {
@@ -119,13 +119,13 @@ const createWindow = async () => {
     });
 
     // Hook onto when we load the UI
-    win.webContents.send("config-update", api.config);
+    win.webContents.send("config-update", api.repo.config);
     win.webContents.on("dom-ready", async () => {
-        win.webContents.send("config-update", api.config);
+        win.webContents.send("config-update", api.repo.config);
     });
 
     // Set the new window in the API
-    api.window = win;
+    api = ServerSingleton(win);
 
     // Start the update service
     const updateService = new UpdateService();

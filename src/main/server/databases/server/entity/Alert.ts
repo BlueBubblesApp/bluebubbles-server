@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from "typeorm";
-import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
+import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 
 @Entity()
 export class Alert {

@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, ManyToOne } from "typeorm";
 
-import { BooleanTransformer } from "@server/api/transformers/BooleanTransformer";
-import { Record } from "@server/api/contacts/entity/Record";
+import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
+import { Record } from "@server/databases/contacts/entity/Record";
 
 @Entity("ZABCDPHONENUMBER")
 export class PhoneNumber {

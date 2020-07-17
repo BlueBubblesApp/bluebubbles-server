@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, JoinColumn, OneToMany } from "typeorm";
-import { PhoneNumber } from "@server/api/contacts/entity/PhoneNumber";
-import { Email } from "@server/api/contacts/entity/Email";
+import { PhoneNumber } from "@server/databases/contacts/entity/PhoneNumber";
+import { Email } from "@server/databases/contacts/entity/Email";
 
 @Entity("ZABCDRECORD")
 export class Record {

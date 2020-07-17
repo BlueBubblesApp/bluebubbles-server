@@ -1,10 +1,10 @@
 /* eslint-disable no-bitwise */
 import { PhoneNumberUtil } from "google-libphonenumber";
 import { FileSystem } from "@server/fileSystem";
-import { ContactRepository } from "@server/api/contacts";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Chat } from "@server/api/imessage/entity/Chat";
-import { MessageRepository } from "@server/api/imessage";
+import { ContactRepository } from "@server/databases/contacts";
+import { Handle } from "@server/databases/imessage/entity/Handle";
+import { Chat } from "@server/databases/imessage/entity/Chat";
+import { MessageRepository } from "@server/databases/imessage";
 
 export const generateUuid = () => {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {

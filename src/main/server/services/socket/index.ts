@@ -5,8 +5,7 @@ import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 
 // Internal libraries
-import { MessageRepository } from "@server/api/imessage";
-import { ActionHandler } from "@server/helpers/actions";
+import { ServerSingleton } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
@@ -19,52 +18,36 @@ import {
 } from "@server/helpers/responses";
 
 // Entities
-import { getChatResponse } from "@server/api/imessage/entity/Chat";
-import { getHandleResponse } from "@server/api/imessage/entity/Handle";
-import { getMessageResponse } from "@server/api/imessage/entity/Message";
-import { Connection } from "typeorm";
-import { Device } from "@server/entity/Device";
-import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
-import { Config } from "@server/entity/Config";
-import { ContactRepository } from "@server/api/contacts";
-import { DBMessageParams } from "@server/api/imessage/types";
-import { Queue } from "@server/entity/Queue";
+import { getChatResponse } from "@server/databases/imessage/entity/Chat";
+import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { Device } from "@server/databases/server/entity/Device";
+import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
+import { DBMessageParams } from "@server/databases/imessage/types";
+import { Queue } from "@server/databases/server/entity/Queue";
+import { ActionHandler } from "@server/helpers/actions";
 
 /**
  * This service class handles all routing for incoming socket
  * connections and requests.
  */
 export class SocketService {
-    db: Connection;
-
     server: io.Server;
-
-    iMessageRepo: MessageRepository;
-
-    contactsRepo: ContactRepository;
-
-    actionHandler: ActionHandler;
 
     /**
      * Starts up the initial Socket.IO connection and initializes other
      * required classes and variables
      *
      * @param db The configuration database
-     * @param iMessageRepo The iMessage database repository
+     * @param server The iMessage database repository
      * @param fs The filesystem class handler
      * @param port The initial port for Socket.IO
      */
-    constructor(db: Connection, iMessageRepo: MessageRepository, contactsRepo: ContactRepository, port: number) {
-        this.db = db;
-
-        this.server = io(port, {
+    constructor() {
+        this.server = io(ServerSingleton().repo.getConfig("socket_port"), {
             // 5 Minute ping timeout
             pingTimeout: 60000
         });
-
-        this.iMessageRepo = iMessageRepo;
-        this.contactsRepo = contactsRepo;
-        this.actionHandler = new ActionHandler(this.db, this.iMessageRepo, this.contactsRepo);
     }
 
     /**
@@ -76,10 +59,10 @@ export class SocketService {
          */
         this.server.on("connection", async socket => {
             const guid = socket.handshake.query?.guid;
-            const cfg = await this.db.getRepository(Config).findOne({ name: "guid" });
+            const cfgGuid = await ServerSingleton().repo.getConfig("guid");
 
             // Basic authentication
-            if (guid === cfg.value) {
+            if (guid === cfgGuid) {
                 console.log("Client Authenticated Successfully");
             } else {
                 socket.disconnect();
@@ -92,9 +75,8 @@ export class SocketService {
              *
              * A console message will be printed, and a socket error will be emitted
              */
-            socket.use((packet, next) => {
+            socket.use((_, next) => {
                 try {
-                    // console.log(socket.request);
                     next();
                 } catch (ex) {
                     console.error(ex);
@@ -116,6 +98,8 @@ export class SocketService {
         const respond = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             if (callback) callback(data);
             else socket.emit(channel, data);
+
+            if (data.error) ServerSingleton().log(data.error.message, "error");
         };
 
         /**
@@ -128,16 +112,41 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
                 // If the device ID exists, update the identifier
-                const device = await this.db.getRepository(Device).findOne({ name: params.deviceName });
+                const device = await ServerSingleton().repo.devices().findOne({ name: params.deviceName });
                 if (device) {
-                    await this.db
-                        .getRepository(Device)
+                    await ServerSingleton()
+                        .repo.devices()
                         .update({ name: params.deviceName }, { identifier: params.deviceId });
                 } else {
                     const item = new Device();
                     item.name = params.deviceName;
                     item.identifier = params.deviceId;
-                    await this.db.getRepository(Device).save(item);
+                    await ServerSingleton().repo.devices().save(item);
+                }
+
+                return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
+            }
+        );
+
+        /**
+         * Add Device ID to the database
+         */
+        socket.on(
+            "get-fcm-data",
+            async (params, cb): Promise<void> => {
+                if (!this) return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
+
+                // If the device ID exists, update the identifier
+                const device = await ServerSingleton().repo.devices().findOne({ name: params.deviceName });
+                if (device) {
+                    await ServerSingleton()
+                        .repo.devices()
+                        .update({ name: params.deviceName }, { identifier: params.deviceId });
+                } else {
+                    const item = new Device();
+                    item.name = params.deviceName;
+                    item.identifier = params.deviceId;
+                    await ServerSingleton().repo.devices().save(item);
                 }
 
                 return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
@@ -149,7 +158,7 @@ export class SocketService {
          */
         socket.on("get-chats", async (params, cb) => {
             const withParticipants = params?.withParticipants ?? true;
-            const chats = await this.iMessageRepo.getChats(null, withParticipants);
+            const chats = await ServerSingleton().iMessageRepo.getChats(null, withParticipants);
 
             const results = [];
             for (const chat of chats ?? []) {
@@ -169,7 +178,7 @@ export class SocketService {
 
             if (!chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
-            const chats = await this.iMessageRepo.getChats(chatGuid, withParticipants);
+            const chats = await ServerSingleton().iMessageRepo.getChats(chatGuid, withParticipants);
             return respond(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
         });
 
@@ -182,7 +191,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
+                const chats = await ServerSingleton().iMessageRepo.getChats(params?.identifier, true);
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
@@ -200,7 +209,7 @@ export class SocketService {
 
                 if (params?.where) dbParams.where = params.where;
 
-                const messages = await this.iMessageRepo.getMessages(dbParams);
+                const messages = await ServerSingleton().iMessageRepo.getMessages(dbParams);
 
                 const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
@@ -222,7 +231,10 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No attachment identifier provided"));
 
-                const attachment = await this.iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
+                const attachment = await ServerSingleton().iMessageRepo.getAttachment(
+                    params?.identifier,
+                    params?.withMessages
+                );
                 if (!attachment) return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 const res = await getAttachmentResponse(attachment, true);
@@ -248,7 +260,7 @@ export class SocketService {
                 const compress = params?.compress ?? false;
 
                 // Get the corresponding attachment
-                const attachment = await this.iMessageRepo.getAttachment(params?.identifier, false);
+                const attachment = await ServerSingleton().iMessageRepo.getAttachment(params?.identifier, false);
                 if (!attachment) return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 // Get the fully qualified path
@@ -279,11 +291,11 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
+                const chats = await ServerSingleton().iMessageRepo.getChats(params?.identifier, true);
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-                const messages = await this.iMessageRepo.getMessages({
+                const messages = await ServerSingleton().iMessageRepo.getMessages({
                     chatGuid: chats[0].guid,
                     limit: 1
                 });
@@ -303,7 +315,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
+                const chats = await ServerSingleton().iMessageRepo.getChats(params?.identifier, true);
 
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
@@ -337,7 +349,7 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
                 try {
-                    await this.actionHandler.sendMessage(
+                    await ActionHandler.sendMessage(
                         tempGuid,
                         chatGuid,
                         message,
@@ -392,7 +404,7 @@ export class SocketService {
                 // If there are no more chunks, compile, save, and send
                 if (!hasMore) {
                     try {
-                        await this.actionHandler.sendMessage(
+                        await ActionHandler.sendMessage(
                             tempGuid,
                             chatGuid,
                             message,
@@ -430,10 +442,10 @@ export class SocketService {
                 if (!Array.isArray(participants))
                     return respond(cb, "error", createBadRequestResponse("Participant list must be an array"));
 
-                const chatGuid = await this.actionHandler.createChat(participants);
+                const chatGuid = await ActionHandler.createChat(participants);
 
                 try {
-                    const newChat = await this.iMessageRepo.getChats(chatGuid, true);
+                    const newChat = await ServerSingleton().iMessageRepo.getChats(chatGuid, true);
                     return respond(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
                 } catch (ex) {
                     throw new Error("Failed to create new chat!");
@@ -453,9 +465,9 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No new group name provided"));
 
                 try {
-                    await this.actionHandler.renameGroupChat(params.identifier, params.newName);
+                    await ActionHandler.renameGroupChat(params.identifier, params.newName);
 
-                    const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                    const chats = await ServerSingleton().iMessageRepo.getChats(params.identifier, true);
                     return respond(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "rename-group-error", createServerErrorResponse(ex.message));
@@ -475,10 +487,10 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No participant address specified"));
 
                 try {
-                    const result = await this.actionHandler.addParticipant(params.identifier, params.address);
+                    const result = await ActionHandler.addParticipant(params.identifier, params.address);
                     if (result.trim() !== "success") return respond(cb, "error", createBadRequestResponse(result));
 
-                    const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                    const chats = await ServerSingleton().iMessageRepo.getChats(params.identifier, true);
                     return respond(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "add-participant-error", createServerErrorResponse(ex.message));
@@ -498,10 +510,10 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No participant address specified"));
 
                 try {
-                    const result = await this.actionHandler.removeParticipant(params.identifier, params.address);
+                    const result = await ActionHandler.removeParticipant(params.identifier, params.address);
                     if (result.trim() !== "success") return respond(cb, "error", createBadRequestResponse(result));
 
-                    const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                    const chats = await ServerSingleton().iMessageRepo.getChats(params.identifier, true);
                     return respond(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "remove-participant-error", createServerErrorResponse(ex.message));
@@ -528,10 +540,10 @@ export class SocketService {
                 item.chatGuid = params.chatGuid;
                 item.dateCreated = new Date().getTime();
                 item.text = params.message.text;
-                await this.db.getRepository(Queue).manager.save(item);
+                await ServerSingleton().repo.queue().manager.save(item);
 
                 try {
-                    await this.actionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
+                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
                     return respond(cb, "tapback-sent", createNoDataResponse());
                 } catch (ex) {
                     return respond(cb, "send-tapback-error", createServerErrorResponse(ex.message));
@@ -545,7 +557,7 @@ export class SocketService {
         socket.on(
             "get-contacts-from-db",
             async (params, cb): Promise<void> => {
-                if (!this.contactsRepo || !this.contactsRepo.db.isConnected) {
+                if (!ServerSingleton().contactsRepo || !ServerSingleton().contactsRepo.db.isConnected) {
                     respond(cb, "contacts", createServerErrorResponse("Contacts repository is disconnected!"));
                     return;
                 }
@@ -553,7 +565,7 @@ export class SocketService {
                 const handles = params;
                 for (let i = 0; i <= handles.length; i += 1) {
                     if (!handles[i] || !handles[i].address) continue;
-                    const contact = await this.contactsRepo.getContactByAddress(handles[i].address);
+                    const contact = await ServerSingleton().contactsRepo.getContactByAddress(handles[i].address);
                     if (contact) {
                         handles[i].firstName = contact.firstName;
                         handles[i].lastName = contact.lastName;
@@ -573,7 +585,7 @@ export class SocketService {
                 try {
                     // Export the contacts
                     let now = new Date().getTime();
-                    await this.actionHandler.exportContacts();
+                    await ActionHandler.exportContacts();
                     let later = new Date().getTime();
                     console.log(`Export took ${later - now} ms`);
 
@@ -604,14 +616,15 @@ export class SocketService {
      *
      * @param port The new port to listen on
      */
-    restart(port: number) {
+    restart() {
         if (this.server) {
             this.server.close();
-            this.server = io(port, {
+            this.server = io(ServerSingleton().repo.getConfig("socket_port"), {
                 // 5 Minute ping timeout
                 pingTimeout: 60000
             });
         }
+
         this.start();
     }
 }

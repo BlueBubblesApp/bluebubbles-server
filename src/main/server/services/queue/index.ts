@@ -1,29 +1,22 @@
-import { Connection } from "typeorm";
+import { ServerSingleton } from "@server/index";
 import { EventCache } from "@server/eventCache";
-import { Queue } from "@server/entity/Queue";
-import { ChangeListener } from "@server/api/imessage/listeners";
-import { MessageRepository } from "@server/api/imessage";
-import { Message } from "@server/api/imessage/entity/Message";
-import { DBWhereItem } from "@server/api/imessage/types";
+import { Queue } from "@server/databases/server/entity/Queue";
+import { ChangeListener } from "@server/databases/imessage/listeners";
+import { Message } from "@server/databases/imessage/entity/Message";
+import { DBWhereItem } from "@server/databases/imessage/types";
 
 export class QueueService extends ChangeListener {
-    db: Connection;
-
-    repo: MessageRepository;
-
     frequencyMs: number;
 
-    constructor(db: Connection, repo: MessageRepository, cache: EventCache, pollFrequency: number) {
+    constructor(cache: EventCache, pollFrequency: number) {
         super({ cache, pollFrequency });
 
-        this.db = db;
-        this.repo = repo;
         this.frequencyMs = pollFrequency;
     }
 
     async getEntries(after: Date): Promise<void> {
         const now = new Date().getTime();
-        const repo = this.db.getRepository(Queue);
+        const repo = ServerSingleton().repo.queue();
 
         // Get all queued items
         const entries = await repo.find();
@@ -72,7 +65,7 @@ export class QueueService extends ChangeListener {
             }
 
             // Check if the entry exists in the messages DB
-            const matches = await this.repo.getMessages({
+            const matches = await ServerSingleton().iMessageRepo.getMessages({
                 chatGuid: entry.chatGuid,
                 limit: 3, // Limit to 3 to get any edge cases (possibly when spamming)
                 withHandle: false, // Exclude to speed up query
@@ -82,7 +75,7 @@ export class QueueService extends ChangeListener {
                 where
             });
 
-            matches.forEach(async match => {
+            matches.forEach(async (match: Message) => {
                 this.cache.add(match.guid);
                 super.emit("message-match", {
                     tempGuid: entry.tempGuid,

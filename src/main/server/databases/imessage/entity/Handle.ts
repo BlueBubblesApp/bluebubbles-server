@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, JoinColumn, JoinTable, ManyToMany } from "typeorm";
 
-import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
-import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
+import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { HandleResponse } from "@server/types";
 
 @Entity("handle")
