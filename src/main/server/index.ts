@@ -29,7 +29,6 @@ import {
     NgrokService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { boolToString, toBoolean } from "./helpers/utils";
 
 import { ActionHandler } from "./helpers/actions";
 

@@ -137,10 +137,6 @@ export const toBoolean = (input: string) => {
     return true;
 };
 
-export const boolToString = (input: boolean) => {
-    return input ? "1" : "0";
-};
-
 export const cliSanitize = (input: string) => {
     return input.replace(/"/g, '\\"');
 };
