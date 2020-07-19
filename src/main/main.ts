@@ -3,13 +3,13 @@ import { app, BrowserWindow, Tray, Menu } from "electron";
 import * as path from "path";
 import * as url from "url";
 
-import { ServerSingleton } from "@server/index";
+import { Server } from "@server/index";
 import { UpdateService } from "@server/services";
 import trayIcon from "./assets/img/tray-icon.png";
 
 let win: BrowserWindow | null;
 let tray: Tray | null;
-let api = ServerSingleton(win);
+let api = Server(win);
 
 // Start the API
 api.start();
@@ -125,7 +125,7 @@ const createWindow = async () => {
     });
 
     // Set the new window in the API
-    api = ServerSingleton(win);
+    api = Server(win);
 
     // Start the update service
     const updateService = new UpdateService();

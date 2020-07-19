@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 /**
@@ -24,7 +25,7 @@ export class FCMService {
         this.refresh(true);
     }
 
-    private refresh(force = false): boolean {
+    private async refresh(force = false): Promise<boolean> {
         // Do nothing if the config doesn't exist
         const serverConfig = FileSystem.getFCMServer();
         const clientConfig = FileSystem.getFCMClient();
@@ -37,10 +38,15 @@ export class FCMService {
             // Re-instantiate the app
             this.lastRefresh = new Date();
             if (this.app) this.app.delete(); // Kill the old connection
+
+            // Create the new connection
             this.app = admin.initializeApp({
                 credential: admin.credential.cert(serverConfig),
                 databaseURL: clientConfig.project_info.firebase_url
             });
+
+            // Set the current ngrok URL if we are connected
+            if (Server().ngrok?.isConnected()) await this.setServerUrl(Server().ngrok.url);
         }
 
         return true;
@@ -52,7 +58,7 @@ export class FCMService {
      * @param serverUrl The new server URL
      */
     async setServerUrl(serverUrl: string): Promise<void> {
-        if (!this.refresh()) return;
+        if (!(await this.refresh())) return;
 
         // Set the rules
         const source = JSON.stringify(
@@ -83,7 +89,7 @@ export class FCMService {
      * @param data The data to send
      */
     async sendNotification(devices: string[], data: any): Promise<admin.messaging.MessagingDevicesResponse[]> {
-        if (!this.refresh()) return null;
+        if (!(await this.refresh())) return null;
 
         // Build out the notification message
         const msg: admin.messaging.DataMessagePayload = { data };

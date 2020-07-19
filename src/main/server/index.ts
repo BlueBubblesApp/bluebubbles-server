@@ -13,21 +13,13 @@ import { ContactRepository } from "@server/databases/contacts";
 import {
     IncomingMessageListener,
     OutgoingMessageListener,
-    MessageUpdateListener,
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
 import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
 
 // Service Imports
-import {
-    SocketService,
-    FCMService,
-    AlertService,
-    QueueService,
-    CaffeinateService,
-    NgrokService
-} from "@server/services";
+import { SocketService, FCMService, AlertService, CaffeinateService, NgrokService } from "@server/services";
 import { EventCache } from "@server/eventCache";
 
 import { ActionHandler } from "./helpers/actions";
@@ -37,7 +29,7 @@ import { ActionHandler } from "./helpers/actions";
  * Plus, we only want one instance of it running at all times.
  */
 let server: BlueBubblesServer = null;
-export const ServerSingleton = (win: BrowserWindow = null) => {
+export const Server = (win: BrowserWindow = null) => {
     // If we already have a server, update the window (if not null) and return
     // the same instance
     if (server) {
@@ -63,19 +55,15 @@ class BlueBubblesServer {
 
     contactsRepo: ContactRepository;
 
-    ngrokServer: string;
-
     socket: SocketService;
 
     fcm: FCMService;
 
     alerter: AlertService;
 
-    queue: QueueService;
-
     caffeinate: CaffeinateService;
 
-    ngrokService: NgrokService;
+    ngrok: NgrokService;
 
     actionHandler: ActionHandler;
 
@@ -112,7 +100,6 @@ class BlueBubblesServer {
         // Services
         this.socket = null;
         this.fcm = null;
-        this.queue = null;
         this.caffeinate = null;
 
         this.hasDiskAccess = true;
@@ -159,8 +146,6 @@ class BlueBubblesServer {
      */
     async start(): Promise<void> {
         await this.setup();
-
-        this.fcm.start();
 
         if (!this.hasStarted) {
             this.log("Starting Configuration IPC Listeners..");
@@ -238,12 +223,12 @@ class BlueBubblesServer {
     }
 
     /**
-     * Emits a notification to to your connected devices over FCM
+     * Emits a notification to to your connected devices over FCM and socket
      *
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async sendNotification(type: string, data: any) {
+    async emitMessage(type: string, data: any) {
         this.socket.server.emit(type, data);
 
         // Send notification to devices
@@ -273,14 +258,28 @@ class BlueBubblesServer {
             return;
         }
 
-        // Start the queue service
-        this.queue.start();
-        this.queue.on("message-timeout", async (item: Queue) => {
-            const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
-            this.log(`Message send timeout for ${text}`, "warn");
-            await this.sendNotification("message-timeout", item);
-        });
-        this.queue.on("message-match", async (item: { tempGuid: string; message: Message }) => {
+        // Create a listener to listen for new/updated messages
+        const incomingMsgListener = new IncomingMessageListener(
+            this.iMessageRepo,
+            this.eventCache,
+            DEFAULT_POLL_FREQUENCY_MS
+        );
+        const outgoingMsgListener = new OutgoingMessageListener(
+            this.iMessageRepo,
+            this.eventCache,
+            DEFAULT_POLL_FREQUENCY_MS * 2
+        );
+
+        // No real rhyme or reason to multiply this by 2. It's just not as much a priority
+        const groupEventListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
+
+        // Add to listeners
+        this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
+
+        /**
+         * Message listener for when we find matches for a given sent message
+         */
+        outgoingMsgListener.on("message-match", async (item: { tempGuid: string; message: Message }) => {
             const text = item.message.cacheHasAttachments
                 ? `Image: ${item.message.text.slice(1, item.message.text.length) || "<No Text>"}`
                 : item.message.text;
@@ -290,47 +289,61 @@ class BlueBubblesServer {
             resp.tempGuid = item.tempGuid;
 
             // We are emitting this as a new message, the only difference being the included tempGuid
-            await this.sendNotification("new-message", resp);
+            await this.emitMessage("new-message", resp);
         });
-
-        // Create a listener to listen for new/updated messages
-        const newMsgListener = new IncomingMessageListener(
-            this.iMessageRepo,
-            this.eventCache,
-            DEFAULT_POLL_FREQUENCY_MS
-        );
-        const myMsgListener = new OutgoingMessageListener(
-            this.iMessageRepo,
-            this.eventCache,
-            DEFAULT_POLL_FREQUENCY_MS * 2
-        );
-        const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
-
-        // No real rhyme or reason to multiply this by 2. It's just not as much a priority
-        const groupChangeListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
-
-        // Add to listeners
-        this.chatListeners = [newMsgListener, myMsgListener, updatedMsgListener, groupChangeListener];
 
         /**
          * Message listener for my messages only. We need this because messages from ourselves
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        myMsgListener.on("new-entry", async (item: Message) => {
+        outgoingMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments
                 ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
             this.log(`New message from [You]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
-            await this.sendNotification("new-message", await getMessageResponse(item));
+            await this.emitMessage("new-message", await getMessageResponse(item));
+        });
+
+        /**
+         * Message listener checking for updated messages. This means either the message's
+         * delivered date or read date have changed since the last time we checked the database.
+         */
+        outgoingMsgListener.on("updated-entry", async (item: Message) => {
+            // ATTENTION: If "from" is null, it means you sent the message from a group chat
+            // Check the isFromMe key prior to checking the "from" key
+            const from = item.isFromMe ? "You" : item.handle?.id;
+            const time = item.dateDelivered || item.dateRead;
+            const updateType = item.dateRead ? "Text Read" : "Text Delivered";
+            const text = item.cacheHasAttachments
+                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                : item.text;
+            this.log(
+                `Updated message from [${from}]: [${text.substring(
+                    0,
+                    50
+                )}] - [${updateType} -> ${time.toLocaleString()}]`
+            );
+
+            // Emit it to the socket and FCM devices
+            await this.emitMessage("updated-message", await getMessageResponse(item));
+        });
+
+        /**
+         * Message listener for outgoing messages that timedout
+         */
+        outgoingMsgListener.on("message-timeout", async (item: Queue) => {
+            const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
+            this.log(`Message send timeout for ${text}`, "warn");
+            await this.emitMessage("message-timeout", item);
         });
 
         /**
          * Message listener for messages that have errored out
          */
-        myMsgListener.on("message-send-error", async (item: Message) => {
+        outgoingMsgListener.on("message-send-error", async (item: Message) => {
             const text = item.cacheHasAttachments
                 ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
@@ -342,61 +355,49 @@ class BlueBubblesServer {
              * ERROR CODES:
              * 4: Message Timeout
              */
-            await this.sendNotification("message-send-error", await getMessageResponse(item));
+            await this.emitMessage("message-send-error", await getMessageResponse(item));
         });
 
         /**
          * Message listener for new messages not from yourself. See 'myMsgListener' comment
          * for why we separate them out into two separate listeners.
          */
-        newMsgListener.on("new-entry", async (item: Message) => {
+        incomingMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments
                 ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
             this.log(`New message from [${item.handle?.id}]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
-            await this.sendNotification("new-message", await getMessageResponse(item));
+            await this.emitMessage("new-message", await getMessageResponse(item));
         });
 
-        /**
-         * Message listener checking for updated messages. This means either the message's
-         * delivered date or read date have changed since the last time we checked the database.
-         */
-        updatedMsgListener.on("updated-entry", async (item: Message) => {
-            // ATTENTION: If "from" is null, it means you sent the message from a group chat
-            // Check the isFromMe key prior to checking the "from" key
-            const from = item.isFromMe ? "You" : item.handle?.id;
-            const time = item.dateDelivered || item.dateRead;
-            const text = item.dateRead ? "Text Read" : "Text Delivered";
-            this.log(`Updated message from [${from}]: [${text} -> ${time.toLocaleString()}]`);
-
-            // Emit it to the socket and FCM devices
-            await this.sendNotification("updated-message", await getMessageResponse(item));
-        });
-
-        groupChangeListener.on("name-change", async (item: Message) => {
+        groupEventListener.on("name-change", async (item: Message) => {
             this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
-            await this.sendNotification("group-name-change", await getMessageResponse(item));
+            await this.emitMessage("group-name-change", await getMessageResponse(item));
         });
 
-        groupChangeListener.on("participant-removed", async (item: Message) => {
+        groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
-            await this.sendNotification("participant-removed", await getMessageResponse(item));
+            await this.emitMessage("participant-removed", await getMessageResponse(item));
         });
 
-        groupChangeListener.on("participant-added", async (item: Message) => {
+        groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
-            await this.sendNotification("participant-added", await getMessageResponse(item));
+            await this.emitMessage("participant-added", await getMessageResponse(item));
         });
 
-        groupChangeListener.on("participant-left", async (item: Message) => {
+        groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
-            await this.sendNotification("participant-left", await getMessageResponse(item));
+            await this.emitMessage("participant-left", await getMessageResponse(item));
         });
+
+        outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
+        incomingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
+        groupEventListener.on("error", (error: Error) => this.log(error.message, "error"));
     }
 
     /**
@@ -453,7 +454,7 @@ class BlueBubblesServer {
 
                     // If the socket port changed, disconnect and reconnect
                     if (item === "socket_port") {
-                        await this.ngrokService.restart();
+                        await this.ngrok.restart();
                         await this.socket.restart();
                     }
                 }
@@ -579,13 +580,6 @@ class BlueBubblesServer {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
-        try {
-            this.log("Initializing queue service...");
-            this.queue = new QueueService(this.eventCache, DEFAULT_POLL_FREQUENCY_MS);
-        } catch (ex) {
-            this.log(`Failed to setup queue service! ${ex.message}`, "error");
-        }
-
         this.hasSetup = true;
     }
 
@@ -599,10 +593,17 @@ class BlueBubblesServer {
 
         try {
             this.log("Connecting to Ngrok...");
-            this.ngrokService = new NgrokService();
-            await this.ngrokService.restart();
+            this.ngrok = new NgrokService();
+            await this.ngrok.restart();
         } catch (ex) {
             this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Starting FCM service...");
+            this.fcm.start();
+        } catch (ex) {
+            this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
 
         this.log("Starting socket service...");
@@ -623,7 +624,6 @@ class BlueBubblesServer {
         this.log("Restarting the server...");
 
         // Remove all listeners
-        this.queue.removeAllListeners();
         for (const i of this.chatListeners) i.stop();
         this.chatListeners = [];
 

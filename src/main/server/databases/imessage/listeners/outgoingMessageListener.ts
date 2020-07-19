@@ -1,7 +1,11 @@
+import { Server } from "@server/index";
 import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
+import { Queue } from "@server/databases/server/entity";
 import { ChangeListener } from "./changeListener";
+
+import { DBWhereItem } from "../types";
 
 export class OutgoingMessageListener extends ChangeListener {
     repo: MessageRepository;
@@ -34,7 +38,89 @@ export class OutgoingMessageListener extends ChangeListener {
      * @param after
      */
     async getEntries(after: Date): Promise<void> {
-        const offsetDate = new Date(after.getTime() - 5000);
+        const offsetDate = new Date(after.getTime() - this.pollFrequency); // Lookback 1 loop
+
+        // First, emit message matches
+        await this.emitMessageMatches();
+
+        // Second, emit the outgoing messages
+        await this.emitOutgoingMessages(offsetDate);
+
+        // Third, check for updated messages
+        await this.emitUpdatedMessages(offsetDate);
+    }
+
+    async emitMessageMatches() {
+        const now = new Date().getTime();
+        const repo = Server().repo.queue();
+
+        // Get all queued items
+        const entries = await repo.find();
+        for (const entry of entries) {
+            // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
+            if (now - entry.dateCreated > 1000 * 60) {
+                await repo.remove(entry);
+                super.emit("message-timeout", entry);
+                continue;
+            }
+
+            let where: DBWhereItem[] = [
+                {
+                    // Text must be from yourself
+                    statement: "message.is_from_me = :fromMe",
+                    args: { fromMe: 1 }
+                }
+            ];
+
+            // If the text starts with the temp GUID, we know it's an attachment
+            // See /server/helpers/action.ts -> sendMessage()
+            // Since it's an attachment, we want to change some of the parameters
+            if (entry.text.startsWith(entry.tempGuid)) {
+                where = [
+                    ...where,
+                    {
+                        // Text must be empty if it's an attachment
+                        statement: "length(message.text) = 1",
+                        args: null
+                    },
+                    {
+                        // The attachment name must match what we've saved in the text
+                        statement: "attachment.transfer_name = :name",
+                        args: { name: entry.text.split("->")[1] }
+                    }
+                ];
+            } else {
+                where = [
+                    ...where,
+                    {
+                        // Text must match
+                        statement: "message.text = :text",
+                        args: { text: entry.text }
+                    }
+                ];
+            }
+
+            // Check if the entry exists in the messages DB
+            const matches = await Server().iMessageRepo.getMessages({
+                chatGuid: entry.chatGuid,
+                limit: 3, // Limit to 3 to get any edge cases (possibly when spamming)
+                withHandle: false, // Exclude to speed up query
+                after: new Date(entry.dateCreated),
+                before: new Date(),
+                sort: "ASC",
+                where
+            });
+
+            for (const match of matches) {
+                const cacheName = OutgoingMessageListener.getCacheName(match);
+                this.cache.add(cacheName);
+                super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
+                await repo.remove(entry);
+            }
+        }
+    }
+
+    async emitOutgoingMessages(after: Date) {
         const baseQuery = [
             {
                 statement: "message.service = 'iMessage'",
@@ -52,7 +138,7 @@ export class OutgoingMessageListener extends ChangeListener {
 
         // First, check for unsent messages
         const newUnsent = await this.repo.getMessages({
-            after: offsetDate,
+            after,
             withChats: false,
             withAttachments: false,
             withHandle: false,
@@ -67,7 +153,7 @@ export class OutgoingMessageListener extends ChangeListener {
 
         // Second, check for sent messages
         const newSent = await this.repo.getMessages({
-            after: offsetDate,
+            after,
             withChats: true,
             where: [
                 ...baseQuery,
@@ -117,24 +203,57 @@ export class OutgoingMessageListener extends ChangeListener {
 
         // Emit the sent messages
         const entries = [...newSent, ...lookbackSent.filter(item => item.isSent)];
-        entries.forEach(async (entry: any) => {
+        for (const entry of entries) {
+            const cacheName = OutgoingMessageListener.getCacheName(entry);
+
             // Skip over any that we've finished
-            if (this.cache.find(entry.guid)) return;
+            if (this.cache.find(cacheName)) return;
 
             // Add to cache
-            this.cache.add(entry.guid);
-            super.emit("new-entry", this.transformEntry(entry));
-        });
+            this.cache.add(cacheName);
+            super.emit("new-entry", entry);
+        }
 
         // Emit the errored messages
         const errored = lookbackSent.filter(item => item.error > 0);
-        errored.forEach(async (entry: any) => {
-            super.emit("message-send-error", this.transformEntry(entry));
-        });
+        for (const entry of errored) super.emit("message-send-error", entry);
     }
 
-    // eslint-disable-next-line class-methods-use-this
-    transformEntry(entry: Message) {
-        return entry;
+    async emitUpdatedMessages(after: Date) {
+        // Get updated entries from myself only
+        const entries = await this.repo.getUpdatedMessages({
+            after,
+            withChats: true,
+            where: [
+                {
+                    statement: "message.is_from_me = :isFromMe",
+                    args: { isFromMe: 1 }
+                }
+            ]
+        });
+
+        // Emit the new message
+        for (const entry of entries) {
+            // Compile so it's unique based on dates as well as ROWID
+            const cacheName = OutgoingMessageListener.getCacheName(entry);
+
+            // Skip over any that we've finished
+            if (this.cache.find(cacheName)) return;
+
+            // Add to cache
+            this.cache.add(cacheName);
+
+            // Send the built message object
+            super.emit("updated-entry", entry);
+
+            // Add artificial delay so we don't overwhelm any listeners
+            await new Promise((resolve, _) => setTimeout(() => resolve(), 200));
+        }
+    }
+
+    static getCacheName(message: Message) {
+        const delivered = message.dateDelivered ? message.dateDelivered.getTime() : 0;
+        const read = message.dateRead ? message.dateRead.getTime() : 0;
+        return `${message.guid}:${delivered}:${read}`;
     }
 }

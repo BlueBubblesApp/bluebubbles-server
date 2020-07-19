@@ -206,7 +206,8 @@ export class MessageRepository {
         after = null,
         before = null,
         withChats = false,
-        sort = "DESC"
+        sort = "DESC",
+        where = []
     }: DBMessageParams) {
         // Sanitize some params
         if (after && typeof after === "number") after = new Date(after);
@@ -238,6 +239,9 @@ export class MessageRepository {
         // Add default WHERE clauses
         query.andWhere("message.service == 'iMessage'");
 
+        // Add any custom WHERE clauses
+        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
+
         // Add date_delivered constraints
         if (after)
             query.andWhere("message.date_delivered >= :after", {
@@ -257,6 +261,10 @@ export class MessageRepository {
             query.andWhere("message.date_read < :before", {
                 before: convertDateTo2001Time(before as Date)
             });
+
+        // Add any custom WHERE clauses
+        // We have to do this here so that it matches both before the OR and after the OR
+        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
 
         // Add pagination params
         query.orderBy("message.date", sort);

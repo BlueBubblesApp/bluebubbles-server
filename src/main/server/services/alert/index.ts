@@ -1,4 +1,4 @@
-import { ServerSingleton } from "@server/index";
+import { Server } from "@server/index";
 import { Alert } from "@server/databases/server/entity/Alert";
 
 import { AlertTypes } from "./types";
@@ -8,7 +8,7 @@ import { AlertTypes } from "./types";
  */
 export class AlertService {
     static async find(): Promise<Alert[]> {
-        const query = ServerSingleton().repo.alerts().createQueryBuilder("alert").orderBy("created", "DESC").limit(10);
+        const query = Server().repo.alerts().createQueryBuilder("alert").orderBy("created", "DESC").limit(10);
         return query.getMany();
     }
 
@@ -22,8 +22,8 @@ export class AlertService {
         alert.isRead = isRead;
 
         // Save and emit the alert to the UI
-        const saved = await ServerSingleton().repo.alerts().save(alert);
-        if (ServerSingleton().window) ServerSingleton().window.webContents.send("new-alert", saved);
+        const saved = await Server().repo.alerts().save(alert);
+        if (Server().window) Server().window.webContents.send("new-alert", saved);
 
         // Save and return the alert
         return saved;
@@ -31,19 +31,19 @@ export class AlertService {
 
     static async markAsRead(id: number): Promise<Alert> {
         // Find the corresponding alert
-        const alert = await ServerSingleton().repo.alerts().findOne(id);
+        const alert = await Server().repo.alerts().findOne(id);
         if (!alert) throw new Error(`Alert [id: ${id}] does not exist!`);
 
         // Modify and save the alert
         alert.isRead = true;
-        return ServerSingleton().repo.alerts().manager.save(alert);
+        return Server().repo.alerts().manager.save(alert);
     }
 
     static async delete(id: number): Promise<void> {
         // Find the corresponding alert
-        const alert = await ServerSingleton().repo.alerts().findOne(id);
+        const alert = await Server().repo.alerts().findOne(id);
         if (!alert) return;
 
-        await ServerSingleton().repo.alerts().remove(alert);
+        await Server().repo.alerts().remove(alert);
     }
 }

@@ -1,18 +1,18 @@
-import { ServerSingleton } from "@server/index";
+import { Server } from "@server/index";
 import * as ngrok from "ngrok";
 
 export class NgrokService {
-    ngrokUrl: string;
+    url: string;
 
     constructor() {
-        this.ngrokUrl = null;
+        this.url = null;
     }
 
     /**
      * Helper for checking if we are connected
      */
     isConnected(): boolean {
-        return this.ngrokUrl !== null;
+        return this.url !== null;
     }
 
     /**
@@ -20,19 +20,17 @@ export class NgrokService {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async start(): Promise<void> {
-        this.ngrokUrl = await ngrok.connect({
-            port: ServerSingleton().repo.getConfig("socket_port"),
+        this.url = await ngrok.connect({
+            port: Server().repo.getConfig("socket_port"),
             // This is required to run ngrok in production
             binPath: bPath => bPath.replace("app.asar", "app.asar.unpacked")
         });
 
-        await ServerSingleton().repo.setConfig("server_address", this.ngrokUrl);
+        await Server().repo.setConfig("server_address", this.url);
 
         // Emit this over the socket
-        if (ServerSingleton().socket) ServerSingleton().socket.server.emit("new-server", this.ngrokUrl);
-
-        if (ServerSingleton().socket) await ServerSingleton().sendNotification("new-server", this.ngrokUrl);
-        await ServerSingleton().fcm.setServerUrl(this.ngrokUrl);
+        if (Server().socket) await Server().emitMessage("new-server", this.url);
+        await Server().fcm.setServerUrl(this.url);
     }
 
     /**
@@ -49,6 +47,6 @@ export class NgrokService {
     async restart(): Promise<string> {
         await this.stop();
         await this.start();
-        return this.ngrokUrl;
+        return this.url;
     }
 }

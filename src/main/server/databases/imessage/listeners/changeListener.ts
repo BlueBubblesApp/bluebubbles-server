@@ -27,7 +27,7 @@ export abstract class ChangeListener extends EventEmitter {
         this.removeAllListeners();
     }
 
-    purgeCache() {
+    checkCache() {
         const now = new Date();
 
         // Purge emitted messages every 30 minutes to save memory (or every 100 items)
@@ -56,25 +56,32 @@ export abstract class ChangeListener extends EventEmitter {
         const beforeCheck = new Date();
 
         // Check the cache and see if it needs to be purged
-        this.purgeCache();
+        this.checkCache();
 
         try {
             // We pass the last check because we don't want it to change
             // while we process asynchronously
-            this.getEntries(this.lastCheck);
+            await this.getEntries(this.lastCheck);
 
             // Save the date for when we started checking
             this.lastCheck = beforeCheck;
         } catch (err) {
-            this.stopped = true;
             super.emit("error", err);
         }
 
+        // If the time it took to do the checking is less than 1 second, find the difference
+        const after = new Date();
+        const processTime = after.getTime() - beforeCheck.getTime();
+        let waitTime = this.pollFrequency;
+
+        // If the processing time took less than the poll frequency, only wait out the remainder
+        // If the processing time took more than the poll frequency, don't wait at all
+        if (processTime < this.pollFrequency) waitTime = this.pollFrequency - processTime;
+        if (processTime >= this.pollFrequency) waitTime = 0;
+
         // Re-run check emssages code
-        setTimeout(() => this.checkForNewEntries(), this.pollFrequency);
+        setTimeout(() => this.checkForNewEntries(), waitTime);
     }
 
     abstract async getEntries(after: Date): Promise<void>;
-
-    abstract transformEntry(entry: any): any;
 }

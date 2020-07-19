@@ -36,7 +36,7 @@ class QRCode extends React.Component<Props, State> {
         if (!data || data.length === 0) return "";
 
         const jsonData = JSON.parse(data);
-        const output = [this.state.config?.guid, this.state.config?.server_address || ""];
+        const output = [this.state.config?.password, this.state.config?.server_address || ""];
 
         output.push(jsonData.project_info.project_id);
         output.push(jsonData.project_info.storage_bucket);

@@ -1,6 +1,6 @@
 import { app } from "electron";
 import { createConnection, Connection } from "typeorm";
-import { ServerSingleton } from "@server/index";
+import { Server } from "@server/index";
 import { Config, Alert, Device, Queue } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 
@@ -114,8 +114,8 @@ export class ServerRepository {
             await this.configs().save(cfg);
         }
 
-        this.config[name] = saniVal;
-        ServerSingleton().emitToUI("config-update", this.config);
+        this.config[name] = value;
+        Server().emitToUI("config-update", this.config);
     }
 
     /**
@@ -129,7 +129,7 @@ export class ServerRepository {
                 if (!item) await this.setConfig(key, DEFAULT_DB_ITEMS[key]());
             }
         } catch (ex) {
-            ServerSingleton().log(`Failed to setup default configurations! ${ex.message}`, "error");
+            Server().log(`Failed to setup default configurations! ${ex.message}`, "error");
         }
     }
 

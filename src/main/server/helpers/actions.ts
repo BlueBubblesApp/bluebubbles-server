@@ -1,4 +1,4 @@
-import { ServerSingleton } from "@server/index";
+import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ValidTapback } from "@server/types";
@@ -64,7 +64,7 @@ export class ActionHandler {
                 item.chatGuid = chatGuid;
                 item.dateCreated = now;
                 item.text = message;
-                await ServerSingleton().repo.queue().manager.save(item);
+                await Server().repo.queue().manager.save(item);
             }
 
             // If there is an attachment, add that to the queue too
@@ -74,7 +74,7 @@ export class ActionHandler {
                 attachmentItem.chatGuid = chatGuid;
                 attachmentItem.dateCreated = now;
                 attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
-                await ServerSingleton().repo.queue().manager.save(attachmentItem);
+                await Server().repo.queue().manager.save(attachmentItem);
             }
         } catch (ex) {
             let msg = ex.message;
@@ -94,11 +94,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            ServerSingleton().iMessageRepo,
-            ServerSingleton().contactsRepo
-        );
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -141,11 +137,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            ServerSingleton().iMessageRepo,
-            ServerSingleton().contactsRepo
-        );
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -186,11 +178,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            ServerSingleton().iMessageRepo,
-            ServerSingleton().contactsRepo
-        );
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
         let address = participant;
         if (!address.includes("@")) {
             address = getiMessageNumberFormat(address);
@@ -236,11 +224,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static toggleTapback = async (chatGuid: string, text: string, tapback: ValidTapback): Promise<string> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            ServerSingleton().iMessageRepo,
-            ServerSingleton().contactsRepo
-        );
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -286,11 +270,7 @@ export class ActionHandler {
      * @returns Boolean on whether a typing indicator was present
      */
     static checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
-        const names = await generateChatNameList(
-            chatGuid,
-            ServerSingleton().iMessageRepo,
-            ServerSingleton().contactsRepo
-        );
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one

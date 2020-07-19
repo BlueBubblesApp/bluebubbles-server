@@ -5,7 +5,7 @@ import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 
 // Internal libraries
-import { ServerSingleton } from "@server/index";
+import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
@@ -44,7 +44,7 @@ export class SocketService {
      * @param port The initial port for Socket.IO
      */
     constructor() {
-        this.server = io(ServerSingleton().repo.getConfig("socket_port"), {
+        this.server = io(Server().repo.getConfig("socket_port"), {
             // 5 Minute ping timeout
             pingTimeout: 60000
         });
@@ -59,10 +59,10 @@ export class SocketService {
          */
         this.server.on("connection", async socket => {
             const guid = socket.handshake.query?.guid;
-            const cfgGuid = await ServerSingleton().repo.getConfig("guid");
+            const cfgPass = (await Server().repo.getConfig("password")) as string;
 
             // Basic authentication
-            if (guid === cfgGuid) {
+            if (guid === cfgPass) {
                 console.log("Client Authenticated Successfully");
             } else {
                 socket.disconnect();
@@ -99,7 +99,7 @@ export class SocketService {
             if (callback) callback(data);
             else socket.emit(channel, data);
 
-            if (data.error) ServerSingleton().log(data.error.message, "error");
+            if (data.error) Server().log(data.error.message, "error");
         };
 
         /**
@@ -112,16 +112,14 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
                 // If the device ID exists, update the identifier
-                const device = await ServerSingleton().repo.devices().findOne({ name: params.deviceName });
+                const device = await Server().repo.devices().findOne({ name: params.deviceName });
                 if (device) {
-                    await ServerSingleton()
-                        .repo.devices()
-                        .update({ name: params.deviceName }, { identifier: params.deviceId });
+                    await Server().repo.devices().update({ name: params.deviceName }, { identifier: params.deviceId });
                 } else {
                     const item = new Device();
                     item.name = params.deviceName;
                     item.identifier = params.deviceId;
-                    await ServerSingleton().repo.devices().save(item);
+                    await Server().repo.devices().save(item);
                 }
 
                 return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
@@ -137,16 +135,14 @@ export class SocketService {
                 if (!this) return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
                 // If the device ID exists, update the identifier
-                const device = await ServerSingleton().repo.devices().findOne({ name: params.deviceName });
+                const device = await Server().repo.devices().findOne({ name: params.deviceName });
                 if (device) {
-                    await ServerSingleton()
-                        .repo.devices()
-                        .update({ name: params.deviceName }, { identifier: params.deviceId });
+                    await Server().repo.devices().update({ name: params.deviceName }, { identifier: params.deviceId });
                 } else {
                     const item = new Device();
                     item.name = params.deviceName;
                     item.identifier = params.deviceId;
-                    await ServerSingleton().repo.devices().save(item);
+                    await Server().repo.devices().save(item);
                 }
 
                 return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
@@ -158,7 +154,7 @@ export class SocketService {
          */
         socket.on("get-chats", async (params, cb) => {
             const withParticipants = params?.withParticipants ?? true;
-            const chats = await ServerSingleton().iMessageRepo.getChats(null, withParticipants);
+            const chats = await Server().iMessageRepo.getChats(null, withParticipants);
 
             const results = [];
             for (const chat of chats ?? []) {
@@ -178,7 +174,7 @@ export class SocketService {
 
             if (!chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
-            const chats = await ServerSingleton().iMessageRepo.getChats(chatGuid, withParticipants);
+            const chats = await Server().iMessageRepo.getChats(chatGuid, withParticipants);
             return respond(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
         });
 
@@ -191,7 +187,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await ServerSingleton().iMessageRepo.getChats(params?.identifier, true);
+                const chats = await Server().iMessageRepo.getChats(params?.identifier, true);
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
@@ -209,7 +205,7 @@ export class SocketService {
 
                 if (params?.where) dbParams.where = params.where;
 
-                const messages = await ServerSingleton().iMessageRepo.getMessages(dbParams);
+                const messages = await Server().iMessageRepo.getMessages(dbParams);
 
                 const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
@@ -231,10 +227,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No attachment identifier provided"));
 
-                const attachment = await ServerSingleton().iMessageRepo.getAttachment(
-                    params?.identifier,
-                    params?.withMessages
-                );
+                const attachment = await Server().iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
                 if (!attachment) return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 const res = await getAttachmentResponse(attachment, true);
@@ -260,7 +253,7 @@ export class SocketService {
                 const compress = params?.compress ?? false;
 
                 // Get the corresponding attachment
-                const attachment = await ServerSingleton().iMessageRepo.getAttachment(params?.identifier, false);
+                const attachment = await Server().iMessageRepo.getAttachment(params?.identifier, false);
                 if (!attachment) return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 // Get the fully qualified path
@@ -291,11 +284,11 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await ServerSingleton().iMessageRepo.getChats(params?.identifier, true);
+                const chats = await Server().iMessageRepo.getChats(params?.identifier, true);
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-                const messages = await ServerSingleton().iMessageRepo.getMessages({
+                const messages = await Server().iMessageRepo.getMessages({
                     chatGuid: chats[0].guid,
                     limit: 1
                 });
@@ -315,7 +308,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await ServerSingleton().iMessageRepo.getChats(params?.identifier, true);
+                const chats = await Server().iMessageRepo.getChats(params?.identifier, true);
 
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
@@ -445,7 +438,7 @@ export class SocketService {
                 const chatGuid = await ActionHandler.createChat(participants);
 
                 try {
-                    const newChat = await ServerSingleton().iMessageRepo.getChats(chatGuid, true);
+                    const newChat = await Server().iMessageRepo.getChats(chatGuid, true);
                     return respond(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
                 } catch (ex) {
                     throw new Error("Failed to create new chat!");
@@ -467,7 +460,7 @@ export class SocketService {
                 try {
                     await ActionHandler.renameGroupChat(params.identifier, params.newName);
 
-                    const chats = await ServerSingleton().iMessageRepo.getChats(params.identifier, true);
+                    const chats = await Server().iMessageRepo.getChats(params.identifier, true);
                     return respond(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "rename-group-error", createServerErrorResponse(ex.message));
@@ -490,7 +483,7 @@ export class SocketService {
                     const result = await ActionHandler.addParticipant(params.identifier, params.address);
                     if (result.trim() !== "success") return respond(cb, "error", createBadRequestResponse(result));
 
-                    const chats = await ServerSingleton().iMessageRepo.getChats(params.identifier, true);
+                    const chats = await Server().iMessageRepo.getChats(params.identifier, true);
                     return respond(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "add-participant-error", createServerErrorResponse(ex.message));
@@ -513,7 +506,7 @@ export class SocketService {
                     const result = await ActionHandler.removeParticipant(params.identifier, params.address);
                     if (result.trim() !== "success") return respond(cb, "error", createBadRequestResponse(result));
 
-                    const chats = await ServerSingleton().iMessageRepo.getChats(params.identifier, true);
+                    const chats = await Server().iMessageRepo.getChats(params.identifier, true);
                     return respond(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "remove-participant-error", createServerErrorResponse(ex.message));
@@ -540,7 +533,7 @@ export class SocketService {
                 item.chatGuid = params.chatGuid;
                 item.dateCreated = new Date().getTime();
                 item.text = params.message.text;
-                await ServerSingleton().repo.queue().manager.save(item);
+                await Server().repo.queue().manager.save(item);
 
                 try {
                     await ActionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
@@ -557,7 +550,7 @@ export class SocketService {
         socket.on(
             "get-contacts-from-db",
             async (params, cb): Promise<void> => {
-                if (!ServerSingleton().contactsRepo || !ServerSingleton().contactsRepo.db.isConnected) {
+                if (!Server().contactsRepo || !Server().contactsRepo.db.isConnected) {
                     respond(cb, "contacts", createServerErrorResponse("Contacts repository is disconnected!"));
                     return;
                 }
@@ -565,7 +558,7 @@ export class SocketService {
                 const handles = params;
                 for (let i = 0; i <= handles.length; i += 1) {
                     if (!handles[i] || !handles[i].address) continue;
-                    const contact = await ServerSingleton().contactsRepo.getContactByAddress(handles[i].address);
+                    const contact = await Server().contactsRepo.getContactByAddress(handles[i].address);
                     if (contact) {
                         handles[i].firstName = contact.firstName;
                         handles[i].lastName = contact.lastName;
@@ -619,7 +612,7 @@ export class SocketService {
     restart() {
         if (this.server) {
             this.server.close();
-            this.server = io(ServerSingleton().repo.getConfig("socket_port"), {
+            this.server = io(Server().repo.getConfig("socket_port"), {
                 // 5 Minute ping timeout
                 pingTimeout: 60000
             });
