@@ -75,15 +75,15 @@
         "mac": {
             "category": "public.app-category.social-networking",
             "target": "dmg",
-            "icon": "./resources/regular/icon-512.png"
+            "icon": "./icons/regular/icon-512.png"
         },
         "linux": {
             "target": "deb",
-            "icon": "./resources/regular/icon-1024.png"
+            "icon": "./icons/regular/icon-1024.png"
         },
         "win": {
             "target": "nsis",
-            "icon": "./resources/regular/icon-1024.png"
+            "icon": "./icons/regular/icon-1024.png"
         }
     },
     "repository": {

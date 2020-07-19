@@ -8,8 +8,6 @@ export abstract class ChangeListener extends EventEmitter {
 
     lastCheck: Date;
 
-    lastPurge: Date;
-
     pollFrequency: number;
 
     constructor({ cache = new EventCache(), pollFrequency = 1000 }: { cache?: EventCache; pollFrequency?: number }) {
@@ -19,7 +17,6 @@ export abstract class ChangeListener extends EventEmitter {
         this.stopped = false;
         this.pollFrequency = pollFrequency;
         this.lastCheck = new Date();
-        this.lastPurge = new Date();
     }
 
     stop() {
@@ -28,22 +25,18 @@ export abstract class ChangeListener extends EventEmitter {
     }
 
     checkCache() {
-        const now = new Date();
-
-        // Purge emitted messages every 30 minutes to save memory (or every 100 items)
-        if (this.cache.size() > 100 || now.getTime() - this.lastPurge.getTime() > 1800000) {
+        // Purge emitted messages if it gets above 250 items
+        // 250 is pretty arbitrary at this point...
+        if (this.cache.size() > 250) {
             if (this.cache.size() > 0) {
                 this.cache.purge();
             }
-
-            this.lastPurge = new Date();
         }
     }
 
     start() {
         this.cache.purge();
         this.lastCheck = new Date();
-        this.lastPurge = new Date();
 
         // Start checking
         this.checkForNewEntries();
@@ -55,9 +48,6 @@ export abstract class ChangeListener extends EventEmitter {
         // Store the date when we started checking
         const beforeCheck = new Date();
 
-        // Check the cache and see if it needs to be purged
-        this.checkCache();
-
         try {
             // We pass the last check because we don't want it to change
             // while we process asynchronously
@@ -68,6 +58,9 @@ export abstract class ChangeListener extends EventEmitter {
         } catch (err) {
             super.emit("error", err);
         }
+
+        // Check the cache and see if it needs to be purged
+        this.checkCache();
 
         // If the time it took to do the checking is less than 1 second, find the difference
         const after = new Date();

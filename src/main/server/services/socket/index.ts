@@ -112,7 +112,7 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
                 // If the device ID exists, update the identifier
-                const device = await Server().repo.devices().findOne({ name: params.deviceName });
+                const device = await Server().repo.devices().findOne({ identifier: params.deviceId });
                 if (device) {
                     await Server().repo.devices().update({ name: params.deviceName }, { identifier: params.deviceId });
                 } else {

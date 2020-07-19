@@ -1,11 +1,9 @@
 import { Server } from "@server/index";
 import { MessageRepository } from "@server/databases/imessage";
-import { Message } from "@server/databases/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
-import { Queue } from "@server/databases/server/entity";
+import { getCacheName } from "@server/databases/imessage/helpers/utils";
+import { DBWhereItem } from "@server/databases/imessage/types";
 import { ChangeListener } from "./changeListener";
-
-import { DBWhereItem } from "../types";
 
 export class OutgoingMessageListener extends ChangeListener {
     repo: MessageRepository;
@@ -38,16 +36,14 @@ export class OutgoingMessageListener extends ChangeListener {
      * @param after
      */
     async getEntries(after: Date): Promise<void> {
-        const offsetDate = new Date(after.getTime() - this.pollFrequency); // Lookback 1 loop
-
         // First, emit message matches
         await this.emitMessageMatches();
 
-        // Second, emit the outgoing messages
-        await this.emitOutgoingMessages(offsetDate);
+        // Second, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
+        await this.emitOutgoingMessages(new Date(after.getTime() - 15000));
 
         // Third, check for updated messages
-        await this.emitUpdatedMessages(offsetDate);
+        await this.emitUpdatedMessages(new Date(after.getTime() - this.pollFrequency));
     }
 
     async emitMessageMatches() {
@@ -112,7 +108,7 @@ export class OutgoingMessageListener extends ChangeListener {
             });
 
             for (const match of matches) {
-                const cacheName = OutgoingMessageListener.getCacheName(match);
+                const cacheName = getCacheName(match);
                 this.cache.add(cacheName);
                 super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
                 await repo.remove(entry);
@@ -198,13 +194,10 @@ export class OutgoingMessageListener extends ChangeListener {
         for (const i of unsent) // Add newly unsent to
             if (!this.notSent.includes(i)) this.notSent.push(i);
 
-        // Add 2 second artificial delay to help eliminate duplicates
-        await new Promise((resolve, _) => setTimeout(() => resolve(), 3000));
-
         // Emit the sent messages
         const entries = [...newSent, ...lookbackSent.filter(item => item.isSent)];
         for (const entry of entries) {
-            const cacheName = OutgoingMessageListener.getCacheName(entry);
+            const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
             if (this.cache.find(cacheName)) return;
@@ -235,7 +228,7 @@ export class OutgoingMessageListener extends ChangeListener {
         // Emit the new message
         for (const entry of entries) {
             // Compile so it's unique based on dates as well as ROWID
-            const cacheName = OutgoingMessageListener.getCacheName(entry);
+            const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
             if (this.cache.find(cacheName)) return;
@@ -249,11 +242,5 @@ export class OutgoingMessageListener extends ChangeListener {
             // Add artificial delay so we don't overwhelm any listeners
             await new Promise((resolve, _) => setTimeout(() => resolve(), 200));
         }
-    }
-
-    static getCacheName(message: Message) {
-        const delivered = message.dateDelivered ? message.dateDelivered.getTime() : 0;
-        const read = message.dateRead ? message.dateRead.getTime() : 0;
-        return `${message.guid}:${delivered}:${read}`;
     }
 }
