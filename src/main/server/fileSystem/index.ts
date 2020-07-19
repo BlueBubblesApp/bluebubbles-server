@@ -8,7 +8,11 @@ import { concatUint8Arrays } from "@server/helpers/utils";
 import { getAppleScripts } from "./scripts";
 
 let subdir = "";
-if (process.env.NODE_ENV !== "production") subdir = "bluebubbles-server";
+let appPath = __dirname.replace("/app.asar/dist", "");
+if (process.env.NODE_ENV !== "production") {
+    appPath = __dirname.replace("/dist", "");
+    subdir = "bluebubbles-server";
+}
 
 /**
  * The class used to handle all communications to the App's "filesystem".
@@ -24,6 +28,10 @@ export class FileSystem {
     public static scriptDir = path.join(FileSystem.baseDir, "Scripts");
 
     public static fcmDir = path.join(FileSystem.baseDir, "FCM");
+
+    public static modules = path.join(appPath, "node_modules");
+
+    public static resources = path.join(appPath, "resources");
 
     /**
      * Sets up all required directories and then, writes the scripts

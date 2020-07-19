@@ -1,11 +1,11 @@
 import "reflect-metadata";
-import { app, BrowserWindow, Tray, Menu } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeTheme } from "electron";
 import * as path from "path";
 import * as url from "url";
+import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
 import { UpdateService } from "@server/services";
-import trayIcon from "./assets/img/tray-icon.png";
 
 let win: BrowserWindow | null;
 let tray: Tray | null;
@@ -68,7 +68,16 @@ const buildTray = () => {
 };
 
 const createTray = () => {
-    tray = new Tray(path.join(__dirname, trayIcon));
+    let iconPath = path.join(FileSystem.resources, "macos", "tray-icon-dark.png");
+    if (!nativeTheme.shouldUseDarkColors) iconPath = path.join(FileSystem.resources, "macos", "tray-icon-light.png");
+
+    // If the tray is already created, just change the icon color
+    if (tray) {
+        tray.setImage(iconPath);
+        return;
+    }
+
+    tray = new Tray(iconPath);
     tray.setToolTip("BlueBubbles");
     tray.setContextMenu(buildTray());
 
@@ -136,6 +145,10 @@ const createWindow = async () => {
 app.on("ready", () => {
     createTray();
     createWindow();
+
+    nativeTheme.on("updated", () => {
+        createTray();
+    });
 });
 
 app.on("window-all-closed", () => {
