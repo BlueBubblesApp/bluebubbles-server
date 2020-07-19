@@ -349,10 +349,7 @@ export class ActionHandler {
         const baseCmd = `osascript "${FileSystem.scriptDir}/exportContacts.scpt"`;
 
         try {
-            const now = new Date().getTime();
             await FileSystem.execShellCommand(baseCmd);
-            const later = new Date().getTime();
-            console.log(`WEIRD: ${later - now} ms`);
         } catch (ex) {
             let msg = ex.message;
             if (msg instanceof String) [, msg] = msg.split("execution error: ");
