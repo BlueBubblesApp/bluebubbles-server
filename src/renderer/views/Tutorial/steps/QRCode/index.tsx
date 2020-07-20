@@ -24,11 +24,9 @@ class QRCode extends React.Component<Props, State> {
 
     async componentDidMount() {
         const client = await ipcRenderer.invoke("get-fcm-client");
-        console.log(client);
         if (client) this.setState({ fcmClient: JSON.stringify(client) });
 
         const config = await ipcRenderer.invoke("get-config");
-        console.log(config);
         if (config) this.setState({ config });
     }
 

@@ -38,12 +38,10 @@ class Permissions extends React.Component<Props, State> {
 
     openPermissionPrompt = async () => {
         const res = await ipcRenderer.invoke("open_perms_prompt");
-        console.log(res);
     };
 
     openAccessibilityPrompt = async () => {
         const res = await ipcRenderer.invoke("prompt_accessibility_perms");
-        console.log(res);
     };
 
     checkPermissions = async () => {

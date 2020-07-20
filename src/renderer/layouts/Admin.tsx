@@ -155,8 +155,7 @@ class AdminLayout extends React.Component<Props & RouteComponentProps, State> {
         if (this.props.location.pathname === "/tutorial") return;
 
         // Check if the tutorial is done
-        const tutorialIsDone = this.state.config?.tutorial_is_done;
-        if (tutorialIsDone && !Number(tutorialIsDone)) {
+        if (!this.state.config?.tutorial_is_done) {
             this.props.history.push("/tutorial");
         }
     }

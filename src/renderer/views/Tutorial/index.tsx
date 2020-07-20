@@ -71,8 +71,7 @@ class Tutorial extends React.Component<Props, State> {
         const { step } = this.state;
 
         const CurrentStep = stepMap[step].component;
-        const tutorialIsDone = config?.tutorial_is_done;
-        if (tutorialIsDone) {
+        if (config?.tutorial_is_done) {
             return <Redirect to="/welcome" />;
         }
 
