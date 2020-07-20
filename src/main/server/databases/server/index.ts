@@ -39,12 +39,10 @@ export class ServerRepository extends EventEmitter {
             type: "sqlite",
             database: dbPath,
             entities: [Config, Alert, Device, Queue],
-            synchronize: isDev,
-            logging: false
+            // We should really use migrations for this.
+            // This is me being lazy. Maybe someday...
+            synchronize: true
         });
-
-        // Create the tables
-        if (!isDev) await this.db.synchronize();
 
         // Load default config items
         await this.loadConfig();

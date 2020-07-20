@@ -1,6 +1,6 @@
 import { Entity, PrimaryColumn } from "typeorm";
 
-@Entity()
+@Entity({ name: "device" })
 export class Device {
     @PrimaryColumn("text", { name: "name" })
     name: string;

@@ -58,7 +58,7 @@ export class FCMService {
      * @param serverUrl The new server URL
      */
     async setServerUrl(serverUrl: string): Promise<void> {
-        if (await this.start()) return;
+        if (!(await this.start())) return;
 
         // Set the rules
         const source = JSON.stringify(
@@ -91,7 +91,7 @@ export class FCMService {
      * @param data The data to send
      */
     async sendNotification(devices: string[], data: any): Promise<admin.messaging.MessagingDevicesResponse[]> {
-        if (await this.start()) return null;
+        if (!(await this.start())) return null;
 
         // Build out the notification message
         const msg: admin.messaging.DataMessagePayload = { data };

@@ -60,9 +60,7 @@ export class ContactRepository {
             name: "Contacts",
             type: "sqlite",
             database: cloudDb ? cloudDb.path : defaultDb,
-            entities: [PhoneNumber, Record, Email],
-            synchronize: false,
-            logging: false
+            entities: [PhoneNumber, Record, Email]
         });
 
         return this.db;

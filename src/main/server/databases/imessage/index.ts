@@ -26,9 +26,7 @@ export class MessageRepository {
             name: "iMessage",
             type: "sqlite",
             database: `${process.env.HOME}/Library/Messages/chat.db`,
-            entities: [Chat, Handle, Message, Attachment],
-            synchronize: false,
-            logging: false
+            entities: [Chat, Handle, Message, Attachment]
         });
 
         return this.db;

@@ -231,14 +231,14 @@ class BlueBubblesServer {
     private async handleConfigUpdate({ prevConfig, nextConfig }: ServerConfigChange) {
         // If the socket port changed, disconnect and reconnect
         if (prevConfig.socket_port !== nextConfig.socket_port) {
-            await this.ngrok.restart();
-            await this.socket.restart();
+            if (this.ngrok) await this.ngrok.restart();
+            if (this.socket) await this.socket.restart();
         }
 
         // If the ngrok URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
             if (this.socket) await this.emitMessage("new-server", nextConfig.server_address);
-            await this.fcm.setServerUrl(nextConfig.server_address as string);
+            if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
         }
 
         this.emitToUI("config-update", nextConfig);

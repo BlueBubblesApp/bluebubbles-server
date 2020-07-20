@@ -23,7 +23,13 @@ export class NgrokService {
         this.url = await ngrok.connect({
             port: Server().repo.getConfig("socket_port"),
             // This is required to run ngrok in production
-            binPath: bPath => bPath.replace("app.asar", "app.asar.unpacked")
+            binPath: bPath => bPath.replace("app.asar", "app.asar.unpacked"),
+            onStatusChange: async (status: string) => {
+                Server().log(`Ngrok status: ${status}`);
+
+                // If the status is closed, restart the server
+                if (status === "closed") await this.restart();
+            }
         });
 
         await Server().repo.setConfig("server_address", this.url);
@@ -33,8 +39,11 @@ export class NgrokService {
      * Disconnect from ngrok
      */
     async stop(): Promise<void> {
-        if (!this.isConnected()) return;
-        await ngrok.disconnect();
+        try {
+            await ngrok.disconnect();
+        } finally {
+            this.url = null;
+        }
     }
 
     /**
