@@ -1,15 +1,21 @@
 import { app } from "electron";
+import { EventEmitter } from "events";
 import { createConnection, Connection } from "typeorm";
 import { Server } from "@server/index";
 import { Config, Alert, Device, Queue } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 
-export class ServerRepository {
+export type ServerConfig = { [key: string]: Date | string | boolean | number };
+export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
+
+export class ServerRepository extends EventEmitter {
     db: Connection = null;
 
-    config: { [key: string]: any };
+    config: ServerConfig;
 
     constructor() {
+        super();
+
         this.db = null;
         this.config = {};
     }
@@ -93,7 +99,7 @@ export class ServerRepository {
      */
     getConfig(name: string): Date | string | boolean | number {
         if (!Object.keys(this.config).includes(name)) return null;
-        return ServerRepository.convertFromDbValue(this.config[name]);
+        return ServerRepository.convertFromDbValue(this.config[name] as any);
     }
 
     /**
@@ -103,6 +109,7 @@ export class ServerRepository {
      * @param value The value for the config item
      */
     async setConfig(name: string, value: Date | string | boolean | number): Promise<void> {
+        const orig = { ...this.config };
         const saniVal = ServerRepository.convertToDbValue(value);
         const item = await this.configs().findOne({ name });
 
@@ -115,7 +122,7 @@ export class ServerRepository {
         }
 
         this.config[name] = value;
-        Server().emitToUI("config-update", this.config);
+        super.emit("config-update", { prevConfig: orig, nextConfig: this.config });
     }
 
     /**

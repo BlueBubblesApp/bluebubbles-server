@@ -27,10 +27,6 @@ export class NgrokService {
         });
 
         await Server().repo.setConfig("server_address", this.url);
-
-        // Emit this over the socket
-        if (Server().socket) await Server().emitMessage("new-server", this.url);
-        await Server().fcm.setServerUrl(this.url);
     }
 
     /**

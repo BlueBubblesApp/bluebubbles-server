@@ -7,7 +7,7 @@ import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS } from "@server/constants";
 
 // Database Imports
-import { ServerRepository } from "@server/databases/server";
+import { ServerRepository, ServerConfigChange } from "@server/databases/server";
 import { MessageRepository } from "@server/databases/imessage";
 import { ContactRepository } from "@server/databases/contacts";
 import {
@@ -145,11 +145,17 @@ class BlueBubblesServer {
      * then starts all of the services required for the server
      */
     async start(): Promise<void> {
-        await this.setup();
-
         if (!this.hasStarted) {
+            await this.setupServer();
             this.log("Starting Configuration IPC Listeners..");
             this.startConfigIpcListeners();
+        }
+
+        try {
+            this.log("Launching Services..");
+            await this.setupServices();
+        } catch (ex) {
+            this.log("There was a problem launching the Server listeners.", "error");
         }
 
         await this.startServices();
@@ -159,10 +165,11 @@ class BlueBubblesServer {
      * Performs the initial setup for the server.
      * Mainly, instantiation of a bunch of classes/handlers
      */
-    private async setup(): Promise<void> {
+    private async setupServer(): Promise<void> {
         this.log("Performing initial setup...");
         this.log("Initializing server database...");
         this.repo = new ServerRepository();
+        this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
         await this.repo.initialize();
 
         // Setup lightweight message cache
@@ -199,13 +206,6 @@ class BlueBubblesServer {
         //     this.log("Full Disk Access permissions are required!", "error");
         //     return;
         // }
-
-        try {
-            this.log("Launching Services..");
-            await this.setupServices();
-        } catch (ex) {
-            this.log("There was a problem launching the Server listeners.", "error");
-        }
     }
 
     /**
@@ -223,6 +223,28 @@ class BlueBubblesServer {
     }
 
     /**
+     * Handles a configuration change
+     *
+     * @param prevConfig The previous configuration
+     * @param nextConfig The current configuration
+     */
+    private async handleConfigUpdate({ prevConfig, nextConfig }: ServerConfigChange) {
+        // If the socket port changed, disconnect and reconnect
+        if (prevConfig.socket_port !== nextConfig.socket_port) {
+            await this.ngrok.restart();
+            await this.socket.restart();
+        }
+
+        // If the ngrok URL is different, emit the change to the listeners
+        if (prevConfig.server_address !== nextConfig.server_address) {
+            if (this.socket) await this.emitMessage("new-server", nextConfig.server_address);
+            await this.fcm.setServerUrl(nextConfig.server_address as string);
+        }
+
+        this.emitToUI("config-update", nextConfig);
+    }
+
+    /**
      * Emits a notification to to your connected devices over FCM and socket
      *
      * @param type The type of notification
@@ -232,7 +254,7 @@ class BlueBubblesServer {
         this.socket.server.emit(type, data);
 
         // Send notification to devices
-        if (this.fcm.app) {
+        if (FCMService.getApp()) {
             const devices = await this.repo.devices().find();
             if (!devices || devices.length === 0) return;
 
@@ -451,16 +473,9 @@ class BlueBubblesServer {
             for (const item of Object.keys(args)) {
                 if (this.repo.hasConfig(item) && this.repo.getConfig(item) !== args[item]) {
                     this.repo.setConfig(item, args[item]);
-
-                    // If the socket port changed, disconnect and reconnect
-                    if (item === "socket_port") {
-                        await this.ngrok.restart();
-                        await this.socket.restart();
-                    }
                 }
             }
 
-            this.emitToUI("config-update", this.repo.config);
             return this.repo.config;
         });
 
@@ -483,7 +498,7 @@ class BlueBubblesServer {
 
         ipcMain.handle("set-fcm-server", (_, args) => {
             FileSystem.saveFCMServer(args);
-            this.fcm.start();
+            this.fcm.start(true);
         });
 
         ipcMain.handle("set-fcm-client", (_, args) => {
@@ -601,7 +616,7 @@ class BlueBubblesServer {
 
         try {
             this.log("Starting FCM service...");
-            this.fcm.start();
+            await this.fcm.start(true);
         } catch (ex) {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
@@ -624,17 +639,16 @@ class BlueBubblesServer {
         this.log("Restarting the server...");
 
         // Remove all listeners
+        console.log("Removing chat listeners...");
         for (const i of this.chatListeners) i.stop();
         this.chatListeners = [];
 
         // Disconnect & reconnect to the iMessage DB
         if (this.iMessageRepo.db.isConnected) {
+            console.log("Reconnecting to iMessage database...");
             await this.iMessageRepo.db.close();
             await this.iMessageRepo.db.connect();
         }
-
-        // Remove the FCM connection (this will reconnect in `start`)
-        if (this.fcm.app) await this.fcm.app.delete();
 
         // Start the server up again
         await this.start();
