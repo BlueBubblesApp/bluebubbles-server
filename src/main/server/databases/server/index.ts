@@ -121,7 +121,7 @@ export class ServerRepository extends EventEmitter {
             await this.configs().save(cfg);
         }
 
-        this.config[name] = value;
+        this.config[name] = ServerRepository.convertFromDbValue(saniVal);
         super.emit("config-update", { prevConfig: orig, nextConfig: this.config });
     }
 

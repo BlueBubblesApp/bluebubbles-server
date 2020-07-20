@@ -159,6 +159,9 @@ class BlueBubblesServer {
         }
 
         await this.startServices();
+
+        // Once we boot up, let's send a hello-world to all the clients
+        if (this.socket?.server) this.socket.server.emit("hello-world");
     }
 
     /**

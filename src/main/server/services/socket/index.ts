@@ -58,11 +58,11 @@ export class SocketService {
          * Handle all other data requests
          */
         this.server.on("connection", async socket => {
-            const guid = socket.handshake.query?.guid;
+            const pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
             const cfgPass = (await Server().repo.getConfig("password")) as string;
 
             // Basic authentication
-            if (guid === cfgPass) {
+            if (pass === cfgPass) {
                 Server().log(`Client Authenticated Successfully`);
             } else {
                 socket.disconnect();
