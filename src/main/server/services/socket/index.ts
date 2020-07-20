@@ -54,6 +54,11 @@ export class SocketService {
      * Creates the initial connection handler for Socket.IO
      */
     start() {
+        this.server.on("connect", () => {
+            // Once we boot up, let's send a hello-world to all the clients
+            Server().emitMessage("hello-world", null);
+        });
+
         /**
          * Handle all other data requests
          */
