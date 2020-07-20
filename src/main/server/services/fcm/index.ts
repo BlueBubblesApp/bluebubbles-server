@@ -20,22 +20,17 @@ export class FCMService {
     /**
      * Starts the FCM app service
      */
-    async start(refresh = false): Promise<boolean> {
+    async start(): Promise<boolean> {
         // If we have already initialized the app, don't re-initialize
         const app = FCMService.getApp();
-        if (app && !refresh) return true;
+        if (app) return true;
+
+        Server().log("Initializing new FCM App");
 
         // Do nothing if the config doesn't exist
         const serverConfig = FileSystem.getFCMServer();
         const clientConfig = FileSystem.getFCMClient();
         if (!serverConfig || !clientConfig) return false;
-
-        // If we want to do a full refresh, delete the current app
-        try {
-            if (app && refresh) await app.delete();
-        } catch (ex) {
-            /* Ignore */
-        }
 
         // Initialize the app
         admin.initializeApp(

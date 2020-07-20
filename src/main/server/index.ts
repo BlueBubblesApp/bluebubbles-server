@@ -496,13 +496,13 @@ class BlueBubblesServer {
             }
         });
 
-        ipcMain.handle("set-fcm-server", (_, args) => {
+        ipcMain.handle("set-fcm-server", async (_, args) => {
             FileSystem.saveFCMServer(args);
-            this.fcm.start(true);
         });
 
-        ipcMain.handle("set-fcm-client", (_, args) => {
+        ipcMain.handle("set-fcm-client", async (_, args) => {
             FileSystem.saveFCMClient(args);
+            await this.fcm.start();
         });
 
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {
@@ -616,7 +616,7 @@ class BlueBubblesServer {
 
         try {
             this.log("Starting FCM service...");
-            await this.fcm.start(true);
+            await this.fcm.start();
         } catch (ex) {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
