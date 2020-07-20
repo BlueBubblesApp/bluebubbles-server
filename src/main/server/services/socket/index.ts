@@ -63,10 +63,10 @@ export class SocketService {
 
             // Basic authentication
             if (guid === cfgPass) {
-                console.log("Client Authenticated Successfully");
+                Server().log(`Client Authenticated Successfully`);
             } else {
                 socket.disconnect();
-                console.log("Closing client connection. Authentication failed.");
+                Server().log(`Closing client connection. Authentication failed.`);
             }
 
             /**
@@ -79,7 +79,7 @@ export class SocketService {
                 try {
                     next();
                 } catch (ex) {
-                    console.error(ex);
+                    Server().log(`Socket server error! ${ex.message}`, "error");
                     socket.error(createServerErrorResponse(ex.message));
                 }
             });

@@ -119,7 +119,7 @@ export class ActionHandler {
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(`Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`);
+                Server().log(`Failed to rename group from [${oldName}] to [${newName}]. Trying again.`, "warn");
                 continue;
             }
         }
@@ -160,7 +160,7 @@ export class ActionHandler {
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(`Failed to add participant to group, [${name}]. Attempting the next name.`);
+                Server().log(`Failed to add participant to group, [${name}]. Trying again.`, "warn");
                 continue;
             }
         }
@@ -205,7 +205,7 @@ export class ActionHandler {
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(`Failed to remove participant from group, [${name}]. Attempting the next name.`);
+                Server().log(`Failed to remove participant to group, [${name}]. Trying again.`, "warn");
                 continue;
             }
         }
@@ -253,7 +253,7 @@ export class ActionHandler {
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(`Failed to toggle tapback on message, [${friendlyMsg}]. Attempting the next group name.`);
+                Server().log(`Failed to toggle tapback on message, [${friendlyMsg}]. Trying again.`, "warn");
                 continue;
             }
         }
@@ -294,9 +294,7 @@ export class ActionHandler {
                 return toBoolean(output.trim());
             } catch (ex) {
                 err = ex;
-                console.warn(
-                    `Failed to check for typing indicators for chat, [${name}]. Attempting the next group name.`
-                );
+                Server().log(`Failed to check for typing indicators for chat, [${name}]. Trying again.`, "warn");
                 continue;
             }
         }

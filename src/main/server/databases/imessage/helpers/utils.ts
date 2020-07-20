@@ -1,5 +1,6 @@
 import { NativeImage } from "electron";
 import { encode as blurHashEncode } from "blurhash";
+import { Server } from "@server/index";
 import { Message } from "@server/databases/imessage/entity/Message";
 
 export const getBlurHash = async (image: NativeImage) => {
@@ -19,7 +20,7 @@ export const getBlurHash = async (image: NativeImage) => {
         blurhash = blurHashEncode(Uint8ClampedArray.from(calcImage.toBitmap()), size.width, size.height, 3, 3);
     } catch (ex) {
         console.log(ex);
-        console.log(`Could not compute blurhash`);
+        Server().log(`Could not compute blurhash: ${ex.message}`, "error");
     }
 
     return blurhash;

@@ -4,6 +4,7 @@ import * as path from "path";
 import * as base64 from "byte-base64";
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 
+import { Server } from "@server/index";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
@@ -142,7 +143,7 @@ export const getAttachmentResponse = async (
             }
         } catch (ex) {
             console.log(ex);
-            console.error(`Could not read file [${fPath}]`);
+            Server().log(`Could not read file [${fPath}]: ${ex.message}`, "error");
         }
     } else {
         console.warn("Attachment hasn't been downloaded yet!");

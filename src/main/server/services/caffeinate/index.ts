@@ -1,5 +1,6 @@
 import * as process from "process";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { Server } from "@server/index";
 
 /**
  * Service that spawns the caffeinate process so that
@@ -46,8 +47,8 @@ export class CaffeinateService {
                 if (!killed) process.kill(-this.childProc.pid);
                 console.info("Killed caffeinate process");
             } catch (ex) {
-                console.error("Failed to kill caffeinate process");
                 console.error(ex);
+                Server().log(`Failed to kill caffeinate process! ${ex.message}`, "error");
             } finally {
                 this.isCaffeinated = false;
             }

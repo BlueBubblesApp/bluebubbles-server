@@ -4,6 +4,7 @@ import * as child_process from "child_process";
 import { app } from "electron";
 import { sync } from "read-chunk";
 
+import { Server } from "@server/index";
 import { concatUint8Arrays } from "@server/helpers/utils";
 import { getAppleScripts } from "./scripts";
 
@@ -169,8 +170,8 @@ export class FileSystem {
     static removeAttachment(name: string): void {
         try {
             fs.unlinkSync(path.join(FileSystem.attachmentsDir, name));
-        } catch (e) {
-            console.warn(`Failed to remove attachment: ${name}`);
+        } catch (ex) {
+            Server().log(`Could not remove attachment: ${ex.message}`, "error");
         }
     }
 
