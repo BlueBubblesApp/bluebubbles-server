@@ -42,6 +42,9 @@ export const getAppleScripts = () => {
                     send theAttachment to targetChat
                 end if
 
+                (* We need this delay or it won't send correctly *)
+                delay 0.5
+
                 if message is not equal to "" then
                     send message to targetChat
                 end if

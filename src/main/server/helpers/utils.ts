@@ -141,6 +141,19 @@ export const cliSanitize = (input: string) => {
     return input.replace(/"/g, '\\"');
 };
 
+export const sanitizeStr = (val: string) => {
+    if (!val) return val;
+    const objChar = String.fromCharCode(65532);
+
+    // Recursively replace all "obj" hidden characters
+    let output = val;
+    while (output.includes(objChar)) {
+        output = output.replace(objChar, "");
+    }
+
+    return output.trim();
+};
+
 export const tapbackUIMap = {
     love: 1,
     like: 2,

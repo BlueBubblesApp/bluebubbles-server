@@ -126,11 +126,7 @@ export const getAttachmentResponse = async (
             if (handledImageMimes.includes(tableData.mimeType)) {
                 image = nativeImage.createFromPath(fPath);
                 if (withBlurhash) {
-                    const now = new Date().getTime();
-                    const size = image.getSize();
                     blurhash = await getBlurHash(image);
-                    const later = new Date().getTime();
-                    console.log(`Calculated blurhash for image (${size.height}x${size.width}) in ${later - now} ms`);
                 }
             }
 

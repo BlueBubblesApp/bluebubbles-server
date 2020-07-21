@@ -583,18 +583,12 @@ export class SocketService {
             async (_, cb): Promise<void> => {
                 try {
                     // Export the contacts
-                    let now = new Date().getTime();
                     await ActionHandler.exportContacts();
-                    let later = new Date().getTime();
-                    console.log(`Export took ${later - now} ms`);
 
                     // Check if the contacts export exists, and respond back with it
                     const contactsPath = path.join(FileSystem.contactsDir, "AddressBook.vcf");
                     if (fslib.existsSync(contactsPath)) {
-                        now = new Date().getTime();
                         const data = fslib.readFileSync(contactsPath).toString("utf-8");
-                        later = new Date().getTime();
-                        console.log(`Read took ${later - now} ms`);
                         respond(cb, "contacts-from-vcf", createSuccessResponse(data));
                     } else {
                         respond(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));
@@ -606,7 +600,7 @@ export class SocketService {
         );
 
         socket.on("disconnect", () => {
-            console.log(`Client ${socket.id} disconnected!`);
+            Server().log(`Client ${socket.id} disconnected!`);
         });
     }
 

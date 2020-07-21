@@ -23,6 +23,7 @@ import { SocketService, FCMService, AlertService, CaffeinateService, NgrokServic
 import { EventCache } from "@server/eventCache";
 
 import { ActionHandler } from "./helpers/actions";
+import { sanitizeStr } from "./helpers/utils";
 
 /**
  * Create a singleton for the server so that it can be referenced everywhere.
@@ -307,7 +308,7 @@ class BlueBubblesServer {
          */
         outgoingMsgListener.on("message-match", async (item: { tempGuid: string; message: Message }) => {
             const text = item.message.cacheHasAttachments
-                ? `Image: ${item.message.text.slice(1, item.message.text.length) || "<No Text>"}`
+                ? `Attachment: ${sanitizeStr(item.message.text) || "<No Text>"}`
                 : item.message.text;
 
             this.log(`Message match found for text, [${text}]`);
@@ -324,9 +325,7 @@ class BlueBubblesServer {
          * before the message is sent, it will cause a duplicate.
          */
         outgoingMsgListener.on("new-entry", async (item: Message) => {
-            const text = item.cacheHasAttachments
-                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
-                : item.text;
+            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
             this.log(`New message from [You]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
@@ -343,9 +342,7 @@ class BlueBubblesServer {
             const from = item.isFromMe ? "You" : item.handle?.id;
             const time = item.dateDelivered || item.dateRead;
             const updateType = item.dateRead ? "Text Read" : "Text Delivered";
-            const text = item.cacheHasAttachments
-                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
-                : item.text;
+            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
             this.log(
                 `Updated message from [${from}]: [${text.substring(
                     0,

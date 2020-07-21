@@ -9,7 +9,8 @@ import {
     getiMessageNumberFormat,
     cliSanitize,
     tapbackUIMap,
-    toBoolean
+    toBoolean,
+    sanitizeStr
 } from "./utils";
 
 /**
@@ -38,9 +39,11 @@ export class ActionHandler {
     ): Promise<void> => {
         if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
+        const cleanMessage = sanitizeStr(message ?? "");
+
         // Create the base command to execute
         let baseCmd = `osascript "${FileSystem.scriptDir}/sendMessage.scpt" "${chatGuid}" "${cliSanitize(
-            message ?? ""
+            cleanMessage
         )}"`;
 
         // Add attachment, if present
@@ -58,12 +61,12 @@ export class ActionHandler {
             await FileSystem.execShellCommand(baseCmd);
 
             // Add queued item
-            if (message && message.length > 0) {
+            if (cleanMessage && cleanMessage.length > 0) {
                 const item = new Queue();
                 item.tempGuid = tempGuid;
                 item.chatGuid = chatGuid;
                 item.dateCreated = now;
-                item.text = message;
+                item.text = cleanMessage;
                 await Server().repo.queue().manager.save(item);
             }
 
