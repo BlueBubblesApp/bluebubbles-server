@@ -29,6 +29,9 @@ export class NgrokService {
 
                 // If the status is closed, restart the server
                 if (status === "closed") await this.restart();
+            },
+            onLogEvent: (log: string) => {
+                Server().log(log);
             }
         });
 

@@ -119,22 +119,26 @@ class BlueBubblesServer {
      * @param message The message to print
      * @param type The log type
      */
-    log(message: any, type?: "log" | "error" | "dir" | "warn") {
+    log(message: any, type?: "log" | "error" | "dir" | "warn" | "debug") {
+        const msg = `${new Date().toLocaleString()} [${(type ?? "log").toUpperCase()}] -> ${message}`;
         switch (type) {
             case "error":
-                console.error(message);
+                console.error(msg);
                 AlertService.create("error", message);
                 break;
             case "dir":
-                console.dir(message);
+                console.dir(msg);
+                break;
+            case "debug":
+                console.debug(msg);
                 break;
             case "warn":
-                console.warn(message);
+                console.warn(msg);
                 AlertService.create("warn", message);
                 break;
             case "log":
             default:
-                console.log(message);
+                console.log(msg);
         }
 
         this.emitToUI("new-log", message);
