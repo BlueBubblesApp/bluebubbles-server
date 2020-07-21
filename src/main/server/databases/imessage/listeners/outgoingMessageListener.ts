@@ -35,23 +35,26 @@ export class OutgoingMessageListener extends ChangeListener {
      *
      * @param after
      */
-    async getEntries(after: Date): Promise<void> {
+    async getEntries(after: Date, before: Date): Promise<void> {
         // First, emit message matches
         await this.emitMessageMatches();
 
         // Second, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
-        await this.emitOutgoingMessages(new Date(after.getTime() - 15000));
+        await this.emitOutgoingMessages(new Date(after.getTime() - 15000), before);
 
         // Third, check for updated messages
-        await this.emitUpdatedMessages(new Date(after.getTime() - this.pollFrequency));
+        await this.emitUpdatedMessages(new Date(after.getTime() - this.pollFrequency), before);
     }
 
-    async emitMessageMatches() {
+    async emitMessageMatches(): Promise<void> {
         const now = new Date().getTime();
         const repo = Server().repo.queue();
 
         // Get all queued items
         const entries = await repo.find();
+
+        // Store a temp list of matched GUIDs
+        const matchedGuids: string[] = [];
         for (const entry of entries) {
             // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
             if (now - entry.dateCreated > 1000 * 60) {
@@ -60,6 +63,7 @@ export class OutgoingMessageListener extends ChangeListener {
                 continue;
             }
 
+            // The "default" where clause. Just stuff from ourselves
             let where: DBWhereItem[] = [
                 {
                     // Text must be from yourself
@@ -99,24 +103,36 @@ export class OutgoingMessageListener extends ChangeListener {
             // Check if the entry exists in the messages DB
             const matches = await Server().iMessageRepo.getMessages({
                 chatGuid: entry.chatGuid,
-                limit: 3, // Limit to 3 to get any edge cases (possibly when spamming)
+                limit: 5, // Limit to 5 to get any edge cases (possibly when spamming)
                 withHandle: false, // Exclude to speed up query
                 after: new Date(entry.dateCreated),
-                before: new Date(),
-                sort: "ASC",
+                sort: "ASC", // Ascending because we want to send the newest first
                 where
             });
 
+            // Find the first non-emitted match
             for (const match of matches) {
+                // If we've already emitted this message-match, skip it
+                if (matchedGuids.includes(match.guid)) continue;
+
+                // Emit the message match to listeners
+                super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
+
+                // Add the message to the cache
                 const cacheName = getCacheName(match);
                 this.cache.add(cacheName);
-                super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
-                await repo.remove(entry);
+                matchedGuids.push(match.guid);
+
+                // Remove the queue entry from the database
+                if (matches.length > 0) await repo.remove(entry);
+
+                // Break because we only want one
+                break;
             }
         }
     }
 
-    async emitOutgoingMessages(after: Date) {
+    async emitOutgoingMessages(after: Date, before: Date) {
         const baseQuery = [
             {
                 statement: "message.service = 'iMessage'",
@@ -135,6 +151,7 @@ export class OutgoingMessageListener extends ChangeListener {
         // First, check for unsent messages
         const newUnsent = await this.repo.getMessages({
             after,
+            before,
             withChats: false,
             withAttachments: false,
             withHandle: false,
@@ -150,6 +167,7 @@ export class OutgoingMessageListener extends ChangeListener {
         // Second, check for sent messages
         const newSent = await this.repo.getMessages({
             after,
+            before,
             withChats: true,
             where: [
                 ...baseQuery,
@@ -212,10 +230,11 @@ export class OutgoingMessageListener extends ChangeListener {
         for (const entry of errored) super.emit("message-send-error", entry);
     }
 
-    async emitUpdatedMessages(after: Date) {
+    async emitUpdatedMessages(after: Date, before: Date) {
         // Get updated entries from myself only
         const entries = await this.repo.getUpdatedMessages({
             after,
+            before,
             withChats: true,
             where: [
                 {

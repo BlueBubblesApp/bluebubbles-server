@@ -17,10 +17,11 @@ export class GroupChangeListener extends ChangeListener {
         this.start();
     }
 
-    async getEntries(after: Date): Promise<void> {
+    async getEntries(after: Date, before: Date): Promise<void> {
         const offsetDate = new Date(after.getTime() - 5000);
         const entries = await this.repo.getMessages({
             after: offsetDate,
+            before,
             withChats: true,
             where: [
                 {

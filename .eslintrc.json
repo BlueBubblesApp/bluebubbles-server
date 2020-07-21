@@ -5,6 +5,11 @@
         "node": true,
         "jest": true
     },
+    "ignorePatterns": [
+        "dist/",
+        "node_modules/",
+        "release/"
+    ],
     "extends": [
         "airbnb",
         "eslint:recommended",

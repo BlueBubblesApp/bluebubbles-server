@@ -51,7 +51,7 @@ export abstract class ChangeListener extends EventEmitter {
         try {
             // We pass the last check because we don't want it to change
             // while we process asynchronously
-            await this.getEntries(this.lastCheck);
+            await this.getEntries(this.lastCheck, beforeCheck);
 
             // Save the date for when we started checking
             this.lastCheck = beforeCheck;
@@ -76,5 +76,5 @@ export abstract class ChangeListener extends EventEmitter {
         setTimeout(() => this.checkForNewEntries(), waitTime);
     }
 
-    abstract async getEntries(after: Date): Promise<void>;
+    abstract async getEntries(after: Date, before: Date): Promise<void>;
 }

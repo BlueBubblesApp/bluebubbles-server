@@ -163,7 +163,6 @@ class Dashboard extends React.Component<Props, State> {
             showPassword
         } = this.state;
         const qrData = this.buildQrData(fcmClient);
-        console.log(config);
 
         let caffeinateString = isCaffeinated ? "Currently caffeinated" : "Not currently caffeinated";
 

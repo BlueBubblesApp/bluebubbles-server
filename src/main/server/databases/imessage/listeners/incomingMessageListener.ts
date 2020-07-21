@@ -16,11 +16,12 @@ export class IncomingMessageListener extends ChangeListener {
         this.start();
     }
 
-    async getEntries(after: Date): Promise<void> {
+    async getEntries(after: Date, before: Date): Promise<void> {
         // Offset 15 seconds to account for the "Apple" delay
         const offsetDate = new Date(after.getTime() - 15000);
         const entries = await this.repo.getMessages({
             after: offsetDate,
+            before,
             withChats: true,
             where: [
                 {
