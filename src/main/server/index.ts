@@ -235,9 +235,11 @@ class BlueBubblesServer {
      */
     private async handleConfigUpdate({ prevConfig, nextConfig }: ServerConfigChange) {
         // If the socket port changed, disconnect and reconnect
+        let ngrokRestarted = false;
         if (prevConfig.socket_port !== nextConfig.socket_port) {
             if (this.ngrok) await this.ngrok.restart();
             if (this.socket) await this.socket.restart();
+            ngrokRestarted = true;
         }
 
         // If the ngrok URL is different, emit the change to the listeners
@@ -247,7 +249,7 @@ class BlueBubblesServer {
         }
 
         // If the ngrok API key is different, restart the ngrok process
-        if (prevConfig.ngrok_key !== nextConfig.ngrok_key) {
+        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !ngrokRestarted) {
             if (this.ngrok) await this.ngrok.restart();
         }
 
