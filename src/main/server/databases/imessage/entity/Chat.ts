@@ -100,6 +100,7 @@ export const getChatResponse = async (tableData: Chat): Promise<ChatResponse> =>
     }
 
     return {
+        originalROWID: tableData.ROWID,
         guid: tableData.guid,
         participants,
         messages,

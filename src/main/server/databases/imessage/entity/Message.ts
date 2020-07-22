@@ -408,6 +408,7 @@ export const getMessageResponse = async (tableData: Message, withBlurhash = true
     }
 
     return {
+        originalROWID: tableData.ROWID,
         guid: tableData.guid,
         text: tableData.text,
         handle: tableData.handle ? await getHandleResponse(tableData.handle) : null,

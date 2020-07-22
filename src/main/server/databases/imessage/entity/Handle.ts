@@ -48,6 +48,7 @@ export const getHandleResponse = async (tableData: Handle): Promise<HandleRespon
     }
 
     return {
+        originalROWID: tableData.ROWID,
         messages,
         chats,
         address: tableData.id,

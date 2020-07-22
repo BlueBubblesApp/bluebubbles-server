@@ -146,6 +146,7 @@ export const getAttachmentResponse = async (
     }
 
     return {
+        originalROWID: tableData.ROWID,
         guid: tableData.guid,
         messages: tableData.messages ? tableData.messages.map(item => item.guid) : [],
         data: data as string,
