@@ -44,6 +44,7 @@ export class NgrokService {
     async stop(): Promise<void> {
         try {
             await ngrok.disconnect();
+            await ngrok.kill();
         } finally {
             this.url = null;
         }
@@ -53,8 +54,13 @@ export class NgrokService {
      * Helper for restarting the ngrok connection
      */
     async restart(): Promise<string> {
-        await this.stop();
-        await this.start();
+        try {
+            await this.stop();
+            await this.start();
+        } catch (ex) {
+            Server().log(`Failed to restart ngrok! ${ex.message}`, "error");
+        }
+
         return this.url;
     }
 }
