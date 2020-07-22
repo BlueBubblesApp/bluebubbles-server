@@ -1,11 +1,16 @@
 import { Server } from "@server/index";
-import * as ngrok from "ngrok";
+import { connect, disconnect, kill, authtoken, INgrokOptions, getUrl } from "ngrok";
+
+const sevenHours = 1000 * 60 * 60 * 7;
 
 export class NgrokService {
     url: string;
 
+    refreshTimer: NodeJS.Timeout = null;
+
     constructor() {
         this.url = null;
+        this.refreshTimer = null;
     }
 
     /**
@@ -20,7 +25,11 @@ export class NgrokService {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async start(): Promise<void> {
-        this.url = await ngrok.connect({
+        // If there is a ngrok API key set, and we have a refresh timer going, kill it
+        const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
+        if (ngrokKey && this.refreshTimer) clearTimeout(this.refreshTimer);
+
+        const opts: INgrokOptions = {
             port: Server().repo.getConfig("socket_port"),
             // This is required to run ngrok in production
             binPath: bPath => bPath.replace("app.asar", "app.asar.unpacked"),
@@ -31,10 +40,34 @@ export class NgrokService {
                 if (status === "closed") await this.restart();
             },
             onLogEvent: (log: string) => {
-                Server().log(log);
+                Server().log(log, "debug");
             }
-        });
+        };
 
+        // As long as the auth token isn't null or undefined, set it
+        if (ngrokKey !== null && ngrokKey !== undefined) await authtoken(ngrokKey);
+
+        // Set the ngrok key (if applicable) in the opts
+        if (ngrokKey && ngrokKey.length !== 0) {
+            opts.authtoken = ngrokKey;
+        }
+
+        // Connect to ngrok
+        this.url = await connect(opts);
+
+        // If there is no API key present, set a timer to auto-refresh after 7 hours.
+        // 8 hours is the "max" time
+        if (!ngrokKey) {
+            if (this.refreshTimer) clearTimeout(this.refreshTimer);
+
+            Server().log("Starting Ngrok refresh timer. Waiting 7 hours...", "debug");
+            this.refreshTimer = setTimeout(async () => {
+                Server().log("Restarting Ngrok process due to session timeout...", "debug");
+                await this.restart();
+            }, sevenHours);
+        }
+
+        // Set the server address. This will emit to all listeners.
         await Server().repo.setConfig("server_address", this.url);
     }
 
@@ -43,8 +76,8 @@ export class NgrokService {
      */
     async stop(): Promise<void> {
         try {
-            await ngrok.disconnect();
-            await ngrok.kill();
+            await disconnect();
+            await kill();
         } finally {
             this.url = null;
         }

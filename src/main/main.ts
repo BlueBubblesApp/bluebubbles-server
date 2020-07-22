@@ -5,7 +5,7 @@ import * as url from "url";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
-import { UpdateService } from "@server/services";
+import { UpdateService, FCMService } from "@server/services";
 
 let win: BrowserWindow | null;
 let tray: Tray | null;
@@ -13,6 +13,21 @@ let api = Server(win);
 
 // Start the API
 api.start();
+
+const handleExit = async () => {
+    if (!api) return;
+
+    Server().log("Stopping all services...");
+
+    if (api.ngrok) await api.ngrok.stop();
+    if (api.socket?.server) api.socket.server.close();
+    if (api.iMessageRepo?.db && api.iMessageRepo.db.isConnected) await api.iMessageRepo.db.close();
+    if (api.repo?.db && api.repo.db.isConnected) await api.repo.db.close();
+    if (api.fcm) FCMService.stop();
+    if (api.caffeinate && api.caffeinate.isCaffeinated) api.caffeinate.stop();
+
+    app.quit();
+};
 
 const buildTray = () => {
     return Menu.buildFromTemplate([
@@ -60,8 +75,8 @@ const buildTray = () => {
         {
             label: "Close",
             type: "normal",
-            click: () => {
-                app.quit();
+            click: async () => {
+                await handleExit();
             }
         }
     ]);
@@ -120,6 +135,7 @@ const createWindow = async () => {
 
     win.on("closed", () => {
         win = null;
+        console.log("CLOSED");
     });
 
     // Prevent the title from being changed from BlueBubbles
@@ -151,9 +167,9 @@ app.on("ready", () => {
     });
 });
 
-app.on("window-all-closed", () => {
+app.on("window-all-closed", async () => {
     if (process.platform !== "darwin") {
-        app.quit();
+        await handleExit();
     }
 });
 
@@ -161,4 +177,12 @@ app.on("activate", () => {
     if (win === null) {
         createWindow();
     }
+});
+
+/**
+ * I'm not totally sure this will work because of the way electron is...
+ * But, I'm going to try.
+ */
+app.on("before-quit", async _ => {
+    await handleExit();
 });

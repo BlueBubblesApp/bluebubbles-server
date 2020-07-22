@@ -246,6 +246,13 @@ class BlueBubblesServer {
             if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
         }
 
+        // If the ngrok API key is different, restart the ngrok process
+        if (prevConfig.ngrok_key !== nextConfig.ngrok_key) {
+            console.log("Restarting ngrok");
+            console.log(nextConfig.ngrok_key);
+            await this.ngrok.restart();
+        }
+
         this.emitToUI("config-update", nextConfig);
     }
 

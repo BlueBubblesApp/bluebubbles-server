@@ -98,4 +98,9 @@ export class FCMService {
 
         return responses;
     }
+
+    static async stop() {
+        const app = FCMService.getApp();
+        if (app) await app.delete();
+    }
 }

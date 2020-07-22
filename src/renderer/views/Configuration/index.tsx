@@ -37,9 +37,11 @@ interface State {
     autoStart: boolean;
     password: string;
     showPassword: boolean;
+    showKey: boolean;
+    ngrokKey: string;
 }
 
-class Dashboard extends React.Component<Props, State> {
+class Configuration extends React.Component<Props, State> {
     state: State = {
         port: String(this.props.config?.socket_port ?? ""),
         fcmClient: null,
@@ -48,7 +50,9 @@ class Dashboard extends React.Component<Props, State> {
         isCaffeinated: false,
         autoStart: this.props.config?.auto_start ?? false,
         password: this.props.config?.password ?? "",
-        showPassword: false
+        showPassword: false,
+        showKey: false,
+        ngrokKey: this.props.config?.ngrok_key ?? ""
     };
 
     componentWillReceiveProps(nextProps: Props) {
@@ -56,7 +60,8 @@ class Dashboard extends React.Component<Props, State> {
             port: String(nextProps.config?.socket_port ?? ""),
             autoStart: nextProps.config?.auto_start,
             autoCaffeinate: nextProps.config?.auto_caffeinate,
-            password: nextProps.config?.password ?? this.state.password
+            password: nextProps.config?.password ?? this.state.password,
+            ngrokKey: nextProps.config?.ngrok_key ?? this.state.ngrokKey
         });
     }
 
@@ -79,13 +84,14 @@ class Dashboard extends React.Component<Props, State> {
     saveConfig = async () => {
         await ipcRenderer.invoke("set-config", {
             socket_port: this.state.port,
-            password: this.state.password
+            password: this.state.password,
+            ngrok_key: this.state.ngrokKey
         });
     };
 
     handleChange = async (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
         const id = e.target.id;
-        if (id === "port") this.setState({ port: e.target.value });
+        if (["port", "password", "ngrokKey"].includes(id)) this.setState({ [id]: e.target.value } as any);
         if (id === "password") this.setState({ password: e.target.value });
         if (id === "toggleCaffeinate") {
             const target = e.target as HTMLInputElement;
@@ -101,6 +107,10 @@ class Dashboard extends React.Component<Props, State> {
 
     toggleShowPassword = () => {
         this.setState({ showPassword: !this.state.showPassword });
+    };
+
+    toggleShowKey = () => {
+        this.setState({ showKey: !this.state.showKey });
     };
 
     handleClientFile = (acceptedFiles: any) => {
@@ -160,7 +170,9 @@ class Dashboard extends React.Component<Props, State> {
             isCaffeinated,
             autoStart,
             password,
-            showPassword
+            showPassword,
+            showKey,
+            ngrokKey
         } = this.state;
         const qrData = this.buildQrData(fcmClient);
 
@@ -186,6 +198,27 @@ class Dashboard extends React.Component<Props, State> {
                             value={config?.server_address}
                             disabled
                         />
+                        <FormControl className={classes.field} size="small" variant="outlined" required>
+                            <InputLabel htmlFor="password">Ngrok API Key (Optional)</InputLabel>
+                            <OutlinedInput
+                                id="ngrokKey"
+                                label="Ngrok API Key (Optional)"
+                                type={showPassword ? "text" : "password"}
+                                value={ngrokKey}
+                                onChange={this.handleChange}
+                                endAdornment={
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            aria-label="toggle password visibility"
+                                            onClick={this.toggleShowKey}
+                                            style={{ width: "25px", height: "25px" }}
+                                        >
+                                            {showKey ? <Visibility /> : <VisibilityOff />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                }
+                            />
+                        </FormControl>
                         <FormControl className={classes.field} size="small" variant="outlined" required>
                             <InputLabel htmlFor="password">Password</InputLabel>
                             <OutlinedInput
@@ -344,4 +377,4 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         }
     });
 
-export default withStyles(styles)(Dashboard);
+export default withStyles(styles)(Configuration);

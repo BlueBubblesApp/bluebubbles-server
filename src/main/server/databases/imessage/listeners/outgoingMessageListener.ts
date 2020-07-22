@@ -53,8 +53,6 @@ export class OutgoingMessageListener extends ChangeListener {
         // Get all queued items
         const entries = await repo.find();
 
-        // Store a temp list of matched GUIDs
-        const matchedGuids: string[] = [];
         for (const entry of entries) {
             // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
             if (now - entry.dateCreated > 1000 * 60) {
@@ -112,8 +110,10 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Find the first non-emitted match
             for (const match of matches) {
+                const matchGuid = `match:${match.guid}`;
+
                 // If we've already emitted this message-match, skip it
-                if (matchedGuids.includes(match.guid)) continue;
+                if (this.cache.find(matchGuid)) continue;
 
                 // Emit the message match to listeners
                 super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
@@ -121,7 +121,10 @@ export class OutgoingMessageListener extends ChangeListener {
                 // Add the message to the cache
                 const cacheName = getCacheName(match);
                 this.cache.add(cacheName);
-                matchedGuids.push(match.guid);
+
+                // We add twice because the message match cache name is slightly different than the standard one
+                // The message match cache is only "relative" to the message match method as opposed to the global one
+                this.cache.add(matchGuid);
 
                 // Remove the queue entry from the database
                 if (matches.length > 0) await repo.remove(entry);
