@@ -8,11 +8,14 @@ import { Server } from "@server/index";
 import { concatUint8Arrays } from "@server/helpers/utils";
 import { getAppleScripts } from "./scripts";
 
+// Directory modifiers based on the environment
 let subdir = "";
+let moddir = "app.asar.unpacked";
 let appPath = __dirname.replace("/app.asar/dist", "");
 if (process.env.NODE_ENV !== "production") {
     appPath = __dirname.replace("/dist", "");
     subdir = "bluebubbles-server";
+    moddir = "";
 }
 
 /**
@@ -30,7 +33,7 @@ export class FileSystem {
 
     public static fcmDir = path.join(FileSystem.baseDir, "FCM");
 
-    public static modules = path.join(appPath, "node_modules");
+    public static modules = path.join(appPath, moddir, "node_modules");
 
     public static resources = path.join(appPath, "resources");
 

@@ -1,5 +1,5 @@
 import { Server } from "@server/index";
-import { connect, disconnect, kill, authtoken, INgrokOptions, getUrl } from "ngrok";
+import { connect, disconnect, kill, authtoken } from "ngrok";
 
 const sevenHours = 1000 * 60 * 60 * 7;
 
@@ -29,10 +29,18 @@ export class NgrokService {
         const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
         if (ngrokKey && this.refreshTimer) clearTimeout(this.refreshTimer);
 
-        const opts: INgrokOptions = {
+        // As long as the auth token isn't null or undefined, set it
+        if (ngrokKey !== null && ngrokKey !== undefined)
+            await authtoken({
+                authtoken: ngrokKey,
+                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
+            });
+
+        // Connect to ngrok
+        this.url = await connect({
             port: Server().repo.getConfig("socket_port"),
             // This is required to run ngrok in production
-            binPath: bPath => bPath.replace("app.asar", "app.asar.unpacked"),
+            binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked"),
             onStatusChange: async (status: string) => {
                 Server().log(`Ngrok status: ${status}`);
 
@@ -42,18 +50,7 @@ export class NgrokService {
             onLogEvent: (log: string) => {
                 Server().log(log, "debug");
             }
-        };
-
-        // As long as the auth token isn't null or undefined, set it
-        if (ngrokKey !== null && ngrokKey !== undefined) await authtoken(ngrokKey);
-
-        // Set the ngrok key (if applicable) in the opts
-        if (ngrokKey && ngrokKey.length !== 0) {
-            opts.authtoken = ngrokKey;
-        }
-
-        // Connect to ngrok
-        this.url = await connect(opts);
+        });
 
         // If there is no API key present, set a timer to auto-refresh after 7 hours.
         // 8 hours is the "max" time
