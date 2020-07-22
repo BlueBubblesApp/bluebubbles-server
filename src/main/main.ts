@@ -135,7 +135,6 @@ const createWindow = async () => {
 
     win.on("closed", () => {
         win = null;
-        console.log("CLOSED");
     });
 
     // Prevent the title from being changed from BlueBubbles

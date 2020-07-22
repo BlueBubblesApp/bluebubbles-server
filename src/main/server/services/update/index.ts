@@ -17,7 +17,7 @@ export class UpdateService {
     start() {
         this.timer = setInterval(async () => {
             await this.checkForUpdate();
-        }, 1000 * 60 * 60); // 1000 * 60 * 60 * 12); // Default 12 hours
+        }, 1000 * 60 * 60 * 12); // Default 12 hours
     }
 
     stop() {
