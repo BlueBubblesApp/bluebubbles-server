@@ -38,7 +38,7 @@ export class MessageRepository {
      * @param identifier A specific chat identifier to get
      * @param withParticipants Whether to include the participants or not
      */
-    async getChats(chatGuid?: string, withParticipants = true) {
+    async getChats(chatGuid?: string, withParticipants = true, includeArchived = false) {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
@@ -46,6 +46,7 @@ export class MessageRepository {
 
         // Add default WHERE clauses
         query.andWhere("chat.service_name == 'iMessage'");
+        if (!includeArchived) query.andWhere("chat.is_archived == 0");
         if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
 
         const chats = await query.getMany();

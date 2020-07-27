@@ -160,7 +160,8 @@ export class SocketService {
          */
         socket.on("get-chats", async (params, cb) => {
             const withParticipants = params?.withParticipants ?? true;
-            const chats = await Server().iMessageRepo.getChats(null, withParticipants);
+            const includeArchived = params?.includeArchived ?? false;
+            const chats = await Server().iMessageRepo.getChats(null, withParticipants, includeArchived);
 
             const results = [];
             for (const chat of chats ?? []) {
