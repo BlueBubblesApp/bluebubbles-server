@@ -49,6 +49,9 @@ export class NgrokService {
             },
             onLogEvent: (log: string) => {
                 Server().log(log, "debug");
+
+                // If the "remote gone away" error happens, we're gonna manually restart
+                if (log.includes("remote gone away")) this.restart();
             }
         });
 
