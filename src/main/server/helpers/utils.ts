@@ -138,7 +138,7 @@ export const toBoolean = (input: string) => {
 };
 
 export const cliSanitize = (input: string) => {
-    return input.replace(/"/g, '\\"');
+    return input.replace(/"/g, '\\"').replace(/\$/g, "\\$");
 };
 
 export const sanitizeStr = (val: string) => {
