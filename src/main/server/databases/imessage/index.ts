@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 import { createConnection, Connection } from "typeorm";
 
-import { DBMessageParams } from "@server/databases/imessage/types";
+import { DBMessageParams, ChatParams } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
@@ -38,7 +38,13 @@ export class MessageRepository {
      * @param identifier A specific chat identifier to get
      * @param withParticipants Whether to include the participants or not
      */
-    async getChats(chatGuid?: string, withParticipants = true, includeArchived = false) {
+    async getChats({
+        chatGuid = null,
+        withParticipants = true,
+        withArchived = false,
+        offset = 0,
+        limit = null
+    }: ChatParams) {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
@@ -46,11 +52,15 @@ export class MessageRepository {
 
         // Add default WHERE clauses
         query.andWhere("chat.service_name == 'iMessage'");
-        if (!includeArchived) query.andWhere("chat.is_archived == 0");
+        if (!withArchived) query.andWhere("chat.is_archived == 0");
         if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
 
-        const chats = await query.getMany();
+        // Set page params
+        query.offset(offset);
+        if (limit) query.limit(limit);
 
+        // Get results
+        const chats = await query.getMany();
         return chats;
     }
 

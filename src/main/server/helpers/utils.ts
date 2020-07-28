@@ -80,7 +80,7 @@ export const generateChatNameList = async (
     if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
     // First, lets get the members of the chat
-    const chats = await iMessageRepo.getChats(chatGuid, true);
+    const chats = await iMessageRepo.getChats({ chatGuid, withParticipants: true });
     if (!chats || chats.length === 0) throw new Error("Chat does not exist");
 
     const chat = chats[0];

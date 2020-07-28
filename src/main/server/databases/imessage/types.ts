@@ -15,3 +15,11 @@ export type DBWhereItem = {
     statement: string;
     args: { [key: string]: string | number };
 };
+
+export type ChatParams = {
+    chatGuid?: string;
+    withParticipants?: boolean;
+    withArchived?: boolean;
+    offset?: number;
+    limit?: number;
+};
