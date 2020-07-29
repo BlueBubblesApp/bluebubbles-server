@@ -19,7 +19,14 @@ import { Message, getMessageResponse } from "@server/databases/imessage/entity/M
 import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
 
 // Service Imports
-import { SocketService, FCMService, AlertService, CaffeinateService, NgrokService } from "@server/services";
+import {
+    SocketService,
+    FCMService,
+    AlertService,
+    CaffeinateService,
+    NgrokService,
+    NetworkService
+} from "@server/services";
 import { EventCache } from "@server/eventCache";
 
 import { ActionHandler } from "./helpers/actions";
@@ -62,6 +69,8 @@ class BlueBubblesServer {
 
     alerter: AlertService;
 
+    networkChecker: NetworkService;
+
     caffeinate: CaffeinateService;
 
     ngrok: NgrokService;
@@ -102,6 +111,7 @@ class BlueBubblesServer {
         this.socket = null;
         this.fcm = null;
         this.caffeinate = null;
+        this.networkChecker = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -198,6 +208,23 @@ class BlueBubblesServer {
             this.fcm = new FCMService();
         } catch (ex) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Initializing network service...");
+            this.networkChecker = new NetworkService();
+            this.networkChecker.on("status-change", connected => {
+                if (connected) {
+                    this.log("Re-connected to network!");
+                    this.ngrok.restart();
+                } else {
+                    this.log("Disconnected from network!");
+                }
+            });
+
+            this.networkChecker.start();
+        } catch (ex) {
+            this.log(`Failed to setup network service! ${ex.message}`, "error");
         }
 
         // Also check accessibility permissions

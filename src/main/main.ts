@@ -7,8 +7,8 @@ import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server/index";
 import { UpdateService, FCMService } from "@server/services";
 
-let win: BrowserWindow | null;
-let tray: Tray | null;
+let win: BrowserWindow;
+let tray: Tray;
 let api = Server(win);
 
 // Start the API
@@ -19,6 +19,7 @@ const handleExit = async () => {
 
     Server().log("Stopping all services...");
 
+    if (api.networkChecker) api.networkChecker.stop();
     if (api.ngrok) await api.ngrok.stop();
     if (api.socket?.server) api.socket.server.close();
     if (api.iMessageRepo?.db && api.iMessageRepo.db.isConnected) await api.iMessageRepo.db.close();
@@ -173,9 +174,7 @@ app.on("window-all-closed", async () => {
 });
 
 app.on("activate", () => {
-    if (win === null) {
-        createWindow();
-    }
+    if (win === null) createWindow();
 });
 
 /**
