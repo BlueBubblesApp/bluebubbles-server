@@ -23,6 +23,7 @@ import { GetApp, Visibility, VisibilityOff } from "@material-ui/icons";
 
 import Dropzone from "react-dropzone";
 import * as QRCode from "qrcode.react";
+import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
 
 interface Props {
     config: Config;
@@ -121,6 +122,9 @@ class Configuration extends React.Component<Props, State> {
         reader.onload = () => {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
+            const valid = isValidClientConfig(binaryStr as string);
+            if (!valid) return;
+
             ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
             this.setState({ fcmClient: binaryStr });
         };
@@ -136,6 +140,9 @@ class Configuration extends React.Component<Props, State> {
         reader.onload = () => {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
+            const valid = isValidServerConfig(binaryStr as string);
+            if (!valid) return;
+
             ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
             this.setState({ fcmServer: binaryStr });
         };
