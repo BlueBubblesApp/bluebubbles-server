@@ -51,7 +51,13 @@ export class NgrokService {
                 Server().log(log, "debug");
 
                 // If the "remote gone away" error happens, we're gonna manually restart
-                if (log.includes("remote gone away")) this.restart();
+                if (log.includes("remote gone away")) {
+                    Server().log(`Ngrok status: "Remote gone away" -> Restarting...`);
+                    this.restart();
+                } else if (log.includes(`lvl=crit msg="command failed"`)) {
+                    Server().log(`Ngrok status: "Command failed" -> Restarting...`);
+                    this.restart();
+                }
             }
         });
 
