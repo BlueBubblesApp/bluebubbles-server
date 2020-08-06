@@ -40,10 +40,10 @@ export const getAppleScripts = () => {
                 if (count of argv) > 2 then
                     set theAttachment to (item 3 of argv) as POSIX file
                     send theAttachment to targetChat
-                end if
 
-                (* We need this delay or it won't send correctly *)
-                delay 0.5
+                    (* We need this delay or it won't send correctly *)
+                    delay 0.5
+                end if
 
                 if message is not equal to "" then
                     send message to targetChat
