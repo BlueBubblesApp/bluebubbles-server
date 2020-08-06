@@ -76,14 +76,6 @@
             "category": "public.app-category.social-networking",
             "target": "dmg",
             "icon": "./icons/regular/icon-512.png"
-        },
-        "linux": {
-            "target": "deb",
-            "icon": "./icons/regular/icon-1024.png"
-        },
-        "win": {
-            "target": "nsis",
-            "icon": "./icons/regular/icon-1024.png"
         }
     },
     "repository": {

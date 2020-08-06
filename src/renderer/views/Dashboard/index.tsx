@@ -159,7 +159,7 @@ class Dashboard extends React.Component<Props, State> {
             <section className={classes.root}>
                 <Typography variant="h3">Welcome!</Typography>
                 <Typography variant="subtitle2">
-                    This is the BlueBubble Dashboard. You'll be to see the status of your server, as well as some cool
+                    This is the BlueBubbles Dashboard. You'll be to see the status of your server, as well as some cool
                     statistics about your iMessages!
                 </Typography>
                 <br />
