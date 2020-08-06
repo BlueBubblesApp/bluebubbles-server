@@ -73,6 +73,11 @@ export const getAppleScripts = () => {
             (* Start the new chat with all the recipients *)
             set thisChat to make new text chat with properties {participants: members}
             log thisChat
+
+            (* Quick iMessage and re-open it *)
+            quit
+            delay 0.5
+            reopen
         end tell
 
         tell application "System Events" to tell process "Messages" to set visible to false
