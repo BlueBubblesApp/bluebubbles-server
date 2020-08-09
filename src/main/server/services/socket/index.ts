@@ -189,6 +189,10 @@ export class SocketService {
 
         /**
          * Get messages in a chat
+         * The `get-messages` endpoint is probably the "proper" one to use.
+         * We should probably deprecate this once the clients all use it.
+         *
+         * TODO: DEPRECATE!
          */
         socket.on(
             "get-chat-messages",
@@ -224,6 +228,53 @@ export class SocketService {
                 }
 
                 return respond(cb, "chat-messages", createSuccessResponse(results));
+            }
+        );
+
+        /**
+         * Get messages
+         */
+        socket.on(
+            "get-messages",
+            async (params, cb): Promise<void> => {
+                const after = params?.after;
+                if (!params?.after) return respond(cb, "error", createBadRequestResponse("No `after` date provided!"));
+
+                // See if there is a chat and make sure it exists
+                const chatGuid = params?.chatGuid;
+                if (chatGuid && chatGuid.length > 0) {
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid });
+                    if (!chats || chats.length === 0)
+                        return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
+                }
+
+                const dbParams: DBMessageParams = {
+                    chatGuid,
+                    offset: params?.offset ?? 0,
+                    limit: params?.limit ?? 100,
+                    after,
+                    before: params?.before,
+                    withChats: params?.withChats ?? true, // Default to true
+                    withAttachments: params?.withAttachments ?? true, // Default to true
+                    withHandle: params?.withHandle ?? true, // Default to true
+                    sort: params?.sort ?? "ASC" // We want to older messages at the top
+                };
+
+                // Add any "where" params
+                if (params?.where) dbParams.where = params.where;
+
+                // Get the messages
+                const messages = await Server().iMessageRepo.getMessages(dbParams);
+
+                // Do you want the blurhash? Default to true
+                const withBlurhash = params?.withBlurhash ?? true;
+                const results = [];
+                for (const msg of messages) {
+                    const msgRes = await getMessageResponse(msg, withBlurhash);
+                    results.push(msgRes);
+                }
+
+                return respond(cb, "messages", createSuccessResponse(results));
             }
         );
 
