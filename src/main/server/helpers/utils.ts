@@ -154,6 +154,15 @@ export const sanitizeStr = (val: string) => {
     return output.trim();
 };
 
+export const slugifyAddress = (val: string) => {
+    if (!val) return val;
+    return val
+        .toLowerCase()
+        .replace(/\s+/g, "") // Replace spaces with nothing
+        .replace(/[^\w-@.]+/g, "") // Remove all non-word chars except @ and .
+        .trim();
+};
+
 export const tapbackUIMap = {
     love: 1,
     like: 2,

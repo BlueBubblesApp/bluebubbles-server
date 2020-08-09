@@ -10,7 +10,8 @@ import {
     cliSanitize,
     tapbackUIMap,
     toBoolean,
-    sanitizeStr
+    sanitizeStr,
+    slugifyAddress
 } from "./utils";
 
 /**
@@ -321,7 +322,7 @@ export class ActionHandler {
 
         // Add members to the chat
         participants.forEach(member => {
-            baseCmd += ` "${member}"`;
+            baseCmd += ` "${slugifyAddress(member)}"`;
         });
 
         // Make sure messages is open
