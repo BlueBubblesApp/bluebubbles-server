@@ -156,10 +156,17 @@ export const sanitizeStr = (val: string) => {
 
 export const slugifyAddress = (val: string) => {
     if (!val) return val;
+
+    // If we want to strip the dashes
+    let slugRegex = /[^\d]+/g; // Strip all non-digits
+    if (val.includes("@"))
+        // If it's an email, change the regex
+        slugRegex = /[^\w@.]+/g; // Strip non-alphanumeric except @ and .
+
     return val
         .toLowerCase()
         .replace(/\s+/g, "") // Replace spaces with nothing
-        .replace(/[^\w-@.]+/g, "") // Remove all non-word chars except @ and .
+        .replace(slugRegex, "")
         .trim();
 };
 
