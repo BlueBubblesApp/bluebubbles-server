@@ -50,11 +50,16 @@ export class NgrokService {
             onLogEvent: (log: string) => {
                 Server().log(log, "debug");
 
-                // If the "remote gone away" error happens, we're gonna manually restart
-                if (log.includes("remote gone away")) {
+                // Sanitize the log a bit (remove quotes and standardize)
+                const cmp_log = log.replace(/"/g, "").replace(/eror/g, "error");
+
+                // Check for any errors or other restart cases
+                if (cmp_log.includes("lvl=error") || cmp_log.includes("lvl=crit")) {
+                    Server().log(`Ngrok status: Error Detected -> Restarting...`);
+                } else if (log.includes("remote gone away")) {
                     Server().log(`Ngrok status: "Remote gone away" -> Restarting...`);
                     this.restart();
-                } else if (log.includes(`lvl=crit msg="command failed"`)) {
+                } else if (log.includes("command failed")) {
                     Server().log(`Ngrok status: "Command failed" -> Restarting...`);
                     this.restart();
                 }
@@ -92,14 +97,41 @@ export class NgrokService {
     /**
      * Helper for restarting the ngrok connection
      */
-    async restart(): Promise<string> {
+    async restart(): Promise<boolean> {
+        const maxTries = 3;
+        let tries = 0;
+        let connected = false;
+
+        // Retry when we aren't connected and we haven't hit our try limit
+        while (tries < maxTries && !connected) {
+            tries += 1;
+            Server().log(`Attempting to restart ngrok (attempt ${tries})`);
+            connected = await this.restartHandler();
+        }
+
+        // Log some nice things (hopefully)
+        if (connected) {
+            Server().log(`Successfully connected to ngrok after ${tries} ${tries === 1 ? "try" : "tries"}`);
+        } else {
+            Server().log(`Failed to connect to ngrok after ${maxTries} tries`);
+        }
+
+        return connected;
+    }
+
+    /**
+     * Restarts ngrok (retries 3 times)
+     */
+    async restartHandler(): Promise<boolean> {
         try {
             await this.stop();
+            await new Promise((resolve, _) => setTimeout(resolve, 3000));
             await this.start();
         } catch (ex) {
             Server().log(`Failed to restart ngrok! ${ex.message}`, "error");
+            return false;
         }
 
-        return this.url;
+        return true;
     }
 }

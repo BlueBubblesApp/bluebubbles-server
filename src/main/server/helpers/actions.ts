@@ -98,6 +98,8 @@ export class ActionHandler {
      * @returns The command line response
      */
     static renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
+        Server().log(`Executing Action: Rename Group (Chat: ${chatGuid}; Name: ${newName})`, "debug");
+
         const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
@@ -141,6 +143,8 @@ export class ActionHandler {
      * @returns The command line response
      */
     static addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        Server().log(`Executing Action: Add Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
+
         const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
@@ -182,6 +186,8 @@ export class ActionHandler {
      * @returns The command line response
      */
     static removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        Server().log(`Executing Action: Remove Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
+
         const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
         let address = participant;
         if (!address.includes("@")) {
@@ -228,6 +234,11 @@ export class ActionHandler {
      * @returns The command line response
      */
     static toggleTapback = async (chatGuid: string, text: string, tapback: ValidTapback): Promise<string> => {
+        Server().log(
+            `Executing Action: Toggle Tapback (Chat: ${chatGuid}; Text: ${text}; Tapback: ${tapback})`,
+            "debug"
+        );
+
         const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
@@ -274,6 +285,8 @@ export class ActionHandler {
      * @returns Boolean on whether a typing indicator was present
      */
     static checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
+        Server().log(`Executing Action: Check Typing Indicators (Chat: ${chatGuid})`, "debug");
+
         const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
@@ -315,6 +328,8 @@ export class ActionHandler {
      * @returns The GUID of the new chat
      */
     static createChat = async (participants: string[]): Promise<string> => {
+        Server().log(`Executing Action: Create Chat (Participants: ${participants.join(", ")}`, "debug");
+
         if (participants.length === 0) throw new Error("No participants specified!");
 
         // Create the base command to execute
@@ -347,6 +362,8 @@ export class ActionHandler {
      * @returns The command line response
      */
     static exportContacts = async (): Promise<void> => {
+        Server().log("Executing Action: Export Contacts", "debug");
+
         // Create the base command to execute
         const baseCmd = `osascript "${FileSystem.scriptDir}/exportContacts.scpt"`;
 

@@ -48,16 +48,35 @@ export class SocketService {
             // 5 Minute ping timeout
             pingTimeout: 60000
         });
+
+        this.startStatusListener();
+    }
+
+    /**
+     * Checks to see if we are currently listening
+     */
+    startStatusListener() {
+        setInterval(async () => {
+            const port = Server().repo.getConfig("socket_port");
+
+            // Check if there are any listening services
+            let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
+            res = (res ?? "").trim();
+
+            // If the result doesn't show anything listening,
+            if (!res.includes(port.toString())) {
+                Server().log("Socket not listening! Restarting...", "error");
+                this.restart();
+            }
+        }, 1000 * 60); // Check every minute
     }
 
     /**
      * Creates the initial connection handler for Socket.IO
      */
     start() {
-        this.server.on("connect", () => {
-            // Once we boot up, let's send a hello-world to all the clients
-            Server().emitMessage("hello-world", null);
-        });
+        // Once we start, let's send a hello-world to all the clients
+        Server().emitMessage("hello-world", null);
 
         /**
          * Handle all other data requests
@@ -653,8 +672,8 @@ export class SocketService {
             }
         );
 
-        socket.on("disconnect", () => {
-            Server().log(`Client ${socket.id} disconnected!`);
+        socket.on("disconnect", reason => {
+            Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
     }
 
