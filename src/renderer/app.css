@@ -1,0 +1,66 @@
+@font-face {
+    font-family: "SF UI Display Light";
+    src: url("./fonts/SF-UI-Display-Light.woff2") format("woff2"),
+        url("./fonts/SF-UI-Display-Light.woff") format("woff");
+}
+
+@font-face {
+    font-family: "SF UI Display Bold";
+    src: url("./fonts/SF-UI-Display-Bold.woff2") format("woff2"), url("./fonts/SF-UI-Display-Bold.woff") format("woff");
+}
+
+@font-face {
+    font-family: "SF UI Display Black";
+    src: url("./fonts/SF-UI-Display-Black.woff2") format("woff2"),
+        url("./fonts/SF-UI-Display-Black.woff") format("woff");
+}
+
+/* Rounded Font */
+@import url("https://use.typekit.net/pyr2zko.css");
+
+/* *{
+  outline: 1px solid red;
+} */
+
+*::-webkit-scrollbar {
+    display: none;
+}
+
+html {
+    height: 100%;
+    min-height: 100%;
+    width: 100%;
+    background: transparent;
+    display: flex;
+}
+
+body {
+    height: 100%;
+    min-height: 100%;
+    width: 100%;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans",
+        "Droid Sans", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    display: flex;
+    flex-direction: column;
+    border-radius: 25px !important;
+    background: transparent;
+}
+
+code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+.root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+    width: 100%;
+}
+
+a {
+    text-decoration: none;
+}
