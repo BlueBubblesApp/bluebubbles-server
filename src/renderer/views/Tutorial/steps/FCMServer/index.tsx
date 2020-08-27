@@ -10,6 +10,7 @@ import ProjectSettingsImage from "@renderer/assets/img/project-settings.png";
 import ServiceAccountImage from "@renderer/assets/img/service-account.png";
 import Dropzone from "react-dropzone";
 import { GetApp } from "@material-ui/icons";
+import { isValidServerConfig } from "@renderer/helpers/utils";
 
 interface Props {
     classes: any;
@@ -36,6 +37,9 @@ class FCMServer extends React.Component<Props, State> {
         reader.onload = () => {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
+            const valid = isValidServerConfig(binaryStr as string);
+            if (!valid) return;
+
             ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
             this.setState({ fcmServer: binaryStr });
         };

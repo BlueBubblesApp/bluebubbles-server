@@ -1,11 +1,11 @@
 import * as io from "socket.io";
 import * as path from "path";
+import * as fslib from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 
 // Internal libraries
-import { MessageRepository } from "@server/api/imessage";
-import { ActionHandler } from "@server/helpers/actions";
+import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
@@ -18,78 +18,79 @@ import {
 } from "@server/helpers/responses";
 
 // Entities
-import { Chat, getChatResponse } from "@server/api/imessage/entity/Chat";
-import { getHandleResponse } from "@server/api/imessage/entity/Handle";
-import { getMessageResponse } from "@server/api/imessage/entity/Message";
-import { Connection } from "typeorm";
-import { Device } from "@server/entity/Device";
-import { getAttachmentResponse } from "@server/api/imessage/entity/Attachment";
-import { Config } from "@server/entity/Config";
-import { ContactRepository } from "@server/api/contacts";
+import { getChatResponse } from "@server/databases/imessage/entity/Chat";
+import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { Device } from "@server/databases/server/entity/Device";
+import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
+import { DBMessageParams } from "@server/databases/imessage/types";
+import { Queue } from "@server/databases/server/entity/Queue";
+import { ActionHandler } from "@server/helpers/actions";
 
 /**
  * This service class handles all routing for incoming socket
  * connections and requests.
  */
 export class SocketService {
-    db: Connection;
-
-    socketServer: io.Server;
-
-    iMessageRepo: MessageRepository;
-
-    contactsRepo: ContactRepository;
-
-    fs: FileSystem;
-
-    actionHandler: ActionHandler;
+    server: io.Server;
 
     /**
      * Starts up the initial Socket.IO connection and initializes other
      * required classes and variables
      *
      * @param db The configuration database
-     * @param iMessageRepo The iMessage database repository
+     * @param server The iMessage database repository
      * @param fs The filesystem class handler
      * @param port The initial port for Socket.IO
      */
-    constructor(
-        db: Connection,
-        iMessageRepo: MessageRepository,
-        contactsRepo: ContactRepository,
-        fs: FileSystem,
-        port: number
-    ) {
-        this.db = db;
-
-        this.socketServer = io(port, {
+    constructor() {
+        this.server = io(Server().repo.getConfig("socket_port"), {
             // 5 Minute ping timeout
             pingTimeout: 60000
         });
 
-        this.iMessageRepo = iMessageRepo;
-        this.contactsRepo = contactsRepo;
-        this.fs = fs;
-        this.actionHandler = new ActionHandler(this.db, this.fs, this.iMessageRepo, this.contactsRepo);
+        this.startStatusListener();
+    }
+
+    /**
+     * Checks to see if we are currently listening
+     */
+    startStatusListener() {
+        setInterval(async () => {
+            const port = Server().repo.getConfig("socket_port");
+
+            // Check if there are any listening services
+            let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
+            res = (res ?? "").trim();
+
+            // If the result doesn't show anything listening,
+            if (!res.includes(port.toString())) {
+                Server().log("Socket not listening! Restarting...", "error");
+                this.restart();
+            }
+        }, 1000 * 60); // Check every minute
     }
 
     /**
      * Creates the initial connection handler for Socket.IO
      */
     start() {
+        // Once we start, let's send a hello-world to all the clients
+        Server().emitMessage("hello-world", null);
+
         /**
          * Handle all other data requests
          */
-        this.socketServer.on("connection", async socket => {
-            const guid = socket.handshake.query?.guid;
-            const cfg = await this.db.getRepository(Config).findOne({ name: "guid" });
+        this.server.on("connection", async socket => {
+            const pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
+            const cfgPass = (await Server().repo.getConfig("password")) as string;
 
             // Basic authentication
-            if (guid === cfg.value) {
-                console.log("Client Authenticated Successfully");
+            if (pass === cfgPass) {
+                Server().log(`Client Authenticated Successfully`);
             } else {
                 socket.disconnect();
-                console.log("Closing client connection. Authentication failed.");
+                Server().log(`Closing client connection. Authentication failed.`);
             }
 
             /**
@@ -98,12 +99,11 @@ export class SocketService {
              *
              * A console message will be printed, and a socket error will be emitted
              */
-            socket.use((packet, next) => {
+            socket.use((_, next) => {
                 try {
-                    // console.log(socket.request);
                     next();
                 } catch (ex) {
-                    console.error(ex);
+                    Server().log(`Socket server error! ${ex.message}`, "error");
                     socket.error(createServerErrorResponse(ex.message));
                 }
             });
@@ -122,6 +122,8 @@ export class SocketService {
         const respond = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             if (callback) callback(data);
             else socket.emit(channel, data);
+
+            if (data.error) Server().log(data.error.message, "error");
         };
 
         /**
@@ -134,16 +136,38 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
                 // If the device ID exists, update the identifier
-                const device = await this.db.getRepository(Device).findOne({ name: params.deviceName });
+                const device = await Server().repo.devices().findOne({ name: params.deviceName });
                 if (device) {
-                    await this.db
-                        .getRepository(Device)
-                        .update({ name: params.deviceName }, { identifier: params.deviceId });
+                    device.identifier = params.deviceId;
+                    await Server().repo.devices().save(device);
                 } else {
                     const item = new Device();
                     item.name = params.deviceName;
                     item.identifier = params.deviceId;
-                    await this.db.getRepository(Device).save(item);
+                    await Server().repo.devices().save(item);
+                }
+
+                return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
+            }
+        );
+
+        /**
+         * Add Device ID to the database
+         */
+        socket.on(
+            "get-fcm-data",
+            async (params, cb): Promise<void> => {
+                if (!this) return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
+
+                // If the device ID exists, update the identifier
+                const device = await Server().repo.devices().findOne({ name: params.deviceName });
+                if (device) {
+                    await Server().repo.devices().update({ name: params.deviceName }, { identifier: params.deviceId });
+                } else {
+                    const item = new Device();
+                    item.name = params.deviceName;
+                    item.identifier = params.deviceId;
+                    await Server().repo.devices().save(item);
                 }
 
                 return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
@@ -155,7 +179,10 @@ export class SocketService {
          */
         socket.on("get-chats", async (params, cb) => {
             const withParticipants = params?.withParticipants ?? true;
-            const chats = await this.iMessageRepo.getChats(null, withParticipants);
+            const withArchived = params?.withArchived ?? false;
+            const offset = params?.offset ?? 0;
+            const limit = params?.offset ?? null;
+            const chats = await Server().iMessageRepo.getChats({ withParticipants, withArchived, limit, offset });
 
             const results = [];
             for (const chat of chats ?? []) {
@@ -175,12 +202,16 @@ export class SocketService {
 
             if (!chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
-            const chats = await this.iMessageRepo.getChats(chatGuid, withParticipants);
+            const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants });
             return respond(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
         });
 
         /**
          * Get messages in a chat
+         * The `get-messages` endpoint is probably the "proper" one to use.
+         * We should probably deprecate this once the clients all use it.
+         *
+         * TODO: DEPRECATE!
          */
         socket.on(
             "get-chat-messages",
@@ -188,19 +219,25 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
+                const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-                const messages = await this.iMessageRepo.getMessages({
+                const dbParams: DBMessageParams = {
                     chatGuid: chats[0].guid,
                     offset: params?.offset ?? 0,
                     limit: params?.limit ?? 100,
                     after: params?.after,
                     before: params?.before,
                     withChats: params?.withChats ?? false,
+                    withAttachments: params?.withAttachments ?? true,
+                    withHandle: params?.withHandle ?? true,
                     sort: params?.sort ?? "DESC"
-                });
+                };
+
+                if (params?.where) dbParams.where = params.where;
+
+                const messages = await Server().iMessageRepo.getMessages(dbParams);
 
                 const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
@@ -214,6 +251,53 @@ export class SocketService {
         );
 
         /**
+         * Get messages
+         */
+        socket.on(
+            "get-messages",
+            async (params, cb): Promise<void> => {
+                const after = params?.after;
+                if (!params?.after) return respond(cb, "error", createBadRequestResponse("No `after` date provided!"));
+
+                // See if there is a chat and make sure it exists
+                const chatGuid = params?.chatGuid;
+                if (chatGuid && chatGuid.length > 0) {
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid });
+                    if (!chats || chats.length === 0)
+                        return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
+                }
+
+                const dbParams: DBMessageParams = {
+                    chatGuid,
+                    offset: params?.offset ?? 0,
+                    limit: params?.limit ?? 100,
+                    after,
+                    before: params?.before,
+                    withChats: params?.withChats ?? true, // Default to true
+                    withAttachments: params?.withAttachments ?? true, // Default to true
+                    withHandle: params?.withHandle ?? true, // Default to true
+                    sort: params?.sort ?? "ASC" // We want to older messages at the top
+                };
+
+                // Add any "where" params
+                if (params?.where) dbParams.where = params.where;
+
+                // Get the messages
+                const messages = await Server().iMessageRepo.getMessages(dbParams);
+
+                // Do you want the blurhash? Default to true
+                const withBlurhash = params?.withBlurhash ?? true;
+                const results = [];
+                for (const msg of messages) {
+                    const msgRes = await getMessageResponse(msg, withBlurhash);
+                    results.push(msgRes);
+                }
+
+                return respond(cb, "messages", createSuccessResponse(results));
+            }
+        );
+
+        /**
          * Get an attachment by guid
          */
         socket.on(
@@ -222,7 +306,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No attachment identifier provided"));
 
-                const attachment = await this.iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
+                const attachment = await Server().iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
                 if (!attachment) return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 const res = await getAttachmentResponse(attachment, true);
@@ -248,7 +332,7 @@ export class SocketService {
                 const compress = params?.compress ?? false;
 
                 // Get the corresponding attachment
-                const attachment = await this.iMessageRepo.getAttachment(params?.identifier, false);
+                const attachment = await Server().iMessageRepo.getAttachment(params?.identifier, false);
                 if (!attachment) return respond(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 // Get the fully qualified path
@@ -279,11 +363,11 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
+                const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
 
-                const messages = await this.iMessageRepo.getMessages({
+                const messages = await Server().iMessageRepo.getMessages({
                     chatGuid: chats[0].guid,
                     limit: 1
                 });
@@ -303,7 +387,7 @@ export class SocketService {
                 if (!params?.identifier)
                     return respond(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-                const chats = await this.iMessageRepo.getChats(params?.identifier, true);
+                const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
 
                 if (!chats || chats.length === 0)
                     return respond(cb, "error", createBadRequestResponse("Chat does not exist"));
@@ -337,7 +421,7 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
                 try {
-                    await this.actionHandler.sendMessage(
+                    await ActionHandler.sendMessage(
                         tempGuid,
                         chatGuid,
                         message,
@@ -374,7 +458,7 @@ export class SocketService {
 
                 // Save the attachment chunk if there is an attachment
                 if (attachmentGuid)
-                    this.fs.saveAttachmentChunk(
+                    FileSystem.saveAttachmentChunk(
                         attachmentGuid,
                         attachmentChunkStart,
                         base64.base64ToBytes(attachmentData)
@@ -392,16 +476,16 @@ export class SocketService {
                 // If there are no more chunks, compile, save, and send
                 if (!hasMore) {
                     try {
-                        await this.actionHandler.sendMessage(
+                        await ActionHandler.sendMessage(
                             tempGuid,
                             chatGuid,
                             message,
                             attachmentGuid,
                             params?.attachmentName,
-                            attachmentGuid ? this.fs.buildAttachmentChunks(attachmentGuid) : null
+                            attachmentGuid ? FileSystem.buildAttachmentChunks(attachmentGuid) : null
                         );
 
-                        this.fs.deleteChunks(attachmentGuid);
+                        FileSystem.deleteChunks(attachmentGuid);
                         return respond(cb, "message-sent", createSuccessResponse(null));
                     } catch (ex) {
                         return respond(cb, "send-message-chunk-error", createServerErrorResponse(ex.message));
@@ -430,10 +514,10 @@ export class SocketService {
                 if (!Array.isArray(participants))
                     return respond(cb, "error", createBadRequestResponse("Participant list must be an array"));
 
-                const chatGuid = await this.actionHandler.createChat(participants);
+                const chatGuid = await ActionHandler.createChat(participants);
 
                 try {
-                    const newChat = await this.iMessageRepo.getChats(chatGuid, true);
+                    const newChat = await Server().iMessageRepo.getChats({ chatGuid });
                     return respond(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
                 } catch (ex) {
                     throw new Error("Failed to create new chat!");
@@ -453,9 +537,9 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No new group name provided"));
 
                 try {
-                    await this.actionHandler.renameGroupChat(params.identifier, params.newName);
+                    await ActionHandler.renameGroupChat(params.identifier, params.newName);
 
-                    const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return respond(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "rename-group-error", createServerErrorResponse(ex.message));
@@ -475,10 +559,10 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No participant address specified"));
 
                 try {
-                    const result = await this.actionHandler.addParticipant(params.identifier, params.address);
+                    const result = await ActionHandler.addParticipant(params.identifier, params.address);
                     if (result.trim() !== "success") return respond(cb, "error", createBadRequestResponse(result));
 
-                    const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return respond(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "add-participant-error", createServerErrorResponse(ex.message));
@@ -498,10 +582,10 @@ export class SocketService {
                     return respond(cb, "error", createBadRequestResponse("No participant address specified"));
 
                 try {
-                    const result = await this.actionHandler.removeParticipant(params.identifier, params.address);
+                    const result = await ActionHandler.removeParticipant(params.identifier, params.address);
                     if (result.trim() !== "success") return respond(cb, "error", createBadRequestResponse(result));
 
-                    const chats = await this.iMessageRepo.getChats(params.identifier, true);
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return respond(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex) {
                     return respond(cb, "remove-participant-error", createServerErrorResponse(ex.message));
@@ -515,12 +599,81 @@ export class SocketService {
         socket.on(
             "send-reaction",
             async (params, cb): Promise<void> => {
-                respond(cb, "reaction-sent", createBadRequestResponse("This action has not yet been implemented"));
+                if (!params?.chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+                if (!params?.message) return respond(cb, "error", createBadRequestResponse("No message provided!"));
+                if (!params?.actionMessage)
+                    return respond(cb, "error", createBadRequestResponse("No action message provided!"));
+                if (!params?.tapback || !["love", "like", "dislike", "question", "emphasize"].includes(params.tapback))
+                    return respond(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
+
+                // Add the reaction to the match queue
+                const item = new Queue();
+                item.tempGuid = params.message.guid;
+                item.chatGuid = params.chatGuid;
+                item.dateCreated = new Date().getTime();
+                item.text = params.message.text;
+                await Server().repo.queue().manager.save(item);
+
+                try {
+                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
+                    return respond(cb, "tapback-sent", createNoDataResponse());
+                } catch (ex) {
+                    return respond(cb, "send-tapback-error", createServerErrorResponse(ex.message));
+                }
             }
         );
 
-        socket.on("disconnect", () => {
-            console.log(`Client ${socket.id} disconnected!`);
+        /**
+         * Gets a contact (or contacts) for a given list of handles, from the database
+         */
+        socket.on(
+            "get-contacts-from-db",
+            async (params, cb): Promise<void> => {
+                if (!Server().contactsRepo || !Server().contactsRepo.db.isConnected) {
+                    respond(cb, "contacts", createServerErrorResponse("Contacts repository is disconnected!"));
+                    return;
+                }
+
+                const handles = params;
+                for (let i = 0; i <= handles.length; i += 1) {
+                    if (!handles[i] || !handles[i].address) continue;
+                    const contact = await Server().contactsRepo.getContactByAddress(handles[i].address);
+                    if (contact) {
+                        handles[i].firstName = contact.firstName;
+                        handles[i].lastName = contact.lastName;
+                    }
+                }
+
+                respond(cb, "contacts-from-disk", createSuccessResponse(handles));
+            }
+        );
+
+        /**
+         * Gets a contacts
+         */
+        socket.on(
+            "get-contacts-from-vcf",
+            async (_, cb): Promise<void> => {
+                try {
+                    // Export the contacts
+                    await ActionHandler.exportContacts();
+
+                    // Check if the contacts export exists, and respond back with it
+                    const contactsPath = path.join(FileSystem.contactsDir, "AddressBook.vcf");
+                    if (fslib.existsSync(contactsPath)) {
+                        const data = fslib.readFileSync(contactsPath).toString("utf-8");
+                        respond(cb, "contacts-from-vcf", createSuccessResponse(data));
+                    } else {
+                        respond(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));
+                    }
+                } catch (ex) {
+                    respond(cb, "contacts-from-vcf", createServerErrorResponse(ex.message));
+                }
+            }
+        );
+
+        socket.on("disconnect", reason => {
+            Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
     }
 
@@ -529,9 +682,15 @@ export class SocketService {
      *
      * @param port The new port to listen on
      */
-    restart(port: number) {
-        this.socketServer.close();
-        this.socketServer = io(port);
+    restart() {
+        if (this.server) {
+            this.server.close();
+            this.server = io(Server().repo.getConfig("socket_port"), {
+                // 5 Minute ping timeout
+                pingTimeout: 60000
+            });
+        }
+
         this.start();
     }
 }

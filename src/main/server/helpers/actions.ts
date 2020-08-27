@@ -1,11 +1,18 @@
-import { Connection } from "typeorm";
+import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { MessageRepository } from "@server/api/imessage";
-import { ContactRepository } from "@server/api/contacts";
-import { EventCache } from "@server/eventCache";
-import { Queue } from "@server/entity/Queue";
+import { Queue } from "@server/databases/server/entity/Queue";
+import { ValidTapback } from "@server/types";
 
-import { safeExecuteAppleScript, generateChatNameList, getiMessageNumberFormat } from "./utils";
+import {
+    safeExecuteAppleScript,
+    generateChatNameList,
+    getiMessageNumberFormat,
+    cliSanitize,
+    tapbackUIMap,
+    toBoolean,
+    sanitizeStr,
+    slugifyAddress
+} from "./utils";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -13,31 +20,6 @@ import { safeExecuteAppleScript, generateChatNameList, getiMessageNumberFormat }
  * variables
  */
 export class ActionHandler {
-    db: Connection;
-
-    fs: FileSystem;
-
-    iMessageRepo: MessageRepository;
-
-    contactsRepo: ContactRepository;
-
-    /**
-     * Constructor to set some vars
-     *
-     * @param fileSystem The instance of the filesystem for the app
-     */
-    constructor(
-        db: Connection,
-        fileSystem: FileSystem,
-        iMessageRepo: MessageRepository,
-        contactsRepo: ContactRepository
-    ) {
-        this.db = db;
-        this.fs = fileSystem;
-        this.iMessageRepo = iMessageRepo;
-        this.contactsRepo = contactsRepo;
-    }
-
     /**
      * Sends a message by executing the sendMessage AppleScript
      *
@@ -48,7 +30,7 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    sendMessage = async (
+    static sendMessage = async (
         tempGuid: string,
         chatGuid: string,
         message: string,
@@ -58,34 +40,35 @@ export class ActionHandler {
     ): Promise<void> => {
         if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
+        const cleanMessage = sanitizeStr(message ?? "");
+
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/sendMessage.scpt" "${chatGuid}" "${(message ?? "").replace(
-            /"/g,
-            '\\"'
+        let baseCmd = `osascript "${FileSystem.scriptDir}/sendMessage.scpt" "${chatGuid}" "${cliSanitize(
+            cleanMessage
         )}"`;
 
         // Add attachment, if present
         if (attachment) {
-            this.fs.saveAttachment(attachmentName, attachment);
-            baseCmd += ` "${this.fs.attachmentsDir}/${attachmentName}"`;
+            FileSystem.saveAttachment(attachmentName, attachment);
+            baseCmd += ` "${FileSystem.attachmentsDir}/${attachmentName}"`;
         }
 
         try {
             // Make sure messages is open
-            await this.fs.startMessages();
+            await FileSystem.startMessages();
 
             // We need offsets here due to iMessage's save times being a bit off for some reason
             const now = new Date(new Date().getTime() - 1000).getTime(); // With 1 second offset
-            await this.fs.execShellCommand(baseCmd);
+            await FileSystem.execShellCommand(baseCmd);
 
             // Add queued item
-            if (message && message.length > 0) {
+            if (cleanMessage && cleanMessage.length > 0) {
                 const item = new Queue();
                 item.tempGuid = tempGuid;
                 item.chatGuid = chatGuid;
                 item.dateCreated = now;
-                item.text = message;
-                await this.db.getRepository(Queue).manager.save(item);
+                item.text = cleanMessage;
+                await Server().repo.queue().manager.save(item);
             }
 
             // If there is an attachment, add that to the queue too
@@ -95,7 +78,7 @@ export class ActionHandler {
                 attachmentItem.chatGuid = chatGuid;
                 attachmentItem.dateCreated = now;
                 attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
-                await this.db.getRepository(Queue).manager.save(attachmentItem);
+                await Server().repo.queue().manager.save(attachmentItem);
             }
         } catch (ex) {
             let msg = ex.message;
@@ -114,8 +97,10 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
+        Server().log(`Executing Action: Rename Group (Chat: ${chatGuid}; Name: ${newName})`, "debug");
+
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -126,7 +111,7 @@ export class ActionHandler {
          */
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const oldName of names) {
@@ -134,15 +119,13 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/renameGroupChat.scpt" "${oldName.replace(
-                        /"/g,
-                        '\\"'
-                    )}" "${newName.replace(/"/g, '\\"')}"`
+                    `osascript "${FileSystem.scriptDir}/renameGroupChat.scpt" "${cliSanitize(oldName)}" "${cliSanitize(
+                        newName
+                    )}"`
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(`Failed to rename group from [${oldName}] to [${newName}]. Attempting the next name.`);
+                Server().log(`Failed to rename group from [${oldName}] to [${newName}]. Trying again.`, "warn");
                 continue;
             }
         }
@@ -159,8 +142,10 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        Server().log(`Executing Action: Add Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
+
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -171,7 +156,7 @@ export class ActionHandler {
          */
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const name of names) {
@@ -179,12 +164,11 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/addParticipant.scpt" "${name}" "${participant}"`
+                    `osascript "${FileSystem.scriptDir}/addParticipant.scpt" "${name}" "${participant}"`
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(`Failed to add participant to group, [${name}]. Attempting the next name.`);
+                Server().log(`Failed to add participant to group, [${name}]. Trying again.`, "warn");
                 continue;
             }
         }
@@ -201,8 +185,10 @@ export class ActionHandler {
      *
      * @returns The command line response
      */
-    removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        const names = await generateChatNameList(chatGuid, this.iMessageRepo, this.contactsRepo);
+    static removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
+        Server().log(`Executing Action: Remove Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
+
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
         let address = participant;
         if (!address.includes("@")) {
             address = getiMessageNumberFormat(address);
@@ -217,7 +203,7 @@ export class ActionHandler {
          */
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         let err = null;
         for (const name of names) {
@@ -225,12 +211,107 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(
-                    this.fs,
-                    `osascript "${this.fs.scriptDir}/removeParticipant.scpt" "${name}" "${address}"`
+                    `osascript "${FileSystem.scriptDir}/removeParticipant.scpt" "${name}" "${address}"`
                 );
             } catch (ex) {
                 err = ex;
-                console.warn(`Failed to remove participant from group, [${name}]. Attempting the next name.`);
+                Server().log(`Failed to remove participant to group, [${name}]. Trying again.`, "warn");
+                continue;
+            }
+        }
+
+        // If we get here, there was an issue
+        throw err;
+    };
+
+    /**
+     * Toggles a tapback to specific message in a chat
+     *
+     * @param chatGuid The GUID for the chat
+     * @param text The message text
+     * @param tapback The tapback to send (as a strong)
+     *
+     * @returns The command line response
+     */
+    static toggleTapback = async (chatGuid: string, text: string, tapback: ValidTapback): Promise<string> => {
+        Server().log(
+            `Executing Action: Toggle Tapback (Chat: ${chatGuid}; Text: ${text}; Tapback: ${tapback})`,
+            "debug"
+        );
+
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
+
+        /**
+         * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
+         * ordered by the chat_handle_join table insertions. Below, we try to try to find the
+         * corresponding chats, and rename them. If the first name fails to be found,
+         * we are going to try and use the backup (second) name. If both failed, we weren't able to
+         * calculate the correct chat name
+         */
+
+        const tapbackId = tapbackUIMap[tapback];
+        const friendlyMsg = text.substring(0, 50);
+
+        // Make sure messages is open
+        await FileSystem.startMessages();
+
+        let err = null;
+        for (const name of names) {
+            console.info(`Attempting to toggle tapback for message [${friendlyMsg}]`);
+
+            try {
+                // This needs await here, or else it will fail
+                return await safeExecuteAppleScript(
+                    `osascript "${FileSystem.scriptDir}/toggleTapback.scpt" "${name}" "${cliSanitize(
+                        text
+                    )}" "${tapbackId}"`
+                );
+            } catch (ex) {
+                err = ex;
+                Server().log(`Failed to toggle tapback on message, [${friendlyMsg}]. Trying again.`, "warn");
+                continue;
+            }
+        }
+
+        // If we get here, there was an issue
+        throw err;
+    };
+
+    /**
+     * Checks to see if a typing indicator is present
+     *
+     * @param chatGuid The GUID for the chat
+     *
+     * @returns Boolean on whether a typing indicator was present
+     */
+    static checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
+        Server().log(`Executing Action: Check Typing Indicators (Chat: ${chatGuid})`, "debug");
+
+        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
+
+        /**
+         * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
+         * ordered by the chat_handle_join table insertions. Below, we try to try to find the
+         * corresponding chats, and rename them. If the first name fails to be found,
+         * we are going to try and use the backup (second) name. If both failed, we weren't able to
+         * calculate the correct chat name
+         */
+
+        // Make sure messages is open
+        await FileSystem.startMessages();
+
+        let err = null;
+        for (const name of names) {
+            console.info(`Attempting to check for a typing indicator for chat, [${name}]`);
+            try {
+                // This needs await here, or else it will fail
+                const output = await safeExecuteAppleScript(
+                    `osascript "${FileSystem.scriptDir}/checkTypingIndicator.scpt" "${name}"`
+                );
+                return toBoolean(output.trim());
+            } catch (ex) {
+                err = ex;
+                Server().log(`Failed to check for typing indicators for chat, [${name}]. Trying again.`, "warn");
                 continue;
             }
         }
@@ -246,22 +327,24 @@ export class ActionHandler {
      *
      * @returns The GUID of the new chat
      */
-    createChat = async (participants: string[]): Promise<string> => {
+    static createChat = async (participants: string[]): Promise<string> => {
+        Server().log(`Executing Action: Create Chat (Participants: ${participants.join(", ")}`, "debug");
+
         if (participants.length === 0) throw new Error("No participants specified!");
 
         // Create the base command to execute
-        let baseCmd = `osascript "${this.fs.scriptDir}/startChat.scpt"`;
+        let baseCmd = `osascript "${FileSystem.scriptDir}/startChat.scpt"`;
 
         // Add members to the chat
         participants.forEach(member => {
-            baseCmd += ` "${member}"`;
+            baseCmd += ` "${slugifyAddress(member)}"`;
         });
 
         // Make sure messages is open
-        await this.fs.startMessages();
+        await FileSystem.startMessages();
 
         // Execute the command
-        let ret = (await this.fs.execShellCommand(baseCmd)) as string;
+        let ret = (await FileSystem.execShellCommand(baseCmd)) as string;
 
         try {
             // Get the chat GUID that was created
@@ -271,5 +354,27 @@ export class ActionHandler {
         }
 
         return ret;
+    };
+
+    /**
+     * Exports contacts from the Contacts app, into a VCF file
+     *
+     * @returns The command line response
+     */
+    static exportContacts = async (): Promise<void> => {
+        Server().log("Executing Action: Export Contacts", "debug");
+
+        // Create the base command to execute
+        const baseCmd = `osascript "${FileSystem.scriptDir}/exportContacts.scpt"`;
+
+        try {
+            await FileSystem.execShellCommand(baseCmd);
+        } catch (ex) {
+            let msg = ex.message;
+            if (msg instanceof String) [, msg] = msg.split("execution error: ");
+            [msg] = msg.split(". (");
+
+            throw new Error(msg);
+        }
     };
 }

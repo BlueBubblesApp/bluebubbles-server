@@ -2,13 +2,11 @@
  * A VERY simple helper class for caching items
  */
 export class EventCache {
-    items: string[];
-
-    constructor() {
-        this.purge();
-    }
+    items: string[] = [];
 
     purge() {
+        if (this.items.length === 0) return;
+        console.info(`Purging ${this.size()} items from cache...`);
         this.items = [];
     }
 

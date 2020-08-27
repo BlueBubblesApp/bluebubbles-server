@@ -1,5 +1,6 @@
 import * as process from "process";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { Server } from "@server/index";
 
 /**
  * Service that spawns the caffeinate process so that
@@ -24,7 +25,7 @@ export class CaffeinateService {
         // -s: Create an assertion to prevent the system from sleeping
         // -w: Waits for the process with the specified pid to exit.
         this.childProc = spawn("caffeinate", ["-i", "-m", "-s", "-w", myPid.toString()], { detached: true });
-        console.info(`Spawned Caffeinate with PID: ${this.childProc.pid}`);
+        Server().log(`Spawned Caffeinate with PID: ${this.childProc.pid}`);
         this.isCaffeinated = true;
 
         // Setup listeners
@@ -44,10 +45,10 @@ export class CaffeinateService {
             try {
                 const killed = this.childProc.kill();
                 if (!killed) process.kill(-this.childProc.pid);
-                console.info("Killed caffeinate process");
+                Server().log("Killed caffeinate process");
             } catch (ex) {
-                console.error("Failed to kill caffeinate process");
                 console.error(ex);
+                Server().log(`Failed to kill caffeinate process! ${ex.message}`, "error");
             } finally {
                 this.isCaffeinated = false;
             }

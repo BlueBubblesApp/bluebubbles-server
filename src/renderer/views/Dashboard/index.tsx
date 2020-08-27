@@ -18,7 +18,6 @@ import GridItem from "@renderer/components/Grid/GridItem";
 
 interface Props {
     classes: any;
-    config: any;
 }
 
 interface State {
@@ -156,16 +155,11 @@ class Dashboard extends React.Component<Props, State> {
     render() {
         const { classes } = this.props;
 
-        let tutorialIsDone = this.props.config?.tutorial_is_done;
-        if (tutorialIsDone && !Boolean(Number(tutorialIsDone))) {
-            return <Redirect to="/tutorial" />;
-        }
-
         return (
             <section className={classes.root}>
                 <Typography variant="h3">Welcome!</Typography>
                 <Typography variant="subtitle2">
-                    This is the BlueBubble Dashboard. You'll be to see the status of your server, as well as some cool
+                    This is the BlueBubbles Dashboard. You'll be to see the status of your server, as well as some cool
                     statistics about your iMessages!
                 </Typography>
                 <br />

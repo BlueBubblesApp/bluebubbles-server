@@ -10,41 +10,59 @@ import {
     LinearProgress,
     Typography,
     Button,
-    IconButton,
     FormControlLabel,
-    Checkbox
+    Checkbox,
+    FormControl,
+    InputLabel,
+    InputAdornment,
+    IconButton,
+    OutlinedInput
 } from "@material-ui/core";
 
-import { GetApp } from "@material-ui/icons";
+import { GetApp, Visibility, VisibilityOff } from "@material-ui/icons";
 
 import Dropzone from "react-dropzone";
 import * as QRCode from "qrcode.react";
+import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
 
 interface Props {
     config: Config;
     classes: any;
 }
-
 interface State {
     port: string;
     fcmClient: any;
     fcmServer: any;
     autoCaffeinate: boolean;
     isCaffeinated: boolean;
+    autoStart: boolean;
+    password: string;
+    showPassword: boolean;
+    showKey: boolean;
+    ngrokKey: string;
 }
 
-class Dashboard extends React.Component<Props, State> {
+class Configuration extends React.Component<Props, State> {
     state: State = {
-        port: String(this.props.config?.socket_port || ""),
+        port: String(this.props.config?.socket_port ?? ""),
         fcmClient: null,
         fcmServer: null,
-        autoCaffeinate: false,
-        isCaffeinated: false
+        autoCaffeinate: this.props.config?.auto_caffeinate ?? false,
+        isCaffeinated: false,
+        autoStart: this.props.config?.auto_start ?? false,
+        password: this.props.config?.password ?? "",
+        showPassword: false,
+        showKey: false,
+        ngrokKey: this.props.config?.ngrok_key ?? ""
     };
 
     componentWillReceiveProps(nextProps: Props) {
         this.setState({
-            port: String(nextProps.config?.socket_port || "")
+            port: String(nextProps.config?.socket_port ?? ""),
+            autoStart: nextProps.config?.auto_start,
+            autoCaffeinate: nextProps.config?.auto_caffeinate,
+            password: nextProps.config?.password ?? this.state.password,
+            ngrokKey: nextProps.config?.ngrok_key ?? this.state.ngrokKey
         });
     }
 
@@ -58,7 +76,6 @@ class Dashboard extends React.Component<Props, State> {
 
     getCaffeinateStatus = async () => {
         const caffeinateStatus = await ipcRenderer.invoke("get-caffeinate-status");
-        console.log(caffeinateStatus);
         this.setState({
             isCaffeinated: caffeinateStatus.isCaffeinated,
             autoCaffeinate: caffeinateStatus.autoCaffeinate
@@ -66,21 +83,35 @@ class Dashboard extends React.Component<Props, State> {
     };
 
     saveConfig = async () => {
-        const res = await ipcRenderer.invoke("set-config", {
-            socket_port: this.state.port
+        await ipcRenderer.invoke("set-config", {
+            socket_port: this.state.port,
+            password: this.state.password,
+            ngrok_key: this.state.ngrokKey
         });
-        console.log(res);
     };
 
     handleChange = async (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
         const id = e.target.id;
-        if (id === "port") this.setState({ port: e.target.value });
+        if (["port", "password", "ngrokKey"].includes(id)) this.setState({ [id]: e.target.value } as any);
+        if (id === "password") this.setState({ password: e.target.value });
         if (id === "toggleCaffeinate") {
             const target = e.target as HTMLInputElement;
             this.setState({ autoCaffeinate: target.checked });
             await ipcRenderer.invoke("toggle-caffeinate", target.checked);
             await this.getCaffeinateStatus();
+        } else if (id === "toggleAutoStart") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ autoStart: target.checked });
+            await ipcRenderer.invoke("toggle-auto-start", target.checked);
         }
+    };
+
+    toggleShowPassword = () => {
+        this.setState({ showPassword: !this.state.showPassword });
+    };
+
+    toggleShowKey = () => {
+        this.setState({ showKey: !this.state.showKey });
     };
 
     handleClientFile = (acceptedFiles: any) => {
@@ -91,6 +122,9 @@ class Dashboard extends React.Component<Props, State> {
         reader.onload = () => {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
+            const valid = isValidClientConfig(binaryStr as string);
+            if (!valid) return;
+
             ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
             this.setState({ fcmClient: binaryStr });
         };
@@ -106,6 +140,9 @@ class Dashboard extends React.Component<Props, State> {
         reader.onload = () => {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
+            const valid = isValidServerConfig(binaryStr as string);
+            if (!valid) return;
+
             ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
             this.setState({ fcmServer: binaryStr });
         };
@@ -117,7 +154,7 @@ class Dashboard extends React.Component<Props, State> {
         if (!data || data.length === 0) return "";
 
         const jsonData = JSON.parse(data);
-        const output = [this.props.config?.guid, this.props.config?.server_address || ""];
+        const output = [this.props.config?.password, this.props.config?.server_address || ""];
 
         output.push(jsonData.project_info.project_id);
         output.push(jsonData.project_info.storage_bucket);
@@ -132,7 +169,18 @@ class Dashboard extends React.Component<Props, State> {
 
     render() {
         const { classes, config } = this.props;
-        const { fcmClient, port, fcmServer, autoCaffeinate, isCaffeinated } = this.state;
+        const {
+            fcmClient,
+            port,
+            fcmServer,
+            autoCaffeinate,
+            isCaffeinated,
+            autoStart,
+            password,
+            showPassword,
+            showKey,
+            ngrokKey
+        } = this.state;
         const qrData = this.buildQrData(fcmClient);
 
         let caffeinateString = isCaffeinated ? "Currently caffeinated" : "Not currently caffeinated";
@@ -153,15 +201,59 @@ class Dashboard extends React.Component<Props, State> {
                             id="server-address"
                             label="Current Server Address"
                             variant="outlined"
+                            size="small"
                             value={config?.server_address}
                             disabled
                         />
+                        <FormControl className={classes.field} size="small" variant="outlined" required>
+                            <InputLabel htmlFor="password">Ngrok API Key (Optional)</InputLabel>
+                            <OutlinedInput
+                                id="ngrokKey"
+                                label="Ngrok API Key (Optional)"
+                                type={showPassword ? "text" : "password"}
+                                value={ngrokKey}
+                                onChange={this.handleChange}
+                                endAdornment={
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            aria-label="toggle password visibility"
+                                            onClick={this.toggleShowKey}
+                                            style={{ width: "25px", height: "25px" }}
+                                        >
+                                            {showKey ? <Visibility /> : <VisibilityOff />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                }
+                            />
+                        </FormControl>
+                        <FormControl className={classes.field} size="small" variant="outlined" required>
+                            <InputLabel htmlFor="password">Password</InputLabel>
+                            <OutlinedInput
+                                id="password"
+                                label="Password"
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={this.handleChange}
+                                endAdornment={
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            aria-label="toggle password visibility"
+                                            onClick={this.toggleShowPassword}
+                                            style={{ width: "25px", height: "25px" }}
+                                        >
+                                            {showPassword ? <Visibility /> : <VisibilityOff />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                }
+                            />
+                        </FormControl>
                         <TextField
                             required
                             className={classes.field}
                             id="port"
                             label="Socket Port"
                             variant="outlined"
+                            size="small"
                             value={port}
                             onChange={this.handleChange}
                         />
@@ -173,9 +265,23 @@ class Dashboard extends React.Component<Props, State> {
                                     id="toggleCaffeinate"
                                     name="toggleCaffeinate"
                                     color="primary"
+                                    size="small"
                                 />
                             }
                             label={`Keep MacOS Awake (${caffeinateString})`}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={autoStart}
+                                    onChange={this.handleChange}
+                                    id="toggleAutoStart"
+                                    name="toggleAutoStart"
+                                    color="primary"
+                                    size="small"
+                                />
+                            }
+                            label="Startup with MacOS"
                         />
                         <br />
                         <section className={classes.fcmConfig}>
@@ -278,4 +384,4 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         }
     });
 
-export default withStyles(styles)(Dashboard);
+export default withStyles(styles)(Configuration);

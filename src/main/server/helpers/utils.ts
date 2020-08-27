@@ -1,10 +1,10 @@
 /* eslint-disable no-bitwise */
 import { PhoneNumberUtil } from "google-libphonenumber";
 import { FileSystem } from "@server/fileSystem";
-import { ContactRepository } from "@server/api/contacts";
-import { Handle } from "@server/api/imessage/entity/Handle";
-import { Chat } from "@server/api/imessage/entity/Chat";
-import { MessageRepository } from "@server/api/imessage";
+import { ContactRepository } from "@server/databases/contacts";
+import { Handle } from "@server/databases/imessage/entity/Handle";
+import { Chat } from "@server/databases/imessage/entity/Chat";
+import { MessageRepository } from "@server/databases/imessage";
 
 export const generateUuid = () => {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -31,7 +31,9 @@ export const getiMessageNumberFormat = (address: string) => {
 export const formatAddressList = (addresses: string[]) => {
     let name = null;
 
-    if (addresses.length <= 4) {
+    if (addresses.length === 1) {
+        [name] = addresses;
+    } else if (addresses.length <= 4) {
         name = addresses.join(", ");
         const pos = name.lastIndexOf(", ");
         name = `${name.substring(0, pos)} & ${name.substring(pos + 2)}`;
@@ -43,10 +45,10 @@ export const formatAddressList = (addresses: string[]) => {
     return name;
 };
 
-export const safeExecuteAppleScript = async (fileSystem: FileSystem, command: string) => {
+export const safeExecuteAppleScript = async (command: string) => {
     try {
         // Execute the command
-        return (await fileSystem.execShellCommand(command)) as string;
+        return (await FileSystem.execShellCommand(command)) as string;
     } catch (ex) {
         let msg = ex.message;
         if (msg instanceof String) [, msg] = msg.split("execution error: ");
@@ -78,7 +80,7 @@ export const generateChatNameList = async (
     if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
     // First, lets get the members of the chat
-    const chats = await iMessageRepo.getChats(chatGuid, true);
+    const chats = await iMessageRepo.getChats({ chatGuid, withParticipants: true });
     if (!chats || chats.length === 0) throw new Error("Chat does not exist");
 
     const chat = chats[0];
@@ -128,4 +130,51 @@ export const generateChatNameList = async (
     }
 
     return names;
+};
+
+export const toBoolean = (input: string) => {
+    if (!input || input === "0" || input === "false" || input === "no") return false;
+    return true;
+};
+
+export const cliSanitize = (input: string) => {
+    return input.replace(/"/g, '\\"').replace(/\$/g, "\\$");
+};
+
+export const sanitizeStr = (val: string) => {
+    if (!val) return val;
+    const objChar = String.fromCharCode(65532);
+
+    // Recursively replace all "obj" hidden characters
+    let output = val;
+    while (output.includes(objChar)) {
+        output = output.replace(objChar, "");
+    }
+
+    return output.trim();
+};
+
+export const slugifyAddress = (val: string) => {
+    if (!val) return val;
+
+    // If we want to strip the dashes
+    let slugRegex = /[^\d]+/g; // Strip all non-digits
+    if (val.includes("@"))
+        // If it's an email, change the regex
+        slugRegex = /[^\w@.]+/g; // Strip non-alphanumeric except @ and .
+
+    return val
+        .toLowerCase()
+        .replace(/\s+/g, "") // Replace spaces with nothing
+        .replace(slugRegex, "")
+        .trim();
+};
+
+export const tapbackUIMap = {
+    love: 1,
+    like: 2,
+    dislike: 3,
+    laugh: 4,
+    emphasize: 5,
+    question: 6
 };

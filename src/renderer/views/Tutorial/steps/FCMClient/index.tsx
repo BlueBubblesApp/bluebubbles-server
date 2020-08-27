@@ -8,6 +8,7 @@ import Dropzone from "react-dropzone";
 import { GetApp } from "@material-ui/icons";
 import { Typography } from "@material-ui/core";
 
+import { isValidClientConfig } from "@renderer/helpers/utils";
 import AndroidIconImage from "@renderer/assets/img/android-icon.png";
 
 interface Props {
@@ -31,6 +32,9 @@ class FCMClient extends React.Component<Props, State> {
         reader.onload = () => {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
+            const valid = isValidClientConfig(binaryStr as string);
+            if (!valid) return;
+
             ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
             this.setState({ fcmClient: binaryStr });
         };

@@ -1,63 +1,89 @@
 // Dependency Imports
 import { app, ipcMain, BrowserWindow } from "electron";
-import { createConnection, Connection } from "typeorm";
-import * as ngrok from "ngrok";
-import * as permissions from "node-mac-permissions";
 
 // Configuration/Filesytem Imports
-import { Config } from "@server/entity/Config";
-import { Alert } from "@server/entity/Alert";
-import { Device } from "@server/entity/Device";
-import { Queue } from "@server/entity/Queue";
+import { Queue } from "@server/databases/server/entity/Queue";
 import { FileSystem } from "@server/fileSystem";
-import { DEFAULT_POLL_FREQUENCY_MS, DEFAULT_DB_ITEMS } from "@server/constants";
+import { DEFAULT_POLL_FREQUENCY_MS } from "@server/constants";
 
 // Database Imports
-import { MessageRepository } from "@server/api/imessage";
-import { ContactRepository } from "@server/api/contacts";
-import { MessageListener } from "@server/api/imessage/listeners/messageListener";
-import { MessageUpdateListener } from "@server/api/imessage/listeners/messageUpdateListener";
-import { GroupChangeListener } from "@server/api/imessage/listeners/groupChangeListener";
-import { MyMessageListener } from "@server/api/imessage/listeners/myMessageListener";
-import { Message, getMessageResponse } from "@server/api/imessage/entity/Message";
+import { ServerRepository, ServerConfigChange } from "@server/databases/server";
+import { MessageRepository } from "@server/databases/imessage";
+import { ContactRepository } from "@server/databases/contacts";
+import {
+    IncomingMessageListener,
+    OutgoingMessageListener,
+    GroupChangeListener
+} from "@server/databases/imessage/listeners";
+import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
 
 // Service Imports
-import { SocketService, FCMService, AlertService, QueueService, CaffeinateService } from "@server/services";
+import {
+    SocketService,
+    FCMService,
+    AlertService,
+    CaffeinateService,
+    NgrokService,
+    NetworkService
+} from "@server/services";
 import { EventCache } from "@server/eventCache";
+
+import { ActionHandler } from "./helpers/actions";
+import { sanitizeStr } from "./helpers/utils";
+
+/**
+ * Create a singleton for the server so that it can be referenced everywhere.
+ * Plus, we only want one instance of it running at all times.
+ */
+let server: BlueBubblesServer = null;
+export const Server = (win: BrowserWindow = null) => {
+    // If we already have a server, update the window (if not null) and return
+    // the same instance
+    if (server) {
+        if (win) server.window = win;
+        return server;
+    }
+
+    server = new BlueBubblesServer(win);
+    return server;
+};
 
 /**
  * Main entry point for the back-end server
  * This will handle all services and helpers that get spun
  * up when running the application.
  */
-export class BlueBubblesServer {
+class BlueBubblesServer {
     window: BrowserWindow;
 
-    db: Connection;
+    repo: ServerRepository;
 
     iMessageRepo: MessageRepository;
 
     contactsRepo: ContactRepository;
 
-    ngrokServer: string;
+    socket: SocketService;
 
-    socketService: SocketService;
+    fcm: FCMService;
 
-    fcmService: FCMService;
+    alerter: AlertService;
 
-    alertService: AlertService;
+    networkChecker: NetworkService;
 
-    queueService: QueueService;
+    caffeinate: CaffeinateService;
 
-    caffeinateService: CaffeinateService;
+    ngrok: NgrokService;
 
-    config: { [key: string]: any };
+    actionHandler: ActionHandler;
 
-    fs: FileSystem;
+    chatListeners: ChangeListener[];
 
     eventCache: EventCache;
 
-    hasProperPermissions: boolean;
+    hasDiskAccess: boolean;
+
+    hasAccessibilityAccess: boolean;
 
     hasSetup: boolean;
 
@@ -72,30 +98,33 @@ export class BlueBubblesServer {
         this.window = window;
 
         // Databases
-        this.db = null;
+        this.repo = null;
         this.iMessageRepo = null;
         this.contactsRepo = null;
 
         // Other helpers
-        this.ngrokServer = null;
-        this.config = {};
-        this.fs = null;
         this.eventCache = null;
+        this.chatListeners = [];
+        this.actionHandler = null;
 
         // Services
-        this.socketService = null;
-        this.alertService = null;
-        this.fcmService = null;
-        this.queueService = null;
-        this.caffeinateService = null;
+        this.socket = null;
+        this.fcm = null;
+        this.caffeinate = null;
+        this.networkChecker = null;
 
-        this.hasProperPermissions = false;
+        this.hasDiskAccess = true;
+        this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
     }
 
-    private emitToUI(event: string, data: any) {
-        if (this.window) this.window.webContents.send(event, data);
+    emitToUI(event: string, data: any) {
+        try {
+            if (this.window) this.window.webContents.send(event, data);
+        } catch {
+            /* Ignore errors here */
+        }
     }
 
     /**
@@ -105,22 +134,26 @@ export class BlueBubblesServer {
      * @param message The message to print
      * @param type The log type
      */
-    private log(message: any, type?: "log" | "error" | "dir" | "warn") {
+    log(message: any, type?: "log" | "error" | "dir" | "warn" | "debug") {
+        const msg = `${new Date().toLocaleString()} [${(type ?? "log").toUpperCase()}] -> ${message}`;
         switch (type) {
             case "error":
-                console.error(message);
-                this.alertService.create("error", message);
+                console.error(msg);
+                AlertService.create("error", message);
                 break;
             case "dir":
-                console.dir(message);
+                console.dir(msg);
+                break;
+            case "debug":
+                console.debug(msg);
                 break;
             case "warn":
-                console.warn(message);
-                this.alertService.create("warn", message);
+                console.warn(msg);
+                AlertService.create("warn", message);
                 break;
             case "log":
             default:
-                console.log(message);
+                console.log(msg);
         }
 
         this.emitToUI("new-log", message);
@@ -131,82 +164,11 @@ export class BlueBubblesServer {
      * then starts all of the services required for the server
      */
     async start(): Promise<void> {
-        await this.setup();
-
-        this.fcmService.start();
-
-        if (this.hasProperPermissions === true) await this.startServices();
-
-        this.log("Starting Configuration IPC Listeners..");
-        this.startConfigIpcListeners();
-
-        if (this.hasStarted === false) {
-            this.log("Connecting to Ngrok...");
-            await this.connectToNgrok();
+        if (!this.hasStarted) {
+            await this.setupServer();
+            this.log("Starting Configuration IPC Listeners..");
+            this.startConfigIpcListeners();
         }
-    }
-
-    /**
-     * Sets a config value in the database and class
-     *
-     * @param name Name of the config item
-     * @param value Value of the config item
-     */
-    private async setConfig(name: string, value: string): Promise<void> {
-        await this.db.getRepository(Config).update({ name }, { value });
-        this.config[name] = value;
-        this.emitToUI("config-update", this.config);
-    }
-
-    /**
-     * Performs the initial setup for the server.
-     * Mainly, instantiation of a bunch of classes/handlers
-     */
-    private async setup(): Promise<void> {
-        this.log("Performing initial setup...");
-        await this.initializeDatabase();
-        await this.setupDefaults();
-
-        // Setup lightweight message cache
-        this.eventCache = new EventCache();
-
-        this.log("Initializing alert service...");
-        this.alertService = new AlertService(this.db, this.window);
-
-        try {
-            this.log("Initializing filesystem...");
-            this.fs = new FileSystem();
-            this.fs.setup();
-        } catch (ex) {
-            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
-        }
-
-        this.log("Initializing configuration database...");
-        const cfg = await this.db.getRepository(Config).find();
-        cfg.forEach(item => {
-            this.config[item.name] = item.value;
-        });
-
-        await this.setupCaffeinate();
-
-        try {
-            this.log("Initializing connection to Google FCM...");
-            this.fcmService = new FCMService(this.fs);
-        } catch (ex) {
-            this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
-        }
-
-        // Also check accessibility permissions
-        this.log("Checking Permissions..");
-        const fdPerms: string = permissions.getAuthStatus("full-disk-access");
-        const abPerms: string = permissions.getAuthStatus("accessibility");
-
-        if (fdPerms !== "authorized" || abPerms !== "authorized") {
-            this.log("The proper permissions have not been set.", "error");
-            return;
-        }
-
-        this.hasProperPermissions = true;
 
         try {
             this.log("Launching Services..");
@@ -214,39 +176,72 @@ export class BlueBubblesServer {
         } catch (ex) {
             this.log("There was a problem launching the Server listeners.", "error");
         }
+
+        await this.startServices();
     }
 
     /**
-     * Initializes the connection to the configuration database
+     * Performs the initial setup for the server.
+     * Mainly, instantiation of a bunch of classes/handlers
      */
-    private async initializeDatabase(): Promise<void> {
+    private async setupServer(): Promise<void> {
+        this.log("Performing initial setup...");
+        this.log("Initializing server database...");
+        this.repo = new ServerRepository();
+        this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
+        await this.repo.initialize();
+
+        // Setup lightweight message cache
+        this.eventCache = new EventCache();
+
         try {
-            this.db = await createConnection({
-                type: "sqlite",
-                database: `${app.getPath("userData")}/config.db`,
-                entities: [Config, Device, Alert, Queue],
-                synchronize: true,
-                logging: false
+            this.log("Initializing filesystem...");
+            FileSystem.setup();
+        } catch (ex) {
+            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
+        }
+
+        await this.setupCaffeinate();
+
+        try {
+            this.log("Initializing connection to Google FCM...");
+            this.fcm = new FCMService();
+        } catch (ex) {
+            this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Initializing network service...");
+            this.networkChecker = new NetworkService();
+            this.networkChecker.on("status-change", connected => {
+                if (connected) {
+                    this.log("Re-connected to network!");
+                    this.ngrok.restart();
+                } else {
+                    this.log("Disconnected from network!");
+                }
             });
-        } catch (ex) {
-            this.log(`Failed to connect to configuration database! ${ex.message}`, "error");
-        }
-    }
 
-    /**
-     * This sets any default database values, if the database
-     * has not already been initialized
-     */
-    private async setupDefaults(): Promise<void> {
-        try {
-            const repo = this.db.getRepository(Config);
-            for (const key of Object.keys(DEFAULT_DB_ITEMS)) {
-                const item = await repo.findOne({ name: key });
-                if (!item) await this.addConfigItem(key, DEFAULT_DB_ITEMS[key]());
-            }
+            this.networkChecker.start();
         } catch (ex) {
-            this.log(`Failed to setup default configurations! ${ex.message}`, "error");
+            this.log(`Failed to setup network service! ${ex.message}`, "error");
         }
+
+        // Also check accessibility permissions
+        this.log("Bypassing permissions temporarily..");
+        // this.log("Checking Permissions..");
+        // const fdPerms: string = permissions.getAuthStatus("full-disk-access");
+        // const abPerms: string = permissions.getAuthStatus("accessibility");
+        //
+        // // Only return out if we don't have disk access
+        // this.hasAccessibilityAccess = abPerms === "authorized";
+        // if (!this.hasAccessibilityAccess)
+        //     this.log("Accessibility permissions are required for certain actions!", "error");
+        // this.hasDiskAccess = fdPerms === "authorized";
+        // if (!this.hasDiskAccess) {
+        //     this.log("Full Disk Access permissions are required!", "error");
+        //     return;
+        // }
     }
 
     /**
@@ -254,9 +249,9 @@ export class BlueBubblesServer {
      */
     private async setupCaffeinate(): Promise<void> {
         try {
-            this.caffeinateService = new CaffeinateService();
-            if (this.config.auto_caffeinate === "1") {
-                this.caffeinateService.start();
+            this.caffeinate = new CaffeinateService();
+            if (this.repo.getConfig("auto_caffeinate")) {
+                this.caffeinate.start();
             }
         } catch (ex) {
             this.log(`Failed to setup caffeinate service! ${ex.message}`, "error");
@@ -264,64 +259,54 @@ export class BlueBubblesServer {
     }
 
     /**
-     * Sets up a connection to the Ngrok servers, opening a secure
-     * tunnel between the internet and your Mac (iMessage server)
+     * Handles a configuration change
+     *
+     * @param prevConfig The previous configuration
+     * @param nextConfig The current configuration
      */
-    async connectToNgrok(): Promise<void> {
-        try {
-            this.ngrokServer = await ngrok.connect({
-                port: this.config.socket_port,
-                // This is required to run ngrok in production
-                binPath: path => path.replace("app.asar", "app.asar.unpacked")
-            });
-
-            await this.setConfig("server_address", this.ngrokServer);
-
-            // Emit this over the socket
-            if (this.socketService) this.socketService.socketServer.emit("new-server", this.ngrokServer);
-
-            if (this.socketService) await this.sendNotification("new-server", this.ngrokServer);
-            await this.fcmService.setServerUrl(this.ngrokServer);
-        } catch (ex) {
-            this.log(`Failed to connect to ngrok! ${ex.message}`, "error");
+    private async handleConfigUpdate({ prevConfig, nextConfig }: ServerConfigChange) {
+        // If the socket port changed, disconnect and reconnect
+        let ngrokRestarted = false;
+        if (prevConfig.socket_port !== nextConfig.socket_port) {
+            if (this.ngrok) await this.ngrok.restart();
+            if (this.socket) await this.socket.restart();
+            ngrokRestarted = true;
         }
+
+        // If the ngrok URL is different, emit the change to the listeners
+        if (prevConfig.server_address !== nextConfig.server_address) {
+            if (this.socket) await this.emitMessage("new-server", nextConfig.server_address);
+            if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
+        }
+
+        // If the ngrok API key is different, restart the ngrok process
+        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !ngrokRestarted) {
+            if (this.ngrok) await this.ngrok.restart();
+        }
+
+        this.emitToUI("config-update", nextConfig);
     }
 
     /**
-     * Emits a notification to to your connected devices over FCM
+     * Emits a notification to to your connected devices over FCM and socket
      *
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async sendNotification(type: string, data: any) {
-        this.socketService.socketServer.emit(type, data);
+    async emitMessage(type: string, data: any) {
+        this.socket.server.emit(type, data);
 
         // Send notification to devices
-        if (this.fcmService.app) {
-            const devices = await this.db.getRepository(Device).find();
+        if (FCMService.getApp()) {
+            const devices = await this.repo.devices().find();
             if (!devices || devices.length === 0) return;
 
             const notifData = JSON.stringify(data);
-            await this.fcmService.sendNotification(
+            await this.fcm.sendNotification(
                 devices.map(device => device.identifier),
                 { type, data: notifData }
             );
         }
-    }
-
-    /**
-     * Helper method for addind a new configuration item to the
-     * database.
-     *
-     * @param name The name of the config item
-     * @param value The initial value of the config item
-     */
-    private async addConfigItem(name: string, value: string | number): Promise<Config> {
-        const item = new Config();
-        item.name = name;
-        item.value = String(value);
-        await this.db.getRepository(Config).save(item);
-        return item;
     }
 
     /**
@@ -330,24 +315,38 @@ export class BlueBubblesServer {
      * we will emit a message to the socket, as well as the FCM server
      */
     private startChatListener() {
-        if (!this.iMessageRepo.db) {
-            this.alertService.create(
+        if (!this.iMessageRepo?.db) {
+            AlertService.create(
                 "info",
                 "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled"
             );
             return;
         }
 
-        // Start the queue service
-        this.queueService.start();
-        this.queueService.on("message-timeout", async (item: Queue) => {
-            const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
-            this.log(`Message send timeout for ${text}`, "warn");
-            await this.sendNotification("message-timeout", item);
-        });
-        this.queueService.on("message-match", async (item: { tempGuid: string; message: Message }) => {
+        // Create a listener to listen for new/updated messages
+        const incomingMsgListener = new IncomingMessageListener(
+            this.iMessageRepo,
+            this.eventCache,
+            DEFAULT_POLL_FREQUENCY_MS
+        );
+        const outgoingMsgListener = new OutgoingMessageListener(
+            this.iMessageRepo,
+            this.eventCache,
+            DEFAULT_POLL_FREQUENCY_MS * 2
+        );
+
+        // No real rhyme or reason to multiply this by 2. It's just not as much a priority
+        const groupEventListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
+
+        // Add to listeners
+        this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
+
+        /**
+         * Message listener for when we find matches for a given sent message
+         */
+        outgoingMsgListener.on("message-match", async (item: { tempGuid: string; message: Message }) => {
             const text = item.message.cacheHasAttachments
-                ? `Image: ${item.message.text.slice(1, item.message.text.length) || "<No Text>"}`
+                ? `Attachment: ${sanitizeStr(item.message.text) || "<No Text>"}`
                 : item.message.text;
 
             this.log(`Message match found for text, [${text}]`);
@@ -355,36 +354,57 @@ export class BlueBubblesServer {
             resp.tempGuid = item.tempGuid;
 
             // We are emitting this as a new message, the only difference being the included tempGuid
-            await this.sendNotification("new-message", resp);
+            await this.emitMessage("new-message", resp);
         });
-
-        // Create a listener to listen for new/updated messages
-        const newMsgListener = new MessageListener(this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS);
-        const myMsgListener = new MyMessageListener(this.iMessageRepo, this.eventCache, DEFAULT_POLL_FREQUENCY_MS * 2);
-        const updatedMsgListener = new MessageUpdateListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS);
-
-        // No real rhyme or reason to multiply this by 2. It's just not as much a priority
-        const groupChangeListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
 
         /**
          * Message listener for my messages only. We need this because messages from ourselves
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        myMsgListener.on("new-entry", async (item: Message) => {
-            const text = item.cacheHasAttachments
-                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
-                : item.text;
+        outgoingMsgListener.on("new-entry", async (item: Message) => {
+            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
             this.log(`New message from [You]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
-            await this.sendNotification("new-message", await getMessageResponse(item));
+            await this.emitMessage("new-message", await getMessageResponse(item));
+        });
+
+        /**
+         * Message listener checking for updated messages. This means either the message's
+         * delivered date or read date have changed since the last time we checked the database.
+         */
+        outgoingMsgListener.on("updated-entry", async (item: Message) => {
+            // ATTENTION: If "from" is null, it means you sent the message from a group chat
+            // Check the isFromMe key prior to checking the "from" key
+            const from = item.isFromMe ? "You" : item.handle?.id;
+            const time = item.dateDelivered || item.dateRead;
+            const updateType = item.dateRead ? "Text Read" : "Text Delivered";
+            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
+            this.log(
+                `Updated message from [${from}]: [${text.substring(
+                    0,
+                    50
+                )}] - [${updateType} -> ${time.toLocaleString()}]`
+            );
+
+            // Emit it to the socket and FCM devices
+            await this.emitMessage("updated-message", await getMessageResponse(item));
+        });
+
+        /**
+         * Message listener for outgoing messages that timedout
+         */
+        outgoingMsgListener.on("message-timeout", async (item: Queue) => {
+            const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
+            this.log(`Message send timeout for ${text}`, "warn");
+            await this.emitMessage("message-timeout", item);
         });
 
         /**
          * Message listener for messages that have errored out
          */
-        myMsgListener.on("message-send-error", async (item: Message) => {
+        outgoingMsgListener.on("message-send-error", async (item: Message) => {
             const text = item.cacheHasAttachments
                 ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
@@ -396,61 +416,49 @@ export class BlueBubblesServer {
              * ERROR CODES:
              * 4: Message Timeout
              */
-            await this.sendNotification("message-send-error", await getMessageResponse(item));
+            await this.emitMessage("message-send-error", await getMessageResponse(item));
         });
 
         /**
          * Message listener for new messages not from yourself. See 'myMsgListener' comment
          * for why we separate them out into two separate listeners.
          */
-        newMsgListener.on("new-entry", async (item: Message) => {
+        incomingMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments
                 ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
             this.log(`New message from [${item.handle?.id}]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
-            await this.sendNotification("new-message", await getMessageResponse(item));
+            await this.emitMessage("new-message", await getMessageResponse(item));
         });
 
-        /**
-         * Message listener checking for updated messages. This means either the message's
-         * delivered date or read date have changed since the last time we checked the database.
-         */
-        updatedMsgListener.on("updated-entry", async (item: Message) => {
-            // ATTENTION: If "from" is null, it means you sent the message from a group chat
-            // Check the isFromMe key prior to checking the "from" key
-            const from = item.isFromMe ? "You" : item.handle?.id;
-            const time = item.dateDelivered || item.dateRead;
-            const text = item.dateRead ? "Text Read" : "Text Delivered";
-            this.log(`Updated message from [${from}]: [${text} -> ${time.toLocaleString()}]`);
-
-            // Emit it to the socket and FCM devices
-            await this.sendNotification("updated-message", await getMessageResponse(item));
-        });
-
-        groupChangeListener.on("name-change", async (item: Message) => {
+        groupEventListener.on("name-change", async (item: Message) => {
             this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
-            await this.sendNotification("group-name-change", await getMessageResponse(item));
+            await this.emitMessage("group-name-change", await getMessageResponse(item));
         });
 
-        groupChangeListener.on("participant-removed", async (item: Message) => {
+        groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
-            await this.sendNotification("participant-removed", await getMessageResponse(item));
+            await this.emitMessage("participant-removed", await getMessageResponse(item));
         });
 
-        groupChangeListener.on("participant-added", async (item: Message) => {
+        groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
-            await this.sendNotification("participant-added", await getMessageResponse(item));
+            await this.emitMessage("participant-added", await getMessageResponse(item));
         });
 
-        groupChangeListener.on("participant-left", async (item: Message) => {
+        groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
-            await this.sendNotification("participant-left", await getMessageResponse(item));
+            await this.emitMessage("participant-left", await getMessageResponse(item));
         });
+
+        outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
+        incomingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
+        groupEventListener.on("error", (error: Error) => this.log(error.message, "error"));
     }
 
     /**
@@ -459,40 +467,40 @@ export class BlueBubblesServer {
      */
     private startIpcListener() {
         ipcMain.handle("get-message-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
             return count;
         });
 
         ipcMain.handle("get-chat-image-count", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatImageCounts();
             return count;
         });
 
         ipcMain.handle("get-group-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("group");
             return count;
         });
 
         ipcMain.handle("get-individual-message-counts", async (event, args) => {
-            if (!this.iMessageRepo.db) return 0;
+            if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("individual");
             return count;
         });
 
         ipcMain.handle("get-devices", async (event, args) => {
-            const devices = await this.db.getRepository(Device).find();
-            return devices;
+            // eslint-disable-next-line no-return-await
+            return await this.repo.devices().find();
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {
-            return this.fs.getFCMServer();
+            return FileSystem.getFCMServer();
         });
 
         ipcMain.handle("get-fcm-client", (event, args) => {
-            return this.fs.getFCMClient();
+            return FileSystem.getFCMClient();
         });
     }
 
@@ -500,102 +508,105 @@ export class BlueBubblesServer {
      * Starts configuration related inter-process-communication handlers.
      */
     private startConfigIpcListeners() {
-        ipcMain.handle("set-config", async (event, args) => {
+        ipcMain.handle("set-config", async (_, args) => {
             for (const item of Object.keys(args)) {
-                if (this.config[item] && this.config[item] !== args[item]) {
-                    this.config[item] = args[item];
-
-                    // If the socket port changed, disconnect and reconnect
-                    if (item === "socket_port" && this.hasProperPermissions === true) {
-                        await ngrok.disconnect();
-                        await this.connectToNgrok();
-                        await this.socketService.restart(args[item]);
-                    }
+                if (this.repo.hasConfig(item) && this.repo.getConfig(item) !== args[item]) {
+                    this.repo.setConfig(item, args[item]);
                 }
-
-                // Update in class
-                if (this.config[item]) await this.setConfig(item, args[item]);
             }
 
-            this.emitToUI("config-update", this.config);
-            return this.config;
+            return this.repo.config;
         });
 
-        ipcMain.handle("get-config", async (event, args) => {
-            if (!this.db) return {};
-
-            const cfg = await this.db.getRepository(Config).find();
-            for (const i of cfg) {
-                this.config[i.name] = i.value;
-            }
-
-            return this.config;
+        ipcMain.handle("get-config", async (_, __) => {
+            if (!this.repo.db) return {};
+            return this.repo.config;
         });
 
-        ipcMain.handle("get-alerts", async (event, args) => {
-            const alerts = await this.alertService.find();
+        ipcMain.handle("get-alerts", async (_, __) => {
+            const alerts = await AlertService.find();
             return alerts;
         });
 
-        ipcMain.handle("mark-alert-as-read", async (event, args) => {
+        ipcMain.handle("mark-alert-as-read", async (_, args) => {
             const alertIds = args ?? [];
             for (const id of alertIds) {
-                await this.alertService.markAsRead(id);
+                await AlertService.markAsRead(id);
             }
         });
 
-        ipcMain.handle("set-fcm-server", (event, args) => {
-            this.fs.saveFCMServer(args);
-            this.fcmService.start();
+        ipcMain.handle("set-fcm-server", async (_, args) => {
+            FileSystem.saveFCMServer(args);
         });
 
-        ipcMain.handle("set-fcm-client", (event, args) => {
-            this.fs.saveFCMClient(args);
+        ipcMain.handle("set-fcm-client", async (_, args) => {
+            FileSystem.saveFCMClient(args);
+            await this.fcm.start();
         });
 
-        ipcMain.handle("complete-tutorial", async (event, args) => {
-            await this.setConfig("tutorial_is_done", "1");
+        ipcMain.handle("toggle-tutorial", async (_, toggle) => {
+            await this.repo.setConfig("tutorial_is_done", toggle);
 
-            await this.setupServices();
-            await this.startServices();
+            if (toggle) {
+                await this.setupServices();
+                await this.startServices();
+            }
         });
 
-        ipcMain.handle("open_perms_prompt", async (event, args) => {
-            permissions.askForFullDiskAccess();
+        ipcMain.handle("open_perms_prompt", async (_, __) => {
+            // permissions.askForFullDiskAccess();
         });
 
-        ipcMain.handle("prompt_accessibility_perms", async (event, args) => {
-            permissions.askForAccessibilityAccess();
+        ipcMain.handle("prompt_accessibility_perms", async (_, __) => {
+            // permissions.askForAccessibilityAccess();
         });
 
-        ipcMain.handle("check_perms", async (event, args) => {
+        ipcMain.handle("check_perms", async (_, __) => {
+            return { abPerms: "authorized", fdPerms: "authorized" };
+            // return {
+            //     abPerms: permissions.getAuthStatus("accessibility"),
+            //     fdPerms: permissions.getAuthStatus("full-disk-access")
+            // };
+        });
+
+        ipcMain.handle("toggle-caffeinate", async (_, toggle) => {
+            if (this.caffeinate && toggle) {
+                this.caffeinate.start();
+            } else if (this.caffeinate && !toggle) {
+                this.caffeinate.stop();
+            }
+
+            await this.repo.setConfig("auto_caffeinate", toggle);
+        });
+
+        ipcMain.handle("get-caffeinate-status", (_, __) => {
             return {
-                abPerms: permissions.getAuthStatus("accessibility"),
-                fdPerms: permissions.getAuthStatus("full-disk-access")
+                isCaffeinated: this.caffeinate.isCaffeinated,
+                autoCaffeinate: this.repo.getConfig("auto_caffeinate")
             };
         });
 
-        ipcMain.handle("toggle-caffeinate", async (event, toggle) => {
-            if (this.caffeinateService && toggle) {
-                this.caffeinateService.start();
-            } else if (this.caffeinateService && !toggle) {
-                this.caffeinateService.stop();
+        ipcMain.handle("purge-event-cache", (_, __) => {
+            if (this.eventCache.size() === 0) {
+                this.log("No events to purge from event cache!");
+            } else {
+                this.log(`Purging ${this.eventCache.size()} items from the event cache!`);
+                this.eventCache.purge();
             }
-
-            const cfgVal = toggle ? "1" : "0";
-            this.config.auto_caffeinate = cfgVal;
-            await this.setConfig("auto_caffeinate", cfgVal);
         });
 
-        ipcMain.handle("get-caffeinate-status", async (event, args) => {
-            const autoCaffeinate = this.config.auto_caffeinate === "1";
-            return { isCaffeinated: this.caffeinateService.isCaffeinated, autoCaffeinate };
+        ipcMain.handle("toggle-auto-start", async (_, toggle) => {
+            await this.repo.setConfig("auto_start", toggle);
+            app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
+        });
+
+        ipcMain.handle("restart-server", async (_, __) => {
+            await this.restart();
         });
     }
 
     /**
      * Helper method for running setup on the message services
-     *
      */
     private async setupServices() {
         if (this.hasSetup) return;
@@ -618,27 +629,9 @@ export class BlueBubblesServer {
 
         try {
             this.log("Initializing up sockets...");
-            this.socketService = new SocketService(
-                this.db,
-                this.iMessageRepo,
-                this.contactsRepo,
-                this.fs,
-                this.config.socket_port
-            );
+            this.socket = new SocketService();
         } catch (ex) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
-        }
-
-        try {
-            this.log("Initializing queue service...");
-            this.queueService = new QueueService(
-                this.db,
-                this.iMessageRepo,
-                this.eventCache,
-                DEFAULT_POLL_FREQUENCY_MS
-            );
-        } catch (ex) {
-            this.log(`Failed to setup queue service! ${ex.message}`, "error");
         }
 
         this.hasSetup = true;
@@ -649,20 +642,54 @@ export class BlueBubblesServer {
      *
      */
     private async startServices() {
-        await ngrok.disconnect();
+        // Start the IPC listener first for the UI
+        if (this.hasDiskAccess && !this.hasStarted) this.startIpcListener();
 
-        this.log("Connecting to Ngrok...");
-        await this.connectToNgrok();
+        try {
+            this.log("Connecting to Ngrok...");
+            this.ngrok = new NgrokService();
+            await this.ngrok.restart();
+        } catch (ex) {
+            this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
+        }
 
-        if (this.hasStarted === false) {
-            this.log("Starting socket service...");
-            this.socketService.start();
+        try {
+            this.log("Starting FCM service...");
+            await this.fcm.start();
+        } catch (ex) {
+            this.log(`Failed to start FCM service! ${ex.message}`, "error");
+        }
 
+        this.log("Starting socket service...");
+        this.socket.restart();
+
+        if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");
             this.startChatListener();
-            this.startIpcListener();
         }
 
         this.hasStarted = true;
+    }
+
+    /**
+     * Restarts the server
+     */
+    async restart() {
+        this.log("Restarting the server...");
+
+        // Remove all listeners
+        console.log("Removing chat listeners...");
+        for (const i of this.chatListeners) i.stop();
+        this.chatListeners = [];
+
+        // Disconnect & reconnect to the iMessage DB
+        if (this.iMessageRepo.db.isConnected) {
+            console.log("Reconnecting to iMessage database...");
+            await this.iMessageRepo.db.close();
+            await this.iMessageRepo.db.connect();
+        }
+
+        // Start the server up again
+        await this.start();
     }
 }

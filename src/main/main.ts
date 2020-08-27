@@ -1,29 +1,109 @@
 import "reflect-metadata";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeTheme } from "electron";
 import * as path from "path";
 import * as url from "url";
+import { FileSystem } from "@server/fileSystem";
 
-import { BlueBubblesServer } from "@server/index";
-import { UpdateService } from "@server/services";
+import { Server } from "@server/index";
+import { UpdateService, FCMService } from "@server/services";
 
-let win: BrowserWindow | null;
-const api = new BlueBubblesServer(win);
-
-const installExtensions = async () => {
-    const installer = require("electron-devtools-installer");
-    const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
-    const extensions = ["REACT_DEVELOPER_TOOLS", "REDUX_DEVTOOLS"];
-    return Promise.all(extensions.map(name => installer.default(installer[name], forceDownload))).catch(console.log);
-};
+let win: BrowserWindow;
+let tray: Tray;
+let api = Server(win);
 
 // Start the API
 api.start();
 
-const createWindow = async () => {
-    if (process.env.NODE_ENV !== "production") {
-        await installExtensions();
+const handleExit = async () => {
+    if (!api) return;
+
+    Server().log("Stopping all services...");
+
+    if (api.networkChecker) api.networkChecker.stop();
+    if (api.ngrok) await api.ngrok.stop();
+    if (api.socket?.server) api.socket.server.close();
+    if (api.iMessageRepo?.db && api.iMessageRepo.db.isConnected) await api.iMessageRepo.db.close();
+    if (api.repo?.db && api.repo.db.isConnected) await api.repo.db.close();
+    if (api.fcm) FCMService.stop();
+    if (api.caffeinate && api.caffeinate.isCaffeinated) api.caffeinate.stop();
+
+    app.quit();
+};
+
+const buildTray = () => {
+    return Menu.buildFromTemplate([
+        {
+            label: "BlueBubbles Server",
+            enabled: false
+        },
+        {
+            label: "Open",
+            type: "normal",
+            click: () => {
+                if (win) {
+                    win.show();
+                } else {
+                    createWindow();
+                }
+            }
+        },
+        {
+            label: "Restart",
+            type: "normal",
+            click: () => {
+                app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
+                app.exit(0);
+            }
+        },
+        {
+            type: "separator"
+        },
+        {
+            label: `Server Address: ${api.repo.getConfig("server_address")}`,
+            enabled: false
+        },
+        {
+            label: `Socket Connections: ${api.socket?.server.sockets.sockets.length ?? 0}`,
+            enabled: false
+        },
+        {
+            label: `Caffeinated: ${api.caffeinate?.isCaffeinated}`,
+            enabled: false
+        },
+        {
+            type: "separator"
+        },
+        {
+            label: "Close",
+            type: "normal",
+            click: async () => {
+                await handleExit();
+            }
+        }
+    ]);
+};
+
+const createTray = () => {
+    let iconPath = path.join(FileSystem.resources, "macos", "tray-icon-dark.png");
+    if (!nativeTheme.shouldUseDarkColors) iconPath = path.join(FileSystem.resources, "macos", "tray-icon-light.png");
+
+    // If the tray is already created, just change the icon color
+    if (tray) {
+        tray.setImage(iconPath);
+        return;
     }
 
+    tray = new Tray(iconPath);
+    tray.setToolTip("BlueBubbles");
+    tray.setContextMenu(buildTray());
+
+    // Rebuild the tray each time it's clicked
+    tray.on("click", () => {
+        tray.setContextMenu(buildTray());
+    });
+};
+
+const createWindow = async () => {
     win = new BrowserWindow({
         title: "BlueBubbles Server",
         useContentSize: true,
@@ -64,13 +144,13 @@ const createWindow = async () => {
     });
 
     // Hook onto when we load the UI
-    win.webContents.send("config-update", api.config);
+    win.webContents.send("config-update", api.repo.config);
     win.webContents.on("dom-ready", async () => {
-        win.webContents.send("config-update", api.config);
+        win.webContents.send("config-update", api.repo.config);
     });
 
     // Set the new window in the API
-    api.window = win;
+    api = Server(win);
 
     // Start the update service
     const updateService = new UpdateService();
@@ -78,16 +158,29 @@ const createWindow = async () => {
     updateService.checkForUpdate();
 };
 
-app.on("ready", createWindow);
+app.on("ready", () => {
+    createTray();
+    createWindow();
 
-app.on("window-all-closed", () => {
+    nativeTheme.on("updated", () => {
+        createTray();
+    });
+});
+
+app.on("window-all-closed", async () => {
     if (process.platform !== "darwin") {
-        app.quit();
+        await handleExit();
     }
 });
 
 app.on("activate", () => {
-    if (win === null) {
-        createWindow();
-    }
+    if (win === null) createWindow();
+});
+
+/**
+ * I'm not totally sure this will work because of the way electron is...
+ * But, I'm going to try.
+ */
+app.on("before-quit", async _ => {
+    await handleExit();
 });

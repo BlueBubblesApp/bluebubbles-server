@@ -1,6 +1,7 @@
 import { app, dialog, shell } from "electron";
 import * as fetchDef from "electron-fetch";
 import * as compareVersions from "compare-versions";
+import { Server } from "@server/index";
 
 const fetch = fetchDef.default;
 export class UpdateService {
@@ -28,7 +29,7 @@ export class UpdateService {
         const response = await fetch("https://api.github.com/repos/BlueBubblesApp/BlueBubbles-Server/releases");
         const body = await response.json();
         if (typeof body === "object" && body !== null && !Array.isArray(body) && body?.message)
-            return console.error(`Failed to get updates for BlueBubbles! Error: ${body?.message}`);
+            return Server().log(`Failed to get updates for BlueBubbles! Error: ${body?.message}`, "warn");
         if (Array.isArray(body) && body.length === 0) return console.log("No updates for BlueBubbles found!");
 
         // Pull latest version
@@ -55,7 +56,7 @@ export class UpdateService {
                 }
             });
         } else {
-            console.log(`No new version available (latest: ${version})`);
+            Server().log(`No new version available (latest: ${version})`);
         }
 
         return null;

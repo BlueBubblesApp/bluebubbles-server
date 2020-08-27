@@ -1,6 +1,7 @@
 // React imports
 import * as React from "react";
-import { Switch, Route, Link } from "react-router-dom";
+import { Switch, Route, Link, withRouter, RouteComponentProps } from "react-router-dom";
+import * as Ago from "s-ago";
 
 // Other imports
 import clsx from "clsx";
@@ -32,26 +33,28 @@ import MenuItem from "@material-ui/core/MenuItem";
 import ListSubheader from "@material-ui/core/ListSubheader";
 
 // Material UI Icons
-import MenuIcon from "@material-ui/icons/Menu";
-import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
-import DeviceIcon from "@material-ui/icons/DeviceHub";
-import HomeIcon from "@material-ui/icons/Home";
-import SettingsIcon from "@material-ui/icons/Settings";
-import LogIcon from "@material-ui/icons/Receipt";
-import NotificationsIcon from "@material-ui/icons/Notifications";
-import WarningIcon from "@material-ui/icons/Warning";
-import InfoIcon from "@material-ui/icons/Help";
-import SuccessIcon from "@material-ui/icons/CheckCircle";
-import ErrorIcon from "@material-ui/icons/Error";
-import CachedIcon from "@material-ui/icons/Cached";
-import DiscFullIcon from "@material-ui/icons/DiscFull";
-import AccessibilityNewIcon from "@material-ui/icons/AccessibilityNew";
+import {
+    Menu as MenuIcon,
+    ChevronLeft as ChevronLeftIcon,
+    DeviceHub as DeviceIcon,
+    Home as HomeIcon,
+    Settings as SettingsIcon,
+    BugReport as BugIcon,
+    Notifications as NotificationsIcon,
+    Warning as WarningIcon,
+    Help as InfoIcon,
+    CheckCircle as SuccessIcon,
+    Error as ErrorIcon,
+    Cached as CachedIcon,
+    DiscFull as DiscFullIcon,
+    AccessibilityNew as AccessibilityNewIcon
+} from "@material-ui/icons";
 
 // Custom Components
 import Configuration from "@renderer/views/Configuration";
 import Devices from "@renderer/views/Devices";
 import Dashboard from "@renderer/views/Dashboard";
-import Logs from "@renderer/views/Logs";
+import Logs from "@renderer/views/Debug";
 import Tutorial from "@renderer/views/Tutorial";
 
 // Helpers
@@ -99,7 +102,7 @@ interface State {
     abPerms: string;
 }
 
-class AdminLayout extends React.Component<Props, State> {
+class AdminLayout extends React.Component<Props & RouteComponentProps, State> {
     state: State = {
         open: false,
         config: null,
@@ -124,8 +127,9 @@ class AdminLayout extends React.Component<Props, State> {
             this.setState({ config: arg });
         });
 
-        ipcRenderer.on("new-alert", (event, arg) => {
+        ipcRenderer.on("new-alert", (event, alert) => {
             const { alerts } = this.state;
+            if (!alert?.text || !alert?.type) return;
 
             // Insert at index 0, then concatenate to 10 items
             alerts.splice(0, 0, alert);
@@ -135,15 +139,24 @@ class AdminLayout extends React.Component<Props, State> {
             this.setState({ alerts });
         });
 
-        // Check for permissions every minute until we have permissions.. maybe?
-        let interval: NodeJS.Timeout = null;
-        if (this.state.abPerms !== "authorized" && this.state.fdPerms !== "authorized") {
-            interval = setInterval(() => {
-                this.checkPermissions();
-                if (this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
-                    clearInterval(interval);
-                }
-            }, 60000);
+        // Check for permissions every 10 seconds until we have permissions.. maybe?
+        // let interval: NodeJS.Timeout = null;
+        // if (this.state.abPerms !== "authorized" && this.state.fdPerms !== "authorized") {
+        //     interval = setInterval(() => {
+        //         this.checkPermissions();
+        //         if (this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
+        //             clearInterval(interval);
+        //         }
+        //     }, 10000);
+        // }
+    }
+
+    componentDidUpdate() {
+        if (this.props.location.pathname === "/tutorial") return;
+
+        // Check if the tutorial is done
+        if (!this.state.config?.tutorial_is_done) {
+            this.props.history.push("/tutorial");
         }
     }
 
@@ -205,6 +218,7 @@ class AdminLayout extends React.Component<Props, State> {
             >
                 {this.state.alerts.map(item => {
                     const typeIcon = alertIconMap[item.type];
+                    const time = item.created ? Ago(item.created) : "N/A";
                     return (
                         <StyledMenuItem key={item.id} onClick={() => this.markAlertAsRead(item.id)}>
                             <section className={classes.alertBlock}>
@@ -220,7 +234,7 @@ class AdminLayout extends React.Component<Props, State> {
                                     <span style={{ textDecoration: item.isRead ? "none" : "underline" }}>
                                         {item.isRead ? "Already read" : "Mark as read"}
                                     </span>
-                                    <span>{item.created ? item.created.toLocaleString() : "N/A"}</span>
+                                    <span>{time}</span>
                                 </section>
                             </section>
                         </StyledMenuItem>
@@ -328,7 +342,7 @@ class AdminLayout extends React.Component<Props, State> {
                         <List>
                             <ListItem
                                 component={Link}
-                                to="/logs"
+                                to="/debug"
                                 button
                                 className={clsx(classes.drawer, {
                                     [classes.listItemOpen]: open,
@@ -336,9 +350,9 @@ class AdminLayout extends React.Component<Props, State> {
                                 })}
                             >
                                 <ListItemIcon>
-                                    <LogIcon />
+                                    <BugIcon />
                                 </ListItemIcon>
-                                <ListItemText primary="Server Logs" />
+                                <ListItemText primary="Server Debugger" />
                             </ListItem>
                             <ListItem
                                 component={Link}
@@ -359,8 +373,8 @@ class AdminLayout extends React.Component<Props, State> {
                         <Divider />
                         <List
                             subheader={
-                                <ListSubheader inset className={classes.header}>
-                                    Permissions
+                                <ListSubheader style={{ display: open ? "block" : "none" }} className={classes.header}>
+                                    MacOS Permissions
                                 </ListSubheader>
                             }
                         >
@@ -414,11 +428,11 @@ class AdminLayout extends React.Component<Props, State> {
                             <Route path="/devices">
                                 <Devices />
                             </Route>
-                            <Route path="/logs">
+                            <Route path="/debug">
                                 <Logs />
                             </Route>
                             <Route path="/">
-                                <Dashboard config={config} />
+                                <Dashboard />
                             </Route>
                         </Switch>
                     </section>
@@ -436,7 +450,8 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
             flexGrow: 1
         },
         root: {
-            display: "flex"
+            display: "flex",
+            marginBottom: "2em"
         },
         appBar: {
             zIndex: theme.zIndex.drawer + 1,
@@ -544,4 +559,4 @@ const styles = (theme: Theme): StyleRules<string, {}> =>
         }
     });
 
-export default withStyles(styles)(AdminLayout);
+export default withStyles(styles)(withRouter(AdminLayout));

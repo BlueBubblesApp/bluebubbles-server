@@ -32,6 +32,7 @@ export type ResponseFormat = {
  * 3: Someone left the conversation (handle_id shows who)
  */
 export type MessageResponse = {
+    originalROWID: number;
     tempGuid?: string;
     guid: string;
     text: string;
@@ -60,12 +61,13 @@ export type MessageResponse = {
     groupActionType: number;
     isExpired: boolean;
     associatedMessageGuid: string | null;
-    associatedMessageType: number | null;
+    associatedMessageType: string | null;
     expressiveSendStyleId: string | null;
     timeExpressiveSendStyleId: number | null;
 };
 
 export type HandleResponse = {
+    originalROWID: number;
     messages?: MessageResponse[];
     chats?: ChatResponse[];
     address: string;
@@ -74,6 +76,7 @@ export type HandleResponse = {
 };
 
 export type ChatResponse = {
+    originalROWID: number;
     guid: string;
     participants?: HandleResponse[];
     messages?: MessageResponse[];
@@ -85,6 +88,7 @@ export type ChatResponse = {
 };
 
 export type AttachmentResponse = {
+    originalROWID: number;
     guid: string;
     messages: string[];
     data: string; // Base64 string
@@ -117,3 +121,5 @@ export enum ErrorTypes {
     SOCKET_ERROR = "Socket Error",
     VALIDATION_ERROR = "Validation Error"
 }
+
+export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";

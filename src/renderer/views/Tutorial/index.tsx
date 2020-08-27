@@ -54,7 +54,7 @@ class Tutorial extends React.Component<Props, State> {
     };
 
     completeTutorial() {
-        ipcRenderer.invoke("complete-tutorial");
+        ipcRenderer.invoke("toggle-tutorial", true);
         this.props.history.push("/welcome");
     }
 
@@ -70,13 +70,10 @@ class Tutorial extends React.Component<Props, State> {
         const { classes, config } = this.props;
         const { step } = this.state;
 
-        let tutorialIsDone = config?.tutorial_is_done;
-        if (tutorialIsDone && Boolean(Number(tutorialIsDone))) {
+        const CurrentStep = stepMap[step].component;
+        if (config?.tutorial_is_done) {
             return <Redirect to="/welcome" />;
         }
-
-        const CurrentStep = stepMap[step].component;
-        const CurrentText = stepMap[step].text;
 
         return (
             <section className={classes.root}>
