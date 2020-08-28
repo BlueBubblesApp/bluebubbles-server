@@ -2,7 +2,7 @@
 import * as React from "react";
 import { BrowserRouter as Router, Route, HashRouter } from "react-router-dom";
 import "./ViewContainer.css";
-import { AnimatedSwitch } from "react-router-transition";
+import { Switch } from "react-router";
 import DashboardView from "./DashboardView/DashboardView";
 import SettingsView from "./SettingsView/SettingsView";
 import PreDashboardView from "./PreDashboardView/PreDashboardView";
@@ -12,22 +12,22 @@ class ViewContainer extends React.Component {
         return (
             <div className="ViewContainer">
                 <HashRouter>
-                    <AnimatedSwitch
-                        atEnter={{ opacity: 0.1 }}
-                        atLeave={{ opacity: 0 }}
-                        atActive={{ opacity: 1 }}
-                        className="switch-wrapper"
+                    <Switch
+                        // atEnter={{ opacity: 0.1 }}
+                        // atLeave={{ opacity: 0 }}
+                        // atActive={{ opacity: 1 }}
+                        // className="switch-wrapper"
                     >
                         <Route exact path="/predashboard" component={PreDashboardView}>
                             <PreDashboardView />
                         </Route>
-                        <Route exact path="/dashboard" component={DashboardView}>
+                        <Route exact path="/" component={DashboardView}>
                             <DashboardView />
                         </Route>
                         <Route path="/settings" component={SettingsView}>
                             <SettingsView />
                         </Route>
-                    </AnimatedSwitch>
+                    </Switch>
                 </HashRouter>
             </div>
         );

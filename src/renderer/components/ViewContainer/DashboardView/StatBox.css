@@ -1,0 +1,31 @@
+.aStatBox {
+    height: 100%;
+    width: 30%;
+    border-radius: 10px;
+    border: 3px solid black;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.aStatBox > h3 {
+    font-size: 25px;
+    margin: auto;
+    text-align: center;
+}
+
+.aStatBoxTitleContainer{
+    width: 100%;
+    height: 35px;
+    border-top: 3px solid black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #147EFB;
+    border-radius: 0 0 7px 7px;
+}
+
+.aStatBoxTitleContainer h3 {
+
+}

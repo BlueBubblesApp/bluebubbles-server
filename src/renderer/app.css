@@ -1,4 +1,4 @@
-@font-face {
+/* @font-face {
     font-family: "SF UI Display Light";
     src: url("./fonts/SF-UI-Display-Light.woff2") format("woff2"),
         url("./fonts/SF-UI-Display-Light.woff") format("woff");
@@ -13,7 +13,7 @@
     font-family: "SF UI Display Black";
     src: url("./fonts/SF-UI-Display-Black.woff2") format("woff2"),
         url("./fonts/SF-UI-Display-Black.woff") format("woff");
-}
+} */
 
 /* Rounded Font */
 @import url("https://use.typekit.net/pyr2zko.css");
@@ -22,9 +22,9 @@
   outline: 1px solid red;
 } */
 
-*::-webkit-scrollbar {
+/* *::-webkit-scrollbar {
     display: none;
-}
+} */
 
 html {
     height: 100%;

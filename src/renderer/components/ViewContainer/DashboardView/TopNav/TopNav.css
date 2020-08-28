@@ -1,0 +1,49 @@
+#dashboardTopNav {
+    width: 100%;
+    height: 10%;
+    /* background-color: red; */
+    margin-top: 2%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#dashboardTopLeftNav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#dashboardTopLeftNav > h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+#dashboardTopRightNav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#settingsIconLink{
+    height: 30px;
+    width: 30px;
+    margin-left: 20px;
+    margin-right: 8px;
+    transition: transform .7s;
+}
+
+#bellIcon {
+    height: 27px;
+    width: 27px;
+    fill: black;
+    margin-right: 20px;
+}
+
+#bellIcon:hover{
+    cursor: pointer;
+}
+
+#settingsIconLink:hover{
+    transform: rotate(180deg);
+}
