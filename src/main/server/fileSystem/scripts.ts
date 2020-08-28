@@ -566,6 +566,8 @@ export const getAppleScripts = () => {
         end tell
         
         tell application "${contactsApp}"
+            quit
+            delay 1.0
             reopen
 
             -- Create an empty file

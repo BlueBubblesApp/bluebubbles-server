@@ -515,12 +515,12 @@ class BlueBubblesServer {
                 }
             }
 
-            return this.repo.config;
+            return this.repo?.config;
         });
 
         ipcMain.handle("get-config", async (_, __) => {
             if (!this.repo.db) return {};
-            return this.repo.config;
+            return this.repo?.config;
         });
 
         ipcMain.handle("get-alerts", async (_, __) => {
