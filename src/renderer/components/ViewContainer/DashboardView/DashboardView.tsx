@@ -14,8 +14,6 @@ import { ipcRenderer } from "electron";
 interface State {
     config: any;
     fcmClient: string;
-    fcmClientURL: string;
-    port: string;
     totalMsgCount: number;
     recentMsgCount: number;
     groupMsgCount: { name: string; count: number };
@@ -28,8 +26,6 @@ class DashboardView extends React.Component<unknown, State> {
     state: State = {
         config: null,
         fcmClient: null,
-        fcmClientURL: null,
-        port: null,
         totalMsgCount: 0,
         recentMsgCount: 0,
         myMsgCount: 0,
@@ -40,13 +36,15 @@ class DashboardView extends React.Component<unknown, State> {
 
     async componentDidMount() {
         const client = await ipcRenderer.invoke("get-fcm-client");
-        this.setState({fcmClientURL: client.project_info.firebase_url});
         if (client) this.setState({ fcmClient: JSON.stringify(client)});
 
         const config = await ipcRenderer.invoke("get-config");
         if (config) this.setState({ config });
-        console.log(config)
         this.loadData();
+
+        ipcRenderer.on("config-update", (event, arg) => {
+            this.setState({ config: arg });
+        });
     }
 
     formatNumber(value: number) {

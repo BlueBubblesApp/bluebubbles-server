@@ -17,6 +17,7 @@
 
 #restartIcon:hover {
     transform: rotate(180deg);
+    cursor: pointer;
 }
 
 #statusColorIndicator{
