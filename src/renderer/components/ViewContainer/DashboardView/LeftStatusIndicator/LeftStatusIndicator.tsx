@@ -1,12 +1,46 @@
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
 import "./LeftStatusIndicator.css";
+import { ipcRenderer } from "electron";
 
-class LeftStatusIndicator extends React.Component {
+interface State {
+    abPerms: any;
+    fdPerms: any;
+    statusColorIndicator: any;
+}
+
+class LeftStatusIndicator extends React.Component<unknown, State> {
+    constructor(props: Readonly<{}>){
+        super(props);
+
+        this.state = {
+            abPerms: "deauthorized",
+            fdPerms: "deauthorized",
+            statusColorIndicator: {
+                backgroundColor: "red"
+            }
+        }
+    }
+
+    async componentDidMount(){
+        this.checkPermissions()
+    }
+
+    checkPermissions = async () => {
+        const res = await ipcRenderer.invoke("check_perms");
+        this.setState({
+            abPerms: res.abPerms,
+            fdPerms: res.fdPerms
+        });
+
+        if(this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
+            this.setState({statusColorIndicator: {backgroundColor: "#38d744"}})
+        }
+    };
     render() {
         return (
             <div id="leftStatusBar">
-                        <div id="statusColorIndicator" />
+                        <div id="statusColorIndicator" style={this.state.statusColorIndicator} />
                         <svg id="restartIcon" viewBox="0 0 512 512">
                             <g>
                                 <path d="M403.678,272c0,40.005-15.615,77.651-43.989,106.011C331.33,406.385,293.683,422,253.678,422

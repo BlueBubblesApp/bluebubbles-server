@@ -18,10 +18,10 @@ class ViewContainer extends React.Component {
                         // atActive={{ opacity: 1 }}
                         // className="switch-wrapper"
                     >
-                        <Route exact path="/predashboard" component={PreDashboardView}>
+                        <Route exact path="/" component={PreDashboardView}>
                             <PreDashboardView />
                         </Route>
-                        <Route exact path="/" component={DashboardView}>
+                        <Route exact path="/dashboard" component={DashboardView}>
                             <DashboardView />
                         </Route>
                         <Route path="/settings" component={SettingsView}>

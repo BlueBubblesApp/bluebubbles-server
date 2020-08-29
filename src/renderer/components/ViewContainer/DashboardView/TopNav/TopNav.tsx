@@ -44,7 +44,7 @@ class TopNav extends React.Component {
                             </g>
                             <g>
                                 <circle cx="130" cy="125" r="125" fill="#fc4e50" />
-                                <text font-size="250" text-anchor="middle" stroke="black" stroke-width="15px" x="130" y="200" fill="black">2</text>
+                                <text fontSize="250" textAnchor="middle" stroke="black" strokeWidth="15px" x="130" y="200" fill="black">2</text>
                             </g>
                         </svg>
                     </div>
