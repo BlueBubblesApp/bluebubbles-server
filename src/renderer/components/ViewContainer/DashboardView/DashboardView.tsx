@@ -1,15 +1,17 @@
+/* eslint-disable max-len */
+/* eslint-disable react/no-unused-state */
+/* eslint-disable class-methods-use-this */
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
 import { Link } from "react-router-dom";
+import { ipcRenderer } from "electron";
+import * as numeral from "numeral";
 import TopNav from "./TopNav/TopNav";
 import LeftStatusIndicator from "./LeftStatusIndicator/LeftStatusIndicator";
 import StatBox from "./StatBox";
-import * as numeral from "numeral";
-const QRCode = require('qrcode.react');
-
-
 import "./DashboardView.css";
-import { ipcRenderer } from "electron";
+
+const QRCode = require("qrcode.react");
 
 interface State {
     config: any;
@@ -36,7 +38,7 @@ class DashboardView extends React.Component<unknown, State> {
 
     async componentDidMount() {
         const client = await ipcRenderer.invoke("get-fcm-client");
-        if (client) this.setState({ fcmClient: JSON.stringify(client)});
+        if (client) this.setState({ fcmClient: JSON.stringify(client) });
 
         const config = await ipcRenderer.invoke("get-config");
         if (config) this.setState({ config });
@@ -47,20 +49,35 @@ class DashboardView extends React.Component<unknown, State> {
         });
     }
 
+    buildQrData = (data: string | null): string => {
+        if (!data || data.length === 0) return "";
+
+        const jsonData = JSON.parse(data);
+        const output = [this.state.config?.password, this.state.config?.server_address || ""];
+
+        output.push(jsonData.project_info.project_id);
+        output.push(jsonData.project_info.storage_bucket);
+        output.push(jsonData.client[0].api_key[0].current_key);
+        output.push(jsonData.project_info.firebase_url);
+        const { client_id } = jsonData.client[0].oauth_client[0];
+        output.push(client_id.substr(0, client_id.indexOf("-")));
+        output.push(jsonData.client[0].client_info.mobilesdk_app_id);
+
+        return JSON.stringify(output);
+    };
+
+    formatPhone(phone: string) {
+        if (phone.substr(0, 1) === "+") {
+            return `(${phone.substr(2, 3)})-${phone.substr(5, 3)}-${phone.substr(8, 4)}`;
+        }
+        return phone;
+    }
+
     formatNumber(value: number) {
         if (value > 1000) {
             return numeral(value).format("0.0a");
-        } else {
-            return value;
         }
-    }
-
-    formatPhone(phone:string){
-        if(phone.substr(0,1) === "+"){
-            return "(" + phone.substr(2,3) + ")-" + phone.substr(5,3) + "-" + phone.substr(8,4);
-        } else{
-            return phone;
-        }
+        return value;
     }
 
     loadData() {
@@ -164,24 +181,6 @@ class DashboardView extends React.Component<unknown, State> {
         }
     }
 
-
-    buildQrData = (data: string | null): string => {
-        if (!data || data.length === 0) return "";
-
-        const jsonData = JSON.parse(data);
-        const output = [this.state.config?.password, this.state.config?.server_address || ""];
-
-        output.push(jsonData.project_info.project_id);
-        output.push(jsonData.project_info.storage_bucket);
-        output.push(jsonData.client[0].api_key[0].current_key);
-        output.push(jsonData.project_info.firebase_url);
-        const client_id = jsonData.client[0].oauth_client[0].client_id;
-        output.push(client_id.substr(0, client_id.indexOf("-")));
-        output.push(jsonData.client[0].client_info.mobilesdk_app_id);
-
-        return JSON.stringify(output);
-    };
-
     render() {
         const qrData = this.buildQrData(this.state.fcmClient);
 
@@ -194,8 +193,22 @@ class DashboardView extends React.Component<unknown, State> {
                         <div id="connectionStatusContainer">
                             <div id="connectionStatusLeft">
                                 <h1 className="secondaryTitle">Connection</h1>
-                                <h3 className="tertiaryTitle">Server Address: <div className="infoField"><p className="infoFieldText">{this.state.config ? this.state.config.server_address : "Loading..."}</p></div></h3>
-                                <h3 className="tertiaryTitle">Server Port:<div className="infoField"><p className="infoFieldText">{this.state.config ? this.state.config.socket_port : "Loading..."}</p></div></h3>
+                                <h3 className="tertiaryTitle">
+                                    Server Address:{" "}
+                                    <div className="infoField">
+                                        <p className="infoFieldText">
+                                            {this.state.config ? this.state.config.server_address : "Loading..."}
+                                        </p>
+                                    </div>
+                                </h3>
+                                <h3 className="tertiaryTitle">
+                                    Server Port:
+                                    <div className="infoField">
+                                        <p className="infoFieldText">
+                                            {this.state.config ? this.state.config.socket_port : "Loading..."}
+                                        </p>
+                                    </div>
+                                </h3>
                             </div>
                             <div id="connectionStatusRight">
                                 <QRCode id="activeQRCode" value={qrData} />
@@ -205,14 +218,27 @@ class DashboardView extends React.Component<unknown, State> {
                             <h1 className="secondaryTitle">Statistics</h1>
                             <div id="statBoxesContainer">
                                 <div className="aStatBoxRow">
-                                    <StatBox title={"All Time"} stat={this.formatNumber(this.state.totalMsgCount) as string}/>
-                                    <StatBox title={"Top Group"} stat={this.state.groupMsgCount.name} middle={true}/>
-                                    <StatBox title={"Best Friend"} stat={this.formatPhone(this.state.individualMsgCount.name)}/>
+                                    <StatBox
+                                        title="All Time"
+                                        stat={this.formatNumber(this.state.totalMsgCount) as string}
+                                    />
+                                    <StatBox title="Top Group" stat={this.state.groupMsgCount.name} middle={true} />
+                                    <StatBox
+                                        title="Best Friend"
+                                        stat={this.formatPhone(this.state.individualMsgCount.name)}
+                                    />
                                 </div>
                                 <div className="aStatBoxRow">
-                                    <StatBox title={"Last 24 Hours"} stat={this.formatNumber(this.state.recentMsgCount) as string}/>
-                                    <StatBox title={"Pictures"} stat={this.formatNumber(this.state.imageCount.count) as string} middle={true}/>
-                                    <StatBox title={"Videos"} stat={"16"}/>
+                                    <StatBox
+                                        title="Last 24 Hours"
+                                        stat={this.formatNumber(this.state.recentMsgCount) as string}
+                                    />
+                                    <StatBox
+                                        title="Pictures"
+                                        stat={this.formatNumber(this.state.imageCount.count) as string}
+                                        middle={true}
+                                    />
+                                    <StatBox title="Videos" stat="16" />
                                 </div>
                             </div>
                         </div>

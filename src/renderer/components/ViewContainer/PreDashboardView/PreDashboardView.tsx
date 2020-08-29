@@ -1,6 +1,11 @@
+/* eslint-disable jsx-a11y/click-events-have-key-events */
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/anchor-is-valid */
+/* eslint-disable class-methods-use-this */
+/* eslint-disable max-len */
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
-import Dropzone from 'react-dropzone'
+import Dropzone from "react-dropzone";
 import { shell, ipcRenderer } from "electron";
 import { Redirect } from "react-router";
 import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
@@ -18,7 +23,7 @@ interface State {
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
-    constructor(props: unknown){
+    constructor(props: unknown) {
         super(props);
 
         this.state = {
@@ -28,17 +33,17 @@ class PreDashboardView extends React.Component<unknown, State> {
             fcmServer: null,
             fcmClient: null,
             redirect: null
-        }
+        };
     }
-    
-    async componentDidMount(){
+
+    async componentDidMount() {
         this.checkPermissions();
 
         try {
             const config = await ipcRenderer.invoke("get-config");
             if (config) this.setState({ config });
-            if(config.tutorial_is_done === true) {
-                this.setState({redirect: "/dashboard"})
+            if (config.tutorial_is_done === true) {
+                this.setState({ redirect: "/dashboard" });
             }
         } catch (ex) {
             console.log("Failed to load database config");
@@ -48,16 +53,7 @@ class PreDashboardView extends React.Component<unknown, State> {
             this.setState({ config: arg });
         });
 
-        console.log(this.state.config)
-    }
-
-    completeTutorial() {
-        ipcRenderer.invoke("toggle-tutorial", true);
-        this.setState({redirect: "/dashboard"})
-    }
-
-    openTutorialLink(){
-        shell.openExternal("https://bluebubbles.app/install/index.html")
+        console.log(this.state.config);
     }
 
     openPermissionPrompt = async () => {
@@ -90,7 +86,12 @@ class PreDashboardView extends React.Component<unknown, State> {
             ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
             this.setState({ fcmServer: binaryStr });
 
-            if(this.state.abPerms === "authorized" && this.state.fdPerms === "authorized" && this.state.fcmClient && this.state.fcmServer) {
+            if (
+                this.state.abPerms === "authorized" &&
+                this.state.fdPerms === "authorized" &&
+                this.state.fcmClient &&
+                this.state.fcmServer
+            ) {
                 this.completeTutorial();
             }
         };
@@ -112,7 +113,12 @@ class PreDashboardView extends React.Component<unknown, State> {
             ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
             this.setState({ fcmClient: binaryStr });
 
-            if(this.state.abPerms === "authorized" && this.state.fdPerms === "authorized" && this.state.fcmClient && this.state.fcmServer) {
+            if (
+                this.state.abPerms === "authorized" &&
+                this.state.fdPerms === "authorized" &&
+                this.state.fcmClient &&
+                this.state.fcmServer
+            ) {
                 this.completeTutorial();
             }
         };
@@ -120,8 +126,17 @@ class PreDashboardView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
+    openTutorialLink() {
+        shell.openExternal("https://bluebubbles.app/install/index.html");
+    }
+
+    completeTutorial() {
+        ipcRenderer.invoke("toggle-tutorial", true);
+        this.setState({ redirect: "/dashboard" });
+    }
+
     render() {
-        if(this.state.redirect) {
+        if (this.state.redirect) {
             return <Redirect to={this.state.redirect} />;
         }
         let fdPermStyles = {
@@ -132,16 +147,16 @@ class PreDashboardView extends React.Component<unknown, State> {
             color: "red"
         };
 
-        if(this.state.fdPerms === "authorized"){
+        if (this.state.fdPerms === "authorized") {
             fdPermStyles = {
                 color: "green"
-            }
+            };
         }
 
-        if(this.state.abPerms === "authorized"){
+        if (this.state.abPerms === "authorized") {
             abPermStyles = {
                 color: "green"
-            }
+            };
         }
 
         return (
@@ -150,40 +165,53 @@ class PreDashboardView extends React.Component<unknown, State> {
                     <h1>Welcome</h1>
                 </div>
                 <div id="predashboardContainer">
-                    <p id="introText">Thank you downloading BlueBubbles! In order to get started, follow the instructions outlined in <a onClick={() => this.openTutorialLink()} style={{color: "#147EFB",cursor: "pointer"}}>our installation tutorial</a></p>
+                    <p id="introText">
+                        Thank you downloading BlueBubbles! In order to get started, follow the instructions outlined in{" "}
+                        <a onClick={() => this.openTutorialLink()} style={{ color: "#147EFB", cursor: "pointer" }}>
+                            our installation tutorial
+                        </a>
+                    </p>
                     <div id="permissionStatusContainer">
                         <h1>Required App Permissions</h1>
-                            <div className="permissionTitleContainer">
-                                <h3 className="permissionTitle">Full Disk Access:</h3>
-                                <h3 className="permissionStatus" style={fdPermStyles} >{this.state.fdPerms === "authorized" ? "Enabled": "Disabled"}</h3>
-                            </div>
-                            <div className="permissionTitleContainer">
-                                <h3 className="permissionTitle">Full Accessibility Access:</h3>
-                                <h3 className="permissionStatus" style={abPermStyles} >{this.state.abPerms === "authorized" ? "Enabled": "Disabled"}</h3>
-                            </div>                            
+                        <div className="permissionTitleContainer">
+                            <h3 className="permissionTitle">Full Disk Access:</h3>
+                            <h3 className="permissionStatus" style={fdPermStyles}>
+                                {this.state.fdPerms === "authorized" ? "Enabled" : "Disabled"}
+                            </h3>
+                        </div>
+                        <div className="permissionTitleContainer">
+                            <h3 className="permissionTitle">Full Accessibility Access:</h3>
+                            <h3 className="permissionStatus" style={abPermStyles}>
+                                {this.state.abPerms === "authorized" ? "Enabled" : "Disabled"}
+                            </h3>
+                        </div>
                     </div>
                     <h1 id="uploadTitle">Required Config Files</h1>
                     <Dropzone onDrop={acceptedFiles => this.handleServerFile(acceptedFiles)}>
-                        {({getRootProps, getInputProps}) => (
+                        {({ getRootProps, getInputProps }) => (
                             <section id="fcmClientDrop">
-                            <div {...getRootProps()}>
-                                <input {...getInputProps()} />
-                                <p>{this.state.fcmServer
-                                    ? "FCM Client Configuration Successfully Loaded"
-                                    : "Drag or click to upload FCM Server"}</p>
-                            </div>
+                                <div {...getRootProps()}>
+                                    <input {...getInputProps()} />
+                                    <p>
+                                        {this.state.fcmServer
+                                            ? "FCM Client Configuration Successfully Loaded"
+                                            : "Drag or click to upload FCM Server"}
+                                    </p>
+                                </div>
                             </section>
                         )}
                     </Dropzone>
                     <Dropzone onDrop={acceptedFiles => this.handleClientFile(acceptedFiles)}>
-                        {({getRootProps, getInputProps}) => (
+                        {({ getRootProps, getInputProps }) => (
                             <section id="fcmServerDrop">
-                            <div {...getRootProps()}>
-                                <input {...getInputProps()} />
-                                <p>{this.state.fcmClient
-                                    ? "FCM Service Configuration Successfully Loaded"
-                                    : "Drag or click to upload FCM Client (google-services.json)"}</p>
-                            </div>
+                                <div {...getRootProps()}>
+                                    <input {...getInputProps()} />
+                                    <p>
+                                        {this.state.fcmClient
+                                            ? "FCM Service Configuration Successfully Loaded"
+                                            : "Drag or click to upload FCM Client (google-services.json)"}
+                                    </p>
+                                </div>
                             </section>
                         )}
                     </Dropzone>

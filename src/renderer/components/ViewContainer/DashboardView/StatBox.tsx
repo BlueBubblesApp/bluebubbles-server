@@ -8,29 +8,25 @@ interface Props {
     stat: string;
 }
 
-class StatBox extends React.Component<Props,unknown> {
-    constructor(props: Readonly<Props>){
-        super(props);
-    }
-    
+class StatBox extends React.Component<Props, unknown> {
     render() {
         return (
             <>
-            {this.props.middle ? (
-                <div className="aStatBox middle">
-                    <h3>{this.props.stat}</h3>
-                    <div className="aStatBoxTitleContainer">
-                        <h3>{this.props.title}</h3>
+                {this.props.middle ? (
+                    <div className="aStatBox middle">
+                        <h3>{this.props.stat}</h3>
+                        <div className="aStatBoxTitleContainer">
+                            <h3>{this.props.title}</h3>
+                        </div>
                     </div>
-                </div>
-            ) : (
-                <div className="aStatBox">
-                    <h3>{this.props.stat}</h3>
-                    <div className="aStatBoxTitleContainer">
-                        <h3>{this.props.title}</h3>
+                ) : (
+                    <div className="aStatBox">
+                        <h3>{this.props.stat}</h3>
+                        <div className="aStatBoxTitleContainer">
+                            <h3>{this.props.title}</h3>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
             </>
         );
     }
