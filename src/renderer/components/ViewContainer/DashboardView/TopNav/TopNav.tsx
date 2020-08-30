@@ -97,7 +97,7 @@ class TopNav extends React.Component<unknown, State> {
                                 return (
                                     <div className="aAlertItem" key={item.id}>
                                         <div className="alertLeftSide">
-                                            <p>{item.value}</p>
+                                            <p>{`${item.value  }.`}</p>
                                             <p>{item.isRead ? "Read" : "New"}</p>
                                         </div>
                                         <div className="alertRightSide">
