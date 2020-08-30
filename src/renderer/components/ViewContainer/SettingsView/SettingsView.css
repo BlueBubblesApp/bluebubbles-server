@@ -25,7 +25,7 @@
 }
 
 .aSettingTitle {
-    margin: 10px 0 10px 40px;
+    margin: 8px 0 8px 40px;
     display: flex;
     align-items: center;
 }
@@ -36,9 +36,8 @@
     background-color: grey;
     border: none;
     border-radius: 4px;
-    height: 23px;
     outline: none;
-    padding: 0 10px;
+    padding: 3px 10px;
     font-size: 16px;
     font-weight: normal;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans",
@@ -145,7 +144,7 @@
     margin-left: 7px;
 }
 
-#fcmServerDrop-Set {
+#fcmClientDrop-Set {
     height: 100px;
     min-height: 100px;
     width: 75%;
@@ -157,7 +156,7 @@
     margin: 0 auto;
 }
 
-#fcmClientDrop-Set {
+#fcmServerDrop-Set {
     height: 100px;
     min-height: 100px;
     width: 75%;
@@ -166,5 +165,5 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 0 auto;
+    margin: 0 auto 50px auto;
 }

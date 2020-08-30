@@ -1,26 +1,80 @@
+/* eslint-disable no-unused-expressions */
 /* eslint-disable class-methods-use-this */
 /* eslint-disable max-len */
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
 import { Link } from "react-router-dom";
+import * as Ago from "s-ago";
 import "./TopNav.css";
+import {
+    Warning as WarningIcon,
+    Help as InfoIcon,
+    CheckCircle as SuccessIcon,
+    Error as ErrorIcon
+} from "@material-ui/icons";
+import { ipcRenderer } from "electron";
 
 interface State {
-    notificationsOpen: boolean;
+    alertsOpen: boolean;
+    alerts: any[];
+    alertElement: HTMLElement;
 }
 
-class TopNav extends React.Component {
+const alertIconMap: { [key: string]: JSX.Element } = {
+    info: <InfoIcon />,
+    warn: <WarningIcon />,
+    error: <ErrorIcon />,
+    success: <SuccessIcon />
+};
+
+class TopNav extends React.Component<unknown, State> {
     constructor(props: Readonly<{}>) {
         super(props);
 
         this.state = {
             // eslint-disable-next-line react/no-unused-state
-            notificationsOpen: false
+            alertsOpen: false,
+            alerts: [],
+            alertElement: null
         };
     }
 
+    async componentDidMount() {
+        try {
+            const currentAlerts = await ipcRenderer.invoke("get-alerts");
+            if (currentAlerts) this.setState({ alerts: currentAlerts });
+        } catch (ex) {
+            console.log("Failed to load alerts");
+        }
+
+        ipcRenderer.on("new-alert", (event, alert) => {
+            const { alerts } = this.state;
+            if (!alert?.text || !alert?.type) return;
+
+            // Insert at index 0, then concatenate to 10 items
+            alerts.splice(0, 0, alert);
+            if (alerts.length > 10) alerts.slice(0, 10);
+
+            // Set the state
+            this.setState({ alerts });
+        });
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    handleOpenNotifications() {}
+    async toggleOpenAlerts() {
+        this.setState({ alertsOpen: !this.state.alertsOpen });
+        console.log(this.state);
+
+        if (!this.state.alertsOpen) {
+            const newAlerts = this.state.alerts;
+            console.log(newAlerts);
+            for (const i of newAlerts) {
+                i.isRead = true;
+                await ipcRenderer.invoke("mark-alert-as-read", i.id);
+            }
+            this.setState({ alerts: newAlerts });
+        }
+    }
 
     render() {
         return (
@@ -34,7 +88,28 @@ class TopNav extends React.Component {
                     <h1>Dashboard</h1>
                 </div>
                 <div id="dashboardTopRightNav">
-                    <svg onClick={() => this.handleOpenNotifications()} id="bellIcon" viewBox="0 0 512 512">
+                    {this.state.alertsOpen ? (
+                        <div id="alertsModal">
+                            {this.state.alerts.map(item => {
+                                const typeIcon = alertIconMap[item.type];
+                                const time = item.created ? Ago(item.created) : "N/A";
+
+                                return (
+                                    <div className="aAlertItem" key={item.id}>
+                                        <div className="alertLeftSide">
+                                            <p>{item.value}</p>
+                                            <p>{item.isRead ? "Read" : "New"}</p>
+                                        </div>
+                                        <div className="alertRightSide">
+                                            {typeIcon}
+                                            <p>{time}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                    <svg onClick={() => this.toggleOpenAlerts()} id="bellIcon" viewBox="0 0 512 512">
                         <g>
                             <path
                                 d="M467.812,431.851l-36.629-61.056c-16.917-28.181-25.856-60.459-25.856-93.312V224c0-67.52-45.056-124.629-106.667-143.04
@@ -47,9 +122,9 @@ class TopNav extends React.Component {
                             <path d="M188.815,469.333C200.847,494.464,226.319,512,255.993,512s55.147-17.536,67.179-42.667H188.815z" />
                         </g>
                         <g>
-                            <circle cx="130" cy="125" r="125" fill="#fc4e50" />
+                            <circle cx="130" cy="130" r="133" fill="#fc4e50" />
                             <text
-                                fontSize="250"
+                                fontSize="200"
                                 textAnchor="middle"
                                 stroke="black"
                                 strokeWidth="15px"
@@ -57,7 +132,7 @@ class TopNav extends React.Component {
                                 y="200"
                                 fill="black"
                             >
-                                2
+                                {this.state.alerts.filter(item => !item.isRead).length}
                             </text>
                         </g>
                     </svg>

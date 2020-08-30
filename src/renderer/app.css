@@ -22,9 +22,9 @@
   outline: 1px solid red;
 } */
 
-/* *::-webkit-scrollbar {
+*::-webkit-scrollbar {
     display: none;
-} */
+}
 
 html {
     height: 100%;
