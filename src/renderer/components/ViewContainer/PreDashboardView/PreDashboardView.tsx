@@ -56,6 +56,10 @@ class PreDashboardView extends React.Component<unknown, State> {
         console.log(this.state.config);
     }
 
+    componentWillUnmount() {
+        ipcRenderer.removeAllListeners("config-update");
+    }
+
     openPermissionPrompt = async () => {
         const res = await ipcRenderer.invoke("open_perms_prompt");
     };

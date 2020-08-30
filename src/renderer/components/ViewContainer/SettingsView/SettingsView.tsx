@@ -90,6 +90,10 @@ class SettingsView extends React.Component<unknown, State> {
         });
     }
 
+    componentWillUnmount() {
+        ipcRenderer.removeAllListeners("config-update");
+    }
+
     getCaffeinateStatus = async () => {
         const caffeinateStatus = await ipcRenderer.invoke("get-caffeinate-status");
         this.setState({

@@ -49,6 +49,10 @@ class DashboardView extends React.Component<unknown, State> {
         });
     }
 
+    componentWillUnmount() {
+        ipcRenderer.removeAllListeners("config-update");
+    }
+
     buildQrData = (data: string | null): string => {
         if (!data || data.length === 0) return "";
 
