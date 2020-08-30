@@ -189,7 +189,7 @@ class DashboardView extends React.Component<unknown, State> {
                 <TopNav />
                 <div id="dashboardLowerContainer">
                     <LeftStatusIndicator />
-                    <div id="rightMainContainer">
+                    <div className="rightMainContainer">
                         <div id="connectionStatusContainer">
                             <div id="connectionStatusLeft">
                                 <h1 className="secondaryTitle">Connection</h1>
