@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 /* eslint-disable max-len */
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
@@ -39,11 +40,15 @@ class LeftStatusIndicator extends React.Component<unknown, State> {
         }
     };
 
+    invokeMain(event: string, args: any) {
+        ipcRenderer.invoke(event, args);
+    }
+
     render() {
         return (
             <div id="leftStatusBar">
                 <div id="statusColorIndicator" style={this.state.statusColorIndicator} />
-                <svg id="restartIcon" viewBox="0 0 512 512">
+                <svg id="restartIcon" onClick={() => this.invokeMain("restart-server", null)} viewBox="0 0 512 512">
                     <g>
                         <path
                             d="M403.678,272c0,40.005-15.615,77.651-43.989,106.011C331.33,406.385,293.683,422,253.678,422
