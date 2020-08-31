@@ -1,0 +1,136 @@
+#PreDashboardView {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+}
+
+#introText {
+    margin-bottom: 30px;
+}
+
+#uploadTitle {
+    left: 0;
+    width: 100%;
+    font-size: 23px;
+}
+
+#welcomeOverlay {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation-name: scaleAndFade;
+    animation-duration: 2s;
+    animation-fill-mode: forwards;
+    position: absolute;
+}
+
+#welcomeOverlay > h1 {
+    margin: 0;
+    font-size: 35px;
+    animation-name: scaleAndFade;
+    animation-duration: 2s;
+    animation-fill-mode: forwards;
+}
+
+@keyframes scaleAndFade {
+    0% {
+    }
+    100% {
+        font-size: 200px;
+        opacity: 0;
+        display: none;
+    }
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+#predashboardContainer {
+    width: 90%;
+    min-width: 90%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    opacity: 0;
+    animation-name: fadeIn;
+    animation-duration: 0.5s;
+    animation-fill-mode: forwards;
+    animation-delay: 1.2s;
+    z-index: 2;
+}
+
+#permissionStatusContainer {
+    height: 20%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+#permissionStatusContainer > h1 {
+    font-size: 23px;
+    margin: 0;
+}
+
+.permissionTitleContainer {
+    margin-top: 20px;
+    width: 100%;
+    display: flex;
+}
+
+.permissionTitle {
+    margin-left: 7%;
+    font-size: 20px;
+}
+
+.permissionStatus {
+    margin-left: 5%;
+}
+
+.granted {
+    color: green;
+}
+
+.denied {
+    color: red;
+}
+
+#fcmClientDrop {
+    height: 25%;
+    width: 90%;
+    border-radius: 20px;
+    border: 3px solid black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+h3 {
+    margin: 0;
+}
+
+#fcmServerDrop {
+    height: 25%;
+    width: 90%;
+    border-radius: 20px;
+    border: 3px solid black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

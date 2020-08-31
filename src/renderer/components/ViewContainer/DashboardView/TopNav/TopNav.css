@@ -1,0 +1,117 @@
+#dashboardTopNav {
+    width: 100%;
+    height: 10%;
+    /* background-color: red; */
+    margin-top: 2%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#dashboardTopLeftNav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#dashboardTopLeftNav > h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+#dashboardTopRightNav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#settingsIconLink {
+    height: 30px;
+    width: 30px;
+    margin-left: 20px;
+    margin-right: 8px;
+    transition: transform 0.7s;
+}
+
+#bellIcon {
+    height: 30px;
+    width: 30px;
+    fill: black;
+    margin-right: 25px;
+}
+
+#bellIcon:hover {
+    cursor: pointer;
+}
+
+#settingsIconLink:hover {
+    transform: rotate(180deg);
+}
+
+#alertsModal {
+    position: absolute;
+    width: 40%;
+    max-width: 40%;
+    min-width: 40%;
+    height: auto;
+    max-height: 70vh;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    z-index: 2;
+    top: 90px;
+    right: 12px;
+    background-color: white;
+    border: 3px solid black;
+    border-radius: 10px;
+}
+
+/* After doesnt work with actiave alerts */
+
+/* 
+#alertsModal:after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    top: -15px;
+    border-top: none;
+    border-right: 15px solid transparent;
+    border-left: 15px solid transparent;
+    border-bottom: 15px solid black;
+  } */
+
+.aAlertItem {
+    width: 100%;
+    border-bottom: 2px solid black;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    height: auto;
+}
+
+.aAlertItem:last-child {
+    border: none;
+}
+
+.alertLeftSide {
+    display: flex;
+    flex-direction: column;
+    width: 75%;
+    min-width: 75%;
+    height: 100%;
+}
+
+.alertLeftSide p {
+    margin: 0;
+    padding: 3px 5px;
+    font-weight: bold;
+    overflow: hidden;
+}
+
+.alertRightSide {
+    display: flex;
+    flex-direction: column;
+    width: 25%;
+    min-width: 25%;
+    height: 100%;
+    align-items: center;
+}

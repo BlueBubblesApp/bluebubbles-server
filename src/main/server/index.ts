@@ -530,9 +530,10 @@ class BlueBubblesServer {
 
         ipcMain.handle("mark-alert-as-read", async (_, args) => {
             const alertIds = args ?? [];
-            for (const id of alertIds) {
-                await AlertService.markAsRead(id);
-            }
+            // for (const id of alertIds) {
+            //     await AlertService.markAsRead(id);
+            // }
+            await AlertService.markAsRead(args);
         });
 
         ipcMain.handle("set-fcm-server", async (_, args) => {
