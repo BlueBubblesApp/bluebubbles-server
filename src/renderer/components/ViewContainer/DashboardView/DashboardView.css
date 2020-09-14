@@ -80,17 +80,22 @@
 
 .infoField {
     width: 95%;
-    background-color: grey;
+    background-color: rgb(153, 153, 153);
     border-radius: 4px;
     display: flex;
     align-items: center;
     padding: 0 8px;
     margin-left: 5px;
+    transition: background-color 0.2s;
 }
 
 .infoFieldText {
     margin: 0;
     font-size: 16px;
+}
+
+.infoField:hover {
+    background-color: grey;
 }
 
 #statBoxesContainer {

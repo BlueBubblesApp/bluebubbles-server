@@ -235,7 +235,7 @@ class SettingsView extends React.Component<unknown, State> {
                                 <i />
                             </label>
                         </div>
-                        <h3 id="fcmTitle">Google FCM Configurations</h3>
+                        <h3 className="largeSettingTitle">Google FCM Configurations</h3>
                         <h3 className="aSettingTitle">
                             Server Config Status:{" "}
                             <p id="serverConfigStatus">{this.state.fcmServer ? "Loaded" : "Not Set"}</p>
@@ -272,6 +272,7 @@ class SettingsView extends React.Component<unknown, State> {
                                 </section>
                             )}
                         </Dropzone>
+                        {/* <h3 className="largeSettingTitle">Manage Devices</h3> */}
                     </div>
                 </div>
             </div>

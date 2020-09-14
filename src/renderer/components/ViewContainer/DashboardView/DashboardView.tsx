@@ -198,7 +198,7 @@ class DashboardView extends React.Component<unknown, State> {
                             <div id="connectionStatusLeft">
                                 <h1 className="secondaryTitle">Connection</h1>
                                 <h3 className="tertiaryTitle">
-                                    Server Address:{" "}
+                                    Server Address:
                                     <div className="infoField">
                                         <p className="infoFieldText">
                                             {this.state.config ? this.state.config.server_address : "Loading..."}
