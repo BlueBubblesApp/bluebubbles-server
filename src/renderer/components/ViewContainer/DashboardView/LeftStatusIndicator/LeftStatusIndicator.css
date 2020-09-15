@@ -8,11 +8,12 @@
     justify-content: flex-end;
 }
 
-#restartIcon{
+#restartIcon {
     width: 26px;
     height: 26px;
     margin-bottom: 10px;
-    transition: transform .4s;
+    transition: transform 0.4s;
+    fill: var(--primary-color);
 }
 
 #restartIcon:hover {
@@ -20,7 +21,7 @@
     cursor: pointer;
 }
 
-#statusColorIndicator{
+#statusColorIndicator {
     width: 14px;
     height: 14px;
     border-radius: 4px;

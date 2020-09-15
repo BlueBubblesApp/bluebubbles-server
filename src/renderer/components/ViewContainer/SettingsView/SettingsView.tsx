@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable max-len */
 /* eslint-disable react/no-unused-state */
@@ -22,6 +23,7 @@ interface State {
     showPassword: boolean;
     showKey: boolean;
     ngrokKey: string;
+    devices: any[];
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -39,13 +41,18 @@ class SettingsView extends React.Component<unknown, State> {
             serverPassword: "",
             showPassword: false,
             showKey: false,
-            ngrokKey: ""
+            ngrokKey: "",
+            devices: []
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
     }
 
     async componentDidMount() {
+        const currentTheme = await ipcRenderer.invoke("get-current-theme");
+        await this.setTheme(currentTheme.currentTheme);
+
+        await this.refreshDevices();
         const config = await ipcRenderer.invoke("get-config");
         if (config)
             this.setState({
@@ -92,6 +99,20 @@ class SettingsView extends React.Component<unknown, State> {
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+    }
+
+    async setTheme(currentTheme: string) {
+        const themedItems = document.querySelectorAll("[data-theme]");
+
+        if (currentTheme === "dark") {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "dark");
+            });
+        } else {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "light");
+            });
+        }
     }
 
     getCaffeinateStatus = async () => {
@@ -179,9 +200,15 @@ class SettingsView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
+    async refreshDevices() {
+        this.setState({
+            devices: await ipcRenderer.invoke("get-devices")
+        });
+    }
+
     render() {
         return (
-            <div id="SettingsView">
+            <div id="SettingsView" data-theme="light">
                 <TopNav />
                 <div id="settingsLowerContainer">
                     <LeftStatusIndicator />
@@ -272,7 +299,25 @@ class SettingsView extends React.Component<unknown, State> {
                                 </section>
                             )}
                         </Dropzone>
-                        {/* <h3 className="largeSettingTitle">Manage Devices</h3> */}
+                        <h3 className="largeSettingTitle">Manage Devices</h3>
+                        <div id="devicesHeadings">
+                            <h1>Device Name</h1>
+                            <h1>Identifier</h1>
+                        </div>
+                        {this.state.devices.length === 0 ? (
+                            <p className="aDeviceRow" style={{ marginBottom: "50px" }}>
+                                No devices registered!
+                            </p>
+                        ) : (
+                            <>
+                                {this.state.devices.map(row => (
+                                    <div className="aDeviceRow" key={row.identifier}>
+                                        <p>{row.name || "N/A"}</p>
+                                        <p>{row.identifier}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

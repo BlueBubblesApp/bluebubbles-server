@@ -1,20 +1,22 @@
-#PreDashboardView{
+#PreDashboardView {
     width: 100%;
     height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: white;
+    background-color: var(--background-color);
 }
 
-#introText{
-    margin-bottom: 30px
+#introText {
+    margin-bottom: 30px;
+    color: var(--primary-color);
 }
 
-#uploadTitle{
+#uploadTitle {
     left: 0;
     width: 100%;
     font-size: 23px;
+    color: var(--primary-color);
 }
 
 #welcomeOverlay {
@@ -35,16 +37,26 @@
     animation-name: scaleAndFade;
     animation-duration: 2s;
     animation-fill-mode: forwards;
+    color: var(--primary-color);
 }
 
-@keyframes scaleAndFade{
-    0%{}
-    100%{font-size: 200px; opacity: 0; display: none;}
+@keyframes scaleAndFade {
+    0% {
+    }
+    100% {
+        font-size: 200px;
+        opacity: 0;
+        display: none;
+    }
 }
 
-@keyframes fadeIn{
-    0%{opacity: 0;}
-    100%{opacity: 1;}
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
 }
 
 #predashboardContainer {
@@ -55,16 +67,16 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background-color: white;
+    background-color: var(--background-color);
     opacity: 0;
     animation-name: fadeIn;
-    animation-duration: .5s;
+    animation-duration: 0.5s;
     animation-fill-mode: forwards;
     animation-delay: 1.2s;
     z-index: 2;
 }
 
-#permissionStatusContainer{
+#permissionStatusContainer {
     height: 20%;
     width: 100%;
     display: flex;
@@ -73,55 +85,75 @@
     align-items: flex-start;
 }
 
-#permissionStatusContainer > h1{
+#permissionStatusContainer > h1 {
     font-size: 23px;
     margin: 0;
+    color: var(--primary-color);
 }
 
-.permissionTitleContainer{
+.permissionTitleContainer {
     margin-top: 20px;
     width: 100%;
     display: flex;
 }
 
-.permissionTitle{
+.permissionTitle {
     margin-left: 7%;
     font-size: 20px;
+    color: var(--primary-color);
 }
 
-.permissionStatus{
+.permissionStatus {
     margin-left: 5%;
 }
 
-.granted{
+.granted {
     color: green;
 }
 
-.denied{
+.denied {
     color: red;
 }
 
-#fcmClientDrop{
+#fcmClientDrop {
     height: 25%;
     width: 90%;
     border-radius: 20px;
-    border: 3px solid black;
+    border: 3px solid var(--primary-color);
     display: flex;
     justify-content: center;
     align-items: center;
     margin-bottom: 10px;
+    transition: border-radius 0.25s;
 }
 
-h3{
+h3 {
     margin: 0;
 }
 
-#fcmServerDrop{
+#fcmServerDrop {
     height: 25%;
     width: 90%;
     border-radius: 20px;
-    border: 3px solid black;
+    border: 3px solid var(--primary-color);
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: border-radius 0.25s;
+}
+
+#fcmClientDrop:hover {
+    border-radius: 30px;
+}
+
+#fcmServerDrop:hover {
+    border-radius: 30px;
+}
+
+#fcmClientDrop div p {
+    color: var(--primary-color);
+}
+
+#fcmServerDrop div p {
+    color: var(--primary-color);
 }

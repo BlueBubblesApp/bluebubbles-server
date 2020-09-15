@@ -1,5 +1,6 @@
+/* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { app, ipcMain, BrowserWindow } from "electron";
+import { app, ipcMain, BrowserWindow, remote, nativeImage, nativeTheme } from "electron";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -165,6 +166,7 @@ class BlueBubblesServer {
      */
     async start(): Promise<void> {
         if (!this.hasStarted) {
+            this.getTheme();
             await this.setupServer();
             this.log("Starting Configuration IPC Listeners..");
             this.startConfigIpcListeners();
@@ -306,6 +308,20 @@ class BlueBubblesServer {
                 devices.map(device => device.identifier),
                 { type, data: notifData }
             );
+        }
+    }
+
+    private getTheme() {
+        nativeTheme.on("updated", () => {
+            this.setTheme(nativeTheme.shouldUseDarkColors);
+        });
+    }
+
+    private setTheme(shouldUseDarkColors: boolean) {
+        if (shouldUseDarkColors === true) {
+            this.emitToUI("theme-update", "dark");
+        } else {
+            this.emitToUI("theme-update", "light");
         }
     }
 
@@ -603,6 +619,17 @@ class BlueBubblesServer {
 
         ipcMain.handle("restart-server", async (_, __) => {
             await this.restart();
+        });
+
+        ipcMain.handle("get-current-theme", (_, __) => {
+            if (nativeTheme.shouldUseDarkColors === true) {
+                return {
+                    currentTheme: "dark"
+                };
+            }
+            return {
+                currentTheme: "light"
+            };
         });
     }
 

@@ -38,6 +38,9 @@ class PreDashboardView extends React.Component<unknown, State> {
 
     async componentDidMount() {
         this.checkPermissions();
+        const currentTheme = await ipcRenderer.invoke("get-current-theme");
+
+        await this.setTheme(currentTheme.currentTheme);
 
         try {
             const config = await ipcRenderer.invoke("get-config");
@@ -58,6 +61,20 @@ class PreDashboardView extends React.Component<unknown, State> {
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+    }
+
+    async setTheme(currentTheme: string) {
+        const themedItems = document.querySelectorAll("[data-theme]");
+
+        if (currentTheme === "dark") {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "dark");
+            });
+        } else {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "light");
+            });
+        }
     }
 
     openPermissionPrompt = async () => {
@@ -164,7 +181,7 @@ class PreDashboardView extends React.Component<unknown, State> {
         }
 
         return (
-            <div id="PreDashboardView">
+            <div id="PreDashboardView" data-theme="light">
                 <div id="welcomeOverlay">
                     <h1>Welcome</h1>
                 </div>

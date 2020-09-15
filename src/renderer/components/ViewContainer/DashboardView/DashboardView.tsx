@@ -37,6 +37,9 @@ class DashboardView extends React.Component<unknown, State> {
     };
 
     async componentDidMount() {
+        const currentTheme = await ipcRenderer.invoke("get-current-theme");
+        await this.setTheme(currentTheme.currentTheme);
+
         const client = await ipcRenderer.invoke("get-fcm-client");
         if (client) this.setState({ fcmClient: JSON.stringify(client) });
 
@@ -51,6 +54,20 @@ class DashboardView extends React.Component<unknown, State> {
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+    }
+
+    async setTheme(currentTheme: string) {
+        const themedItems = document.querySelectorAll("[data-theme]");
+
+        if (currentTheme === "dark") {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "dark");
+            });
+        } else {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "light");
+            });
+        }
     }
 
     buildQrData = (data: string | null): string => {
@@ -189,7 +206,7 @@ class DashboardView extends React.Component<unknown, State> {
         const qrData = this.buildQrData(this.state.fcmClient);
 
         return (
-            <div id="DashboardView">
+            <div id="DashboardView" data-theme="light">
                 <TopNav />
                 <div id="dashboardLowerContainer">
                     <LeftStatusIndicator />

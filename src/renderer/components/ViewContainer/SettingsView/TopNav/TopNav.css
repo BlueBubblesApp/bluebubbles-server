@@ -17,6 +17,7 @@
 #settingsTopLeftNav > h1 {
     margin: 0;
     font-size: 30px;
+    color: var(--primary-color);
 }
 
 #dashboardIconLink {
@@ -25,6 +26,10 @@
     margin-left: 20px;
     margin-right: 8px;
     transition: transform 0.9s;
+}
+
+#dashboardIcon {
+    fill: var(--primary-color);
 }
 
 #dashboardIconLink:hover {

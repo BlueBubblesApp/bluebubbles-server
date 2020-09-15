@@ -64,3 +64,16 @@ code {
 a {
     text-decoration: none;
 }
+
+/* Default Theme Colors */
+[data-theme^="light"],
+[data-theme] [data-theme^="light"] {
+    --primary-color: #000000;
+    --background-color: #ffffff;
+}
+
+[data-theme^="dark"],
+[data-theme] [data-theme^="dark"] {
+    --primary-color: #e6e6e6;
+    --background-color: #1e1e1e;
+}

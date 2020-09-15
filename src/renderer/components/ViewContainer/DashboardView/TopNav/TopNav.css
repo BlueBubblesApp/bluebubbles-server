@@ -17,6 +17,7 @@
 #dashboardTopLeftNav > h1 {
     margin: 0;
     font-size: 30px;
+    color: var(--primary-color);
 }
 
 #dashboardTopRightNav {
@@ -34,10 +35,14 @@
     outline: none;
 }
 
+#settingsIcon {
+    fill: var(--primary-color);
+}
+
 #bellIcon {
     height: 30px;
     width: 30px;
-    fill: black;
+    fill: var(--primary-color);
     margin-right: 25px;
 }
 
@@ -61,8 +66,8 @@
     z-index: 2;
     top: 90px;
     right: 12px;
-    background-color: white;
-    border: 3px solid black;
+    background-color: var(--background-color);
+    border: 3px solid var(--primary-color);
     border-radius: 10px;
 }
 
@@ -82,7 +87,7 @@
 
 .aAlertItem {
     width: 100%;
-    border-bottom: 2px solid black;
+    border-bottom: 2px solid var(--primary-color);
     padding: 5px;
     display: flex;
     align-items: center;
