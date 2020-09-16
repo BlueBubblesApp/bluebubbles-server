@@ -72,8 +72,6 @@ class SettingsView extends React.Component<unknown, State> {
                 showKey: false,
                 ngrokKey: config.ngrok_key
             });
-        console.log(config);
-        console.log(this.state);
         this.getCaffeinateStatus();
 
         const client = await ipcRenderer.invoke("get-fcm-client");
@@ -165,8 +163,6 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ autoStart: target.checked });
             await ipcRenderer.invoke("toggle-auto-start", target.checked);
         }
-
-        console.log(this.state);
     };
 
     saveConfig = async () => {
@@ -175,8 +171,6 @@ class SettingsView extends React.Component<unknown, State> {
             password: this.state.serverPassword,
             ngrok_key: this.state.ngrokKey
         });
-
-        console.log("saved config");
     };
 
     handleClientFile = (acceptedFiles: any) => {

@@ -80,7 +80,7 @@
     left: 0;
     width: 42px;
     height: 22px;
-    background-color: #fff;
+    background-color: rgb(241, 241, 241);
     border-radius: 11px;
     transform: translate3d(2px, 2px, 0) scale3d(1, 1, 1);
     transition: all 0.25s linear;
@@ -139,6 +139,8 @@
     font-size: 25px;
     margin: 10px 0 10px 10px;
     color: var(--primary-color);
+    display: flex;
+    align-items: center;
 }
 
 #serverConfigStatus {
