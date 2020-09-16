@@ -173,7 +173,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 0 auto 50px auto;
+    margin: 0 auto 35px auto;
     transition: border-radius 0.2s;
 }
 
@@ -210,11 +210,63 @@
 }
 
 #devicesHeadings > h1 {
-    font-size: 20px;
+    font-size: 18px;
     margin: 0;
     color: var(--primary-color);
 }
 
 .aDeviceRow p {
     color: var(--primary-color) !important;
+}
+
+#logHeadings {
+    display: flex;
+    justify-content: space-between;
+    width: calc(100% - 130px);
+    margin-left: 30px;
+    margin-bottom: 15px;
+}
+
+#logHeadings > h1 {
+    font-size: 18px;
+    margin: 0;
+    color: var(--primary-color);
+}
+
+.aLogRow {
+    display: flex;
+    justify-content: space-between;
+    width: calc(100% - 140px);
+    margin-left: 40px;
+    margin-bottom: 20px;
+    padding-bottom: 5px;
+    color: var(--primary-color);
+    /* border-bottom: 1px solid var(--primary-color); */
+}
+
+.aLogRow p {
+    margin: 0;
+}
+
+.aLogTimestamp {
+    width: 85px;
+    min-width: 85px;
+    margin-left: 25px !important;
+    text-align: right;
+}
+
+#clearLogsButton {
+    background: none;
+    text-decoration: none;
+    outline: none;
+    border-radius: 8px;
+    border: 2px solid var(--primary-color);
+    padding: 5px;
+    margin-left: 25px;
+    color: var(--primary-color);
+    transition: border-radius 0.25s;
+}
+
+#clearLogsButton:hover {
+    border-radius: 12px;
 }

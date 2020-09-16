@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unused-state */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/anchor-is-valid */
@@ -55,8 +56,6 @@ class PreDashboardView extends React.Component<unknown, State> {
         ipcRenderer.on("config-update", (event, arg) => {
             this.setState({ config: arg });
         });
-
-        console.log(this.state.config);
     }
 
     componentWillUnmount() {

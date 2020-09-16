@@ -26,7 +26,6 @@ ipcRenderer.on("theme-update", (event, arg) => {
     themedItems.forEach(item => {
         item.setAttribute("data-theme", arg);
     });
-    // document.documentElement.setAttribute("data-theme", arg)
 });
 
 render();
