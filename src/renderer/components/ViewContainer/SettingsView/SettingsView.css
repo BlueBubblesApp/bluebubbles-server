@@ -269,4 +269,5 @@
 
 #clearLogsButton:hover {
     border-radius: 12px;
+    cursor: pointer;
 }
