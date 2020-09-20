@@ -1,17 +1,23 @@
-import { app, dialog, shell } from "electron";
+import { app, dialog, shell, BrowserWindow } from "electron";
 import * as fetchDef from "electron-fetch";
 import * as compareVersions from "compare-versions";
 import { Server } from "@server/index";
 
 const fetch = fetchDef.default;
 export class UpdateService {
+    window: BrowserWindow;
+
     timer: NodeJS.Timeout;
 
     currentVersion: string;
 
-    constructor() {
+    isOpen: boolean;
+
+    constructor(window: BrowserWindow) {
         // This won't work in dev-mode because it checks Electron's Version
         this.currentVersion = app.getVersion();
+        this.isOpen = false;
+        this.window = window;
     }
 
     start() {
@@ -25,6 +31,8 @@ export class UpdateService {
     }
 
     async checkForUpdate() {
+        if (this.isOpen) return null;
+
         // Fetch from Github
         const response = await fetch("https://api.github.com/repos/BlueBubblesApp/BlueBubbles-Server/releases");
         const body = await response.json();
@@ -49,7 +57,9 @@ export class UpdateService {
             };
 
             // If there is a newer version, show the dialog and redirect if 'Download' is clicked
-            dialog.showMessageBox(dialogOpts).then(returnValue => {
+            this.isOpen = true;
+            dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
+                this.isOpen = false;
                 if (returnValue.response === 0) {
                     shell.openExternal("https://github.com/BlueBubblesApp/BlueBubbles-Server/releases");
                     app.quit();

@@ -214,7 +214,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                                     <input {...getInputProps()} />
                                     <p>
                                         {this.state.fcmServer
-                                            ? "FCM Client Configuration Successfully Loaded"
+                                            ? "FCM Server Configuration Successfully Loaded"
                                             : "Drag or click to upload FCM Server"}
                                     </p>
                                 </div>
@@ -228,7 +228,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                                     <input {...getInputProps()} />
                                     <p>
                                         {this.state.fcmClient
-                                            ? "FCM Service Configuration Successfully Loaded"
+                                            ? "FCM Client Configuration Successfully Loaded"
                                             : "Drag or click to upload FCM Client (google-services.json)"}
                                     </p>
                                 </div>

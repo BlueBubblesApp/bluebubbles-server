@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "",
     "main": "./dist/main.js",
     "scripts": {
@@ -13,11 +13,9 @@
         "prestart": "npm run build",
         "start": "electron .",
         "lint": "eslint --ext=jsx,js,tsx,ts src",
-        "test": "jest '(\\/test\\/(?!e2e/)).*'",
         "pretest:e2e": "npm run build",
-        "test:e2e": "jest '(\\/test\\/e2e/).*'",
         "pack": "npm run build && electron-builder --dir",
-        "dist": "npm run build && electron-builder --publish never",
+        "dist": "yarn build && electron-builder build --mac --publish never",
         "release": "npm run build && electron-builder --publish always",
         "postinstall": "electron-builder install-app-deps"
     },
@@ -34,23 +32,6 @@
             "prettier --config ./.prettierrc --ignore-path ./.prettierignore --write",
             "eslint --ext=jsx,js,ts,tsx --fix src"
         ]
-    },
-    "jest": {
-        "transform": {
-            "^.+\\.tsx?$": "ts-jest"
-        },
-        "testRegex": "(/test/.+\\.spec)\\.tsx?$",
-        "moduleFileExtensions": [
-            "ts",
-            "tsx",
-            "js",
-            "json",
-            "node"
-        ],
-        "moduleNameMapper": {
-            "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/mocks/fileMock.js",
-            "\\.(s?css|sass)$": "<rootDir>/mocks/styleMock.js"
-        }
     },
     "build": {
         "productName": "BlueBubbles",
@@ -94,6 +75,7 @@
     "devDependencies": {
         "@babel/core": "^7.9.0",
         "@babel/plugin-proposal-class-properties": "^7.8.3",
+        "@babel/plugin-proposal-decorators": "^7.8.3",
         "@babel/polyfill": "^7.8.7",
         "@babel/preset-env": "^7.9.5",
         "@babel/preset-react": "^7.9.4",
@@ -137,7 +119,6 @@
         "html-webpack-plugin": "^4.2.0",
         "husky": "^4.2.5",
         "image-webpack-loader": "^6.0.0",
-        "jest": "^25.3.0",
         "lint-staged": "^10.1.5",
         "node-sass": "^4.13.1",
         "prettier": "^2.0.4",
@@ -147,8 +128,7 @@
         "source-map-loader": "^0.2.4",
         "spectron": "^10.0.1",
         "style-loader": "^1.1.4",
-        "ts-jest": "^25.4.0",
-        "typescript": "^3.8.3",
+        "typescript": "^4.0.2",
         "webpack": "^4.42.1",
         "webpack-cli": "^3.3.11",
         "webpack-dev-server": "^3.10.3",
@@ -156,7 +136,6 @@
         "webpack-node-externals": "^1.7.2"
     },
     "dependencies": {
-        "@babel/plugin-proposal-decorators": "^7.8.3",
         "@firebase/app-types": "^0.6.1",
         "@firebase/auth-interop-types": "^0.1.5",
         "@firebase/util": "^0.2.50",
@@ -190,5 +169,10 @@
         "socket.io": "^2.3.0",
         "sqlite3": "^4.2.0",
         "typeorm": "^0.2.24"
+    },
+    "devEngines": {
+        "node": ">=14.x",
+        "npm": ">=6.x",
+        "yarn": ">=1.x"
     }
 }

@@ -1,6 +1,6 @@
 import * as io from "socket.io";
 import * as path from "path";
-import * as fslib from "fs";
+import * as fs from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 
@@ -341,6 +341,10 @@ export class SocketService {
                     fPath = path.join(process.env.HOME, fPath.slice(1));
                 }
 
+                // Check if the file exists before trying to read it
+                if (!fs.existsSync(fPath))
+                    return respond(cb, "error", createServerErrorResponse("Attachment not downloaded on server"));
+
                 // Get data as a Uint8Array
                 let data = FileSystem.readFileChunk(fPath, start, chunkSize);
                 if (compress) data = Uint8Array.from(zlib.deflateSync(data));
@@ -660,8 +664,8 @@ export class SocketService {
 
                     // Check if the contacts export exists, and respond back with it
                     const contactsPath = path.join(FileSystem.contactsDir, "AddressBook.vcf");
-                    if (fslib.existsSync(contactsPath)) {
-                        const data = fslib.readFileSync(contactsPath).toString("utf-8");
+                    if (fs.existsSync(contactsPath)) {
+                        const data = fs.readFileSync(contactsPath).toString("utf-8");
                         respond(cb, "contacts-from-vcf", createSuccessResponse(data));
                     } else {
                         respond(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));

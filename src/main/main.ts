@@ -11,8 +11,23 @@ let win: BrowserWindow;
 let tray: Tray;
 let api = Server(win);
 
-// Start the API
-api.start();
+// Only 1 instance is allowed
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on("second-instance", (_, __, ___) => {
+        if (win) {
+            if (win.isMinimized()) win.restore();
+            win.focus();
+        }
+    });
+
+    // Start the API when the app is ready
+    app.whenReady().then(() => {
+        api.start();
+    });
+}
 
 const handleExit = async () => {
     if (!api) return;
@@ -59,7 +74,7 @@ const buildTray = () => {
             type: "separator"
         },
         {
-            label: `Server Address: ${api.repo.getConfig("server_address")}`,
+            label: `Server Address: ${api.repo?.getConfig("server_address")}`,
             enabled: false
         },
         {
@@ -146,7 +161,6 @@ const createWindow = async () => {
     });
 
     // Hook onto when we load the UI
-    win.webContents.send("config-update", api.repo.config);
     win.webContents.on("dom-ready", async () => {
         win.webContents.send("config-update", api.repo.config);
     });
@@ -155,7 +169,7 @@ const createWindow = async () => {
     api = Server(win);
 
     // Start the update service
-    const updateService = new UpdateService();
+    const updateService = new UpdateService(win);
     updateService.start();
     updateService.checkForUpdate();
 };
