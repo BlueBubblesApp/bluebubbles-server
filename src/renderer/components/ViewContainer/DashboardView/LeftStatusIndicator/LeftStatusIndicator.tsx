@@ -12,6 +12,8 @@ interface State {
 }
 
 class LeftStatusIndicator extends React.Component<unknown, State> {
+    backgroundPermissionsCheck: NodeJS.Timeout;
+
     constructor(props: Readonly<{}>) {
         super(props);
 
@@ -26,6 +28,14 @@ class LeftStatusIndicator extends React.Component<unknown, State> {
 
     async componentDidMount() {
         this.checkPermissions();
+
+        this.backgroundPermissionsCheck = setInterval(() => {
+            this.checkPermissions();
+        }, 20000);
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.backgroundPermissionsCheck);
     }
 
     checkPermissions = async () => {
@@ -37,6 +47,8 @@ class LeftStatusIndicator extends React.Component<unknown, State> {
 
         if (this.state.abPerms === "authorized" && this.state.fdPerms === "authorized") {
             this.setState({ statusColorIndicator: { backgroundColor: "#38d744" } });
+        } else {
+            this.setState({ statusColorIndicator: { backgroundColor: "red" } });
         }
     };
 

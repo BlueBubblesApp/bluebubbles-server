@@ -24,6 +24,8 @@ interface State {
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
+    backgroundPermissionsCheck: NodeJS.Timeout;
+
     constructor(props: unknown) {
         super(props);
 
@@ -56,10 +58,15 @@ class PreDashboardView extends React.Component<unknown, State> {
         ipcRenderer.on("config-update", (event, arg) => {
             this.setState({ config: arg });
         });
+
+        this.backgroundPermissionsCheck = setInterval(() => {
+            this.checkPermissions();
+        }, 5000);
     }
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+        clearInterval(this.backgroundPermissionsCheck);
     }
 
     async setTheme(currentTheme: string) {
@@ -88,6 +95,20 @@ class PreDashboardView extends React.Component<unknown, State> {
         const res = await ipcRenderer.invoke("check_perms");
         this.setState({
             abPerms: res.abPerms,
+            fdPerms: res.fdPerms
+        });
+    };
+
+    promptAccessibility = async () => {
+        const res = await ipcRenderer.invoke("prompt_accessibility");
+        this.setState({
+            abPerms: res.abPerms
+        });
+    };
+
+    promptDiskAccess = async () => {
+        const res = await ipcRenderer.invoke("prompt_disk_access");
+        this.setState({
             fdPerms: res.fdPerms
         });
     };
@@ -190,6 +211,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                         <a onClick={() => this.openTutorialLink()} style={{ color: "#147EFB", cursor: "pointer" }}>
                             our installation tutorial
                         </a>
+                        .
                     </p>
                     <div id="permissionStatusContainer">
                         <h1>Required App Permissions</h1>
@@ -198,12 +220,22 @@ class PreDashboardView extends React.Component<unknown, State> {
                             <h3 className="permissionStatus" style={fdPermStyles}>
                                 {this.state.fdPerms === "authorized" ? "Enabled" : "Disabled"}
                             </h3>
+                            {this.state.fdPerms === "authorized" ? null : (
+                                <button className="recheckPermissionButton" onClick={() => this.promptDiskAccess()}>
+                                    Temporarily Fake Enabled
+                                </button>
+                            )}
                         </div>
                         <div className="permissionTitleContainer">
                             <h3 className="permissionTitle">Full Accessibility Access:</h3>
                             <h3 className="permissionStatus" style={abPermStyles}>
                                 {this.state.abPerms === "authorized" ? "Enabled" : "Disabled"}
                             </h3>
+                            {this.state.abPerms === "authorized" ? null : (
+                                <button className="recheckPermissionButton" onClick={() => this.promptAccessibility()}>
+                                    Prompt For Access
+                                </button>
+                            )}
                         </div>
                     </div>
                     <h1 id="uploadTitle">Required Config Files</h1>

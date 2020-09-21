@@ -115,6 +115,20 @@
     color: red;
 }
 
+.recheckPermissionButton {
+    margin-left: 20px;
+    border: 2px solid var(--primary-color);
+    border-radius: 8px;
+    background: var(--background-color);
+    transition: border-radius 0.25s;
+    outline: none;
+}
+
+.recheckPermissionButton:hover {
+    border-radius: 15px;
+    cursor: pointer;
+}
+
 #fcmClientDrop {
     height: 25%;
     width: 90%;
