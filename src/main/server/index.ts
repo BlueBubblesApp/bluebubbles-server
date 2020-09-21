@@ -494,6 +494,12 @@ class BlueBubblesServer {
             return count;
         });
 
+        ipcMain.handle("get-chat-video-count", async (event, args) => {
+            if (!this.iMessageRepo?.db) return 0;
+            const count = await this.iMessageRepo.getChatVideoCounts();
+            return count;
+        });
+
         ipcMain.handle("get-group-message-counts", async (event, args) => {
             if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("group");

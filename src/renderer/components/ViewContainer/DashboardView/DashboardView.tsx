@@ -22,6 +22,7 @@ interface State {
     individualMsgCount: { name: string; count: number };
     myMsgCount: number;
     imageCount: { name: string; count: number };
+    videoCount: { name: string; count: number };
 }
 
 class DashboardView extends React.Component<unknown, State> {
@@ -33,7 +34,8 @@ class DashboardView extends React.Component<unknown, State> {
         myMsgCount: 0,
         groupMsgCount: { name: "Loading...", count: 0 },
         individualMsgCount: { name: "Loading...", count: 0 },
-        imageCount: { name: "Loading...", count: 0 }
+        imageCount: { name: "Loading...", count: 0 },
+        videoCount: { name: "Loading...", count: 0 }
     };
 
     async componentDidMount() {
@@ -109,6 +111,7 @@ class DashboardView extends React.Component<unknown, State> {
         this.loadIndividualChatCounts();
         this.loadMyMessageCount();
         this.loadChatImageCounts();
+        this.loadChatVideoCounts();
     }
 
     async loadGroupChatCounts() {
@@ -167,6 +170,21 @@ class DashboardView extends React.Component<unknown, State> {
             });
 
             this.setState({ imageCount: top });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
+    }
+
+    async loadChatVideoCounts() {
+        try {
+            const res = await ipcRenderer.invoke("get-chat-video-count");
+            let top = this.state.videoCount;
+            res.forEach((item: any) => {
+                const identifier = item.chat_identifier.startsWith("chat") ? item.group_name : item.chat_identifier;
+                if (item.video_count > top.count) top = { name: identifier, count: item.video_count };
+            });
+
+            this.setState({ videoCount: top });
         } catch (ex) {
             console.log("Failed to load database stats");
         }
@@ -259,7 +277,10 @@ class DashboardView extends React.Component<unknown, State> {
                                         stat={this.formatNumber(this.state.imageCount.count) as string}
                                         middle={true}
                                     />
-                                    <StatBox title="Videos" stat="16" />
+                                    <StatBox
+                                        title="Videos"
+                                        stat={this.formatNumber(this.state.videoCount.count) as string}
+                                    />
                                 </div>
                             </div>
                         </div>
