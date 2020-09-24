@@ -1,3 +1,4 @@
+/* eslint-disable react/sort-comp */
 /* eslint-disable react/no-unused-state */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 /* eslint-disable jsx-a11y/no-static-element-interactions */
@@ -21,6 +22,7 @@ interface State {
     fcmServer: any;
     fcmClient: any;
     redirect: any;
+    inputPassword: string;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -35,7 +37,8 @@ class PreDashboardView extends React.Component<unknown, State> {
             fdPerms: "deauthorized",
             fcmServer: null,
             fcmClient: null,
-            redirect: null
+            redirect: null,
+            inputPassword: ""
         };
     }
 
@@ -158,7 +161,8 @@ class PreDashboardView extends React.Component<unknown, State> {
                 this.state.abPerms === "authorized" &&
                 this.state.fdPerms === "authorized" &&
                 this.state.fcmClient &&
-                this.state.fcmServer
+                this.state.fcmServer &&
+                this.state.inputPassword.length > 0
             ) {
                 this.completeTutorial();
             }
@@ -175,6 +179,26 @@ class PreDashboardView extends React.Component<unknown, State> {
         ipcRenderer.invoke("toggle-tutorial", true);
         this.setState({ redirect: "/dashboard" });
     }
+
+    handleInputChange = async (e: any) => {
+        this.setState({ inputPassword: e.target.value });
+    };
+
+    savePassword = async () => {
+        await ipcRenderer.invoke("set-config", {
+            password: this.state.inputPassword
+        });
+
+        if (
+            this.state.abPerms === "authorized" &&
+            this.state.fdPerms === "authorized" &&
+            this.state.fcmClient &&
+            this.state.fcmServer &&
+            this.state.inputPassword.length > 0
+        ) {
+            this.completeTutorial();
+        }
+    };
 
     render() {
         if (this.state.redirect) {
@@ -236,6 +260,19 @@ class PreDashboardView extends React.Component<unknown, State> {
                                     Prompt For Access
                                 </button>
                             )}
+                        </div>
+                    </div>
+                    <div id="requiredServerSettingsContainer">
+                        <h1>Required Server Settings</h1>
+                        <div id="setPasswordContainer">
+                            <h3>Server Password:</h3>
+                            <input
+                                id="requiredPasswordInput"
+                                placeholder="Enter a password"
+                                value={this.state.inputPassword}
+                                onChange={e => this.handleInputChange(e)}
+                                onBlur={() => this.savePassword()}
+                            />
                         </div>
                     </div>
                     <h1 id="uploadTitle">Required Config Files</h1>
