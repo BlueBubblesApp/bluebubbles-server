@@ -3,9 +3,10 @@ import * as React from "react";
 import { BrowserRouter as Router, Route, HashRouter } from "react-router-dom";
 import "./ViewContainer.css";
 import { Switch } from "react-router";
-import { AnimatedSwitch } from "react-router-transition";
 import DashboardView from "./DashboardView/DashboardView";
+import DebugView from "./DebugView/DebugView";
 import SettingsView from "./SettingsView/SettingsView";
+import DevicesView from "./DevicesView/DevicesView";
 import PreDashboardView from "./PreDashboardView/PreDashboardView";
 
 class ViewContainer extends React.Component {
@@ -19,6 +20,12 @@ class ViewContainer extends React.Component {
                         </Route>
                         <Route exact path="/dashboard" component={DashboardView}>
                             <DashboardView />
+                        </Route>
+                        <Route exact path="/debug" component={DebugView}>
+                            <DebugView />
+                        </Route>
+                        <Route exact path="/devices" component={DevicesView}>
+                            <DevicesView />
                         </Route>
                         <Route path="/settings" component={SettingsView}>
                             <SettingsView />

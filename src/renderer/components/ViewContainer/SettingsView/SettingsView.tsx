@@ -8,10 +8,10 @@ import * as React from "react";
 import { ipcRenderer } from "electron";
 import Dropzone from "react-dropzone";
 import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
-import "./SettingsView.css";
-import * as Ago from "s-ago";
-import TopNav from "./TopNav/TopNav";
+import TopNav from "@renderer/components/TopNav/TopNav";
 import LeftStatusIndicator from "../DashboardView/LeftStatusIndicator/LeftStatusIndicator";
+
+import "./SettingsView.css";
 
 interface State {
     config: any;
@@ -25,8 +25,6 @@ interface State {
     showPassword: boolean;
     showKey: boolean;
     ngrokKey: string;
-    devices: any[];
-    logs: any[];
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -44,9 +42,7 @@ class SettingsView extends React.Component<unknown, State> {
             serverPassword: "",
             showPassword: false,
             showKey: false,
-            ngrokKey: "",
-            devices: [],
-            logs: []
+            ngrokKey: ""
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -56,7 +52,6 @@ class SettingsView extends React.Component<unknown, State> {
         const currentTheme = await ipcRenderer.invoke("get-current-theme");
         await this.setTheme(currentTheme.currentTheme);
 
-        await this.refreshDevices();
         const config = await ipcRenderer.invoke("get-config");
         if (config)
             this.setState({
@@ -96,17 +91,6 @@ class SettingsView extends React.Component<unknown, State> {
 
         ipcRenderer.on("config-update", (event, arg) => {
             this.setState({ config: arg });
-        });
-
-        ipcRenderer.on("new-log", (event: any, data: any) => {
-            // Build the new log
-            let newLog = [...this.state.logs, { log: data, timestamp: new Date() }];
-
-            // Make sure there are only 10 logs in the list
-            newLog = newLog.slice(newLog.length - 10 < 0 ? 0 : newLog.length - 10, newLog.length);
-
-            // Set the new logs
-            this.setState({ logs: newLog });
         });
     }
 
@@ -209,12 +193,6 @@ class SettingsView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
-    async refreshDevices() {
-        this.setState({
-            devices: await ipcRenderer.invoke("get-devices")
-        });
-    }
-
     invokeMain(event: string, args: any) {
         ipcRenderer.invoke(event, args);
     }
@@ -222,7 +200,7 @@ class SettingsView extends React.Component<unknown, State> {
     render() {
         return (
             <div id="SettingsView" data-theme="light">
-                <TopNav />
+                <TopNav header="Settings" />
                 <div id="settingsLowerContainer">
                     <LeftStatusIndicator />
                     <div id="settingsMainRightContainer">
@@ -241,13 +219,32 @@ class SettingsView extends React.Component<unknown, State> {
                             onBlur={() => this.saveConfig()}
                         />
                         <h3 className="aSettingTitle">Server Password:</h3>
-                        <input
-                            id="serverPassword"
-                            className="aInput"
-                            value={this.state.serverPassword}
-                            onChange={e => this.handleInputChange(e)}
-                            onBlur={() => this.saveConfig()}
-                        />
+                        <span>
+                            <input
+                                id="serverPassword"
+                                className="aInput"
+                                value={this.state.serverPassword}
+                                onChange={e => this.handleInputChange(e)}
+                                onBlur={() => this.saveConfig()}
+                                type={this.state.showPassword ? "text" : "password"}
+                            />
+                            <svg
+                                id="passwordView"
+                                viewBox="0 0 512 512"
+                                onClick={() => this.setState({ showPassword: !this.state.showPassword })}
+                            >
+                                <g>
+                                    <path d="M234.667,170.667c-35.307,0-64,28.693-64,64s28.693,64,64,64s64-28.693,64-64S269.973,170.667,234.667,170.667z" />
+                                    <path
+                                        d="M234.667,74.667C128,74.667,36.907,141.013,0,234.667c36.907,93.653,128,160,234.667,160
+                                        c106.773,0,197.76-66.347,234.667-160C432.427,141.013,341.44,74.667,234.667,74.667z M234.667,341.333
+                                        c-58.88,0-106.667-47.787-106.667-106.667S175.787,128,234.667,128s106.667,47.787,106.667,106.667
+                                        S293.547,341.333,234.667,341.333z"
+                                    />
+                                </g>
+                            </svg>
+                        </span>
+
                         <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
                         <input
                             id="ngrokKey"
@@ -312,49 +309,6 @@ class SettingsView extends React.Component<unknown, State> {
                                 </section>
                             )}
                         </Dropzone>
-                        <h3 className="largeSettingTitle">Manage Devices</h3>
-                        <div id="devicesHeadings">
-                            <h1>Device Name</h1>
-                            <h1>Identifier</h1>
-                        </div>
-                        {this.state.devices.length === 0 ? (
-                            <p className="aDeviceRow" style={{ marginBottom: "25px" }}>
-                                No devices registered!
-                            </p>
-                        ) : (
-                            <>
-                                {this.state.devices.map(row => (
-                                    <div className="aDeviceRow" key={row.identifier}>
-                                        <p>{row.name || "N/A"}</p>
-                                        <p>{row.identifier}</p>
-                                    </div>
-                                ))}
-                            </>
-                        )}
-                        <h3 className="largeSettingTitle">
-                            Debug Logs{" "}
-                            <button id="clearLogsButton" onClick={() => this.invokeMain("purge-event-cache", null)}>
-                                Clear Log Cache
-                            </button>
-                        </h3>
-                        <div id="logHeadings">
-                            <h1>Log Message</h1>
-                            <h1>Timestamp</h1>
-                        </div>
-                        {this.state.logs.length === 0 ? (
-                            <div className="aLogRow">
-                                <p>No logs. This page only shows logs while this page is open!</p>
-                            </div>
-                        ) : (
-                            <>
-                                {this.state.logs.map((row, index) => (
-                                    <div key={index} className="aLogRow">
-                                        <p>{row.log || "N/A"}</p>
-                                        <p className="aLogTimestamp">{Ago(row.timestamp)}</p>
-                                    </div>
-                                ))}
-                            </>
-                        )}
                     </div>
                 </div>
             </div>

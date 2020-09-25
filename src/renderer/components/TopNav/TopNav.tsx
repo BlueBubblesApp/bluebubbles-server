@@ -9,8 +9,12 @@ interface State {
     notificationsOpen: boolean;
 }
 
-class TopNav extends React.Component {
-    constructor(props: Readonly<{}>) {
+interface Props {
+    header: string;
+}
+
+class TopNav extends React.Component<Props, State> {
+    constructor(props: Readonly<Props>) {
         super(props);
 
         this.state = {
@@ -36,7 +40,7 @@ class TopNav extends React.Component {
                             />
                         </svg>
                     </Link>
-                    <h1>Settings</h1>
+                    <h1>{this.props.header}</h1>
                 </div>
             </div>
         );

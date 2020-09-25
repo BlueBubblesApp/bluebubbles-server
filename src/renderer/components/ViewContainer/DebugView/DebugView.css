@@ -46,10 +46,6 @@
     transition: background-color 0.2s;
 }
 
-span > #serverPassword {
-    width: calc(100% - 130px);
-}
-
 .aInput:hover {
     background-color: grey;
 }
@@ -72,7 +68,7 @@ span > #serverPassword {
     margin-right: 0.5rem;
     width: 46px;
     height: 26px;
-    background-color: lightgrey;
+    background-color: #e6e6e6;
     border-radius: 23px;
     vertical-align: text-bottom;
     transition: all 0.3s linear;
@@ -199,18 +195,60 @@ span > #serverPassword {
     color: var(--primary-color);
 }
 
-#settingsMainRightContainer > span {
-    width: calc(100% - 90px);
-    max-width: calc(100% - 90px);
+#logHeadings {
     display: flex;
     justify-content: space-between;
-    flex-direction: row;
-    align-items: center;
+    width: calc(100% - 130px);
+    margin-left: 30px;
+    margin-bottom: 15px;
 }
 
-#passwordView {
-    height: 28px;
-    width: 28px;
-    fill: grey;
+#logHeadings > h1 {
+    font-size: 18px;
+    margin: 0;
+    color: var(--primary-color);
+    margin-right: 10px;
+}
+
+.aLogRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: calc(100% - 140px);
+    margin-left: 30px;
+    padding-bottom: 10px;
+    padding-top: 10px;
+    border-top: 1px solid grey;
+    color: var(--primary-color);
+}
+
+.aLogRow p {
+    margin: 0;
+    font-size: 14px;
+    vertical-align: middle;
+    color: var(--primary-color) !important;
+}
+
+.aLogTimestamp {
+    width: 85px;
+    min-width: 85px;
+    margin-left: 25px !important;
+    text-align: right;
+}
+
+#clearLogsButton {
+    background: none;
+    text-decoration: none;
+    outline: none;
+    border-radius: 8px;
+    border: 2px solid var(--primary-color);
+    padding: 5px;
+    margin-left: 25px;
+    color: var(--primary-color);
+    transition: border-radius 0.25s;
+}
+
+#clearLogsButton:hover {
+    border-radius: 12px;
     cursor: pointer;
 }

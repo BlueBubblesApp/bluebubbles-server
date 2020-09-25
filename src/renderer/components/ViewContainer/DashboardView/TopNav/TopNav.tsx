@@ -93,7 +93,7 @@ class TopNav extends React.Component<unknown, State> {
                                     <div className="aAlertItem" key={item.id}>
                                         <div className="alertLeftSide">
                                             <p>{`${item.value}.`}</p>
-                                            <p>{item.isRead ? "Read" : "New"}</p>
+                                            <p id="readTxt">{item.isRead ? "Read" : "New"}</p>
                                         </div>
                                         <div className="alertRightSide">
                                             {typeIcon}

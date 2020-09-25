@@ -56,8 +56,9 @@
 
 #alertsModal {
     position: absolute;
-    width: 40%;
-    max-width: 40%;
+    padding: 10px;
+    width: 50%;
+    max-width: 50%;
     min-width: 40%;
     height: auto;
     max-height: 70vh;
@@ -88,7 +89,8 @@
 .aAlertItem {
     width: 100%;
     border-bottom: 2px solid var(--primary-color);
-    padding: 5px;
+    margin-bottom: 5px;
+    margin-top: 10px;
     display: flex;
     align-items: center;
     height: auto;
@@ -114,13 +116,18 @@
     color: var(--primary-color);
 }
 
+#readTxt {
+    font-size: 12px;
+    color: grey;
+}
+
 .alertRightSide {
     display: flex;
     flex-direction: column;
     width: 25%;
     min-width: 25%;
     height: 100%;
-    align-items: center;
+    align-items: flex-end;
 }
 
 .alertRightSide svg {

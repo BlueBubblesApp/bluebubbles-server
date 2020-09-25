@@ -21,6 +21,34 @@
     cursor: pointer;
 }
 
+#debugIcon {
+    margin-left: 8px;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 10px;
+    transition: transform 0.4s;
+    fill: var(--primary-color);
+}
+
+#debugIcon:hover {
+    cursor: pointer;
+    transform: scale(1.2);
+}
+
+#deviceIcon {
+    margin-left: 5px;
+    width: 30px;
+    height: 30px;
+    margin-bottom: 10px;
+    transition: transform 0.4s;
+    fill: var(--primary-color);
+}
+
+#deviceIcon:hover {
+    cursor: pointer;
+    transform: scale(1.2);
+}
+
 #statusColorIndicator {
     width: 14px;
     height: 14px;
