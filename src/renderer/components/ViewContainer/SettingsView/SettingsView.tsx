@@ -1,0 +1,365 @@
+/* eslint-disable react/no-array-index-key */
+/* eslint-disable class-methods-use-this */
+/* eslint-disable jsx-a11y/label-has-associated-control */
+/* eslint-disable max-len */
+/* eslint-disable react/no-unused-state */
+/* eslint-disable react/prefer-stateless-function */
+import * as React from "react";
+import { ipcRenderer } from "electron";
+import Dropzone from "react-dropzone";
+import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
+import "./SettingsView.css";
+import * as Ago from "s-ago";
+import TopNav from "./TopNav/TopNav";
+import LeftStatusIndicator from "../DashboardView/LeftStatusIndicator/LeftStatusIndicator";
+
+interface State {
+    config: any;
+    serverPort: string;
+    fcmClient: any;
+    fcmServer: any;
+    autoCaffeinate: boolean;
+    isCaffeinated: boolean;
+    autoStart: boolean;
+    serverPassword: string;
+    showPassword: boolean;
+    showKey: boolean;
+    ngrokKey: string;
+    devices: any[];
+    logs: any[];
+}
+
+class SettingsView extends React.Component<unknown, State> {
+    constructor(props: unknown) {
+        super(props);
+
+        this.state = {
+            config: null,
+            serverPort: "",
+            fcmClient: null,
+            fcmServer: null,
+            autoCaffeinate: false,
+            isCaffeinated: false,
+            autoStart: false,
+            serverPassword: "",
+            showPassword: false,
+            showKey: false,
+            ngrokKey: "",
+            devices: [],
+            logs: []
+        };
+
+        this.handleInputChange = this.handleInputChange.bind(this);
+    }
+
+    async componentDidMount() {
+        const currentTheme = await ipcRenderer.invoke("get-current-theme");
+        await this.setTheme(currentTheme.currentTheme);
+
+        await this.refreshDevices();
+        const config = await ipcRenderer.invoke("get-config");
+        if (config)
+            this.setState({
+                config,
+                serverPort: String(config.socket_port),
+                fcmClient: null,
+                fcmServer: null,
+                autoCaffeinate: config.auto_caffeinate,
+                isCaffeinated: false,
+                autoStart: config.auto_start,
+                serverPassword: config.password,
+                showPassword: false,
+                showKey: false,
+                ngrokKey: config.ngrok_key
+            });
+        this.getCaffeinateStatus();
+
+        const client = await ipcRenderer.invoke("get-fcm-client");
+        if (client) this.setState({ fcmClient: JSON.stringify(client) });
+        const server = await ipcRenderer.invoke("get-fcm-server");
+        if (server) this.setState({ fcmServer: JSON.stringify(server) });
+
+        const toggleCaffeinate: HTMLInputElement = document.getElementById("toggleCaffeinate") as HTMLInputElement;
+        const toggleAutoStart: HTMLInputElement = document.getElementById("toggleAutoStart") as HTMLInputElement;
+
+        if (this.state.autoCaffeinate) {
+            toggleCaffeinate.checked = true;
+        } else {
+            toggleCaffeinate.checked = false;
+        }
+
+        if (this.state.autoStart) {
+            toggleAutoStart.checked = true;
+        } else {
+            toggleAutoStart.checked = false;
+        }
+
+        ipcRenderer.on("config-update", (event, arg) => {
+            this.setState({ config: arg });
+        });
+
+        ipcRenderer.on("new-log", (event: any, data: any) => {
+            // Build the new log
+            let newLog = [...this.state.logs, { log: data, timestamp: new Date() }];
+
+            // Make sure there are only 10 logs in the list
+            newLog = newLog.slice(newLog.length - 10 < 0 ? 0 : newLog.length - 10, newLog.length);
+
+            // Set the new logs
+            this.setState({ logs: newLog });
+        });
+    }
+
+    componentWillUnmount() {
+        ipcRenderer.removeAllListeners("config-update");
+    }
+
+    async setTheme(currentTheme: string) {
+        const themedItems = document.querySelectorAll("[data-theme]");
+
+        if (currentTheme === "dark") {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "dark");
+            });
+        } else {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "light");
+            });
+        }
+    }
+
+    getCaffeinateStatus = async () => {
+        const caffeinateStatus = await ipcRenderer.invoke("get-caffeinate-status");
+        this.setState({
+            isCaffeinated: caffeinateStatus.isCaffeinated,
+            autoCaffeinate: caffeinateStatus.autoCaffeinate
+        });
+    };
+
+    toggleShowPassword = () => {
+        this.setState({ showPassword: !this.state.showPassword });
+    };
+
+    toggleShowKey = () => {
+        this.setState({ showKey: !this.state.showKey });
+    };
+
+    handleInputChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const id = e.target.id;
+        if (["serverPort", "serverPassword", "ngrokKey"].includes(id)) {
+            this.setState({ [id]: e.target.value } as any);
+        }
+
+        if (id === "toggleCaffeinate") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ autoCaffeinate: target.checked });
+            await ipcRenderer.invoke("toggle-caffeinate", target.checked);
+            await this.getCaffeinateStatus();
+        }
+
+        if (id === "toggleAutoStart") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ autoStart: target.checked });
+            await ipcRenderer.invoke("toggle-auto-start", target.checked);
+        }
+    };
+
+    saveConfig = async () => {
+        await ipcRenderer.invoke("set-config", {
+            socket_port: this.state.serverPort,
+            password: this.state.serverPassword,
+            ngrok_key: this.state.ngrokKey
+        });
+    };
+
+    handleClientFile = (acceptedFiles: any) => {
+        const reader = new FileReader();
+
+        reader.onabort = () => console.log("file reading was aborted");
+        reader.onerror = () => console.log("file reading has failed");
+        reader.onload = () => {
+            // Do whatever you want with the file contents
+            const binaryStr = reader.result;
+            const valid = isValidClientConfig(binaryStr as string);
+            if (!valid) return;
+
+            ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
+            this.setState({ fcmClient: binaryStr });
+        };
+
+        reader.readAsText(acceptedFiles[0]);
+    };
+
+    handleServerFile = (acceptedFiles: any) => {
+        const reader = new FileReader();
+
+        reader.onabort = () => console.log("file reading was aborted");
+        reader.onerror = () => console.log("file reading has failed");
+        reader.onload = () => {
+            // Do whatever you want with the file contents
+            const binaryStr = reader.result;
+            const valid = isValidServerConfig(binaryStr as string);
+            if (!valid) return;
+
+            ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+            this.setState({ fcmServer: binaryStr });
+        };
+
+        reader.readAsText(acceptedFiles[0]);
+    };
+
+    async refreshDevices() {
+        this.setState({
+            devices: await ipcRenderer.invoke("get-devices")
+        });
+    }
+
+    invokeMain(event: string, args: any) {
+        ipcRenderer.invoke(event, args);
+    }
+
+    render() {
+        return (
+            <div id="SettingsView" data-theme="light">
+                <TopNav />
+                <div id="settingsLowerContainer">
+                    <LeftStatusIndicator />
+                    <div id="settingsMainRightContainer">
+                        <h3 className="aSettingTitle">Server Address:</h3>
+                        <input
+                            readOnly
+                            className="aInput"
+                            value={this.state.config ? this.state.config.server_address : ""}
+                        />
+                        <h3 className="aSettingTitle">Server Port:</h3>
+                        <input
+                            id="serverPort"
+                            className="aInput"
+                            value={this.state.serverPort}
+                            onChange={e => this.handleInputChange(e)}
+                            onBlur={() => this.saveConfig()}
+                        />
+                        <h3 className="aSettingTitle">Server Password:</h3>
+                        <input
+                            id="serverPassword"
+                            className="aInput"
+                            value={this.state.serverPassword}
+                            onChange={e => this.handleInputChange(e)}
+                            onBlur={() => this.saveConfig()}
+                        />
+                        <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
+                        <input
+                            id="ngrokKey"
+                            className="aInput"
+                            placeholder="No key uploaded"
+                            value={this.state.ngrokKey}
+                            onChange={e => this.handleInputChange(e)}
+                            onBlur={() => this.saveConfig()}
+                        />
+                        <div className="aCheckboxDiv firstCheckBox">
+                            <h3 className="aSettingTitle">Keep MacOS Awake</h3>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleCaffeinate"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <h3 className="aSettingTitle">Startup With MacOS</h3>
+                            <label className="form-switch">
+                                <input id="toggleAutoStart" onChange={e => this.handleInputChange(e)} type="checkbox" />
+                                <i />
+                            </label>
+                        </div>
+                        <h3 className="largeSettingTitle">Google FCM Configurations</h3>
+                        <h3 className="aSettingTitle">
+                            Server Config Status:{" "}
+                            <p id="serverConfigStatus">{this.state.fcmServer ? "Loaded" : "Not Set"}</p>
+                        </h3>
+                        <Dropzone onDrop={acceptedFiles => this.handleServerFile(acceptedFiles)}>
+                            {({ getRootProps, getInputProps }) => (
+                                <section id="fcmClientDrop-Set">
+                                    <div {...getRootProps()}>
+                                        <input {...getInputProps()} />
+                                        <p>
+                                            {this.state.fcmServer
+                                                ? "FCM Client Configuration Successfully Loaded"
+                                                : "Drag or click to upload FCM Server"}
+                                        </p>
+                                    </div>
+                                </section>
+                            )}
+                        </Dropzone>
+                        <h3 className="aSettingTitle">
+                            Client Config Status:{" "}
+                            <p id="clientConfigStatus">{this.state.fcmClient ? "Loaded" : "Not Set"}</p>
+                        </h3>
+                        <Dropzone onDrop={acceptedFiles => this.handleClientFile(acceptedFiles)}>
+                            {({ getRootProps, getInputProps }) => (
+                                <section id="fcmServerDrop-Set">
+                                    <div {...getRootProps()}>
+                                        <input {...getInputProps()} />
+                                        <p>
+                                            {this.state.fcmClient
+                                                ? "FCM Service Configuration Successfully Loaded"
+                                                : "Drag or click to upload FCM Client (google-services.json)"}
+                                        </p>
+                                    </div>
+                                </section>
+                            )}
+                        </Dropzone>
+                        <h3 className="largeSettingTitle">Manage Devices</h3>
+                        <div id="devicesHeadings">
+                            <h1>Device Name</h1>
+                            <h1>Identifier</h1>
+                        </div>
+                        {this.state.devices.length === 0 ? (
+                            <p className="aDeviceRow" style={{ marginBottom: "25px" }}>
+                                No devices registered!
+                            </p>
+                        ) : (
+                            <>
+                                {this.state.devices.map(row => (
+                                    <div className="aDeviceRow" key={row.identifier}>
+                                        <p>{row.name || "N/A"}</p>
+                                        <p>{row.identifier}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                        <h3 className="largeSettingTitle">
+                            Debug Logs{" "}
+                            <button id="clearLogsButton" onClick={() => this.invokeMain("purge-event-cache", null)}>
+                                Clear Log Cache
+                            </button>
+                        </h3>
+                        <div id="logHeadings">
+                            <h1>Log Message</h1>
+                            <h1>Timestamp</h1>
+                        </div>
+                        {this.state.logs.length === 0 ? (
+                            <div className="aLogRow">
+                                <p>No logs. This page only shows logs while this page is open!</p>
+                            </div>
+                        ) : (
+                            <>
+                                {this.state.logs.map((row, index) => (
+                                    <div key={index} className="aLogRow">
+                                        <p>{row.log || "N/A"}</p>
+                                        <p className="aLogTimestamp">{Ago(row.timestamp)}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+}
+
+export default SettingsView;

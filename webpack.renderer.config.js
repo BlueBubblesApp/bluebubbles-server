@@ -57,6 +57,10 @@ module.exports = merge.smart(baseConfig, {
                 enforce: 'pre',
                 test: /\.js$/,
                 loader: 'source-map-loader'
+            },
+            {
+                test: /\.(woff|woff2|ttf|eot)$/,
+                use: 'file?name=fonts/[name].[ext]!static'
             }
         ]
     },
