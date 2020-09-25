@@ -157,7 +157,10 @@ class BlueBubblesServer {
                 console.log(msg);
         }
 
-        this.emitToUI("new-log", message);
+        this.emitToUI("new-log", {
+            message,
+            type: type ?? "log"
+        });
     }
 
     /**

@@ -14,6 +14,7 @@ import LeftStatusIndicator from "../DashboardView/LeftStatusIndicator/LeftStatus
 interface State {
     config: any;
     logs: any[];
+    showDebug: boolean;
 }
 
 const MAX_LENGTH = 25;
@@ -24,7 +25,8 @@ class SettingsView extends React.Component<unknown, State> {
 
         this.state = {
             config: null,
-            logs: []
+            logs: [],
+            showDebug: false
         };
     }
 
@@ -33,6 +35,8 @@ class SettingsView extends React.Component<unknown, State> {
         await this.setTheme(currentTheme.currentTheme);
 
         ipcRenderer.on("new-log", (event: any, data: any) => {
+            if (!this.state.showDebug && data.type === "debug") return;
+
             // Build the new log
             let newLog = [...this.state.logs, { log: data, timestamp: new Date() }];
 
@@ -58,6 +62,14 @@ class SettingsView extends React.Component<unknown, State> {
         }
     }
 
+    handleInputChange = async (e: any) => {
+        const { id } = e.target;
+        if (id === "toggleDebug") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ showDebug: target.checked });
+        }
+    };
+
     invokeMain(event: string, args: any) {
         ipcRenderer.invoke(event, args);
     }
@@ -73,7 +85,9 @@ class SettingsView extends React.Component<unknown, State> {
                             Debug Logs{" "}
                             <button id="clearLogsButton" onClick={() => this.invokeMain("purge-event-cache", null)}>
                                 Clear Event Cache
-                            </button>
+                            </button>{" "}
+                            <p>Show Debug Logs</p>
+                            <input id="toggleDebug" onChange={e => this.handleInputChange(e)} type="checkbox" />
                         </h3>
                         <div id="logHeadings">
                             <h1>Log Message</h1>
@@ -87,7 +101,7 @@ class SettingsView extends React.Component<unknown, State> {
                             <>
                                 {this.state.logs.map((row, index) => (
                                     <div key={index} className="aLogRow">
-                                        <p>{row.log || "N/A"}</p>
+                                        <p>{row.log.message || "N/A"}</p>
                                         <p className="aLogTimestamp">{Ago(row.timestamp)}</p>
                                     </div>
                                 ))}
