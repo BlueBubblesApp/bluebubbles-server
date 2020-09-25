@@ -34,7 +34,7 @@ export const getAppleScripts = () => {
             set message to item 2 of argv
 
             tell application "Messages"
-                set targetChat to a reference to text chat id chatGuid
+                set targetChat to a reference to chat id chatGuid
 
                 (* Send the attachment first *)
                 if (count of argv) > 2 then
@@ -71,7 +71,7 @@ export const getAppleScripts = () => {
             end repeat
 
             (* Start the new chat with all the recipients *)
-            set thisChat to make new text chat with properties {participants: members}
+            set thisChat to make new chat with properties {participants: members}
             log thisChat
 
             (* Quick iMessage and re-open it *)

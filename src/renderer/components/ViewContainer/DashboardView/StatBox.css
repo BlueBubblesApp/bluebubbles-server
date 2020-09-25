@@ -41,8 +41,8 @@
     transition: border-radius 0.25s;
 }
 
-.aStatBoxTitleContainer h3 {
-}
+/* .aStatBoxTitleContainer h3 {
+} */
 
 .aStatBoxTitleContainer:nth-child(1) {
     background-color: red !important;
