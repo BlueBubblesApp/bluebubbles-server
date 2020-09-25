@@ -1,3 +1,5 @@
+/* eslint-disable react/no-array-index-key */
+/* eslint-disable class-methods-use-this */
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable max-len */
 /* eslint-disable react/no-unused-state */
@@ -7,6 +9,7 @@ import { ipcRenderer } from "electron";
 import Dropzone from "react-dropzone";
 import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
 import "./SettingsView.css";
+import * as Ago from "s-ago";
 import TopNav from "./TopNav/TopNav";
 import LeftStatusIndicator from "../DashboardView/LeftStatusIndicator/LeftStatusIndicator";
 
@@ -22,6 +25,8 @@ interface State {
     showPassword: boolean;
     showKey: boolean;
     ngrokKey: string;
+    devices: any[];
+    logs: any[];
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -39,13 +44,19 @@ class SettingsView extends React.Component<unknown, State> {
             serverPassword: "",
             showPassword: false,
             showKey: false,
-            ngrokKey: ""
+            ngrokKey: "",
+            devices: [],
+            logs: []
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
     }
 
     async componentDidMount() {
+        const currentTheme = await ipcRenderer.invoke("get-current-theme");
+        await this.setTheme(currentTheme.currentTheme);
+
+        await this.refreshDevices();
         const config = await ipcRenderer.invoke("get-config");
         if (config)
             this.setState({
@@ -61,8 +72,6 @@ class SettingsView extends React.Component<unknown, State> {
                 showKey: false,
                 ngrokKey: config.ngrok_key
             });
-        console.log(config);
-        console.log(this.state);
         this.getCaffeinateStatus();
 
         const client = await ipcRenderer.invoke("get-fcm-client");
@@ -88,10 +97,35 @@ class SettingsView extends React.Component<unknown, State> {
         ipcRenderer.on("config-update", (event, arg) => {
             this.setState({ config: arg });
         });
+
+        ipcRenderer.on("new-log", (event: any, data: any) => {
+            // Build the new log
+            let newLog = [...this.state.logs, { log: data, timestamp: new Date() }];
+
+            // Make sure there are only 10 logs in the list
+            newLog = newLog.slice(newLog.length - 10 < 0 ? 0 : newLog.length - 10, newLog.length);
+
+            // Set the new logs
+            this.setState({ logs: newLog });
+        });
     }
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+    }
+
+    async setTheme(currentTheme: string) {
+        const themedItems = document.querySelectorAll("[data-theme]");
+
+        if (currentTheme === "dark") {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "dark");
+            });
+        } else {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "light");
+            });
+        }
     }
 
     getCaffeinateStatus = async () => {
@@ -129,8 +163,6 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ autoStart: target.checked });
             await ipcRenderer.invoke("toggle-auto-start", target.checked);
         }
-
-        console.log(this.state);
     };
 
     saveConfig = async () => {
@@ -139,8 +171,6 @@ class SettingsView extends React.Component<unknown, State> {
             password: this.state.serverPassword,
             ngrok_key: this.state.ngrokKey
         });
-
-        console.log("saved config");
     };
 
     handleClientFile = (acceptedFiles: any) => {
@@ -179,9 +209,19 @@ class SettingsView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
+    async refreshDevices() {
+        this.setState({
+            devices: await ipcRenderer.invoke("get-devices")
+        });
+    }
+
+    invokeMain(event: string, args: any) {
+        ipcRenderer.invoke(event, args);
+    }
+
     render() {
         return (
-            <div id="SettingsView">
+            <div id="SettingsView" data-theme="light">
                 <TopNav />
                 <div id="settingsLowerContainer">
                     <LeftStatusIndicator />
@@ -235,7 +275,7 @@ class SettingsView extends React.Component<unknown, State> {
                                 <i />
                             </label>
                         </div>
-                        <h3 id="fcmTitle">Google FCM Configurations</h3>
+                        <h3 className="largeSettingTitle">Google FCM Configurations</h3>
                         <h3 className="aSettingTitle">
                             Server Config Status:{" "}
                             <p id="serverConfigStatus">{this.state.fcmServer ? "Loaded" : "Not Set"}</p>
@@ -272,6 +312,49 @@ class SettingsView extends React.Component<unknown, State> {
                                 </section>
                             )}
                         </Dropzone>
+                        <h3 className="largeSettingTitle">Manage Devices</h3>
+                        <div id="devicesHeadings">
+                            <h1>Device Name</h1>
+                            <h1>Identifier</h1>
+                        </div>
+                        {this.state.devices.length === 0 ? (
+                            <p className="aDeviceRow" style={{ marginBottom: "25px" }}>
+                                No devices registered!
+                            </p>
+                        ) : (
+                            <>
+                                {this.state.devices.map(row => (
+                                    <div className="aDeviceRow" key={row.identifier}>
+                                        <p>{row.name || "N/A"}</p>
+                                        <p>{row.identifier}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                        <h3 className="largeSettingTitle">
+                            Debug Logs{" "}
+                            <button id="clearLogsButton" onClick={() => this.invokeMain("purge-event-cache", null)}>
+                                Clear Log Cache
+                            </button>
+                        </h3>
+                        <div id="logHeadings">
+                            <h1>Log Message</h1>
+                            <h1>Timestamp</h1>
+                        </div>
+                        {this.state.logs.length === 0 ? (
+                            <div className="aLogRow">
+                                <p>No logs. This page only shows logs while this page is open!</p>
+                            </div>
+                        ) : (
+                            <>
+                                {this.state.logs.map((row, index) => (
+                                    <div key={index} className="aLogRow">
+                                        <p>{row.log || "N/A"}</p>
+                                        <p className="aLogTimestamp">{Ago(row.timestamp)}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

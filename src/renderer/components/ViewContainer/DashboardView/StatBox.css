@@ -7,12 +7,26 @@
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
+    transition: border-radius 0.25s;
+    box-shadow: 4px 4px 4px 2px rgba(0, 0, 0, 0.2);
+}
+
+.aStatBox:hover {
+    /* cursor: pointer; */
+    /* transition: all .3s; */
+    border-radius: 20px;
+}
+
+.aStatBox:hover > .aStatBoxTitleContainer {
+    /* background-color: green; */
+    border-radius: 0 0 15px 15px;
 }
 
 .aStatBox > h3 {
     font-size: 25px;
     margin: auto;
     text-align: center;
+    color: var(--primary-color);
 }
 
 .aStatBoxTitleContainer {
@@ -24,7 +38,12 @@
     align-items: center;
     background-color: #147efb;
     border-radius: 0 0 7px 7px;
+    transition: border-radius 0.25s;
 }
 
 .aStatBoxTitleContainer h3 {
+}
+
+.aStatBoxTitleContainer:nth-child(1) {
+    background-color: red !important;
 }

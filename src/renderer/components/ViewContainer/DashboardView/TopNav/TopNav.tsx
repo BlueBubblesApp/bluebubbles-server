@@ -17,7 +17,6 @@ import { ipcRenderer } from "electron";
 interface State {
     alertsOpen: boolean;
     alerts: any[];
-    alertElement: HTMLElement;
 }
 
 const alertIconMap: { [key: string]: JSX.Element } = {
@@ -32,10 +31,8 @@ class TopNav extends React.Component<unknown, State> {
         super(props);
 
         this.state = {
-            // eslint-disable-next-line react/no-unused-state
             alertsOpen: false,
-            alerts: [],
-            alertElement: null
+            alerts: []
         };
     }
 
@@ -63,11 +60,9 @@ class TopNav extends React.Component<unknown, State> {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     async toggleOpenAlerts() {
         this.setState({ alertsOpen: !this.state.alertsOpen });
-        console.log(this.state);
 
         if (!this.state.alertsOpen) {
             const newAlerts = this.state.alerts;
-            console.log(newAlerts);
             for (const i of newAlerts) {
                 i.isRead = true;
                 await ipcRenderer.invoke("mark-alert-as-read", i.id);

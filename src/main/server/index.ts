@@ -1,5 +1,6 @@
+/* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { app, ipcMain, BrowserWindow } from "electron";
+import { app, ipcMain, BrowserWindow, nativeTheme, systemPreferences } from "electron";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -165,6 +166,7 @@ class BlueBubblesServer {
      */
     async start(): Promise<void> {
         if (!this.hasStarted) {
+            this.getTheme();
             await this.setupServer();
             this.log("Starting Configuration IPC Listeners..");
             this.startConfigIpcListeners();
@@ -227,16 +229,21 @@ class BlueBubblesServer {
             this.log(`Failed to setup network service! ${ex.message}`, "error");
         }
 
-        // Also check accessibility permissions
-        this.log("Bypassing permissions temporarily..");
-        // this.log("Checking Permissions..");
-        // const fdPerms: string = permissions.getAuthStatus("full-disk-access");
-        // const abPerms: string = permissions.getAuthStatus("accessibility");
-        //
-        // // Only return out if we don't have disk access
-        // this.hasAccessibilityAccess = abPerms === "authorized";
-        // if (!this.hasAccessibilityAccess)
-        //     this.log("Accessibility permissions are required for certain actions!", "error");
+        this.log("Checking Permissions...");
+
+        // Log if we dont have accessibility access
+        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
+            this.hasAccessibilityAccess = true;
+            this.log("Accessibilty permissions are enabled");
+        } else {
+            this.log("Accessibility permissions are required for certain actions!", "error");
+        }
+
+        // Bypass FD Perms for now
+        this.hasDiskAccess = true;
+        this.log("Bypassing full disk access requirement");
+
+        // Check if we have full disk access
         // this.hasDiskAccess = fdPerms === "authorized";
         // if (!this.hasDiskAccess) {
         //     this.log("Full Disk Access permissions are required!", "error");
@@ -306,6 +313,20 @@ class BlueBubblesServer {
                 devices.map(device => device.identifier),
                 { type, data: notifData }
             );
+        }
+    }
+
+    private getTheme() {
+        nativeTheme.on("updated", () => {
+            this.setTheme(nativeTheme.shouldUseDarkColors);
+        });
+    }
+
+    private setTheme(shouldUseDarkColors: boolean) {
+        if (shouldUseDarkColors === true) {
+            this.emitToUI("theme-update", "dark");
+        } else {
+            this.emitToUI("theme-update", "light");
         }
     }
 
@@ -478,6 +499,12 @@ class BlueBubblesServer {
             return count;
         });
 
+        ipcMain.handle("get-chat-video-count", async (event, args) => {
+            if (!this.iMessageRepo?.db) return 0;
+            const count = await this.iMessageRepo.getChatVideoCounts();
+            return count;
+        });
+
         ipcMain.handle("get-group-message-counts", async (event, args) => {
             if (!this.iMessageRepo?.db) return 0;
             const count = await this.iMessageRepo.getChatMessageCounts("group");
@@ -554,20 +581,24 @@ class BlueBubblesServer {
             }
         });
 
-        ipcMain.handle("open_perms_prompt", async (_, __) => {
-            // permissions.askForFullDiskAccess();
-        });
-
-        ipcMain.handle("prompt_accessibility_perms", async (_, __) => {
-            // permissions.askForAccessibilityAccess();
-        });
-
         ipcMain.handle("check_perms", async (_, __) => {
-            return { abPerms: "authorized", fdPerms: "authorized" };
-            // return {
-            //     abPerms: permissions.getAuthStatus("accessibility"),
-            //     fdPerms: permissions.getAuthStatus("full-disk-access")
-            // };
+            // return { abPerms: "authorized", fdPerms: "authorized" };
+            return {
+                abPerms: systemPreferences.isTrustedAccessibilityClient(false) ? "authorized" : "denied",
+                fdPerms: "authorized"
+            };
+        });
+
+        ipcMain.handle("prompt_accessibility", async (_, __) => {
+            return {
+                abPerms: systemPreferences.isTrustedAccessibilityClient(true) ? "authorized" : "denied"
+            };
+        });
+
+        ipcMain.handle("prompt_disk_access", async (_, __) => {
+            return {
+                fdPerms: "authorized"
+            };
         });
 
         ipcMain.handle("toggle-caffeinate", async (_, toggle) => {
@@ -603,6 +634,17 @@ class BlueBubblesServer {
 
         ipcMain.handle("restart-server", async (_, __) => {
             await this.restart();
+        });
+
+        ipcMain.handle("get-current-theme", (_, __) => {
+            if (nativeTheme.shouldUseDarkColors === true) {
+                return {
+                    currentTheme: "dark"
+                };
+            }
+            return {
+                currentTheme: "light"
+            };
         });
     }
 

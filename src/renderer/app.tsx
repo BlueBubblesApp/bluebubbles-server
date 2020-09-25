@@ -1,5 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
+import { ipcRenderer } from "electron";
 import { HashRouter as Router } from "react-router-dom";
 import ViewContainer from "./components/ViewContainer/ViewContainer";
 
@@ -18,5 +19,13 @@ const render = () => {
         mainElement
     );
 };
+
+ipcRenderer.on("theme-update", (event, arg) => {
+    const themedItems = document.querySelectorAll("[data-theme]");
+
+    themedItems.forEach(item => {
+        item.setAttribute("data-theme", arg);
+    });
+});
 
 render();

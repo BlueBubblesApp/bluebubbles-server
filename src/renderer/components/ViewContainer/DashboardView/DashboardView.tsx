@@ -22,6 +22,7 @@ interface State {
     individualMsgCount: { name: string; count: number };
     myMsgCount: number;
     imageCount: { name: string; count: number };
+    videoCount: { name: string; count: number };
 }
 
 class DashboardView extends React.Component<unknown, State> {
@@ -33,10 +34,14 @@ class DashboardView extends React.Component<unknown, State> {
         myMsgCount: 0,
         groupMsgCount: { name: "Loading...", count: 0 },
         individualMsgCount: { name: "Loading...", count: 0 },
-        imageCount: { name: "Loading...", count: 0 }
+        imageCount: { name: "Loading...", count: 0 },
+        videoCount: { name: "Loading...", count: 0 }
     };
 
     async componentDidMount() {
+        const currentTheme = await ipcRenderer.invoke("get-current-theme");
+        await this.setTheme(currentTheme.currentTheme);
+
         const client = await ipcRenderer.invoke("get-fcm-client");
         if (client) this.setState({ fcmClient: JSON.stringify(client) });
 
@@ -51,6 +56,20 @@ class DashboardView extends React.Component<unknown, State> {
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+    }
+
+    async setTheme(currentTheme: string) {
+        const themedItems = document.querySelectorAll("[data-theme]");
+
+        if (currentTheme === "dark") {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "dark");
+            });
+        } else {
+            themedItems.forEach(item => {
+                item.setAttribute("data-theme", "light");
+            });
+        }
     }
 
     buildQrData = (data: string | null): string => {
@@ -92,6 +111,7 @@ class DashboardView extends React.Component<unknown, State> {
         this.loadIndividualChatCounts();
         this.loadMyMessageCount();
         this.loadChatImageCounts();
+        this.loadChatVideoCounts();
     }
 
     async loadGroupChatCounts() {
@@ -155,6 +175,21 @@ class DashboardView extends React.Component<unknown, State> {
         }
     }
 
+    async loadChatVideoCounts() {
+        try {
+            const res = await ipcRenderer.invoke("get-chat-video-count");
+            let top = this.state.videoCount;
+            res.forEach((item: any) => {
+                const identifier = item.chat_identifier.startsWith("chat") ? item.group_name : item.chat_identifier;
+                if (item.video_count > top.count) top = { name: identifier, count: item.video_count };
+            });
+
+            this.setState({ videoCount: top });
+        } catch (ex) {
+            console.log("Failed to load database stats");
+        }
+    }
+
     async loadRecentMessageCount() {
         try {
             const after = new Date();
@@ -189,7 +224,7 @@ class DashboardView extends React.Component<unknown, State> {
         const qrData = this.buildQrData(this.state.fcmClient);
 
         return (
-            <div id="DashboardView">
+            <div id="DashboardView" data-theme="light">
                 <TopNav />
                 <div id="dashboardLowerContainer">
                     <LeftStatusIndicator />
@@ -198,7 +233,7 @@ class DashboardView extends React.Component<unknown, State> {
                             <div id="connectionStatusLeft">
                                 <h1 className="secondaryTitle">Connection</h1>
                                 <h3 className="tertiaryTitle">
-                                    Server Address:{" "}
+                                    Server Address:
                                     <div className="infoField">
                                         <p className="infoFieldText">
                                             {this.state.config ? this.state.config.server_address : "Loading..."}
@@ -242,7 +277,10 @@ class DashboardView extends React.Component<unknown, State> {
                                         stat={this.formatNumber(this.state.imageCount.count) as string}
                                         middle={true}
                                     />
-                                    <StatBox title="Videos" stat="16" />
+                                    <StatBox
+                                        title="Videos"
+                                        stat={this.formatNumber(this.state.videoCount.count) as string}
+                                    />
                                 </div>
                             </div>
                         </div>

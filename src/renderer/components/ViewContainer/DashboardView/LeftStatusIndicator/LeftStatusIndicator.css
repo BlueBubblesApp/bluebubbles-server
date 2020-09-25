@@ -13,6 +13,7 @@
     height: 26px;
     margin-bottom: 10px;
     transition: transform 0.4s;
+    fill: var(--primary-color);
 }
 
 #restartIcon:hover {
@@ -25,4 +26,5 @@
     height: 14px;
     border-radius: 4px;
     margin-bottom: 15px;
+    background-color: red;
 }
