@@ -89,12 +89,14 @@ export class Chat {
 export const getChatResponse = async (tableData: Chat): Promise<ChatResponse> => {
     const messages = [];
     for (const msg of tableData?.messages ?? []) {
+        if (!msg) continue;
         const msgRes = await getMessageResponse(msg);
         messages.push(msgRes);
     }
 
     const participants = [];
     for (const handle of tableData?.participants ?? []) {
+        if (!handle) continue;
         const handleRes = await getHandleResponse(handle);
         participants.push(handleRes);
     }

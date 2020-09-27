@@ -48,7 +48,7 @@ export const formatAddressList = (addresses: string[]) => {
 export const safeExecuteAppleScript = async (command: string) => {
     try {
         // Execute the command
-        return (await FileSystem.execShellCommand(command)) as string;
+        return (await FileSystem.executeAppleScript(command)) as string;
     } catch (ex) {
         let msg = ex.message;
         if (msg instanceof String) [, msg] = msg.split("execution error: ");
@@ -137,8 +137,13 @@ export const toBoolean = (input: string) => {
     return true;
 };
 
-export const cliSanitize = (input: string) => {
-    return input.replace(/"/g, '\\"').replace(/\$/g, "\\$");
+/**
+ * Replace new lines/returns as well as escape quotes/dollar signs
+ *
+ * @param input String to sanitize
+ */
+export const escapeScript = (input: string) => {
+    return input.replace(/'/g, "\\'").replace(/\$/g, "\\$").replace(/\r?\n/g, "");
 };
 
 export const sanitizeStr = (val: string) => {

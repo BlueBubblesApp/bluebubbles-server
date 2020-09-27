@@ -2,15 +2,23 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ValidTapback } from "@server/types";
+import {
+    sendMessage,
+    startChat,
+    renameGroupChat,
+    addParticipant,
+    removeParticipant,
+    toggleTapback,
+    checkTypingIndicator,
+    exportContacts
+} from "@server/fileSystem/scripts";
 
 import {
     safeExecuteAppleScript,
     generateChatNameList,
     getiMessageNumberFormat,
-    cliSanitize,
     tapbackUIMap,
     toBoolean,
-    sanitizeStr,
     slugifyAddress
 } from "./utils";
 
@@ -40,17 +48,9 @@ export class ActionHandler {
     ): Promise<void> => {
         if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
-        const cleanMessage = sanitizeStr(message ?? "");
-
-        // Create the base command to execute
-        let baseCmd = `osascript "${FileSystem.scriptDir}/sendMessage.scpt" "${chatGuid}" "${cliSanitize(
-            cleanMessage
-        )}"`;
-
         // Add attachment, if present
         if (attachment) {
             FileSystem.saveAttachment(attachmentName, attachment);
-            baseCmd += ` "${FileSystem.attachmentsDir}/${attachmentName}"`;
         }
 
         try {
@@ -59,15 +59,21 @@ export class ActionHandler {
 
             // We need offsets here due to iMessage's save times being a bit off for some reason
             const now = new Date(new Date().getTime() - 1000).getTime(); // With 1 second offset
-            await FileSystem.execShellCommand(baseCmd);
+            await FileSystem.executeAppleScript(
+                sendMessage(
+                    chatGuid,
+                    message ?? "",
+                    attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
+                )
+            );
 
             // Add queued item
-            if (cleanMessage && cleanMessage.length > 0) {
+            if (message && message.length > 0) {
                 const item = new Queue();
                 item.tempGuid = tempGuid;
                 item.chatGuid = chatGuid;
                 item.dateCreated = now;
-                item.text = cleanMessage;
+                item.text = message ?? "";
                 await Server().repo.queue().manager.save(item);
             }
 
@@ -118,11 +124,7 @@ export class ActionHandler {
             console.info(`Attempting rename group from [${oldName}] to [${newName}]`);
             try {
                 // This needs await here, or else it will fail
-                return await safeExecuteAppleScript(
-                    `osascript "${FileSystem.scriptDir}/renameGroupChat.scpt" "${cliSanitize(oldName)}" "${cliSanitize(
-                        newName
-                    )}"`
-                );
+                return await safeExecuteAppleScript(renameGroupChat(oldName, newName));
             } catch (ex) {
                 err = ex;
                 Server().log(`Failed to rename group from [${oldName}] to [${newName}]. Trying again.`, "warn");
@@ -163,9 +165,7 @@ export class ActionHandler {
             console.info(`Attempting to add participant to group [${name}]`);
             try {
                 // This needs await here, or else it will fail
-                return await safeExecuteAppleScript(
-                    `osascript "${FileSystem.scriptDir}/addParticipant.scpt" "${name}" "${participant}"`
-                );
+                return await safeExecuteAppleScript(addParticipant(name, participant));
             } catch (ex) {
                 err = ex;
                 Server().log(`Failed to add participant to group, [${name}]. Trying again.`, "warn");
@@ -210,9 +210,7 @@ export class ActionHandler {
             console.info(`Attempting to remove participant from group [${name}]`);
             try {
                 // This needs await here, or else it will fail
-                return await safeExecuteAppleScript(
-                    `osascript "${FileSystem.scriptDir}/removeParticipant.scpt" "${name}" "${address}"`
-                );
+                return await safeExecuteAppleScript(removeParticipant(name, participant));
             } catch (ex) {
                 err = ex;
                 Server().log(`Failed to remove participant to group, [${name}]. Trying again.`, "warn");
@@ -261,11 +259,7 @@ export class ActionHandler {
 
             try {
                 // This needs await here, or else it will fail
-                return await safeExecuteAppleScript(
-                    `osascript "${FileSystem.scriptDir}/toggleTapback.scpt" "${name}" "${cliSanitize(
-                        text
-                    )}" "${tapbackId}"`
-                );
+                return await safeExecuteAppleScript(toggleTapback(name, text, tapbackId));
             } catch (ex) {
                 err = ex;
                 Server().log(`Failed to toggle tapback on message, [${friendlyMsg}]. Trying again.`, "warn");
@@ -305,9 +299,7 @@ export class ActionHandler {
             console.info(`Attempting to check for a typing indicator for chat, [${name}]`);
             try {
                 // This needs await here, or else it will fail
-                const output = await safeExecuteAppleScript(
-                    `osascript "${FileSystem.scriptDir}/checkTypingIndicator.scpt" "${name}"`
-                );
+                const output = await safeExecuteAppleScript(checkTypingIndicator(name));
                 return toBoolean(output.trim());
             } catch (ex) {
                 err = ex;
@@ -332,19 +324,14 @@ export class ActionHandler {
 
         if (participants.length === 0) throw new Error("No participants specified!");
 
-        // Create the base command to execute
-        let baseCmd = `osascript "${FileSystem.scriptDir}/startChat.scpt"`;
-
         // Add members to the chat
-        participants.forEach(member => {
-            baseCmd += ` "${slugifyAddress(member)}"`;
-        });
+        const buddies = participants.map(item => slugifyAddress(item));
 
         // Make sure messages is open
         await FileSystem.startMessages();
 
         // Execute the command
-        let ret = (await FileSystem.execShellCommand(baseCmd)) as string;
+        let ret = (await FileSystem.executeAppleScript(startChat(buddies))) as string;
 
         try {
             // Get the chat GUID that was created
@@ -364,11 +351,8 @@ export class ActionHandler {
     static exportContacts = async (): Promise<void> => {
         Server().log("Executing Action: Export Contacts", "debug");
 
-        // Create the base command to execute
-        const baseCmd = `osascript "${FileSystem.scriptDir}/exportContacts.scpt"`;
-
         try {
-            await FileSystem.execShellCommand(baseCmd);
+            await FileSystem.executeAppleScript(exportContacts());
         } catch (ex) {
             let msg = ex.message;
             if (msg instanceof String) [, msg] = msg.split("execution error: ");
