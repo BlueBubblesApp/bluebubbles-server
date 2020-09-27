@@ -203,6 +203,10 @@ export class SocketService {
             if (!chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
             const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants });
+            if (chats.length === 0) {
+                return respond(cb, "error", createBadRequestResponse("Chat does not exist!"));
+            }
+
             return respond(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
         });
 

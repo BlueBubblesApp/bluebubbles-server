@@ -3,10 +3,9 @@ import * as path from "path";
 import * as child_process from "child_process";
 import { app } from "electron";
 import { sync } from "read-chunk";
-
 import { Server } from "@server/index";
-import { concatUint8Arrays } from "@server/helpers/utils";
-import { getAppleScripts } from "./scripts";
+import { escapeScript, concatUint8Arrays } from "@server/helpers/utils";
+import { startMessages } from "./scripts";
 
 // Directory modifiers based on the environment
 let subdir = "";
@@ -29,8 +28,6 @@ export class FileSystem {
 
     public static contactsDir = path.join(FileSystem.baseDir, "Contacts");
 
-    public static scriptDir = path.join(FileSystem.baseDir, "Scripts");
-
     public static fcmDir = path.join(FileSystem.baseDir, "FCM");
 
     public static modules = path.join(appPath, moddir, "node_modules");
@@ -43,7 +40,6 @@ export class FileSystem {
      */
     static async setup(): Promise<void> {
         FileSystem.setupDirectories();
-        FileSystem.setupScripts();
     }
 
     /**
@@ -51,22 +47,9 @@ export class FileSystem {
      */
     static setupDirectories(): void {
         if (!fs.existsSync(FileSystem.baseDir)) fs.mkdirSync(FileSystem.baseDir);
-        if (!fs.existsSync(FileSystem.scriptDir)) fs.mkdirSync(FileSystem.scriptDir);
         if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
         if (!fs.existsSync(FileSystem.contactsDir)) fs.mkdirSync(FileSystem.contactsDir);
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
-    }
-
-    /**
-     * Creates required scripts
-     */
-    static setupScripts(): void {
-        getAppleScripts().forEach(script => {
-            // Remove each script, and re-write it (in case of update)
-            const scriptPath = `${FileSystem.scriptDir}/${script.name}`;
-            if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
-            fs.writeFileSync(scriptPath, script.contents);
-        });
     }
 
     /**
@@ -215,10 +198,20 @@ export class FileSystem {
         });
     }
 
+    static async executeAppleScript(cmd: string) {
+        let parts = cmd.split("\n");
+        parts = parts
+            .map(i => escapeScript(i).trim())
+            .filter(i => i && i.length > 0)
+            .map(i => `'${i}'`);
+
+        return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);
+    }
+
     /**
      * Makes sure that Messages is running
      */
     static async startMessages() {
-        await FileSystem.execShellCommand(`osascript "${FileSystem.scriptDir}/startMessages.scpt"`);
+        await FileSystem.executeAppleScript(startMessages());
     }
 }

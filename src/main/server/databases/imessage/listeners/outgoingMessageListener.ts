@@ -52,10 +52,13 @@ export class OutgoingMessageListener extends ChangeListener {
 
         // Get all queued items
         const entries = await repo.find();
+        if (entries.length > 0) {
+            Server().log(`Detected ${entries.length} queued outgoing message(s)`, "debug");
+        }
 
         for (const entry of entries) {
-            // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
-            if (now - entry.dateCreated > 1000 * 60) {
+            // If the entry has been in there for longer than 2 minutes, delete it, and send a message-timeout
+            if (now - entry.dateCreated > 1000 * 60 * 2) {
                 await repo.remove(entry);
                 super.emit("message-timeout", entry);
                 continue;
@@ -108,12 +111,19 @@ export class OutgoingMessageListener extends ChangeListener {
                 where
             });
 
+            if (matches.length > 0) {
+                Server().log(`Found ${matches.length} match(es) for outgoing message(s)`, "debug");
+            }
+
             // Find the first non-emitted match
             for (const match of matches) {
                 const matchGuid = `match:${match.guid}`;
 
                 // If we've already emitted this message-match, skip it
-                if (this.cache.find(matchGuid)) continue;
+                if (this.cache.find(matchGuid)) {
+                    Server().log(`Message GUID ${matchGuid} has already been emitted`, "debug");
+                    continue;
+                }
 
                 // Emit the message match to listeners
                 super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
@@ -167,6 +177,10 @@ export class OutgoingMessageListener extends ChangeListener {
             ]
         });
 
+        if (newUnsent.length > 0) {
+            Server().log(`Detected ${newUnsent.length} unsent outgoing message(s)`, "debug");
+        }
+
         // Second, check for sent messages
         const newSent = await this.repo.getMessages({
             after,
@@ -209,6 +223,10 @@ export class OutgoingMessageListener extends ChangeListener {
             ]
         });
 
+        if (lookbackSent.length > 0) {
+            Server().log(`Detected ${lookbackSent.length} sent (previously unsent) message(s)`, "debug");
+        }
+
         // Fourth, add the new unsent items to the list
         const sentOrErrored = lookbackSent.filter(item => item.isSent || item.error > 0).map(item => item.ROWID);
         this.notSent = this.notSent.filter(item => !sentOrErrored.includes(item)); // Filter down not sent
@@ -246,6 +264,10 @@ export class OutgoingMessageListener extends ChangeListener {
                 }
             ]
         });
+
+        if (entries.length > 0) {
+            Server().log(`Detected ${entries.length} updated message(s)`, "debug");
+        }
 
         // Emit the new message
         for (const entry of entries) {

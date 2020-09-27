@@ -123,7 +123,9 @@ const createWindow = async () => {
         title: "BlueBubbles Server",
         useContentSize: true,
         width: 1080,
-        height: 1030,
+        minWidth: 800,
+        height: 750,
+        minHeight: 600,
         webPreferences: {
             nodeIntegration: true // Required in new electron version
         }
