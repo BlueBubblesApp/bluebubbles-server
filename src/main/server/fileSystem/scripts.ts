@@ -2,6 +2,7 @@
 import * as macosVersion from "macos-version";
 import * as compareVersions from "compare-versions";
 import { FileSystem } from "@server/fileSystem";
+import { escapeInput } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
@@ -21,21 +22,25 @@ export const startMessages = () => {
  * The AppleScript used to send a message with or without an attachment
  */
 export const sendMessage = (chatGuid: string, message: string, attachment: string) => {
+    if (!chatGuid || !message) return null;
+
     let attachmentScpt = "";
     if (attachment && attachment.length > 0) {
-        attachmentScpt = `set theAttachment to "${attachment}" as POSIX file
+        attachmentScpt = `set theAttachment to "${escapeInput(attachment)}" as POSIX file
             send theAttachment to targetChat
             delay 0.5`;
+    }
+
+    let messageScpt = "";
+    if (message && message.length > 0) {
+        messageScpt = `send "${escapeInput(message)}" to targetChat`;
     }
 
     return `tell application "Messages"
         set targetChat to a reference to chat id "${chatGuid}"
 
         ${attachmentScpt}
-
-        if "${message}" is not equal to "" then
-            send "${message}" to targetChat
-        end if
+        ${messageScpt}
     end tell
 
     tell application "System Events" to tell process "Messages" to set visible to false`;

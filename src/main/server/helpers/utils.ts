@@ -46,6 +46,8 @@ export const formatAddressList = (addresses: string[]) => {
 };
 
 export const safeExecuteAppleScript = async (command: string) => {
+    if (!command) return null;
+
     try {
         // Execute the command
         return (await FileSystem.executeAppleScript(command)) as string;
@@ -143,7 +145,21 @@ export const toBoolean = (input: string) => {
  * @param input String to sanitize
  */
 export const escapeScript = (input: string) => {
-    return input.replace(/'/g, "\\'").replace(/\$/g, "\\$").replace(/\r?\n/g, "");
+    return input.replace(/"/g, '\\"'); // Replace double quote with escaped double quote
+};
+
+/**
+ * Replace new lines/returns as well as escape quotes/dollar signs
+ *
+ * @param input String to sanitize
+ */
+export const escapeInput = (input: string) => {
+    return input
+        .replace(/\\/g, "\\\\\\\\") // Replace backslash with 4 backslashes (yes, this is on purpose)
+        .replace(/"/g, '\\\\"') // Replace double quote with escaped double quote (2 backslashes)
+        .replace(/\$/g, "\\$") // Replace $ with escaped $ (1 backslash)
+        .replace(/`/g, "\\`") // Replace ` with escaped ` (1 backslashes)
+        .replace(/\r?\n/g, "\\n"); // Replace returns with explicit new line character
 };
 
 export const sanitizeStr = (val: string) => {

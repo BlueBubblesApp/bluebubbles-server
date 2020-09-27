@@ -203,7 +203,7 @@ export class FileSystem {
         parts = parts
             .map(i => escapeScript(i).trim())
             .filter(i => i && i.length > 0)
-            .map(i => `'${i}'`);
+            .map(i => `"${i}"`);
 
         return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);
     }
