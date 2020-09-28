@@ -46,6 +46,9 @@ export class UpdateService {
 
         // Compare latest version to current version
         if (compareVersions(version, this.currentVersion) === 1) {
+            // Emit to all the clients:
+            Server().emitMessage("server-update", version);
+
             const dialogOpts = {
                 type: "info",
                 buttons: ["Download", "Ignore"],
