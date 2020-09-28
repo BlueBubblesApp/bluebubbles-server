@@ -57,8 +57,8 @@ export class OutgoingMessageListener extends ChangeListener {
         }
 
         for (const entry of entries) {
-            // If the entry has been in there for longer than 2 minutes, delete it, and send a message-timeout
-            if (now - entry.dateCreated > 1000 * 60 * 2) {
+            // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
+            if (now - entry.dateCreated > 1000 * 60) {
                 await repo.remove(entry);
                 super.emit("message-timeout", entry);
                 continue;
@@ -90,40 +90,25 @@ export class OutgoingMessageListener extends ChangeListener {
                         args: { name: entry.text.split("->")[1] }
                     }
                 ];
-            } else {
-                where = [
-                    ...where,
-                    {
-                        // Text must match
-                        statement: "message.text = :text",
-                        args: { text: entry.text }
-                    }
-                ];
             }
 
-            // Check if the entry exists in the messages DB
+            // Check for any message created after the "date created" of the queue item
+            // We will (re)emit all messages. The cache should catch if any dupes are being sent
             const matches = await Server().iMessageRepo.getMessages({
                 chatGuid: entry.chatGuid,
-                limit: 5, // Limit to 5 to get any edge cases (possibly when spamming)
+                limit: 50, // 50 is semi-arbitrary. We just don't want to miss anything
                 withHandle: false, // Exclude to speed up query
                 after: new Date(entry.dateCreated),
                 sort: "ASC", // Ascending because we want to send the newest first
                 where
             });
 
-            if (matches.length > 0) {
-                Server().log(`Found ${matches.length} match(es) for outgoing message(s)`, "debug");
-            }
-
             // Find the first non-emitted match
             for (const match of matches) {
                 const matchGuid = `match:${match.guid}`;
 
                 // If we've already emitted this message-match, skip it
-                if (this.cache.find(matchGuid)) {
-                    Server().log(`Message GUID ${matchGuid} has already been emitted`, "debug");
-                    continue;
-                }
+                if (this.cache.find(matchGuid)) continue;
 
                 // Emit the message match to listeners
                 super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
