@@ -22,7 +22,7 @@ export const startMessages = () => {
  * The AppleScript used to send a message with or without an attachment
  */
 export const sendMessage = (chatGuid: string, message: string, attachment: string) => {
-    if (!chatGuid || !message) return null;
+    if (!chatGuid || (!message && !attachment)) return null;
 
     let attachmentScpt = "";
     if (attachment && attachment.length > 0) {

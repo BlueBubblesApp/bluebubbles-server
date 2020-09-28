@@ -199,6 +199,8 @@ export class FileSystem {
     }
 
     static async executeAppleScript(cmd: string) {
+        if (!cmd || cmd.length === 0) return null;
+
         let parts = cmd.split("\n");
         parts = parts
             .map(i => escapeDoubleQuote(i).trim())

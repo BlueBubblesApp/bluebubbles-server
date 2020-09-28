@@ -1,4 +1,5 @@
 /* eslint-disable no-bitwise */
+import { Server } from "@server/index";
 import { PhoneNumberUtil } from "google-libphonenumber";
 import { FileSystem } from "@server/fileSystem";
 import { ContactRepository } from "@server/databases/contacts";
@@ -53,9 +54,12 @@ export const safeExecuteAppleScript = async (command: string) => {
         return (await FileSystem.executeAppleScript(command)) as string;
     } catch (ex) {
         let msg = ex.message;
-        if (msg instanceof String) [, msg] = msg.split("execution error: ");
-        [msg] = msg.split(". (");
+        if (msg instanceof String) {
+            [, msg] = msg.split("execution error: ");
+            [msg] = msg.split(". (");
+        }
 
+        Server().log(msg, "warn");
         throw new Error(msg);
     }
 };
