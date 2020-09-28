@@ -585,7 +585,6 @@ class BlueBubblesServer {
         });
 
         ipcMain.handle("check_perms", async (_, __) => {
-            // return { abPerms: "authorized", fdPerms: "authorized" };
             return {
                 abPerms: systemPreferences.isTrustedAccessibilityClient(false) ? "authorized" : "denied",
                 fdPerms: "authorized"
