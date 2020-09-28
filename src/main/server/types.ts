@@ -6,6 +6,7 @@ export type Error = {
 };
 
 export type ResponseData =
+    | ServerMetadataResponse
     | MessageResponse
     | HandleResponse
     | ChatResponse
@@ -21,6 +22,11 @@ export type ResponseFormat = {
     error?: Error;
     // Single or list of database objects, or null
     data?: ResponseData;
+};
+
+export type ServerMetadataResponse = {
+    os_version: string;
+    server_version: string;
 };
 
 /**

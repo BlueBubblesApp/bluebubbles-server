@@ -88,9 +88,12 @@ export class ActionHandler {
             }
         } catch (ex) {
             let msg = ex.message;
-            if (msg instanceof String) [, msg] = msg.split("execution error: ");
-            [msg] = msg.split(". (");
+            if (msg instanceof String) {
+                [, msg] = msg.split("execution error: ");
+                [msg] = msg.split(". (");
+            }
 
+            Server().log(msg, "warn");
             throw new Error(msg);
         }
     };
@@ -300,6 +303,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 const output = await safeExecuteAppleScript(checkTypingIndicator(name));
+                if (!output) return false;
                 return toBoolean(output.trim());
             } catch (ex) {
                 err = ex;

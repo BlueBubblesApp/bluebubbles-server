@@ -1,15 +1,17 @@
+import { app } from "electron";
 import * as io from "socket.io";
 import * as path from "path";
 import * as fs from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
+import * as macosVersion from "macos-version";
 
 // Internal libraries
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ResponseFormat } from "@server/types";
+import { ResponseFormat, ServerMetadataResponse } from "@server/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
@@ -26,6 +28,8 @@ import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachm
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
+
+const osVersion = macosVersion();
 
 /**
  * This service class handles all routing for incoming socket
@@ -125,6 +129,18 @@ export class SocketService {
 
             if (data.error) Server().log(data.error.message, "error");
         };
+
+        /**
+         * Return information about the server
+         */
+        socket.on("get-server-metadata", (_, cb): void => {
+            const meta: ServerMetadataResponse = {
+                os_version: osVersion,
+                server_version: app.getVersion()
+            };
+
+            return respond(cb, "server-metadata", createSuccessResponse(meta, "Successfully fetched metadata"));
+        });
 
         /**
          * Add Device ID to the database
