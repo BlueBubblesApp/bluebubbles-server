@@ -3,6 +3,7 @@ import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
 import { getCacheName } from "@server/databases/imessage/helpers/utils";
 import { DBWhereItem } from "@server/databases/imessage/types";
+import { onlyAlphaNumeric } from "@server/helpers/utils";
 import { ChangeListener } from "./changeListener";
 
 export class OutgoingMessageListener extends ChangeListener {
@@ -94,14 +95,20 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Check for any message created after the "date created" of the queue item
             // We will (re)emit all messages. The cache should catch if any dupes are being sent
-            const matches = await Server().iMessageRepo.getMessages({
+            let matches = await Server().iMessageRepo.getMessages({
                 chatGuid: entry.chatGuid,
-                limit: 50, // 50 is semi-arbitrary. We just don't want to miss anything
+                limit: 25, // 25 is semi-arbitrary. We just don't want to miss anything
                 withHandle: false, // Exclude to speed up query
                 after: new Date(entry.dateCreated),
                 sort: "ASC", // Ascending because we want to send the newest first
                 where
             });
+
+            // Filter down the results to only that match the sanitized value
+            // Only if it's a message, not an attachment
+            if (!entry.text.startsWith(entry.tempGuid)) {
+                matches = matches.filter(msg => onlyAlphaNumeric(entry.text) === onlyAlphaNumeric(msg.text));
+            }
 
             // Find the first non-emitted match
             for (const match of matches) {

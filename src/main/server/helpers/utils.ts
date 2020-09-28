@@ -167,8 +167,8 @@ export const escapeOsaExp = (input: string) => {
  *
  * @param input String to sanitize
  */
-export const flattenStr = (input: string) => {
-    return input.replace(/\s/g, "").replace(/\r?\n/g, "");
+export const onlyAlphaNumeric = (input: string) => {
+    return input.replace(/[\W_]+/g, "");
 };
 
 export const sanitizeStr = (val: string) => {
