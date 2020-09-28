@@ -113,7 +113,7 @@ export class SocketService {
             });
 
             // Pass to method to handle the socket events
-            this.routeSocket(socket);
+            SocketService.routeSocket(socket);
         });
     }
 
@@ -122,7 +122,7 @@ export class SocketService {
      *
      * @param socket The incoming socket connection
      */
-    routeSocket(socket: io.Socket) {
+    static routeSocket(socket: io.Socket) {
         const respond = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             if (callback) callback(data);
             else socket.emit(channel, data);
@@ -168,25 +168,16 @@ export class SocketService {
         );
 
         /**
-         * Add Device ID to the database
+         * Gets the FCM client config data
          */
         socket.on(
-            "get-fcm-data",
-            async (params, cb): Promise<void> => {
-                if (!this) return respond(cb, "error", createBadRequestResponse("No device name or ID specified"));
-
-                // If the device ID exists, update the identifier
-                const device = await Server().repo.devices().findOne({ name: params.deviceName });
-                if (device) {
-                    await Server().repo.devices().update({ name: params.deviceName }, { identifier: params.deviceId });
-                } else {
-                    const item = new Device();
-                    item.name = params.deviceName;
-                    item.identifier = params.deviceId;
-                    await Server().repo.devices().save(item);
-                }
-
-                return respond(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
+            "get-fcm-client",
+            async (_, cb): Promise<void> => {
+                return respond(
+                    cb,
+                    "fcm-client",
+                    createSuccessResponse(FileSystem.getFCMClient(), "Successfully got FCM data")
+                );
             }
         );
 
