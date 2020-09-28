@@ -58,7 +58,7 @@ export class ActionHandler {
             await FileSystem.startMessages();
 
             // We need offsets here due to iMessage's save times being a bit off for some reason
-            const now = new Date(new Date().getTime() - 1000).getTime(); // With 1 second offset
+            const now = new Date(new Date().getTime() - 3000).getTime(); // With 3 second offset
             await FileSystem.executeAppleScript(
                 sendMessage(
                     chatGuid,

@@ -2,7 +2,7 @@
 import * as macosVersion from "macos-version";
 import * as compareVersions from "compare-versions";
 import { FileSystem } from "@server/fileSystem";
-import { escapeInput } from "@server/helpers/utils";
+import { escapeOsaExp } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
@@ -26,14 +26,14 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
 
     let attachmentScpt = "";
     if (attachment && attachment.length > 0) {
-        attachmentScpt = `set theAttachment to "${escapeInput(attachment)}" as POSIX file
+        attachmentScpt = `set theAttachment to "${escapeOsaExp(attachment)}" as POSIX file
             send theAttachment to targetChat
             delay 0.5`;
     }
 
     let messageScpt = "";
     if (message && message.length > 0) {
-        messageScpt = `send "${escapeInput(message)}" to targetChat`;
+        messageScpt = `send "${escapeOsaExp(message)}" to targetChat`;
     }
 
     return `tell application "Messages"

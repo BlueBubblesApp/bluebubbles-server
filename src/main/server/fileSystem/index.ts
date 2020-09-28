@@ -4,7 +4,7 @@ import * as child_process from "child_process";
 import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server/index";
-import { escapeScript, concatUint8Arrays } from "@server/helpers/utils";
+import { escapeDoubleQuote, concatUint8Arrays } from "@server/helpers/utils";
 import { startMessages } from "./scripts";
 
 // Directory modifiers based on the environment
@@ -201,7 +201,7 @@ export class FileSystem {
     static async executeAppleScript(cmd: string) {
         let parts = cmd.split("\n");
         parts = parts
-            .map(i => escapeScript(i).trim())
+            .map(i => escapeDoubleQuote(i).trim())
             .filter(i => i && i.length > 0)
             .map(i => `"${i}"`);
 
