@@ -38,10 +38,11 @@ class SettingsView extends React.Component<unknown, State> {
             if (!this.state.showDebug && data.type === "debug") return;
 
             // Build the new log
-            let newLog = [...this.state.logs, { log: data, timestamp: new Date() }];
+            // Insert the newest log at the top of the list
+            let newLog = [{ log: data, timestamp: new Date() }, ...this.state.logs];
 
             // Make sure there are only MAX_LENGTH logs in the list
-            newLog = newLog.slice(newLog.length - MAX_LENGTH < 0 ? 0 : newLog.length - MAX_LENGTH, newLog.length);
+            newLog = newLog.slice(0, MAX_LENGTH);
 
             // Set the new logs
             this.setState({ logs: newLog });
