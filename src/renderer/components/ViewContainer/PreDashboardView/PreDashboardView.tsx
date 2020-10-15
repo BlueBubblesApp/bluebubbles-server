@@ -23,6 +23,7 @@ interface State {
     fcmClient: any;
     redirect: any;
     inputPassword: string;
+    enableNgrok: boolean;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -38,7 +39,8 @@ class PreDashboardView extends React.Component<unknown, State> {
             fcmServer: null,
             fcmClient: null,
             redirect: null,
-            inputPassword: ""
+            inputPassword: "",
+            enableNgrok: true
         };
     }
 
@@ -54,6 +56,10 @@ class PreDashboardView extends React.Component<unknown, State> {
             if (config.tutorial_is_done === true) {
                 this.setState({ redirect: "/dashboard" });
             }
+
+            this.setState({ enableNgrok: config.enable_ngrok });
+            const ngrokCheckbox: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
+            ngrokCheckbox.checked = config.enable_ngrok;
         } catch (ex) {
             console.log("Failed to load database config");
         }
@@ -184,6 +190,11 @@ class PreDashboardView extends React.Component<unknown, State> {
         this.setState({ inputPassword: e.target.value });
     };
 
+    handleNgrokCheckboxChange() {
+        console.log(this.state.enableNgrok);
+        this.setState({ enableNgrok: !this.state.enableNgrok });
+    }
+
     savePassword = async () => {
         await ipcRenderer.invoke("set-config", {
             password: this.state.inputPassword
@@ -274,6 +285,17 @@ class PreDashboardView extends React.Component<unknown, State> {
                                 onBlur={() => this.savePassword()}
                             />
                         </div>
+                        <div id="setNgrokContainer">
+                            <h3>Enable NGROK: </h3>
+                            <div className="form-switch">
+                                <input
+                                    id="toggleNgrok"
+                                    onChange={() => this.handleNgrokCheckboxChange()}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
                     </div>
                     <h1 id="uploadTitle">Required Config Files</h1>
                     <Dropzone onDrop={acceptedFiles => this.handleServerFile(acceptedFiles)}>
@@ -304,6 +326,18 @@ class PreDashboardView extends React.Component<unknown, State> {
                             </section>
                         )}
                     </Dropzone>
+                    <div id="skipDiv">
+                        {this.state.abPerms && this.state.fdPerms && this.state.inputPassword ? (
+                            <button onClick={() => this.completeTutorial()}>Skip FCM Setup</button>
+                        ) : null}
+                        {this.state.abPerms &&
+                        this.state.fdPerms &&
+                        this.state.inputPassword &&
+                        this.state.fcmClient &&
+                        this.state.fcmServer ? (
+                            <button onClick={() => this.completeTutorial()}>Continue</button>
+                        ) : null}
+                    </div>
                 </div>
             </div>
         );

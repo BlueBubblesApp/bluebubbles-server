@@ -6,5 +6,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
     ngrok_key: () => "",
     password: () => "bluebubblesisawesome",
     auto_caffeinate: () => 0,
-    auto_start: () => 0
+    auto_start: () => 0,
+    enable_ngrok: () => 1
 };
