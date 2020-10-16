@@ -293,7 +293,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                         </div>
                         <div id="setNgrokContainer">
                             <h3>Enable NGROK: </h3>
-                            <div>
+                            <div className="form-switch">
                                 <input
                                     id="toggleNgrok"
                                     onChange={() => this.handleNgrokCheckboxChange()}
