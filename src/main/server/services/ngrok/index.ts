@@ -1,6 +1,8 @@
 import { Server } from "@server/index";
 import { connect, disconnect, kill, authtoken } from "ngrok";
 
+const localIpUrl = require("local-ip-url");
+
 const sevenHours = 1000 * 60 * 60 * 7;
 
 export class NgrokService {
@@ -25,6 +27,12 @@ export class NgrokService {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async start(): Promise<void> {
+        const enableNgrok = Server().repo.getConfig("enable_ngrok") as boolean;
+        if (!enableNgrok) {
+            Server().log("Ngrok is diabled. Skipping.");
+            await Server().repo.setConfig("server_address", localIpUrl());
+            return;
+        }
         // If there is a ngrok API key set, and we have a refresh timer going, kill it
         const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
         if (ngrokKey && this.refreshTimer) clearTimeout(this.refreshTimer);
@@ -86,6 +94,11 @@ export class NgrokService {
      * Disconnect from ngrok
      */
     async stop(): Promise<void> {
+        const enableNgrok = Server().repo.getConfig("enable_ngrok") as boolean;
+        if (!enableNgrok) {
+            await Server().repo.setConfig("server_address", localIpUrl());
+        }
+
         try {
             await disconnect();
             await kill();
@@ -98,6 +111,14 @@ export class NgrokService {
      * Helper for restarting the ngrok connection
      */
     async restart(): Promise<boolean> {
+        const enableNgrok = Server().repo.getConfig("enable_ngrok") as boolean;
+        if (!enableNgrok) {
+            Server().log("Ngrok is diabled. Skipping.");
+            await Server().repo.setConfig("server_address", localIpUrl());
+            // await Server().repo.setConfig("port", localIpUrl());
+            return false;
+        }
+
         const maxTries = 25;
         let tries = 0;
         let connected = false;

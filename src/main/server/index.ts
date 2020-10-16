@@ -613,6 +613,17 @@ class BlueBubblesServer {
             await this.repo.setConfig("auto_caffeinate", toggle);
         });
 
+        ipcMain.handle("toggle-ngrok", async (_, toggle) => {
+            await this.repo.setConfig("enable_ngrok", toggle);
+
+            if (this.ngrok && toggle) {
+                this.ngrok.start();
+            } else if (this.ngrok && !toggle) {
+                console.log("Stopping ngrok");
+                this.ngrok.stop();
+            }
+        });
+
         ipcMain.handle("get-caffeinate-status", (_, __) => {
             return {
                 isCaffeinated: this.caffeinate.isCaffeinated,

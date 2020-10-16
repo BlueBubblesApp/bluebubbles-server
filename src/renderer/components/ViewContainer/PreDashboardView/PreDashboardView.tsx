@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable react/sort-comp */
 /* eslint-disable react/no-unused-state */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
@@ -182,6 +183,7 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     completeTutorial() {
+        console.log(this.state);
         ipcRenderer.invoke("toggle-tutorial", true);
         this.setState({ redirect: "/dashboard" });
     }
@@ -191,8 +193,10 @@ class PreDashboardView extends React.Component<unknown, State> {
     };
 
     handleNgrokCheckboxChange() {
-        console.log(this.state.enableNgrok);
+        const ngrokCheckbox: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
+        ngrokCheckbox.checked = !this.state.enableNgrok;
         this.setState({ enableNgrok: !this.state.enableNgrok });
+        ipcRenderer.invoke("toggle-ngrok", !this.state.enableNgrok);
     }
 
     savePassword = async () => {
@@ -234,6 +238,8 @@ class PreDashboardView extends React.Component<unknown, State> {
                 color: "green"
             };
         }
+
+        const toggleNgrok = document.getElementById("toggleNgrok") as HTMLInputElement;
 
         return (
             <div id="PreDashboardView" data-theme="light">
@@ -287,7 +293,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                         </div>
                         <div id="setNgrokContainer">
                             <h3>Enable NGROK: </h3>
-                            <div className="form-switch">
+                            <div>
                                 <input
                                     id="toggleNgrok"
                                     onChange={() => this.handleNgrokCheckboxChange()}
@@ -328,13 +334,16 @@ class PreDashboardView extends React.Component<unknown, State> {
                     </Dropzone>
                     <div id="skipDiv">
                         {this.state.abPerms && this.state.fdPerms && this.state.inputPassword ? (
-                            <button onClick={() => this.completeTutorial()}>Skip FCM Setup</button>
+                            <button onClick={() => this.completeTutorial()}>
+                                {toggleNgrok.checked ? "Skip FCM Setup" : "Skip FCM And Ngrok Setup"}
+                            </button>
                         ) : null}
                         {this.state.abPerms &&
                         this.state.fdPerms &&
                         this.state.inputPassword &&
                         this.state.fcmClient &&
-                        this.state.fcmServer ? (
+                        this.state.fcmServer &&
+                        toggleNgrok.checked ? (
                             <button onClick={() => this.completeTutorial()}>Continue</button>
                         ) : null}
                     </div>
