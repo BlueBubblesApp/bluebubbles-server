@@ -621,6 +621,9 @@ class BlueBubblesServer {
             } else if (this.ngrok && !toggle) {
                 console.log("Stopping ngrok");
                 this.ngrok.stop();
+
+                // Revert the server address to nothing
+                await this.repo.setConfig("server_address", "Ngrok Disabled...");
             }
         });
 
