@@ -48,7 +48,7 @@ export class SocketService {
      * @param port The initial port for Socket.IO
      */
     constructor() {
-        this.server = io(Server().repo.getConfig("socket_port"), {
+        this.server = io(Server().repo.getConfig("socket_port") as number, {
             // 5 Minute ping timeout
             pingTimeout: 60000
         });
@@ -700,7 +700,7 @@ export class SocketService {
     restart() {
         if (this.server) {
             this.server.close();
-            this.server = io(Server().repo.getConfig("socket_port"), {
+            this.server = io(Server().repo.getConfig("socket_port") as number, {
                 // 5 Minute ping timeout
                 pingTimeout: 60000
             });

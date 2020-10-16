@@ -149,7 +149,6 @@
         "firebase-admin": "^8.12.1",
         "google-libphonenumber": "^3.2.10",
         "history": "^4.10.1",
-        "local-ip-url": "^1.0.3",
         "macos-version": "^5.2.0",
         "ngrok": "^3.2.7",
         "node-pre-gyp": "^0.15.0",

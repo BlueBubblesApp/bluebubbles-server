@@ -192,11 +192,9 @@ class PreDashboardView extends React.Component<unknown, State> {
         this.setState({ inputPassword: e.target.value });
     };
 
-    handleNgrokCheckboxChange() {
-        const ngrokCheckbox: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
-        ngrokCheckbox.checked = !this.state.enableNgrok;
-        this.setState({ enableNgrok: !this.state.enableNgrok });
-        ipcRenderer.invoke("toggle-ngrok", !this.state.enableNgrok);
+    handleNgrokCheckboxChange(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({ enableNgrok: e.target.checked });
+        ipcRenderer.invoke("toggle-ngrok", e.target.checked);
     }
 
     savePassword = async () => {
@@ -296,7 +294,8 @@ class PreDashboardView extends React.Component<unknown, State> {
                             <div className="form-switch">
                                 <input
                                     id="toggleNgrok"
-                                    onChange={() => this.handleNgrokCheckboxChange()}
+                                    checked={this.state.enableNgrok}
+                                    onChange={e => this.handleNgrokCheckboxChange(e)}
                                     type="checkbox"
                                 />
                                 <i />
