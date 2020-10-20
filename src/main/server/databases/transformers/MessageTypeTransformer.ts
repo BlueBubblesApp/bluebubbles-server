@@ -1,6 +1,6 @@
 import { ValueTransformer } from "typeorm";
 
-export const ReactionIdToString: { [key: number]: string } = {
+export const ReactionIdToString: { [key: string]: string } = {
     0: null,
     1000: "sticker",
     2000: "love",
@@ -34,6 +34,9 @@ export const ReactionStringToId: { [key: string]: number } = {
 };
 
 export const MessageTypeTransformer: ValueTransformer = {
-    from: dbValue => Object.keys(ReactionIdToString).indexOf(dbValue) >= 0 ? ReactionIdToString[dbValue] : (dbValue as number).toString(),
+    from: (dbValue: number) =>
+        Object.keys(ReactionIdToString).includes(dbValue.toString())
+            ? ReactionIdToString[dbValue.toString()]
+            : dbValue.toString(),
     to: entityValue => ReactionStringToId[entityValue] ?? 0
 };
