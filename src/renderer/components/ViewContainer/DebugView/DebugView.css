@@ -59,7 +59,7 @@
 .form-switch {
     display: inline-block;
     cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
+    /* -webkit-tap-highlight-color: transparent; */
 }
 
 .form-switch i {

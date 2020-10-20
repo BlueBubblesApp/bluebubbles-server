@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable react/sort-comp */
 /* eslint-disable react/no-unused-state */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
@@ -23,6 +24,7 @@ interface State {
     fcmClient: any;
     redirect: any;
     inputPassword: string;
+    enableNgrok: boolean;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -38,7 +40,8 @@ class PreDashboardView extends React.Component<unknown, State> {
             fcmServer: null,
             fcmClient: null,
             redirect: null,
-            inputPassword: ""
+            inputPassword: "",
+            enableNgrok: true
         };
     }
 
@@ -54,6 +57,10 @@ class PreDashboardView extends React.Component<unknown, State> {
             if (config.tutorial_is_done === true) {
                 this.setState({ redirect: "/dashboard" });
             }
+
+            this.setState({ enableNgrok: config.enable_ngrok });
+            const ngrokCheckbox: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
+            ngrokCheckbox.checked = config.enable_ngrok;
         } catch (ex) {
             console.log("Failed to load database config");
         }
@@ -176,6 +183,7 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     completeTutorial() {
+        console.log(this.state);
         ipcRenderer.invoke("toggle-tutorial", true);
         this.setState({ redirect: "/dashboard" });
     }
@@ -183,6 +191,11 @@ class PreDashboardView extends React.Component<unknown, State> {
     handleInputChange = async (e: any) => {
         this.setState({ inputPassword: e.target.value });
     };
+
+    handleNgrokCheckboxChange(e: React.ChangeEvent<HTMLInputElement>) {
+        this.setState({ enableNgrok: e.target.checked });
+        ipcRenderer.invoke("toggle-ngrok", e.target.checked);
+    }
 
     savePassword = async () => {
         await ipcRenderer.invoke("set-config", {
@@ -223,6 +236,8 @@ class PreDashboardView extends React.Component<unknown, State> {
                 color: "green"
             };
         }
+
+        const toggleNgrok = document.getElementById("toggleNgrok") as HTMLInputElement;
 
         return (
             <div id="PreDashboardView" data-theme="light">
@@ -274,6 +289,18 @@ class PreDashboardView extends React.Component<unknown, State> {
                                 onBlur={() => this.savePassword()}
                             />
                         </div>
+                        <div id="setNgrokContainer">
+                            <h3>Enable NGROK: </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <input
+                                    id="toggleNgrok"
+                                    checked={this.state.enableNgrok}
+                                    onChange={e => this.handleNgrokCheckboxChange(e)}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
                     </div>
                     <h1 id="uploadTitle">Required Config Files</h1>
                     <Dropzone onDrop={acceptedFiles => this.handleServerFile(acceptedFiles)}>
@@ -304,6 +331,21 @@ class PreDashboardView extends React.Component<unknown, State> {
                             </section>
                         )}
                     </Dropzone>
+                    <div id="skipDiv">
+                        {this.state.abPerms && this.state.fdPerms && this.state.inputPassword ? (
+                            <button onClick={() => this.completeTutorial()}>
+                                {toggleNgrok.checked ? "Skip FCM Setup" : "Skip FCM And Ngrok Setup"}
+                            </button>
+                        ) : null}
+                        {this.state.abPerms &&
+                        this.state.fdPerms &&
+                        this.state.inputPassword &&
+                        this.state.fcmClient &&
+                        this.state.fcmServer &&
+                        toggleNgrok.checked ? (
+                            <button onClick={() => this.completeTutorial()}>Continue</button>
+                        ) : null}
+                    </div>
                 </div>
             </div>
         );

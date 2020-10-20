@@ -25,6 +25,7 @@ interface State {
     showPassword: boolean;
     showKey: boolean;
     ngrokKey: string;
+    enableNgrok: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -42,7 +43,8 @@ class SettingsView extends React.Component<unknown, State> {
             serverPassword: "",
             showPassword: false,
             showKey: false,
-            ngrokKey: ""
+            ngrokKey: "",
+            enableNgrok: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -65,7 +67,8 @@ class SettingsView extends React.Component<unknown, State> {
                 serverPassword: config.password,
                 showPassword: false,
                 showKey: false,
-                ngrokKey: config.ngrok_key
+                ngrokKey: config.ngrok_key,
+                enableNgrok: config.enable_ngrok
             });
         this.getCaffeinateStatus();
 
@@ -76,6 +79,13 @@ class SettingsView extends React.Component<unknown, State> {
 
         const toggleCaffeinate: HTMLInputElement = document.getElementById("toggleCaffeinate") as HTMLInputElement;
         const toggleAutoStart: HTMLInputElement = document.getElementById("toggleAutoStart") as HTMLInputElement;
+        const toggleNgrok: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
+
+        if (this.state.enableNgrok) {
+            toggleNgrok.checked = true;
+        } else {
+            toggleNgrok.checked = false;
+        }
 
         if (this.state.autoCaffeinate) {
             toggleCaffeinate.checked = true;
@@ -133,6 +143,12 @@ class SettingsView extends React.Component<unknown, State> {
         const id = e.target.id;
         if (["serverPort", "serverPassword", "ngrokKey"].includes(id)) {
             this.setState({ [id]: e.target.value } as any);
+        }
+
+        if (id === "toggleNgrok") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ enableNgrok: target.checked });
+            await ipcRenderer.invoke("toggle-ngrok", target.checked!);
         }
 
         if (id === "toggleCaffeinate") {
@@ -255,6 +271,13 @@ class SettingsView extends React.Component<unknown, State> {
                             onBlur={() => this.saveConfig()}
                         />
                         <div className="aCheckboxDiv firstCheckBox">
+                            <h3 className="aSettingTitle">Enable Ngrok</h3>
+                            <label className="form-switch">
+                                <input id="toggleNgrok" onChange={e => this.handleInputChange(e)} type="checkbox" />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
                             <h3 className="aSettingTitle">Keep MacOS Awake</h3>
                             <label className="form-switch">
                                 <input

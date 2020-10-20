@@ -25,6 +25,12 @@ export class NgrokService {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async start(): Promise<void> {
+        const enableNgrok = Server().repo.getConfig("enable_ngrok") as boolean;
+        if (!enableNgrok) {
+            Server().log("Ngrok is diabled. Skipping.");
+            return;
+        }
+
         // If there is a ngrok API key set, and we have a refresh timer going, kill it
         const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
         if (ngrokKey && this.refreshTimer) clearTimeout(this.refreshTimer);
@@ -98,6 +104,12 @@ export class NgrokService {
      * Helper for restarting the ngrok connection
      */
     async restart(): Promise<boolean> {
+        const enableNgrok = Server().repo.getConfig("enable_ngrok") as boolean;
+        if (!enableNgrok) {
+            Server().log("Ngrok is diabled. Skipping.");
+            return false;
+        }
+
         const maxTries = 25;
         let tries = 0;
         let connected = false;
