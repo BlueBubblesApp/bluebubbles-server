@@ -59,6 +59,7 @@ export type MessageResponse = {
     isServiceMessage: boolean;
     isForward: boolean;
     isArchived: boolean;
+    hasDdResults: boolean;
     cacheRoomnames: string | null;
     isAudioMessage: boolean;
     datePlayed: number | null;

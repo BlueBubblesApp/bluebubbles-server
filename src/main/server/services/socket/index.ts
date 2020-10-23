@@ -687,6 +687,24 @@ export class SocketService {
             }
         );
 
+        /**
+         * Tells all clients that a chat is read
+         */
+        socket.on("toggle-chat-read-status", (params, cb): void => {
+            // Make sure we have all the required data
+            if (!params?.chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+            if (!params?.status) return respond(cb, "error", createBadRequestResponse("No chat status provided!"));
+
+            // Send the notification out to all clients
+            Server().emitMessage("chat-read-status-changed", {
+                chatGuid: params.chatGuid,
+                status: params.status
+            });
+
+            // Return null so Typescript doesn't yell at us
+            return null;
+        });
+
         socket.on("disconnect", reason => {
             Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
