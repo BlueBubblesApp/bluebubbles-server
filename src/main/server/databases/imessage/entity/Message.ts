@@ -430,6 +430,7 @@ export const getMessageResponse = async (tableData: Message, withBlurhash = true
         isArchived: tableData.isArchived,
         cacheRoomnames: tableData.cacheRoomnames,
         isAudioMessage: tableData.isAudioMessage,
+        hasDdResults: tableData.hasDdResults,
         datePlayed: tableData.datePlayed ? tableData.datePlayed.getTime() : null,
         itemType: tableData.itemType,
         groupTitle: tableData.groupTitle,
