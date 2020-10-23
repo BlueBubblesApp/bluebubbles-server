@@ -1,3 +1,4 @@
+import { app } from "electron";
 import { Server } from "@server/index";
 import { connect, disconnect, kill, authtoken } from "ngrok";
 
@@ -119,7 +120,7 @@ export class NgrokService {
             tries += 1;
 
             // Set the wait time based on which try we are attempting
-            const wait = tries > 1 ? 5000 * tries : 1000;
+            const wait = tries > 1 ? 2000 * tries : 1000;
             Server().log(`Attempting to restart ngrok (attempt ${tries}; ${wait} ms delay)`);
             connected = await this.restartHandler(wait);
         }
@@ -129,6 +130,12 @@ export class NgrokService {
             Server().log(`Successfully connected to ngrok after ${tries} ${tries === 1 ? "try" : "tries"}`);
         } else {
             Server().log(`Failed to connect to ngrok after ${maxTries} tries`);
+        }
+
+        if (tries >= maxTries) {
+            Server().log("Reached maximum retry attempts for Ngrok. Force restarting app...");
+            app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
+            app.exit(0);
         }
 
         return connected;
