@@ -85,12 +85,16 @@ export class FCMService {
      * @param devices Devices to send the notification to
      * @param data The data to send
      */
-    async sendNotification(devices: string[], data: any): Promise<admin.messaging.MessagingDevicesResponse[]> {
+    async sendNotification(
+        devices: string[],
+        data: any,
+        priority: "normal" | "high" = "normal"
+    ): Promise<admin.messaging.MessagingDevicesResponse[]> {
         if (!(await this.start())) return null;
 
         // Build out the notification message
         const msg: admin.messaging.DataMessagePayload = { data };
-        const options: admin.messaging.MessagingOptions = { priority: "high" };
+        const options: admin.messaging.MessagingOptions = { priority };
 
         const responses: admin.messaging.MessagingDevicesResponse[] = [];
         for (const device of devices)
