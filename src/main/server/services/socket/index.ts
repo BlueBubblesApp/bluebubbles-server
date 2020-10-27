@@ -693,7 +693,7 @@ export class SocketService {
         socket.on("toggle-chat-read-status", (params, cb): void => {
             // Make sure we have all the required data
             if (!params?.chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided!"));
-            if (!params?.status) return respond(cb, "error", createBadRequestResponse("No chat status provided!"));
+            if (params?.status === null) return respond(cb, "error", createBadRequestResponse("No chat status provided!"));
 
             // Send the notification out to all clients
             Server().emitMessage("chat-read-status-changed", {
