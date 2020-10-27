@@ -285,7 +285,7 @@ class BlueBubblesServer {
 
         // If the ngrok URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
-            if (this.socket) await this.emitMessage("new-server", nextConfig.server_address);
+            if (this.socket) await this.emitMessage("new-server", nextConfig.server_address, "high");
             if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
         }
 
@@ -303,7 +303,7 @@ class BlueBubblesServer {
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async emitMessage(type: string, data: any) {
+    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal") {
         this.socket.server.emit(type, data);
 
         // Send notification to devices
@@ -314,7 +314,8 @@ class BlueBubblesServer {
             const notifData = JSON.stringify(data);
             await this.fcm.sendNotification(
                 devices.map(device => device.identifier),
-                { type, data: notifData }
+                { type, data: notifData },
+                priority
             );
         }
     }
@@ -454,7 +455,7 @@ class BlueBubblesServer {
             this.log(`New message from [${item.handle?.id}]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(item));
+            await this.emitMessage("new-message", await getMessageResponse(item), "high");
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
