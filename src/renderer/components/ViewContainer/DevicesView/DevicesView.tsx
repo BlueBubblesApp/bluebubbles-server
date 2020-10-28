@@ -54,6 +54,13 @@ class SettingsView extends React.Component<unknown, State> {
         });
     }
 
+    invokeMain(event: string, args: any) {
+        ipcRenderer.invoke(event, args);
+        if (event === "purge-devices") {
+            this.refreshDevices();
+        }
+    }
+
     render() {
         return (
             <div id="SettingsView" data-theme="light">
@@ -61,7 +68,13 @@ class SettingsView extends React.Component<unknown, State> {
                 <div id="settingsLowerContainer">
                     <LeftStatusIndicator />
                     <div id="settingsMainRightContainer">
-                        <h3 className="largeSettingTitle">Manage Devices</h3>
+                        <div id="headingRow">
+                            <h3 className="largeSettingTitle">Manage Devices</h3>
+                            <button id="clearLogsButton" onClick={() => this.invokeMain("purge-devices", null)}>
+                                Clear Devices
+                            </button>
+                        </div>
+
                         <div id="devicesHeadings">
                             <h1>Device Name</h1>
                             <h1>Identifier</h1>

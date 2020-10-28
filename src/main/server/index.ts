@@ -655,6 +655,10 @@ class BlueBubblesServer {
             }
         });
 
+        ipcMain.handle("purge-devices", (_, __) => {
+            this.repo.devices().clear();
+        });
+
         ipcMain.handle("toggle-auto-start", async (_, toggle) => {
             await this.repo.setConfig("auto_start", toggle);
             app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
