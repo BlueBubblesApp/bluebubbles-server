@@ -25,6 +25,8 @@ interface State {
     redirect: any;
     inputPassword: string;
     enableNgrok: boolean;
+    showModal: boolean;
+    serverUrl: string;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -41,7 +43,9 @@ class PreDashboardView extends React.Component<unknown, State> {
             fcmClient: null,
             redirect: null,
             inputPassword: "",
-            enableNgrok: true
+            enableNgrok: true,
+            showModal: false,
+            serverUrl: ""
         };
     }
 
@@ -78,6 +82,16 @@ class PreDashboardView extends React.Component<unknown, State> {
         ipcRenderer.removeAllListeners("config-update");
         clearInterval(this.backgroundPermissionsCheck);
     }
+
+    saveCustomServerUrl = (save: boolean) => {
+        if (save) {
+            ipcRenderer.invoke("set-config", {
+                server_address: this.state.serverUrl
+            });
+        }
+
+        this.setState({ showModal: false });
+    };
 
     async setTheme(currentTheme: string) {
         const themedItems = document.querySelectorAll("[data-theme]");
@@ -179,7 +193,7 @@ class PreDashboardView extends React.Component<unknown, State> {
     };
 
     openTutorialLink() {
-        shell.openExternal("https://bluebubbles.app/install/index.html");
+        shell.openExternal("https://bluebubbles.app/install");
     }
 
     completeTutorial() {
@@ -188,13 +202,16 @@ class PreDashboardView extends React.Component<unknown, State> {
         this.setState({ redirect: "/dashboard" });
     }
 
-    handleInputChange = async (e: any) => {
-        this.setState({ inputPassword: e.target.value });
+    handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        this.setState({ [e.target.name]: e.target.value } as any);
     };
 
     handleNgrokCheckboxChange(e: React.ChangeEvent<HTMLInputElement>) {
         this.setState({ enableNgrok: e.target.checked });
         ipcRenderer.invoke("toggle-ngrok", e.target.checked);
+        if (!e.target.checked) {
+            this.setState({ showModal: true });
+        }
     }
 
     savePassword = async () => {
@@ -284,6 +301,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                             <input
                                 id="requiredPasswordInput"
                                 placeholder="Enter a password"
+                                name="inputPassword"
                                 value={this.state.inputPassword}
                                 onChange={e => this.handleInputChange(e)}
                                 onBlur={() => this.savePassword()}
@@ -345,6 +363,37 @@ class PreDashboardView extends React.Component<unknown, State> {
                         toggleNgrok.checked ? (
                             <button onClick={() => this.completeTutorial()}>Continue</button>
                         ) : null}
+                    </div>
+                </div>
+
+                <div id="myModal" className="modal" style={{ display: this.state.showModal ? "block" : "none" }}>
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <span
+                                role="button"
+                                className="close"
+                                onClick={() => this.saveCustomServerUrl(false)}
+                                onKeyDown={() => this.saveCustomServerUrl(false)}
+                                tabIndex={0}
+                            >
+                                &times;
+                            </span>
+                            <h2>Enter your server&rsquo;s host name</h2>
+                        </div>
+                        <div className="modal-body">
+                            <div className="modal-col">
+                                <input
+                                    id="serverUrl"
+                                    className="aInput"
+                                    name="serverUrl"
+                                    value={this.state.serverUrl}
+                                    onChange={e => this.handleInputChange(e)}
+                                />
+                                <button className="modal-button" onClick={() => this.saveCustomServerUrl(true)}>
+                                    Save
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

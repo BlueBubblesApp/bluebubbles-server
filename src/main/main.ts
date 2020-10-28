@@ -10,6 +10,7 @@ import { UpdateService, FCMService } from "@server/services";
 let win: BrowserWindow;
 let tray: Tray;
 let api = Server(win);
+let updateService: UpdateService;
 
 // Only 1 instance is allowed
 const gotTheLock = app.requestSingleInstanceLock();
@@ -59,6 +60,15 @@ const buildTray = () => {
                     win.show();
                 } else {
                     createWindow();
+                }
+            }
+        },
+        {
+            label: "Check for Updates",
+            type: "normal",
+            click: async () => {
+                if (updateService) {
+                    await updateService.checkForUpdate(true);
                 }
             }
         },
@@ -169,9 +179,9 @@ const createWindow = async () => {
     api = Server(win);
 
     // Start the update service
-    const updateService = new UpdateService(win);
+    updateService = new UpdateService(win);
     updateService.start();
-    updateService.checkForUpdate();
+    updateService.checkForUpdate(false);
 };
 
 app.on("ready", () => {
