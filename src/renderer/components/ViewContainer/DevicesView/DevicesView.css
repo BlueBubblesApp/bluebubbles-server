@@ -234,3 +234,10 @@
     font-size: 14px;
     vertical-align: middle;
 }
+
+#headingRow {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}

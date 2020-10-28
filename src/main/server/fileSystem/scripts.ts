@@ -47,6 +47,18 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
 };
 
 /**
+ * The AppleScript used to restart iMessage
+ */
+export const restartMessages = () => {
+    return `tell application "Messages"
+        quit
+        delay 0.5
+        reopen
+        delay 0.5
+    end tell`;
+};
+
+/**
  * The AppleScript used to start a chat with some number of participants
  */
 export const startChat = (participants: string[]) => {
@@ -67,6 +79,74 @@ export const startChat = (participants: string[]) => {
     end tell
 
     tell application "System Events" to tell process "Messages" to set visible to false`;
+};
+
+/**
+ * The AppleScript used to rename a group chat
+ */
+export const openChat = (name: string) => {
+    return `tell application "System Events"
+        (* Check if messages was in the foreground *)
+        set isForeground to false
+        tell application "Finder"
+            try
+                set frontApp to window 1 of (first application process whose frontmost is true)
+                set winName to name of frontApp
+                if winName is equal to "Messages" then
+                    set isForeground to true
+                end if
+            end try
+        end tell
+
+        tell process "Messages"
+            set groupMatch to -1
+            
+            (* Iterate over each chat row *)
+            repeat with chatRow in ((table 1 of scroll area 1 of splitter group 1 of window 1)'s entire contents as list)
+                if chatRow's class is row then
+                    
+                    (* Pull out the chat's name *)
+                    set fullName to (chatRow's UI element 1)'s description
+                    set nameSplit to my splitText(fullName, ". ")
+                    set chatName to item 1 of nameSplit
+                    
+                    (* Only pull out groups *)
+                    if chatName is equal to "${name}" then
+                        set groupMatch to chatRow
+                        exit repeat
+                    end if
+                end if
+            end repeat
+            
+            (* If no match, exit *)
+            if groupMatch is equal to -1 then
+                tell me to error "Group chat does not exist"
+            end if
+
+            (* We have to activate the window so that we can hit enter *)
+            tell application "Messages"
+                reopen
+                activate
+            end tell
+            delay 1
+            
+            (* Select the chat *)
+            select groupMatch
+
+        (* If the window was not in the foreground originally, hide it *)
+        if isForeground is equal to false then
+            tell application "Finder"
+                set visible of process "Messages" to false
+            end tell
+        end if
+    end tell
+
+    on splitText(theText, theDelimiter)
+        set AppleScript's text item delimiters to theDelimiter
+        set theTextItems to every text item of theText
+        set AppleScript's text item delimiters to ""
+        return theTextItems
+    end splitText`;
 };
 
 /**
@@ -99,7 +179,7 @@ export const renameGroupChat = (currentName: string, newName: string) => {
                     set chatName to item 1 of nameSplit
                     
                     (* Only pull out groups *)
-                    if chatName is equal to currentName then
+                    if chatName is equal to "${currentName}" then
                         set groupMatch to chatRow
                         exit repeat
                     end if
@@ -131,7 +211,7 @@ export const renameGroupChat = (currentName: string, newName: string) => {
                     end try
 
                     tell pop over 1 to tell scroll area 1 to tell text field 1
-                        set value to newName
+                        set value to "${newName}"
                         confirm
                     end tell
                     click
@@ -388,7 +468,7 @@ export const toggleTapback = (chatName: string, messageText: string, reactionInd
                     set chatName to item 1 of nameSplit
                     
                     (* Only pull out groups *)
-                    if chatName is equal to "${chatName} then
+                    if chatName is equal to "${chatName}" then
                         set groupMatch to chatRow
                         exit repeat
                     end if

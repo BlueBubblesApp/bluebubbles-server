@@ -10,7 +10,9 @@ import {
     removeParticipant,
     toggleTapback,
     checkTypingIndicator,
-    exportContacts
+    exportContacts,
+    restartMessages,
+    openChat
 } from "@server/fileSystem/scripts";
 
 import {
@@ -59,13 +61,32 @@ export class ActionHandler {
 
             // We need offsets here due to iMessage's save times being a bit off for some reason
             const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-            await FileSystem.executeAppleScript(
-                sendMessage(
-                    chatGuid,
-                    message ?? "",
-                    attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
-                )
-            );
+
+            // Try to send the iMessage
+            try {
+                await FileSystem.executeAppleScript(
+                    sendMessage(
+                        chatGuid,
+                        message ?? "",
+                        attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
+                    )
+                );
+            } catch (ex) {
+                // If it's not a timeout failure, throw the error
+                if (!((ex?.message ?? "") as string).includes("AppleEvent timed out")) {
+                    throw ex;
+                }
+
+                // If it's a timeout error, restart iMessage and retry
+                await FileSystem.executeAppleScript(restartMessages());
+                await FileSystem.executeAppleScript(
+                    sendMessage(
+                        chatGuid,
+                        message ?? "",
+                        attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
+                    )
+                );
+            }
 
             // Add queued item
             if (message && message.length > 0) {
@@ -109,7 +130,7 @@ export class ActionHandler {
     static renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
         Server().log(`Executing Action: Rename Group (Chat: ${chatGuid}; Name: ${newName})`, "debug");
 
-        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
+        const names = await generateChatNameList(chatGuid);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -150,7 +171,7 @@ export class ActionHandler {
     static addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
         Server().log(`Executing Action: Add Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
 
-        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
+        const names = await generateChatNameList(chatGuid);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -191,7 +212,7 @@ export class ActionHandler {
     static removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
         Server().log(`Executing Action: Remove Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
 
-        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
+        const names = await generateChatNameList(chatGuid);
         let address = participant;
         if (!address.includes("@")) {
             address = getiMessageNumberFormat(address);
@@ -226,6 +247,50 @@ export class ActionHandler {
     };
 
     /**
+     * Opens a chat in iMessage
+     *
+     * @param chatGuid The GUID for the chat
+     *
+     * @returns The command line response
+     */
+    static openChat = async (chatGuid: string): Promise<string> => {
+        Server().log(`Executing Action: Open Chat (Chat: ${chatGuid})`, "debug");
+
+        const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+        if (!chats || chats.length === 0) throw new Error("Chat does not exist");
+        if (chats[0].participants.length > 1) throw new Error("Chat is a group chat");
+
+        const names = await generateChatNameList(chatGuid);
+
+        /**
+         * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
+         * ordered by the chat_handle_join table insertions. Below, we try to try to find the
+         * corresponding chats, and rename them. If the first name fails to be found,
+         * we are going to try and use the backup (second) name. If both failed, we weren't able to
+         * calculate the correct chat name
+         */
+
+        // Make sure messages is open
+        await FileSystem.startMessages();
+
+        let err = null;
+        for (const name of names) {
+            console.info(`Attempting to open chat, [${name}]`);
+            try {
+                // This needs await here, or else it will fail
+                return await safeExecuteAppleScript(openChat(name));
+            } catch (ex) {
+                err = ex;
+                Server().log(`Failed to open chat, [${name}]. Trying again.`, "warn");
+                continue;
+            }
+        }
+
+        // If we get here, there was an issue
+        throw err;
+    };
+
+    /**
      * Toggles a tapback to specific message in a chat
      *
      * @param chatGuid The GUID for the chat
@@ -240,7 +305,7 @@ export class ActionHandler {
             "debug"
         );
 
-        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
+        const names = await generateChatNameList(chatGuid);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one
@@ -284,7 +349,7 @@ export class ActionHandler {
     static checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
         Server().log(`Executing Action: Check Typing Indicators (Chat: ${chatGuid})`, "debug");
 
-        const names = await generateChatNameList(chatGuid, Server().iMessageRepo, Server().contactsRepo);
+        const names = await generateChatNameList(chatGuid);
 
         /**
          * Above, we calculate 2 different names. One as-is, returned by the chat query, and one

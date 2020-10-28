@@ -26,7 +26,8 @@ import {
     AlertService,
     CaffeinateService,
     NgrokService,
-    NetworkService
+    NetworkService,
+    QueueService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 
@@ -74,6 +75,8 @@ class BlueBubblesServer {
 
     caffeinate: CaffeinateService;
 
+    queue: QueueService;
+
     ngrok: NgrokService;
 
     actionHandler: ActionHandler;
@@ -113,6 +116,7 @@ class BlueBubblesServer {
         this.fcm = null;
         this.caffeinate = null;
         this.networkChecker = null;
+        this.queue = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -209,6 +213,13 @@ class BlueBubblesServer {
         await this.setupCaffeinate();
 
         try {
+            this.log("Initializing queue service...");
+            this.queue = new QueueService();
+        } catch (ex) {
+            this.log(`Failed to setup queue service! ${ex.message}`, "error");
+        }
+
+        try {
             this.log("Initializing connection to Google FCM...");
             this.fcm = new FCMService();
         } catch (ex) {
@@ -285,7 +296,7 @@ class BlueBubblesServer {
 
         // If the ngrok URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
-            if (this.socket) await this.emitMessage("new-server", nextConfig.server_address);
+            if (this.socket) await this.emitMessage("new-server", nextConfig.server_address, "high");
             if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
         }
 
@@ -303,7 +314,7 @@ class BlueBubblesServer {
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async emitMessage(type: string, data: any) {
+    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal") {
         this.socket.server.emit(type, data);
 
         // Send notification to devices
@@ -314,7 +325,8 @@ class BlueBubblesServer {
             const notifData = JSON.stringify(data);
             await this.fcm.sendNotification(
                 devices.map(device => device.identifier),
-                { type, data: notifData }
+                { type, data: notifData },
+                priority
             );
         }
     }
@@ -454,7 +466,7 @@ class BlueBubblesServer {
             this.log(`New message from [${item.handle?.id}]: [${text.substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(item));
+            await this.emitMessage("new-message", await getMessageResponse(item), "high");
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
@@ -641,6 +653,10 @@ class BlueBubblesServer {
                 this.log(`Purging ${this.eventCache.size()} items from the event cache!`);
                 this.eventCache.purge();
             }
+        });
+
+        ipcMain.handle("purge-devices", (_, __) => {
+            this.repo.devices().clear();
         });
 
         ipcMain.handle("toggle-auto-start", async (_, toggle) => {
