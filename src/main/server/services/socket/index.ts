@@ -28,6 +28,7 @@ import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachm
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
+import { QueueItem } from "@server/services/queue";
 
 const osVersion = macosVersion();
 
@@ -693,13 +694,29 @@ export class SocketService {
         socket.on("toggle-chat-read-status", (params, cb): void => {
             // Make sure we have all the required data
             if (!params?.chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided!"));
-            if (params?.status === null) return respond(cb, "error", createBadRequestResponse("No chat status provided!"));
+            if (params?.status === null)
+                return respond(cb, "error", createBadRequestResponse("No chat status provided!"));
 
             // Send the notification out to all clients
             Server().emitMessage("chat-read-status-changed", {
                 chatGuid: params.chatGuid,
                 status: params.status
             });
+
+            // Return null so Typescript doesn't yell at us
+            return null;
+        });
+
+        /**
+         * Tells the server to "read a chat"
+         */
+        socket.on("open-chat", (params, cb): void => {
+            // Make sure we have all the required data
+            if (!params?.chatGuid) return respond(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+            // Dispatch it to the queue service
+            const item: QueueItem = { type: "open-chat", data: params?.chatGuid };
+            Server().queue.add(item);
 
             // Return null so Typescript doesn't yell at us
             return null;

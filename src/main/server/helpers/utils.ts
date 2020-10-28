@@ -64,9 +64,9 @@ export const safeExecuteAppleScript = async (command: string) => {
     }
 };
 
-export const getContactRecord = async (contactsRepo: ContactRepository, chat: Chat, member: Handle) => {
+export const getContactRecord = async (chat: Chat, member: Handle) => {
     // Get the corresponding
-    const record = await contactsRepo.getContactByAddress(member.id);
+    const record = await Server().contactsRepo.getContactByAddress(member.id);
 
     // If the record is unknown, we want to format it
     // Otherwise, store either the full name, email, or just first name
@@ -78,19 +78,15 @@ export const getContactRecord = async (contactsRepo: ContactRepository, chat: Ch
     return { known: true, value: record.firstName };
 };
 
-export const generateChatNameList = async (
-    chatGuid: string,
-    iMessageRepo: MessageRepository,
-    contactsRepo: ContactRepository
-) => {
+export const generateChatNameList = async (chatGuid: string) => {
     if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
 
     // First, lets get the members of the chat
-    const chats = await iMessageRepo.getChats({ chatGuid, withParticipants: true });
+    const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
     if (!chats || chats.length === 0) throw new Error("Chat does not exist");
 
     const chat = chats[0];
-    const order = await iMessageRepo.getParticipantOrder(chat.ROWID);
+    const order = await Server().iMessageRepo.getParticipantOrder(chat.ROWID);
 
     const names = [];
     if (!chat.displayName) {
@@ -101,7 +97,7 @@ export const generateChatNameList = async (
 
         // Calculate as-is, returned from query
         for (const member of chat.participants) {
-            const record = await getContactRecord(contactsRepo, chat, member);
+            const record = await getContactRecord(chat, member);
             if (record.known) {
                 knownAsIs.push(record.value);
             } else {
@@ -115,7 +111,7 @@ export const generateChatNameList = async (
             const member = chat.participants.find(item => item.ROWID === row.handle_id);
             if (!member) continue;
 
-            const record = await getContactRecord(contactsRepo, chat, member);
+            const record = await getContactRecord(chat, member);
             if (record.known) {
                 knownInOrder.push(record.value);
             } else {

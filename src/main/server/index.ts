@@ -26,7 +26,8 @@ import {
     AlertService,
     CaffeinateService,
     NgrokService,
-    NetworkService
+    NetworkService,
+    QueueService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 
@@ -74,6 +75,8 @@ class BlueBubblesServer {
 
     caffeinate: CaffeinateService;
 
+    queue: QueueService;
+
     ngrok: NgrokService;
 
     actionHandler: ActionHandler;
@@ -113,6 +116,7 @@ class BlueBubblesServer {
         this.fcm = null;
         this.caffeinate = null;
         this.networkChecker = null;
+        this.queue = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -207,6 +211,13 @@ class BlueBubblesServer {
         }
 
         await this.setupCaffeinate();
+
+        try {
+            this.log("Initializing queue service...");
+            this.queue = new QueueService();
+        } catch (ex) {
+            this.log(`Failed to setup queue service! ${ex.message}`, "error");
+        }
 
         try {
             this.log("Initializing connection to Google FCM...");

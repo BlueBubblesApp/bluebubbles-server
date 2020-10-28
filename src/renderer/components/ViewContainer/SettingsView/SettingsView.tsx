@@ -5,7 +5,7 @@
 /* eslint-disable react/no-unused-state */
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
-import { ipcRenderer } from "electron";
+import { ipcRenderer, dialog } from "electron";
 import Dropzone from "react-dropzone";
 import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
 import TopNav from "@renderer/components/TopNav/TopNav";
@@ -26,6 +26,8 @@ interface State {
     showKey: boolean;
     ngrokKey: string;
     enableNgrok: boolean;
+    showModal: boolean;
+    serverUrl: string;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -44,7 +46,9 @@ class SettingsView extends React.Component<unknown, State> {
             showPassword: false,
             showKey: false,
             ngrokKey: "",
-            enableNgrok: false
+            enableNgrok: false,
+            showModal: false,
+            serverUrl: ""
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -138,10 +142,20 @@ class SettingsView extends React.Component<unknown, State> {
         this.setState({ showKey: !this.state.showKey });
     };
 
+    saveCustomServerUrl = (save: boolean) => {
+        if (save) {
+            ipcRenderer.invoke("set-config", {
+                server_address: this.state.serverUrl
+            });
+        }
+
+        this.setState({ showModal: false });
+    };
+
     handleInputChange = async (e: any) => {
         // eslint-disable-next-line prefer-destructuring
         const id = e.target.id;
-        if (["serverPort", "serverPassword", "ngrokKey"].includes(id)) {
+        if (["serverPort", "serverPassword", "ngrokKey", "serverUrl"].includes(id)) {
             this.setState({ [id]: e.target.value } as any);
         }
 
@@ -149,6 +163,10 @@ class SettingsView extends React.Component<unknown, State> {
             const target = e.target as HTMLInputElement;
             this.setState({ enableNgrok: target.checked });
             await ipcRenderer.invoke("toggle-ngrok", target.checked!);
+
+            if (!target.checked) {
+                this.setState({ showModal: true });
+            }
         }
 
         if (id === "toggleCaffeinate") {
@@ -224,6 +242,7 @@ class SettingsView extends React.Component<unknown, State> {
                         <input
                             readOnly
                             className="aInput"
+                            placeholder="No server address specified..."
                             value={this.state.config ? this.state.config.server_address : ""}
                         />
                         <h3 className="aSettingTitle">Server Port:</h3>
@@ -332,6 +351,36 @@ class SettingsView extends React.Component<unknown, State> {
                                 </section>
                             )}
                         </Dropzone>
+                    </div>
+                </div>
+
+                <div id="myModal" className="modal" style={{ display: this.state.showModal ? "block" : "none" }}>
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <span
+                                role="button"
+                                className="close"
+                                onClick={() => this.saveCustomServerUrl(false)}
+                                onKeyDown={() => this.saveCustomServerUrl(false)}
+                                tabIndex={0}
+                            >
+                                &times;
+                            </span>
+                            <h2>Enter your server&rsquo;s host name</h2>
+                        </div>
+                        <div className="modal-body">
+                            <div className="modal-col">
+                                <input
+                                    id="serverUrl"
+                                    className="aInput"
+                                    value={this.state.serverUrl}
+                                    onChange={e => this.handleInputChange(e)}
+                                />
+                                <button className="modal-button" onClick={() => this.saveCustomServerUrl(true)}>
+                                    Save
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

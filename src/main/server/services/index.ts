@@ -5,5 +5,15 @@ import { CaffeinateService } from "./caffeinate";
 import { UpdateService } from "./update";
 import { NgrokService } from "./ngrok";
 import { NetworkService } from "./network";
+import { QueueService } from "./queue";
 
-export { SocketService, FCMService, AlertService, CaffeinateService, UpdateService, NgrokService, NetworkService };
+export {
+    SocketService,
+    FCMService,
+    AlertService,
+    CaffeinateService,
+    UpdateService,
+    NgrokService,
+    NetworkService,
+    QueueService
+};

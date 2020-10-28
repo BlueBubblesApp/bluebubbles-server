@@ -22,7 +22,7 @@ export class UpdateService {
 
     start() {
         this.timer = setInterval(async () => {
-            await this.checkForUpdate();
+            await this.checkForUpdate(false);
         }, 1000 * 60 * 60 * 12); // Default 12 hours
     }
 
@@ -30,7 +30,7 @@ export class UpdateService {
         if (this.timer) clearInterval(this.timer);
     }
 
-    async checkForUpdate() {
+    async checkForUpdate(showDialogForNoUpdate: boolean) {
         if (this.isOpen) return null;
 
         // Fetch from Github
@@ -70,6 +70,20 @@ export class UpdateService {
             });
         } else {
             Server().log(`No new version available (latest: ${version})`);
+            if (showDialogForNoUpdate && !this.isOpen) {
+                this.isOpen = true;
+
+                const dialogOpts = {
+                    type: "info",
+                    title: "No Update Available",
+                    message: "No Update Available",
+                    detail: `You are running the latest BlueBubbles macOS Server (${this.currentVersion})!`
+                };
+
+                dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
+                    this.isOpen = false;
+                });
+            }
         }
 
         return null;
