@@ -56,3 +56,49 @@
     margin-bottom: 15px;
     background-color: red;
 }
+
+#statusTooltip {
+    position: absolute;
+    left: 63px;
+    bottom: 40px;
+    border: 1px solid var(--primary-color);
+    background-color: var(--background-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 5px;
+    border-radius: 7px;
+    animation-name: fadeIn;
+    animation-duration: 0.2s;
+    animation-fill-mode: forwards;
+}
+
+#statusTooltip div {
+    display: flex;
+    align-items: center;
+}
+
+#statusTooltip div {
+    display: flex;
+    align-items: center;
+}
+
+#statusTooltip div h3 {
+    color: var(--primary-color);
+    font-size: 14px;
+}
+
+#fdSubIcon {
+    height: 13px;
+    width: 13px;
+    margin-left: 5px;
+    border-radius: 3px;
+}
+
+#accessibilitySubIcon {
+    height: 13px;
+    width: 13px;
+    margin-left: 5px;
+    border-radius: 3px;
+}
