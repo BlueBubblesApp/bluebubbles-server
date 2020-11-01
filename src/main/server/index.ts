@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
 import { app, ipcMain, BrowserWindow, nativeTheme, systemPreferences } from "electron";
+import ServerLog from "electron-log";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -33,6 +34,11 @@ import { EventCache } from "@server/eventCache";
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
+
+// Set the log format
+const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
+ServerLog.transports.console.format = logFormat;
+ServerLog.transports.file.format = logFormat;
 
 /**
  * Create a singleton for the server so that it can be referenced everywhere.
@@ -139,26 +145,22 @@ class BlueBubblesServer {
      * @param message The message to print
      * @param type The log type
      */
-    log(message: any, type?: "log" | "error" | "dir" | "warn" | "debug") {
-        const msg = `${new Date().toLocaleString()} [${(type ?? "log").toUpperCase()}] -> ${message}`;
+    log(message: any, type?: "log" | "error" | "warn" | "debug") {
         switch (type) {
             case "error":
-                console.error(msg);
+                ServerLog.error(message);
                 AlertService.create("error", message);
                 break;
-            case "dir":
-                console.dir(msg);
-                break;
             case "debug":
-                console.debug(msg);
+                ServerLog.debug(message);
                 break;
             case "warn":
-                console.warn(msg);
+                ServerLog.warn(message);
                 AlertService.create("warn", message);
                 break;
             case "log":
             default:
-                console.log(msg);
+                ServerLog.log(message);
         }
 
         this.emitToUI("new-log", {

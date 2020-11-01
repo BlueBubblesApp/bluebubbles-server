@@ -146,6 +146,7 @@
         "classnames": "^2.2.6",
         "compare-versions": "^3.6.0",
         "electron-fetch": "^1.4.0",
+        "electron-log": "^4.2.4",
         "firebase-admin": "^8.12.1",
         "google-libphonenumber": "^3.2.10",
         "history": "^4.10.1",
