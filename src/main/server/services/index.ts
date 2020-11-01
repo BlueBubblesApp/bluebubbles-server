@@ -6,6 +6,7 @@ import { UpdateService } from "./update";
 import { NgrokService } from "./ngrok";
 import { NetworkService } from "./network";
 import { QueueService } from "./queue";
+import { IPCService } from "./ipc";
 
 export {
     SocketService,
@@ -15,5 +16,6 @@ export {
     UpdateService,
     NgrokService,
     NetworkService,
-    QueueService
+    QueueService,
+    IPCService
 };
