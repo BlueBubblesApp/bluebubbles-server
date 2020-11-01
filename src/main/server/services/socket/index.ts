@@ -126,7 +126,12 @@ export class SocketService {
     static routeSocket(socket: io.Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             const resData = data;
-            resData.data = Server().repo.getConfig("encrypt_coms") ? Server().encryptData(data.data) : data.data;
+
+            // Only encrypt coms if Ngrok is disabled and encrypt is enabled
+            resData.data =
+                Server().repo.getConfig("encrypt_coms") && !Server().repo.getConfig("enable_ngrok")
+                    ? Server().encryptData(data.data)
+                    : data.data;
 
             if (callback) callback(resData);
             else socket.emit(channel, resData);

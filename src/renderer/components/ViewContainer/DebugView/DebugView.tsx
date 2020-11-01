@@ -86,7 +86,7 @@ class SettingsView extends React.Component<Props, State> {
                         </div>
                         {filteredLogs.length === 0 ? (
                             <div className="aLogRow">
-                                <p>No logs. This page only shows logs while this page is open!</p>
+                                <p>No logs to show! They will be streamed here in real-time.</p>
                             </div>
                         ) : (
                             <>
