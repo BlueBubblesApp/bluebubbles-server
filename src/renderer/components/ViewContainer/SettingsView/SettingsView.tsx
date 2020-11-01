@@ -245,7 +245,7 @@ class SettingsView extends React.Component<unknown, State> {
                             placeholder="No server address specified..."
                             value={this.state.config ? this.state.config.server_address : ""}
                         />
-                        <h3 className="aSettingTitle">Server Port:</h3>
+                        <h3 className="aSettingTitle">Local Port:</h3>
                         <input
                             id="serverPort"
                             className="aInput"
