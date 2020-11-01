@@ -2,6 +2,7 @@
 // Dependency Imports
 import { BrowserWindow, nativeTheme, systemPreferences } from "electron";
 import ServerLog from "electron-log";
+import { privateEncrypt } from "crypto";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -35,6 +36,7 @@ import { EventCache } from "@server/eventCache";
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
+import { ResponseData } from "./types";
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -332,6 +334,16 @@ class BlueBubblesServer {
                 priority
             );
         }
+    }
+
+    encryptData(data: ResponseData): ResponseData {
+        // If it's a string, encrypt using the password
+        if (typeof data === "string") {
+            return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(data));
+        }
+
+        // If it's not a string, it's JSON, so stringify it and encrypt it
+        return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(JSON.stringify(data)));
     }
 
     private getTheme() {

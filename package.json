@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.1.8",
+    "version": "0.1.7",
     "description": "",
     "main": "./dist/main.js",
     "scripts": {

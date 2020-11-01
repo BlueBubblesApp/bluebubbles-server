@@ -125,8 +125,11 @@ export class SocketService {
      */
     static routeSocket(socket: io.Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
-            if (callback) callback(data);
-            else socket.emit(channel, data);
+            const resData = data;
+            resData.data = Server().repo.getConfig("encrypt_coms") ? Server().encryptData(data.data) : data.data;
+
+            if (callback) callback(resData);
+            else socket.emit(channel, resData);
 
             if (data.error) Server().log(data.error.message, "error");
         };
