@@ -250,7 +250,7 @@ class DashboardView extends React.Component<unknown, State> {
                                 </h3>
                             </div>
                             <div id="connectionStatusRight">
-                                <QRCode id="activeQRCode" value={qrData} size={256} />
+                                <QRCode id="activeQRCode" value={qrData} size={200} />
                             </div>
                         </div>
                         <div id="statisticsContainer">
