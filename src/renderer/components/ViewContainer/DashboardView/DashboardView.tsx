@@ -241,7 +241,7 @@ class DashboardView extends React.Component<unknown, State> {
                                     </div>
                                 </h3>
                                 <h3 className="tertiaryTitle">
-                                    Server Port:
+                                    Local Port:
                                     <div className="infoField">
                                         <p className="infoFieldText">
                                             {this.state.config ? this.state.config.socket_port : "Loading..."}
@@ -250,7 +250,7 @@ class DashboardView extends React.Component<unknown, State> {
                                 </h3>
                             </div>
                             <div id="connectionStatusRight">
-                                <QRCode id="activeQRCode" value={qrData} />
+                                <QRCode id="activeQRCode" value={qrData} size={200} />
                             </div>
                         </div>
                         <div id="statisticsContainer">

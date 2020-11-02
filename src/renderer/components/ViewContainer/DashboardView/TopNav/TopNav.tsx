@@ -2,17 +2,18 @@
 /* eslint-disable class-methods-use-this */
 /* eslint-disable max-len */
 /* eslint-disable react/prefer-stateless-function */
+import { ipcRenderer } from "electron";
 import * as React from "react";
 import { Link } from "react-router-dom";
-import * as Ago from "s-ago";
-import "./TopNav.css";
+
 import {
     Warning as WarningIcon,
     Help as InfoIcon,
     CheckCircle as SuccessIcon,
     Error as ErrorIcon
 } from "@material-ui/icons";
-import { ipcRenderer } from "electron";
+
+import "./TopNav.css";
 
 interface State {
     alertsOpen: boolean;
@@ -87,7 +88,7 @@ class TopNav extends React.Component<unknown, State> {
                         <div id="alertsModal">
                             {this.state.alerts.map(item => {
                                 const typeIcon = alertIconMap[item.type];
-                                const time = item.created ? Ago(item.created) : "N/A";
+                                const time = item.created ? (item.created as Date).toLocaleTimeString() : "N/A";
 
                                 return (
                                     <div className="aAlertItem" key={item.id}>

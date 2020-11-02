@@ -10,6 +10,7 @@ interface State {
     abPerms: any;
     fdPerms: any;
     statusColorIndicator: any;
+    showStatusTooltip: boolean;
 }
 
 class LeftStatusIndicator extends React.Component<unknown, State> {
@@ -23,7 +24,8 @@ class LeftStatusIndicator extends React.Component<unknown, State> {
             fdPerms: "deauthorized",
             statusColorIndicator: {
                 backgroundColor: "red"
-            }
+            },
+            showStatusTooltip: false
         };
     }
 
@@ -55,6 +57,14 @@ class LeftStatusIndicator extends React.Component<unknown, State> {
 
     invokeMain(event: string, args: any) {
         ipcRenderer.invoke(event, args);
+    }
+
+    showStatusTooltip() {
+        this.setState({ showStatusTooltip: true });
+    }
+
+    hideStatusTooltip() {
+        this.setState({ showStatusTooltip: false });
     }
 
     render() {
@@ -125,7 +135,30 @@ class LeftStatusIndicator extends React.Component<unknown, State> {
                         </g>
                     </svg>
                 </Link>
-                <div id="statusColorIndicator" style={this.state.statusColorIndicator} />
+                {this.state.showStatusTooltip ? (
+                    <div id="statusTooltip">
+                        <div>
+                            <h3>Full Disk Access:</h3>{" "}
+                            <span
+                                id="fdSubIcon"
+                                style={{ backgroundColor: this.state.fdPerms === "authorized" ? "#38d744" : "red" }}
+                            />
+                        </div>
+                        <div>
+                            <h3>Accessibilty Access:</h3>{" "}
+                            <span
+                                id="accessibilitySubIcon"
+                                style={{ backgroundColor: this.state.abPerms === "authorized" ? "#38d744" : "red" }}
+                            />
+                        </div>
+                    </div>
+                ) : null}
+                <div
+                    id="statusColorIndicator"
+                    style={this.state.statusColorIndicator}
+                    onMouseEnter={() => this.showStatusTooltip()}
+                    onMouseLeave={() => this.hideStatusTooltip()}
+                />
                 <svg id="restartIcon" onClick={() => this.invokeMain("restart-server", null)} viewBox="0 0 512 512">
                     <g>
                         <path

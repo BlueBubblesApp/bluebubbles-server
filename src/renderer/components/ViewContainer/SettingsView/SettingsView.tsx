@@ -28,6 +28,7 @@ interface State {
     enableNgrok: boolean;
     showModal: boolean;
     serverUrl: string;
+    encryptComs: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -48,7 +49,8 @@ class SettingsView extends React.Component<unknown, State> {
             ngrokKey: "",
             enableNgrok: false,
             showModal: false,
-            serverUrl: ""
+            serverUrl: "",
+            encryptComs: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -72,36 +74,16 @@ class SettingsView extends React.Component<unknown, State> {
                 showPassword: false,
                 showKey: false,
                 ngrokKey: config.ngrok_key,
-                enableNgrok: config.enable_ngrok
+                enableNgrok: config.enable_ngrok,
+                encryptComs: config.encrypt_coms
             });
+
         this.getCaffeinateStatus();
 
         const client = await ipcRenderer.invoke("get-fcm-client");
         if (client) this.setState({ fcmClient: JSON.stringify(client) });
         const server = await ipcRenderer.invoke("get-fcm-server");
         if (server) this.setState({ fcmServer: JSON.stringify(server) });
-
-        const toggleCaffeinate: HTMLInputElement = document.getElementById("toggleCaffeinate") as HTMLInputElement;
-        const toggleAutoStart: HTMLInputElement = document.getElementById("toggleAutoStart") as HTMLInputElement;
-        const toggleNgrok: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
-
-        if (this.state.enableNgrok) {
-            toggleNgrok.checked = true;
-        } else {
-            toggleNgrok.checked = false;
-        }
-
-        if (this.state.autoCaffeinate) {
-            toggleCaffeinate.checked = true;
-        } else {
-            toggleCaffeinate.checked = false;
-        }
-
-        if (this.state.autoStart) {
-            toggleAutoStart.checked = true;
-        } else {
-            toggleAutoStart.checked = false;
-        }
 
         ipcRenderer.on("config-update", (event, arg) => {
             this.setState({ config: arg });
@@ -181,6 +163,14 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ autoStart: target.checked });
             await ipcRenderer.invoke("toggle-auto-start", target.checked);
         }
+
+        if (id === "toggleEncrypt") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ encryptComs: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                encrypt_coms: target.checked
+            });
+        }
     };
 
     saveConfig = async () => {
@@ -245,7 +235,7 @@ class SettingsView extends React.Component<unknown, State> {
                             placeholder="No server address specified..."
                             value={this.state.config ? this.state.config.server_address : ""}
                         />
-                        <h3 className="aSettingTitle">Server Port:</h3>
+                        <h3 className="aSettingTitle">Local Port:</h3>
                         <input
                             id="serverPort"
                             className="aInput"
@@ -280,6 +270,19 @@ class SettingsView extends React.Component<unknown, State> {
                             </svg>
                         </span>
 
+                        <div className="aCheckboxDiv firstCheckBox">
+                            <h3 className="aSettingTitle">Encrypt Communications</h3>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleEncrypt"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.encryptComs}
+                                />
+                                <i />
+                            </label>
+                        </div>
+
                         <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
                         <input
                             id="ngrokKey"
@@ -292,7 +295,12 @@ class SettingsView extends React.Component<unknown, State> {
                         <div className="aCheckboxDiv firstCheckBox">
                             <h3 className="aSettingTitle">Enable Ngrok</h3>
                             <label className="form-switch">
-                                <input id="toggleNgrok" onChange={e => this.handleInputChange(e)} type="checkbox" />
+                                <input
+                                    id="toggleNgrok"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.enableNgrok}
+                                />
                                 <i />
                             </label>
                         </div>
@@ -303,6 +311,7 @@ class SettingsView extends React.Component<unknown, State> {
                                     id="toggleCaffeinate"
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
+                                    checked={this.state.autoCaffeinate}
                                 />
                                 <i />
                             </label>
@@ -310,7 +319,12 @@ class SettingsView extends React.Component<unknown, State> {
                         <div className="aCheckboxDiv">
                             <h3 className="aSettingTitle">Startup With MacOS</h3>
                             <label className="form-switch">
-                                <input id="toggleAutoStart" onChange={e => this.handleInputChange(e)} type="checkbox" />
+                                <input
+                                    id="toggleAutoStart"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.autoStart}
+                                />
                                 <i />
                             </label>
                         </div>

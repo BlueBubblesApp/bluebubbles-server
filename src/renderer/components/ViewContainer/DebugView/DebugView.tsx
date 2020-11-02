@@ -7,25 +7,24 @@
 import * as React from "react";
 import { ipcRenderer } from "electron";
 import "./DebugView.css";
-import * as Ago from "s-ago";
 import TopNav from "@renderer/components/TopNav/TopNav";
 import LeftStatusIndicator from "../DashboardView/LeftStatusIndicator/LeftStatusIndicator";
 
 interface State {
     config: any;
-    logs: any[];
     showDebug: boolean;
 }
 
-const MAX_LENGTH = 25;
+interface Props {
+    logs: any[];
+}
 
-class SettingsView extends React.Component<unknown, State> {
-    constructor(props: unknown) {
+class SettingsView extends React.Component<Props, State> {
+    constructor(props: Props) {
         super(props);
 
         this.state = {
             config: null,
-            logs: [],
             showDebug: false
         };
     }
@@ -33,20 +32,6 @@ class SettingsView extends React.Component<unknown, State> {
     async componentDidMount() {
         const currentTheme = await ipcRenderer.invoke("get-current-theme");
         await this.setTheme(currentTheme.currentTheme);
-
-        ipcRenderer.on("new-log", (event: any, data: any) => {
-            if (!this.state.showDebug && data.type === "debug") return;
-
-            // Build the new log
-            // Insert the newest log at the top of the list
-            let newLog = [{ log: data, timestamp: new Date() }, ...this.state.logs];
-
-            // Make sure there are only MAX_LENGTH logs in the list
-            newLog = newLog.slice(0, MAX_LENGTH);
-
-            // Set the new logs
-            this.setState({ logs: newLog });
-        });
     }
 
     async setTheme(currentTheme: string) {
@@ -76,6 +61,11 @@ class SettingsView extends React.Component<unknown, State> {
     }
 
     render() {
+        let filteredLogs = this.props.logs ?? [];
+        if (!this.state.showDebug) {
+            filteredLogs = filteredLogs.filter(item => item.log.type !== "debug");
+        }
+
         return (
             <div id="SettingsView" data-theme="light">
                 <TopNav header="Debugging" />
@@ -94,16 +84,16 @@ class SettingsView extends React.Component<unknown, State> {
                             <h1>Log Message</h1>
                             <h1>Timestamp</h1>
                         </div>
-                        {this.state.logs.length === 0 ? (
+                        {filteredLogs.length === 0 ? (
                             <div className="aLogRow">
-                                <p>No logs. This page only shows logs while this page is open!</p>
+                                <p>No logs to show! They will be streamed here in real-time.</p>
                             </div>
                         ) : (
                             <>
-                                {this.state.logs.map((row, index) => (
+                                {filteredLogs.map((row, index) => (
                                     <div key={index} className="aLogRow">
                                         <p>{row.log.message || "N/A"}</p>
-                                        <p className="aLogTimestamp">{Ago(row.timestamp)}</p>
+                                        <p className="aLogTimestamp">{(row.timestamp as Date).toLocaleTimeString()}</p>
                                     </div>
                                 ))}
                             </>

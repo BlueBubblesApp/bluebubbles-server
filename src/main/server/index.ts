@@ -1,6 +1,8 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { app, ipcMain, BrowserWindow, nativeTheme, systemPreferences } from "electron";
+import { BrowserWindow, nativeTheme, systemPreferences } from "electron";
+import ServerLog from "electron-log";
+import { privateEncrypt } from "crypto";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -27,12 +29,19 @@ import {
     CaffeinateService,
     NgrokService,
     NetworkService,
-    QueueService
+    QueueService,
+    IPCService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
+import { ResponseData } from "./types";
+
+// Set the log format
+const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
+ServerLog.transports.console.format = logFormat;
+ServerLog.transports.file.format = logFormat;
 
 /**
  * Create a singleton for the server so that it can be referenced everywhere.
@@ -139,26 +148,22 @@ class BlueBubblesServer {
      * @param message The message to print
      * @param type The log type
      */
-    log(message: any, type?: "log" | "error" | "dir" | "warn" | "debug") {
-        const msg = `${new Date().toLocaleString()} [${(type ?? "log").toUpperCase()}] -> ${message}`;
+    log(message: any, type?: "log" | "error" | "warn" | "debug") {
         switch (type) {
             case "error":
-                console.error(msg);
+                ServerLog.error(message);
                 AlertService.create("error", message);
                 break;
-            case "dir":
-                console.dir(msg);
-                break;
             case "debug":
-                console.debug(msg);
+                ServerLog.debug(message);
                 break;
             case "warn":
-                console.warn(msg);
+                ServerLog.warn(message);
                 AlertService.create("warn", message);
                 break;
             case "log":
             default:
-                console.log(msg);
+                ServerLog.log(message);
         }
 
         this.emitToUI("new-log", {
@@ -176,7 +181,7 @@ class BlueBubblesServer {
             this.getTheme();
             await this.setupServer();
             this.log("Starting Configuration IPC Listeners..");
-            this.startConfigIpcListeners();
+            IPCService.startConfigIpcListeners();
         }
 
         try {
@@ -329,6 +334,16 @@ class BlueBubblesServer {
                 priority
             );
         }
+    }
+
+    encryptData(data: ResponseData): ResponseData {
+        // If it's a string, encrypt using the password
+        if (typeof data === "string") {
+            return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(data));
+        }
+
+        // If it's not a string, it's JSON, so stringify it and encrypt it
+        return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(JSON.stringify(data)));
     }
 
     private getTheme() {
@@ -498,192 +513,9 @@ class BlueBubblesServer {
     }
 
     /**
-     * Starts the inter-process-communication handlers. Basically, a router
-     * for all requests sent by the Electron front-end
-     */
-    private startIpcListener() {
-        ipcMain.handle("get-message-count", async (event, args) => {
-            if (!this.iMessageRepo?.db) return 0;
-            const count = await this.iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
-            return count;
-        });
-
-        ipcMain.handle("get-chat-image-count", async (event, args) => {
-            if (!this.iMessageRepo?.db) return 0;
-            const count = await this.iMessageRepo.getChatImageCounts();
-            return count;
-        });
-
-        ipcMain.handle("get-chat-video-count", async (event, args) => {
-            if (!this.iMessageRepo?.db) return 0;
-            const count = await this.iMessageRepo.getChatVideoCounts();
-            return count;
-        });
-
-        ipcMain.handle("get-group-message-counts", async (event, args) => {
-            if (!this.iMessageRepo?.db) return 0;
-            const count = await this.iMessageRepo.getChatMessageCounts("group");
-            return count;
-        });
-
-        ipcMain.handle("get-individual-message-counts", async (event, args) => {
-            if (!this.iMessageRepo?.db) return 0;
-            const count = await this.iMessageRepo.getChatMessageCounts("individual");
-            return count;
-        });
-
-        ipcMain.handle("get-devices", async (event, args) => {
-            // eslint-disable-next-line no-return-await
-            return await this.repo.devices().find();
-        });
-
-        ipcMain.handle("get-fcm-server", (event, args) => {
-            return FileSystem.getFCMServer();
-        });
-
-        ipcMain.handle("get-fcm-client", (event, args) => {
-            return FileSystem.getFCMClient();
-        });
-    }
-
-    /**
-     * Starts configuration related inter-process-communication handlers.
-     */
-    private startConfigIpcListeners() {
-        ipcMain.handle("set-config", async (_, args) => {
-            for (const item of Object.keys(args)) {
-                if (this.repo.hasConfig(item) && this.repo.getConfig(item) !== args[item]) {
-                    this.repo.setConfig(item, args[item]);
-                }
-            }
-
-            return this.repo?.config;
-        });
-
-        ipcMain.handle("get-config", async (_, __) => {
-            if (!this.repo.db) return {};
-            return this.repo?.config;
-        });
-
-        ipcMain.handle("get-alerts", async (_, __) => {
-            const alerts = await AlertService.find();
-            return alerts;
-        });
-
-        ipcMain.handle("mark-alert-as-read", async (_, args) => {
-            const alertIds = args ?? [];
-            // for (const id of alertIds) {
-            //     await AlertService.markAsRead(id);
-            // }
-            await AlertService.markAsRead(args);
-        });
-
-        ipcMain.handle("set-fcm-server", async (_, args) => {
-            FileSystem.saveFCMServer(args);
-        });
-
-        ipcMain.handle("set-fcm-client", async (_, args) => {
-            FileSystem.saveFCMClient(args);
-            await this.fcm.start();
-        });
-
-        ipcMain.handle("toggle-tutorial", async (_, toggle) => {
-            await this.repo.setConfig("tutorial_is_done", toggle);
-
-            if (toggle) {
-                await this.setupServices();
-                await this.startServices();
-            }
-        });
-
-        ipcMain.handle("check_perms", async (_, __) => {
-            return {
-                abPerms: systemPreferences.isTrustedAccessibilityClient(false) ? "authorized" : "denied",
-                fdPerms: "authorized"
-            };
-        });
-
-        ipcMain.handle("prompt_accessibility", async (_, __) => {
-            return {
-                abPerms: systemPreferences.isTrustedAccessibilityClient(true) ? "authorized" : "denied"
-            };
-        });
-
-        ipcMain.handle("prompt_disk_access", async (_, __) => {
-            return {
-                fdPerms: "authorized"
-            };
-        });
-
-        ipcMain.handle("toggle-caffeinate", async (_, toggle) => {
-            if (this.caffeinate && toggle) {
-                this.caffeinate.start();
-            } else if (this.caffeinate && !toggle) {
-                this.caffeinate.stop();
-            }
-
-            await this.repo.setConfig("auto_caffeinate", toggle);
-        });
-
-        ipcMain.handle("toggle-ngrok", async (_, toggle) => {
-            await this.repo.setConfig("enable_ngrok", toggle);
-
-            if (this.ngrok && toggle) {
-                this.ngrok.start();
-            } else if (this.ngrok && !toggle) {
-                console.log("Stopping ngrok");
-                this.ngrok.stop();
-
-                // Revert the server address to nothing
-                await this.repo.setConfig("server_address", "Ngrok Disabled...");
-            }
-        });
-
-        ipcMain.handle("get-caffeinate-status", (_, __) => {
-            return {
-                isCaffeinated: this.caffeinate.isCaffeinated,
-                autoCaffeinate: this.repo.getConfig("auto_caffeinate")
-            };
-        });
-
-        ipcMain.handle("purge-event-cache", (_, __) => {
-            if (this.eventCache.size() === 0) {
-                this.log("No events to purge from event cache!");
-            } else {
-                this.log(`Purging ${this.eventCache.size()} items from the event cache!`);
-                this.eventCache.purge();
-            }
-        });
-
-        ipcMain.handle("purge-devices", (_, __) => {
-            this.repo.devices().clear();
-        });
-
-        ipcMain.handle("toggle-auto-start", async (_, toggle) => {
-            await this.repo.setConfig("auto_start", toggle);
-            app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
-        });
-
-        ipcMain.handle("restart-server", async (_, __) => {
-            await this.restart();
-        });
-
-        ipcMain.handle("get-current-theme", (_, __) => {
-            if (nativeTheme.shouldUseDarkColors === true) {
-                return {
-                    currentTheme: "dark"
-                };
-            }
-            return {
-                currentTheme: "light"
-            };
-        });
-    }
-
-    /**
      * Helper method for running setup on the message services
      */
-    private async setupServices() {
+    async setupServices() {
         if (this.hasSetup) return;
 
         try {
@@ -716,9 +548,9 @@ class BlueBubblesServer {
      * Helper method for starting the message services
      *
      */
-    private async startServices() {
+    async startServices() {
         // Start the IPC listener first for the UI
-        if (this.hasDiskAccess && !this.hasStarted) this.startIpcListener();
+        if (this.hasDiskAccess && !this.hasStarted) IPCService.startIpcListener();
 
         try {
             this.log("Connecting to Ngrok...");
