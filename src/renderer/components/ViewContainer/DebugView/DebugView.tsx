@@ -63,7 +63,7 @@ class SettingsView extends React.Component<Props, State> {
     render() {
         let filteredLogs = this.props.logs ?? [];
         if (!this.state.showDebug) {
-            filteredLogs = filteredLogs.filter(item => item.type !== "debug");
+            filteredLogs = filteredLogs.filter(item => item.log.type !== "debug");
         }
 
         return (
