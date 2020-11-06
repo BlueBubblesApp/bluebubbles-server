@@ -84,6 +84,9 @@ export class IPCService {
             //     await AlertService.markAsRead(id);
             // }
             await AlertService.markAsRead(args);
+
+            Server().notificationCount = 0;
+            app.setBadgeCount(Server().notificationCount);
         });
 
         ipcMain.handle("set-fcm-server", async (_, args) => {

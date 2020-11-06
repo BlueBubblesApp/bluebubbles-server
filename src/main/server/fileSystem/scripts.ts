@@ -129,11 +129,15 @@ export const openChat = (name: string) => {
             select groupMatch
 
         (* If the window was not in the foreground originally, hide it *)
-        if isForeground is equal to false then
-            tell application "Finder"
-                set visible of process "Messages" to false
-            end tell
-        end if
+        try
+            if isForeground is equal to false then
+                tell application "Finder"
+                    set visible of process "Messages" to false
+                end tell
+            end if
+        on error errorMsg
+            (* Don't do anything *)
+        end try
     end tell
 
     on splitText(theText, theDelimiter)
@@ -218,11 +222,15 @@ export const renameGroupChat = (currentName: string, newName: string) => {
         end tell
 
         (* If the window was not in the foreground originally, hide it *)
-        if isForeground is equal to false then
-            tell application "Finder"
-                set visible of process "Messages" to false
-            end tell
-        end if
+        try
+            if isForeground is equal to false then
+                tell application "Finder"
+                    set visible of process "Messages" to false
+                end tell
+            end if
+        on error errorMsg
+            (* Don't do anything *)
+        end try
     end tell
 
     on splitText(theText, theDelimiter)
@@ -323,11 +331,15 @@ export const addParticipant = (currentName: string, participant: string) => {
         end tell
 
         (* If the window was not in the foreground originally, hide it *)
-        if isForeground is equal to false then
-            tell application "Finder"
-                set visible of process "Messages" to false
-            end tell
-        end if
+        try
+            if isForeground is equal to false then
+                tell application "Finder"
+                    set visible of process "Messages" to false
+                end tell
+            end if
+        on error errorMsg
+            (* Don't do anything *)
+        end try
     end tell
 
     on splitText(theText, theDelimiter)
@@ -430,11 +442,15 @@ export const removeParticipant = (currentName: string, address: string) => {
         end tell
 
         (* If the window was not in the foreground originally, hide it *)
-        if isForeground is equal to false then
-            tell application "Finder"
-                set visible of process "Messages" to false
-            end tell
-        end if
+        try
+            if isForeground is equal to false then
+                tell application "Finder"
+                    set visible of process "Messages" to false
+                end tell
+            end if
+        on error errorMsg
+            (* Don't do anything *)
+        end try
     end tell
 
     on splitText(theText, theDelimiter)
@@ -603,11 +619,15 @@ export const exportContacts = () => {
     return `set contactsPath to POSIX file "${FileSystem.contactsDir}/AddressBook.vcf" as string
         
         -- Remove any existing back up file (if any)
-        tell application "Finder"
-            if exists (file contactsPath) then
-                delete file contactsPath -- move to trash
-            end if
-        end tell
+        try
+            tell application "Finder"
+                if exists (file contactsPath) then
+                    delete file contactsPath -- move to trash
+                end if
+            end tell
+        on error errorMsg
+            (* Don't do anything *)
+        end try
         
         tell application "${contactsApp}"
             quit

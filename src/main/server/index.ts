@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { BrowserWindow, nativeTheme, systemPreferences } from "electron";
+import { app, BrowserWindow, nativeTheme, systemPreferences } from "electron";
 import ServerLog from "electron-log";
 import { privateEncrypt } from "crypto";
 
@@ -102,6 +102,8 @@ class BlueBubblesServer {
 
     hasStarted: boolean;
 
+    notificationCount: number;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -131,6 +133,7 @@ class BlueBubblesServer {
         this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
+        this.notificationCount = 0;
     }
 
     emitToUI(event: string, data: any) {
@@ -153,6 +156,7 @@ class BlueBubblesServer {
             case "error":
                 ServerLog.error(message);
                 AlertService.create("error", message);
+                this.notificationCount += 1;
                 break;
             case "debug":
                 ServerLog.debug(message);
@@ -160,12 +164,17 @@ class BlueBubblesServer {
             case "warn":
                 ServerLog.warn(message);
                 AlertService.create("warn", message);
+                this.notificationCount += 1;
                 break;
             case "log":
             default:
                 ServerLog.log(message);
         }
 
+        if (["error", "warn"].includes(type)) {
+            app.setBadgeCount(this.notificationCount);
+        }
+        
         this.emitToUI("new-log", {
             message,
             type: type ?? "log"
@@ -204,6 +213,14 @@ class BlueBubblesServer {
         this.repo = new ServerRepository();
         this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
         await this.repo.initialize();
+
+        // Load notification count
+        try {
+            const alerts = (await AlertService.find()).filter((item) => !item.isRead);
+            this.notificationCount = alerts.length;
+        } catch (ex) {
+            this.log("Failed to get initial notification count. Skipping.", "warn");
+        }
 
         // Setup lightweight message cache
         this.eventCache = new EventCache();

@@ -436,6 +436,7 @@ export const getMessageResponse = async (tableData: Message, withBlurhash = true
         groupTitle: tableData.groupTitle,
         groupActionType: tableData.groupActionType,
         isExpired: tableData.isExpirable,
+        balloonBundleId: tableData.balloonBundleId,
         associatedMessageGuid: tableData.associatedMessageGuid,
         associatedMessageType: tableData.associatedMessageType,
         expressiveSendStyleId: tableData.expressiveSendStyleId,
