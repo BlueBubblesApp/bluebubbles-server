@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 import * as macosVersion from "macos-version";
+import * as CryptoJS from "crypto-js";
 
 // Internal libraries
 import { Server } from "@server/index";
@@ -126,12 +127,18 @@ export class SocketService {
     static routeSocket(socket: io.Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             const resData = data;
+            resData.encrypted = false;
 
-            // Only encrypt coms if Ngrok is disabled and encrypt is enabled
-            resData.data =
-                Server().repo.getConfig("encrypt_coms") && !Server().repo.getConfig("enable_ngrok")
-                    ? Server().encryptData(data.data)
-                    : data.data;
+            // Only encrypt coms enabled
+            const encrypt = Server().repo.getConfig("encrypt_coms") as boolean;
+            const passphrase = Server().repo.getConfig("password") as string;
+            if (encrypt && typeof data.data === "string") {
+                resData.encrypted = true;
+                resData.data = CryptoJS.AES.encrypt(data.data, passphrase).toString();
+            } else if (encrypt) {
+                resData.encrypted = true;
+                resData.data = CryptoJS.AES.encrypt(JSON.stringify(data.data), passphrase).toString();
+            }
 
             if (callback) callback(resData);
             else socket.emit(channel, resData);

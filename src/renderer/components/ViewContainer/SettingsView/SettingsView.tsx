@@ -270,7 +270,7 @@ class SettingsView extends React.Component<unknown, State> {
                             </svg>
                         </span>
 
-                        {/* <div className="aCheckboxDiv firstCheckBox">
+                        <div className="aCheckboxDiv firstCheckBox">
                             <h3 className="aSettingTitle">Encrypt Communications</h3>
                             <label className="form-switch">
                                 <input
@@ -281,7 +281,7 @@ class SettingsView extends React.Component<unknown, State> {
                                 />
                                 <i />
                             </label>
-                        </div> */}
+                        </div>
 
                         <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
                         <input

@@ -2,7 +2,6 @@
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences } from "electron";
 import ServerLog from "electron-log";
-import { privateEncrypt } from "crypto";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -174,7 +173,7 @@ class BlueBubblesServer {
         if (["error", "warn"].includes(type)) {
             app.setBadgeCount(this.notificationCount);
         }
-        
+
         this.emitToUI("new-log", {
             message,
             type: type ?? "log"
@@ -216,7 +215,7 @@ class BlueBubblesServer {
 
         // Load notification count
         try {
-            const alerts = (await AlertService.find()).filter((item) => !item.isRead);
+            const alerts = (await AlertService.find()).filter(item => !item.isRead);
             this.notificationCount = alerts.length;
         } catch (ex) {
             this.log("Failed to get initial notification count. Skipping.", "warn");
@@ -351,16 +350,6 @@ class BlueBubblesServer {
                 priority
             );
         }
-    }
-
-    encryptData(data: ResponseData): ResponseData {
-        // If it's a string, encrypt using the password
-        if (typeof data === "string") {
-            return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(data));
-        }
-
-        // If it's not a string, it's JSON, so stringify it and encrypt it
-        return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(JSON.stringify(data)));
     }
 
     private getTheme() {
