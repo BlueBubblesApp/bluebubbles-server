@@ -421,7 +421,7 @@ class BlueBubblesServer {
          */
         outgoingMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
-            this.log(`New message from [You]: [${text.substring(0, 50)}]`);
+            this.log(`New message from [You]: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(item));
@@ -439,7 +439,7 @@ class BlueBubblesServer {
             const updateType = item.dateRead ? "Text Read" : "Text Delivered";
             const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
             this.log(
-                `Updated message from [${from}]: [${text.substring(
+                `Updated message from [${from}]: [${(text ?? "<No Text>").substring(
                     0,
                     50
                 )}] - [${updateType} -> ${time.toLocaleString()}]`
@@ -453,7 +453,7 @@ class BlueBubblesServer {
          * Message listener for outgoing messages that timedout
          */
         outgoingMsgListener.on("message-timeout", async (item: Queue) => {
-            const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
+            const text = (item.text ?? "").startsWith(item.tempGuid) ? "image" : `text, [${item.text ?? "<No Text>"}]`;
             this.log(`Message send timeout for ${text}`, "warn");
             await this.emitMessage("message-timeout", item);
         });
@@ -463,9 +463,9 @@ class BlueBubblesServer {
          */
         outgoingMsgListener.on("message-send-error", async (item: Message) => {
             const text = item.cacheHasAttachments
-                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
-            this.log(`Failed to send message: [${text.substring(0, 50)}]`);
+            this.log(`Failed to send message: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
 
@@ -482,9 +482,9 @@ class BlueBubblesServer {
          */
         incomingMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments
-                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
-            this.log(`New message from [${item.handle?.id}]: [${text.substring(0, 50)}]`);
+            this.log(`New message from [${item.handle?.id}]: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(item), "high");
