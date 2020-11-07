@@ -12,7 +12,7 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ResponseFormat, ServerMetadataResponse } from "@server/types";
+import { ResponseFormat, ServerMetadataResponse, AttachmentResponse } from "@server/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
@@ -132,12 +132,16 @@ export class SocketService {
             // Only encrypt coms enabled
             const encrypt = Server().repo.getConfig("encrypt_coms") as boolean;
             const passphrase = Server().repo.getConfig("password") as string;
-            if (encrypt && typeof data.data === "string") {
-                resData.encrypted = true;
-                resData.data = CryptoJS.AES.encrypt(data.data, passphrase).toString();
-            } else if (encrypt) {
-                resData.encrypted = true;
-                resData.data = CryptoJS.AES.encrypt(JSON.stringify(data.data), passphrase).toString();
+
+            // Don't encrypt the attachment, it's already encrypted
+            if (encrypt) {
+                if (typeof data.data === "string" && channel !== "attachment-chunk") {
+                    resData.data = CryptoJS.AES.encrypt(data.data, passphrase).toString();
+                    resData.encrypted = true;
+                } else if (channel !== "attachment-chunk") {
+                    resData.data = CryptoJS.AES.encrypt(JSON.stringify(data.data), passphrase).toString();
+                    resData.encrypted = true;
+                }
             }
 
             if (callback) callback(resData);
