@@ -92,6 +92,7 @@ export type ChatResponse = {
     style: number;
     chatIdentifier: string;
     isArchived: boolean;
+    isFiltered: boolean;
     displayName: string;
     groupId: string;
 };
