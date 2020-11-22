@@ -201,6 +201,7 @@ class BlueBubblesServer {
         }
 
         await this.startServices();
+        await this.postChecks();
     }
 
     /**
@@ -263,6 +264,25 @@ class BlueBubblesServer {
             this.networkChecker.start();
         } catch (ex) {
             this.log(`Failed to setup network service! ${ex.message}`, "error");
+        }
+    }
+
+    private async postChecks(): Promise<void> {
+        this.log("Running post-start checks...");
+
+        // Make sure a password is set
+        const password = this.repo.getConfig("password") as string;
+        const tutorialFinished = this.repo.getConfig("tutorial_is_done") as boolean;
+        if (tutorialFinished && (!password || password.length === 0)) {
+            dialog.showMessageBox(this.window, {
+                type: "warning",
+                buttons: ["OK"],
+                title: "BlueBubbles Warning",
+                message: "No Password Set!",
+                detail:
+                    `No password is currently set. BlueBubbles will not function correctly without one. ` +
+                    `Please go to the configuration page, fill in a password, and save the configuration.`
+            });
         }
     }
 
@@ -517,7 +537,7 @@ class BlueBubblesServer {
                 title: "BlueBubbles Error",
                 message: "Full-Disk Access Permission Required!",
                 detail:
-                    `In order to function correctly, BlueBubbles requires full-disk access.` +
+                    `In order to function correctly, BlueBubbles requires full-disk access. ` +
                     `Please enable Full-Disk Access in System Preferences > Security & Privacy.`
             };
 
