@@ -290,6 +290,15 @@ export class ActionHandler {
         throw err;
     };
 
+    static startOrStopTypingInChat = async (chatGuid: string, isTyping: boolean): Promise<void> => {
+        Server().log(`Executing Action: Change Typing Status (Chat: ${chatGuid})`, "debug");
+        if (isTyping) {
+            Server().blueBubblesServerHelper.startTyping(chatGuid);
+        } else {
+            Server().blueBubblesServerHelper.stopTyping(chatGuid);
+        }
+    };
+
     /**
      * Toggles a tapback to specific message in a chat
      *

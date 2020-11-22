@@ -37,6 +37,7 @@ import { EventCache } from "@server/eventCache";
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
 import { ResponseData } from "./types";
+import { BlueBubblesHelperService } from "./services/helperProcess";
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -75,6 +76,8 @@ class BlueBubblesServer {
     contactsRepo: ContactRepository;
 
     socket: SocketService;
+
+    blueBubblesServerHelper: BlueBubblesHelperService;
 
     fcm: FCMService;
 
@@ -122,6 +125,7 @@ class BlueBubblesServer {
 
         // Services
         this.socket = null;
+        this.blueBubblesServerHelper = null;
         this.fcm = null;
         this.caffeinate = null;
         this.networkChecker = null;
@@ -541,6 +545,13 @@ class BlueBubblesServer {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
+        try {
+            this.log("Initializing up helper service...");
+            this.blueBubblesServerHelper = new BlueBubblesHelperService();
+        } catch (ex) {
+            this.log(`Failed to setup helper service! ${ex.message}`, "error");
+        }
+
         this.hasSetup = true;
     }
 
@@ -569,6 +580,9 @@ class BlueBubblesServer {
 
         this.log("Starting socket service...");
         this.socket.restart();
+
+        this.log("Starting helper listener...");
+        this.blueBubblesServerHelper.start();
 
         if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");

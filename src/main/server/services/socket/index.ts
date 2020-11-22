@@ -731,6 +731,52 @@ export class SocketService {
             return null;
         });
 
+        /**
+         * Tells the server to start typing in a chat
+         */
+        socket.on(
+            "started-typing",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                // Dispatch it to the queue service
+
+                try {
+                    await ActionHandler.startOrStopTypingInChat(params.chatGuid, true);
+                    return response(cb, "started-typing-sent", createNoDataResponse());
+                } catch {
+                    return response(cb, "started-typing-error", createServerErrorResponse("Failed to stop typing"));
+                }
+
+                // Return null so Typescript doesn't yell at us
+                return null;
+            }
+        );
+
+        /**
+         * Tells the server to stop typing in a chat
+         * This will happen automaticaly after 10 seconds,
+         * but the client can tell the server to do so manually
+         */
+        socket.on(
+            "stopped-typing",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.startOrStopTypingInChat(params.chatGuid, false);
+                    return response(cb, "stopped-typing-sent", createNoDataResponse());
+                } catch {
+                    return response(cb, "stopped-typing-error", createServerErrorResponse("Failed to stop typing!"));
+                }
+
+                // Return null so Typescript doesn't yell at us
+                return null;
+            }
+        );
+
         socket.on("disconnect", reason => {
             Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
