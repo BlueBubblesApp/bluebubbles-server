@@ -553,7 +553,7 @@ export class SocketService {
                 if (!Array.isArray(participants))
                     return response(cb, "error", createBadRequestResponse("Participant list must be an array"));
 
-                const chatGuid = await ActionHandler.createChat(participants);
+                const chatGuid = await ActionHandler.createChat(participants, params?.service || "iMessage");
 
                 try {
                     const newChat = await Server().iMessageRepo.getChats({ chatGuid });

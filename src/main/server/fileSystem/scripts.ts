@@ -61,12 +61,12 @@ export const restartMessages = () => {
 /**
  * The AppleScript used to start a chat with some number of participants
  */
-export const startChat = (participants: string[]) => {
+export const startChat = (participants: string[], service: string) => {
     const formatted = participants.map(buddy => `buddy "${buddy}" of targetService`);
     const buddies = formatted.join(", ");
 
     return `tell application "Messages"
-        set targetService to 1st service whose service type = iMessage
+        set targetService to 1st service whose service type = ${service}
 
         (* Start the new chat with all the recipients *)
         set thisChat to make new text chat with properties {participants: {${buddies}}}

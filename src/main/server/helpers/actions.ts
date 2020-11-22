@@ -390,7 +390,7 @@ export class ActionHandler {
      *
      * @returns The GUID of the new chat
      */
-    static createChat = async (participants: string[]): Promise<string> => {
+    static createChat = async (participants: string[], service: string): Promise<string> => {
         Server().log(`Executing Action: Create Chat (Participants: ${participants.join(", ")}`, "debug");
 
         if (participants.length === 0) throw new Error("No participants specified!");
@@ -402,7 +402,7 @@ export class ActionHandler {
         await FileSystem.startMessages();
 
         // Execute the command
-        let ret = (await FileSystem.executeAppleScript(startChat(buddies))) as string;
+        let ret = (await FileSystem.executeAppleScript(startChat(buddies, service))) as string;
 
         try {
             // Get the chat GUID that was created
