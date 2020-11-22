@@ -177,6 +177,8 @@ export class SocketService {
                     device.identifier = params.deviceId;
                     await Server().repo.devices().save(device);
                 } else {
+                    Server().log(`Registering new client with Google FCM (${params.deviceName}`);
+
                     const item = new Device();
                     item.name = params.deviceName;
                     item.identifier = params.deviceId;
