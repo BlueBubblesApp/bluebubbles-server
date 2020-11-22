@@ -270,7 +270,7 @@ class BlueBubblesServer {
         // Log if we dont have accessibility access
         if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
             this.hasAccessibilityAccess = true;
-            this.log("Accessibilty permissions are enabled");
+            this.log("Accessibility permissions are enabled");
         } else {
             this.log("Accessibility permissions are required for certain actions!", "error");
         }
