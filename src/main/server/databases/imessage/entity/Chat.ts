@@ -109,6 +109,7 @@ export const getChatResponse = async (tableData: Chat): Promise<ChatResponse> =>
         style: tableData.style,
         chatIdentifier: tableData.chatIdentifier,
         isArchived: tableData.isArchived,
+        isFiltered: tableData.isFiltered,
         displayName: tableData.displayName,
         groupId: tableData.groupId
     };

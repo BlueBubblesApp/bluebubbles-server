@@ -15,6 +15,7 @@ let updateService: UpdateService;
 // Only 1 instance is allowed
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
+    console.error("BlueBubbles is already running! Quiting...");
     app.quit();
 } else {
     app.on("second-instance", (_, __, ___) => {
@@ -76,8 +77,7 @@ const buildTray = () => {
             label: "Restart",
             type: "normal",
             click: () => {
-                app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
-                app.exit(0);
+                Server().restartNormally();
             }
         },
         {

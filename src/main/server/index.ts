@@ -1,8 +1,8 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { BrowserWindow, nativeTheme, systemPreferences } from "electron";
+import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
 import ServerLog from "electron-log";
-import { privateEncrypt } from "crypto";
+import * as process from "process";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -33,10 +33,10 @@ import {
     IPCService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
+import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
-import { ResponseData } from "./types";
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -102,6 +102,8 @@ class BlueBubblesServer {
 
     hasStarted: boolean;
 
+    notificationCount: number;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -131,6 +133,7 @@ class BlueBubblesServer {
         this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
+        this.notificationCount = 0;
     }
 
     emitToUI(event: string, data: any) {
@@ -153,6 +156,7 @@ class BlueBubblesServer {
             case "error":
                 ServerLog.error(message);
                 AlertService.create("error", message);
+                this.notificationCount += 1;
                 break;
             case "debug":
                 ServerLog.debug(message);
@@ -160,10 +164,15 @@ class BlueBubblesServer {
             case "warn":
                 ServerLog.warn(message);
                 AlertService.create("warn", message);
+                this.notificationCount += 1;
                 break;
             case "log":
             default:
                 ServerLog.log(message);
+        }
+
+        if (["error", "warn"].includes(type)) {
+            app.setBadgeCount(this.notificationCount);
         }
 
         this.emitToUI("new-log", {
@@ -192,6 +201,7 @@ class BlueBubblesServer {
         }
 
         await this.startServices();
+        await this.postChecks();
     }
 
     /**
@@ -204,6 +214,14 @@ class BlueBubblesServer {
         this.repo = new ServerRepository();
         this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
         await this.repo.initialize();
+
+        // Load notification count
+        try {
+            const alerts = (await AlertService.find()).filter(item => !item.isRead);
+            this.notificationCount = alerts.length;
+        } catch (ex) {
+            this.log("Failed to get initial notification count. Skipping.", "warn");
+        }
 
         // Setup lightweight message cache
         this.eventCache = new EventCache();
@@ -247,27 +265,25 @@ class BlueBubblesServer {
         } catch (ex) {
             this.log(`Failed to setup network service! ${ex.message}`, "error");
         }
+    }
 
-        this.log("Checking Permissions...");
+    private async postChecks(): Promise<void> {
+        this.log("Running post-start checks...");
 
-        // Log if we dont have accessibility access
-        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
-            this.hasAccessibilityAccess = true;
-            this.log("Accessibilty permissions are enabled");
-        } else {
-            this.log("Accessibility permissions are required for certain actions!", "error");
+        // Make sure a password is set
+        const password = this.repo.getConfig("password") as string;
+        const tutorialFinished = this.repo.getConfig("tutorial_is_done") as boolean;
+        if (tutorialFinished && (!password || password.length === 0)) {
+            dialog.showMessageBox(this.window, {
+                type: "warning",
+                buttons: ["OK"],
+                title: "BlueBubbles Warning",
+                message: "No Password Set!",
+                detail:
+                    `No password is currently set. BlueBubbles will not function correctly without one. ` +
+                    `Please go to the configuration page, fill in a password, and save the configuration.`
+            });
         }
-
-        // Bypass FD Perms for now
-        this.hasDiskAccess = true;
-        this.log("Bypassing full disk access requirement");
-
-        // Check if we have full disk access
-        // this.hasDiskAccess = fdPerms === "authorized";
-        // if (!this.hasDiskAccess) {
-        //     this.log("Full Disk Access permissions are required!", "error");
-        //     return;
-        // }
     }
 
     /**
@@ -334,16 +350,6 @@ class BlueBubblesServer {
                 priority
             );
         }
-    }
-
-    encryptData(data: ResponseData): ResponseData {
-        // If it's a string, encrypt using the password
-        if (typeof data === "string") {
-            return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(data));
-        }
-
-        // If it's not a string, it's JSON, so stringify it and encrypt it
-        return privateEncrypt(this.repo.getConfig("password") as string, Buffer.from(JSON.stringify(data)));
     }
 
     private getTheme() {
@@ -415,7 +421,7 @@ class BlueBubblesServer {
          */
         outgoingMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
-            this.log(`New message from [You]: [${text.substring(0, 50)}]`);
+            this.log(`New message from [You]: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(item));
@@ -433,7 +439,7 @@ class BlueBubblesServer {
             const updateType = item.dateRead ? "Text Read" : "Text Delivered";
             const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
             this.log(
-                `Updated message from [${from}]: [${text.substring(
+                `Updated message from [${from}]: [${(text ?? "<No Text>").substring(
                     0,
                     50
                 )}] - [${updateType} -> ${time.toLocaleString()}]`
@@ -447,7 +453,7 @@ class BlueBubblesServer {
          * Message listener for outgoing messages that timedout
          */
         outgoingMsgListener.on("message-timeout", async (item: Queue) => {
-            const text = item.text.startsWith(item.tempGuid) ? "image" : `text, [${item.text}]`;
+            const text = (item.text ?? "").startsWith(item.tempGuid) ? "image" : `text, [${item.text ?? "<No Text>"}]`;
             this.log(`Message send timeout for ${text}`, "warn");
             await this.emitMessage("message-timeout", item);
         });
@@ -457,9 +463,9 @@ class BlueBubblesServer {
          */
         outgoingMsgListener.on("message-send-error", async (item: Message) => {
             const text = item.cacheHasAttachments
-                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
-            this.log(`Failed to send message: [${text.substring(0, 50)}]`);
+            this.log(`Failed to send message: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
 
@@ -476,9 +482,9 @@ class BlueBubblesServer {
          */
         incomingMsgListener.on("new-entry", async (item: Message) => {
             const text = item.cacheHasAttachments
-                ? `Attachment: ${item.text.slice(1, item.text.length) || "<No Text>"}`
+                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
                 : item.text;
-            this.log(`New message from [${item.handle?.id}]: [${text.substring(0, 50)}]`);
+            this.log(`New message from [${item.handle?.id}]: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(item), "high");
@@ -523,7 +529,26 @@ class BlueBubblesServer {
             this.iMessageRepo = new MessageRepository();
             await this.iMessageRepo.initialize();
         } catch (ex) {
-            this.log(`Failed to connect to iMessage database! Please enable Full Disk Access!`, "error");
+            this.log(ex, "error");
+
+            const dialogOpts = {
+                type: "error",
+                buttons: ["Restart", "Open System Preferences", "Ignore"],
+                title: "BlueBubbles Error",
+                message: "Full-Disk Access Permission Required!",
+                detail:
+                    `In order to function correctly, BlueBubbles requires full-disk access. ` +
+                    `Please enable Full-Disk Access in System Preferences > Security & Privacy.`
+            };
+
+            dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
+                if (returnValue.response === 0) {
+                    this.restartNormally();
+                } else if (returnValue.response === 1) {
+                    FileSystem.executeAppleScript(openSystemPreferences());
+                    app.quit();
+                }
+            });
         }
 
         try {
@@ -539,6 +564,24 @@ class BlueBubblesServer {
             this.socket = new SocketService();
         } catch (ex) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
+        }
+
+        this.log("Checking Permissions...");
+
+        // Log if we dont have accessibility access
+        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
+            this.hasAccessibilityAccess = true;
+            this.log("Accessibility permissions are enabled");
+        } else {
+            this.log("Accessibility permissions are required for certain actions!", "error");
+        }
+
+        // Log if we dont have accessibility access
+        if (this.iMessageRepo?.db) {
+            this.hasDiskAccess = true;
+            this.log("Full-disk access permissions are enabled");
+        } else {
+            this.log("Full-disk access permissions are required!", "error");
         }
 
         this.hasSetup = true;
@@ -598,5 +641,15 @@ class BlueBubblesServer {
 
         // Start the server up again
         await this.start();
+    }
+
+    restartNormally() {
+        app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
+        app.exit(0);
+    }
+
+    restartViaTerminal() {
+        FileSystem.executeAppleScript(runTerminalScript(process.execPath));
+        app.exit();
     }
 }

@@ -29,10 +29,6 @@ export class IncomingMessageListener extends ChangeListener {
                     args: null
                 },
                 {
-                    statement: "message.text IS NOT NULL",
-                    args: null
-                },
-                {
                     statement: "message.is_from_me = :fromMe",
                     args: { fromMe: 0 }
                 }
