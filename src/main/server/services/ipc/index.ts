@@ -1,4 +1,4 @@
-import { app, ipcMain, nativeTheme, systemPreferences } from "electron";
+import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
@@ -192,6 +192,10 @@ export class IPCService {
             return {
                 currentTheme: "light"
             };
+        });
+
+        ipcMain.handle("show-dialog", (_, opts: Electron.MessageBoxOptions) => {
+            return dialog.showMessageBox(Server().window, opts);
         });
     }
 }

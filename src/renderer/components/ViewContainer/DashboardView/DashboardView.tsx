@@ -250,7 +250,11 @@ class DashboardView extends React.Component<unknown, State> {
                                 </h3>
                             </div>
                             <div id="connectionStatusRight">
-                                <QRCode id="activeQRCode" value={qrData} size={200} />
+                                {qrData ? (
+                                    <QRCode id="activeQRCode" value={qrData} size={200} />
+                                ) : (
+                                    <p id="qrErrorText">Please load your Google Firebase configuration!</p>
+                                )}
                             </div>
                         </div>
                         <div id="statisticsContainer">
