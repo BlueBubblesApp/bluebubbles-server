@@ -418,6 +418,7 @@ class SettingsView extends React.Component<unknown, State> {
                     <div className="modal-content">
                         <div className="modal-header">
                             <span
+                                id="modalCloseBtn"
                                 role="button"
                                 className="close"
                                 onClick={() => this.saveCustomServerUrl(false)}
@@ -426,7 +427,7 @@ class SettingsView extends React.Component<unknown, State> {
                             >
                                 &times;
                             </span>
-                            <h2>Enter your server&rsquo;s host name</h2>
+                            <h2>Enter your server&rsquo;s host name and port</h2>
                         </div>
                         <div className="modal-body">
                             <div className="modal-col">

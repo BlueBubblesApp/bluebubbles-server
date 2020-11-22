@@ -282,7 +282,7 @@ span > #serverPassword {
 
 .modal-header {
     padding: 2px 16px;
-    color: white;
+    color: var(--primary-color);
 }
 
 .modal-col {
@@ -300,4 +300,8 @@ span > #serverPassword {
     margin-left: 65px;
     margin-top: 10px;
     margin-bottom: 10px;
+}
+
+#modalCloseBtn {
+    color: var(--primary-color);
 }

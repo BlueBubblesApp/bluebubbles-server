@@ -378,7 +378,7 @@ h3 {
 
 .modal-header {
     padding: 2px 16px;
-    color: white;
+    color: var(--primary-color);
 }
 
 .modal-col {
