@@ -146,23 +146,41 @@ class PreDashboardView extends React.Component<unknown, State> {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
             const valid = isValidServerConfig(binaryStr as string);
-            if (!valid) return;
+            const validClient = isValidClientConfig(binaryStr as string);
 
-            ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
-            this.setState({ fcmServer: binaryStr });
+            if (valid) {
+                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                this.setState({ fcmServer: binaryStr });
+            } else if (validClient) {
+                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
+                this.setState({ fcmClient: binaryStr });
 
-            if (
-                this.state.abPerms === "authorized" &&
-                this.state.fdPerms === "authorized" &&
-                this.state.fcmClient &&
-                this.state.fcmServer
-            ) {
-                this.completeTutorial();
+                this.invokeMain("show-dialog", {
+                    type: "warning",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Warning",
+                    message: "We've corrected a mistake you made",
+                    detail:
+                        `The file you chose was for the FCM Client configuration and ` +
+                        `we've saved it as such. Now, please choose the correct server configuration.`
+                });
+            } else {
+                this.invokeMain("show-dialog", {
+                    type: "error",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Error",
+                    message: "Invalid FCM Server configuration selected!",
+                    detail: "The file you have selected is not in the correct format!"
+                });
             }
         };
 
         reader.readAsText(acceptedFiles[0]);
     };
+
+    async invokeMain(event: string, args: any): Promise<any> {
+        return ipcRenderer.invoke(event, args);
+    }
 
     handleClientFile = (acceptedFiles: any) => {
         const reader = new FileReader();
@@ -173,19 +191,32 @@ class PreDashboardView extends React.Component<unknown, State> {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
             const valid = isValidClientConfig(binaryStr as string);
-            if (!valid) return;
+            const validServer = isValidServerConfig(binaryStr as string);
 
-            ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-            this.setState({ fcmClient: binaryStr });
+            if (valid) {
+                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
+                this.setState({ fcmClient: binaryStr });
+            } else if (validServer) {
+                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                this.setState({ fcmServer: binaryStr });
 
-            if (
-                this.state.abPerms === "authorized" &&
-                this.state.fdPerms === "authorized" &&
-                this.state.fcmClient &&
-                this.state.fcmServer &&
-                this.state.inputPassword.length > 0
-            ) {
-                this.completeTutorial();
+                this.invokeMain("show-dialog", {
+                    type: "warning",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Warning",
+                    message: "We've corrected a mistake you made",
+                    detail:
+                        `The file you chose was for the FCM Server configuration and ` +
+                        `we've saved it as such. Now, please choose the correct client configuration.`
+                });
+            } else {
+                this.invokeMain("show-dialog", {
+                    type: "error",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Error",
+                    message: "Invalid FCM Client configuration selected!",
+                    detail: "The file you have selected is not in the correct format!"
+                });
             }
         };
 
@@ -230,6 +261,22 @@ class PreDashboardView extends React.Component<unknown, State> {
         }
     };
 
+    getSkipBtn() {
+        const output = (str: string) => {
+            return <button onClick={() => this.completeTutorial()}>{str}</button>;
+        };
+
+        if (!this.state.inputPassword) return null;
+        if (this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer)) return output("Skip FCM Setup");
+        if (!this.state.enableNgrok && this.state.fcmClient && this.state.fcmServer) return output("Skip Ngrok Setup");
+        if (!this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer))
+            return output("Skip FCM and Ngrok Setup");
+        if (this.state.fcmClient && this.state.fcmServer && this.state.abPerms === "authorized")
+            return output("Continue");
+
+        return null;
+    }
+
     render() {
         if (this.state.redirect) {
             return <Redirect to={this.state.redirect} />;
@@ -253,8 +300,6 @@ class PreDashboardView extends React.Component<unknown, State> {
                 color: "green"
             };
         }
-
-        const toggleNgrok = document.getElementById("toggleNgrok") as HTMLInputElement;
 
         return (
             <div id="PreDashboardView" data-theme="light">
@@ -349,27 +394,14 @@ class PreDashboardView extends React.Component<unknown, State> {
                             </section>
                         )}
                     </Dropzone>
-                    <div id="skipDiv">
-                        {this.state.abPerms && this.state.fdPerms && this.state.inputPassword ? (
-                            <button onClick={() => this.completeTutorial()}>
-                                {toggleNgrok.checked ? "Skip FCM Setup" : "Skip FCM And Ngrok Setup"}
-                            </button>
-                        ) : null}
-                        {this.state.abPerms &&
-                        this.state.fdPerms &&
-                        this.state.inputPassword &&
-                        this.state.fcmClient &&
-                        this.state.fcmServer &&
-                        toggleNgrok.checked ? (
-                            <button onClick={() => this.completeTutorial()}>Continue</button>
-                        ) : null}
-                    </div>
+                    <div id="skipDiv">{this.getSkipBtn()}</div>
                 </div>
 
                 <div id="myModal" className="modal" style={{ display: this.state.showModal ? "block" : "none" }}>
                     <div className="modal-content">
                         <div className="modal-header">
                             <span
+                                id="modalCloseBtn"
                                 role="button"
                                 className="close"
                                 onClick={() => this.saveCustomServerUrl(false)}
@@ -378,7 +410,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                             >
                                 &times;
                             </span>
-                            <h2>Enter your server&rsquo;s host name</h2>
+                            <h2>Enter your server&rsquo;s host name and port</h2>
                         </div>
                         <div className="modal-body">
                             <div className="modal-col">
