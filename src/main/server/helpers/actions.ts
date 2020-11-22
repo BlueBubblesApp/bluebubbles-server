@@ -142,8 +142,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const oldName of names) {
@@ -183,8 +183,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -228,8 +228,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -272,8 +272,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -320,8 +320,8 @@ export class ActionHandler {
         const tapbackId = tapbackUIMap[tapback];
         const friendlyMsg = text.substring(0, 50);
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -361,8 +361,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
