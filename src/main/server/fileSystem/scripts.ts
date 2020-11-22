@@ -651,3 +651,10 @@ export const exportContacts = () => {
 export const runTerminalScript = (path: string) => {
     return `tell application "Terminal" to do script "${escapeOsaExp(path)}"`;
 };
+
+export const openSystemPreferences = () => {
+    return `tell application "System Preferences"
+        reopen
+        activate
+    end tell`;
+};

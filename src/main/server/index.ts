@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { app, BrowserWindow, nativeTheme, systemPreferences } from "electron";
+import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
 import ServerLog from "electron-log";
 import * as process from "process";
 
@@ -33,7 +33,7 @@ import {
     IPCService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { runTerminalScript } from "@server/fileSystem/scripts";
+import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
@@ -531,6 +531,25 @@ class BlueBubblesServer {
             await this.iMessageRepo.initialize();
         } catch (ex) {
             this.log(`Failed to connect to iMessage database! Please enable Full Disk Access!`, "error");
+
+            const dialogOpts = {
+                type: "error",
+                buttons: ["Restart", "Open System Preferences"],
+                title: "BlueBubbles Error",
+                message: "Full-Disk Access Permission Required!",
+                detail:
+                    `In order to function correctly, BlueBubbles requires full-disk access.` +
+                    `Please enable Full-Disk Access in System Preferences > Security & Privacy.`
+            };
+
+            dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
+                if (returnValue.response === 0) {
+                    this.restartNormally();
+                } else if (returnValue.response === 1) {
+                    FileSystem.executeAppleScript(openSystemPreferences());
+                    app.quit();
+                }
+            });
         }
 
         try {
@@ -605,6 +624,11 @@ class BlueBubblesServer {
 
         // Start the server up again
         await this.start();
+    }
+
+    restartNormally() {
+        app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
+        app.exit(0);
     }
 
     restartViaTerminal() {
