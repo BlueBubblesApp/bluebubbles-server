@@ -509,11 +509,11 @@ class BlueBubblesServer {
             this.iMessageRepo = new MessageRepository();
             await this.iMessageRepo.initialize();
         } catch (ex) {
-            this.log(`Failed to connect to iMessage database! Please enable Full Disk Access!`, "error");
+            this.log(ex, "error");
 
             const dialogOpts = {
                 type: "error",
-                buttons: ["Restart", "Open System Preferences"],
+                buttons: ["Restart", "Open System Preferences", "Ignore"],
                 title: "BlueBubbles Error",
                 message: "Full-Disk Access Permission Required!",
                 detail:

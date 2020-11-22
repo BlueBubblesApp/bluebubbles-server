@@ -133,6 +133,7 @@ export class MessageRepository {
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
+        withSMS = false,
         where = [
             {
                 statement: "message.service = 'iMessage'",
@@ -188,7 +189,16 @@ export class MessageRepository {
                 before: convertDateTo2001Time(before as Date)
             });
 
-        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
+        if (where && where.length > 0) {
+            // If withSMS is enabled, remove any statements specifying the message service
+            if (withSMS) {
+                where = where.filter(item => item.statement !== `message.service = 'iMessage'`);
+            }
+
+            for (const item of where) {
+                query.andWhere(item.statement, item.args);
+            }
+        }
 
         // Add pagination params
         query.orderBy("message.date", sort);

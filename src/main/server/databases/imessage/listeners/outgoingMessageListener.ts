@@ -140,10 +140,6 @@ export class OutgoingMessageListener extends ChangeListener {
     async emitOutgoingMessages(after: Date, before: Date) {
         const baseQuery = [
             {
-                statement: "message.service = 'iMessage'",
-                args: null
-            },
-            {
                 statement: "message.is_from_me = :fromMe",
                 args: { fromMe: 1 }
             }

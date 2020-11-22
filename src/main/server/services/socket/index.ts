@@ -263,6 +263,7 @@ export class SocketService {
                     withChats: params?.withChats ?? false,
                     withAttachments: params?.withAttachments ?? true,
                     withHandle: params?.withHandle ?? true,
+                    withSMS: params?.withSMS ?? false,
                     sort: params?.sort ?? "DESC"
                 };
 
@@ -288,7 +289,8 @@ export class SocketService {
             "get-messages",
             async (params, cb): Promise<void> => {
                 const after = params?.after;
-                if (!params?.after) return response(cb, "error", createBadRequestResponse("No `after` date provided!"));
+                if (!params?.after && !params.limit)
+                    return response(cb, "error", createBadRequestResponse("No `after` date or `limit` provided!"));
 
                 // See if there is a chat and make sure it exists
                 const chatGuid = params?.chatGuid;
@@ -307,6 +309,7 @@ export class SocketService {
                     withChats: params?.withChats ?? true, // Default to true
                     withAttachments: params?.withAttachments ?? true, // Default to true
                     withHandle: params?.withHandle ?? true, // Default to true
+                    withSMS: params?.withSMS ?? false,
                     sort: params?.sort ?? "ASC" // We want to older messages at the top
                 };
 

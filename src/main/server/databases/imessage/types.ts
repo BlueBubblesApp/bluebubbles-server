@@ -8,6 +8,7 @@ export type DBMessageParams = {
     withAttachments?: boolean;
     withHandle?: boolean;
     sort?: "ASC" | "DESC";
+    withSMS?: boolean;
     where?: DBWhereItem[];
 };
 
