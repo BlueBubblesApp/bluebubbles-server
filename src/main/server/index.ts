@@ -264,27 +264,6 @@ class BlueBubblesServer {
         } catch (ex) {
             this.log(`Failed to setup network service! ${ex.message}`, "error");
         }
-
-        this.log("Checking Permissions...");
-
-        // Log if we dont have accessibility access
-        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
-            this.hasAccessibilityAccess = true;
-            this.log("Accessibility permissions are enabled");
-        } else {
-            this.log("Accessibility permissions are required for certain actions!", "error");
-        }
-
-        // Bypass FD Perms for now
-        this.hasDiskAccess = true;
-        this.log("Bypassing full disk access requirement");
-
-        // Check if we have full disk access
-        // this.hasDiskAccess = fdPerms === "authorized";
-        // if (!this.hasDiskAccess) {
-        //     this.log("Full Disk Access permissions are required!", "error");
-        //     return;
-        // }
     }
 
     /**
@@ -565,6 +544,24 @@ class BlueBubblesServer {
             this.socket = new SocketService();
         } catch (ex) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
+        }
+
+        this.log("Checking Permissions...");
+
+        // Log if we dont have accessibility access
+        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
+            this.hasAccessibilityAccess = true;
+            this.log("Accessibility permissions are enabled");
+        } else {
+            this.log("Accessibility permissions are required for certain actions!", "error");
+        }
+
+        // Log if we dont have accessibility access
+        if (this.iMessageRepo?.db) {
+            this.hasDiskAccess = true;
+            this.log("Full-disk access permissions are enabled");
+        } else {
+            this.log("Full-disk access permissions are required!", "error");
         }
 
         this.hasSetup = true;

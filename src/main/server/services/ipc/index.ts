@@ -110,7 +110,7 @@ export class IPCService {
         ipcMain.handle("check_perms", async (_, __) => {
             return {
                 abPerms: systemPreferences.isTrustedAccessibilityClient(false) ? "authorized" : "denied",
-                fdPerms: "authorized"
+                fdPerms: Server().iMessageRepo?.db ? "authorized" : "denied"
             };
         });
 
