@@ -42,6 +42,7 @@ export class MessageRepository {
         chatGuid = null,
         withParticipants = true,
         withArchived = false,
+        withSMS = false,
         offset = 0,
         limit = null
     }: ChatParams) {
@@ -51,7 +52,10 @@ export class MessageRepository {
         if (withParticipants) query.innerJoinAndSelect("chat.participants", "handle");
 
         // Add default WHERE clauses
-        query.andWhere("chat.service_name == 'iMessage'");
+        if (!withSMS) {
+            query.andWhere("chat.service_name == 'iMessage'");
+        }
+
         if (!withArchived) query.andWhere("chat.is_archived == 0");
         if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
 

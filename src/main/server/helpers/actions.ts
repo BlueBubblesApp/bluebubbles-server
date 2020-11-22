@@ -258,7 +258,7 @@ export class ActionHandler {
     static openChat = async (chatGuid: string): Promise<string> => {
         Server().log(`Executing Action: Open Chat (Chat: ${chatGuid})`, "debug");
 
-        const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+        const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true, withSMS: true });
         if (!chats || chats.length === 0) throw new Error("Chat does not exist");
         if (chats[0].participants.length > 1) throw new Error("Chat is a group chat");
 

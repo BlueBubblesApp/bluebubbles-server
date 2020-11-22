@@ -21,6 +21,7 @@ export type ChatParams = {
     chatGuid?: string;
     withParticipants?: boolean;
     withArchived?: boolean;
+    withSMS?: boolean;
     offset?: number;
     limit?: number;
 };
