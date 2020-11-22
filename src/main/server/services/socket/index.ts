@@ -639,7 +639,10 @@ export class SocketService {
                 if (!params?.message) return response(cb, "error", createBadRequestResponse("No message provided!"));
                 if (!params?.actionMessage)
                     return response(cb, "error", createBadRequestResponse("No action message provided!"));
-                if (!params?.tapback || !["love", "like", "laugh", "dislike", "question", "emphasize"].includes(params.tapback))
+                if (
+                    !params?.tapback ||
+                    !["love", "like", "laugh", "dislike", "question", "emphasize"].includes(params.tapback)
+                )
                     return response(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
 
                 // Add the reaction to the match queue
