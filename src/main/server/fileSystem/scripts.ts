@@ -647,3 +647,7 @@ export const exportContacts = () => {
             end try
         end tell`;
 };
+
+export const runTerminalScript = (path: string) => {
+    return `tell application "Terminal" to do script "${escapeOsaExp(path)}"`;
+};

@@ -77,6 +77,8 @@ export class ActionHandler {
                     throw ex;
                 }
 
+                Server().log("Timeout error. Retrying message...");
+
                 // If it's a timeout error, restart iMessage and retry
                 await FileSystem.executeAppleScript(restartMessages());
                 await FileSystem.executeAppleScript(

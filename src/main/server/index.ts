@@ -2,6 +2,7 @@
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences } from "electron";
 import ServerLog from "electron-log";
+import * as process from "process";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -32,10 +33,10 @@ import {
     IPCService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
+import { runTerminalScript } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
-import { ResponseData } from "./types";
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -604,5 +605,10 @@ class BlueBubblesServer {
 
         // Start the server up again
         await this.start();
+    }
+
+    restartViaTerminal() {
+        FileSystem.executeAppleScript(runTerminalScript(process.execPath));
+        app.exit();
     }
 }

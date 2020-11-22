@@ -170,6 +170,10 @@ export class IPCService {
             Server().repo.devices().clear();
         });
 
+        ipcMain.handle("restart-via-terminal", (_, __) => {
+            Server().restartViaTerminal();
+        });
+
         ipcMain.handle("toggle-auto-start", async (_, toggle) => {
             await Server().repo.setConfig("auto_start", toggle);
             app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });

@@ -12,7 +12,7 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ResponseFormat, ServerMetadataResponse, AttachmentResponse } from "@server/types";
+import { ResponseFormat, ServerMetadataResponse } from "@server/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
