@@ -1,3 +1,4 @@
+import { FileSystem } from "@server/fileSystem";
 import { ActionHandler } from "@server/helpers/actions";
 import { Server } from "@server/index";
 
@@ -7,7 +8,7 @@ export type QueueItem = {
 };
 
 export class QueueService {
-    items: QueueItem[];
+    items: QueueItem[] = [];
 
     isProcessing = false;
 
@@ -30,9 +31,25 @@ export class QueueService {
 
         // Handle the event
         try {
+            Server().log(`Handling queue item, '${item.type}'`);
             switch (item.type) {
                 case "open-chat":
                     await ActionHandler.openChat(item.data);
+                    break;
+                case "send-attachment":
+                    await ActionHandler.sendMessage(
+                        item.data.tempGuid,
+                        item.data.chatGuid,
+                        item.data.message,
+                        item.data.attachmentGuid,
+                        item.data.attachmentName,
+                        item.data.chunks
+                    );
+
+                    // After 60 seconds, delete the attachment chunks
+                    setTimeout(() => {
+                        FileSystem.deleteChunks(item.data.attachmentGuid);
+                    }, 60000);
                     break;
                 default:
                     Server().log(`Unhandled queue item type: ${item.type}`, "warn");

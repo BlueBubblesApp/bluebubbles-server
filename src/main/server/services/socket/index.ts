@@ -29,7 +29,7 @@ import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachm
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
-import { QueueItem } from "@server/services/queue";
+import { QueueItem } from "@server/services/queue/index";
 
 const osVersion = macosVersion();
 
@@ -524,21 +524,19 @@ export class SocketService {
 
                 // If there are no more chunks, compile, save, and send
                 if (!hasMore) {
-                    try {
-                        await ActionHandler.sendMessage(
+                    Server().queue.add({
+                        type: "send-attachment",
+                        data: {
                             tempGuid,
                             chatGuid,
                             message,
                             attachmentGuid,
-                            params?.attachmentName,
-                            attachmentGuid ? FileSystem.buildAttachmentChunks(attachmentGuid) : null
-                        );
+                            attachmentName: params?.attachmentName,
+                            chunks: attachmentGuid ? FileSystem.buildAttachmentChunks(attachmentGuid) : null
+                        }
+                    });
 
-                        FileSystem.deleteChunks(attachmentGuid);
-                        return response(cb, "message-sent", createSuccessResponse(null));
-                    } catch (ex) {
-                        return response(cb, "send-message-chunk-error", createServerErrorResponse(ex.message));
-                    }
+                    return response(cb, "message-sent", createSuccessResponse(null));
                 }
 
                 return response(cb, "message-chunk-saved", createSuccessResponse(null));
