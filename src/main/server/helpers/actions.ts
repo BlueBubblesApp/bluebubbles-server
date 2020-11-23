@@ -72,6 +72,8 @@ export class ActionHandler {
                     )
                 );
             } catch (ex) {
+                Server().log(ex);
+
                 // If it's not a timeout failure, throw the error
                 if (!((ex?.message ?? "") as string).includes("AppleEvent timed out")) {
                     throw ex;
