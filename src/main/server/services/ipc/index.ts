@@ -1,4 +1,4 @@
-import { app, ipcMain, nativeTheme, systemPreferences } from "electron";
+import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
@@ -84,6 +84,9 @@ export class IPCService {
             //     await AlertService.markAsRead(id);
             // }
             await AlertService.markAsRead(args);
+
+            Server().notificationCount = 0;
+            app.setBadgeCount(Server().notificationCount);
         });
 
         ipcMain.handle("set-fcm-server", async (_, args) => {
@@ -107,7 +110,7 @@ export class IPCService {
         ipcMain.handle("check_perms", async (_, __) => {
             return {
                 abPerms: systemPreferences.isTrustedAccessibilityClient(false) ? "authorized" : "denied",
-                fdPerms: "authorized"
+                fdPerms: Server().iMessageRepo?.db ? "authorized" : "denied"
             };
         });
 
@@ -167,6 +170,10 @@ export class IPCService {
             Server().repo.devices().clear();
         });
 
+        ipcMain.handle("restart-via-terminal", (_, __) => {
+            Server().restartViaTerminal();
+        });
+
         ipcMain.handle("toggle-auto-start", async (_, toggle) => {
             await Server().repo.setConfig("auto_start", toggle);
             app.setLoginItemSettings({ openAtLogin: toggle, openAsHidden: true });
@@ -185,6 +192,10 @@ export class IPCService {
             return {
                 currentTheme: "light"
             };
+        });
+
+        ipcMain.handle("show-dialog", (_, opts: Electron.MessageBoxOptions) => {
+            return dialog.showMessageBox(Server().window, opts);
         });
     }
 }

@@ -48,7 +48,7 @@ export class ActionHandler {
         attachmentName?: string,
         attachment?: Uint8Array
     ): Promise<void> => {
-        if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
+        if (!chatGuid) throw new Error("No chat GUID provided");
 
         // Add attachment, if present
         if (attachment) {
@@ -72,10 +72,14 @@ export class ActionHandler {
                     )
                 );
             } catch (ex) {
+                Server().log(ex);
+
                 // If it's not a timeout failure, throw the error
                 if (!((ex?.message ?? "") as string).includes("AppleEvent timed out")) {
                     throw ex;
                 }
+
+                Server().log("Timeout error. Retrying message...");
 
                 // If it's a timeout error, restart iMessage and retry
                 await FileSystem.executeAppleScript(restartMessages());
@@ -140,8 +144,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const oldName of names) {
@@ -181,8 +185,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -226,8 +230,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -256,7 +260,7 @@ export class ActionHandler {
     static openChat = async (chatGuid: string): Promise<string> => {
         Server().log(`Executing Action: Open Chat (Chat: ${chatGuid})`, "debug");
 
-        const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+        const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true, withSMS: true });
         if (!chats || chats.length === 0) throw new Error("Chat does not exist");
         if (chats[0].participants.length > 1) throw new Error("Chat is a group chat");
 
@@ -270,8 +274,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -327,8 +331,8 @@ export class ActionHandler {
         const tapbackId = tapbackUIMap[tapback];
         const friendlyMsg = text.substring(0, 50);
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -368,8 +372,8 @@ export class ActionHandler {
          * calculate the correct chat name
          */
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
+        // Make sure messages is restarted to prevent accessibility issues
+        await FileSystem.executeAppleScript(restartMessages());
 
         let err = null;
         for (const name of names) {
@@ -397,7 +401,7 @@ export class ActionHandler {
      *
      * @returns The GUID of the new chat
      */
-    static createChat = async (participants: string[]): Promise<string> => {
+    static createChat = async (participants: string[], service: string): Promise<string> => {
         Server().log(`Executing Action: Create Chat (Participants: ${participants.join(", ")}`, "debug");
 
         if (participants.length === 0) throw new Error("No participants specified!");
@@ -409,7 +413,7 @@ export class ActionHandler {
         await FileSystem.startMessages();
 
         // Execute the command
-        let ret = (await FileSystem.executeAppleScript(startChat(buddies))) as string;
+        let ret = (await FileSystem.executeAppleScript(startChat(buddies, service))) as string;
 
         try {
             // Get the chat GUID that was created

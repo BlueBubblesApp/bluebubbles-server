@@ -190,10 +190,33 @@ class SettingsView extends React.Component<unknown, State> {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
             const valid = isValidClientConfig(binaryStr as string);
-            if (!valid) return;
+            const validServer = isValidServerConfig(binaryStr as string);
 
-            ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-            this.setState({ fcmClient: binaryStr });
+            if (valid) {
+                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
+                this.setState({ fcmClient: binaryStr });
+            } else if (validServer) {
+                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                this.setState({ fcmServer: binaryStr });
+
+                this.invokeMain("show-dialog", {
+                    type: "warning",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Warning",
+                    message: "We've corrected a mistake you made",
+                    detail:
+                        `The file you chose was for the FCM Server configuration and ` +
+                        `we've saved it as such. Now, please choose the correct client configuration.`
+                });
+            } else {
+                this.invokeMain("show-dialog", {
+                    type: "error",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Error",
+                    message: "Invalid FCM Client configuration selected!",
+                    detail: "The file you have selected is not in the correct format!"
+                });
+            }
         };
 
         reader.readAsText(acceptedFiles[0]);
@@ -208,17 +231,40 @@ class SettingsView extends React.Component<unknown, State> {
             // Do whatever you want with the file contents
             const binaryStr = reader.result;
             const valid = isValidServerConfig(binaryStr as string);
-            if (!valid) return;
+            const validClient = isValidClientConfig(binaryStr as string);
 
-            ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
-            this.setState({ fcmServer: binaryStr });
+            if (valid) {
+                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                this.setState({ fcmServer: binaryStr });
+            } else if (validClient) {
+                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
+                this.setState({ fcmClient: binaryStr });
+
+                this.invokeMain("show-dialog", {
+                    type: "warning",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Warning",
+                    message: "We've corrected a mistake you made",
+                    detail:
+                        `The file you chose was for the FCM Client configuration and ` +
+                        `we've saved it as such. Now, please choose the correct server configuration.`
+                });
+            } else {
+                this.invokeMain("show-dialog", {
+                    type: "error",
+                    buttons: ["OK"],
+                    title: "BlueBubbles Error",
+                    message: "Invalid FCM Server configuration selected!",
+                    detail: "The file you have selected is not in the correct format!"
+                });
+            }
         };
 
         reader.readAsText(acceptedFiles[0]);
     };
 
-    invokeMain(event: string, args: any) {
-        ipcRenderer.invoke(event, args);
+    async invokeMain(event: string, args: any): Promise<any> {
+        return ipcRenderer.invoke(event, args);
     }
 
     render() {
@@ -270,7 +316,7 @@ class SettingsView extends React.Component<unknown, State> {
                             </svg>
                         </span>
 
-                        {/* <div className="aCheckboxDiv firstCheckBox">
+                        <div className="aCheckboxDiv firstCheckBox">
                             <h3 className="aSettingTitle">Encrypt Communications</h3>
                             <label className="form-switch">
                                 <input
@@ -281,7 +327,7 @@ class SettingsView extends React.Component<unknown, State> {
                                 />
                                 <i />
                             </label>
-                        </div> */}
+                        </div>
 
                         <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
                         <input
@@ -372,6 +418,7 @@ class SettingsView extends React.Component<unknown, State> {
                     <div className="modal-content">
                         <div className="modal-header">
                             <span
+                                id="modalCloseBtn"
                                 role="button"
                                 className="close"
                                 onClick={() => this.saveCustomServerUrl(false)}
@@ -380,7 +427,7 @@ class SettingsView extends React.Component<unknown, State> {
                             >
                                 &times;
                             </span>
-                            <h2>Enter your server&rsquo;s host name</h2>
+                            <h2>Enter your server&rsquo;s host name and port</h2>
                         </div>
                         <div className="modal-body">
                             <div className="modal-col">

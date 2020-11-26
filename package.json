@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.1.8",
+    "version": "0.1.10",
     "description": "",
     "main": "./dist/main.js",
     "scripts": {
@@ -83,6 +83,7 @@
         "@hot-loader/react-dom": "^16.13.0",
         "@types/chartist": "^0.9.48",
         "@types/classnames": "^2.2.10",
+        "@types/crypto-js": "^4.0.1",
         "@types/electron-devtools-installer": "^2.2.0",
         "@types/google-libphonenumber": "^7.4.18",
         "@types/history": "^4.7.5",
@@ -145,6 +146,7 @@
         "chartist": "^0.10.1",
         "classnames": "^2.2.6",
         "compare-versions": "^3.6.0",
+        "crypto-js": "^4.0.0",
         "electron-fetch": "^1.4.0",
         "electron-log": "^4.2.4",
         "firebase-admin": "^8.12.1",

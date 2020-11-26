@@ -68,6 +68,7 @@ export type MessageResponse = {
     groupTitle: string | null;
     groupActionType: number;
     isExpired: boolean;
+    balloonBundleId: string | null;
     associatedMessageGuid: string | null;
     associatedMessageType: string | null;
     expressiveSendStyleId: string | null;
@@ -91,6 +92,7 @@ export type ChatResponse = {
     style: number;
     chatIdentifier: string;
     isArchived: boolean;
+    isFiltered: boolean;
     displayName: string;
     groupId: string;
 };

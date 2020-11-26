@@ -42,6 +42,7 @@ export class MessageRepository {
         chatGuid = null,
         withParticipants = true,
         withArchived = false,
+        withSMS = false,
         offset = 0,
         limit = null
     }: ChatParams) {
@@ -51,7 +52,10 @@ export class MessageRepository {
         if (withParticipants) query.innerJoinAndSelect("chat.participants", "handle");
 
         // Add default WHERE clauses
-        query.andWhere("chat.service_name == 'iMessage'");
+        if (!withSMS) {
+            query.andWhere("chat.service_name == 'iMessage'");
+        }
+
         if (!withArchived) query.andWhere("chat.is_archived == 0");
         if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
 
@@ -133,11 +137,8 @@ export class MessageRepository {
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
+        withSMS = false,
         where = [
-            {
-                statement: "message.service = 'iMessage'",
-                args: null
-            },
             {
                 statement: "message.text IS NOT NULL",
                 args: null
@@ -188,7 +189,16 @@ export class MessageRepository {
                 before: convertDateTo2001Time(before as Date)
             });
 
-        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
+        if (where && where.length > 0) {
+            // If withSMS is enabled, remove any statements specifying the message service
+            if (withSMS) {
+                where = where.filter(item => item.statement !== `message.service = 'iMessage'`);
+            }
+
+            for (const item of where) {
+                query.andWhere(item.statement, item.args);
+            }
+        }
 
         // Add pagination params
         query.orderBy("message.date", sort);
@@ -245,9 +255,6 @@ export class MessageRepository {
             );
         }
 
-        // Add default WHERE clauses
-        query.andWhere("message.service == 'iMessage'");
-
         // Add any custom WHERE clauses
         if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
 
@@ -295,10 +302,7 @@ export class MessageRepository {
         const query = this.db.getRepository(Message).createQueryBuilder("message");
 
         // Add default WHERE clauses
-        query
-            .andWhere("message.service == 'iMessage'")
-            .andWhere("message.text IS NOT NULL")
-            .andWhere("associated_message_type == 0");
+        query.andWhere("message.text IS NOT NULL").andWhere("associated_message_type == 0");
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 

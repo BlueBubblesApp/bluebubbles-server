@@ -378,7 +378,7 @@ h3 {
 
 .modal-header {
     padding: 2px 16px;
-    color: white;
+    color: var(--primary-color);
 }
 
 .modal-col {
@@ -396,4 +396,8 @@ h3 {
     margin-left: 65px;
     margin-top: 10px;
     margin-bottom: 10px;
+}
+
+#modalCloseBtn {
+    color: var(--primary-color);
 }
