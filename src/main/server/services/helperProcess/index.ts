@@ -7,8 +7,6 @@ export class BlueBubblesHelperService {
 
     helper: net.Socket;
 
-    typingCache: string[];
-
     constructor() {
         this.server = net.createServer((socket: net.Socket) => {
             this.helper = socket;
@@ -24,6 +22,7 @@ export class BlueBubblesHelperService {
     }
 
     start() {
+        this.server.close();
         this.server.listen(45677, "localhost");
     }
 
@@ -41,7 +40,7 @@ export class BlueBubblesHelperService {
             event: "start-typing",
             data: chatGuid
         };
-        if (!this.helper.write(`${JSON.stringify(data)  }\n`)) {
+        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
             Server().log("Failed to start typing, an error occured writing to the socket", "error");
         }
     }
@@ -60,14 +59,43 @@ export class BlueBubblesHelperService {
             event: "stop-typing",
             data: chatGuid
         };
-        if (!this.helper.write(`${JSON.stringify(data)  }\n`)) {
+        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
             Server().log("Failed to stop typing, an error occured writing to the socket", "error");
+        }
+    }
+
+    sendReaction(chatGuid: string, associatedMessage: string, isRemoving = false) {
+        if (!this.helper || !this.server) {
+            Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");
+            return;
+        }
+        if (!chatGuid) {
+            Server().log("Failed to send reaction, no chatGuid specified!", "error");
+            return;
+        }
+
+        const data = {
+            event: "send-reaction",
+            data: {
+                associatedMessage,
+                isRemoving
+            }
+        };
+        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
+            Server().log("Failed to send reaction, an error occured writing to the socket", "error");
         }
     }
 
     setupListeners() {
         this.helper.on("data", (event: string) => {
-            const data = JSON.parse(event);
+            if (event == null) return;
+            let data;
+            try {
+                data = JSON.parse(event);
+            } catch (e) {
+                return;
+            }
+            if (data == null) return;
             if (data.event === "started-typing") {
                 Server().emitMessage("typing-indicator", { display: true, guid: data.guid });
                 Server().log(`Started typing! ${data}`);
