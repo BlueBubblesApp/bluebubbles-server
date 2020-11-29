@@ -80,6 +80,9 @@ class SettingsView extends React.Component<Props, State> {
                             <button id="clearLogsButton" onClick={() => this.invokeMain("restart-via-terminal", null)}>
                                 Restart via Terminal
                             </button>{" "}
+                            <button id="clearLogsButton" onClick={() => this.invokeMain("open-log-location", null)}>
+                                Open Log Location
+                            </button>{" "}
                             <p>Show Debug Logs</p>
                             <input id="toggleDebug" onChange={e => this.handleInputChange(e)} type="checkbox" />
                         </h3>

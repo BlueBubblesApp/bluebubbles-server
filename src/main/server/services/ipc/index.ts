@@ -3,6 +3,7 @@ import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alert";
+import { openLogs } from "@server/fileSystem/scripts";
 
 export class IPCService {
     /**
@@ -196,6 +197,10 @@ export class IPCService {
 
         ipcMain.handle("show-dialog", (_, opts: Electron.MessageBoxOptions) => {
             return dialog.showMessageBox(Server().window, opts);
+        });
+
+        ipcMain.handle("open-log-location", (_, opts: Electron.MessageBoxOptions) => {
+            FileSystem.executeAppleScript(openLogs());
         });
     }
 }
