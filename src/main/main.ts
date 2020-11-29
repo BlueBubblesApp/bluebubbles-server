@@ -50,7 +50,7 @@ const handleExit = async () => {
 const buildTray = () => {
     return Menu.buildFromTemplate([
         {
-            label: "BlueBubbles Server",
+            label: `BlueBubbles Server v${app.getVersion()}`,
             enabled: false
         },
         {
