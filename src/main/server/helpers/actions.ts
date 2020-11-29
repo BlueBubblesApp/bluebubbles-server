@@ -303,6 +303,11 @@ export class ActionHandler {
         }
     };
 
+    static markChatRead = async (chatGuid: string): Promise<void> => {
+        Server().log(`Executing Action: Marking chat as read (Chat: ${chatGuid})`, "debug");
+        Server().blueBubblesServerHelper.markChatRead(chatGuid);
+    };
+
     /**
      * Toggles a tapback to specific message in a chat
      *

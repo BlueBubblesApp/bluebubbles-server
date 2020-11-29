@@ -64,6 +64,25 @@ export class BlueBubblesHelperService {
         }
     }
 
+    markChatRead(chatGuid: string) {
+        if (!this.helper || !this.server) {
+            Server().log("Failed to mark chat as read, BlueBubblesHelper is not running!", "error");
+            return;
+        }
+        if (!chatGuid) {
+            Server().log("Failed to mark chat as read, no chatGuid specified!", "error");
+            return;
+        }
+
+        const data = {
+            event: "mark-chat-read",
+            data: chatGuid
+        };
+        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
+            Server().log("Failed to mark chat as read, an error occured writing to the socket", "error");
+        }
+    }
+
     sendReaction(chatGuid: string, associatedMessage: string, isRemoving = false) {
         if (!this.helper || !this.server) {
             Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");

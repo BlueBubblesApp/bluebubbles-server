@@ -805,6 +805,31 @@ export class SocketService {
         socket.on("disconnect", reason => {
             Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
+
+        /**
+         * Tells the server to mark a chat as read
+         */
+        socket.on(
+            "mark-chat-read",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.markChatRead(params.chatGuid);
+                    return response(cb, "mark-chat-read-sent", createNoDataResponse());
+                } catch {
+                    return response(cb, "mark-chat-read-error", createServerErrorResponse("Failed to mark chat read!"));
+                }
+
+                // Return null so Typescript doesn't yell at us
+                return null;
+            }
+        );
+
+        socket.on("disconnect", reason => {
+            Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
+        });
     }
 
     /**
