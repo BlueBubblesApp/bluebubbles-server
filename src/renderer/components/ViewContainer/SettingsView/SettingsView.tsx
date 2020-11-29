@@ -29,6 +29,7 @@ interface State {
     showModal: boolean;
     serverUrl: string;
     encryptComs: boolean;
+    hideDockIcon: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -50,7 +51,8 @@ class SettingsView extends React.Component<unknown, State> {
             enableNgrok: false,
             showModal: false,
             serverUrl: "",
-            encryptComs: false
+            encryptComs: false,
+            hideDockIcon: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -75,7 +77,8 @@ class SettingsView extends React.Component<unknown, State> {
                 showKey: false,
                 ngrokKey: config.ngrok_key,
                 enableNgrok: config.enable_ngrok,
-                encryptComs: config.encrypt_coms
+                encryptComs: config.encrypt_coms,
+                hideDockIcon: config.hide_dock_icon
             });
 
         this.getCaffeinateStatus();
@@ -169,6 +172,14 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ encryptComs: target.checked });
             await ipcRenderer.invoke("set-config", {
                 encrypt_coms: target.checked
+            });
+        }
+
+        if (id === "toggleDockIcon") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ hideDockIcon: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                hide_dock_icon: target.checked
             });
         }
     };
@@ -370,6 +381,18 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
                                     checked={this.state.autoStart}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <h3 className="aSettingTitle">Hide Dock Icon</h3>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleDockIcon"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.hideDockIcon}
                                 />
                                 <i />
                             </label>

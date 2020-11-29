@@ -284,6 +284,19 @@ class BlueBubblesServer {
                     `Please go to the configuration page, fill in a password, and save the configuration.`
             });
         }
+
+        this.setDockIcon();
+    }
+
+    private setDockIcon() {
+        if (!this.repo || !this.repo.db) return;
+
+        const hideDockIcon = this.repo.getConfig("hide_dock_icon") as boolean;
+        if (hideDockIcon) {
+            app.dock.hide();
+        } else {
+            app.dock.show();
+        }
     }
 
     /**
@@ -324,6 +337,11 @@ class BlueBubblesServer {
         // If the ngrok API key is different, restart the ngrok process
         if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !ngrokRestarted) {
             if (this.ngrok) await this.ngrok.restart();
+        }
+
+        // If the dock style changes
+        if (prevConfig.hide_dock_icon !== nextConfig.hide_dock_icon) {
+            this.setDockIcon();
         }
 
         this.emitToUI("config-update", nextConfig);
