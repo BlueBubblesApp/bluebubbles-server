@@ -204,6 +204,16 @@ export class SocketService {
         );
 
         /**
+         * Handles a server ping
+         */
+        socket.on(
+            "ping",
+            async (_, cb): Promise<void> => {
+                return response(cb, "pong", createSuccessResponse("pong"));
+            }
+        );
+
+        /**
          * Get all chats
          */
         socket.on("get-chats", async (params, cb) => {

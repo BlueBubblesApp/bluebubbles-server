@@ -140,6 +140,10 @@ export class MessageRepository {
         withSMS = false,
         where = [
             {
+                statement: "message.service = 'iMessage'",
+                args: null
+            },
+            {
                 statement: "message.text IS NOT NULL",
                 args: null
             }
@@ -255,6 +259,9 @@ export class MessageRepository {
             );
         }
 
+        // Add default WHERE clauses
+        query.andWhere("message.service == 'iMessage'");
+
         // Add any custom WHERE clauses
         if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
 
@@ -302,7 +309,10 @@ export class MessageRepository {
         const query = this.db.getRepository(Message).createQueryBuilder("message");
 
         // Add default WHERE clauses
-        query.andWhere("message.text IS NOT NULL").andWhere("associated_message_type == 0");
+        query
+            .andWhere("message.service == 'iMessage'")
+            .andWhere("message.text IS NOT NULL")
+            .andWhere("associated_message_type == 0");
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 
