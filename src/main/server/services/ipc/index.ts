@@ -181,7 +181,7 @@ export class IPCService {
         });
 
         ipcMain.handle("restart-server", async (_, __) => {
-            await Server().restart();
+            await Server().hostRestart();
         });
 
         ipcMain.handle("get-current-theme", (_, __) => {

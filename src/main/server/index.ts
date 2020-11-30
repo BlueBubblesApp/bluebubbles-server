@@ -561,7 +561,7 @@ class BlueBubblesServer {
 
             dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
                 if (returnValue.response === 0) {
-                    this.restartNormally();
+                    this.relaunch();
                 } else if (returnValue.response === 1) {
                     FileSystem.executeAppleScript(openSystemPreferences());
                     app.quit();
@@ -642,7 +642,7 @@ class BlueBubblesServer {
     /**
      * Restarts the server
      */
-    async restart() {
+    async hostRestart() {
         this.log("Restarting the server...");
 
         // Remove all listeners
@@ -661,12 +661,66 @@ class BlueBubblesServer {
         await this.start();
     }
 
-    restartNormally() {
+    relaunch() {
         app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
         app.exit(0);
     }
 
-    restartViaTerminal() {
+    async stopServices() {
+        Server().log("Stopping all services...");
+
+        try {
+            await this.ngrok.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping Ngrok!\n${ex}`);
+        }
+
+        try {
+            this.socket.server.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the socket!\n${ex}`);
+        }
+
+        try {
+            await this.iMessageRepo.db.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the iMessage database connection!\n${ex}`);
+        }
+
+        try {
+            await this.repo.db.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the server database connection!\n${ex}`);
+        }
+
+        try {
+            await this.contactsRepo.db.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the contacts database connection!\n${ex}`);
+        }
+
+        try {
+            this.networkChecker.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the network checker service!\n${ex}`);
+        }
+
+        try {
+            FCMService.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the FCM service!\n${ex}`);
+        }
+
+        try {
+            this.caffeinate.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the caffeinate service!\n${ex}`);
+        }
+    }
+
+    async restartViaTerminal() {
+        // Close everything gracefully
+        await this.stopServices();
         FileSystem.executeAppleScript(runTerminalScript(process.execPath));
         app.exit();
     }

@@ -17,6 +17,8 @@ export class FCMService {
         }
     }
 
+    lastRestart = 0;
+
     /**
      * Starts the FCM app service
      */
@@ -26,6 +28,10 @@ export class FCMService {
         if (app) return true;
 
         Server().log("Initializing new FCM App");
+
+        // Load in the last restart date
+        const lastRestart = Server().repo.getConfig("last_fcm_restart");
+        this.lastRestart = !lastRestart ? 0 : (lastRestart as number);
 
         // Do nothing if the config doesn't exist
         const serverConfig = FileSystem.getFCMServer();
@@ -40,6 +46,8 @@ export class FCMService {
             },
             AppName
         );
+
+        this.listen();
 
         // Set the current ngrok URL if we are connected
         if (Server().ngrok?.isConnected()) await this.setServerUrl(Server().ngrok.url);
@@ -77,6 +85,36 @@ export class FCMService {
         config.once("value", _ => {
             config.update({ serverUrl });
         });
+    }
+
+    async listen() {
+        const app = FCMService.getApp();
+        if (!app) return;
+
+        const db = app.database();
+        db.ref("config")
+            .child("nextRestart")
+            .on("value", async (snapshot: admin.database.DataSnapshot) => {
+                const value = snapshot.val();
+                if (!value) return;
+
+                Server().log("Received request to restart via FCM! Standby...");
+
+                try {
+                    if (value > this.lastRestart) {
+                        Server().log("Restarting...");
+
+                        // Update the last restart values
+                        await Server().repo.setConfig("last_fcm_restart", value);
+                        this.lastRestart = value;
+
+                        // Do a restart
+                        await Server().relaunch();
+                    }
+                } catch (ex) {
+                    Server().log(`Failed to restart after FCM request!\n${ex}`, "error");
+                }
+            });
     }
 
     /**

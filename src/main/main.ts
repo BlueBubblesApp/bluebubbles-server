@@ -33,17 +33,7 @@ if (!gotTheLock) {
 
 const handleExit = async () => {
     if (!api) return;
-
-    Server().log("Stopping all services...");
-
-    if (api.networkChecker) api.networkChecker.stop();
-    if (api.ngrok) await api.ngrok.stop();
-    if (api.socket?.server) api.socket.server.close();
-    if (api.iMessageRepo?.db && api.iMessageRepo.db.isConnected) await api.iMessageRepo.db.close();
-    if (api.repo?.db && api.repo.db.isConnected) await api.repo.db.close();
-    if (api.fcm) FCMService.stop();
-    if (api.caffeinate && api.caffeinate.isCaffeinated) api.caffeinate.stop();
-
+    await Server().stopServices();
     app.quit();
 };
 
@@ -77,7 +67,7 @@ const buildTray = () => {
             label: "Restart",
             type: "normal",
             click: () => {
-                Server().restartNormally();
+                Server().relaunch();
             }
         },
         {
