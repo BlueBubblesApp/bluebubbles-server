@@ -48,7 +48,7 @@ export class ActionHandler {
         attachmentName?: string,
         attachment?: Uint8Array
     ): Promise<void> => {
-        if (!chatGuid.startsWith("iMessage")) throw new Error("Invalid chat GUID!");
+        if (!chatGuid) throw new Error("No chat GUID provided");
 
         // Add attachment, if present
         if (attachment) {

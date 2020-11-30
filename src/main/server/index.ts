@@ -38,6 +38,8 @@ import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scr
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
 
+const findProcess = require("find-process");
+
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
 ServerLog.transports.console.format = logFormat;
@@ -284,6 +286,34 @@ class BlueBubblesServer {
                     `Please go to the configuration page, fill in a password, and save the configuration.`
             });
         }
+
+        this.setDockIcon();
+
+        try {
+            const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
+            const parentProc = await findProcess("pid", process.ppid);
+            const parentName = parentProc && parentProc.length > 0 ? parentProc[0].name : null;
+
+            // Restart if enabled and the parent process is the app being launched
+            if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
+                Server().log("Restarting via terminal after post-check (configured)");
+                await this.restartViaTerminal();
+            }
+        } catch (ex) {
+            Server().log(`Failed to restart via terminal!\n${ex}`);
+        }
+    }
+
+    private setDockIcon() {
+        if (!this.repo || !this.repo.db) return;
+
+        const hideDockIcon = this.repo.getConfig("hide_dock_icon") as boolean;
+        if (hideDockIcon) {
+            app.dock.hide();
+            app.show();
+        } else {
+            app.dock.show();
+        }
     }
 
     /**
@@ -324,6 +354,11 @@ class BlueBubblesServer {
         // If the ngrok API key is different, restart the ngrok process
         if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !ngrokRestarted) {
             if (this.ngrok) await this.ngrok.restart();
+        }
+
+        // If the dock style changes
+        if (prevConfig.hide_dock_icon !== nextConfig.hide_dock_icon) {
+            this.setDockIcon();
         }
 
         this.emitToUI("config-update", nextConfig);
@@ -543,7 +578,7 @@ class BlueBubblesServer {
 
             dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
                 if (returnValue.response === 0) {
-                    this.restartNormally();
+                    this.relaunch();
                 } else if (returnValue.response === 1) {
                     FileSystem.executeAppleScript(openSystemPreferences());
                     app.quit();
@@ -624,7 +659,7 @@ class BlueBubblesServer {
     /**
      * Restarts the server
      */
-    async restart() {
+    async hostRestart() {
         this.log("Restarting the server...");
 
         // Remove all listeners
@@ -643,12 +678,66 @@ class BlueBubblesServer {
         await this.start();
     }
 
-    restartNormally() {
+    relaunch() {
         app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
         app.exit(0);
     }
 
-    restartViaTerminal() {
+    async stopServices() {
+        Server().log("Stopping all services...");
+
+        try {
+            await this.ngrok.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping Ngrok!\n${ex}`);
+        }
+
+        try {
+            this.socket.server.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the socket!\n${ex}`);
+        }
+
+        try {
+            await this.iMessageRepo.db.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the iMessage database connection!\n${ex}`);
+        }
+
+        try {
+            await this.repo.db.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the server database connection!\n${ex}`);
+        }
+
+        try {
+            await this.contactsRepo.db.close();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the contacts database connection!\n${ex}`);
+        }
+
+        try {
+            this.networkChecker.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the network checker service!\n${ex}`);
+        }
+
+        try {
+            FCMService.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the FCM service!\n${ex}`);
+        }
+
+        try {
+            this.caffeinate.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the caffeinate service!\n${ex}`);
+        }
+    }
+
+    async restartViaTerminal() {
+        // Close everything gracefully
+        await this.stopServices();
         FileSystem.executeAppleScript(runTerminalScript(process.execPath));
         app.exit();
     }
