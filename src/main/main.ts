@@ -128,7 +128,8 @@ const createWindow = async () => {
         height: 750,
         minHeight: 600,
         webPreferences: {
-            nodeIntegration: true // Required in new electron version
+            nodeIntegration: true, // Required in new electron version
+            enableRemoteModule: true
         }
     });
 

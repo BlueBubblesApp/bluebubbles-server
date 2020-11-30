@@ -38,6 +38,8 @@ import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scr
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
 
+const findProcess = require("find-process");
+
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
 ServerLog.transports.console.format = logFormat;
@@ -287,9 +289,18 @@ class BlueBubblesServer {
 
         this.setDockIcon();
 
-        const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
-        if (restartViaTerminal) {
-            await this.restartViaTerminal();
+        try {
+            const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
+            const parentProc = await findProcess("pid", process.ppid);
+            const parentName = parentProc && parentProc.length > 0 ? parentProc[0].name : null;
+
+            // Restart if enabled and the parent process is the app being launched
+            if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
+                Server().log("Restarting via terminal after post-check (configured)");
+                await this.restartViaTerminal();
+            }
+        } catch (ex) {
+            Server().log(`Failed to restart via terminal!\n${ex}`);
         }
     }
 
