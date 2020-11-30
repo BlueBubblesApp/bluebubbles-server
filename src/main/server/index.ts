@@ -286,6 +286,11 @@ class BlueBubblesServer {
         }
 
         this.setDockIcon();
+
+        const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
+        if (restartViaTerminal) {
+            await this.restartViaTerminal();
+        }
     }
 
     private setDockIcon() {
@@ -294,6 +299,7 @@ class BlueBubblesServer {
         const hideDockIcon = this.repo.getConfig("hide_dock_icon") as boolean;
         if (hideDockIcon) {
             app.dock.hide();
+            app.show();
         } else {
             app.dock.show();
         }

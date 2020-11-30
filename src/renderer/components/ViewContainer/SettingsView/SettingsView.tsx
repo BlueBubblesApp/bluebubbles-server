@@ -30,6 +30,7 @@ interface State {
     serverUrl: string;
     encryptComs: boolean;
     hideDockIcon: boolean;
+    startViaTerminal: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -52,7 +53,8 @@ class SettingsView extends React.Component<unknown, State> {
             showModal: false,
             serverUrl: "",
             encryptComs: false,
-            hideDockIcon: false
+            hideDockIcon: false,
+            startViaTerminal: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -78,7 +80,8 @@ class SettingsView extends React.Component<unknown, State> {
                 ngrokKey: config.ngrok_key,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
-                hideDockIcon: config.hide_dock_icon
+                hideDockIcon: config.hide_dock_icon,
+                startViaTerminal: config.start_via_terminal
             });
 
         this.getCaffeinateStatus();
@@ -180,6 +183,14 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ hideDockIcon: target.checked });
             await ipcRenderer.invoke("set-config", {
                 hide_dock_icon: target.checked
+            });
+        }
+
+        if (id === "toggleTerminalStart") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ startViaTerminal: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                start_via_terminal: target.checked
             });
         }
     };
@@ -393,6 +404,18 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
                                     checked={this.state.hideDockIcon}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <h3 className="aSettingTitle">Always Start via Terminal</h3>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleTerminalStart"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.startViaTerminal}
                                 />
                                 <i />
                             </label>

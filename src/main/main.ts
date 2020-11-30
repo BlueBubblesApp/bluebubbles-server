@@ -1,11 +1,12 @@
 import "reflect-metadata";
 import { app, BrowserWindow, Tray, Menu, nativeTheme } from "electron";
+import * as process from "process";
 import * as path from "path";
 import * as url from "url";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
-import { UpdateService, FCMService } from "@server/services";
+import { UpdateService } from "@server/services";
 
 let win: BrowserWindow;
 let tray: Tray;
@@ -199,4 +200,83 @@ app.on("activate", () => {
  */
 app.on("before-quit", async _ => {
     await handleExit();
+});
+
+const quickStrConvert = (val: string): string | number | boolean => {
+    if (val.toLowerCase() === "true") return true;
+    if (val.toLowerCase() === "false") return false;
+    return val;
+};
+
+const handleSet = async (parts: string[]): Promise<void> => {
+    const configKey = parts.length > 1 ? parts[1] : null;
+    const configValue = parts.length > 2 ? parts[2] : null;
+    if (!configKey || !configValue) {
+        Server().log("Empty config key/value. Ignoring...");
+        return;
+    }
+
+    if (!Server().repo.hasConfig(configKey)) {
+        Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
+        return;
+    }
+
+    try {
+        await Server().repo.setConfig(configKey, quickStrConvert(configValue));
+        Server().log(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
+    } catch (ex) {
+        Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
+    }
+};
+
+const showHelp = () => {
+    const help = `[================================== Help Menu ==================================]\n
+Available Commands:
+    - help:             Show the help menu
+    - restart:          Relaunch/Restart the app
+    - set:              Set configuration item -> \`set <config item> <value>\`
+                        Available configuration items:
+                            -> tutorial_is_done: boolean
+                            -> socket_port: number
+                            -> server_address: string
+                            -> ngrok_key: string
+                            -> password: string
+                            -> auto_caffeinate: boolean
+                            -> auto_start: boolean
+                            -> enable_ngrok: boolean
+                            -> encrypt_coms: boolean
+                            -> hide_dock_icon: boolean
+                            -> last_fcm_restart: number
+                            -> start_via_terminal: boolean
+\n[===============================================================================]`;
+
+    console.log(help);
+};
+
+process.stdin.on("data", chunk => {
+    const line = chunk.toString().trim();
+    if (!api || !line || line.length === 0) return;
+    Server().log(`Handling STDIN: ${line}`, "debug");
+
+    // Handle the standard input
+    const parts = chunk ? line.split(" ") : [];
+    if (parts.length === 0) {
+        Server().log("Invalid command", "debug");
+        return;
+    }
+
+    switch (parts[0].toLowerCase()) {
+        case "help":
+            showHelp();
+            break;
+        case "set":
+            handleSet(parts);
+            break;
+        case "restart":
+        case "relaunch":
+            Server().relaunch();
+            break;
+        default:
+            Server().log(`Unhandled command, '${parts[0]}'`, "debug");
+    }
 });
