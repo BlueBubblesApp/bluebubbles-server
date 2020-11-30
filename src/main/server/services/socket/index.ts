@@ -207,16 +207,6 @@ export class SocketService {
          * Handles a server ping
          */
         socket.on(
-            "ping",
-            async (_, cb): Promise<void> => {
-                return response(cb, "pong", createSuccessResponse("pong"));
-            }
-        );
-
-        /**
-         * Handles a server ping
-         */
-        socket.on(
             "get-logs",
             async (params, cb): Promise<void> => {
                 const count = params?.count ?? 100;
