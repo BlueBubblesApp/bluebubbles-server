@@ -68,7 +68,12 @@ export class FCMService {
             {
                 rules: {
                     ".read": true,
-                    ".write": false
+                    ".write": false,
+                    config: {
+                        nextRestart: {
+                            ".write": true
+                        }
+                    }
                 }
             },
             null,
