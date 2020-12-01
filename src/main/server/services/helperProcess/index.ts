@@ -18,6 +18,15 @@ export class BlueBubblesHelperService {
                 Server().log("Helper disconnected!", "error");
                 this.helper = null;
             });
+            this.helper.on("error", () => {
+                Server().log("An error occured in the BlueBubblesHelper connection! Closing...", "error");
+                if (this.helper) this.helper.destroy();
+            });
+        });
+        this.server.on("error", () => {
+            Server().log("An error occured in the TCP Socket! Retarting", "error");
+            this.server.close();
+            this.start();
         });
     }
 
