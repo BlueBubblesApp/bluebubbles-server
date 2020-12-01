@@ -107,11 +107,15 @@ export class BlueBubblesHelperService {
 
     setupListeners() {
         this.helper.on("data", (event: string) => {
-            if (event == null) return;
+            if (event == null) {
+                Server().log(`Failed to decode null helper data!`);
+                return;
+            }
             let data;
             try {
                 data = JSON.parse(event);
             } catch (e) {
+                Server().log(`Failed to decode helper data! ${event}`);
                 return;
             }
             if (data == null) return;
