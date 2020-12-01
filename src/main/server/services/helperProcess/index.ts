@@ -106,7 +106,7 @@ export class BlueBubblesHelperService {
     }
 
     setupListeners() {
-        this.helper.on("data", (event: string) => {
+        this.helper.on("data", (event: any) => {
             if (event == null) {
                 Server().log(`Failed to decode null helper data!`);
                 return;
