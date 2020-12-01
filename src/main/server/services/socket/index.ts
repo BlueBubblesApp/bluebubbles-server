@@ -785,9 +785,6 @@ export class SocketService {
                 } catch {
                     return response(cb, "started-typing-error", createServerErrorResponse("Failed to stop typing"));
                 }
-
-                // Return null so Typescript doesn't yell at us
-                return null;
             }
         );
 
@@ -808,16 +805,8 @@ export class SocketService {
                 } catch {
                     return response(cb, "stopped-typing-error", createServerErrorResponse("Failed to stop typing!"));
                 }
-
-                // Return null so Typescript doesn't yell at us
-                return null;
             }
         );
-
-        socket.on("disconnect", reason => {
-            Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
-        });
-
         /**
          * Tells the server to mark a chat as read
          */
@@ -836,6 +825,29 @@ export class SocketService {
 
                 // Return null so Typescript doesn't yell at us
                 return null;
+            }
+        );
+        /**
+         * Tells the server to stop typing in a chat
+         * This will happen automaticaly after 10 seconds,
+         * but the client can tell the server to do so manually
+         */
+        socket.on(
+            "update-typing-status",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.updateTypingStatus(params.chatGuid);
+                    return response(cb, "update-typing-status-sent", createNoDataResponse());
+                } catch {
+                    return response(
+                        cb,
+                        "update-typing-status-error",
+                        createServerErrorResponse("Failed to update typing status!")
+                    );
+                }
             }
         );
 

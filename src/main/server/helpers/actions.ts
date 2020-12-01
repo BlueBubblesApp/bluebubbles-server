@@ -308,6 +308,11 @@ export class ActionHandler {
         Server().blueBubblesServerHelper.markChatRead(chatGuid);
     };
 
+    static updateTypingStatus = async (chatGuid: string): Promise<void> => {
+        Server().log(`Executing Action: Update Typing Status (Chat: ${chatGuid})`, "debug");
+        Server().blueBubblesServerHelper.getTypingStatus(chatGuid);
+    };
+
     /**
      * Toggles a tapback to specific message in a chat
      *

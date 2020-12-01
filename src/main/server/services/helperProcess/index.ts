@@ -105,6 +105,25 @@ export class BlueBubblesHelperService {
         }
     }
 
+    getTypingStatus(chatGuid: string) {
+        if (!this.helper || !this.server) {
+            Server().log("Failed to retreive typing status, BlueBubblesHelper is not running!", "error");
+            return;
+        }
+        if (!chatGuid) {
+            Server().log("Failed to retreive typing status, no chatGuid specified!", "error");
+            return;
+        }
+
+        const data = {
+            event: "check-typing-status",
+            data: chatGuid
+        };
+        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
+            Server().log("Failed to retreive typing status, an error occured writing to the socket", "error");
+        }
+    }
+
     setupListeners() {
         this.helper.on("data", (eventRaw: string) => {
             if (eventRaw == null) {
