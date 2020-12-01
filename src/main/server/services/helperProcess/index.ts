@@ -111,8 +111,14 @@ export class BlueBubblesHelperService {
                 Server().log(`Failed to decode null helper data!`);
                 return;
             }
-            const event = eventRaw.trim();
-            // .replace(/[\u0000-\u0019]+/g,"");
+
+            const eventData: string[] = String(eventRaw).split("\n");
+            const event = eventData[eventData.length - 2];
+            if (event == null) {
+                Server().log(`Failed to decode null helper data!`);
+                return;
+            }
+
             let data;
             try {
                 data = JSON.parse(event);
@@ -123,12 +129,11 @@ export class BlueBubblesHelperService {
             if (data == null) return;
             if (data.event === "started-typing") {
                 Server().emitMessage("typing-indicator", { display: true, guid: data.guid });
-                Server().log(`Started typing! ${data}`);
+                Server().log(`Started typing! ${data.guid}`);
             } else if (data.event === "stopped-typing") {
                 Server().emitMessage("typing-indicator", { display: false, guid: data.guid });
-                Server().log(`Stopped typing! ${data}`);
+                Server().log(`Stopped typing! ${data.guid}`);
             }
-            Server().log(`Helper gave new data! ${event}`);
         });
     }
 }
