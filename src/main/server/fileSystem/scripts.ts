@@ -1,6 +1,7 @@
 /* eslint-disable max-len */
 import * as macosVersion from "macos-version";
 import * as compareVersions from "compare-versions";
+import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
 import { escapeOsaExp } from "@server/helpers/utils";
 
@@ -657,4 +658,11 @@ export const openSystemPreferences = () => {
         reopen
         activate
     end tell`;
+};
+
+export const openLogs = () => {
+    const logPath = transports.file.getFile().path;
+    const pieces = logPath.split("/");
+    const parent = pieces.slice(0, pieces.length - 1).join("/");
+    return `do shell script "open ${parent}"`;
 };

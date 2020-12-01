@@ -1,6 +1,10 @@
 import * as fs from "fs";
+import * as stream from "stream";
+import * as readline from "readline";
+
 import * as path from "path";
 import * as child_process from "child_process";
+import { transports } from "electron-log";
 import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server/index";
@@ -73,6 +77,39 @@ export class FileSystem {
         const parent = path.join(FileSystem.attachmentsDir, guid);
         if (!fs.existsSync(parent)) fs.mkdirSync(parent);
         fs.writeFileSync(path.join(parent, `${chunkNumber}.chunk`), buffer);
+    }
+
+    static getLogs({ count = 100 }): Promise<string> {
+        const fPath = transports.file.getFile().path;
+        return FileSystem.readLastLines({
+            filePath: fPath,
+            count
+        });
+    }
+
+    private static readLastLines({ filePath, count = 100 }: { filePath: string; count?: number }): Promise<string> {
+        const inStream = fs.createReadStream(filePath);
+        const outStream = new stream.Writable();
+        return new Promise((resolve, reject) => {
+            const rl = readline.createInterface(inStream, outStream);
+
+            let output = "";
+            let lineCount = 0;
+            rl.on("line", line => {
+                lineCount += 1;
+                output += `${line}\n`;
+
+                if (lineCount >= count) {
+                    resolve(output);
+                }
+            });
+
+            rl.on("error", reject);
+
+            rl.on("close", () => {
+                resolve(output);
+            });
+        });
     }
 
     /**

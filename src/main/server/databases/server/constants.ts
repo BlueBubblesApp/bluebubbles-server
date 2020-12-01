@@ -8,5 +8,8 @@ export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
     auto_caffeinate: () => 0,
     auto_start: () => 0,
     enable_ngrok: () => 1,
-    encrypt_coms: () => 0
+    encrypt_coms: () => 0,
+    hide_dock_icon: () => 0,
+    last_fcm_restart: () => 0,
+    start_via_terminal: () => 0
 };

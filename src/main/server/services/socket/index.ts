@@ -204,6 +204,18 @@ export class SocketService {
         );
 
         /**
+         * Handles a server ping
+         */
+        socket.on(
+            "get-logs",
+            async (params, cb): Promise<void> => {
+                const count = params?.count ?? 100;
+                const logs = await FileSystem.getLogs({ count });
+                return response(cb, "logs", createSuccessResponse(logs));
+            }
+        );
+
+        /**
          * Get all chats
          */
         socket.on("get-chats", async (params, cb) => {
