@@ -111,15 +111,7 @@ export class BlueBubblesHelperService {
                 Server().log(`Failed to decode null helper data!`);
                 return;
             }
-            const event = eventRaw
-                .replace(/\\n/g, "\\n")
-                .replace(/\\'/g, "\\'")
-                .replace(/\\"/g, '\\"')
-                .replace(/\\&/g, "\\&")
-                .replace(/\\r/g, "\\r")
-                .replace(/\\t/g, "\\t")
-                .replace(/\\b/g, "\\b")
-                .replace(/\\f/g, "\\f");
+            const event = eventRaw.trim();
             // .replace(/[\u0000-\u0019]+/g,"");
             let data;
             try {
