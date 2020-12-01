@@ -115,7 +115,7 @@ export class BlueBubblesHelperService {
             try {
                 data = JSON.parse(event);
             } catch (e) {
-                Server().log(`Failed to decode helper data! ${event}`);
+                Server().log(`Failed to decode helper data! ${event}, ${e}`);
                 return;
             }
             if (data == null) return;
