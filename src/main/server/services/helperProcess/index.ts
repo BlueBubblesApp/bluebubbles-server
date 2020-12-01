@@ -106,11 +106,21 @@ export class BlueBubblesHelperService {
     }
 
     setupListeners() {
-        this.helper.on("data", (event: any) => {
-            if (event == null) {
+        this.helper.on("data", (eventRaw: string) => {
+            if (eventRaw == null) {
                 Server().log(`Failed to decode null helper data!`);
                 return;
             }
+            const event = eventRaw
+                .replace(/\\n/g, "\\n")
+                .replace(/\\'/g, "\\'")
+                .replace(/\\"/g, '\\"')
+                .replace(/\\&/g, "\\&")
+                .replace(/\\r/g, "\\r")
+                .replace(/\\t/g, "\\t")
+                .replace(/\\b/g, "\\b")
+                .replace(/\\f/g, "\\f");
+            // .replace(/[\u0000-\u0019]+/g,"");
             let data;
             try {
                 data = JSON.parse(event);
