@@ -659,8 +659,9 @@ export class SocketService {
             "send-reaction",
             async (params, cb): Promise<void> => {
                 if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
-                if (!params?.message) return response(cb, "error", createBadRequestResponse("No message provided!"));
-                if (!params?.actionMessage)
+                if (!params?.messageGuid || !params?.messageText)
+                    return response(cb, "error", createBadRequestResponse("No message provided!"));
+                if (!params?.actionMessageGuid || !params?.actionMessageText)
                     return response(cb, "error", createBadRequestResponse("No action message provided!"));
                 if (
                     !params?.tapback ||
@@ -673,25 +674,25 @@ export class SocketService {
                     try {
                         await ActionHandler.togglePrivateTapback(
                             params.chatGuid,
-                            params.actionMessage.guid,
+                            params.actionMessageGuid,
                             params.tapback
                         );
                         return response(cb, "tapback-sent", createNoDataResponse());
                     } catch (ex) {
-                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
+                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.messageText));
                     }
                 }
 
                 // Add the reaction to the match queue
                 const item = new Queue();
-                item.tempGuid = params.message.guid;
+                item.tempGuid = params.messageGuid;
                 item.chatGuid = params.chatGuid;
                 item.dateCreated = new Date().getTime();
-                item.text = params.message.text;
+                item.text = params.messageText;
                 await Server().repo.queue().manager.save(item);
 
                 try {
-                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
+                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessageText, params.tapback);
                     return response(cb, "tapback-sent", createNoDataResponse());
                 } catch (ex) {
                     return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
