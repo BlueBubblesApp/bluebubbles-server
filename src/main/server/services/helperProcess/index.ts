@@ -1,4 +1,5 @@
 import { Server } from "@server/index";
+import { ValidTapback } from "@server/types";
 
 import * as net from "net";
 
@@ -92,7 +93,7 @@ export class BlueBubblesHelperService {
         }
     }
 
-    sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: string) {
+    sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: ValidTapback) {
         if (!this.helper || !this.server) {
             Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");
             return;
@@ -103,7 +104,7 @@ export class BlueBubblesHelperService {
         }
         const data = {
             event: "send-reaction",
-            data: `${chatGuid},${actionMessageGuid},${reactionType}`
+            data: `${chatGuid},${actionMessageGuid},${reactionType as string}`
         };
         if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
             Server().log("Failed to send reaction, an error occured writing to the socket", "error");

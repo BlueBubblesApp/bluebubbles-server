@@ -317,7 +317,7 @@ export class ActionHandler {
     static togglePrivateTapback = async (
         chatGuid: string,
         actionMessageGuid: string,
-        reactionType: string
+        reactionType: ValidTapback
     ): Promise<void> => {
         Server().log(
             `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`,
