@@ -111,6 +111,24 @@ export class BlueBubblesHelperService {
         }
     }
 
+    setDisplayName(chatGuid: string, newName: string) {
+        if (!this.helper || !this.server) {
+            Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");
+            return;
+        }
+        if (!chatGuid || !newName) {
+            Server().log("Failed to send reaction. Invalid params!", "error");
+            return;
+        }
+        const data = {
+            event: "set-display-name",
+            data: `${chatGuid},${newName}`
+        };
+        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
+            Server().log("Failed to set display name, an error occured writing to the socket", "error");
+        }
+    }
+
     getTypingStatus(chatGuid: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to retreive typing status, BlueBubblesHelper is not running!", "error");

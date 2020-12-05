@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 import { app } from "electron";
 import * as io from "socket.io";
 import * as path from "path";
@@ -594,6 +595,20 @@ export class SocketService {
                     return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
                 if (!params?.newName)
                     return response(cb, "error", createBadRequestResponse("No new group name provided"));
+
+                if (Server().blueBubblesServerHelper.helper) {
+                    try {
+                        await ActionHandler.privateRenameGroupChat(params.identifier, params.newName);
+
+                        const chats = await Server().iMessageRepo.getChats({
+                            chatGuid: params.identifier,
+                            withSMS: true
+                        });
+                        return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
+                    } catch (ex) {
+                        return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
+                    }
+                }
 
                 try {
                     await ActionHandler.renameGroupChat(params.identifier, params.newName);

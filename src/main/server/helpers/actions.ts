@@ -165,6 +165,11 @@ export class ActionHandler {
         throw err;
     };
 
+    static privateRenameGroupChat = async (chatGuid: string, newName: string): Promise<void> => {
+        Server().log(`Executing Action: Changing chat display name (Chat: ${chatGuid}; NewName: ${newName};)`, "debug");
+        Server().blueBubblesServerHelper.setDisplayName(chatGuid, newName);
+    };
+
     /**
      * Adds a participant using an AppleScript
      *
