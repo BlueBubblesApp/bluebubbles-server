@@ -780,6 +780,17 @@ export class SocketService {
                 // Dispatch it to the queue service
 
                 try {
+                    await ActionHandler.togglePrivateTapback(
+                        params.chatGuid,
+                        "E16E83C7-329E-4EF2-B074-FFDB514E69D9",
+                        "emphasize"
+                    );
+                    // return response(cb, "started-typing-sent", createNoDataResponse());
+                } catch {
+                    // return response(cb, "started-typing-error", createServerErrorResponse("Failed to stop typing"));
+                }
+
+                try {
                     await ActionHandler.startOrStopTypingInChat(params.chatGuid, true);
                     return response(cb, "started-typing-sent", createNoDataResponse());
                 } catch {

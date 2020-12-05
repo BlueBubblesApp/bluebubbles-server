@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -311,6 +312,18 @@ export class ActionHandler {
     static updateTypingStatus = async (chatGuid: string): Promise<void> => {
         Server().log(`Executing Action: Update Typing Status (Chat: ${chatGuid})`, "debug");
         Server().blueBubblesServerHelper.getTypingStatus(chatGuid);
+    };
+
+    static togglePrivateTapback = async (
+        chatGuid: string,
+        actionMessageGuid: string,
+        reactionType: string
+    ): Promise<void> => {
+        Server().log(
+            `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`,
+            "debug"
+        );
+        Server().blueBubblesServerHelper.sendReaction(chatGuid, actionMessageGuid, reactionType);
     };
 
     /**

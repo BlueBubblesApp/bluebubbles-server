@@ -92,22 +92,18 @@ export class BlueBubblesHelperService {
         }
     }
 
-    sendReaction(chatGuid: string, associatedMessage: string, isRemoving = false) {
+    sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");
             return;
         }
-        if (!chatGuid) {
-            Server().log("Failed to send reaction, no chatGuid specified!", "error");
+        if (!chatGuid || !actionMessageGuid || !reactionType) {
+            Server().log("Failed to send reaction. Invalid params!", "error");
             return;
         }
-
         const data = {
             event: "send-reaction",
-            data: {
-                associatedMessage,
-                isRemoving
-            }
+            data: `${chatGuid},${actionMessageGuid},${reactionType}`
         };
         if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
             Server().log("Failed to send reaction, an error occured writing to the socket", "error");
