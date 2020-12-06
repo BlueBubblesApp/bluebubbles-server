@@ -2,6 +2,7 @@ import { Server } from "@server/index";
 import { ValidTapback } from "@server/types";
 
 import * as net from "net";
+import { ValidRemoveTapback } from "../../types";
 
 export class BlueBubblesHelperService {
     server: net.Server;
@@ -93,7 +94,7 @@ export class BlueBubblesHelperService {
         }
     }
 
-    sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: ValidTapback) {
+    sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: ValidTapback | ValidRemoveTapback) {
         if (!this.helper || !this.server) {
             Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");
             return;
