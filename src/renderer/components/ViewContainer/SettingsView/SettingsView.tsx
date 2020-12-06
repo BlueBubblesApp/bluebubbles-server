@@ -31,6 +31,7 @@ interface State {
     encryptComs: boolean;
     hideDockIcon: boolean;
     startViaTerminal: boolean;
+    smsSupport: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -54,7 +55,8 @@ class SettingsView extends React.Component<unknown, State> {
             serverUrl: "",
             encryptComs: false,
             hideDockIcon: false,
-            startViaTerminal: false
+            startViaTerminal: false,
+            smsSupport: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -191,6 +193,14 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ startViaTerminal: target.checked });
             await ipcRenderer.invoke("set-config", {
                 start_via_terminal: target.checked
+            });
+        }
+
+        if (id === "toggleSmsSupport") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ smsSupport: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                sms_support: target.checked
             });
         }
     };
@@ -392,6 +402,18 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
                                     checked={this.state.autoStart}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <h3 className="aSettingTitle">SMS Suppurt (Client App Must Support)</h3>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleSmsSupport"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.smsSupport}
                                 />
                                 <i />
                             </label>

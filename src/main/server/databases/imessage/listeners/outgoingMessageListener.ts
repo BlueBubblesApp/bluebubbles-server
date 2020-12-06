@@ -145,6 +145,15 @@ export class OutgoingMessageListener extends ChangeListener {
             }
         ];
 
+        // If SMS support is disabled, only search for iMessage
+        const smsSupport = Server().repo.getConfig("sms_support") as boolean;
+        if (!smsSupport) {
+            baseQuery.push({
+                statement: "message.service = 'iMessage'",
+                args: null
+            });
+        }
+
         // First, check for unsent messages
         const newUnsent = await this.repo.getMessages({
             after,
@@ -236,12 +245,24 @@ export class OutgoingMessageListener extends ChangeListener {
     }
 
     async emitUpdatedMessages(after: Date, before: Date) {
+        const baseQuery: DBWhereItem[] = [];
+
+        // If SMS support is disabled, only search for iMessage
+        const smsSupport = Server().repo.getConfig("sms_support") as boolean;
+        if (!smsSupport) {
+            baseQuery.push({
+                statement: "message.service = 'iMessage'",
+                args: null
+            });
+        }
+
         // Get updated entries from myself only
         const entries = await this.repo.getUpdatedMessages({
             after,
             before,
             withChats: true,
             where: [
+                ...baseQuery,
                 {
                     statement: "message.is_from_me = :isFromMe",
                     args: { isFromMe: 1 }
