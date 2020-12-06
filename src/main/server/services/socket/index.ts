@@ -680,7 +680,20 @@ export class SocketService {
                     return response(cb, "error", createBadRequestResponse("No action message provided!"));
                 if (
                     !params?.tapback ||
-                    !["love", "like", "laugh", "dislike", "question", "emphasize"].includes(params.tapback)
+                    ![
+                        "love",
+                        "like",
+                        "dislike",
+                        "laugh",
+                        "emphasize",
+                        "question",
+                        "-love",
+                        "-like",
+                        "-dislike",
+                        "-laugh",
+                        "-emphasize",
+                        "-question"
+                    ].includes(params.tapback)
                 )
                     return response(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
 
@@ -810,7 +823,7 @@ export class SocketService {
                 // Dispatch it to the queue service
                 try {
                     await ActionHandler.startOrStopTypingInChat(params.chatGuid, true);
-                    return response(cb, "started-typing-sent", createNoDataResponse());
+                    return response(cb, "started-typing-sent", createSuccessResponse(null));
                 } catch {
                     return response(cb, "started-typing-error", createServerErrorResponse("Failed to stop typing"));
                 }
@@ -830,7 +843,7 @@ export class SocketService {
 
                 try {
                     await ActionHandler.startOrStopTypingInChat(params.chatGuid, false);
-                    return response(cb, "stopped-typing-sent", createNoDataResponse());
+                    return response(cb, "stopped-typing-sent", createSuccessResponse(null));
                 } catch {
                     return response(cb, "stopped-typing-error", createServerErrorResponse("Failed to stop typing!"));
                 }
@@ -847,7 +860,7 @@ export class SocketService {
 
                 try {
                     await ActionHandler.markChatRead(params.chatGuid);
-                    return response(cb, "mark-chat-read-sent", createNoDataResponse());
+                    return response(cb, "mark-chat-read-sent", createSuccessResponse(null));
                 } catch {
                     return response(cb, "mark-chat-read-error", createServerErrorResponse("Failed to mark chat read!"));
                 }
@@ -869,7 +882,7 @@ export class SocketService {
 
                 try {
                     await ActionHandler.updateTypingStatus(params.chatGuid);
-                    return response(cb, "update-typing-status-sent", createNoDataResponse());
+                    return response(cb, "update-typing-status-sent", createSuccessResponse(null));
                 } catch {
                     return response(
                         cb,
