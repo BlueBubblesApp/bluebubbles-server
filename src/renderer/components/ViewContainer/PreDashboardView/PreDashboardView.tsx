@@ -27,6 +27,7 @@ interface State {
     enableNgrok: boolean;
     showModal: boolean;
     serverUrl: string;
+    smsSupport: boolean;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -45,7 +46,8 @@ class PreDashboardView extends React.Component<unknown, State> {
             inputPassword: "",
             enableNgrok: true,
             showModal: false,
-            serverUrl: ""
+            serverUrl: "",
+            smsSupport: false
         };
     }
 
@@ -222,7 +224,6 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     completeTutorial() {
-        console.log(this.state);
         ipcRenderer.invoke("toggle-tutorial", true);
         this.setState({ redirect: "/dashboard" });
     }
@@ -231,11 +232,19 @@ class PreDashboardView extends React.Component<unknown, State> {
         this.setState({ [e.target.name]: e.target.value } as any);
     };
 
-    handleNgrokCheckboxChange(e: React.ChangeEvent<HTMLInputElement>) {
-        this.setState({ enableNgrok: e.target.checked });
-        ipcRenderer.invoke("toggle-ngrok", e.target.checked);
-        if (!e.target.checked) {
-            this.setState({ showModal: true });
+    handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>, stateVar: string) {
+        this.setState({ [stateVar]: e.target.checked } as any);
+
+        if (e.target.id === "toggleNgrok") {
+            ipcRenderer.invoke("toggle-ngrok", e.target.checked);
+
+            if (!e.target.checked) {
+                this.setState({ showModal: true });
+            }
+        } else {
+            ipcRenderer.invoke("set-config", {
+                [e.target.id]: e.target.checked
+            });
         }
     }
 
@@ -352,7 +361,19 @@ class PreDashboardView extends React.Component<unknown, State> {
                                 <input
                                     id="toggleNgrok"
                                     checked={this.state.enableNgrok}
-                                    onChange={e => this.handleNgrokCheckboxChange(e)}
+                                    onChange={e => this.handleCheckboxChange(e, "enableNgrok")}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
+                        <div id="setNgrokContainer">
+                            <h3>SMS Support (Android Client): </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <input
+                                    id="sms_support"
+                                    checked={this.state.smsSupport}
+                                    onChange={e => this.handleCheckboxChange(e, "smsSupport")}
                                     type="checkbox"
                                 />
                                 <i />

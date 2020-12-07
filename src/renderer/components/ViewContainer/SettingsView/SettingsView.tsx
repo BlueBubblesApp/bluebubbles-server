@@ -83,7 +83,8 @@ class SettingsView extends React.Component<unknown, State> {
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
-                startViaTerminal: config.start_via_terminal
+                startViaTerminal: config.start_via_terminal,
+                smsSupport: config.sms_support
             });
 
         this.getCaffeinateStatus();
@@ -411,7 +412,7 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">SMS Suppurt (Client App Must Support)</h3>
+                            <h3 className="aSettingTitle">SMS Support (Desktop Client)</h3>
                             <label className="form-switch">
                                 <input
                                     id="toggleSmsSupport"

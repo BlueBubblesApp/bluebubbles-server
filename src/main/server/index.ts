@@ -302,6 +302,8 @@ class BlueBubblesServer {
         } catch (ex) {
             Server().log(`Failed to restart via terminal!\n${ex}`);
         }
+
+        this.log("Finished post-start checks...");
     }
 
     private setDockIcon() {
