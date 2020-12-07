@@ -7,7 +7,7 @@
 import * as React from "react";
 import { ipcRenderer, dialog } from "electron";
 import Dropzone from "react-dropzone";
-import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
+import { isValidServerConfig, isValidClientConfig, invokeMain, checkFirebaseUrl } from "@renderer/helpers/utils";
 import TopNav from "@renderer/components/TopNav/TopNav";
 import LeftStatusIndicator from "../DashboardView/LeftStatusIndicator/LeftStatusIndicator";
 
@@ -31,6 +31,7 @@ interface State {
     encryptComs: boolean;
     hideDockIcon: boolean;
     startViaTerminal: boolean;
+    smsSupport: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -54,7 +55,8 @@ class SettingsView extends React.Component<unknown, State> {
             serverUrl: "",
             encryptComs: false,
             hideDockIcon: false,
-            startViaTerminal: false
+            startViaTerminal: false,
+            smsSupport: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -81,7 +83,8 @@ class SettingsView extends React.Component<unknown, State> {
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
-                startViaTerminal: config.start_via_terminal
+                startViaTerminal: config.start_via_terminal,
+                smsSupport: config.sms_support
             });
 
         this.getCaffeinateStatus();
@@ -193,6 +196,14 @@ class SettingsView extends React.Component<unknown, State> {
                 start_via_terminal: target.checked
             });
         }
+
+        if (id === "toggleSmsSupport") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ smsSupport: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                sms_support: target.checked
+            });
+        }
     };
 
     saveConfig = async () => {
@@ -213,15 +224,19 @@ class SettingsView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidClientConfig(binaryStr as string);
             const validServer = isValidServerConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
+                }
             } else if (validServer) {
-                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                ipcRenderer.invoke("set-fcm-server", jsonData);
                 this.setState({ fcmServer: binaryStr });
 
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "warning",
                     buttons: ["OK"],
                     title: "BlueBubbles Warning",
@@ -231,7 +246,7 @@ class SettingsView extends React.Component<unknown, State> {
                         `we've saved it as such. Now, please choose the correct client configuration.`
                 });
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
@@ -254,25 +269,29 @@ class SettingsView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidServerConfig(binaryStr as string);
             const validClient = isValidClientConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                ipcRenderer.invoke("set-fcm-server", jsonData);
                 this.setState({ fcmServer: binaryStr });
             } else if (validClient) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
 
-                this.invokeMain("show-dialog", {
-                    type: "warning",
-                    buttons: ["OK"],
-                    title: "BlueBubbles Warning",
-                    message: "We've corrected a mistake you made",
-                    detail:
-                        `The file you chose was for the FCM Client configuration and ` +
-                        `we've saved it as such. Now, please choose the correct server configuration.`
-                });
+                    invokeMain("show-dialog", {
+                        type: "warning",
+                        buttons: ["OK"],
+                        title: "BlueBubbles Warning",
+                        message: "We've corrected a mistake you made",
+                        detail:
+                            `The file you chose was for the FCM Client configuration and ` +
+                            `we've saved it as such. Now, please choose the correct server configuration.`
+                    });
+                }
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
@@ -284,10 +303,6 @@ class SettingsView extends React.Component<unknown, State> {
 
         reader.readAsText(acceptedFiles[0]);
     };
-
-    async invokeMain(event: string, args: any): Promise<any> {
-        return ipcRenderer.invoke(event, args);
-    }
 
     render() {
         return (
@@ -392,6 +407,18 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
                                     checked={this.state.autoStart}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <h3 className="aSettingTitle">SMS Support (Desktop Client)</h3>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleSmsSupport"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.smsSupport}
                                 />
                                 <i />
                             </label>

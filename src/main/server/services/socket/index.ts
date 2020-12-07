@@ -88,8 +88,11 @@ export class SocketService {
          * Handle all other data requests
          */
         this.server.on("connection", async socket => {
-            const pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
+            let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
             const cfgPass = (await Server().repo.getConfig("password")) as string;
+
+            // Decode the param incase it contains URL encoded characters
+            pass = decodeURI(pass);
 
             // Basic authentication
             if (pass === cfgPass) {
