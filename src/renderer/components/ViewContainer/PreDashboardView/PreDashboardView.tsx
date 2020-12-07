@@ -11,7 +11,7 @@ import * as React from "react";
 import Dropzone from "react-dropzone";
 import { shell, ipcRenderer } from "electron";
 import { Redirect } from "react-router";
-import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
+import { isValidServerConfig, isValidClientConfig, checkFirebaseUrl, invokeMain } from "@renderer/helpers/utils";
 import "./PreDashboardView.css";
 import { Config } from "@server/databases/server/entity";
 
@@ -147,25 +147,29 @@ class PreDashboardView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidServerConfig(binaryStr as string);
             const validClient = isValidClientConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                ipcRenderer.invoke("set-fcm-server", jsonData);
                 this.setState({ fcmServer: binaryStr });
             } else if (validClient) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
 
-                this.invokeMain("show-dialog", {
-                    type: "warning",
-                    buttons: ["OK"],
-                    title: "BlueBubbles Warning",
-                    message: "We've corrected a mistake you made",
-                    detail:
-                        `The file you chose was for the FCM Client configuration and ` +
-                        `we've saved it as such. Now, please choose the correct server configuration.`
-                });
+                    invokeMain("show-dialog", {
+                        type: "warning",
+                        buttons: ["OK"],
+                        title: "BlueBubbles Warning",
+                        message: "We've corrected a mistake you made",
+                        detail:
+                            `The file you chose was for the FCM Client configuration and ` +
+                            `we've saved it as such. Now, please choose the correct server configuration.`
+                    });
+                }
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
@@ -178,10 +182,6 @@ class PreDashboardView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
-    async invokeMain(event: string, args: any): Promise<any> {
-        return ipcRenderer.invoke(event, args);
-    }
-
     handleClientFile = (acceptedFiles: any) => {
         const reader = new FileReader();
 
@@ -192,25 +192,19 @@ class PreDashboardView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidClientConfig(binaryStr as string);
             const validServer = isValidServerConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
+                }
             } else if (validServer) {
                 ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
                 this.setState({ fcmServer: binaryStr });
-
-                this.invokeMain("show-dialog", {
-                    type: "warning",
-                    buttons: ["OK"],
-                    title: "BlueBubbles Warning",
-                    message: "We've corrected a mistake you made",
-                    detail:
-                        `The file you chose was for the FCM Server configuration and ` +
-                        `we've saved it as such. Now, please choose the correct client configuration.`
-                });
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
