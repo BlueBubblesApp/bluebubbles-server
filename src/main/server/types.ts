@@ -45,6 +45,7 @@ export type MessageResponse = {
     text: string;
     handle?: HandleResponse | null;
     handleId: number;
+    otherHandle: number;
     chats?: ChatResponse[];
     attachments?: AttachmentResponse[];
     subject: string;
