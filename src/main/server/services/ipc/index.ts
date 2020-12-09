@@ -204,6 +204,7 @@ export class IPCService {
         });
 
         ipcMain.handle("clear-alerts", async (_, __) => {
+            app.setBadgeCount(0);
             await Server().repo.alerts().clear();
         });
     }
