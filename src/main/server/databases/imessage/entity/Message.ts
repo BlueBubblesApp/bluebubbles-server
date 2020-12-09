@@ -413,6 +413,7 @@ export const getMessageResponse = async (tableData: Message, withBlurhash = true
         text: tableData.text,
         handle: tableData.handle ? await getHandleResponse(tableData.handle) : null,
         handleId: tableData.handleId,
+        otherHandle: tableData.otherHandle,
         chats,
         attachments,
         subject: tableData.subject,

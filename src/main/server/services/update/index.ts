@@ -60,14 +60,17 @@ export class UpdateService {
             };
 
             // If there is a newer version, show the dialog and redirect if 'Download' is clicked
-            this.isOpen = true;
-            dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
-                this.isOpen = false;
-                if (returnValue.response === 0) {
-                    shell.openExternal("https://github.com/BlueBubblesApp/BlueBubbles-Server/releases");
-                    app.quit();
-                }
-            });
+            const showToast = Server().repo.getConfig("show_update_toast") as boolean;
+            if (showToast) {
+                this.isOpen = true;
+                dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
+                    this.isOpen = false;
+                    if (returnValue.response === 0) {
+                        shell.openExternal("https://github.com/BlueBubblesApp/BlueBubbles-Server/releases");
+                        app.quit();
+                    }
+                });
+            }
         } else {
             Server().log(`No new version available (latest: ${version})`);
             if (showDialogForNoUpdate && !this.isOpen) {

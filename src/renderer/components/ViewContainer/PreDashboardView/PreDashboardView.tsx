@@ -28,6 +28,7 @@ interface State {
     showModal: boolean;
     serverUrl: string;
     smsSupport: boolean;
+    showUpdateToast: boolean;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -47,7 +48,8 @@ class PreDashboardView extends React.Component<unknown, State> {
             enableNgrok: true,
             showModal: false,
             serverUrl: "",
-            smsSupport: false
+            smsSupport: false,
+            showUpdateToast: true
         };
     }
 
@@ -374,6 +376,18 @@ class PreDashboardView extends React.Component<unknown, State> {
                                     id="sms_support"
                                     checked={this.state.smsSupport}
                                     onChange={e => this.handleCheckboxChange(e, "smsSupport")}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
+                        <div id="setNgrokContainer">
+                            <h3>Show Update Notification: </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <input
+                                    id="show_update_toast"
+                                    checked={this.state.showUpdateToast}
+                                    onChange={e => this.handleCheckboxChange(e, "showUpdateToast")}
                                     type="checkbox"
                                 />
                                 <i />
