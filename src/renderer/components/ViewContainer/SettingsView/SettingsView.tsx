@@ -32,6 +32,7 @@ interface State {
     hideDockIcon: boolean;
     startViaTerminal: boolean;
     smsSupport: boolean;
+    showUpdateToast: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -56,7 +57,8 @@ class SettingsView extends React.Component<unknown, State> {
             encryptComs: false,
             hideDockIcon: false,
             startViaTerminal: false,
-            smsSupport: false
+            smsSupport: false,
+            showUpdateToast: true
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -84,7 +86,8 @@ class SettingsView extends React.Component<unknown, State> {
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
                 startViaTerminal: config.start_via_terminal,
-                smsSupport: config.sms_support
+                smsSupport: config.sms_support,
+                showUpdateToast: config.show_update_toast
             });
 
         this.getCaffeinateStatus();
@@ -202,6 +205,14 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ smsSupport: target.checked });
             await ipcRenderer.invoke("set-config", {
                 sms_support: target.checked
+            });
+        }
+
+        if (id === "toggleUpdateToast") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ showUpdateToast: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                show_update_toast: target.checked
             });
         }
     };
@@ -419,6 +430,18 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
                                     checked={this.state.smsSupport}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <h3 className="aSettingTitle">Show Update Notification</h3>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleUpdateToast"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.showUpdateToast}
                                 />
                                 <i />
                             </label>
