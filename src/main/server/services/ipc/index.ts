@@ -202,5 +202,9 @@ export class IPCService {
         ipcMain.handle("open-log-location", (_, opts: Electron.MessageBoxOptions) => {
             FileSystem.executeAppleScript(openLogs());
         });
+
+        ipcMain.handle("clear-alerts", (_, opts: Electron.MessageBoxOptions) => {
+            Server().repo.alerts().clear();
+        });
     }
 }

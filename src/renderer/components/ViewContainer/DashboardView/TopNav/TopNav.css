@@ -137,3 +137,30 @@
 .alertRightSide p {
     color: var(--primary-color);
 }
+
+#alertTopbar {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+#alertTopbar button {
+    background: none;
+    text-decoration: none;
+    outline: none;
+    border-radius: 8px;
+    border: 2px solid var(--primary-color);
+    padding: 5px;
+    margin-left: 25px;
+    color: var(--primary-color);
+    transition: border-radius 0.25s;
+    cursor: pointer;
+}
+
+#noAlertText {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--primary-color);
+}
