@@ -5,7 +5,7 @@
 /* eslint-disable react/no-unused-state */
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
-import { ipcRenderer, dialog } from "electron";
+import { ipcRenderer } from "electron";
 import Dropzone from "react-dropzone";
 import { isValidServerConfig, isValidClientConfig, invokeMain, checkFirebaseUrl } from "@renderer/helpers/utils";
 import TopNav from "@renderer/components/TopNav/TopNav";
@@ -365,7 +365,13 @@ class SettingsView extends React.Component<unknown, State> {
                         </span>
 
                         <div className="aCheckboxDiv firstCheckBox">
-                            <h3 className="aSettingTitle">Encrypt Communications</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Encrypt Communications</h3>
+                                <p className="settingsHelp">
+                                    Messages sent back to the clients will be encrypted using AES password-based
+                                    encryption
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleEncrypt"
@@ -376,8 +382,12 @@ class SettingsView extends React.Component<unknown, State> {
                                 <i />
                             </label>
                         </div>
-
-                        <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
+                        <div>
+                            <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
+                            <p className="settingsHelp">
+                                Using an API key will allow you to use the benefits of the upgraded Ngrok service
+                            </p>
+                        </div>
                         <input
                             id="ngrokKey"
                             className="aInput"
@@ -387,7 +397,13 @@ class SettingsView extends React.Component<unknown, State> {
                             onBlur={() => this.saveConfig()}
                         />
                         <div className="aCheckboxDiv firstCheckBox">
-                            <h3 className="aSettingTitle">Enable Ngrok</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Enable Ngrok</h3>
+                                <p className="settingsHelp">
+                                    Using Ngrok allows a connection to clients without port-forwarding. Disabling Ngrok
+                                    will allow you to use port-forwarding.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleNgrok"
@@ -399,7 +415,13 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Keep MacOS Awake</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Keep MacOS Awake</h3>
+                                <p className="settingsHelp">
+                                    When enabled, you mac will not fall asleep due to inactivity, with the caveat of
+                                    when you close your laptop
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleCaffeinate"
@@ -411,7 +433,12 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Startup With MacOS</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Startup With MacOS</h3>
+                                <p className="settingsHelp">
+                                    When enabled, BlueBubbles will start automatically when you login.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleAutoStart"
@@ -423,9 +450,15 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">SMS Support (Desktop Client)</h3>
+                            <div>
+                                <h3 className="aSettingTitle">SMS Support (Desktop Client)</h3>
+                                <p className="settingsHelp">
+                                    Enabling this will allow the server to `emit` SMS message notifications
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
+                                    title="Test Test"
                                     id="toggleSmsSupport"
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
@@ -435,7 +468,13 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Show Update Notification</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Show Update Notification</h3>
+                                <p className="settingsHelp">
+                                    Disabling this option will hide the popup notification when a new update is
+                                    available.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleUpdateToast"
@@ -447,7 +486,13 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Hide Dock Icon</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Hide Dock Icon</h3>
+                                <p className="settingsHelp">
+                                    Hiding the dock icon will not close the app. You can open the app again via the
+                                    status bar icon.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleDockIcon"
@@ -459,7 +504,13 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Always Start via Terminal</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Always Start via Terminal</h3>
+                                <p className="settingsHelp">
+                                    When BlueBubbles starts up, it will auto-reload itself in terminal mode. When in
+                                    terminal, type `help` for command information.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleTerminalStart"
@@ -475,6 +526,7 @@ class SettingsView extends React.Component<unknown, State> {
                             Server Config Status:{" "}
                             <p id="serverConfigStatus">{this.state.fcmServer ? "Loaded" : "Not Set"}</p>
                         </h3>
+                        <br />
                         <Dropzone onDrop={acceptedFiles => this.handleServerFile(acceptedFiles)}>
                             {({ getRootProps, getInputProps }) => (
                                 <section id="fcmClientDrop-Set">
@@ -489,10 +541,12 @@ class SettingsView extends React.Component<unknown, State> {
                                 </section>
                             )}
                         </Dropzone>
+                        <br />
                         <h3 className="aSettingTitle">
                             Client Config Status:{" "}
                             <p id="clientConfigStatus">{this.state.fcmClient ? "Loaded" : "Not Set"}</p>
                         </h3>
+                        <br />
                         <Dropzone onDrop={acceptedFiles => this.handleClientFile(acceptedFiles)}>
                             {({ getRootProps, getInputProps }) => (
                                 <section id="fcmServerDrop-Set">
