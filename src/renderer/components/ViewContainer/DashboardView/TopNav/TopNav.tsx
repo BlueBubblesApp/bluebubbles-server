@@ -95,7 +95,7 @@ class TopNav extends React.Component<unknown, State> {
                     {this.state.alertsOpen ? (
                         <div id="alertsModal">
                             <div id="alertTopbar">
-                                <button id="clearAlertsBtn" onClick={() => invokeMain("clear-alerts", null)}>
+                                <button id="clearAlertsBtn" onClick={() => this.clearAlerts()}>
                                     Clear Alerts
                                 </button>
                             </div>

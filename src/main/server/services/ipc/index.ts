@@ -199,12 +199,12 @@ export class IPCService {
             return dialog.showMessageBox(Server().window, opts);
         });
 
-        ipcMain.handle("open-log-location", (_, opts: Electron.MessageBoxOptions) => {
+        ipcMain.handle("open-log-location", (_, __) => {
             FileSystem.executeAppleScript(openLogs());
         });
 
-        ipcMain.handle("clear-alerts", (_, opts: Electron.MessageBoxOptions) => {
-            Server().repo.alerts().clear();
+        ipcMain.handle("clear-alerts", async (_, __) => {
+            await Server().repo.alerts().clear();
         });
     }
 }
