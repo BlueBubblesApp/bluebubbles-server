@@ -38,6 +38,8 @@ export class FileSystem {
 
     public static resources = path.join(appPath, "resources");
 
+    public static contactsVcf = `${FileSystem.contactsDir}/AddressBook.vcf`;
+
     /**
      * Sets up all required directories and then, writes the scripts
      * to the scripts directory
@@ -252,5 +254,13 @@ export class FileSystem {
      */
     static async startMessages() {
         await FileSystem.executeAppleScript(startMessages());
+    }
+
+    static deleteContactsVcf() {
+        try {
+            fs.unlinkSync(FileSystem.contactsVcf);
+        } catch (ex) {
+            // Do nothing
+        }
     }
 }
