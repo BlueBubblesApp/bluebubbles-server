@@ -180,6 +180,7 @@ export class SocketService {
                 const device = await Server().repo.devices().findOne({ name: params.deviceName });
                 if (device) {
                     device.identifier = params.deviceId;
+                    device.last_active = new Date().getTime();
                     await Server().repo.devices().save(device);
                 } else {
                     Server().log(`Registering new client with Google FCM (${params.deviceName})`);
@@ -187,8 +188,11 @@ export class SocketService {
                     const item = new Device();
                     item.name = params.deviceName;
                     item.identifier = params.deviceId;
+                    item.last_active = new Date().getTime();
                     await Server().repo.devices().save(item);
                 }
+
+                Server().repo.purgeOldDevices();
 
                 return response(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
             }
