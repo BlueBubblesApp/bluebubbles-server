@@ -10,6 +10,8 @@ import { DateTransformer } from "@server/databases/transformers/DateTransformer"
 import { Message } from "@server/databases/imessage/entity/Message";
 import { getBlurHash } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
+import { FileSystem } from "@server/fileSystem";
+import { basename } from "path";
 
 @Entity("attachment")
 export class Attachment {
@@ -97,7 +99,7 @@ export class Attachment {
 
 const handledImageMimes = ["image/jpeg", "image/jpg", "image/png", "image/bmp", "image/tiff", "image/gif"];
 export const getAttachmentResponse = async (
-    tableData: Attachment,
+    attachment: Attachment,
     withData = false,
     withBlurhash = true
 ): Promise<AttachmentResponse> => {
@@ -106,36 +108,66 @@ export const getAttachmentResponse = async (
     let image: NativeImage = null;
 
     // Get the fully qualified path
+    const tableData = attachment;
     let fPath = tableData.filePath;
 
     // If the attachment isn't finished downloading, the path will be null
     if (fPath) {
-        if (fPath[0] === "~") {
-            fPath = path.join(process.env.HOME, fPath.slice(1));
-        }
+        fPath = FileSystem.getRealPath(fPath);
 
         try {
-            // Try to read the file
-            const fopen = fs.readFileSync(fPath);
+            // If the attachment is a caf, let's convert it
+            if (tableData.uti === "com.apple.coreaudio-format") {
+                const newPath = `${FileSystem.convertDir}/${tableData.guid}.mp3`;
 
-            // If we want data, get the data
-            if (withData) {
-                data = Uint8Array.from(fopen);
-            }
+                // If the path doesn't exist, let's convert the attachment
+                let failed = false;
+                if (!fs.existsSync(newPath)) {
+                    try {
+                        Server().log(`Converting attachment, ${tableData.transferName}, to an MP3...`);
+                        await FileSystem.convertCafToMp3(tableData, newPath);
+                    } catch (ex) {
+                        failed = true;
+                        Server().log(`Failed to convert CAF to MP3 for attachment, ${tableData.transferName}`);
+                        Server().log(ex, "error");
+                    }
+                }
 
-            if (handledImageMimes.includes(tableData.mimeType)) {
-                image = nativeImage.createFromPath(fPath);
-                if (withBlurhash) {
-                    blurhash = await getBlurHash(image);
+                if (!failed) {
+                    // If conversion is successful, we need to modify the attachment a bit
+                    tableData.mimeType = "audio/mp3";
+                    tableData.filePath = newPath;
+                    tableData.transferName = basename(newPath).replace(".caf", ".mp3");
+
+                    // Set the fPath to the newly converted path
+                    fPath = newPath;
                 }
             }
 
-            // If there is no data, return null for the data
-            // Otherwise, convert it to a base64 string
-            if (!data) {
-                data = null;
-            } else {
-                data = base64.bytesToBase64(data as Uint8Array);
+            const exists = fs.existsSync(fPath);
+            if (exists) {
+                // Try to read the file
+                const fopen = fs.readFileSync(fPath);
+
+                // If we want data, get the data
+                if (withData) {
+                    data = Uint8Array.from(fopen);
+                }
+
+                if (handledImageMimes.includes(tableData.mimeType)) {
+                    image = nativeImage.createFromPath(fPath);
+                    if (withBlurhash) {
+                        blurhash = await getBlurHash(image);
+                    }
+                }
+
+                // If there is no data, return null for the data
+                // Otherwise, convert it to a base64 string
+                if (!data) {
+                    data = null;
+                } else {
+                    data = base64.bytesToBase64(data as Uint8Array);
+                }
             }
         } catch (ex) {
             console.log(ex);

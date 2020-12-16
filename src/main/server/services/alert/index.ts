@@ -13,7 +13,7 @@ export class AlertService {
     }
 
     static async create(type: AlertTypes, message: string, isRead = false): Promise<Alert> {
-        if (!message) return null;
+        if (!type || !message) return null;
 
         // Create the alert based on parameters
         const alert = new Alert();

@@ -30,6 +30,7 @@ import { DBMessageParams } from "@server/databases/imessage/types";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
 import { QueueItem } from "@server/services/queue/index";
+import { basename } from "path";
 
 const osVersion = macosVersion();
 
@@ -395,9 +396,38 @@ export class SocketService {
                 if (!attachment) return response(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 // Get the fully qualified path
-                let fPath = attachment.filePath;
-                if (fPath[0] === "~") {
-                    fPath = path.join(process.env.HOME, fPath.slice(1));
+                let fPath = FileSystem.getRealPath(attachment.filePath);
+
+                // Check if the file exists before trying to read it
+                if (!fs.existsSync(fPath))
+                    return response(cb, "error", createServerErrorResponse("Attachment not downloaded on server"));
+
+                // If the attachment is a caf, let's convert it
+                if (attachment.uti === "com.apple.coreaudio-format") {
+                    const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp3`;
+
+                    // If the path doesn't exist, let's convert the attachment
+                    let failed = false;
+                    if (!fs.existsSync(newPath)) {
+                        try {
+                            Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
+                            await FileSystem.convertCafToMp3(attachment, newPath);
+                        } catch (ex) {
+                            failed = true;
+                            Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`);
+                            Server().log(ex, "error");
+                        }
+                    }
+
+                    if (!failed) {
+                        // If conversion is successful, we need to modify the attachment a bit
+                        attachment.mimeType = "audio/mp3";
+                        attachment.filePath = newPath;
+                        attachment.transferName = basename(newPath).replace(".caf", ".mp3");
+
+                        // Set the fPath to the newly converted path
+                        fPath = newPath;
+                    }
                 }
 
                 // Check if the file exists before trying to read it

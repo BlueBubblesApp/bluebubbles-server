@@ -9,6 +9,8 @@ import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server/index";
 import { escapeDoubleQuote, concatUint8Arrays } from "@server/helpers/utils";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
+
 import { startMessages } from "./scripts";
 
 // Directory modifiers based on the environment
@@ -32,6 +34,8 @@ export class FileSystem {
 
     public static contactsDir = path.join(FileSystem.baseDir, "Contacts");
 
+    public static convertDir = path.join(FileSystem.baseDir, "Convert");
+
     public static fcmDir = path.join(FileSystem.baseDir, "FCM");
 
     public static modules = path.join(appPath, moddir, "node_modules");
@@ -54,6 +58,7 @@ export class FileSystem {
     static setupDirectories(): void {
         if (!fs.existsSync(FileSystem.baseDir)) fs.mkdirSync(FileSystem.baseDir);
         if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
+        if (!fs.existsSync(FileSystem.convertDir)) fs.mkdirSync(FileSystem.convertDir);
         if (!fs.existsSync(FileSystem.contactsDir)) fs.mkdirSync(FileSystem.contactsDir);
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
     }
@@ -262,5 +267,19 @@ export class FileSystem {
         } catch (ex) {
             // Do nothing
         }
+    }
+
+    static getRealPath(filePath: string) {
+        let output = filePath;
+        if (output[0] === "~") {
+            output = path.join(process.env.HOME, output.slice(1));
+        }
+
+        return output;
+    }
+
+    static async convertCafToMp3(attachment: Attachment, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(attachment.filePath);
+        await FileSystem.execShellCommand(`/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`);
     }
 }
