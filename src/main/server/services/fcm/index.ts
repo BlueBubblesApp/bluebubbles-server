@@ -103,11 +103,9 @@ export class FCMService {
                 const value = snapshot.val();
                 if (!value) return;
 
-                Server().log("Received request to restart via FCM! Standby...");
-
                 try {
                     if (value > this.lastRestart) {
-                        Server().log("Restarting...");
+                        Server().log("Received request to restart via FCM! Restarting...");
 
                         // Update the last restart values
                         await Server().repo.setConfig("last_fcm_restart", value);
