@@ -76,7 +76,7 @@ export class ActionHandler {
                 Server().log(ex);
 
                 const errMsg = (ex?.message ?? "") as string;
-                const retry = errMsg.includes("AppleEvent timed out") || errMsg.includes("(1002)");
+                const retry = errMsg.includes("AppleEvent timed out") || errMsg.includes("1002");
 
                 // If we don't want to retry, throw the original error
                 if (!retry) throw ex;
