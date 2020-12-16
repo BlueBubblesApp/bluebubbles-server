@@ -154,7 +154,7 @@
         "google-libphonenumber": "^3.2.10",
         "history": "^4.10.1",
         "macos-version": "^5.2.0",
-        "ngrok": "^3.2.7",
+        "ngrok": "^3.3.0",
         "node-pre-gyp": "^0.15.0",
         "numeral": "^2.0.6",
         "qrcode.react": "^1.0.0",
