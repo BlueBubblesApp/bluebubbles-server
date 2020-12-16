@@ -53,7 +53,8 @@ export class SocketService {
     constructor() {
         this.server = io(Server().repo.getConfig("socket_port") as number, {
             // 5 Minute ping timeout
-            pingTimeout: 60000
+            pingTimeout: 60000,
+            path: "/"
         });
 
         this.startStatusListener();
