@@ -86,7 +86,7 @@ class SettingsView extends React.Component<unknown, State> {
                         ) : (
                             <>
                                 {this.state.devices.map(row => (
-                                    <div className="aDeviceRow" key={row.identifier}>
+                                    <div className="aDeviceRow" key={`${row.name}-${row.identifier}`}>
                                         <p>{row.name || "N/A"}</p>
                                         <p id="deviceIdentifier">{row.identifier}</p>
                                     </div>
