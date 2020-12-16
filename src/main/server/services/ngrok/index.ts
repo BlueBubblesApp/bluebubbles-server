@@ -151,7 +151,7 @@ export class NgrokService {
         } catch (ex) {
             Server().log(`Failed to restart ngrok!\n${ex}`, "error");
 
-            const errString = ex.toString() ?? "";
+            const errString = ex?.toString() ?? "";
             if (errString.includes("socket hang up") || errString.includes("[object Object]")) {
                 Server().log("Socket hang up detected. Performing full server restart...");
                 Server().relaunch();
