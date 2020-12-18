@@ -168,6 +168,19 @@ export class SocketService {
         });
 
         /**
+         * Return information about the server's config
+         */
+        socket.on("get-server-config", (_, cb): void => {
+            const { config } = Server().repo;
+
+            // Strip out some stuff the user doesn't need
+            if ("password" in config) delete config.password;
+            if ("server_address" in config) delete config.server_address;
+
+            return response(cb, "server-config", createSuccessResponse(config, "Successfully fetched server config"));
+        });
+
+        /**
          * Add Device ID to the database
          */
         socket.on(

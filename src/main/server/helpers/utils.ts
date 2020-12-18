@@ -199,6 +199,26 @@ export const slugifyAddress = (val: string) => {
         .trim();
 };
 
+export const parseMetadataString = (metadata: string): { [key: string]: string } => {
+    if (!metadata) return {};
+
+    const output: { [key: string]: string } = {};
+    for (const line of metadata.split("\n")) {
+        if (!line.includes("=")) continue;
+
+        const items = line.split(" = ");
+        if (items.length < 2) continue;
+
+        const value = items[1].replace(/"/g, "").trim();
+        if (value.length === 0 || value === "(") continue;
+
+        // If all conditions to parse pass, save the key/value pair
+        output[items[0].trim()] = value;
+    }
+
+    return output;
+};
+
 export const tapbackUIMap = {
     love: 1,
     like: 2,

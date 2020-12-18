@@ -8,10 +8,10 @@ import { Server } from "@server/index";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { getBlurHash } from "@server/databases/imessage/helpers/utils";
+import { convertAudio, getAttachmentMetadata, getBlurHash } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
-import { basename } from "path";
+import { Metadata } from "@server/fileSystem/types";
 
 @Entity("attachment")
 export class Attachment {
@@ -104,6 +104,7 @@ export const getAttachmentResponse = async (
     withBlurhash = true
 ): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
+    let metadata: Metadata = null;
     let blurhash: string = null;
     let image: NativeImage = null;
 
@@ -118,54 +119,30 @@ export const getAttachmentResponse = async (
         try {
             // If the attachment is a caf, let's convert it
             if (tableData.uti === "com.apple.coreaudio-format") {
-                const newPath = `${FileSystem.convertDir}/${tableData.guid}.mp3`;
-
-                // If the path doesn't exist, let's convert the attachment
-                let failed = false;
-                if (!fs.existsSync(newPath)) {
-                    try {
-                        Server().log(`Converting attachment, ${tableData.transferName}, to an MP3...`);
-                        await FileSystem.convertCafToMp3(tableData, newPath);
-                    } catch (ex) {
-                        failed = true;
-                        Server().log(`Failed to convert CAF to MP3 for attachment, ${tableData.transferName}`);
-                        Server().log(ex, "error");
-                    }
-                }
-
-                if (!failed) {
-                    // If conversion is successful, we need to modify the attachment a bit
-                    tableData.mimeType = "audio/mp3";
-                    tableData.filePath = newPath;
-                    tableData.transferName = basename(newPath).replace(".caf", ".mp3");
-
-                    // Set the fPath to the newly converted path
-                    fPath = newPath;
-                }
+                const newPath = await convertAudio(tableData);
+                fPath = newPath ?? fPath;
             }
 
+            // If the attachment exists, do some things
             const exists = fs.existsSync(fPath);
             if (exists) {
-                // Try to read the file
-                const fopen = fs.readFileSync(fPath);
-
                 // If we want data, get the data
                 if (withData) {
-                    data = Uint8Array.from(fopen);
+                    data = Uint8Array.from(fs.readFileSync(fPath));
                 }
 
-                if (handledImageMimes.includes(tableData.mimeType)) {
+                // If the user wants the blurhash, get it for them!
+                if (withBlurhash && handledImageMimes.includes(tableData.mimeType)) {
                     image = nativeImage.createFromPath(fPath);
-                    if (withBlurhash) {
-                        blurhash = await getBlurHash(image);
-                    }
+                    blurhash = await getBlurHash(image);
                 }
+
+                // Fetch the attachment metadata if there is a mimeType
+                metadata = await getAttachmentMetadata(tableData);
 
                 // If there is no data, return null for the data
                 // Otherwise, convert it to a base64 string
-                if (!data) {
-                    data = null;
-                } else {
+                if (data) {
                     data = base64.bytesToBase64(data as Uint8Array);
                 }
             }
@@ -182,8 +159,8 @@ export const getAttachmentResponse = async (
         guid: tableData.guid,
         messages: tableData.messages ? tableData.messages.map(item => item.guid) : [],
         data: data as string,
-        height: image ? image.getSize().height : 0,
-        width: image ? image.getSize().width : 0,
+        height: (metadata?.height ?? 0) as number,
+        width: (metadata?.width ?? 0) as number,
         blurhash,
         uti: tableData.uti,
         mimeType: tableData.mimeType,
@@ -192,6 +169,7 @@ export const getAttachmentResponse = async (
         transferName: tableData.transferName,
         totalBytes: tableData.totalBytes,
         isSticker: tableData.isSticker,
-        hideAttachment: tableData.hideAttachment
+        hideAttachment: tableData.hideAttachment,
+        metadata
     };
 };
