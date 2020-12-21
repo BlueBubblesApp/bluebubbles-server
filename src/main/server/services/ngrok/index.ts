@@ -111,7 +111,7 @@ export class NgrokService {
             return false;
         }
 
-        const maxTries = 25;
+        const maxTries = 3;
         let tries = 0;
         let connected = false;
 
@@ -134,8 +134,7 @@ export class NgrokService {
 
         if (tries >= maxTries) {
             Server().log("Reached maximum retry attempts for Ngrok. Force restarting app...");
-            app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
-            app.exit(0);
+            Server().relaunch();
         }
 
         return connected;
@@ -151,6 +150,13 @@ export class NgrokService {
             await this.start();
         } catch (ex) {
             Server().log(`Failed to restart ngrok!\n${ex}`, "error");
+
+            const errString = ex?.toString() ?? "";
+            if (errString.includes("socket hang up") || errString.includes("[object Object]")) {
+                Server().log("Socket hang up detected. Performing full server restart...");
+                Server().relaunch();
+            }
+
             return false;
         }
 

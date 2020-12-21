@@ -618,33 +618,28 @@ export const exportContacts = () => {
     if (osVersion && compareVersions(osVersion, "10.7.0") <= 0) contactsApp = "Address Book";
 
     return `set contactsPath to POSIX file "${FileSystem.contactsDir}/AddressBook.vcf" as string
-        
-        -- Remove any existing back up file (if any)
-        try
-            tell application "Finder"
-                if exists (file contactsPath) then
-                    delete file contactsPath -- move to trash
-                end if
-            end tell
-        on error errorMsg
-            (* Don't do anything *)
-        end try
-        
         tell application "${contactsApp}"
             quit
             delay 1.0
             reopen
 
-            -- Create an empty file
+            (* Create empty file *)
             set contactsFile to (open for access file contactsPath with write permission)
-            
+
             try
+                (* Add VCF contacts to file *)
                 repeat with per in people
                     write ((vcard of per as text) & linefeed) to contactsFile
                 end repeat
+
+                (* Close the file *)
                 close access contactsFile
             on error
-                close access contactsFile
+                try
+                    close access contactsFile
+                on error
+                    log "Failed to close contacts file"
+                end try
             end try
         end tell`;
 };

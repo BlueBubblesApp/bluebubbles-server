@@ -78,6 +78,7 @@ class SettingsView extends React.Component<unknown, State> {
                         <div id="devicesHeadings">
                             <h1>Device Name</h1>
                             <h1>Identifier</h1>
+                            <h1>Last Active</h1>
                         </div>
                         {this.state.devices.length === 0 ? (
                             <p className="aDeviceRow" style={{ marginBottom: "25px" }}>
@@ -85,12 +86,19 @@ class SettingsView extends React.Component<unknown, State> {
                             </p>
                         ) : (
                             <>
-                                {this.state.devices.map(row => (
-                                    <div className="aDeviceRow" key={row.identifier}>
-                                        <p>{row.name || "N/A"}</p>
-                                        <p id="deviceIdentifier">{row.identifier}</p>
-                                    </div>
-                                ))}
+                                {this.state.devices.map(row => {
+                                    const dateObj = row.last_active
+                                        ? new Date(row.last_active).toLocaleDateString()
+                                        : "N/A";
+
+                                    return (
+                                        <div className="aDeviceRow" key={`${row.name}-${row.identifier}`}>
+                                            <p>{row.name || "N/A"}</p>
+                                            <p id="deviceIdentifier">{row.identifier}</p>
+                                            <p id="lastActive">{dateObj}</p>
+                                        </div>
+                                    );
+                                })}
                             </>
                         )}
                     </div>

@@ -30,6 +30,7 @@ import { DBMessageParams } from "@server/databases/imessage/types";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
 import { QueueItem } from "@server/services/queue/index";
+import { basename } from "path";
 
 const osVersion = macosVersion();
 
@@ -52,7 +53,8 @@ export class SocketService {
     constructor() {
         this.server = io(Server().repo.getConfig("socket_port") as number, {
             // 5 Minute ping timeout
-            pingTimeout: 60000
+            pingTimeout: 60000,
+            path: "/"
         });
 
         this.startStatusListener();
@@ -166,6 +168,19 @@ export class SocketService {
         });
 
         /**
+         * Return information about the server's config
+         */
+        socket.on("get-server-config", (_, cb): void => {
+            const { config } = Server().repo;
+
+            // Strip out some stuff the user doesn't need
+            if ("password" in config) delete config.password;
+            if ("server_address" in config) delete config.server_address;
+
+            return response(cb, "server-config", createSuccessResponse(config, "Successfully fetched server config"));
+        });
+
+        /**
          * Add Device ID to the database
          */
         socket.on(
@@ -178,15 +193,19 @@ export class SocketService {
                 const device = await Server().repo.devices().findOne({ name: params.deviceName });
                 if (device) {
                     device.identifier = params.deviceId;
+                    device.last_active = new Date().getTime();
                     await Server().repo.devices().save(device);
                 } else {
-                    Server().log(`Registering new client with Google FCM (${params.deviceName}`);
+                    Server().log(`Registering new client with Google FCM (${params.deviceName})`);
 
                     const item = new Device();
                     item.name = params.deviceName;
                     item.identifier = params.deviceId;
+                    item.last_active = new Date().getTime();
                     await Server().repo.devices().save(item);
                 }
+
+                Server().repo.purgeOldDevices();
 
                 return response(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
             }
@@ -395,9 +414,38 @@ export class SocketService {
                 if (!attachment) return response(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
                 // Get the fully qualified path
-                let fPath = attachment.filePath;
-                if (fPath[0] === "~") {
-                    fPath = path.join(process.env.HOME, fPath.slice(1));
+                let fPath = FileSystem.getRealPath(attachment.filePath);
+
+                // Check if the file exists before trying to read it
+                if (!fs.existsSync(fPath))
+                    return response(cb, "error", createServerErrorResponse("Attachment not downloaded on server"));
+
+                // If the attachment is a caf, let's convert it
+                if (attachment.uti === "com.apple.coreaudio-format") {
+                    const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp3`;
+
+                    // If the path doesn't exist, let's convert the attachment
+                    let failed = false;
+                    if (!fs.existsSync(newPath)) {
+                        try {
+                            Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
+                            await FileSystem.convertCafToMp3(attachment, newPath);
+                        } catch (ex) {
+                            failed = true;
+                            Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`);
+                            Server().log(ex, "error");
+                        }
+                    }
+
+                    if (!failed) {
+                        // If conversion is successful, we need to modify the attachment a bit
+                        attachment.mimeType = "audio/mp3";
+                        attachment.filePath = newPath;
+                        attachment.transferName = basename(newPath).replace(".caf", ".mp3");
+
+                        // Set the fPath to the newly converted path
+                        fPath = newPath;
+                    }
                 }
 
                 // Check if the file exists before trying to read it

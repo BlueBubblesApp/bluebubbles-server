@@ -370,7 +370,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                             </div>
                         </div>
                         <div id="setNgrokContainer">
-                            <h3>SMS Support (Android Client): </h3>
+                            <h3>SMS Support (Desktop Client): </h3>
                             <div style={{ marginTop: "3px" }}>
                                 <input
                                     id="sms_support"

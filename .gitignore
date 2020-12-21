@@ -4,3 +4,4 @@ release/
 .vscode
 .DS_Store
 **/*.log
+.env
