@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.1.13",
+    "version": "0.1.14",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles Android and Desktop Apps",
     "main": "./dist/main.js",
     "scripts": {
@@ -15,7 +15,8 @@
         "lint": "eslint --ext=jsx,js,tsx,ts src",
         "pretest:e2e": "npm run build",
         "pack": "npm run build && electron-builder --dir",
-        "dist": "yarn build && electron-builder build --mac --publish never",
+        "dist": "yarn build && electron-builder build --mac --publish never && yarn run zip-release",
+        "zip-release": "ditto -c -k --sequesterRsrc --keepParent ./release/mac/BlueBubbles.app ./release/BlueBubbles.zip",
         "postinstall": "electron-builder install-app-deps"
     },
     "husky": {
