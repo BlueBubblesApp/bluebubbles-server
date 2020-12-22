@@ -125,6 +125,24 @@ export class ServerRepository extends EventEmitter {
         super.emit("config-update", { prevConfig: orig, nextConfig: this.config });
     }
 
+    async purgeOldDevices() {
+        // Get devices that have a null last_active or older than 7 days
+        const sevenDaysAgo = new Date().getTime() - 86400 * 1000 * 7; // Now - 7 days
+        const devicesToDelete = (await this.devices().find()).filter(
+            (item: Device) => !item.last_active || (item.last_active && item.last_active <= sevenDaysAgo)
+        );
+
+        // Delete the devices
+        if (devicesToDelete.length > 0) {
+            Server().log(`Automatically purging ${devicesToDelete.length} devices from your server`);
+            for (const item of devicesToDelete) {
+                const dateStr = item.last_active ? new Date(item.last_active).toLocaleDateString() : "N/A";
+                Server().log(`    -> Device: ${item.name} (Last Active: ${dateStr})`);
+                await this.devices().delete({ name: item.name, identifier: item.identifier });
+            }
+        }
+    }
+
     /**
      * This sets any default database values, if the database
      * has not already been initialized

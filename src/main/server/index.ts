@@ -3,6 +3,7 @@
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
 import ServerLog from "electron-log";
 import * as process from "process";
+import { EventEmitter } from "events";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -69,7 +70,7 @@ export const Server = (win: BrowserWindow = null) => {
  * This will handle all services and helpers that get spun
  * up when running the application.
  */
-class BlueBubblesServer {
+class BlueBubblesServer extends EventEmitter {
     window: BrowserWindow;
 
     repo: ServerRepository;
@@ -110,12 +111,16 @@ class BlueBubblesServer {
 
     notificationCount: number;
 
+    isRestarting: boolean;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
      * @param window The browser window associated with the Electron app
      */
     constructor(window: BrowserWindow) {
+        super();
+
         this.window = window;
 
         // Databases
@@ -141,6 +146,7 @@ class BlueBubblesServer {
         this.hasSetup = false;
         this.hasStarted = false;
         this.notificationCount = 0;
+        this.isRestarting = false;
     }
 
     emitToUI(event: string, data: any) {
@@ -196,6 +202,11 @@ class BlueBubblesServer {
         if (!this.hasStarted) {
             this.getTheme();
             await this.setupServer();
+
+            // Do some pre-flight checks
+            await this.preChecks();
+            if (this.isRestarting) return;
+
             this.log("Starting Configuration IPC Listeners..");
             IPCService.startConfigIpcListeners();
         }
@@ -209,6 +220,8 @@ class BlueBubblesServer {
 
         await this.startServices();
         await this.postChecks();
+
+        this.emit("setup-complete");
     }
 
     /**
@@ -274,6 +287,29 @@ class BlueBubblesServer {
         }
     }
 
+    private async preChecks(): Promise<void> {
+        this.log("Running pre-start checks...");
+
+        this.setDockIcon();
+
+        try {
+            const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
+            const parentProc = await findProcess("pid", process.ppid);
+            const parentName = parentProc && parentProc.length > 0 ? parentProc[0].name : null;
+
+            // Restart if enabled and the parent process is the app being launched
+            if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
+                this.isRestarting = true;
+                Server().log("Restarting via terminal after post-check (configured)");
+                await this.restartViaTerminal();
+            }
+        } catch (ex) {
+            Server().log(`Failed to restart via terminal!\n${ex}`);
+        }
+
+        this.log("Finished pre-start checks...");
+    }
+
     private async postChecks(): Promise<void> {
         this.log("Running post-start checks...");
 
@@ -294,19 +330,7 @@ class BlueBubblesServer {
 
         this.setDockIcon();
 
-        try {
-            const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
-            const parentProc = await findProcess("pid", process.ppid);
-            const parentName = parentProc && parentProc.length > 0 ? parentProc[0].name : null;
-
-            // Restart if enabled and the parent process is the app being launched
-            if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
-                Server().log("Restarting via terminal after post-check (configured)");
-                await this.restartViaTerminal();
-            }
-        } catch (ex) {
-            Server().log(`Failed to restart via terminal!\n${ex}`);
-        }
+        this.log("Finished post-start checks...");
     }
 
     private setDockIcon() {
@@ -694,6 +718,7 @@ class BlueBubblesServer {
     }
 
     relaunch() {
+        this.isRestarting = true;
         app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
         app.exit(0);
     }
@@ -702,37 +727,39 @@ class BlueBubblesServer {
         Server().log("Stopping all services...");
 
         try {
-            await this.ngrok.stop();
+            await this.ngrok?.stop();
         } catch (ex) {
             Server().log(`There was an issue stopping Ngrok!\n${ex}`);
         }
 
         try {
-            this.socket.server.close();
+            if (this?.socket?.server) this.socket.server.close();
         } catch (ex) {
             Server().log(`There was an issue stopping the socket!\n${ex}`);
         }
 
         try {
-            await this.iMessageRepo.db.close();
+            await this.iMessageRepo?.db?.close();
         } catch (ex) {
             Server().log(`There was an issue stopping the iMessage database connection!\n${ex}`);
         }
 
         try {
-            await this.repo.db.close();
+            if (this.repo?.db?.isConnected) {
+                await this.repo?.db?.close();
+            }
         } catch (ex) {
             Server().log(`There was an issue stopping the server database connection!\n${ex}`);
         }
 
         try {
-            await this.contactsRepo.db.close();
+            await this.contactsRepo?.db?.close();
         } catch (ex) {
             Server().log(`There was an issue stopping the contacts database connection!\n${ex}`);
         }
 
         try {
-            this.networkChecker.stop();
+            if (this.networkChecker) this.networkChecker.stop();
         } catch (ex) {
             Server().log(`There was an issue stopping the network checker service!\n${ex}`);
         }
@@ -744,7 +771,7 @@ class BlueBubblesServer {
         }
 
         try {
-            this.caffeinate.stop();
+            if (this.caffeinate) this.caffeinate.stop();
         } catch (ex) {
             Server().log(`There was an issue stopping the caffeinate service!\n${ex}`);
         }
@@ -753,7 +780,11 @@ class BlueBubblesServer {
     async restartViaTerminal() {
         // Close everything gracefully
         await this.stopServices();
+
+        // Kick off the restart script
         FileSystem.executeAppleScript(runTerminalScript(process.execPath));
-        app.exit();
+
+        // Exit the current instance
+        app.exit(0);
     }
 }

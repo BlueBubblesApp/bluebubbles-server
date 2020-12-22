@@ -1,3 +1,5 @@
+import { ServerConfig } from "./databases/server";
+
 export type ValidStatuses = 200 | 201 | 400 | 401 | 403 | 404 | 500;
 
 export type Error = {
@@ -13,12 +15,13 @@ export type ResponseData =
     | AttachmentResponse
     | (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[]
     | Uint8Array
+    | ServerConfig
     | string
     | null;
 
 export type ResponseFormat = {
     status: ValidStatuses;
-    encrypted: boolean;
+    encrypted?: boolean;
     message: ResponseMessages | string;
     error?: Error;
     // Single or list of database objects, or null
@@ -45,6 +48,7 @@ export type MessageResponse = {
     text: string;
     handle?: HandleResponse | null;
     handleId: number;
+    otherHandle: number;
     chats?: ChatResponse[];
     attachments?: AttachmentResponse[];
     subject: string;
@@ -113,6 +117,7 @@ export type AttachmentResponse = {
     transferName: string;
     isSticker: boolean;
     hideAttachment: boolean;
+    metadata: { [key: string]: string | boolean | number };
 };
 
 export enum ResponseMessages {

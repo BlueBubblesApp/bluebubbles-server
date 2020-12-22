@@ -5,9 +5,9 @@
 /* eslint-disable react/no-unused-state */
 /* eslint-disable react/prefer-stateless-function */
 import * as React from "react";
-import { ipcRenderer, dialog } from "electron";
+import { ipcRenderer } from "electron";
 import Dropzone from "react-dropzone";
-import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
+import { isValidServerConfig, isValidClientConfig, invokeMain, checkFirebaseUrl } from "@renderer/helpers/utils";
 import TopNav from "@renderer/components/TopNav/TopNav";
 import LeftStatusIndicator from "../DashboardView/LeftStatusIndicator/LeftStatusIndicator";
 
@@ -31,6 +31,9 @@ interface State {
     encryptComs: boolean;
     hideDockIcon: boolean;
     startViaTerminal: boolean;
+    smsSupport: boolean;
+    checkForUpdates: boolean;
+    autoInstallUpdates: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -54,7 +57,10 @@ class SettingsView extends React.Component<unknown, State> {
             serverUrl: "",
             encryptComs: false,
             hideDockIcon: false,
-            startViaTerminal: false
+            startViaTerminal: false,
+            smsSupport: false,
+            checkForUpdates: true,
+            autoInstallUpdates: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -81,7 +87,10 @@ class SettingsView extends React.Component<unknown, State> {
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
-                startViaTerminal: config.start_via_terminal
+                startViaTerminal: config.start_via_terminal,
+                smsSupport: config.sms_support,
+                checkForUpdates: config.check_for_updates,
+                autoInstallUpdates: config.auto_install_updates
             });
 
         this.getCaffeinateStatus();
@@ -193,6 +202,30 @@ class SettingsView extends React.Component<unknown, State> {
                 start_via_terminal: target.checked
             });
         }
+
+        if (id === "toggleSmsSupport") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ smsSupport: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                sms_support: target.checked
+            });
+        }
+
+        if (id === "toggleCheckForUpdates") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ checkForUpdates: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                check_for_updates: target.checked
+            });
+        }
+
+        if (id === "toggleAutoInstallUpdates") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ autoInstallUpdates: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                auto_install_updates: target.checked
+            });
+        }
     };
 
     saveConfig = async () => {
@@ -213,15 +246,19 @@ class SettingsView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidClientConfig(binaryStr as string);
             const validServer = isValidServerConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
+                }
             } else if (validServer) {
-                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                ipcRenderer.invoke("set-fcm-server", jsonData);
                 this.setState({ fcmServer: binaryStr });
 
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "warning",
                     buttons: ["OK"],
                     title: "BlueBubbles Warning",
@@ -231,7 +268,7 @@ class SettingsView extends React.Component<unknown, State> {
                         `we've saved it as such. Now, please choose the correct client configuration.`
                 });
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
@@ -254,25 +291,29 @@ class SettingsView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidServerConfig(binaryStr as string);
             const validClient = isValidClientConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                ipcRenderer.invoke("set-fcm-server", jsonData);
                 this.setState({ fcmServer: binaryStr });
             } else if (validClient) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
 
-                this.invokeMain("show-dialog", {
-                    type: "warning",
-                    buttons: ["OK"],
-                    title: "BlueBubbles Warning",
-                    message: "We've corrected a mistake you made",
-                    detail:
-                        `The file you chose was for the FCM Client configuration and ` +
-                        `we've saved it as such. Now, please choose the correct server configuration.`
-                });
+                    invokeMain("show-dialog", {
+                        type: "warning",
+                        buttons: ["OK"],
+                        title: "BlueBubbles Warning",
+                        message: "We've corrected a mistake you made",
+                        detail:
+                            `The file you chose was for the FCM Client configuration and ` +
+                            `we've saved it as such. Now, please choose the correct server configuration.`
+                    });
+                }
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
@@ -284,10 +325,6 @@ class SettingsView extends React.Component<unknown, State> {
 
         reader.readAsText(acceptedFiles[0]);
     };
-
-    async invokeMain(event: string, args: any): Promise<any> {
-        return ipcRenderer.invoke(event, args);
-    }
 
     render() {
         return (
@@ -339,7 +376,13 @@ class SettingsView extends React.Component<unknown, State> {
                         </span>
 
                         <div className="aCheckboxDiv firstCheckBox">
-                            <h3 className="aSettingTitle">Encrypt Communications</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Encrypt Communications</h3>
+                                <p className="settingsHelp">
+                                    Messages sent back to the clients will be encrypted using AES password-based
+                                    encryption
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleEncrypt"
@@ -350,8 +393,12 @@ class SettingsView extends React.Component<unknown, State> {
                                 <i />
                             </label>
                         </div>
-
-                        <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
+                        <div>
+                            <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
+                            <p className="settingsHelp">
+                                Using an API key will allow you to use the benefits of the upgraded Ngrok service
+                            </p>
+                        </div>
                         <input
                             id="ngrokKey"
                             className="aInput"
@@ -361,7 +408,13 @@ class SettingsView extends React.Component<unknown, State> {
                             onBlur={() => this.saveConfig()}
                         />
                         <div className="aCheckboxDiv firstCheckBox">
-                            <h3 className="aSettingTitle">Enable Ngrok</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Enable Ngrok</h3>
+                                <p className="settingsHelp">
+                                    Using Ngrok allows a connection to clients without port-forwarding. Disabling Ngrok
+                                    will allow you to use port-forwarding.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleNgrok"
@@ -373,7 +426,13 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Keep MacOS Awake</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Keep MacOS Awake</h3>
+                                <p className="settingsHelp">
+                                    When enabled, you mac will not fall asleep due to inactivity, with the caveat of
+                                    when you close your laptop
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleCaffeinate"
@@ -385,7 +444,12 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Startup With MacOS</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Startup With MacOS</h3>
+                                <p className="settingsHelp">
+                                    When enabled, BlueBubbles will start automatically when you login.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleAutoStart"
@@ -397,7 +461,66 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Hide Dock Icon</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Check for Updates on Startup</h3>
+                                <p className="settingsHelp">
+                                    When enabled, BlueBubbles will automatically check for updates on startup
+                                </p>
+                            </div>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleCheckForUpdates"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.checkForUpdates}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <div>
+                                <h3 className="aSettingTitle">Auto Install/Apply Updates</h3>
+                                <p className="settingsHelp">
+                                    When enabled, BlueBubbles will auto-install the latest available version when an
+                                    update is detected
+                                </p>
+                            </div>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleAutoInstallUpdates"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.autoInstallUpdates}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <div>
+                                <h3 className="aSettingTitle">SMS Support (Desktop Client)</h3>
+                                <p className="settingsHelp">
+                                    Enabling this will allow the server to `emit` SMS message notifications
+                                </p>
+                            </div>
+                            <label className="form-switch">
+                                <input
+                                    title="Test Test"
+                                    id="toggleSmsSupport"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.smsSupport}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <div>
+                                <h3 className="aSettingTitle">Hide Dock Icon</h3>
+                                <p className="settingsHelp">
+                                    Hiding the dock icon will not close the app. You can open the app again via the
+                                    status bar icon.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleDockIcon"
@@ -409,7 +532,13 @@ class SettingsView extends React.Component<unknown, State> {
                             </label>
                         </div>
                         <div className="aCheckboxDiv">
-                            <h3 className="aSettingTitle">Always Start via Terminal</h3>
+                            <div>
+                                <h3 className="aSettingTitle">Always Start via Terminal</h3>
+                                <p className="settingsHelp">
+                                    When BlueBubbles starts up, it will auto-reload itself in terminal mode. When in
+                                    terminal, type `help` for command information.
+                                </p>
+                            </div>
                             <label className="form-switch">
                                 <input
                                     id="toggleTerminalStart"
@@ -425,6 +554,7 @@ class SettingsView extends React.Component<unknown, State> {
                             Server Config Status:{" "}
                             <p id="serverConfigStatus">{this.state.fcmServer ? "Loaded" : "Not Set"}</p>
                         </h3>
+                        <br />
                         <Dropzone onDrop={acceptedFiles => this.handleServerFile(acceptedFiles)}>
                             {({ getRootProps, getInputProps }) => (
                                 <section id="fcmClientDrop-Set">
@@ -439,10 +569,12 @@ class SettingsView extends React.Component<unknown, State> {
                                 </section>
                             )}
                         </Dropzone>
+                        <br />
                         <h3 className="aSettingTitle">
                             Client Config Status:{" "}
                             <p id="clientConfigStatus">{this.state.fcmClient ? "Loaded" : "Not Set"}</p>
                         </h3>
+                        <br />
                         <Dropzone onDrop={acceptedFiles => this.handleClientFile(acceptedFiles)}>
                             {({ getRootProps, getInputProps }) => (
                                 <section id="fcmServerDrop-Set">

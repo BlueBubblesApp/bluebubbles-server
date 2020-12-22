@@ -14,6 +14,7 @@ import {
 } from "@material-ui/icons";
 
 import "./TopNav.css";
+import { invokeMain } from "@renderer/helpers/utils";
 
 interface State {
     alertsOpen: boolean;
@@ -72,6 +73,13 @@ class TopNav extends React.Component<unknown, State> {
         }
     }
 
+    clearAlerts() {
+        invokeMain("clear-alerts", null);
+        this.setState({
+            alerts: []
+        });
+    }
+
     render() {
         return (
             <div id="dashboardTopNav">
@@ -86,6 +94,16 @@ class TopNav extends React.Component<unknown, State> {
                 <div id="dashboardTopRightNav">
                     {this.state.alertsOpen ? (
                         <div id="alertsModal">
+                            <div id="alertTopbar">
+                                <button id="clearAlertsBtn" onClick={() => this.clearAlerts()}>
+                                    Clear Alerts
+                                </button>
+                            </div>
+                            {this.state.alerts.length === 0 ? (
+                                <div id="noAlertText">
+                                    <p>You have no alerts :)</p>
+                                </div>
+                            ) : null}
                             {this.state.alerts.map(item => {
                                 const typeIcon = alertIconMap[item.type];
                                 const time = item.created ? (item.created as Date).toLocaleTimeString() : "N/A";

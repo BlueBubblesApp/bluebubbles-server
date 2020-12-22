@@ -11,7 +11,7 @@ import * as React from "react";
 import Dropzone from "react-dropzone";
 import { shell, ipcRenderer } from "electron";
 import { Redirect } from "react-router";
-import { isValidServerConfig, isValidClientConfig } from "@renderer/helpers/utils";
+import { isValidServerConfig, isValidClientConfig, checkFirebaseUrl, invokeMain } from "@renderer/helpers/utils";
 import "./PreDashboardView.css";
 import { Config } from "@server/databases/server/entity";
 
@@ -27,6 +27,10 @@ interface State {
     enableNgrok: boolean;
     showModal: boolean;
     serverUrl: string;
+    smsSupport: boolean;
+    showUpdateToast: boolean;
+    checkForUpdates: boolean;
+    autoInstallUpdates: boolean;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -45,7 +49,11 @@ class PreDashboardView extends React.Component<unknown, State> {
             inputPassword: "",
             enableNgrok: true,
             showModal: false,
-            serverUrl: ""
+            serverUrl: "",
+            smsSupport: false,
+            showUpdateToast: true,
+            checkForUpdates: true,
+            autoInstallUpdates: false
         };
     }
 
@@ -147,25 +155,29 @@ class PreDashboardView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidServerConfig(binaryStr as string);
             const validClient = isValidClientConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
+                ipcRenderer.invoke("set-fcm-server", jsonData);
                 this.setState({ fcmServer: binaryStr });
             } else if (validClient) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
 
-                this.invokeMain("show-dialog", {
-                    type: "warning",
-                    buttons: ["OK"],
-                    title: "BlueBubbles Warning",
-                    message: "We've corrected a mistake you made",
-                    detail:
-                        `The file you chose was for the FCM Client configuration and ` +
-                        `we've saved it as such. Now, please choose the correct server configuration.`
-                });
+                    invokeMain("show-dialog", {
+                        type: "warning",
+                        buttons: ["OK"],
+                        title: "BlueBubbles Warning",
+                        message: "We've corrected a mistake you made",
+                        detail:
+                            `The file you chose was for the FCM Client configuration and ` +
+                            `we've saved it as such. Now, please choose the correct server configuration.`
+                    });
+                }
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
@@ -178,10 +190,6 @@ class PreDashboardView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
-    async invokeMain(event: string, args: any): Promise<any> {
-        return ipcRenderer.invoke(event, args);
-    }
-
     handleClientFile = (acceptedFiles: any) => {
         const reader = new FileReader();
 
@@ -192,25 +200,19 @@ class PreDashboardView extends React.Component<unknown, State> {
             const binaryStr = reader.result;
             const valid = isValidClientConfig(binaryStr as string);
             const validServer = isValidServerConfig(binaryStr as string);
+            const jsonData = JSON.parse(binaryStr as string);
 
             if (valid) {
-                ipcRenderer.invoke("set-fcm-client", JSON.parse(binaryStr as string));
-                this.setState({ fcmClient: binaryStr });
+                const test = checkFirebaseUrl(jsonData);
+                if (test) {
+                    ipcRenderer.invoke("set-fcm-client", jsonData);
+                    this.setState({ fcmClient: binaryStr });
+                }
             } else if (validServer) {
                 ipcRenderer.invoke("set-fcm-server", JSON.parse(binaryStr as string));
                 this.setState({ fcmServer: binaryStr });
-
-                this.invokeMain("show-dialog", {
-                    type: "warning",
-                    buttons: ["OK"],
-                    title: "BlueBubbles Warning",
-                    message: "We've corrected a mistake you made",
-                    detail:
-                        `The file you chose was for the FCM Server configuration and ` +
-                        `we've saved it as such. Now, please choose the correct client configuration.`
-                });
             } else {
-                this.invokeMain("show-dialog", {
+                invokeMain("show-dialog", {
                     type: "error",
                     buttons: ["OK"],
                     title: "BlueBubbles Error",
@@ -228,7 +230,6 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     completeTutorial() {
-        console.log(this.state);
         ipcRenderer.invoke("toggle-tutorial", true);
         this.setState({ redirect: "/dashboard" });
     }
@@ -237,11 +238,19 @@ class PreDashboardView extends React.Component<unknown, State> {
         this.setState({ [e.target.name]: e.target.value } as any);
     };
 
-    handleNgrokCheckboxChange(e: React.ChangeEvent<HTMLInputElement>) {
-        this.setState({ enableNgrok: e.target.checked });
-        ipcRenderer.invoke("toggle-ngrok", e.target.checked);
-        if (!e.target.checked) {
-            this.setState({ showModal: true });
+    handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>, stateVar: string) {
+        this.setState({ [stateVar]: e.target.checked } as any);
+
+        if (e.target.id === "toggleNgrok") {
+            ipcRenderer.invoke("toggle-ngrok", e.target.checked);
+
+            if (!e.target.checked) {
+                this.setState({ showModal: true });
+            }
+        } else {
+            ipcRenderer.invoke("set-config", {
+                [e.target.id]: e.target.checked
+            });
         }
     }
 
@@ -358,7 +367,43 @@ class PreDashboardView extends React.Component<unknown, State> {
                                 <input
                                     id="toggleNgrok"
                                     checked={this.state.enableNgrok}
-                                    onChange={e => this.handleNgrokCheckboxChange(e)}
+                                    onChange={e => this.handleCheckboxChange(e, "enableNgrok")}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
+                        <div id="setNgrokContainer">
+                            <h3>Check for Updates on Startup: </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <input
+                                    id="check_for_updates"
+                                    checked={this.state.checkForUpdates}
+                                    onChange={e => this.handleCheckboxChange(e, "checkForUpdates")}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
+                        <div id="setNgrokContainer">
+                            <h3>Auto Install/Apply Updates: </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <input
+                                    id="auto_install_updates"
+                                    checked={this.state.autoInstallUpdates}
+                                    onChange={e => this.handleCheckboxChange(e, "autoInstallUpdates")}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
+                        <div id="setNgrokContainer">
+                            <h3>SMS Support (Desktop Client): </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <input
+                                    id="sms_support"
+                                    checked={this.state.smsSupport}
+                                    onChange={e => this.handleCheckboxChange(e, "smsSupport")}
                                     type="checkbox"
                                 />
                                 <i />

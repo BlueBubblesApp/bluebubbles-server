@@ -24,13 +24,6 @@
     overflow: scroll;
 }
 
-.aSettingTitle {
-    margin: 8px 0 8px 40px;
-    display: flex;
-    align-items: center;
-    color: var(--primary-color);
-}
-
 .aInput {
     margin: 0 0 0 65px;
     width: calc(100% - 180px);
@@ -209,8 +202,13 @@
 
 #deviceIdentifier {
     word-break: break-all;
+    text-align: center;
+    max-width: 70%;
+}
+
+#lastActive {
+    word-break: break-all;
     text-align: right;
-    max-width: 75%;
 }
 
 #devicesHeadings {

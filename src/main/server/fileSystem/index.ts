@@ -8,8 +8,20 @@ import { transports } from "electron-log";
 import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server/index";
-import { escapeDoubleQuote, concatUint8Arrays } from "@server/helpers/utils";
+import { escapeDoubleQuote, concatUint8Arrays, parseMetadataString } from "@server/helpers/utils";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
+
 import { startMessages } from "./scripts";
+import {
+    AudioMetadata,
+    AudioMetadataKeys,
+    MetadataDataTypes,
+    MetadataKeyMap,
+    VideoMetadataKeys,
+    VideoMetadata,
+    ImageMetadata,
+    ImageMetadataKeys
+} from "./types";
 
 // Directory modifiers based on the environment
 let subdir = "";
@@ -32,11 +44,15 @@ export class FileSystem {
 
     public static contactsDir = path.join(FileSystem.baseDir, "Contacts");
 
+    public static convertDir = path.join(FileSystem.baseDir, "Convert");
+
     public static fcmDir = path.join(FileSystem.baseDir, "FCM");
 
     public static modules = path.join(appPath, moddir, "node_modules");
 
-    public static resources = path.join(appPath, "resources");
+    public static resources = path.join(appPath, "appResources");
+
+    public static contactsVcf = `${FileSystem.contactsDir}/AddressBook.vcf`;
 
     /**
      * Sets up all required directories and then, writes the scripts
@@ -52,6 +68,7 @@ export class FileSystem {
     static setupDirectories(): void {
         if (!fs.existsSync(FileSystem.baseDir)) fs.mkdirSync(FileSystem.baseDir);
         if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
+        if (!fs.existsSync(FileSystem.convertDir)) fs.mkdirSync(FileSystem.convertDir);
         if (!fs.existsSync(FileSystem.contactsDir)) fs.mkdirSync(FileSystem.contactsDir);
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
     }
@@ -222,7 +239,7 @@ export class FileSystem {
     /**
      * Asynchronously executes a shell command
      */
-    static async execShellCommand(cmd: string) {
+    static async execShellCommand(cmd: string): Promise<string> {
         const { exec } = child_process;
         return new Promise((resolve, reject) => {
             exec(cmd, (error, stdout, stderr) => {
@@ -252,5 +269,94 @@ export class FileSystem {
      */
     static async startMessages() {
         await FileSystem.executeAppleScript(startMessages());
+    }
+
+    static deleteContactsVcf() {
+        try {
+            fs.unlinkSync(FileSystem.contactsVcf);
+        } catch (ex) {
+            // Do nothing
+        }
+    }
+
+    static getRealPath(filePath: string) {
+        let output = filePath;
+        if (output[0] === "~") {
+            output = path.join(process.env.HOME, output.slice(1));
+        }
+
+        return output;
+    }
+
+    static async convertCafToMp3(attachment: Attachment, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(attachment.filePath);
+        await FileSystem.execShellCommand(`/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`);
+    }
+
+    static async getFileMetadata(filePath: string): Promise<{ [key: string]: string }> {
+        try {
+            return parseMetadataString(await FileSystem.execShellCommand(`mdls "${FileSystem.getRealPath(filePath)}"`));
+        } catch (ex) {
+            return null;
+        }
+    }
+
+    private static async parseMetadata(filePath: string, parserKeyDefinition: MetadataKeyMap): Promise<any> {
+        const metadata: { [key: string]: string } = await FileSystem.getFileMetadata(filePath);
+        if (!metadata) return null;
+
+        const getNumber = (num: string) => {
+            if (!num) return null;
+
+            try {
+                return Number.parseFloat(num);
+            } catch (ex) {
+                return null;
+            }
+        };
+
+        const meta: { [key: string]: any } = {};
+        for (const [key, value] of Object.entries(metadata)) {
+            if (!(key in parserKeyDefinition)) continue;
+
+            // Get the types info for the field
+            const { dataType, metaKey } = parserKeyDefinition[key];
+
+            // Parse the item by type
+            let itemValue: any;
+            switch (dataType) {
+                case MetadataDataTypes.Bool:
+                    itemValue = value === "1";
+                    break;
+                case MetadataDataTypes.Float:
+                    itemValue = getNumber(value);
+                    break;
+                case MetadataDataTypes.Int:
+                    itemValue = Math.trunc(getNumber(value));
+                    break;
+                default:
+                    itemValue = value;
+                    break;
+            }
+
+            meta[metaKey] = itemValue;
+        }
+
+        return meta;
+    }
+
+    static async getAudioMetadata(audioPath: string): Promise<AudioMetadata> {
+        const meta = await FileSystem.parseMetadata(audioPath, AudioMetadataKeys);
+        return meta as AudioMetadata;
+    }
+
+    static async getVideoMetadata(videoPath: string): Promise<VideoMetadata> {
+        const meta = await FileSystem.parseMetadata(videoPath, VideoMetadataKeys);
+        return meta as VideoMetadata;
+    }
+
+    static async getImageMetadata(imagePath: string): Promise<ImageMetadata> {
+        const meta = await FileSystem.parseMetadata(imagePath, ImageMetadataKeys);
+        return meta as ImageMetadata;
     }
 }

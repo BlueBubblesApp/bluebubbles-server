@@ -74,16 +74,18 @@ export class ActionHandler {
                     )
                 );
             } catch (ex) {
+                // Log the actual error
                 Server().log(ex);
 
-                // If it's not a timeout failure, throw the error
-                if (!((ex?.message ?? "") as string).includes("AppleEvent timed out")) {
-                    throw ex;
-                }
+                const errMsg = (ex?.message ?? "") as string;
+                const retry = errMsg.includes("AppleEvent timed out") || errMsg.includes("1002");
 
-                Server().log("Timeout error. Retrying message...");
+                // If we don't want to retry, throw the original error
+                if (!retry) throw ex;
 
-                // If it's a timeout error, restart iMessage and retry
+                Server().log("Message send error. Trying to re-send message...");
+
+                // If it's a restartable-error, restart iMessage and retry
                 await FileSystem.executeAppleScript(restartMessages());
                 await FileSystem.executeAppleScript(
                     sendMessage(
@@ -463,6 +465,7 @@ export class ActionHandler {
         Server().log("Executing Action: Export Contacts", "debug");
 
         try {
+            FileSystem.deleteContactsVcf();
             await FileSystem.executeAppleScript(exportContacts());
         } catch (ex) {
             let msg = ex.message;

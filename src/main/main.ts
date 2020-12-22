@@ -128,8 +128,7 @@ const createWindow = async () => {
         height: 750,
         minHeight: 600,
         webPreferences: {
-            nodeIntegration: true, // Required in new electron version
-            enableRemoteModule: true
+            nodeIntegration: true // Required in new electron version
         }
     });
 
@@ -172,8 +171,14 @@ const createWindow = async () => {
 
     // Start the update service
     updateService = new UpdateService(win);
-    updateService.start();
-    updateService.checkForUpdate(false);
+
+    Server().on("setup-complete", () => {
+        const check = Server().repo.getConfig("check_for_updates") as boolean;
+        if (check) {
+            updateService.start();
+            updateService.checkForUpdate(false);
+        }
+    });
 };
 
 app.on("ready", () => {

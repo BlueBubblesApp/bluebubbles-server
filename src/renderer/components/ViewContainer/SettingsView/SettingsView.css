@@ -25,7 +25,7 @@
 }
 
 .aSettingTitle {
-    margin: 8px 0 8px 40px;
+    margin: 8px 0 5px 40px;
     display: flex;
     align-items: center;
     color: var(--primary-color);
@@ -304,4 +304,11 @@ span > #serverPassword {
 
 #modalCloseBtn {
     color: var(--primary-color);
+}
+
+.settingsHelp {
+    margin: 0 10px 8px 45px;
+    color: var(--primary-color);
+    font-size: small;
+    word-break: break-word;
 }
