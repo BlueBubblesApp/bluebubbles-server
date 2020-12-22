@@ -15,8 +15,7 @@
         "lint": "eslint --ext=jsx,js,tsx,ts src",
         "pretest:e2e": "npm run build",
         "pack": "npm run build && electron-builder --dir",
-        "dist": "yarn build && electron-builder build --mac --publish never && yarn run zip-release",
-        "zip-release": "ditto -c -k --sequesterRsrc --keepParent ./release/mac/BlueBubbles.app ./release/BlueBubbles.zip",
+        "dist": "yarn build && electron-builder build --mac --publish never",
         "postinstall": "electron-builder install-app-deps"
     },
     "husky": {
@@ -55,7 +54,14 @@
         ],
         "mac": {
             "category": "public.app-category.social-networking",
-            "target": "dmg",
+            "target": [
+                {
+                    "target": "dmg"
+                },
+                {
+                    "target": "zip"
+                }
+            ],
             "type": "distribution",
             "icon": "./icons/regular/icon-512.png",
             "darkModeSupport": true,
@@ -161,6 +167,7 @@
         "crypto-js": "^4.0.0",
         "electron-fetch": "^1.4.0",
         "electron-log": "^4.2.4",
+        "electron-updater": "^4.3.5",
         "find-process": "^1.4.4",
         "firebase-admin": "^9.4.2",
         "google-libphonenumber": "^3.2.10",
