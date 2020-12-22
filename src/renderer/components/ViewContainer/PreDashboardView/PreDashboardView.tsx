@@ -29,6 +29,8 @@ interface State {
     serverUrl: string;
     smsSupport: boolean;
     showUpdateToast: boolean;
+    checkForUpdates: boolean;
+    autoInstallUpdates: boolean;
 }
 
 class PreDashboardView extends React.Component<unknown, State> {
@@ -49,7 +51,9 @@ class PreDashboardView extends React.Component<unknown, State> {
             showModal: false,
             serverUrl: "",
             smsSupport: false,
-            showUpdateToast: true
+            showUpdateToast: true,
+            checkForUpdates: true,
+            autoInstallUpdates: false
         };
     }
 
@@ -370,24 +374,36 @@ class PreDashboardView extends React.Component<unknown, State> {
                             </div>
                         </div>
                         <div id="setNgrokContainer">
-                            <h3>SMS Support (Desktop Client): </h3>
+                            <h3>Check for Updates on Startup: </h3>
                             <div style={{ marginTop: "3px" }}>
                                 <input
-                                    id="sms_support"
-                                    checked={this.state.smsSupport}
-                                    onChange={e => this.handleCheckboxChange(e, "smsSupport")}
+                                    id="check_for_updates"
+                                    checked={this.state.checkForUpdates}
+                                    onChange={e => this.handleCheckboxChange(e, "checkForUpdates")}
                                     type="checkbox"
                                 />
                                 <i />
                             </div>
                         </div>
                         <div id="setNgrokContainer">
-                            <h3>Show Update Notification: </h3>
+                            <h3>Auto Install/Apply Updates: </h3>
                             <div style={{ marginTop: "3px" }}>
                                 <input
-                                    id="show_update_toast"
-                                    checked={this.state.showUpdateToast}
-                                    onChange={e => this.handleCheckboxChange(e, "showUpdateToast")}
+                                    id="auto_install_updates"
+                                    checked={this.state.autoInstallUpdates}
+                                    onChange={e => this.handleCheckboxChange(e, "autoInstallUpdates")}
+                                    type="checkbox"
+                                />
+                                <i />
+                            </div>
+                        </div>
+                        <div id="setNgrokContainer">
+                            <h3>SMS Support (Desktop Client): </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <input
+                                    id="sms_support"
+                                    checked={this.state.smsSupport}
+                                    onChange={e => this.handleCheckboxChange(e, "smsSupport")}
                                     type="checkbox"
                                 />
                                 <i />

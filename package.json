@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.1.14",
+    "version": "0.1.15",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles Android and Desktop Apps",
     "main": "./dist/main.js",
     "scripts": {
@@ -15,8 +15,7 @@
         "lint": "eslint --ext=jsx,js,tsx,ts src",
         "pretest:e2e": "npm run build",
         "pack": "npm run build && electron-builder --dir",
-        "dist": "yarn build && electron-builder build --mac --publish never && yarn run zip-release",
-        "zip-release": "ditto -c -k --sequesterRsrc --keepParent ./release/mac/BlueBubbles.app ./release/BlueBubbles.zip",
+        "dist": "yarn build && electron-builder build --mac --publish never",
         "postinstall": "electron-builder install-app-deps"
     },
     "husky": {
@@ -55,7 +54,14 @@
         ],
         "mac": {
             "category": "public.app-category.social-networking",
-            "target": "dmg",
+            "target": [
+                {
+                    "target": "dmg"
+                },
+                {
+                    "target": "zip"
+                }
+            ],
             "type": "distribution",
             "icon": "./icons/regular/icon-512.png",
             "darkModeSupport": true,
@@ -116,7 +122,7 @@
         "babel-loader": "^8.1.0",
         "cross-env": "^7.0.2",
         "css-loader": "^3.5.2",
-        "electron": "^10.2.0",
+        "electron": "^11.1.1",
         "electron-builder": "^22.9.1",
         "electron-notarize": "^1.0.0",
         "eslint": "^6.8.0",
@@ -159,8 +165,8 @@
         "byte-base64": "^1.1.0",
         "compare-versions": "^3.6.0",
         "crypto-js": "^4.0.0",
-        "electron-fetch": "^1.4.0",
         "electron-log": "^4.2.4",
+        "electron-updater": "^4.3.5",
         "find-process": "^1.4.4",
         "firebase-admin": "^9.4.2",
         "google-libphonenumber": "^3.2.10",

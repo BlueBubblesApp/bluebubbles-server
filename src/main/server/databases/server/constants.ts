@@ -13,5 +13,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
     last_fcm_restart: () => 0,
     start_via_terminal: () => 0,
     sms_support: () => 0,
-    show_update_toast: () => 1
+    check_for_updates: () => 1,
+    auto_install_updates: () => 0
 };
