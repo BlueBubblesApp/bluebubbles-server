@@ -32,7 +32,8 @@ interface State {
     hideDockIcon: boolean;
     startViaTerminal: boolean;
     smsSupport: boolean;
-    showUpdateToast: boolean;
+    checkForUpdates: boolean;
+    autoInstallUpdates: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -58,7 +59,8 @@ class SettingsView extends React.Component<unknown, State> {
             hideDockIcon: false,
             startViaTerminal: false,
             smsSupport: false,
-            showUpdateToast: true
+            checkForUpdates: true,
+            autoInstallUpdates: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -87,7 +89,8 @@ class SettingsView extends React.Component<unknown, State> {
                 hideDockIcon: config.hide_dock_icon,
                 startViaTerminal: config.start_via_terminal,
                 smsSupport: config.sms_support,
-                showUpdateToast: config.show_update_toast
+                checkForUpdates: config.check_for_updates,
+                autoInstallUpdates: config.auto_install_updates
             });
 
         this.getCaffeinateStatus();
@@ -208,11 +211,19 @@ class SettingsView extends React.Component<unknown, State> {
             });
         }
 
-        if (id === "toggleUpdateToast") {
+        if (id === "toggleCheckForUpdates") {
             const target = e.target as HTMLInputElement;
-            this.setState({ showUpdateToast: target.checked });
+            this.setState({ checkForUpdates: target.checked });
             await ipcRenderer.invoke("set-config", {
-                show_update_toast: target.checked
+                check_for_updates: target.checked
+            });
+        }
+
+        if (id === "toggleAutoInstallUpdates") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ autoInstallUpdates: target.checked });
+            await ipcRenderer.invoke("set-config", {
+                auto_install_updates: target.checked
             });
         }
     };
@@ -451,6 +462,41 @@ class SettingsView extends React.Component<unknown, State> {
                         </div>
                         <div className="aCheckboxDiv">
                             <div>
+                                <h3 className="aSettingTitle">Check for Updates on Startup</h3>
+                                <p className="settingsHelp">
+                                    When enabled, BlueBubbles will automatically check for updates on startup
+                                </p>
+                            </div>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleCheckForUpdates"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.checkForUpdates}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <div>
+                                <h3 className="aSettingTitle">Auto Install/Apply Updates</h3>
+                                <p className="settingsHelp">
+                                    When enabled, BlueBubbles will auto-install the latest available version when an
+                                    update is detected
+                                </p>
+                            </div>
+                            <label className="form-switch">
+                                <input
+                                    id="toggleAutoInstallUpdates"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.autoInstallUpdates}
+                                />
+                                <i />
+                            </label>
+                        </div>
+                        <div className="aCheckboxDiv">
+                            <div>
                                 <h3 className="aSettingTitle">SMS Support (Desktop Client)</h3>
                                 <p className="settingsHelp">
                                     Enabling this will allow the server to `emit` SMS message notifications
@@ -463,24 +509,6 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
                                     checked={this.state.smsSupport}
-                                />
-                                <i />
-                            </label>
-                        </div>
-                        <div className="aCheckboxDiv">
-                            <div>
-                                <h3 className="aSettingTitle">Show Update Notification</h3>
-                                <p className="settingsHelp">
-                                    Disabling this option will hide the popup notification when a new update is
-                                    available.
-                                </p>
-                            </div>
-                            <label className="form-switch">
-                                <input
-                                    id="toggleUpdateToast"
-                                    onChange={e => this.handleInputChange(e)}
-                                    type="checkbox"
-                                    checked={this.state.showUpdateToast}
                                 />
                                 <i />
                             </label>

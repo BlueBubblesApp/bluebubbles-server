@@ -1,11 +1,7 @@
-import { app, dialog, shell, BrowserWindow } from "electron";
+import { app, BrowserWindow, dialog } from "electron";
 import { autoUpdater } from "electron-updater";
-import * as fetchDef from "electron-fetch";
-import * as compareVersions from "compare-versions";
 import { Server } from "@server/index";
-import { FeedURLOptions } from "electron/main";
 
-const fetch = fetchDef.default;
 export class UpdateService {
     window: BrowserWindow;
 
@@ -14,6 +10,8 @@ export class UpdateService {
     currentVersion: string;
 
     isOpen: boolean;
+
+    hasUpdate = false;
 
     constructor(window: BrowserWindow) {
         // This won't work in dev-mode because it checks Electron's Version
@@ -35,6 +33,8 @@ export class UpdateService {
 
     start() {
         this.timer = setInterval(async () => {
+            if (this.hasUpdate) return;
+
             await this.checkForUpdate(false);
         }, 1000 * 60 * 60 * 12); // Default 12 hours
     }
@@ -44,69 +44,28 @@ export class UpdateService {
     }
 
     async checkForUpdate(showDialogForNoUpdate: boolean): Promise<void> {
-        console.log(this.currentVersion);
-        console.log("CHECKING UPDATE");
         const res = await autoUpdater.checkForUpdatesAndNotify();
-        console.log(res);
+        this.hasUpdate = !!res?.updateInfo;
 
-        // if (this.isOpen) return null;
+        if (this.hasUpdate) {
+            Server().emitMessage("server-update", res.updateInfo.version);
 
-        // // Fetch from Github
-        // const response = await fetch("https://api.github.com/repos/BlueBubblesApp/BlueBubbles-Server/releases");
-        // const body = await response.json();
-        // if (typeof body === "object" && body !== null && !Array.isArray(body) && body?.message)
-        //     return Server().log(`Failed to get updates for BlueBubbles! Error: ${body?.message}`, "warn");
-        // if (Array.isArray(body) && body.length === 0) return console.log("No updates for BlueBubbles found!");
+            if (Server().repo.getConfig("auto_install_updates") as boolean) {
+                autoUpdater.on("update-downloaded", info => {
+                    autoUpdater.quitAndInstall(false, true);
+                });
+            }
+        }
 
-        // // Pull latest version
-        // const latest = body[0];
-        // const version = latest.tag_name.replace("v", "");
+        if (!this.hasUpdate && showDialogForNoUpdate) {
+            const dialogOpts = {
+                type: "info",
+                title: "BlueBubbles Update",
+                message: "You have the latest version installed!",
+                detail: `You are running the latest version of BlueBubbles! v${this.currentVersion}`
+            };
 
-        // // Compare latest version to current version
-        // if (compareVersions(version, this.currentVersion) === 1) {
-        //     // Emit to all the clients:
-        //     Server().emitMessage("server-update", version);
-
-        //     const dialogOpts = {
-        //         type: "info",
-        //         buttons: ["Download", "Ignore"],
-        //         title: "BlueBubbles Update",
-        //         message: "BlueBubbles Update Available!",
-        //         detail:
-        //             `A new version of BlueBubbles is available! (Version: ${version}). ` +
-        //             `Click download to be redirected.`
-        //     };
-
-        //     // If there is a newer version, show the dialog and redirect if 'Download' is clicked
-        //     const showToast = Server().repo.getConfig("show_update_toast") as boolean;
-        //     if (showToast) {
-        //         this.isOpen = true;
-        //         dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
-        //             this.isOpen = false;
-        //             if (returnValue.response === 0) {
-        //                 shell.openExternal("https://github.com/BlueBubblesApp/BlueBubbles-Server/releases");
-        //                 app.quit();
-        //             }
-        //         });
-        //     }
-        // } else {
-        //     Server().log(`No new version available (latest: ${version})`);
-        //     if (showDialogForNoUpdate && !this.isOpen) {
-        //         this.isOpen = true;
-
-        //         const dialogOpts = {
-        //             type: "info",
-        //             title: "No Update Available",
-        //             message: "No Update Available",
-        //             detail: `You are running the latest BlueBubbles macOS Server (${this.currentVersion})!`
-        //         };
-
-        //         dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
-        //             this.isOpen = false;
-        //         });
-        //     }
-        // }
-
-        return null;
+            dialog.showMessageBox(this.window, dialogOpts);
+        }
     }
 }
