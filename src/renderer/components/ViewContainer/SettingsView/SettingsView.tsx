@@ -210,7 +210,6 @@ class SettingsView extends React.Component<unknown, State> {
                 sms_support: target.checked
             });
         }
-
         if (id === "toggleCheckForUpdates") {
             const target = e.target as HTMLInputElement;
             this.setState({ checkForUpdates: target.checked });
