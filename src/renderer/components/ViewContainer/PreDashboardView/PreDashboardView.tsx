@@ -275,7 +275,9 @@ class PreDashboardView extends React.Component<unknown, State> {
             return <button onClick={() => this.completeTutorial()}>{str}</button>;
         };
 
-        if (!this.state.inputPassword) return null;
+        const password = this.state.inputPassword;
+
+        if (!password || password?.trim().length === 0) return null;
         if (this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer)) return output("Skip FCM Setup");
         if (!this.state.enableNgrok && this.state.fcmClient && this.state.fcmServer) return output("Skip Ngrok Setup");
         if (!this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer))
