@@ -91,13 +91,13 @@ export class SocketService {
          */
         this.server.on("connection", async socket => {
             let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
-            const cfgPass = (await Server().repo.getConfig("password")) as string;
+            const cfgPass = String((await Server().repo.getConfig("password")) as string);
 
             // Decode the param incase it contains URL encoded characters
             pass = decodeURI(pass);
 
             // Basic authentication
-            if (pass === cfgPass) {
+            if (pass?.trim() === cfgPass?.trim()) {
                 Server().log(`Client Authenticated Successfully`);
             } else {
                 socket.disconnect();
@@ -614,15 +614,17 @@ export class SocketService {
             async (params, cb): Promise<void> => {
                 let participants = params?.participants;
 
-                if (!participants || participants.length === 0)
+                if (!participants || participants.length === 0) {
                     return response(cb, "error", createBadRequestResponse("No participants specified"));
+                }
 
                 if (typeof participants === "string") {
                     participants = [participants];
                 }
 
-                if (!Array.isArray(participants))
+                if (!Array.isArray(participants)) {
                     return response(cb, "error", createBadRequestResponse("Participant list must be an array"));
+                }
 
                 const chatGuid = await ActionHandler.createChat(participants, params?.service || "iMessage");
 

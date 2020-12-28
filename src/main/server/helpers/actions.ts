@@ -410,7 +410,11 @@ export class ActionHandler {
 
         try {
             // Get the chat GUID that was created
-            ret = ret.split("text chat id")[1].trim();
+            if (ret.includes("text chat id")) {
+                ret = ret.split("text chat id")[1].trim();
+            } else if (ret.includes("chat id")) {
+                ret = ret.split("chat id")[1].trim();
+            }
         } catch (ex) {
             throw new Error("Failed to get chat GUID from new chat!");
         }
