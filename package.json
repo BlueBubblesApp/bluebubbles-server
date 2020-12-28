@@ -171,7 +171,7 @@
         "firebase-admin": "^9.4.2",
         "google-libphonenumber": "^3.2.10",
         "macos-version": "^5.2.0",
-        "ngrok": "^3.3.0",
+        "ngrok": "^3.4.0",
         "numeral": "^2.0.6",
         "qrcode.react": "^1.0.0",
         "react": "^16.13.1",
