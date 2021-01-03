@@ -1,6 +1,6 @@
 import * as fs from "fs";
 
-import { NativeImage } from "electron";
+import { nativeImage, NativeImage } from "electron";
 import { basename } from "path";
 import { encode as blurHashEncode } from "blurhash";
 
@@ -9,6 +9,7 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
 import { Attachment } from "../entity/Attachment";
+import { handledImageMimes } from "./constants";
 
 export const getBlurHash = async (image: NativeImage) => {
     let blurhash: string = null;
@@ -77,6 +78,31 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
         metadata = await FileSystem.getAudioMetadata(attachment.filePath);
     } else if (attachment.mimeType.startsWith("image")) {
         metadata = await FileSystem.getImageMetadata(attachment.filePath);
+
+        try {
+            // If we got no height/width data, let's try to fallback to other code to fetch it
+            if (handledImageMimes.includes(attachment.mimeType) && (!metadata?.height || !metadata?.width)) {
+                Server().log("Image metadata empty, getting size from NativeImage...", "debug");
+
+                // Load the image data
+                const image = nativeImage.createFromPath(FileSystem.getRealPath(attachment.filePath));
+
+                // If we were able to load the image, get the size
+                if (image) {
+                    const size = image.getSize();
+
+                    // If the size if available, set the metadata for it
+                    if (size?.height && size?.width) {
+                        // If the metadata is null, let's give it some data
+                        if (metadata === null) metadata = {};
+                        metadata.height = size.height;
+                        metadata.width = size.width;
+                    }
+                }
+            }
+        } catch (ex) {
+            Server().log("Failed to load size data from NativeImage!", "debug");
+        }
     } else if (attachment.mimeType.startsWith("video")) {
         metadata = await FileSystem.getVideoMetadata(attachment.filePath);
     }

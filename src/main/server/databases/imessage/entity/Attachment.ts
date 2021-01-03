@@ -12,6 +12,7 @@ import { convertAudio, getAttachmentMetadata, getBlurHash } from "@server/databa
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
+import { handledImageMimes } from "../helpers/constants";
 
 @Entity("attachment")
 export class Attachment {
@@ -97,7 +98,6 @@ export class Attachment {
     hideAttachment: boolean;
 }
 
-const handledImageMimes = ["image/jpeg", "image/jpg", "image/png", "image/bmp", "image/tiff", "image/gif"];
 export const getAttachmentResponse = async (
     attachment: Attachment,
     withData = false,
