@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import { autoUpdater } from "electron-updater";
 import { Server } from "@server/index";
 
@@ -19,6 +19,16 @@ export class UpdateService {
         this.isOpen = false;
         this.window = window;
 
+        const autoUpdate = Server().repo.getConfig("auto_install_updates") as boolean;
+        if (autoUpdate) {
+            autoUpdater.autoDownload = true;
+            autoUpdater.autoInstallOnAppQuit = true;
+        } else {
+            autoUpdater.autoDownload = false;
+            autoUpdater.autoInstallOnAppQuit = false;
+        }
+
+        // Set the feed stuff
         autoUpdater.setFeedURL({
             provider: "github",
             owner: "BlueBubblesApp",
@@ -29,9 +39,18 @@ export class UpdateService {
             private: false,
             releaseType: "release"
         });
+
+        autoUpdater.on("update-downloaded", info => {
+            autoUpdater.quitAndInstall(false, true);
+        });
+
+        ipcMain.handle("install-update", async (_, __) => {
+            await autoUpdater.downloadUpdate();
+        });
     }
 
     start() {
+        if (this.timer) return;
         this.timer = setInterval(async () => {
             if (this.hasUpdate) return;
 
@@ -49,12 +68,13 @@ export class UpdateService {
 
         if (this.hasUpdate) {
             Server().emitMessage("server-update", res.updateInfo.version);
+            Server().emitToUI("update-available", res.updateInfo.version);
 
-            if (Server().repo.getConfig("auto_install_updates") as boolean) {
-                autoUpdater.on("update-downloaded", info => {
-                    autoUpdater.quitAndInstall(false, true);
-                });
-            }
+            const notification = {
+                title: "BlueBubbles Update Available!",
+                body: `BlueBubbles macOS Server v${res.updateInfo.version} is now available to be installed!`
+            };
+            new Notification(notification).show();
         }
 
         if (!this.hasUpdate && showDialogForNoUpdate) {

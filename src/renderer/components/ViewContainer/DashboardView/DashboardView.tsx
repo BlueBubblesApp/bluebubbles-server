@@ -13,6 +13,10 @@ import "./DashboardView.css";
 
 const QRCode = require("qrcode.react");
 
+interface Props {
+    newUpdate: string;
+}
+
 interface State {
     config: any;
     fcmClient: string;
@@ -25,18 +29,22 @@ interface State {
     videoCount: { name: string; count: number };
 }
 
-class DashboardView extends React.Component<unknown, State> {
-    state: State = {
-        config: null,
-        fcmClient: null,
-        totalMsgCount: 0,
-        recentMsgCount: 0,
-        myMsgCount: 0,
-        groupMsgCount: { name: "Loading...", count: 0 },
-        individualMsgCount: { name: "Loading...", count: 0 },
-        imageCount: { name: "Loading...", count: 0 },
-        videoCount: { name: "Loading...", count: 0 }
-    };
+class DashboardView extends React.Component<Props, State> {
+    constructor(props: Props) {
+        super(props);
+
+        this.state = {
+            config: null,
+            fcmClient: null,
+            totalMsgCount: 0,
+            recentMsgCount: 0,
+            myMsgCount: 0,
+            groupMsgCount: { name: "Loading...", count: 0 },
+            individualMsgCount: { name: "Loading...", count: 0 },
+            imageCount: { name: "Loading...", count: 0 },
+            videoCount: { name: "Loading...", count: 0 }
+        };
+    }
 
     async componentDidMount() {
         const currentTheme = await ipcRenderer.invoke("get-current-theme");
@@ -127,6 +135,7 @@ class DashboardView extends React.Component<unknown, State> {
             });
         } catch (ex) {
             console.log("Failed to load database stats");
+            console.error(ex);
         }
     }
 
@@ -225,7 +234,7 @@ class DashboardView extends React.Component<unknown, State> {
 
         return (
             <div id="DashboardView" data-theme="light">
-                <TopNav />
+                <TopNav newUpdate={this.props.newUpdate} />
                 <div id="dashboardLowerContainer">
                     <LeftStatusIndicator />
                     <div className="rightMainContainer">

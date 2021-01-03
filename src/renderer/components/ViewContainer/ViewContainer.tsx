@@ -15,6 +15,7 @@ import "./ViewContainer.css";
 
 interface State {
     logs: any[];
+    newUpdate: string;
 }
 
 const MAX_LENGTH = 25;
@@ -24,7 +25,8 @@ class ViewContainer extends React.Component<unknown, State> {
         super(props);
 
         this.state = {
-            logs: []
+            logs: [],
+            newUpdate: null
         };
     }
 
@@ -40,6 +42,10 @@ class ViewContainer extends React.Component<unknown, State> {
             // Set the new logs
             this.setState({ logs: newLog });
         });
+
+        ipcRenderer.on("update-available", (event: any, data: any) => {
+            this.setState({ newUpdate: data });
+        });
     }
 
     render() {
@@ -51,7 +57,7 @@ class ViewContainer extends React.Component<unknown, State> {
                             <PreDashboardView />
                         </Route>
                         <Route exact path="/dashboard" component={DashboardView}>
-                            <DashboardView />
+                            <DashboardView newUpdate={this.state.newUpdate} />
                         </Route>
                         <Route exact path="/debug" component={DebugView}>
                             <DebugView logs={this.state.logs} />

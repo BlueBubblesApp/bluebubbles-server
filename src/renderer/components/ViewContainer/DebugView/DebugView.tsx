@@ -98,7 +98,7 @@ class SettingsView extends React.Component<Props, State> {
                             <>
                                 {filteredLogs.map((row, index) => (
                                     <div key={index} className="aLogRow">
-                                        <p>{row.log.message || "N/A"}</p>
+                                        <p>{row?.log?.message || "N/A"}</p>
                                         <p className="aLogTimestamp">{(row.timestamp as Date).toLocaleTimeString()}</p>
                                     </div>
                                 ))}

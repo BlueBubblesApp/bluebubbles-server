@@ -171,7 +171,7 @@ const createWindow = async () => {
 
     Server().on("setup-complete", () => {
         // Start the update service
-        updateService = new UpdateService(win);
+        if (!updateService) updateService = new UpdateService(win);
 
         const check = Server().repo.getConfig("check_for_updates") as boolean;
         if (check) {

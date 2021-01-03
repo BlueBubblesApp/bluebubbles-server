@@ -235,6 +235,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Load notification count
         try {
+            this.log("Initializing alert service...");
             const alerts = (await AlertService.find()).filter(item => !item.isRead);
             this.notificationCount = alerts.length;
         } catch (ex) {
@@ -242,6 +243,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Setup lightweight message cache
+        this.log("Initializing event cache...");
         this.eventCache = new EventCache();
 
         try {
@@ -251,6 +253,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
         }
 
+        this.log("Initializing caffeinate service...");
         await this.setupCaffeinate();
 
         try {

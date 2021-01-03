@@ -67,14 +67,19 @@ export class SocketService {
         setInterval(async () => {
             const port = Server().repo.getConfig("socket_port");
 
-            // Check if there are any listening services
-            let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
-            res = (res ?? "").trim();
+            try {
+                // Check if there are any listening services
+                let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
+                res = (res ?? "").trim();
 
-            // If the result doesn't show anything listening,
-            if (!res.includes(port.toString())) {
-                Server().log("Socket not listening! Restarting...", "error");
-                this.restart();
+                // If the result doesn't show anything listening,
+                if (!res.includes(port.toString())) {
+                    Server().log("Socket not listening! Restarting...", "error");
+                    this.restart();
+                }
+            } catch (ex) {
+                Server().log("Unable to start socket status listener!", "error");
+                Server().log(ex, "debug");
             }
         }, 1000 * 60); // Check every minute
     }
