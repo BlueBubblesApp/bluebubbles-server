@@ -23,6 +23,7 @@ interface Props {
 interface State {
     alertsOpen: boolean;
     alerts: any[];
+    isDownloading: boolean;
 }
 
 const alertIconMap: { [key: string]: JSX.Element } = {
@@ -38,7 +39,8 @@ class TopNav extends React.Component<Props, State> {
 
         this.state = {
             alertsOpen: false,
-            alerts: []
+            alerts: [],
+            isDownloading: false
         };
     }
 
@@ -82,6 +84,12 @@ class TopNav extends React.Component<Props, State> {
         this.setState({
             alerts: []
         });
+    }
+
+    downloadUpdate() {
+        if (this.state.isDownloading) return;
+        this.setState({ isDownloading: true });
+        invokeMain("install-update", null);
     }
 
     render() {
@@ -130,8 +138,10 @@ class TopNav extends React.Component<Props, State> {
 
                     {this.props.newUpdate ? (
                         <div style={{ marginRight: "10px", color: "red" }}>
-                            <button id="clearLogsButton" onClick={() => invokeMain("install-update", null)}>
-                                {`New version available! Click here to install v${this.props.newUpdate}!`}
+                            <button id="clearLogsButton" onClick={this.downloadUpdate}>
+                                {this.state.isDownloading
+                                    ? `Downloading...`
+                                    : `New version available! Click here to install v${this.props.newUpdate}!`}
                             </button>
                         </div>
                     ) : null}
