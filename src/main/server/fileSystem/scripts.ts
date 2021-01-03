@@ -44,7 +44,9 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
         ${messageScpt}
     end tell
 
-    tell application "System Events" to tell process "Messages" to set visible to false`;
+    try
+        tell application "System Events" to tell process "Messages" to set visible to false
+    end try`;
 };
 
 /**
@@ -74,7 +76,9 @@ export const startChat = (participants: string[], service: string) => {
         log thisChat
     end tell
 
-    tell application "System Events" to tell process "Messages" to set visible to false`;
+    try
+        tell application "System Events" to tell process "Messages" to set visible to false
+    end try`;
 };
 
 /**
