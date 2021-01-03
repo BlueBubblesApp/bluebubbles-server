@@ -34,7 +34,7 @@
     },
     "build": {
         "productName": "BlueBubbles",
-        "appId": "com.BlueBubbles.BlueBubbles-Server",
+        "appId": "com.bluebubbles.messaging",
         "directories": {
             "output": "release",
             "buildResources": "appResources"
