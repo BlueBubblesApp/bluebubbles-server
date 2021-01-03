@@ -524,15 +524,28 @@ export class SocketService {
                 const chatGuid = params?.guid;
                 const message = params?.message;
 
+                // Make sure a chat GUID is provided
                 if (!chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
+                // Make sure the chat exists
+                const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
+                if (!chats || chats.length === 0)
+                    return response(
+                        cb,
+                        "error",
+                        createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
+                    );
+
+                // Make sure we have a temp GUID, for matching
                 if ((tempGuid && (!message || message.length === 0)) || (!tempGuid && message))
                     return response(cb, "error", createBadRequestResponse("No temporary GUID provided with message"));
 
+                // Make sure that if we have an attachment, there is also a guid and name
                 if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
                 try {
+                    // Send the message
                     await ActionHandler.sendMessage(
                         tempGuid,
                         chatGuid,
@@ -587,6 +600,15 @@ export class SocketService {
 
                 // If there are no more chunks, compile, save, and send
                 if (!hasMore) {
+                    // Make sure the chat exists before we send the response
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
+                    if (!chats || chats.length === 0)
+                        return response(
+                            cb,
+                            "error",
+                            createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
+                        );
+
                     Server().queue.add({
                         type: "send-attachment",
                         data: {
@@ -632,7 +654,16 @@ export class SocketService {
                     const newChat = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
                     return response(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
                 } catch (ex) {
-                    return response(cb, "start-chat-failed", createServerErrorResponse(ex?.message ?? ex));
+                    let err = ex?.message ?? ex ?? "";
+
+                    // Handle specific error cases
+                    if (err.toLowerCase().includes("rowid")) {
+                        err =
+                            `iMessage/iCloud is not configured on your macOS device! ` +
+                            `Configure it, then rescan your QRCode`;
+                    }
+
+                    return response(cb, "start-chat-failed", createServerErrorResponse(err));
                 }
             }
         );
