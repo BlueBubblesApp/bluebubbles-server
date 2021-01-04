@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -12,7 +13,8 @@ import {
     checkTypingIndicator,
     exportContacts,
     restartMessages,
-    openChat
+    openChat,
+    sendMessageFallback
 } from "@server/fileSystem/scripts";
 
 import {
@@ -78,20 +80,28 @@ export class ActionHandler {
                 const errMsg = (ex?.message ?? "") as string;
                 const retry = errMsg.includes("AppleEvent timed out") || errMsg.includes("1002");
 
-                // If we don't want to retry, throw the original error
-                if (!retry) throw ex;
-
-                Server().log("Message send error. Trying to re-send message...");
-
-                // If it's a restartable-error, restart iMessage and retry
-                await FileSystem.executeAppleScript(restartMessages());
-                await FileSystem.executeAppleScript(
-                    sendMessage(
-                        chatGuid,
-                        message ?? "",
-                        attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
-                    )
-                );
+                if (retry) {
+                    // If it's a plain ole retry case, retry after restarting Messages
+                    Server().log("Message send error. Trying to re-send message...");
+                    await FileSystem.executeAppleScript(restartMessages());
+                    await FileSystem.executeAppleScript(
+                        sendMessage(
+                            chatGuid,
+                            message ?? "",
+                            attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
+                        )
+                    );
+                } else if (errMsg.includes("-1728") && chatGuid.includes(";-;")) {
+                    // If our error has to do with not getting the chat ID, run the fallback script
+                    Server().log("Message send error (can't get chat id). Running fallback send script...");
+                    await FileSystem.executeAppleScript(
+                        sendMessageFallback(
+                            chatGuid,
+                            message ?? "",
+                            attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
+                        )
+                    );
+                }
             }
 
             // Add queued item
