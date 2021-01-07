@@ -49,6 +49,40 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
     end try`;
 };
 
+export const sendMessageFallback = (chatGuid: string, message: string, attachment: string) => {
+    if (!chatGuid || (!message && !attachment)) return null;
+
+    let attachmentScpt = "";
+    if (attachment && attachment.length > 0) {
+        attachmentScpt = `set theAttachment to "${escapeOsaExp(attachment)}" as POSIX file
+            send theAttachment to targetBuddy
+            delay 0.5`;
+    }
+
+    let messageScpt = "";
+    if (message && message.length > 0) {
+        messageScpt = `send "${escapeOsaExp(message)}" to targetBuddy`;
+    }
+
+    // Extract the address from the phone number
+    let address = chatGuid;
+    let service = "iMessage";
+    if (!address.includes(";-;")) throw new Error("Cannot send message via fallback script");
+    [service, address] = address.split(";-;");
+
+    return `tell application "Messages"
+        set targetService to 1st service whose service type = ${service}
+        set targetBuddy to buddy "${address}" of targetService
+        
+        ${attachmentScpt}
+        ${messageScpt}
+    end tell
+
+    try
+        tell application "System Events" to tell process "Messages" to set visible to false
+    end try`;
+};
+
 /**
  * The AppleScript used to restart iMessage
  */
@@ -64,15 +98,16 @@ export const restartMessages = () => {
 /**
  * The AppleScript used to start a chat with some number of participants
  */
-export const startChat = (participants: string[], service: string) => {
+export const startChat = (participants: string[], service: string, useTextChat: boolean) => {
     const formatted = participants.map(buddy => `buddy "${buddy}" of targetService`);
     const buddies = formatted.join(", ");
 
+    const qualifier = useTextChat ? " text " : " ";
     return `tell application "Messages"
         set targetService to 1st service whose service type = ${service}
 
         (* Start the new chat with all the recipients *)
-        set thisChat to make new text chat with properties {participants: {${buddies}}}
+        set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}
         log thisChat
     end tell
 
