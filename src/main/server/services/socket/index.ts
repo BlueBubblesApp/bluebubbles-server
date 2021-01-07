@@ -533,14 +533,16 @@ export class SocketService {
                 // Make sure a chat GUID is provided
                 if (!chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
-                // Make sure the chat exists
-                const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
-                if (!chats || chats.length === 0)
-                    return response(
-                        cb,
-                        "error",
-                        createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
-                    );
+                // Make sure the chat exists (if group chat)
+                if (chatGuid.includes(";+;")) {
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
+                    if (!chats || chats.length === 0)
+                        return response(
+                            cb,
+                            "error",
+                            createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
+                        );
+                }
 
                 // Make sure we have a temp GUID, for matching
                 if ((tempGuid && (!message || message.length === 0)) || (!tempGuid && message))
@@ -607,13 +609,15 @@ export class SocketService {
                 // If there are no more chunks, compile, save, and send
                 if (!hasMore) {
                     // Make sure the chat exists before we send the response
-                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
-                    if (!chats || chats.length === 0)
-                        return response(
-                            cb,
-                            "error",
-                            createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
-                        );
+                    if (chatGuid.includes(";+;")) {
+                        const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
+                        if (!chats || chats.length === 0)
+                            return response(
+                                cb,
+                                "error",
+                                createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
+                            );
+                    }
 
                     Server().queue.add({
                         type: "send-attachment",
