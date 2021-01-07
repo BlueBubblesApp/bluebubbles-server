@@ -70,11 +70,12 @@ class PreDashboardView extends React.Component<unknown, State> {
                 this.setState({ redirect: "/dashboard" });
             }
 
-            this.setState({ enableNgrok: config.enable_ngrok });
+            this.setState({ enableNgrok: config?.enable_ngrok });
             const ngrokCheckbox: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
-            ngrokCheckbox.checked = config.enable_ngrok;
+            if (ngrokCheckbox) ngrokCheckbox.checked = config.enable_ngrok;
         } catch (ex) {
             console.log("Failed to load database config");
+            console.error(ex);
         }
 
         ipcRenderer.on("config-update", (event, arg) => {

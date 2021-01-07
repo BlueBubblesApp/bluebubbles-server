@@ -169,10 +169,10 @@ const createWindow = async () => {
     // Set the new window in the API
     api = Server(win);
 
-    // Start the update service
-    updateService = new UpdateService(win);
-
     Server().on("setup-complete", () => {
+        // Start the update service
+        if (!updateService) updateService = new UpdateService(win);
+
         const check = Server().repo.getConfig("check_for_updates") as boolean;
         if (check) {
             updateService.start();
