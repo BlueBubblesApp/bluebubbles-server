@@ -66,11 +66,12 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
 
     // Extract the address from the phone number
     let address = chatGuid;
+    let service = "iMessage";
     if (!address.includes(";-;")) throw new Error("Cannot send message via fallback script");
-    [, address] = address.split(";-;");
+    [service, address] = address.split(";-;");
 
     return `tell application "Messages"
-        set targetService to 1st service whose service type = iMessage
+        set targetService to 1st service whose service type = ${service}
         set targetBuddy to buddy "${address}" of targetService
         
         ${attachmentScpt}
@@ -97,15 +98,16 @@ export const restartMessages = () => {
 /**
  * The AppleScript used to start a chat with some number of participants
  */
-export const startChat = (participants: string[], service: string) => {
+export const startChat = (participants: string[], service: string, useTextChat: boolean) => {
     const formatted = participants.map(buddy => `buddy "${buddy}" of targetService`);
     const buddies = formatted.join(", ");
 
+    const qualifier = useTextChat ? " text " : " ";
     return `tell application "Messages"
         set targetService to 1st service whose service type = ${service}
 
         (* Start the new chat with all the recipients *)
-        set thisChat to make new text chat with properties {participants: {${buddies}}}
+        set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}
         log thisChat
     end tell
 

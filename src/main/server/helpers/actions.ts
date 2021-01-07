@@ -416,7 +416,14 @@ export class ActionHandler {
         await FileSystem.startMessages();
 
         // Execute the command
-        let ret = (await FileSystem.executeAppleScript(startChat(buddies, service))) as string;
+        let ret = "";
+        try {
+            // First try to send via the AppleScript using the `text chat` qualifier
+            ret = (await FileSystem.executeAppleScript(startChat(buddies, service, true))) as string;
+        } catch (ex) {
+            // If the above command fails, try with just the `chat` qualifier
+            ret = (await FileSystem.executeAppleScript(startChat(buddies, service, false))) as string;
+        }
 
         try {
             // Get the chat GUID that was created
