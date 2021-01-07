@@ -138,7 +138,7 @@ class TopNav extends React.Component<Props, State> {
 
                     {this.props.newUpdate ? (
                         <div style={{ marginRight: "10px", color: "red" }}>
-                            <button id="clearLogsButton" onClick={this.downloadUpdate}>
+                            <button id="clearLogsButton" onClick={() => this.downloadUpdate()}>
                                 {this.state.isDownloading
                                     ? `Downloading...`
                                     : `New version available! Click here to install v${this.props.newUpdate}!`}
