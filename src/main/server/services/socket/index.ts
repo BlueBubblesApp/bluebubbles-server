@@ -33,6 +33,7 @@ import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
 
 const osVersion = macosVersion();
+const unknownError = "Unknown Error. Check server logs!";
 
 /**
  * This service class handles all routing for incoming socket
@@ -653,15 +654,50 @@ export class SocketService {
                     return response(cb, "error", createBadRequestResponse("Participant list must be an array"));
                 }
 
-                const chatGuid = await ActionHandler.createChat(participants, params?.service || "iMessage");
+                let chatGuid;
+
+                try {
+                    // First, try to create the chat using our "normal" method
+                    chatGuid = await ActionHandler.createUniversalChat(
+                        participants,
+                        params?.service ?? "iMessage",
+                        params?.message,
+                        params?.tempGuid
+                    );
+                } catch (ex) {
+                    // If there was a failure, and there is only 1 participant, and we have a message, try to fallback
+                    if (participants.length === 1 && (params?.message ?? "").length > 0 && params?.tempGuid) {
+                        Server().log("Universal create chat failed. Attempting single chat creation.", "debug");
+
+                        try {
+                            chatGuid = await ActionHandler.createSingleChat(
+                                participants[0],
+                                params?.service ?? "iMessage",
+                                params?.message,
+                                params?.tempGuid
+                            );
+                        } catch (ex2) {
+                            // If the fallback fails, return that error
+                            return response(cb, "error", createBadRequestResponse(ex2?.message ?? ex2 ?? unknownError));
+                        }
+                    } else {
+                        // If it failed and didn't meet our fallback criteria, return the error as-is
+                        return response(cb, "error", createBadRequestResponse(ex?.message ?? ex ?? unknownError));
+                    }
+                }
+
+                // Make sure we have a chat GUID
+                if (!chatGuid || chatGuid.length === 0) {
+                    return response(cb, "error", createBadRequestResponse("Failed to create chat! Check server logs!"));
+                }
 
                 try {
                     const newChat = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
                     return response(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
                 } catch (ex) {
-                    let err = ex?.message ?? ex ?? "";
+                    let err = ex?.message ?? ex ?? unknownError;
 
-                    // Handle specific error cases
+                    // If it's a ROWID error, we want to handle it specifically
                     if (err.toLowerCase().includes("rowid")) {
                         err =
                             `iMessage/iCloud is not configured on your macOS device! ` +
