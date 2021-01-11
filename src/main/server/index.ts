@@ -112,6 +112,8 @@ class BlueBubblesServer extends EventEmitter {
 
     isRestarting: boolean;
 
+    isStopping: boolean;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -145,6 +147,7 @@ class BlueBubblesServer extends EventEmitter {
         this.hasStarted = false;
         this.notificationCount = 0;
         this.isRestarting = false;
+        this.isStopping = false;
     }
 
     emitToUI(event: string, data: any) {
@@ -720,13 +723,19 @@ class BlueBubblesServer extends EventEmitter {
         await this.start();
     }
 
-    relaunch() {
+    async relaunch() {
         this.isRestarting = true;
+
+        // Close everything gracefully
+        await this.stopServices();
+
+        // Relaunch the process
         app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
         app.exit(0);
     }
 
     async stopServices() {
+        this.isStopping = true;
         Server().log("Stopping all services...");
 
         try {
@@ -781,6 +790,8 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async restartViaTerminal() {
+        this.isRestarting = true;
+
         // Close everything gracefully
         await this.stopServices();
 

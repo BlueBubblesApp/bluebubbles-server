@@ -58,7 +58,7 @@ export class ContactRepository {
 
         this.db = await createConnection({
             name: "Contacts",
-            type: "sqlite",
+            type: "better-sqlite3",
             database: cloudDb ? cloudDb.path : defaultDb,
             entities: [PhoneNumber, Record, Email]
         });
