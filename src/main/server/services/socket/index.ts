@@ -34,6 +34,7 @@ import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
 
 const osVersion = macosVersion();
+const unknownError = "Unknown Error. Check server logs!";
 
 /**
  * This service class handles all routing for incoming socket
@@ -68,14 +69,19 @@ export class SocketService {
         setInterval(async () => {
             const port = Server().repo.getConfig("socket_port");
 
-            // Check if there are any listening services
-            let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
-            res = (res ?? "").trim();
+            try {
+                // Check if there are any listening services
+                let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
+                res = (res ?? "").trim();
 
-            // If the result doesn't show anything listening,
-            if (!res.includes(port.toString())) {
-                Server().log("Socket not listening! Restarting...", "error");
-                this.restart();
+                // If the result doesn't show anything listening,
+                if (!res.includes(port.toString())) {
+                    Server().log("Socket not listening! Restarting...", "error");
+                    this.restart();
+                }
+            } catch (ex) {
+                Server().log("Unable to start socket status listener!", "error");
+                Server().log(ex, "debug");
             }
         }, 1000 * 60); // Check every minute
     }
@@ -92,13 +98,13 @@ export class SocketService {
          */
         this.server.on("connection", async socket => {
             let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
-            const cfgPass = (await Server().repo.getConfig("password")) as string;
+            const cfgPass = String((await Server().repo.getConfig("password")) as string);
 
             // Decode the param incase it contains URL encoded characters
             pass = decodeURI(pass);
 
             // Basic authentication
-            if (pass === cfgPass) {
+            if (pass?.trim() === cfgPass?.trim()) {
                 Server().log(`Client Authenticated Successfully`);
             } else {
                 socket.disconnect();
@@ -525,15 +531,30 @@ export class SocketService {
                 const chatGuid = params?.guid;
                 const message = params?.message;
 
+                // Make sure a chat GUID is provided
                 if (!chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
+                // Make sure the chat exists (if group chat)
+                if (chatGuid.includes(";+;")) {
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
+                    if (!chats || chats.length === 0)
+                        return response(
+                            cb,
+                            "error",
+                            createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
+                        );
+                }
+
+                // Make sure we have a temp GUID, for matching
                 if ((tempGuid && (!message || message.length === 0)) || (!tempGuid && message))
                     return response(cb, "error", createBadRequestResponse("No temporary GUID provided with message"));
 
+                // Make sure that if we have an attachment, there is also a guid and name
                 if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
                 try {
+                    // Send the message
                     await ActionHandler.sendMessage(
                         tempGuid,
                         chatGuid,
@@ -588,6 +609,17 @@ export class SocketService {
 
                 // If there are no more chunks, compile, save, and send
                 if (!hasMore) {
+                    // Make sure the chat exists before we send the response
+                    if (chatGuid.includes(";+;")) {
+                        const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
+                        if (!chats || chats.length === 0)
+                            return response(
+                                cb,
+                                "error",
+                                createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
+                            );
+                    }
+
                     Server().queue.add({
                         type: "send-attachment",
                         data: {
@@ -615,23 +647,69 @@ export class SocketService {
             async (params, cb): Promise<void> => {
                 let participants = params?.participants;
 
-                if (!participants || participants.length === 0)
+                if (!participants || participants.length === 0) {
                     return response(cb, "error", createBadRequestResponse("No participants specified"));
+                }
 
                 if (typeof participants === "string") {
                     participants = [participants];
                 }
 
-                if (!Array.isArray(participants))
+                if (!Array.isArray(participants)) {
                     return response(cb, "error", createBadRequestResponse("Participant list must be an array"));
+                }
 
-                const chatGuid = await ActionHandler.createChat(participants, params?.service || "iMessage");
+                let chatGuid;
+
+                try {
+                    // First, try to create the chat using our "normal" method
+                    chatGuid = await ActionHandler.createUniversalChat(
+                        participants,
+                        params?.service ?? "iMessage",
+                        params?.message,
+                        params?.tempGuid
+                    );
+                } catch (ex) {
+                    // If there was a failure, and there is only 1 participant, and we have a message, try to fallback
+                    if (participants.length === 1 && (params?.message ?? "").length > 0 && params?.tempGuid) {
+                        Server().log("Universal create chat failed. Attempting single chat creation.", "debug");
+
+                        try {
+                            chatGuid = await ActionHandler.createSingleChat(
+                                participants[0],
+                                params?.service ?? "iMessage",
+                                params?.message,
+                                params?.tempGuid
+                            );
+                        } catch (ex2) {
+                            // If the fallback fails, return that error
+                            return response(cb, "error", createBadRequestResponse(ex2?.message ?? ex2 ?? unknownError));
+                        }
+                    } else {
+                        // If it failed and didn't meet our fallback criteria, return the error as-is
+                        return response(cb, "error", createBadRequestResponse(ex?.message ?? ex ?? unknownError));
+                    }
+                }
+
+                // Make sure we have a chat GUID
+                if (!chatGuid || chatGuid.length === 0) {
+                    return response(cb, "error", createBadRequestResponse("Failed to create chat! Check server logs!"));
+                }
 
                 try {
                     const newChat = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
                     return response(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
                 } catch (ex) {
-                    return response(cb, "start-chat-failed", createServerErrorResponse(ex?.message ?? ex));
+                    let err = ex?.message ?? ex ?? unknownError;
+
+                    // If it's a ROWID error, we want to handle it specifically
+                    if (err.toLowerCase().includes("rowid")) {
+                        err =
+                            `iMessage/iCloud is not configured on your macOS device! ` +
+                            `Configure it, then rescan your QRCode`;
+                    }
+
+                    return response(cb, "start-chat-failed", createServerErrorResponse(err));
                 }
             }
         );

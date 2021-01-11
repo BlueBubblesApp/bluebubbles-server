@@ -36,6 +36,8 @@ interface State {
 class PreDashboardView extends React.Component<unknown, State> {
     backgroundPermissionsCheck: NodeJS.Timeout;
 
+    mounted = false;
+
     constructor(props: unknown) {
         super(props);
 
@@ -58,6 +60,7 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     async componentDidMount() {
+        this.mounted = true;
         this.checkPermissions();
         const currentTheme = await ipcRenderer.invoke("get-current-theme");
 
@@ -70,11 +73,12 @@ class PreDashboardView extends React.Component<unknown, State> {
                 this.setState({ redirect: "/dashboard" });
             }
 
-            this.setState({ enableNgrok: config.enable_ngrok });
+            this.setState({ enableNgrok: config?.enable_ngrok });
             const ngrokCheckbox: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
-            ngrokCheckbox.checked = config.enable_ngrok;
+            if (ngrokCheckbox) ngrokCheckbox.checked = config.enable_ngrok;
         } catch (ex) {
             console.log("Failed to load database config");
+            console.error(ex);
         }
 
         ipcRenderer.on("config-update", (event, arg) => {
@@ -87,8 +91,14 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     componentWillUnmount() {
+        this.mounted = false;
         ipcRenderer.removeAllListeners("config-update");
         clearInterval(this.backgroundPermissionsCheck);
+    }
+
+    setState(params: any) {
+        if (!this.mounted) return;
+        super.setState(params);
     }
 
     saveCustomServerUrl = (save: boolean) => {
@@ -275,7 +285,9 @@ class PreDashboardView extends React.Component<unknown, State> {
             return <button onClick={() => this.completeTutorial()}>{str}</button>;
         };
 
-        if (!this.state.inputPassword) return null;
+        const password = this.state.inputPassword;
+
+        if (!password || password?.trim().length === 0) return null;
         if (this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer)) return output("Skip FCM Setup");
         if (!this.state.enableNgrok && this.state.fcmClient && this.state.fcmServer) return output("Skip Ngrok Setup");
         if (!this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer))

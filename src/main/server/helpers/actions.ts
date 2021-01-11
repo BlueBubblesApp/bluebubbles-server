@@ -13,7 +13,8 @@ import {
     checkTypingIndicator,
     exportContacts,
     restartMessages,
-    openChat
+    openChat,
+    sendMessageFallback
 } from "@server/fileSystem/scripts";
 import { ValidRemoveTapback } from "../types";
 
@@ -78,22 +79,30 @@ export class ActionHandler {
                 Server().log(ex);
 
                 const errMsg = (ex?.message ?? "") as string;
-                const retry = errMsg.includes("AppleEvent timed out") || errMsg.includes("1002");
+                const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
 
-                // If we don't want to retry, throw the original error
-                if (!retry) throw ex;
-
-                Server().log("Message send error. Trying to re-send message...");
-
-                // If it's a restartable-error, restart iMessage and retry
-                await FileSystem.executeAppleScript(restartMessages());
-                await FileSystem.executeAppleScript(
-                    sendMessage(
-                        chatGuid,
-                        message ?? "",
-                        attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
-                    )
-                );
+                if (retry) {
+                    // If it's a plain ole retry case, retry after restarting Messages
+                    Server().log("Message send error. Trying to re-send message...");
+                    await FileSystem.executeAppleScript(restartMessages());
+                    await FileSystem.executeAppleScript(
+                        sendMessage(
+                            chatGuid,
+                            message ?? "",
+                            attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
+                        )
+                    );
+                } else if (errMsg.includes("-1728") && chatGuid.includes(";-;")) {
+                    // If our error has to do with not getting the chat ID, run the fallback script
+                    Server().log("Message send error (can't get chat id). Running fallback send script...");
+                    await FileSystem.executeAppleScript(
+                        sendMessageFallback(
+                            chatGuid,
+                            message ?? "",
+                            attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
+                        )
+                    );
+                }
             }
 
             // Add queued item
@@ -432,8 +441,13 @@ export class ActionHandler {
      *
      * @returns The GUID of the new chat
      */
-    static createChat = async (participants: string[], service: string): Promise<string> => {
-        Server().log(`Executing Action: Create Chat (Participants: ${participants.join(", ")}`, "debug");
+    static createUniversalChat = async (
+        participants: string[],
+        service: string,
+        message?: string,
+        tempGuid?: string
+    ): Promise<string> => {
+        Server().log(`Executing Action: Create Chat Universal (Participants: ${participants.join(", ")})`, "debug");
 
         if (participants.length === 0) throw new Error("No participants specified!");
 
@@ -444,16 +458,75 @@ export class ActionHandler {
         await FileSystem.startMessages();
 
         // Execute the command
-        let ret = (await FileSystem.executeAppleScript(startChat(buddies, service))) as string;
+        let ret = "";
 
         try {
-            // Get the chat GUID that was created
-            ret = ret.split("text chat id")[1].trim();
+            try {
+                // First try to send via the AppleScript using the `text chat` qualifier
+                ret = (await FileSystem.executeAppleScript(startChat(buddies, service, true))) as string;
+            } catch (ex) {
+                // If the above command fails, try with just the `chat` qualifier
+                ret = (await FileSystem.executeAppleScript(startChat(buddies, service, false))) as string;
+            }
         } catch (ex) {
-            throw new Error("Failed to get chat GUID from new chat!");
+            // If we failed to create the chat, we can try to "guess" the
+            // This catch catches the 2nd attempt to start a chat
+            throw new Error(`AppleScript error: ${ex}`);
+        }
+
+        // Get the chat GUID that was created
+        if (ret.includes("text chat id")) {
+            ret = ret.split("text chat id")[1].trim();
+        } else if (ret.includes("chat id")) {
+            ret = ret.split("chat id")[1].trim();
+        }
+
+        // If no chat ID found, throw an error
+        if (!ret || ret.length === 0) {
+            throw new Error("Failed to get Chat GUID from AppleScript response!");
+        }
+
+        // If there is a message attached, try to send it
+        try {
+            if (message && message.length > 0 && tempGuid && tempGuid.length > 0 && ret.startsWith(service)) {
+                await ActionHandler.sendMessage(tempGuid, ret, message);
+            }
+        } catch (ex) {
+            throw new Error(`Failed to send message to chat, ${ret}!`);
         }
 
         return ret;
+    };
+
+    /**
+     * Creates a new chat using a participant
+     *
+     * @param participant: The participant to include in the chat
+     *
+     * @returns The GUID of the new chat
+     */
+    static createSingleChat = async (
+        participant: string,
+        service: string,
+        message: string,
+        tempGuid: string
+    ): Promise<string> => {
+        Server().log(`Executing Action: Create Single Chat (Participant: ${participant})`, "debug");
+
+        // Slugify the address
+        const buddy = slugifyAddress(participant);
+
+        // Make sure messages is open
+        await FileSystem.startMessages();
+
+        // Assume the chat GUID
+        const chatGuid = `${service};-;${buddy}`;
+
+        // Send the message to the chat
+        await ActionHandler.sendMessage(tempGuid, chatGuid, message);
+
+        // Return the chat GUID
+        return chatGuid;
     };
 
     /**

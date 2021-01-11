@@ -4,6 +4,7 @@ import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "elec
 import ServerLog from "electron-log";
 import * as process from "process";
 import { EventEmitter } from "events";
+import * as macosVersion from "macos-version";
 
 // Configuration/Filesytem Imports
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -42,6 +43,8 @@ import { ResponseData } from "./types";
 import { BlueBubblesHelperService } from "./services/helperProcess";
 
 const findProcess = require("find-process");
+
+const osVersion = macosVersion();
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -113,6 +116,8 @@ class BlueBubblesServer extends EventEmitter {
 
     isRestarting: boolean;
 
+    isStopping: boolean;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -147,6 +152,7 @@ class BlueBubblesServer extends EventEmitter {
         this.hasStarted = false;
         this.notificationCount = 0;
         this.isRestarting = false;
+        this.isStopping = false;
     }
 
     emitToUI(event: string, data: any) {
@@ -237,6 +243,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Load notification count
         try {
+            this.log("Initializing alert service...");
             const alerts = (await AlertService.find()).filter(item => !item.isRead);
             this.notificationCount = alerts.length;
         } catch (ex) {
@@ -244,6 +251,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Setup lightweight message cache
+        this.log("Initializing event cache...");
         this.eventCache = new EventCache();
 
         try {
@@ -253,6 +261,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
         }
 
+        this.log("Initializing caffeinate service...");
         await this.setupCaffeinate();
 
         try {
@@ -290,9 +299,11 @@ class BlueBubblesServer extends EventEmitter {
     private async preChecks(): Promise<void> {
         this.log("Running pre-start checks...");
 
+        // Set the dock icon according to the config
         this.setDockIcon();
 
         try {
+            // Restart via terminal if configured
             const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
             const parentProc = await findProcess("pid", process.ppid);
             const parentName = parentProc && parentProc.length > 0 ? parentProc[0].name : null;
@@ -305,6 +316,16 @@ class BlueBubblesServer extends EventEmitter {
             }
         } catch (ex) {
             Server().log(`Failed to restart via terminal!\n${ex}`);
+        }
+
+        // Log some server metadata
+        this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
+        this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
+
+        // Check if on Big Sur. If we are, then create a log/alert saying that
+        const isBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
+        if (isBigSur) {
+            this.log("Warning: macOS Big Sur does NOT support creating chats due to API limitations!", "warn");
         }
 
         this.log("Finished pre-start checks...");
@@ -717,13 +738,19 @@ class BlueBubblesServer extends EventEmitter {
         await this.start();
     }
 
-    relaunch() {
+    async relaunch() {
         this.isRestarting = true;
+
+        // Close everything gracefully
+        await this.stopServices();
+
+        // Relaunch the process
         app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
         app.exit(0);
     }
 
     async stopServices() {
+        this.isStopping = true;
         Server().log("Stopping all services...");
 
         try {
@@ -778,6 +805,8 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async restartViaTerminal() {
+        this.isRestarting = true;
+
         // Close everything gracefully
         await this.stopServices();
 

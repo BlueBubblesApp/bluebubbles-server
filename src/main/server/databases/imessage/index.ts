@@ -24,7 +24,7 @@ export class MessageRepository {
     async initialize() {
         this.db = await createConnection({
             name: "iMessage",
-            type: "sqlite",
+            type: "better-sqlite3",
             database: `${process.env.HOME}/Library/Messages/chat.db`,
             entities: [Chat, Handle, Message, Attachment]
         });
@@ -93,7 +93,28 @@ export class MessageRepository {
 
         if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
 
-        query.andWhere("attachment.guid == :guid", { guid: attachmentGuid });
+        // Format the attachment GUID if it has weird additional characters
+        let actualGuid = attachmentGuid;
+
+        // If the attachment GUID starts with "at_", strip it out basically
+        // It can be `at_0`, at_1`, etc. So we need to get the 3rd index, `at_0_GUID`
+        if (actualGuid.includes("at_")) {
+            // eslint-disable-next-line prefer-destructuring
+            actualGuid = actualGuid.split("_")[2];
+        }
+
+        // Sometimes attachments have a `/` or `:` in it. If so, we want to get the actual GUID from it
+        // `i.e. p:/GUID`
+        if (actualGuid.includes("/")) {
+            // eslint-disable-next-line prefer-destructuring
+            actualGuid = actualGuid.split("/")[1];
+        }
+        if (actualGuid.includes(":")) {
+            // eslint-disable-next-line prefer-destructuring
+            actualGuid = actualGuid.split(":")[1];
+        }
+
+        query.andWhere("attachment.guid LIKE :guid", { guid: `%${actualGuid}` });
 
         const attachment = await query.getOne();
         return attachment;

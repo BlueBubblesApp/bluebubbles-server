@@ -1,6 +1,6 @@
 {
-    "type": "sqlite",
-    "database": "~/Library/Application Support/BlueBubbles/config.sqlite",
+    "type": "better-sqlite3",
+    "database": "~/Library/Application Support/bluebubbles-server/config.sqlite",
     "synchronize": true,
     "logging": false,
     "entities": ["src/main/server/entity/**/*.ts"],

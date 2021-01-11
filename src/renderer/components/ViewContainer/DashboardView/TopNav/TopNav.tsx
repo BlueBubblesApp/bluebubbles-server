@@ -16,9 +16,14 @@ import {
 import "./TopNav.css";
 import { invokeMain } from "@renderer/helpers/utils";
 
+interface Props {
+    newUpdate: string;
+}
+
 interface State {
     alertsOpen: boolean;
     alerts: any[];
+    isDownloading: boolean;
 }
 
 const alertIconMap: { [key: string]: JSX.Element } = {
@@ -28,13 +33,14 @@ const alertIconMap: { [key: string]: JSX.Element } = {
     success: <SuccessIcon />
 };
 
-class TopNav extends React.Component<unknown, State> {
-    constructor(props: Readonly<{}>) {
+class TopNav extends React.Component<Props, State> {
+    constructor(props: Props) {
         super(props);
 
         this.state = {
             alertsOpen: false,
-            alerts: []
+            alerts: [],
+            isDownloading: false
         };
     }
 
@@ -80,6 +86,12 @@ class TopNav extends React.Component<unknown, State> {
         });
     }
 
+    downloadUpdate() {
+        if (this.state.isDownloading) return;
+        this.setState({ isDownloading: true });
+        invokeMain("install-update", null);
+    }
+
     render() {
         return (
             <div id="dashboardTopNav">
@@ -121,6 +133,16 @@ class TopNav extends React.Component<unknown, State> {
                                     </div>
                                 );
                             })}
+                        </div>
+                    ) : null}
+
+                    {this.props.newUpdate ? (
+                        <div style={{ marginRight: "10px", color: "red" }}>
+                            <button id="clearLogsButton" onClick={() => this.downloadUpdate()}>
+                                {this.state.isDownloading
+                                    ? `Downloading...`
+                                    : `New version available! Click here to install v${this.props.newUpdate}!`}
+                            </button>
                         </div>
                     ) : null}
                     <svg onClick={() => this.toggleOpenAlerts()} id="bellIcon" viewBox="0 0 512 512">

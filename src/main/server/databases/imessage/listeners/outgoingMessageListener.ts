@@ -289,7 +289,7 @@ export class OutgoingMessageListener extends ChangeListener {
             super.emit("updated-entry", entry);
 
             // Add artificial delay so we don't overwhelm any listeners
-            await new Promise((resolve, _) => setTimeout(() => resolve(), 200));
+            await new Promise<void>((resolve, _) => setTimeout(() => resolve(), 200));
         }
     }
 }
