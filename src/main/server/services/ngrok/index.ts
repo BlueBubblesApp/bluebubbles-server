@@ -2,7 +2,8 @@ import { app } from "electron";
 import { Server } from "@server/index";
 import { connect, disconnect, kill, authtoken } from "ngrok";
 
-const sevenHours = 1000 * 60 * 60 * 7;
+// const sevenHours = 1000 * 60 * 60 * 7;  // This is the old ngrok timeout
+const oneHour45 = 1000 * 60 * (60 + 45); // This is the new ngrok timeout
 
 export class NgrokService {
     url: string;
@@ -78,11 +79,11 @@ export class NgrokService {
         if (!ngrokKey) {
             if (this.refreshTimer) clearTimeout(this.refreshTimer);
 
-            Server().log("Starting Ngrok refresh timer. Waiting 7 hours...", "debug");
+            Server().log("Starting Ngrok refresh timer. Waiting 1 hour and 45 minutes", "debug");
             this.refreshTimer = setTimeout(async () => {
                 Server().log("Restarting Ngrok process due to session timeout...", "debug");
                 await this.restart();
-            }, sevenHours);
+            }, oneHour45);
         }
 
         // Set the server address. This will emit to all listeners.
