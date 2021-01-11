@@ -197,6 +197,12 @@ app.on("activate", () => {
     if (win === null) createWindow();
 });
 
+app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+        handleExit();
+    }
+});
+
 /**
  * I'm not totally sure this will work because of the way electron is... but, I'm going to try.
  * Basically, we want to gracefully exist whenever there is a Ctrl + C or other exit command
