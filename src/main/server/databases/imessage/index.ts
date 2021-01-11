@@ -24,7 +24,7 @@ export class MessageRepository {
     async initialize() {
         this.db = await createConnection({
             name: "iMessage",
-            type: "sqlite",
+            type: "better-sqlite3",
             database: `${process.env.HOME}/Library/Messages/chat.db`,
             entities: [Chat, Handle, Message, Attachment]
         });

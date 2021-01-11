@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import { autoUpdater } from "electron-updater";
+import * as semver from "semver";
 import { Server } from "@server/index";
 
 export class UpdateService {
@@ -18,6 +19,11 @@ export class UpdateService {
         this.currentVersion = app.getVersion();
         this.isOpen = false;
         this.window = window;
+
+        // Correct current version if needed
+        if (this.currentVersion.split(".").length > 3) {
+            this.currentVersion = semver.coerce(this.currentVersion).format();
+        }
 
         const autoUpdate = Server().repo.getConfig("auto_install_updates") as boolean;
         if (autoUpdate) {
@@ -63,8 +69,8 @@ export class UpdateService {
     }
 
     async checkForUpdate(showDialogForNoUpdate: boolean): Promise<void> {
-        const res = await autoUpdater.checkForUpdatesAndNotify();
-        this.hasUpdate = !!res?.updateInfo;
+        const res = await autoUpdater.checkForUpdates();
+        this.hasUpdate = !!res?.updateInfo && semver.lt(this.currentVersion, res.updateInfo.version);
 
         if (this.hasUpdate) {
             Server().emitMessage("server-update", res.updateInfo.version);

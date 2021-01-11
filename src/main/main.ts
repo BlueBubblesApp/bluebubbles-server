@@ -10,8 +10,12 @@ import { UpdateService } from "@server/services";
 
 let win: BrowserWindow;
 let tray: Tray;
-let api = Server(win);
 let updateService: UpdateService;
+
+app.allowRendererProcessReuse = false;
+
+// Instantiate the server
+Server(win);
 
 // Only 1 instance is allowed
 const gotTheLock = app.requestSingleInstanceLock();
@@ -26,14 +30,14 @@ if (!gotTheLock) {
         }
     });
 
-    // Start the API when the app is ready
+    // Start the Server() when the app is ready
     app.whenReady().then(() => {
-        api.start();
+        Server().start();
     });
 }
 
 const handleExit = async () => {
-    if (!api) return;
+    if (!Server() || Server().isStopping) return;
     await Server().stopServices();
     app.quit();
 };
@@ -75,15 +79,15 @@ const buildTray = () => {
             type: "separator"
         },
         {
-            label: `Server Address: ${api.repo?.getConfig("server_address")}`,
+            label: `Server Address: ${Server().repo?.getConfig("server_address")}`,
             enabled: false
         },
         {
-            label: `Socket Connections: ${api.socket?.server.sockets.sockets.length ?? 0}`,
+            label: `Socket Connections: ${Server().socket?.server.sockets.sockets.length ?? 0}`,
             enabled: false
         },
         {
-            label: `Caffeinated: ${api.caffeinate?.isCaffeinated}`,
+            label: `Caffeinated: ${Server().caffeinate?.isCaffeinated}`,
             enabled: false
         },
         {
@@ -163,12 +167,11 @@ const createWindow = async () => {
 
     // Hook onto when we load the UI
     win.webContents.on("dom-ready", async () => {
-        win.webContents.send("config-update", api.repo.config);
+        win.webContents.send("config-update", Server().repo.config);
     });
 
-    // Set the new window in the API
-    api = Server(win);
-
+    // Set the new window in the Server()
+    Server(win);
     Server().on("setup-complete", () => {
         // Start the update service
         if (!updateService) updateService = new UpdateService(win);
@@ -190,23 +193,29 @@ app.on("ready", () => {
     });
 });
 
-app.on("window-all-closed", async () => {
-    if (process.platform !== "darwin") {
-        await handleExit();
-    }
-});
-
 app.on("activate", () => {
     if (win === null) createWindow();
 });
 
-/**
- * I'm not totally sure this will work because of the way electron is...
- * But, I'm going to try.
- */
-app.on("before-quit", async _ => {
-    await handleExit();
+app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+        handleExit();
+    }
 });
+
+/**
+ * I'm not totally sure this will work because of the way electron is... but, I'm going to try.
+ * Basically, we want to gracefully exist whenever there is a Ctrl + C or other exit command
+ */
+app.on("before-quit", () => handleExit());
+app.on("will-quit", () => handleExit());
+process.on("SIGINT", () => handleExit());
+
+/**
+ * All code below this point has to do with the command-line functionality.
+ * This is when you run the app via terminal, we want to give users the ability
+ * to still be able to interact with the app.
+ */
 
 const quickStrConvert = (val: string): string | number | boolean => {
     if (val.toLowerCase() === "true") return true;
@@ -235,6 +244,26 @@ const handleSet = async (parts: string[]): Promise<void> => {
     }
 };
 
+const handleShow = async (parts: string[]): Promise<void> => {
+    const configKey = parts.length > 1 ? parts[1] : null;
+    if (!configKey) {
+        Server().log("Empty config key. Ignoring...");
+        return;
+    }
+
+    if (!Server().repo.hasConfig(configKey)) {
+        Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
+        return;
+    }
+
+    try {
+        const value = await Server().repo.getConfig(configKey);
+        Server().log(`${configKey} -> ${value}`);
+    } catch (ex) {
+        Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
+    }
+};
+
 const showHelp = () => {
     const help = `[================================== Help Menu ==================================]\n
 Available Commands:
@@ -254,6 +283,7 @@ Available Commands:
                             -> hide_dock_icon: boolean
                             -> last_fcm_restart: number
                             -> start_via_terminal: boolean
+    - show:             Show the current configuration for an item -> \`show <config item>\`
 \n[===============================================================================]`;
 
     console.log(help);
@@ -261,7 +291,7 @@ Available Commands:
 
 process.stdin.on("data", chunk => {
     const line = chunk.toString().trim();
-    if (!api || !line || line.length === 0) return;
+    if (!Server() || !line || line.length === 0) return;
     Server().log(`Handling STDIN: ${line}`, "debug");
 
     // Handle the standard input
@@ -277,6 +307,9 @@ process.stdin.on("data", chunk => {
             break;
         case "set":
             handleSet(parts);
+            break;
+        case "show":
+            handleShow(parts);
             break;
         case "restart":
         case "relaunch":

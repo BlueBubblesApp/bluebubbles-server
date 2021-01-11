@@ -36,7 +36,7 @@ export class ServerRepository extends EventEmitter {
 
         this.db = await createConnection({
             name: "config",
-            type: "sqlite",
+            type: "better-sqlite3",
             database: dbPath,
             entities: [Config, Alert, Device, Queue],
             // We should really use migrations for this.
