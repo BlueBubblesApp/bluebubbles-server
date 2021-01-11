@@ -36,6 +36,8 @@ interface State {
 class PreDashboardView extends React.Component<unknown, State> {
     backgroundPermissionsCheck: NodeJS.Timeout;
 
+    mounted = false;
+
     constructor(props: unknown) {
         super(props);
 
@@ -58,6 +60,7 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     async componentDidMount() {
+        this.mounted = true;
         this.checkPermissions();
         const currentTheme = await ipcRenderer.invoke("get-current-theme");
 
@@ -88,8 +91,14 @@ class PreDashboardView extends React.Component<unknown, State> {
     }
 
     componentWillUnmount() {
+        this.mounted = false;
         ipcRenderer.removeAllListeners("config-update");
         clearInterval(this.backgroundPermissionsCheck);
+    }
+
+    setState(params: any) {
+        if (!this.mounted) return;
+        super.setState(params);
     }
 
     saveCustomServerUrl = (save: boolean) => {
