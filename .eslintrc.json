@@ -38,10 +38,12 @@
     },
     "plugins": ["react", "prettier", "@typescript-eslint"],
     "rules": {
+        "guard-for-in": "off",
         "no-restricted-syntax": "off",
         "no-await-in-loop": "off",
         "no-console": 0,
         "no-continue": "off",
+        "no-underscore-dangle": "off",
         "global-require": 0,
         "max-len": ["error", { "code": 120 }],
         "import/prefer-default-export": 0,

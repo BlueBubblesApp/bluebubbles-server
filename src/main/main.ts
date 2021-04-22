@@ -42,166 +42,166 @@ const handleExit = async () => {
     app.quit();
 };
 
-const buildTray = () => {
-    return Menu.buildFromTemplate([
-        {
-            label: `BlueBubbles Server v${app.getVersion()}`,
-            enabled: false
-        },
-        {
-            label: "Open",
-            type: "normal",
-            click: () => {
-                if (win) {
-                    win.show();
-                } else {
-                    createWindow();
-                }
-            }
-        },
-        {
-            label: "Check for Updates",
-            type: "normal",
-            click: async () => {
-                if (updateService) {
-                    await updateService.checkForUpdate(true);
-                }
-            }
-        },
-        {
-            label: "Restart",
-            type: "normal",
-            click: () => {
-                Server().relaunch();
-            }
-        },
-        {
-            type: "separator"
-        },
-        {
-            label: `Server Address: ${Server().repo?.getConfig("server_address")}`,
-            enabled: false
-        },
-        {
-            label: `Socket Connections: ${Server().socket?.server.sockets.sockets.length ?? 0}`,
-            enabled: false
-        },
-        {
-            label: `Caffeinated: ${Server().caffeinate?.isCaffeinated}`,
-            enabled: false
-        },
-        {
-            type: "separator"
-        },
-        {
-            label: "Close",
-            type: "normal",
-            click: async () => {
-                await handleExit();
-            }
-        }
-    ]);
-};
+// const buildTray = () => {
+//     return Menu.buildFromTemplate([
+//         {
+//             label: `BlueBubbles Server v${app.getVersion()}`,
+//             enabled: false
+//         },
+//         {
+//             label: "Open",
+//             type: "normal",
+//             click: () => {
+//                 if (win) {
+//                     win.show();
+//                 } else {
+//                     createWindow();
+//                 }
+//             }
+//         },
+//         {
+//             label: "Check for Updates",
+//             type: "normal",
+//             click: async () => {
+//                 if (updateService) {
+//                     await updateService.checkForUpdate(true);
+//                 }
+//             }
+//         },
+//         {
+//             label: "Restart",
+//             type: "normal",
+//             click: () => {
+//                 Server().relaunch();
+//             }
+//         },
+//         {
+//             type: "separator"
+//         },
+//         {
+//             label: `Server Address: ${Server().db?.getConfig("server_address")}`,
+//             enabled: false
+//         },
+//         {
+//             label: `Socket Connections: ${Server().socket?.server.sockets.sockets.length ?? 0}`,
+//             enabled: false
+//         },
+//         {
+//             label: `Caffeinated: ${Server().caffeinate?.isCaffeinated}`,
+//             enabled: false
+//         },
+//         {
+//             type: "separator"
+//         },
+//         {
+//             label: "Close",
+//             type: "normal",
+//             click: async () => {
+//                 await handleExit();
+//             }
+//         }
+//     ]);
+// };
 
-const createTray = () => {
-    let iconPath = path.join(FileSystem.resources, "macos", "tray-icon-dark.png");
-    if (!nativeTheme.shouldUseDarkColors) iconPath = path.join(FileSystem.resources, "macos", "tray-icon-light.png");
+// const createTray = () => {
+//     let iconPath = path.join(FileSystem.resources, "macos", "tray-icon-dark.png");
+//     if (!nativeTheme.shouldUseDarkColors) iconPath = path.join(FileSystem.resources, "macos", "tray-icon-light.png");
 
-    // If the tray is already created, just change the icon color
-    if (tray) {
-        tray.setImage(iconPath);
-        return;
-    }
+//     // If the tray is already created, just change the icon color
+//     if (tray) {
+//         tray.setImage(iconPath);
+//         return;
+//     }
 
-    tray = new Tray(iconPath);
-    tray.setToolTip("BlueBubbles");
-    tray.setContextMenu(buildTray());
+//     tray = new Tray(iconPath);
+//     tray.setToolTip("BlueBubbles");
+//     tray.setContextMenu(buildTray());
 
-    // Rebuild the tray each time it's clicked
-    tray.on("click", () => {
-        tray.setContextMenu(buildTray());
-    });
-};
+//     // Rebuild the tray each time it's clicked
+//     tray.on("click", () => {
+//         tray.setContextMenu(buildTray());
+//     });
+// };
 
-const createWindow = async () => {
-    win = new BrowserWindow({
-        title: "BlueBubbles Server",
-        useContentSize: true,
-        width: 1080,
-        minWidth: 800,
-        height: 750,
-        minHeight: 600,
-        webPreferences: {
-            nodeIntegration: true // Required in new electron version
-        }
-    });
+// const createWindow = async () => {
+//     win = new BrowserWindow({
+//         title: "BlueBubbles Server",
+//         useContentSize: true,
+//         width: 1080,
+//         minWidth: 800,
+//         height: 750,
+//         minHeight: 600,
+//         webPreferences: {
+//             nodeIntegration: true // Required in new electron version
+//         }
+//     });
 
-    if (process.env.NODE_ENV === "development") {
-        process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "1"; // eslint-disable-line require-atomic-updates
-        win.loadURL(`http://localhost:2003`);
-    } else {
-        win.loadURL(
-            url.format({
-                pathname: path.join(__dirname, "index.html"),
-                protocol: "file:",
-                slashes: true
-            })
-        );
-    }
+//     if (process.env.NODE_ENV === "development") {
+//         process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "1"; // eslint-disable-line require-atomic-updates
+//         win.loadURL(`http://localhost:2003`);
+//     } else {
+//         win.loadURL(
+//             url.format({
+//                 pathname: path.join(__dirname, "index.html"),
+//                 protocol: "file:",
+//                 slashes: true
+//             })
+//         );
+//     }
 
-    if (process.env.NODE_ENV === "development") {
-        // Open DevTools, see https://github.com/electron/electron/issues/12438 for why we wait for dom-ready
-        win.webContents.once("dom-ready", () => {
-            win!.webContents.openDevTools();
-        });
-    }
+//     if (process.env.NODE_ENV === "development") {
+//         // Open DevTools, see https://github.com/electron/electron/issues/12438 for why we wait for dom-ready
+//         win.webContents.once("dom-ready", () => {
+//             win!.webContents.openDevTools();
+//         });
+//     }
 
-    win.on("closed", () => {
-        win = null;
-    });
+//     win.on("closed", () => {
+//         win = null;
+//     });
 
-    // Prevent the title from being changed from BlueBubbles
-    win.on("page-title-updated", evt => {
-        evt.preventDefault();
-    });
+//     // Prevent the title from being changed from BlueBubbles
+//     win.on("page-title-updated", evt => {
+//         evt.preventDefault();
+//     });
 
-    // Hook onto when we load the UI
-    win.webContents.on("dom-ready", async () => {
-        win.webContents.send("config-update", Server().repo.config);
-    });
+//     // Hook onto when we load the UI
+//     win.webContents.on("dom-ready", async () => {
+//         win.webContents.send("config-update", Server().db.config);
+//     });
 
-    // Set the new window in the Server()
-    Server(win);
-    Server().on("setup-complete", () => {
-        // Start the update service
-        if (!updateService) updateService = new UpdateService(win);
+//     // Set the new window in the Server()
+//     Server(win);
+//     Server().on("setup-complete", () => {
+//         // Start the update service
+//         if (!updateService) updateService = new UpdateService(win);
 
-        const check = Server().repo.getConfig("check_for_updates") as boolean;
-        if (check) {
-            updateService.start();
-            updateService.checkForUpdate(false);
-        }
-    });
-};
+//         const check = Server().db.getConfig("check_for_updates") as boolean;
+//         if (check) {
+//             updateService.start();
+//             updateService.checkForUpdate(false);
+//         }
+//     });
+// };
 
-app.on("ready", () => {
-    createTray();
-    createWindow();
+// app.on("ready", () => {
+//     createTray();
+//     createWindow();
 
-    nativeTheme.on("updated", () => {
-        createTray();
-    });
-});
+//     nativeTheme.on("updated", () => {
+//         createTray();
+//     });
+// });
 
-app.on("activate", () => {
-    if (win === null) createWindow();
-});
+// app.on("activate", () => {
+//     if (win === null) createWindow();
+// });
 
-app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-        handleExit();
-    }
-});
+// app.on("window-all-closed", () => {
+//     if (process.platform !== "darwin") {
+//         handleExit();
+//     }
+// });
 
 /**
  * I'm not totally sure this will work because of the way electron is... but, I'm going to try.
@@ -231,13 +231,13 @@ const handleSet = async (parts: string[]): Promise<void> => {
         return;
     }
 
-    if (!Server().repo.hasConfig(configKey)) {
+    if (!Server().db.hasConfig(configKey)) {
         Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
         return;
     }
 
     try {
-        await Server().repo.setConfig(configKey, quickStrConvert(configValue));
+        await Server().db.setConfig(configKey, quickStrConvert(configValue));
         Server().log(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
     } catch (ex) {
         Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
@@ -251,13 +251,13 @@ const handleShow = async (parts: string[]): Promise<void> => {
         return;
     }
 
-    if (!Server().repo.hasConfig(configKey)) {
+    if (!Server().db.hasConfig(configKey)) {
         Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
         return;
     }
 
     try {
-        const value = await Server().repo.getConfig(configKey);
+        const value = await Server().db.getConfig(configKey);
         Server().log(`${configKey} -> ${value}`);
     } catch (ex) {
         Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");

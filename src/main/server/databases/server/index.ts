@@ -1,128 +1,79 @@
 import { app } from "electron";
 import { EventEmitter } from "events";
 import { createConnection, Connection } from "typeorm";
+
 import { Server } from "@server/index";
-import { Config, Alert, Device, Queue } from "./entity";
-import { DEFAULT_DB_ITEMS } from "./constants";
+import { Alert, Device, Queue, Plugin } from "./entity";
+import { CreatePluginParams, IConfig, ConfigTypes } from "./types";
 
-export type ServerConfig = { [key: string]: Date | string | boolean | number };
-export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
+export class ServerDatabase extends EventEmitter {
+    dbName = "server";
 
-export class ServerRepository extends EventEmitter {
-    db: Connection = null;
-
-    config: ServerConfig;
+    dbConn: Connection = null;
 
     constructor() {
         super();
 
-        this.db = null;
-        this.config = {};
+        this.dbConn = null;
     }
 
     async initialize(): Promise<Connection> {
         const isDev = process.env.NODE_ENV !== "production";
 
         // If the DB is set, but not connected, try to connect
-        if (this.db) {
-            if (!this.db.isConnected) await this.db.connect();
-            return this.db;
+        if (this.dbConn) {
+            if (!this.dbConn.isConnected) await this.dbConn.connect();
+            return this.dbConn;
         }
 
-        let dbPath = `${app.getPath("userData")}/config.db`;
-        if (isDev) {
-            dbPath = `${app.getPath("userData")}/bluebubbles-server/config.db`;
-        }
-
-        this.db = await createConnection({
-            name: "config",
+        this.dbConn = await createConnection({
+            name: this.dbName,
             type: "better-sqlite3",
-            database: dbPath,
-            entities: [Config, Alert, Device, Queue],
-            // We should really use migrations for this.
-            // This is me being lazy. Maybe someday...
-            synchronize: true
+            database: `${Server().appPath}/${this.dbName}.db`,
+            entities: [Alert, Device, Queue, Plugin],
+            logging: false,
+            migrationsTableName: "migrations",
+            migrationsRun: true,
+            migrations: []
         });
 
-        // Load default config items
-        await this.loadConfig();
-        await this.setupDefaults();
-        return this.db;
+        try {
+            const repo = this.dbConn.getRepository(Plugin);
+            await repo.count();
+        } catch (ex) {
+            // If this fails, we need to synchronize
+            this.dbConn.synchronize();
+        }
+
+        return this.dbConn;
     }
 
     /**
      * Get the device repo
      */
     devices() {
-        return this.db.getRepository(Device);
+        return this.dbConn.getRepository(Device);
     }
 
     /**
      * Get the alert repo
      */
     alerts() {
-        return this.db.getRepository(Alert);
+        return this.dbConn.getRepository(Alert);
     }
 
     /**
-     * Get the device repo
+     * Get the queue repo
      */
     queue() {
-        return this.db.getRepository(Queue);
+        return this.dbConn.getRepository(Queue);
     }
 
     /**
-     * Get the device repo
+     * Get the plugins repo
      */
-    configs() {
-        return this.db.getRepository(Config);
-    }
-
-    private async loadConfig() {
-        const items: Config[] = await this.configs().find();
-        for (const i of items) this.config[i.name] = ServerRepository.convertFromDbValue(i.value);
-    }
-
-    /**
-     * Checks if the config has an item
-     *
-     * @param name The name of the item to check for
-     */
-    hasConfig(name: string): boolean {
-        return Object.keys(this.config).includes(name);
-    }
-
-    /**
-     * Retrieves a config item from the cache
-     *
-     * @param name The name of the config item
-     */
-    getConfig(name: string): Date | string | boolean | number {
-        if (!Object.keys(this.config).includes(name)) return null;
-        return ServerRepository.convertFromDbValue(this.config[name] as any);
-    }
-
-    /**
-     * Sets a config item in the database
-     *
-     * @param name The name of the config item
-     * @param value The value for the config item
-     */
-    async setConfig(name: string, value: Date | string | boolean | number): Promise<void> {
-        const orig = { ...this.config };
-        const saniVal = ServerRepository.convertToDbValue(value);
-        const item = await this.configs().findOne({ name });
-
-        // Either change or create the new Config object
-        if (item) {
-            await this.configs().update(item, { value: saniVal });
-        } else {
-            const cfg = this.configs().create({ name, value: saniVal });
-            await this.configs().save(cfg);
-        }
-
-        this.config[name] = ServerRepository.convertFromDbValue(saniVal);
-        super.emit("config-update", { prevConfig: orig, nextConfig: this.config });
+    plugins() {
+        return this.dbConn.getRepository(Plugin);
     }
 
     async purgeOldDevices() {
@@ -134,28 +85,35 @@ export class ServerRepository extends EventEmitter {
 
         // Delete the devices
         if (devicesToDelete.length > 0) {
-            Server().log(`Automatically purging ${devicesToDelete.length} devices from your server`);
+            Server().logger.debug(`Automatically purging ${devicesToDelete.length} devices from your server`);
             for (const item of devicesToDelete) {
                 const dateStr = item.last_active ? new Date(item.last_active).toLocaleDateString() : "N/A";
-                Server().log(`    -> Device: ${item.name} (Last Active: ${dateStr})`);
+                Server().logger.debug(`    -> Device: ${item.name} (Last Active: ${dateStr})`);
                 await this.devices().delete({ name: item.name, identifier: item.identifier });
             }
         }
     }
 
-    /**
-     * This sets any default database values, if the database
-     * has not already been initialized
-     */
-    private async setupDefaults(): Promise<void> {
-        try {
-            for (const key of Object.keys(DEFAULT_DB_ITEMS)) {
-                const item = await this.hasConfig(key);
-                if (!item) await this.setConfig(key, DEFAULT_DB_ITEMS[key]());
-            }
-        } catch (ex) {
-            Server().log(`Failed to setup default configurations! ${ex.message}`, "error");
-        }
+    static createPlugin({
+        name,
+        displayName,
+        enabled,
+        type,
+        description = "",
+        version = 1,
+        properties = null
+    }: CreatePluginParams) {
+        const plugin = new Plugin();
+
+        plugin.name = name;
+        plugin.displayName = displayName;
+        plugin.enabled = enabled;
+        plugin.type = type;
+        plugin.description = description;
+        plugin.version = version;
+        plugin.properties = properties;
+
+        return plugin;
     }
 
     /**

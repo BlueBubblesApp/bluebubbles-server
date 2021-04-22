@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { Queue } from "@server/databases/server/entity/Queue";
+import { Queue } from "@server/databases/global/entity/Queue";
 import { ValidTapback } from "@server/types";
 import {
     sendMessage,
@@ -111,7 +111,7 @@ export class ActionHandler {
                 item.chatGuid = chatGuid;
                 item.dateCreated = now;
                 item.text = message ?? "";
-                await Server().repo.queue().manager.save(item);
+                await Server().db.queue().manager.save(item);
             }
 
             // If there is an attachment, add that to the queue too
@@ -121,7 +121,7 @@ export class ActionHandler {
                 attachmentItem.chatGuid = chatGuid;
                 attachmentItem.dateCreated = now;
                 attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
-                await Server().repo.queue().manager.save(attachmentItem);
+                await Server().db.queue().manager.save(attachmentItem);
             }
         } catch (ex) {
             let msg = ex.message;

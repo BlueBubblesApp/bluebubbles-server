@@ -13,7 +13,7 @@ import { shell, ipcRenderer } from "electron";
 import { Redirect } from "react-router";
 import { isValidServerConfig, isValidClientConfig, checkFirebaseUrl, invokeMain } from "@renderer/helpers/utils";
 import "./PreDashboardView.css";
-import { Config } from "@server/databases/server/entity";
+import { Config } from "@server/databases/globalConfig/entity";
 
 interface State {
     config: Config;
