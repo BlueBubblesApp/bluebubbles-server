@@ -1,5 +1,5 @@
 import type * as WS from "@trufflesuite/uws-js-unofficial";
-import type { UpgradedHttp, UpgradedSocket } from "./types";
+import type { UpgradedHttp, UpgradedSocket } from "../types";
 
 type ProtocolOpts = WS.HttpResponse | WS.WebSocket | UpgradedSocket;
 

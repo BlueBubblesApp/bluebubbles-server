@@ -1,9 +1,9 @@
 import * as WS from "@trufflesuite/uws-js-unofficial";
 import { Server } from "@server/index";
 
-import { Response } from "../../../../response";
+import { Response } from "../../../../helpers/response";
 import type { UpgradedHttp } from "../../../../types";
-import { Transform } from "../../../../transform";
+import { Transform } from "../../../../helpers/transform";
 
 export const getPlugins = async (res: WS.HttpResponse, req: WS.HttpRequest): Promise<void> => {
     // Re-brand the context with our extra stuff

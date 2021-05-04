@@ -1,5 +1,5 @@
 import * as WS from "@trufflesuite/uws-js-unofficial";
-import { Response } from "../../response";
+import { Response } from "../../helpers/response";
 import { AuthApi } from "../../common/auth";
 import { UpgradedHttp } from "../../types";
 

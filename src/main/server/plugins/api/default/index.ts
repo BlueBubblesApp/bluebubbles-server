@@ -6,7 +6,7 @@ import * as QueryString from "querystring";
 import { IPluginConfig, IPluginConfigPropItemType, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
 import { ApiPluginBase } from "../base";
 import { HttpRouterV1 } from "./router/http";
-import { Response } from "./response";
+import { Response } from "./helpers/response";
 import { DEFAULT_PASSWORD } from "./constants";
 import { ApiDatabase } from "./database";
 import { AuthApi } from "./common/auth";

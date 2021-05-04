@@ -5,7 +5,7 @@ import type { HttpRouterBase } from "../base";
 import { AuthMiddleware } from "../../../middleware/http/authMiddleware";
 import { InjectMiddleware } from "../../../middleware/http/injectMiddleware";
 import { RequestParserMiddleware } from "../../../middleware/http/requestParserMiddleware";
-import { Response } from "../../../response";
+import { Response } from "../../../helpers/response";
 import { UpgradedHttp, WsMiddleware } from "../../../types";
 import { tokenAuth } from "./auth";
 import { ping } from "./general";

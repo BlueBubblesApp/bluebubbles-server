@@ -1,6 +1,6 @@
 import * as WS from "@trufflesuite/uws-js-unofficial";
 
-import { Response } from "../../../../response";
+import { Response } from "../../../../helpers/response";
 import type { UpgradedHttp } from "../../../../types";
 import type { PasswordAuthBody, RefreshAuthBody } from "../../../shared/types";
 import { AuthApi } from "../../../../common/auth";
