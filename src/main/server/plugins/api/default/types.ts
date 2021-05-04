@@ -10,6 +10,12 @@ export type TokenData = {
 
 export type WsMiddleware = (res: WS.HttpResponse, req: WS.HttpRequest) => Promise<void>;
 
+export type RequestData = {
+    json: NodeJS.Dict<any>;
+    params: NodeJS.Dict<string | string[]>;
+    headers: NodeJS.Dict<string>;
+};
+
 export type UpgradedSocket = WS.WebSocket & {
     auth: Token;
     plugin: DefaultApiPlugin;

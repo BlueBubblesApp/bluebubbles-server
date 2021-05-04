@@ -102,7 +102,7 @@ export default class DefaultApiPlugin extends ApiPluginBase {
      */
     async startup() {
         // Serve static routes
-        for (const uri of Object.keys(this.staticMap)) {
+        for (const uri in this.staticMap) {
             this.serveStatic(uri, this.staticMap[uri]);
         }
 
@@ -152,20 +152,7 @@ export default class DefaultApiPlugin extends ApiPluginBase {
             upgrade: async (res: WS.HttpResponse, req: WS.HttpRequest, context: WS.WebSocketBehavior) => {
                 console.log(`A WebSocket connected via URL: ${req.getUrl()}!`);
 
-                let json: { [key: string]: any } = null;
-                let params: { [key: string]: any } = null;
-
-                try {
-                    json = Parsers.readJson(res);
-                } catch (ex) {
-                    // Don't do anything
-                }
-
-                try {
-                    params = QueryString.parse(req.getQuery());
-                } catch (ex) {
-                    // Don't do anything
-                }
+                const parsed = await Parsers.parseRequest(req, res);
 
                 /**
                  * Upgrades the connection, and injects some context
@@ -173,14 +160,11 @@ export default class DefaultApiPlugin extends ApiPluginBase {
                  * @param auth The token data to inject
                  */
                 const next = (auth: Token): void => {
+                    let injectedMeta = { auth, plugin: this };
+                    injectedMeta = { ...injectedMeta, ...parsed };
+
                     res.upgrade(
-                        {
-                            auth,
-                            pluginDb: this.db,
-                            plugin: this,
-                            json,
-                            params
-                        },
+                        injectedMeta,
                         req.getHeader("sec-websocket-key"),
                         req.getHeader("sec-websocket-protocol"),
                         req.getHeader("sec-websocket-extensions"),
@@ -213,6 +197,10 @@ export default class DefaultApiPlugin extends ApiPluginBase {
                 const decoder = new TextDecoder("utf-8");
                 const msg = JSON.parse(decoder.decode(message)) as ClientWsRequest;
 
+                // Let's rebrand the websocket with the injected info (this will get passed to the router)
+                const websocket = ws as UpgradedSocket;
+
+                // Handle the message paths
                 switch (msg.path) {
                     default: {
                         this.logger.warn(`Websocket route, "${msg.path}" does not exist`);
