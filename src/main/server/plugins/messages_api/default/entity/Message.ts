@@ -5,7 +5,7 @@ import { MessageTypeTransformer } from "@server/databases/transformers/MessageTy
 import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "./Handle";
 import { Chat, getChatResponse } from "./Chat";
-import type { Attachment, getAttachmentResponse } from "./Attachment";
+import { Attachment, getAttachmentResponse } from "./Attachment";
 
 @Entity("message")
 export class Message {

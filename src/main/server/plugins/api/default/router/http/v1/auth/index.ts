@@ -3,7 +3,7 @@ import * as WS from "@trufflesuite/uws-js-unofficial";
 import { Response } from "../../../../response";
 import type { UpgradedHttp } from "../../../../types";
 import type { PasswordAuthBody, RefreshAuthBody } from "../../../shared/types";
-import { SharedAuth } from "../../../../shared/sharedAuth";
+import { AuthApi } from "../../../../common/auth";
 
 export const tokenAuth = async (res: WS.HttpResponse, req: WS.HttpRequest): Promise<void> => {
     // Re-brand the context with our extra stuff
@@ -30,7 +30,7 @@ export const tokenAuth = async (res: WS.HttpResponse, req: WS.HttpRequest): Prom
                 fail("Incorrect Password");
             } else {
                 // If the password is correct, generate a new token and return it
-                const jwt = await SharedAuth.createNewToken(request.pluginDb, request.plugin, name);
+                const jwt = await AuthApi.createNewToken(request.plugin.db, request.plugin, name);
                 Response.ok(res, { jwt });
             }
         }
@@ -39,7 +39,7 @@ export const tokenAuth = async (res: WS.HttpResponse, req: WS.HttpRequest): Prom
         if (!token) {
             fail("A `token` is required to re-authenticate!");
         } else {
-            const jwt = await SharedAuth.refreshToken(request.pluginDb, request.plugin, token);
+            const jwt = await AuthApi.refreshToken(request.plugin.db, request.plugin, token);
             Response.ok(res, { jwt });
         }
     } else {

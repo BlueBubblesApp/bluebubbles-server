@@ -8,9 +8,10 @@ export type TokenData = {
     expires_in: number;
 };
 
+export type WsMiddleware = (res: WS.HttpResponse, req: WS.HttpRequest) => Promise<void>;
+
 export type UpgradedSocket = WS.WebSocket & {
     auth: Token;
-    pluginDb: ApiDatabase;
     plugin: DefaultApiPlugin;
     json: NodeJS.Dict<any>;
     params: NodeJS.Dict<string | string[]>;
@@ -18,7 +19,6 @@ export type UpgradedSocket = WS.WebSocket & {
 
 export type UpgradedHttp = WS.HttpRequest & {
     auth: Token;
-    pluginDb: ApiDatabase;
     plugin: DefaultApiPlugin;
     json: NodeJS.Dict<any>;
     params: NodeJS.Dict<string | string[]>;

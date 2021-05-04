@@ -1,6 +1,6 @@
 import * as WS from "@trufflesuite/uws-js-unofficial";
 import { Response } from "../../response";
-import { SharedAuth } from "../../shared/sharedAuth";
+import { AuthApi } from "../../common/auth";
 import { UpgradedHttp } from "../../types";
 
 export class AuthMiddleware {
@@ -19,7 +19,7 @@ export class AuthMiddleware {
             fail('Missing "Authorization" header');
             // If the token is not valid, return a bad request
         } else {
-            const dbToken = await SharedAuth.getToken(context.pluginDb, token);
+            const dbToken = await AuthApi.getToken(context.plugin.db, token);
             if (!dbToken) {
                 fail("Invalid Token");
             } else {

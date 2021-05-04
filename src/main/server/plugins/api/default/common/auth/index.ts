@@ -1,9 +1,9 @@
-import type DefaultApiPlugin from "../index";
-import type { ApiDatabase } from "../database";
-import { TokenHelper } from "../helpers/tokenHelper";
-import { Token } from "../database/entity";
+import type DefaultApiPlugin from "../../index";
+import type { ApiDatabase } from "../../database";
+import { TokenHelper } from "../../helpers/tokenHelper";
+import { Token } from "../../database/entity";
 
-export class SharedAuth {
+export class AuthApi {
     public static async getToken(db: ApiDatabase, token: string): Promise<Token> {
         if (!db) throw new Error("Database has not yet been initialized!");
         return db.getToken(token);
@@ -23,7 +23,7 @@ export class SharedAuth {
         if (!token) throw new Error(`Invalid refresh token!`);
 
         // Create new token & delete the old one
-        const jwt = await SharedAuth.createNewToken(db, plugin, token.name);
+        const jwt = await AuthApi.createNewToken(db, plugin, token.name);
         await db.tokens().delete(token.id);
 
         // Return the new token

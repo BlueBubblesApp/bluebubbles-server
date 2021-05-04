@@ -3,23 +3,21 @@ import * as path from "path";
 import * as fs from "fs";
 import * as QueryString from "querystring";
 
-import { FileSystem } from "@server/fileSystem";
 import { IPluginConfig, IPluginConfigPropItemType, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
 import { ApiPluginBase } from "../base";
-import { onAbort, HttpRoute } from "./routes/http";
+import { HttpRouterV1 } from "./router/http";
 import { Response } from "./response";
 import { DEFAULT_PASSWORD } from "./constants";
 import { ApiDatabase } from "./database";
-import { SharedAuth } from "./shared/sharedAuth";
+import { AuthApi } from "./common/auth";
 import { Token } from "./database/entity";
 import { Parsers } from "./helpers/parsers";
-import { ClientWsRequest, UpgradedHttp, UpgradedSocket, WsRoute } from "./types";
-import { getPlugins } from "./routes/http/v1/plugin";
-import { tokenAuth } from "./routes/http/v1/auth";
-import { ping } from "./routes/http/v1/general";
-import { InjectMiddleware } from "./middleware/http/injectMiddleware";
-import { AuthMiddleware } from "./middleware/http/authMiddleware";
+import { ClientWsRequest, UpgradedSocket, WsRoute } from "./types";
+import type { HttpRouterBase } from "./router/http/base";
 
+/**
+ * The configuration for this BlueBubbles plugin
+ */
 const configuration: IPluginConfig = {
     name: "default",
     type: IPluginTypes.API,
@@ -50,24 +48,25 @@ const configuration: IPluginConfig = {
 };
 
 export default class DefaultApiPlugin extends ApiPluginBase {
+    // The instance of the uWS.js app
     app: WS.TemplatedApp = null;
 
+    // A list of connected sockets
     sockets: UpgradedSocket[] = [];
 
+    // An instance of a plugin-specific database
     db: ApiDatabase;
 
-    get certDir() {
-        return path.join(this.path, "ssl");
-    }
+    routers: HttpRouterBase[] = [];
 
-    get certPath() {
-        return path.join(this.certDir, "cert.pem");
-    }
+    // Currently supported API versions
+    apiVersions = [1];
 
-    get keyPath() {
-        return path.join(this.certDir, "key.pem");
-    }
-
+    /**
+     * A map specifying which routes go to which static files
+     *
+     * @returns The static files map
+     */
     // eslint-disable-next-line class-methods-use-this
     get staticMap(): { [key: string]: any } {
         return {
@@ -83,9 +82,12 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         super({ ...args, config: configuration });
     }
 
+    /**
+     * Lifecycle method called before starting up the plugin.
+     * This will initialize the DB and the uWS.js app
+     */
     async pluginWillLoad() {
         // Setup the database
-        console.log("INITING DB");
         this.db = new ApiDatabase(this);
         await this.db.initialize();
 
@@ -93,6 +95,11 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         this.app = WS.App();
     }
 
+    /**
+     * Lifecycle method to startup the actual plugin services. For
+     * this startup method, we are calling methods to serve static files,
+     * serve the HTTP routes, as well as websockets
+     */
     async startup() {
         // Serve static routes
         for (const uri of Object.keys(this.staticMap)) {
@@ -101,11 +108,12 @@ export default class DefaultApiPlugin extends ApiPluginBase {
 
         // Setup middlewares and routes
         this.setupWebsockets();
-        this.setupRoutesV1();
+        this.setupHttpRoutes();
 
+        // Start listening
         const port = this.getProperty("port") as number;
         if (port && port > 0 && port < 65535) {
-            this.app.listen(port, listenSocket => {
+            this.app.listen(port, _ => {
                 this.logger.info(`Listening on port, ${port}`);
             });
         } else {
@@ -113,19 +121,28 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         }
     }
 
+    /**
+     * Handler/Helper for serving static files
+     *
+     * @param urlPath The URL path to match
+     * @param filePath The corresponding static file path (or null for wildcards)
+     */
     serveStatic(urlPath: string, filePath: string = null) {
         if (!this.app) return;
 
-        this.app.get(urlPath, (res, req) => {
+        this.app.get(urlPath, (res: WS.HttpResponse, req: WS.HttpRequest) => {
             try {
                 res.end(fs.readFileSync(`${__dirname}${filePath ?? req.getUrl()}`));
             } catch (e) {
-                res.writeStatus("500 Internal Server Error");
-                res.end("500 - Internal Server Error");
+                console.error(e);
+                Response.error(res, 500, e.message);
             }
         });
     }
 
+    /**
+     * Sets up the websocket handlers for uWS.js
+     */
     async setupWebsockets() {
         if (!this.app) return;
 
@@ -176,7 +193,7 @@ export default class DefaultApiPlugin extends ApiPluginBase {
                 if (!authorization || authorization.trim().length === 0) return next(null);
 
                 // If the token is present, get it from the DB and make sure it's not expired
-                const token = await SharedAuth.getToken(this.db, authorization);
+                const token = await AuthApi.getToken(this.db, authorization);
                 if (!token || token.isExpired()) return next(null);
 
                 // Pass the token on to the next handler
@@ -207,41 +224,19 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         this.logger.info("Finished setting up websocket...");
     }
 
-    public protected(
-        ...handlers: ((res: WS.HttpResponse, req: WS.HttpRequest) => Promise<void>)[]
-    ): (res: WS.HttpResponse, req: WS.HttpRequest) => Promise<void> {
-        const injector = InjectMiddleware.middleware({
-            plugin: this,
-            pluginDb: this.db,
-            hasEnded: false
-        });
-
-        return HttpRoute.base(injector, AuthMiddleware.middleware, ...handlers);
-    }
-
-    public unprotected(
-        ...handlers: ((res: WS.HttpResponse, req: WS.HttpRequest) => Promise<void>)[]
-    ): (res: WS.HttpResponse, req: WS.HttpRequest) => Promise<void> {
-        const injector = InjectMiddleware.middleware({
-            plugin: this,
-            pluginDb: this.db,
-            hasEnded: false
-        });
-
-        return HttpRoute.base(injector, ...handlers);
-    }
-
-    async setupRoutesV1() {
+    setupHttpRoutes() {
         this.logger.info("Setting up routes...");
 
-        // General routes
-        this.app.get(HttpRoute.v1("/ping"), this.unprotected(ping));
+        // Load all the routers for the APIs
+        if (this.apiVersions.includes(1)) {
+            this.routers.push(new HttpRouterV1(this));
+        }
 
-        // Plugin routes
-        this.app.get(HttpRoute.v1("/plugin"), this.protected(getPlugins));
-
-        // Authentication routes
-        this.app.post(HttpRoute.v1("/token"), this.unprotected(tokenAuth));
+        // Serve all the routers
+        for (const i of this.routers) {
+            this.logger.info(`  -> Serving routes for router: ${i.name}`);
+            i.serve();
+        }
 
         this.logger.info("Finished setting up routes...");
     }
