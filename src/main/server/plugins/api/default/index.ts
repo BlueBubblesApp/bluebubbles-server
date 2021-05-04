@@ -224,6 +224,9 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         this.logger.info("Finished setting up websocket...");
     }
 
+    /**
+     * Sets up the HTTP routes, for all supported versions of the API
+     */
     setupHttpRoutes() {
         this.logger.info("Setting up routes...");
 
@@ -241,6 +244,10 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         this.logger.info("Finished setting up routes...");
     }
 
+    /**
+     * Shuts down the uWS.js app by closing all sockets and then,
+     * "deleting" the app object
+     */
     async shutdown() {
         for (const socket of this.sockets) {
             socket.close();
