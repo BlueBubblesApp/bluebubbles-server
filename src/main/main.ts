@@ -6,17 +6,17 @@ import * as url from "url";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
-import { UpdateService } from "@server/services";
+// import { UpdateService } from "@server/services";
 
 let win: BrowserWindow;
 let tray: Tray;
-let updateService: UpdateService;
+// let updateService: UpdateService;
 
 app.allowRendererProcessReuse = false;
 
 // Instantiate the server
-Server(win);
-
+// Server(win);
+//
 // Only 1 instance is allowed
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -223,46 +223,46 @@ const quickStrConvert = (val: string): string | number | boolean => {
     return val;
 };
 
-const handleSet = async (parts: string[]): Promise<void> => {
-    const configKey = parts.length > 1 ? parts[1] : null;
-    const configValue = parts.length > 2 ? parts[2] : null;
-    if (!configKey || !configValue) {
-        Server().log("Empty config key/value. Ignoring...");
-        return;
-    }
+// const handleSet = async (parts: string[]): Promise<void> => {
+//     const configKey = parts.length > 1 ? parts[1] : null;
+//     const configValue = parts.length > 2 ? parts[2] : null;
+//     if (!configKey || !configValue) {
+//         Server().logger.info("Empty config key/value. Ignoring...");
+//         return;
+//     }
 
-    if (!Server().db.hasConfig(configKey)) {
-        Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
-        return;
-    }
+//     if (!Server().db.hasConfig(configKey)) {
+//         Server().logger.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
+//         return;
+//     }
 
-    try {
-        await Server().db.setConfig(configKey, quickStrConvert(configValue));
-        Server().log(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
-    } catch (ex) {
-        Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
-    }
-};
+//     try {
+//         await Server().db.setConfig(configKey, quickStrConvert(configValue));
+//         Server().logger.info(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
+//     } catch (ex) {
+//         Server().logger.info(`Failed set config item, '${configKey}'\n${ex}`, "error");
+//     }
+// };
 
-const handleShow = async (parts: string[]): Promise<void> => {
-    const configKey = parts.length > 1 ? parts[1] : null;
-    if (!configKey) {
-        Server().log("Empty config key. Ignoring...");
-        return;
-    }
+// const handleShow = async (parts: string[]): Promise<void> => {
+//     const configKey = parts.length > 1 ? parts[1] : null;
+//     if (!configKey) {
+//         Server().logger.info("Empty config key. Ignoring...");
+//         return;
+//     }
 
-    if (!Server().db.hasConfig(configKey)) {
-        Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
-        return;
-    }
+//     if (!Server().db.hasConfig(configKey)) {
+//         Server().logger.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
+//         return;
+//     }
 
-    try {
-        const value = await Server().db.getConfig(configKey);
-        Server().log(`${configKey} -> ${value}`);
-    } catch (ex) {
-        Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
-    }
-};
+//     try {
+//         const value = await Server().db.getConfig(configKey);
+//         Server().logger.info(`${configKey} -> ${value}`);
+//     } catch (ex) {
+//         Server().logger.info(`Failed set config item, '${configKey}'\n${ex}`, "error");
+//     }
+// };
 
 const showHelp = () => {
     const help = `[================================== Help Menu ==================================]\n
@@ -290,32 +290,30 @@ Available Commands:
 };
 
 process.stdin.on("data", chunk => {
-    const line = chunk.toString().trim();
-    if (!Server() || !line || line.length === 0) return;
-    Server().log(`Handling STDIN: ${line}`, "debug");
-
-    // Handle the standard input
-    const parts = chunk ? line.split(" ") : [];
-    if (parts.length === 0) {
-        Server().log("Invalid command", "debug");
-        return;
-    }
-
-    switch (parts[0].toLowerCase()) {
-        case "help":
-            showHelp();
-            break;
-        case "set":
-            handleSet(parts);
-            break;
-        case "show":
-            handleShow(parts);
-            break;
-        case "restart":
-        case "relaunch":
-            Server().relaunch();
-            break;
-        default:
-            Server().log(`Unhandled command, '${parts[0]}'`, "debug");
-    }
+    // const line = chunk.toString().trim();
+    // if (!Server() || !line || line.length === 0) return;
+    // Server().logger.info(`Handling STDIN: ${line}`, "debug");
+    // // Handle the standard input
+    // const parts = chunk ? line.split(" ") : [];
+    // if (parts.length === 0) {
+    //     Server().logger.info("Invalid command", "debug");
+    //     return;
+    // }
+    // switch (parts[0].toLowerCase()) {
+    //     case "help":
+    //         showHelp();
+    //         break;
+    //     case "set":
+    //         handleSet(parts);
+    //         break;
+    //     case "show":
+    //         handleShow(parts);
+    //         break;
+    //     case "restart":
+    //     case "relaunch":
+    //         Server().relaunch();
+    //         break;
+    //     default:
+    //         Server().logger.info(`Unhandled command, '${parts[0]}'`, "debug");
+    // }
 });

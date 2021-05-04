@@ -5,7 +5,7 @@ import { Server } from "@server/index";
 import { PluginLogger } from "@server/logger/builtins/pluginLogger";
 
 import { GlobalConfig } from "@server/databases/globalConfig";
-import { IPluginConfig, PluginConstructorParams } from "@server/plugins/types";
+import { IPluginConfig, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
 
 import { getPluginIdentifier } from "./helpers";
 
@@ -42,6 +42,10 @@ abstract class PluginBase extends EventEmitter {
         return getPluginIdentifier(this.config.type, this.config.name);
     }
 
+    get path(): string {
+        return `${Server().appPath}/plugins/${this.id}`;
+    }
+
     constructor(args: PluginConstructorParams, eventEmitterOptions?: EventEmitterOptions) {
         super(eventEmitterOptions);
 
@@ -70,6 +74,11 @@ abstract class PluginBase extends EventEmitter {
         }
 
         return plugin;
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    getPluginsByType(type: IPluginTypes) {
+        return Server().pluginManager.getPluginsByType(type);
     }
 
     getProperty(name: string, catchError = false): any {

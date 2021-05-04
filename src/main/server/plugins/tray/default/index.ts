@@ -5,7 +5,7 @@ import { FileSystem } from "@server/fileSystem";
 import { TrayPluginBase } from "@server/plugins/tray/base";
 import { IPluginConfig, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
 import { BlueBubblesServer, Server } from "@server/index";
-import DefaultUI from "@server/plugins/ui/default";
+import type DefaultUI from "@server/plugins/ui/default";
 
 const configuration: IPluginConfig = {
     name: "default",

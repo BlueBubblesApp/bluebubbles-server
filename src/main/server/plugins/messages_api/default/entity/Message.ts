@@ -3,9 +3,9 @@ import { BooleanTransformer } from "@server/databases/transformers/BooleanTransf
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
 import { MessageResponse } from "@server/types";
-import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
+import { Handle, getHandleResponse } from "./Handle";
+import { Chat, getChatResponse } from "./Chat";
+import type { Attachment, getAttachmentResponse } from "./Attachment";
 
 @Entity("message")
 export class Message {
@@ -40,7 +40,7 @@ export class Message {
     })
     chats: Chat[];
 
-    @ManyToMany(type => Attachment)
+    @ManyToMany("Attachment")
     @JoinTable({
         name: "message_attachment_join",
         joinColumns: [{ name: "message_id" }],

@@ -66,7 +66,7 @@ const configuration: IPluginConfig = {
         {
             name: "token",
             label: "Auth Token (Optional)",
-            type: IPluginConfigPropItemType.STRING,
+            type: IPluginConfigPropItemType.PASSWORD,
             description: "If you have an ngrok auth token, you can enter it here for longer session limits",
             default: "",
             required: false

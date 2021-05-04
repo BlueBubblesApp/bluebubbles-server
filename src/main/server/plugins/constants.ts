@@ -10,7 +10,7 @@ export const PluginTypeMinMaxMap: { [key: string]: MinMaxMap } = {
         min: 1,
         max: 1
     },
-    messages_db: {
+    messages_api: {
         min: 1,
         max: 1
     },
@@ -18,8 +18,12 @@ export const PluginTypeMinMaxMap: { [key: string]: MinMaxMap } = {
         min: null as number,
         max: null as number
     },
-    transport: {
+    api: {
         min: 1,
         max: 5
-    } // This is a little bit arbitrary
+    }, // This is a little bit arbitrary
+    data_transformer: {
+        min: 1,
+        max: 1
+    }
 };

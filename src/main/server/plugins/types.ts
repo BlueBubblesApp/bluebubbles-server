@@ -26,6 +26,7 @@ export type PluginConstructorParams = {
 
 export enum IPluginConfigPropItemType {
     STRING = "string",
+    PASSWORD = "password",
     NUMBER = "number",
     BOOLEAN = "boolean",
     DATE = "date",
@@ -37,8 +38,9 @@ export enum IPluginTypes {
     UI = "ui",
     TRAY = "tray",
     GENERAL = "general",
-    MESSAGES_DB = "messages_db",
-    TRANSPORT = "transport"
+    MESSAGES_DB = "messages_api",
+    API = "api",
+    DATA_TRANSFORMER = "data_transformer"
 }
 
 export type IPluginPropOption = {
@@ -55,6 +57,7 @@ export type IPluginConfigPropItem = {
     value?: any;
     default?: any;
     options?: IPluginPropOption[];
+    multiple?: boolean;
     placeholder?: string;
     description?: string;
     required?: boolean;
@@ -72,9 +75,7 @@ export type IPluginConfig = {
 
 export type IPluginProperties = {
     enabled: boolean;
-    properties: {
-        [key: string]: any;
-    };
+    properties: IPluginConfigPropItem[];
 };
 
 export type IPluginDBConfig = {

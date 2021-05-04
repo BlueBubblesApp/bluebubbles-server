@@ -7,11 +7,12 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "t
 import { Server } from "@server/index";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
-import { Message } from "@server/databases/imessage/entity/Message";
-import { convertAudio, getAttachmentMetadata, getBlurHash } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
+import { Message } from "@server/plugins/messages_api/default/entity/Message";
+import { convertAudio, getAttachmentMetadata, getBlurHash } from "../helpers/utils";
+
 import { handledImageMimes } from "../helpers/constants";
 
 @Entity("attachment")
@@ -148,7 +149,7 @@ export const getAttachmentResponse = async (
             }
         } catch (ex) {
             console.log(ex);
-            Server().log(`Could not read file [${fPath}]: ${ex.message}`, "error");
+            Server().logger.error(`Could not read file [${fPath}]: ${ex.message}`);
         }
     } else {
         console.warn("Attachment hasn't been downloaded yet!");

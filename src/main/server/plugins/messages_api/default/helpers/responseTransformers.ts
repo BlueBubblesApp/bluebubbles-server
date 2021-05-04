@@ -1,4 +1,4 @@
-import { ChatSpec, MessageSpec, HandleSpec, AttachmentSpec } from "@server/plugins/messages_db/types";
+import { ChatSpec, MessageSpec, HandleSpec, AttachmentSpec } from "@server/plugins/messages_api/types";
 
 import { Chat } from "../entity/Chat";
 import { Handle } from "../entity/Handle";

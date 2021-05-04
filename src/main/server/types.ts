@@ -1,4 +1,4 @@
-import { IConfig } from "./databases/globalConfig";
+import { GlobalConfig } from "./databases/globalConfig";
 
 export type ValidStatuses = 200 | 201 | 400 | 401 | 403 | 404 | 500;
 
@@ -15,7 +15,7 @@ export type ResponseData =
     | AttachmentResponse
     | (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[]
     | Uint8Array
-    | IConfig
+    | GlobalConfig
     | string
     | null;
 

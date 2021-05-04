@@ -3,7 +3,7 @@ import { createConnection, Connection } from "typeorm";
 
 // All the plugin scaffolding & types
 import { IPluginConfig, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
-import { MessagesDbPluginBase } from "@server/plugins/messages_db/base";
+import { MessagesDbPluginBase } from "@server/plugins/messages_api/base";
 import {
     AttachmentSpec,
     ChatSpec,
@@ -13,7 +13,7 @@ import {
     GetChatsParams,
     GetHandlesParams,
     GetMessagesParams
-} from "@server/plugins/messages_db/types";
+} from "@server/plugins/messages_api/types";
 
 // All the custom plugin imports
 import { Chat } from "./entity/Chat";

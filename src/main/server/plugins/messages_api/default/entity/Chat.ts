@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
-import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { Handle, getHandleResponse } from "@server/plugins/messages_api/default/entity/Handle";
+import { Message, getMessageResponse } from "@server/plugins/messages_api/default/entity/Message";
 import { ChatResponse } from "@server/types";
 
 @Entity("chat")

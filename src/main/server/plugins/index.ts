@@ -6,13 +6,14 @@ import { Plugin } from "@server/databases/server/entity";
 import { PluginBase } from "./base";
 import {
     IPluginConfigPropItem,
+    IPluginConfigPropItemType,
     IPluginDBConfig,
     IPluginProperties,
     IPluginTypes,
     PluginConstructorParams
 } from "./types";
 import { PluginTypeMinMaxMap } from "./constants";
-import { getPluginIdentifier, parseIdentifier } from "./helpers";
+import { checkForUpdatedPluginProps, getPluginIdentifier, isNullish, parseIdentifier } from "./helpers";
 
 // IMPORT PLUGINS HERE
 import DefaultUI from "./ui/default";
@@ -20,6 +21,8 @@ import DefaultTray from "./tray/default";
 import NgrokPlugin from "./general/ngrok";
 import CaffeinatePlugin from "./general/caffeinate";
 import NetworkCheckerPlugin from "./general/networkChecker";
+import DefaultApiPlugin from "./api/default/index";
+import DefaultMessagesDb from "./messages_api/default";
 
 /**
  * This is just a helper method to slightly simplify logging. It's
@@ -41,7 +44,18 @@ const logger = {
 };
 
 // REGISTER PLUGINS HERE
-const registeredPlugins: any[] = [DefaultUI, DefaultTray, NgrokPlugin, CaffeinatePlugin, NetworkCheckerPlugin];
+const registeredPlugins: any[] = [
+    // Defaults
+    // DefaultUI,
+    // DefaultTray,
+    DefaultApiPlugin
+    // DefaultMessagesDb,
+
+    // General
+    // NgrokPlugin,
+    // CaffeinatePlugin,
+    // NetworkCheckerPlugin
+];
 
 type LoggerList = { [key: string]: PluginLogger };
 
@@ -90,20 +104,90 @@ class PluginManager {
                     plugin = await Server().db.plugins().save(newPlugin);
                 }
 
+                // Check for config updates
+                // If there are updates, reset the config
+                if (checkForUpdatedPluginProps(item.config.properties, plugin.properties as IPluginConfigPropItem[])) {
+                    plugin.properties = item.config.properties;
+                    await Server().db.plugins().update(plugin.id, plugin);
+                    logger.debug(
+                        `Found updated properties for plugin, '${getPluginIdentifier(
+                            plugin.type as IPluginTypes,
+                            plugin.name
+                        )}'`
+                    );
+                }
+
+                // Set defaults
+                const propsToSet: { identifier: string; property: IPluginConfigPropItem; newValue: any }[] = [];
+                const properties = plugin.properties as IPluginConfigPropItem[];
+                for (let i = 0; i < properties.length; i += 1) {
+                    const current = properties[i].value ?? null;
+                    if (!current) {
+                        // Save to set later
+                        propsToSet.push({
+                            identifier: getPluginIdentifier(plugin.type as IPluginTypes, plugin.name),
+                            property: properties[i],
+                            newValue: this.getPropertyDefault(properties[i])
+                        });
+                    }
+                }
+
                 // Save the plugin properties to the map
                 this.pluginProperties[getPluginIdentifier(plugin.type as IPluginTypes, plugin.name)] = {
                     enabled: plugin.enabled,
-                    properties: plugin.properties as IPluginConfigPropItem[]
+                    properties
                 };
+
+                // Set the new (default) properties
+                // We have to do it after the plugin properties are saved to the manager
+                for (const pts of propsToSet) {
+                    await this.setPluginProperty(pts.identifier, pts.property.name, pts.newValue);
+                }
 
                 logger.info(`  -> Loaded ${item.id}...`);
             } catch (ex) {
                 logger.error(`Failed to load plugin configuration for, "${item.id}"`);
-                console.trace();
+                console.error(ex);
             }
         }
 
         logger.info(`Successfully loaded ${Object.keys(this.pluginProperties).length} plugins!`);
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    private getPropertyDefault(propertyMeta: IPluginConfigPropItem) {
+        // Check if it's select, multiselect, and bool
+        const isSelect = (propertyMeta?.options ?? []).length > 0;
+        const isMulti = propertyMeta.multiple ?? false;
+
+        let value = null;
+        if (propertyMeta.type === IPluginConfigPropItemType.BOOLEAN) {
+            value = propertyMeta.default ?? false;
+        } else if (propertyMeta.type === IPluginConfigPropItemType.NUMBER) {
+            value = propertyMeta.default ?? 0;
+        } else if (propertyMeta.type === IPluginConfigPropItemType.JSON_STRING) {
+            value = propertyMeta.default ?? "{}";
+        } else if (propertyMeta.type === IPluginConfigPropItemType.JSON) {
+            value = propertyMeta.default ?? {};
+        } else if ([IPluginConfigPropItemType.STRING, IPluginConfigPropItemType.PASSWORD].includes(propertyMeta.type)) {
+            value = propertyMeta.default ?? "";
+        }
+
+        // If it's a single-select
+        if (isSelect && !isMulti) {
+            const opts = (propertyMeta.options ?? []).filter(item => item.default ?? false);
+            if (opts.length > 0) {
+                value = opts[0].value;
+            }
+            // If it's a multi-select
+        } else if (isSelect && isMulti) {
+            const opts = (propertyMeta.options ?? []).filter(item => item.default ?? false).map(item => item.value);
+            if (opts.length > 0) {
+                value = opts.join(",");
+            }
+        }
+
+        return value;
     }
 
     async startPlugins() {
@@ -127,7 +211,7 @@ class PluginManager {
                     await this.initiatePlugin(plugin);
                 } catch (ex) {
                     logger.error(`Failed to start plugin, '${plugin.config.name}'`);
-                    console.trace();
+                    console.error(ex);
                 }
             }
 
@@ -221,7 +305,7 @@ class PluginManager {
                 logger.info(`  -> Loaded ${plugin.id}...`);
             } catch (err) {
                 logger.error(`Failed to load plugin!`);
-                console.trace();
+                console.error(err);
             }
         }
     }
@@ -262,23 +346,42 @@ class PluginManager {
             throw new Error(`Plugin identifier '${identifier}' does not exist!`);
         }
 
-        if (!Object.keys(this.pluginProperties[identifier].properties).includes(name)) {
+        const matching = this.pluginProperties[identifier].properties.filter(item => item.name === name);
+        if (!matching || matching.length === 0) {
             throw new Error(`Plugin property '${name}' does not exist!`);
         }
 
-        return this.pluginProperties[identifier].properties[name].value;
+        return matching[0].value ?? null;
     }
 
-    setPluginProperty(identifier: string, name: string, value: any) {
+    async setPluginProperty(identifier: string, name: string, value: any) {
         if (!Object.keys(this.pluginProperties).includes(identifier)) {
             throw new Error(`Plugin identifier '${identifier}' does not exist!`);
         }
 
-        if (!Object.keys(this.pluginProperties[identifier].properties).includes(name)) {
+        const matching = this.pluginProperties[identifier].properties.filter(item => item.name === name);
+        if (!matching || matching.length === 0) {
             throw new Error(`Plugin property '${name}' does not exist!`);
         }
 
-        this.pluginProperties[identifier].properties[name] = value;
+        const pid = parseIdentifier(identifier);
+
+        // Set it in the database
+        const plugin = await Server().db.plugins().findOne({ name: pid.name, type: pid.type });
+        if (!plugin) {
+            logger.warn(`Can't set plugin property for unknown plugin: ${identifier}`);
+            return;
+        }
+
+        // Set it locally (in-place set/insert)
+        for (let i = 0; i < this.pluginProperties[identifier].properties.length; i += 1) {
+            if (this.pluginProperties[identifier].properties[i].name !== name) continue;
+            this.pluginProperties[identifier].properties[i].value = value;
+        }
+
+        // Set it in the database
+        plugin.properties = this.pluginProperties[identifier].properties;
+        await await Server().db.plugins().update(plugin.id, plugin);
     }
 
     getPluginCountByType(type: string): number {
@@ -299,13 +402,13 @@ class PluginManager {
         if (!props) return false;
 
         // If the config name doesn't exist, return false
-        const configs = props.properties;
         const propName = propSplit[1];
-        if (!Object.keys(configs).includes(propName)) return false;
+        const matches = props.properties.filter(item => item.name === propName);
+        if (!matches || matches.length === 0) return false;
 
         // If all validation passes, return the eval
         // eslint-disable-next-line no-unneeded-ternary
-        return configs[propName] ? true : false;
+        return !isNullish(matches[0].value);
     }
 
     isPluginRunning(identifier: string) {

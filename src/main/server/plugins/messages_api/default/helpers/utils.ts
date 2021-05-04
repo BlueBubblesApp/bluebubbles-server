@@ -5,10 +5,10 @@ import { basename } from "path";
 import { encode as blurHashEncode } from "blurhash";
 
 import { Server } from "@server/index";
-import { Message } from "@server/databases/imessage/entity/Message";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
-import { Attachment } from "../entity/Attachment";
+import type { Attachment } from "../entity/Attachment";
+import type { Message } from "../entity/Message";
 import { handledImageMimes } from "./constants";
 
 export const getBlurHash = async (image: NativeImage) => {
@@ -28,7 +28,7 @@ export const getBlurHash = async (image: NativeImage) => {
         blurhash = blurHashEncode(Uint8ClampedArray.from(calcImage.toBitmap()), size.width, size.height, 3, 3);
     } catch (ex) {
         console.log(ex);
-        Server().log(`Could not compute blurhash: ${ex.message}`, "error");
+        Server().logger.error(`Could not compute blurhash: ${ex.message}`);
     }
 
     return blurhash;
@@ -48,12 +48,12 @@ export const convertAudio = async (attachment: Attachment): Promise<string> => {
     let failed = false;
     if (!fs.existsSync(newPath)) {
         try {
-            Server().log(`Converting attachment, ${theAttachment.transferName}, to an MP3...`);
+            Server().logger.info(`Converting attachment, ${theAttachment.transferName}, to an MP3...`);
             await FileSystem.convertCafToMp3(theAttachment, newPath);
         } catch (ex) {
             failed = true;
-            Server().log(`Failed to convert CAF to MP3 for attachment, ${theAttachment.transferName}`);
-            Server().log(ex, "error");
+            Server().logger.error(`Failed to convert CAF to MP3 for attachment, ${theAttachment.transferName}`);
+            Server().logger.error(ex);
         }
     }
 
@@ -82,7 +82,7 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
         try {
             // If we got no height/width data, let's try to fallback to other code to fetch it
             if (handledImageMimes.includes(attachment.mimeType) && (!metadata?.height || !metadata?.width)) {
-                Server().log("Image metadata empty, getting size from NativeImage...", "debug");
+                Server().logger.debug("Image metadata empty, getting size from NativeImage...");
 
                 // Load the image data
                 const image = nativeImage.createFromPath(FileSystem.getRealPath(attachment.filePath));
@@ -101,7 +101,7 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
                 }
             }
         } catch (ex) {
-            Server().log("Failed to load size data from NativeImage!", "debug");
+            Server().logger.error("Failed to load size data from NativeImage!");
         }
     } else if (attachment.mimeType.startsWith("video")) {
         metadata = await FileSystem.getVideoMetadata(attachment.filePath);

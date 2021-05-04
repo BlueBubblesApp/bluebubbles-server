@@ -18,8 +18,6 @@ export class ServerDatabase extends EventEmitter {
     }
 
     async initialize(): Promise<Connection> {
-        const isDev = process.env.NODE_ENV !== "production";
-
         // If the DB is set, but not connected, try to connect
         if (this.dbConn) {
             if (!this.dbConn.isConnected) await this.dbConn.connect();
