@@ -11,6 +11,7 @@ import { tokenAuth } from "./auth";
 import { ping } from "./general";
 import { getPlugins } from "./plugin";
 import { getChats } from "./chat";
+import { getHandles } from "./handle";
 
 export class HttpRouter implements HttpRouterBase {
     name = "v1";
@@ -39,6 +40,9 @@ export class HttpRouter implements HttpRouterBase {
 
         // Chat API routes
         this.app.get(HttpRouter.path("/chat"), this.protected(getChats));
+
+        // Handle API routes
+        this.app.get(HttpRouter.path("/handle"), this.protected(getHandles));
 
         // Plugin routes
         this.app.get(HttpRouter.path("/plugin"), this.protected(getPlugins));

@@ -3,6 +3,11 @@ import type * as WS from "@trufflesuite/uws-js-unofficial";
 import { RequestData } from "../types";
 
 export class Parsers {
+    public static queryMap: NodeJS.Dict<any> = {
+        true: true,
+        false: false
+    };
+
     public static async parseRequest(req: WS.HttpRequest, res: WS.HttpResponse): Promise<RequestData> {
         let json: NodeJS.Dict<any> = null;
         let params: NodeJS.Dict<string | string[]> = null;
@@ -29,6 +34,15 @@ export class Parsers {
 
         try {
             params = QueryString.parse(queryString);
+
+            // Normalize any values via the map
+            for (const key in params) {
+                try {
+                    params[key] = Parsers.queryMap[params[key] as string] ?? params[key];
+                } catch (ex) {
+                    /* Don't really care... yet */
+                }
+            }
         } catch (ex) {
             console.error("Failed to parse parameters");
             console.error(ex);

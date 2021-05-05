@@ -38,7 +38,7 @@ export enum IPluginTypes {
     UI = "ui",
     TRAY = "tray",
     GENERAL = "general",
-    MESSAGES_DB = "messages_api",
+    MESSAGES_API = "messages_api",
     API = "api",
     DATA_TRANSFORMER = "data_transformer"
 }

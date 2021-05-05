@@ -22,7 +22,7 @@ import NgrokPlugin from "./general/ngrok";
 import CaffeinatePlugin from "./general/caffeinate";
 import NetworkCheckerPlugin from "./general/networkChecker";
 import DefaultApiPlugin from "./api/default/index";
-import DefaultMessagesDb from "./messages_api/default";
+import DefaultMessagesApi from "./messages_api/default";
 
 /**
  * This is just a helper method to slightly simplify logging. It's
@@ -48,8 +48,8 @@ const registeredPlugins: any[] = [
     // Defaults
     // DefaultUI,
     // DefaultTray,
-    DefaultApiPlugin
-    // DefaultMessagesDb,
+    DefaultApiPlugin,
+    DefaultMessagesApi
 
     // General
     // NgrokPlugin,

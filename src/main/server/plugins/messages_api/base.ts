@@ -11,7 +11,7 @@ import {
     GetMessagesParams
 } from "./types";
 
-interface MessagesDbPluginBase {
+interface MessagesApiPluginBase {
     setup?(): Promise<void>;
     connect(): Promise<void>;
     disconnect(): Promise<void>;
@@ -44,7 +44,7 @@ interface MessagesDbPluginBase {
     getTotalVideosForChat?(guid: string): Promise<number>;
 }
 
-class MessagesDbPluginBase extends PluginBase {
+class MessagesApiPluginBase extends PluginBase {
     async startup() {
         if (this.setup) await this.setup();
         await this.connect();
@@ -55,4 +55,4 @@ class MessagesDbPluginBase extends PluginBase {
     }
 }
 
-export { MessagesDbPluginBase };
+export { MessagesApiPluginBase };

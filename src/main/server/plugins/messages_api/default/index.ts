@@ -3,7 +3,8 @@ import { createConnection, Connection } from "typeorm";
 
 // All the plugin scaffolding & types
 import { IPluginConfig, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
-import { MessagesDbPluginBase } from "@server/plugins/messages_api/base";
+import { MessagesApiPluginBase } from "@server/plugins/messages_api/base";
+import { convertDateTo2001Time } from "@server/helpers/dateUtil";
 import {
     AttachmentSpec,
     ChatSpec,
@@ -20,26 +21,26 @@ import { Chat } from "./entity/Chat";
 import { Handle } from "./entity/Handle";
 import { Message } from "./entity/Message";
 import { Attachment } from "./entity/Attachment";
-import { convertDateTo2001Time } from "./helpers/dateUtil";
+import { ApiInterface } from "./interface";
+import { attachmentToSpec, chatToSpec, handleToSpec, messageToSpec } from "./helpers/responseTransformers";
 
 // Your plugin configuration
 const configuration: IPluginConfig = {
     name: "default",
-    type: IPluginTypes.MESSAGES_DB,
+    type: IPluginTypes.MESSAGES_API,
     displayName: "Default Messages API",
     description: "This is the default Messages Database for BlueBubbles",
     version: 1,
     properties: []
 };
 
-export default class DefaultMessagesDb extends MessagesDbPluginBase {
+export default class DefaultMessagesApi extends MessagesApiPluginBase {
     db: Connection = null;
 
-    constructor(args: PluginConstructorParams) {
-        super(args);
+    api: ApiInterface = null;
 
-        // Set it after the fact due to class vars
-        this.config = configuration;
+    constructor(args: PluginConstructorParams) {
+        super({ ...args, config: configuration });
     }
 
     async connect(): Promise<void> {
@@ -49,6 +50,8 @@ export default class DefaultMessagesDb extends MessagesDbPluginBase {
             database: `${process.env.HOME}/Library/Messages/chat.db`,
             entities: [Chat, Handle, Message, Attachment]
         });
+
+        this.api = new ApiInterface(this.db);
     }
 
     async disconnect(): Promise<void> {
@@ -58,38 +61,12 @@ export default class DefaultMessagesDb extends MessagesDbPluginBase {
     /**
      * Get all the chats from the DB
      *
-     * @param identifier A specific chat identifier to get
-     * @param withParticipants Whether to include the participants or not
+     * @param params GetChatParams
      */
-    async getChats({
-        guid = null,
-        withHandles = true,
-        withMessages = false,
-        includeArchived = true,
-        includeSms = false,
-        offset = 0,
-        limit = null
-    }: GetChatsParams): Promise<ChatSpec[]> {
-        const query = this.db.getRepository(Chat).createQueryBuilder("chat");
-
-        // Inner-join because a chat must have participants
-        if (withHandles) query.innerJoinAndSelect("chat.participants", "handle");
-
-        // Left-join because a chat may or may not have any messages
-        if (withMessages) query.leftJoinAndSelect("chat.messages", "message");
-
-        // Add default WHERE clauses
-        if (!includeSms) query.andWhere("chat.service_name = 'iMessage'");
-        if (!includeArchived) query.andWhere("chat.is_archived = 0");
-        if (guid) query.andWhere("chat.guid = :guid", { guid });
-
-        // Set page params
-        query.offset(offset);
-        if (limit) query.limit(limit);
-
-        // Get results
-        const chats = await query.getMany();
-        return chats;
+    async getChats(params: GetChatsParams): Promise<ChatSpec[]> {
+        const chats = await this.api.getChats(params);
+        const transformed = chats.map(chat => chatToSpec(chat));
+        return transformed;
     }
 
     /**
@@ -122,16 +99,9 @@ export default class DefaultMessagesDb extends MessagesDbPluginBase {
      * @param guid A specific chat identifier to get
      */
     async getChatParticipants(guid: string): Promise<HandleSpec[]> {
-        const query = this.db.getRepository(Handle).createQueryBuilder("handle");
-
-        // Inner-join because a handle may or may not have a chat technically
-        query.leftJoinAndSelect("handle.chats", "chat");
-
-        // Add in the param for the chat GUID
-        query.andWhere("chat.guid = :guid", { guid });
-
-        // Get results
-        return query.getMany();
+        const handles = await this.api.getChatParticipants(guid);
+        const transformed = handles.map(handle => handleToSpec(handle));
+        return transformed;
     }
 
     /**
@@ -157,198 +127,23 @@ export default class DefaultMessagesDb extends MessagesDbPluginBase {
     /**
      * Gets all messages
      *
-     * @param guid A specific chat identifier to get
+     * @param params GetMessagesParams
      */
-    async getMessages({
-        guid = null,
-        chatGuid = null,
-        associatedMessageGuid = null,
-        withChats = true,
-        withHandle = true,
-        withOtherHandle = false,
-        withAttachments = true,
-        withAttachmentsData = false,
-        includeSms = false,
-        before = null,
-        after = null,
-        offset = 0,
-        limit = 100,
-        sort = "DESC",
-        where = []
-    }: GetMessagesParams): Promise<MessageSpec[]> {
-        let beforeDate = before;
-        let afterDate = after;
-
-        // Sanitize some params
-        if (after && typeof after === "number") afterDate = new Date(after);
-        if (before && typeof before === "number") beforeDate = new Date(before);
-
-        // Get messages with sender and the chat it's from
-        const query = this.db.getRepository(Message).createQueryBuilder("message");
-
-        if (withHandle) query.leftJoinAndSelect("message.handle", "handle");
-
-        if (withAttachments)
-            query.leftJoinAndSelect(
-                "message.attachments",
-                "attachment",
-                "message.ROWID = message_attachment.message_id AND " +
-                    "attachment.ROWID = message_attachment.attachment_id"
-            );
-
-        // Inner-join because all messages will have a chat
-        if (chatGuid) {
-            query
-                .innerJoinAndSelect(
-                    "message.chats",
-                    "chat",
-                    "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
-                )
-                .andWhere("chat.guid = :guid", { guid: chatGuid });
-        } else if (withChats) {
-            query.innerJoinAndSelect(
-                "message.chats",
-                "chat",
-                "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
-            );
-        }
-
-        // Add date restraints
-        if (afterDate)
-            query.andWhere("message.date >= :after", {
-                after: convertDateTo2001Time(afterDate as Date)
-            });
-        if (beforeDate)
-            query.andWhere("message.date < :before", {
-                before: convertDateTo2001Time(beforeDate as Date)
-            });
-        if (guid) query.andWhere("message.guid = :guid", { guid });
-        if (!includeSms) {
-            query.andWhere("message.service = 'iMessage'");
-        }
-
-        let whereCpy = [...where];
-        if (whereCpy && whereCpy.length > 0) {
-            // If withSMS is enabled, remove any statements specifying the message service
-            if (includeSms) {
-                whereCpy = whereCpy.filter(item => item.statement !== `message.service = 'iMessage'`);
-            }
-
-            for (const item of whereCpy) {
-                query.andWhere(item.statement, item.args);
-            }
-        }
-
-        // Add pagination params
-        query.orderBy("message.date", sort);
-        query.offset(offset);
-        query.limit(limit);
-
-        return query.getMany();
+    async getMessages(params: GetMessagesParams): Promise<MessageSpec[]> {
+        const messages = await this.api.getMessages(params);
+        const transformed = messages.map(message => messageToSpec(message));
+        return transformed;
     }
 
     /**
      * Helper for getting updated messages from the DB (delivered/read)
      *
-     * @param guid A specific chat identifier to get
+     * @param params GetMessagesParams
      */
-    async getUpdatedMessages({
-        chatGuid = null,
-        withChats = true,
-        withHandle = true,
-        withAttachments = true,
-        includeSms = false,
-        before = null,
-        after = null,
-        offset = 0,
-        limit = 100,
-        sort = "DESC",
-        where = []
-    }: GetMessagesParams): Promise<MessageSpec[]> {
-        let beforeDate = before;
-        let afterDate = after;
-
-        // Sanitize some params
-        if (afterDate && typeof afterDate === "number") afterDate = new Date(afterDate);
-        if (beforeDate && typeof beforeDate === "number") beforeDate = new Date(beforeDate);
-
-        // Get messages with sender and the chat it's from
-        const query = this.db.getRepository(Message).createQueryBuilder("message");
-
-        if (withHandle) query.leftJoinAndSelect("message.handle", "handle");
-
-        // Add the with attachments query
-        if (withAttachments)
-            query.leftJoinAndSelect(
-                "message.attachments",
-                "attachment",
-                "message.ROWID = message_attachment.message_id AND " +
-                    "attachment.ROWID = message_attachment.attachment_id"
-            );
-
-        // Inner-join because all messages will have a chat
-        if (chatGuid) {
-            query
-                .innerJoinAndSelect(
-                    "message.chats",
-                    "chat",
-                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
-                )
-                .andWhere("chat.guid = :guid", { guid: chatGuid });
-        } else if (withChats) {
-            query.innerJoinAndSelect(
-                "message.chats",
-                "chat",
-                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
-            );
-        }
-
-        // Add default WHERE clauses
-        query.andWhere("message.service == 'iMessage'");
-
-        // Add any custom WHERE clauses
-        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
-
-        // Add date_delivered constraints
-        if (afterDate)
-            query.andWhere("message.date_delivered >= :after", {
-                after: convertDateTo2001Time(afterDate as Date)
-            });
-        if (beforeDate)
-            query.andWhere("message.date_delivered < :before", {
-                before: convertDateTo2001Time(beforeDate as Date)
-            });
-
-        // Add date_read constraints
-        if (afterDate)
-            query.orWhere("message.date_read >= :after", {
-                after: convertDateTo2001Time(afterDate as Date)
-            });
-        if (beforeDate)
-            query.andWhere("message.date_read < :before", {
-                before: convertDateTo2001Time(beforeDate as Date)
-            });
-
-        // Add any custom WHERE clauses
-        // We have to do this here so that it matches both before the OR and after the OR
-        let whereCpy = [...where];
-        if (whereCpy && whereCpy.length > 0) {
-            // If withSMS is enabled, remove any statements specifying the message service
-            if (includeSms) {
-                whereCpy = whereCpy.filter(item => item.statement !== `message.service = 'iMessage'`);
-            }
-
-            for (const item of whereCpy) {
-                query.andWhere(item.statement, item.args);
-            }
-        }
-
-        // Add pagination params
-        query.orderBy("message.date", sort);
-        query.offset(offset);
-        query.limit(limit);
-
-        return query.getMany();
+    async getUpdatedMessages(params: GetMessagesParams): Promise<MessageSpec[]> {
+        const messages = await this.api.getMessages(params);
+        const transformed = messages.map(message => messageToSpec(message));
+        return transformed;
     }
 
     /**
@@ -367,35 +162,12 @@ export default class DefaultMessagesDb extends MessagesDbPluginBase {
     /**
      * Get the handles from the DB
      *
-     * @param identifier A specific chat identifier to get
-     * @param withParticipants Whether to include the participants or not
+     * @param params GetJHandlesParams
      */
-    async getHandles({
-        address = null,
-        withChats = true,
-        offset = 0,
-        limit = null,
-        where = []
-    }: GetHandlesParams): Promise<HandleSpec[]> {
-        const query = this.db.getRepository(Handle).createQueryBuilder("handle");
-
-        // Inner-join because a handle may or may not have a chat technically
-        if (withChats) query.leftJoinAndSelect("handle.chats", "chat");
-
-        // Add in the param for address querying
-        if (address) query.andWhere("handle.id = :address OR handle.uncanonicalized_id = :address", { address });
-
-        // Add in the where clauses
-        for (const item of where ?? []) {
-            query.andWhere(item.statement, item.args);
-        }
-
-        // Set page params
-        query.offset(offset);
-        if (limit) query.limit(limit);
-
-        // Get results
-        return query.getMany();
+    async getHandles(params: GetHandlesParams): Promise<HandleSpec[]> {
+        const handles = await this.api.getHandles(params);
+        const transformed = handles.map(handle => handleToSpec(handle));
+        return transformed;
     }
 
     /**
@@ -417,42 +189,10 @@ export default class DefaultMessagesDb extends MessagesDbPluginBase {
      * @param identifier A specific chat identifier to get
      * @param withParticipants Whether to include the participants or not
      */
-    async getAttachments({
-        guid = null,
-        withData = false,
-        withMessages = false,
-        offset = 0,
-        limit = null,
-        where = []
-    }: GetAttachmentsParams): Promise<AttachmentSpec[]> {
-        const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
-
-        // Inner-join because a handle may or may not have a chat technically
-        if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
-
-        // Add in the param for guid querying
-        if (guid) query.andWhere("attachment.guid = :guid", { guid });
-
-        // Add in the where clauses
-        for (const item of where ?? []) {
-            query.andWhere(item.statement, item.args);
-        }
-
-        // Set page params
-        query.offset(offset);
-        if (limit) query.limit(limit);
-
-        // Get results
-        const attachments = await query.getMany();
-
-        // Load attachments
-        if (withData) {
-            for (let i = 0; i < attachments.length; i += 1) {
-                // Do nothing for now
-            }
-        }
-
-        return attachments;
+    async getAttachments(params: GetAttachmentsParams): Promise<AttachmentSpec[]> {
+        const attachments = await this.api.getAttachments(params);
+        const transformed = attachments.map(attachment => attachmentToSpec(attachment));
+        return transformed;
     }
 
     /**
