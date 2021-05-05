@@ -8,7 +8,7 @@ export class ChatApi {
     public static async getChats(plugin: DefaultApiPlugin, params?: GetChatsParams): Promise<ChatSpec[]> {
         const dbPlugins = (await plugin.getPluginsByType(IPluginTypes.MESSAGES_DB)) as MessagesDbPluginBase[];
         const dbPlugin = dbPlugins && dbPlugins.length > 0 ? dbPlugins[0] : null;
-        if (!dbPlugin) throw new Error("No Messages DB plugins found!");
+        if (!dbPlugin) throw new Error("No Messages API plugin found!");
         return dbPlugin.getChats(params ?? {});
     }
 

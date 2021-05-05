@@ -23,6 +23,14 @@ export class Response {
         });
     }
 
+    public static notFound(res: WS.HttpResponse) {
+        res.writeStatus(`404 Not Found`);
+        Response.respond(res, {
+            code: 404,
+            message: "Endpoint does not exist"
+        });
+    }
+
     public static unauthorized(res: WS.HttpResponse, code = 401, errors?: string[] | string) {
         res.writeStatus(`${code} Unauthorized`);
         Response.respond(res, {

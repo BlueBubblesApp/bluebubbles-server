@@ -4,12 +4,13 @@ import { ChatSpec, GetChatsParams } from "@server/plugins/messages_api/types";
 import { IPluginTypes } from "@server/plugins/types";
 import { DataTransformerPluginBase } from "@server/plugins/data_transformer/base";
 
-import { SharedChatApi } from "../../../../shared/sharedChatApi";
+import { ChatApi } from "../../../../common/chat/index";
 import type { UpgradedHttp } from "../../../../types";
+import { Response } from "../../../../helpers/response";
 
-export const getChats = async (res: WS.HttpResponse, req: WS.HttpRequest): Promise<ChatSpec[]> => {
+export const getChats = async (res: WS.HttpResponse, req: WS.HttpRequest): Promise<void> => {
     const context = req as UpgradedHttp;
-    const chats = await SharedChatApi.getChats(context.plugin, context.params as GetChatsParams);
+    let chats = await ChatApi.getChats(context.plugin, context.params as GetChatsParams);
 
     // Get the data transformer
     const dbPlugins = (await context.plugin.getPluginsByType(
@@ -20,10 +21,10 @@ export const getChats = async (res: WS.HttpResponse, req: WS.HttpRequest): Promi
     // Transform the data if we can
     if (dbPlugin && dbPlugin.chatSpecToApi) {
         // eslint-disable-next-line no-return-await
-        return chats.map(async item => await dbPlugin.chatSpecToApi(item));
+        chats = chats.map(async item => await dbPlugin.chatSpecToApi(item));
     }
 
-    return chats;
+    Response.ok(res, chats);
 };
 
 export const getChat = async (res: WS.HttpResponse, req: WS.HttpRequest): Promise<ChatSpec> => {
@@ -31,7 +32,7 @@ export const getChat = async (res: WS.HttpResponse, req: WS.HttpRequest): Promis
     const { guid } = context.params;
     if (!guid) throw new Error("No Chat GUID provided!");
 
-    const chat = await SharedChatApi.getChat(context.plugin, guid as string, context.params as GetChatsParams);
+    const chat = await ChatApi.getChat(context.plugin, guid as string, context.params as GetChatsParams);
 
     // Get the data transformer
     const dbPlugins = (await context.plugin.getPluginsByType(

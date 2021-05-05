@@ -26,7 +26,7 @@ import { convertDateTo2001Time } from "./helpers/dateUtil";
 const configuration: IPluginConfig = {
     name: "default",
     type: IPluginTypes.MESSAGES_DB,
-    displayName: "Default Messages DB",
+    displayName: "Default Messages API",
     description: "This is the default Messages Database for BlueBubbles",
     version: 1,
     properties: []

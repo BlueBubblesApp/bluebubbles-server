@@ -10,6 +10,7 @@ import { UpgradedHttp, WsMiddleware } from "../../../types";
 import { tokenAuth } from "./auth";
 import { ping } from "./general";
 import { getPlugins } from "./plugin";
+import { getChats } from "./chat";
 
 export class HttpRouter implements HttpRouterBase {
     name = "v1";
@@ -33,11 +34,17 @@ export class HttpRouter implements HttpRouterBase {
     public async serve() {
         this.app.get(HttpRouter.path("/ping"), this.base(ping));
 
+        // Authentication routes
+        this.app.post(HttpRouter.path("/token"), this.base(tokenAuth));
+
+        // Chat API routes
+        this.app.get(HttpRouter.path("/chat"), this.protected(getChats));
+
         // Plugin routes
         this.app.get(HttpRouter.path("/plugin"), this.protected(getPlugins));
 
-        // Authentication routes
-        this.app.post(HttpRouter.path("/token"), this.base(tokenAuth));
+        // Catch-all for any unhandled routes (404)
+        this.app.any("/*", (res, _) => Response.notFound(res));
     }
 
     public base(...handlers: WsMiddleware[]): WsMiddleware {
