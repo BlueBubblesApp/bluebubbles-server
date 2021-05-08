@@ -157,7 +157,7 @@ export default class DefaultApiPlugin extends ApiPluginBase {
 
         this.app.ws("/ws/*", {
             upgrade: async (res: WS.HttpResponse, req: WS.HttpRequest, context: WS.WebSocketBehavior) => {
-                console.log(`A WebSocket connected via URL: "${req.getUrl()}"`);
+                this.logger.info(`A WebSocket connected via URL: "${req.getUrl()}"`);
 
                 // Parse the request for headers, params, and JSON data
                 const parsed = await Parsers.parseRequest(req, res);
@@ -200,7 +200,7 @@ export default class DefaultApiPlugin extends ApiPluginBase {
                 return next(token);
             },
             close: (_: WS.WebSocket, __: number, ___: ArrayBuffer) => {
-                console.log(`A WebSocket disconnected`);
+                this.logger.info(`A WebSocket disconnected`);
             },
             open: (ws: WS.WebSocket) => {
                 // Re-brand to incorporate new injected fields
