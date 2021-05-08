@@ -81,16 +81,16 @@ abstract class PluginBase extends EventEmitter {
         return Server().pluginManager.getPluginsByType(type);
     }
 
-    getProperty(name: string, catchError = false): any {
+    getProperty(name: string, defaultValue: any = undefined): any {
         try {
             return Server().pluginManager.getPluginProperty(this.id, name);
         } catch (ex) {
-            if (catchError) {
-                throw ex;
+            if (defaultValue !== undefined) {
+                return defaultValue;
             }
-        }
 
-        return null;
+            throw ex;
+        }
     }
 
     setProperty(name: string, value: any): any {

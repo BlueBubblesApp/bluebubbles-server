@@ -1,20 +1,21 @@
 import { Server } from "@server/index";
-import { MessageRepository } from "@server/databases/imessage";
-import { EventCache } from "@server/eventCache";
-import { getCacheName } from "@server/databases/imessage/helpers/utils";
-import { DBWhereItem } from "@server/databases/imessage/types";
 import { onlyAlphaNumeric } from "@server/helpers/utils";
-import { ChangeListener } from "./changeListener";
+import { EventCache } from "@server/helpers/eventCache";
+import { ChangeListener } from "@server/interface/changeListener";
+
+import { getCacheName } from "../helpers/utils";
+import type DefaultMessagesApi from "../index";
+import { ApiEvent, TypeOrmWhereParam } from "../../types";
 
 export class OutgoingMessageListener extends ChangeListener {
-    repo: MessageRepository;
+    app: DefaultMessagesApi;
 
     notSent: number[];
 
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
+    constructor(app: DefaultMessagesApi, cache: EventCache, pollFrequency: number) {
         super({ cache, pollFrequency });
 
-        this.repo = repo;
+        this.app = app;
         this.notSent = [];
 
         // Start the listener
@@ -54,19 +55,19 @@ export class OutgoingMessageListener extends ChangeListener {
         // Get all queued items
         const entries = await repo.find();
         if (entries.length > 0) {
-            Server().log(`Detected ${entries.length} queued outgoing message(s)`, "debug");
+            this.app.logger.debug(`Detected ${entries.length} queued outgoing message(s)`);
         }
 
         for (const entry of entries) {
             // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
             if (now - entry.dateCreated > 1000 * 60) {
                 await repo.remove(entry);
-                super.emit("message-timeout", entry);
+                super.emit(ApiEvent.MESSAGE_TIMEOUT, entry);
                 continue;
             }
 
             // The "default" where clause. Just stuff from ourselves
-            let where: DBWhereItem[] = [
+            let where: TypeOrmWhereParam[] = [
                 {
                     // Text must be from yourself
                     statement: "message.is_from_me = :fromMe",
@@ -95,7 +96,7 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Check for any message created after the "date created" of the queue item
             // We will (re)emit all messages. The cache should catch if any dupes are being sent
-            let matches = await Server().iMessageRepo.getMessages({
+            let matches = await this.app.api.getMessages({
                 chatGuid: entry.chatGuid,
                 limit: 25, // 25 is semi-arbitrary. We just don't want to miss anything
                 withHandle: false, // Exclude to speed up query
@@ -118,7 +119,7 @@ export class OutgoingMessageListener extends ChangeListener {
                 if (this.cache.find(matchGuid)) continue;
 
                 // Emit the message match to listeners
-                super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
+                super.emit(ApiEvent.MESSAGE_MATCH, { tempGuid: entry.tempGuid, message: match });
 
                 // Add the message to the cache
                 const cacheName = getCacheName(match);
@@ -146,16 +147,16 @@ export class OutgoingMessageListener extends ChangeListener {
         ];
 
         // If SMS support is disabled, only search for iMessage
-        const smsSupport = Server().db.getConfig("sms_support") as boolean;
-        if (!smsSupport) {
-            baseQuery.push({
-                statement: "message.service = 'iMessage'",
-                args: null
-            });
-        }
+        // const smsSupport = Server().db.getConfig("sms_support") as boolean;
+        // if (!smsSupport) {
+        //     baseQuery.push({
+        //         statement: "message.service = 'iMessage'",
+        //         args: null
+        //     });
+        // }
 
         // First, check for unsent messages
-        const newUnsent = await this.repo.getMessages({
+        const newUnsent = await this.app.api.getMessages({
             after,
             before,
             withChats: false,
@@ -171,11 +172,11 @@ export class OutgoingMessageListener extends ChangeListener {
         });
 
         if (newUnsent.length > 0) {
-            Server().log(`Detected ${newUnsent.length} unsent outgoing message(s)`, "debug");
+            this.app.logger.debug(`Detected ${newUnsent.length} unsent outgoing message(s)`);
         }
 
         // Second, check for sent messages
-        const newSent = await this.repo.getMessages({
+        const newSent = await this.app.api.getMessages({
             after,
             before,
             withChats: true,
@@ -205,7 +206,7 @@ export class OutgoingMessageListener extends ChangeListener {
         }
 
         // Third, check for anything that hasn't been sent
-        const lookbackSent = await this.repo.getMessages({
+        const lookbackSent = await this.app.api.getMessages({
             withChats: true,
             where: [
                 ...baseQuery,
@@ -217,7 +218,7 @@ export class OutgoingMessageListener extends ChangeListener {
         });
 
         if (lookbackSent.length > 0) {
-            Server().log(`Detected ${lookbackSent.length} sent (previously unsent) message(s)`, "debug");
+            this.app.logger.debug(`Detected ${lookbackSent.length} sent (previously unsent) message(s)`);
         }
 
         // Fourth, add the new unsent items to the list
@@ -236,28 +237,28 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Add to cache
             this.cache.add(cacheName);
-            super.emit("new-entry", entry);
+            super.emit(ApiEvent.NEW_MESSAGE, entry);
         }
 
         // Emit the errored messages
         const errored = lookbackSent.filter(item => item.error > 0);
-        for (const entry of errored) super.emit("message-send-error", entry);
+        for (const entry of errored) super.emit(ApiEvent.MESSAGE_SEND_ERROR, entry);
     }
 
     async emitUpdatedMessages(after: Date, before: Date) {
-        const baseQuery: DBWhereItem[] = [];
+        const baseQuery: TypeOrmWhereParam[] = [];
 
         // If SMS support is disabled, only search for iMessage
-        const smsSupport = Server().db.getConfig("sms_support") as boolean;
-        if (!smsSupport) {
-            baseQuery.push({
-                statement: "message.service = 'iMessage'",
-                args: null
-            });
-        }
+        // const smsSupport = Server().db.getConfig("sms_support") as boolean;
+        // if (!smsSupport) {
+        //     baseQuery.push({
+        //         statement: "message.service = 'iMessage'",
+        //         args: null
+        //     });
+        // }
 
         // Get updated entries from myself only
-        const entries = await this.repo.getUpdatedMessages({
+        const entries = await this.app.api.getUpdatedMessages({
             after,
             before,
             withChats: true,
@@ -271,7 +272,7 @@ export class OutgoingMessageListener extends ChangeListener {
         });
 
         if (entries.length > 0) {
-            Server().log(`Detected ${entries.length} updated message(s)`, "debug");
+            this.app.logger.debug(`Detected ${entries.length} updated message(s)`);
         }
 
         // Emit the new message
@@ -286,7 +287,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Send the built message object
-            super.emit("updated-entry", entry);
+            super.emit(ApiEvent.UPDATED_MESSAGE, entry);
 
             // Add artificial delay so we don't overwhelm any listeners
             await new Promise<void>((resolve, _) => setTimeout(() => resolve(), 200));

@@ -13,7 +13,7 @@ export class AuthApi {
         if (!db) throw new Error("Database has not yet been initialized!");
 
         const token = await db.generateToken(name);
-        const password = plugin.getProperty("password") as string;
+        const password = plugin.getProperty("password", null) as string;
         if (!password) throw new Error("Password is required, but has not been set!");
         return TokenHelper.generateJwt(token, password);
     }

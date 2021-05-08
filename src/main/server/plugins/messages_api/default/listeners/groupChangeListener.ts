@@ -1,16 +1,18 @@
-import MessagesRepo from "../index";
-import { Message } from "../entity/Message";
-import { ChangeListener } from "./changeListener";
+import { ChangeListener } from "@server/interface/changeListener";
+
+import type DefaultMessagesApi from "../index";
+import type { Message } from "../entity/Message";
+import { ApiEvent } from "../../types";
 
 export class GroupChangeListener extends ChangeListener {
-    repo: MessagesRepo;
+    app: DefaultMessagesApi;
 
     frequencyMs: number;
 
-    constructor(repo: MessagesRepo, pollFrequency: number) {
+    constructor(app: DefaultMessagesApi, pollFrequency: number) {
         super({ pollFrequency });
 
-        this.repo = repo;
+        this.app = app;
         this.frequencyMs = pollFrequency;
 
         // Start the listener
@@ -19,7 +21,7 @@ export class GroupChangeListener extends ChangeListener {
 
     async getEntries(after: Date, before: Date): Promise<void> {
         const offsetDate = new Date(after.getTime() - 5000);
-        const entries = await this.repo.getMessages({
+        const entries = await this.app.api.getMessages({
             after: offsetDate,
             before,
             where: [
@@ -44,13 +46,13 @@ export class GroupChangeListener extends ChangeListener {
 
             // Send the built message object
             if (entry.itemType === 1 && entry.groupActionType === 0) {
-                super.emit("participant-added", this.transformEntry(entry));
+                super.emit(ApiEvent.GROUP_PARTICIPANT_ADDED, this.transformEntry(entry));
             } else if (entry.itemType === 1 && entry.groupActionType === 1) {
-                super.emit("participant-removed", this.transformEntry(entry));
+                super.emit(ApiEvent.GROUP_PARTICIPANT_REMOVED, this.transformEntry(entry));
             } else if (entry.itemType === 2) {
-                super.emit("name-change", this.transformEntry(entry));
+                super.emit(ApiEvent.GROUP_NAME_CHANGE, this.transformEntry(entry));
             } else if (entry.itemType === 3) {
-                super.emit("participant-left", this.transformEntry(entry));
+                super.emit(ApiEvent.GROUP_PARTICIPANT_LEFT, this.transformEntry(entry));
             } else {
                 console.warn(`Unhandled message item type: [${entry.itemType}]`);
             }

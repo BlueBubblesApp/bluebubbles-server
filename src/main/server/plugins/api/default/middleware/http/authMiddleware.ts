@@ -17,9 +17,11 @@ export class AuthMiddleware {
         const token = (context?.headers?.authorization ?? context.params.Authorization ?? "") as string;
         if (!token || token.length === 0) {
             fail('Missing "Authorization" header');
-            // If the token is not valid, return a bad request
+        } else if (token && !token.startsWith("Bearer ")) {
+            fail("Invalid Authorization token! Token must be a `Bearer` token.");
         } else {
-            const dbToken = await AuthApi.getToken(context.plugin.db, token);
+            const tokenValue = token.split("Bearer ")[1];
+            const dbToken = await AuthApi.getToken(context.plugin.db, tokenValue);
             if (!dbToken) {
                 fail("Invalid Token");
             } else {

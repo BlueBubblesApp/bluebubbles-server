@@ -1,4 +1,6 @@
 import * as JWT from "jsonwebtoken";
+import * as CryptoJS from "crypto-js";
+
 import { Token } from "../database/entity";
 import { DEFAULT_PASSWORD } from "../constants";
 
@@ -11,15 +13,11 @@ export class TokenHelper {
             audience: "bluebubbles-clients"
         };
 
-        return JWT.sign(
-            {
-                data: {
-                    accessToken: token.accessToken,
-                    refreshToken: token.refreshToken
-                }
-            },
-            password,
-            opts
-        );
+        // AES encrypt the token data using the password
+        const authData = JSON.stringify({ accessToken: token.accessToken, refreshToken: token.refreshToken });
+        const encryptedAuth = CryptoJS.AES.encrypt(authData, password);
+
+        // Create a JWT for the data
+        return JWT.sign({ data: encryptedAuth.toString() }, password, opts);
     }
 }

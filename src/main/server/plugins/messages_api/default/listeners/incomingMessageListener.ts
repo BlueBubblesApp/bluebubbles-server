@@ -1,17 +1,19 @@
-import { EventCache } from "@server/eventCache";
+import type { EventCache } from "@server/helpers/eventCache";
 
-import MessagesRepo from "../index";
-import { Message } from "../entity/Message";
-import { ChangeListener } from "./changeListener";
+import { ChangeListener } from "@server/interface/changeListener";
 import { getCacheName } from "../helpers/utils";
 
-export class IncomingMessageListener extends ChangeListener {
-    repo: MessagesRepo;
+import type DefaultMessagesApi from "../index";
+import type { Message } from "../entity/Message";
+import { ApiEvent } from "../../types";
 
-    constructor(repo: MessagesRepo, cache: EventCache, pollFrequency: number) {
+export class IncomingMessageListener extends ChangeListener {
+    app: DefaultMessagesApi;
+
+    constructor(app: DefaultMessagesApi, cache: EventCache, pollFrequency: number) {
         super({ cache, pollFrequency });
 
-        this.repo = repo;
+        this.app = app;
 
         // Start the listener
         this.start();
@@ -28,15 +30,15 @@ export class IncomingMessageListener extends ChangeListener {
         ];
 
         // If SMS support isn't enabled, add the iMessage server specifier
-        const smsSupport = Server().db.getConfig("sms_support") as boolean;
-        if (!smsSupport) {
-            query.push({
-                statement: "message.service = 'iMessage'",
-                args: null
-            });
-        }
+        // const smsSupport = Server().db.getConfig("sms_support") as boolean;
+        // if (!smsSupport) {
+        //     query.push({
+        //         statement: "message.service = 'iMessage'",
+        //         args: null
+        //     });
+        // }
 
-        const entries = await this.repo.getMessages({
+        const entries = await this.app.api.getMessages({
             after: offsetDate,
             before,
             withChats: true,
@@ -52,7 +54,7 @@ export class IncomingMessageListener extends ChangeListener {
 
             // Add to cache
             this.cache.add(cacheName);
-            super.emit("new-entry", this.transformEntry(entry));
+            super.emit(ApiEvent.NEW_MESSAGE, this.transformEntry(entry));
         });
     }
 

@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { EventCache } from "@server/eventCache";
+import { EventCache } from "@server/helpers/eventCache";
 
 export abstract class ChangeListener extends EventEmitter {
     stopped: boolean;

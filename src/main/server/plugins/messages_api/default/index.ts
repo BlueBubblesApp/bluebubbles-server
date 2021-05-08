@@ -2,9 +2,10 @@
 import { createConnection, Connection } from "typeorm";
 
 // All the plugin scaffolding & types
-import { IPluginConfig, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
+import { IPluginConfig, IPluginConfigPropItemType, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
 import { MessagesApiPluginBase } from "@server/plugins/messages_api/base";
-import { convertDateTo2001Time } from "@server/helpers/dateUtil";
+import { EventCache } from "@server/helpers/eventCache";
+import { ChangeListener } from "@server/interface/changeListener";
 import {
     AttachmentSpec,
     ChatSpec,
@@ -13,7 +14,8 @@ import {
     GetAttachmentsParams,
     GetChatsParams,
     GetHandlesParams,
-    GetMessagesParams
+    GetMessagesParams,
+    ApiEvent
 } from "@server/plugins/messages_api/types";
 
 // All the custom plugin imports
@@ -23,6 +25,7 @@ import { Message } from "./entity/Message";
 import { Attachment } from "./entity/Attachment";
 import { ApiInterface } from "./interface";
 import { attachmentToSpec, chatToSpec, handleToSpec, messageToSpec } from "./helpers/responseTransformers";
+import { GroupChangeListener, IncomingMessageListener, OutgoingMessageListener } from "./listeners";
 
 // Your plugin configuration
 const configuration: IPluginConfig = {
@@ -31,13 +34,25 @@ const configuration: IPluginConfig = {
     displayName: "Default Messages API",
     description: "This is the default Messages Database for BlueBubbles",
     version: 1,
-    properties: []
+    properties: [
+        {
+            name: "poll_frequency",
+            label: "Poll Frequency",
+            type: IPluginConfigPropItemType.NUMBER,
+            description: "Enter the local port to open up to outside access.",
+            default: 1234,
+            placeholder: "Enter a number between 100 and 65,535.",
+            required: true
+        }
+    ]
 };
 
 export default class DefaultMessagesApi extends MessagesApiPluginBase {
     db: Connection = null;
 
     api: ApiInterface = null;
+
+    dbListeners: ChangeListener[] = [];
 
     constructor(args: PluginConstructorParams) {
         super({ ...args, config: configuration });
@@ -52,9 +67,44 @@ export default class DefaultMessagesApi extends MessagesApiPluginBase {
         });
 
         this.api = new ApiInterface(this.db);
+        this.registerDbListeners();
+    }
+
+    registerDbListeners() {
+        const eventCache = new EventCache();
+        const frequency = this.getProperty("poll_frequency", 1000);
+        const incomingListener = new IncomingMessageListener(this, eventCache, frequency);
+        const outgoingListener = new OutgoingMessageListener(this, eventCache, frequency);
+        const groupListener = new GroupChangeListener(this, frequency);
+
+        // Set the listeners
+        this.dbListeners = [incomingListener, outgoingListener, groupListener];
+
+        // Forward everything through this plugin's emitter
+        incomingListener.on(ApiEvent.NEW_MESSAGE, data => this.emit(ApiEvent.NEW_MESSAGE, data));
+        outgoingListener.on(ApiEvent.NEW_MESSAGE, data => this.emit(ApiEvent.NEW_MESSAGE, data));
+        outgoingListener.on(ApiEvent.UPDATED_MESSAGE, data => this.emit(ApiEvent.UPDATED_MESSAGE, data));
+        outgoingListener.on(ApiEvent.MESSAGE_TIMEOUT, data => this.emit(ApiEvent.MESSAGE_TIMEOUT, data));
+        outgoingListener.on(ApiEvent.MESSAGE_MATCH, data => this.emit(ApiEvent.MESSAGE_MATCH, data));
+        outgoingListener.on(ApiEvent.MESSAGE_SEND_ERROR, data => this.emit(ApiEvent.MESSAGE_SEND_ERROR, data));
+
+        // Forward group events as normal message events
+        groupListener.on(ApiEvent.GROUP_PARTICIPANT_ADDED, data => this.emit(ApiEvent.NEW_MESSAGE, data));
+        groupListener.on(ApiEvent.GROUP_PARTICIPANT_REMOVED, data => this.emit(ApiEvent.NEW_MESSAGE, data));
+        groupListener.on(ApiEvent.GROUP_NAME_CHANGE, data => this.emit(ApiEvent.NEW_MESSAGE, data));
+        groupListener.on(ApiEvent.GROUP_PARTICIPANT_LEFT, data => this.emit(ApiEvent.NEW_MESSAGE, data));
+    }
+
+    unregisterDbListeners() {
+        for (const item of this.dbListeners) {
+            item.stop();
+        }
+
+        this.dbListeners = [];
     }
 
     async disconnect(): Promise<void> {
+        await this.unregisterDbListeners();
         await this.db.close();
     }
 

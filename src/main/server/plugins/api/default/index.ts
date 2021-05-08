@@ -1,9 +1,11 @@
 import * as WS from "@trufflesuite/uws-js-unofficial";
 import * as path from "path";
 import * as fs from "fs";
-import * as QueryString from "querystring";
 
 import { IPluginConfig, IPluginConfigPropItemType, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
+import { MessagesApiPluginBase } from "@server/plugins/messages_api/base";
+import { ApiEvent } from "@server/plugins/messages_api/types";
+
 import { ApiPluginBase } from "../base";
 import { HttpRouterV1 } from "./router/http";
 import { Response } from "./helpers/response";
@@ -44,7 +46,7 @@ const configuration: IPluginConfig = {
             required: true
         }
     ],
-    dependencies: [] // ['messages_api.default'] // Other plugins this depends on (<type>.<name>)
+    dependencies: ["messages_api.default"] // Other plugins this depends on (<type>.<name>)
 };
 
 export default class DefaultApiPlugin extends ApiPluginBase {
@@ -119,6 +121,8 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         } else {
             this.logger.error(`Invalid port provided! Port provided: ${port}`);
         }
+
+        this.startMessagesApiListeners();
     }
 
     /**
@@ -230,6 +234,55 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         }
 
         this.logger.info("Finished setting up routes...");
+    }
+
+    async startMessagesApiListeners(): Promise<void> {
+        const apiPlugins = (await this.getPluginsByType(IPluginTypes.MESSAGES_API)) as MessagesApiPluginBase[];
+        const apiPlugin = apiPlugins && apiPlugins.length > 0 ? apiPlugins[0] : null;
+
+        console.log("HERE IS THE PROB");
+        if (!apiPlugin) {
+            this.logger.error("No Messages Api plugin found! Message updates will not be supported!");
+            return;
+        }
+
+        console.log("HERE IS THE PROB 2");
+
+        apiPlugin.on(ApiEvent.NEW_MESSAGE, () => {
+            this.logger.info("New Message!");
+        });
+
+        apiPlugin.on(ApiEvent.UPDATED_MESSAGE, () => {
+            this.logger.info("Updated Message!");
+        });
+
+        apiPlugin.on(ApiEvent.MESSAGE_MATCH, () => {
+            this.logger.info("Message Match!");
+        });
+
+        apiPlugin.on(ApiEvent.GROUP_NAME_CHANGE, () => {
+            this.logger.info("Group Name Change!");
+        });
+
+        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_ADDED, () => {
+            this.logger.info("Group Participant Added!");
+        });
+
+        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_REMOVED, () => {
+            this.logger.info("Group Participant Removed!");
+        });
+
+        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_LEFT, () => {
+            this.logger.info("Group Participant Left!");
+        });
+
+        apiPlugin.on(ApiEvent.MESSAGE_SEND_ERROR, () => {
+            this.logger.info("Message Send Error!");
+        });
+
+        apiPlugin.on(ApiEvent.MESSAGE_TIMEOUT, () => {
+            this.logger.info("Message Timeout!");
+        });
     }
 
     /**

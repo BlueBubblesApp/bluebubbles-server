@@ -96,7 +96,7 @@ export default class NgrokPlugin extends GeneralPluginBase {
 
     async startup() {
         // If there is a ngrok API key set, and we have a refresh timer going, kill it
-        const ngrokKey = this.getProperty("token");
+        const ngrokKey = this.getProperty("token", null);
         if (ngrokKey && this.refreshTimer) clearTimeout(this.refreshTimer);
 
         // As long as the auth token isn't null or undefined, set it

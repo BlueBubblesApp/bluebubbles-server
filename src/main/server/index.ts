@@ -38,7 +38,7 @@ import { PluginManager } from "@server/plugins";
 //     QueueService,
 //     IPCService
 // } from "@server/services";
-import { EventCache } from "@server/eventCache";
+import { EventCache } from "@server/helpers/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
@@ -210,7 +210,6 @@ export class BlueBubblesServer extends EventEmitter {
 
         await this.startServices();
         await this.postChecks();
-
         this.emit("setup-complete");
     }
 
