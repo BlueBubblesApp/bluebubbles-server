@@ -1,7 +1,7 @@
 import { IPluginTypes } from "@server/plugins/types";
 
 import type { MessagesApiPluginBase } from "@server/plugins/messages_api/base";
-import type { MessageSpec, GetMessagesParams } from "@server/plugins/messages_api/types";
+import type { MessageSpec, GetMessagesParams } from "@server/specs/iMessageSpec";
 import type DefaultApiPlugin from "../../index";
 
 export class MessageApi {

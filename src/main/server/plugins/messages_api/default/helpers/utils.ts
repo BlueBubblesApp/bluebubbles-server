@@ -7,9 +7,12 @@ import { encode as blurHashEncode } from "blurhash";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
+import type { MessageDbSpec, MessageSpec } from "@server/specs/iMessageSpec";
+
 import type { Attachment } from "../entity/Attachment";
 import type { Message } from "../entity/Message";
 import { handledImageMimes } from "./constants";
+import { ApiEvent } from "../../types";
 
 export const getBlurHash = async (image: NativeImage) => {
     let blurhash: string = null;
@@ -108,4 +111,43 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
     }
 
     return metadata;
+};
+
+export const groupMessageType = (message: MessageSpec): string => {
+    const msg = message as MessageDbSpec;
+
+    // Send the built message object
+    if (msg.itemType === 1 && msg.groupActionType === 0) return ApiEvent.GROUP_PARTICIPANT_ADDED;
+    if (msg.itemType === 1 && msg.groupActionType === 1) return ApiEvent.GROUP_PARTICIPANT_REMOVED;
+    if (msg.itemType === 2) return ApiEvent.GROUP_NAME_CHANGE;
+    if (msg.itemType === 3) return ApiEvent.GROUP_PARTICIPANT_LEFT;
+
+    return null;
+};
+
+export const messageOverview = (message: MessageSpec): string => {
+    const msg = message as MessageDbSpec;
+    const msgType = msg?.isFromMe ? "Outgoing Message" : "Incoming Message";
+
+    // If there are attachments, return the attachment count
+    if ((msg?.attachments ?? []).length > 0) {
+        // If there is text (more than 1 char; 1st char is the invisible char)
+        if ((msg?.text ?? "").length > 1)
+            return `${(msg?.attachments ?? []).length} Attachments & ${msgType}: ${msg.text}`;
+
+        // If it's just attachments, just show that
+        return `${(msg?.attachments ?? []).length} Attachments`;
+    }
+
+    // Check for a group event
+    if (!msg?.text && [1, 2, 3].includes(msg?.itemType)) {
+        const groupEvent = groupMessageType(message);
+        return `Group Event: ${groupEvent}`;
+    }
+
+    // Check for a message reaction
+    if (msg?.associatedMessageGuid && (msg?.associatedMessageType ?? 0) > 0) return `Reaction: ${msg?.text}`;
+
+    // If all alse doesn't get caught, return the message text
+    return `${msgType}: ${msg?.text ?? "N/A"}`;
 };

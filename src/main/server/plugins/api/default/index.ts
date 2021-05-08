@@ -5,6 +5,9 @@ import * as fs from "fs";
 import { IPluginConfig, IPluginConfigPropItemType, IPluginTypes, PluginConstructorParams } from "@server/plugins/types";
 import { MessagesApiPluginBase } from "@server/plugins/messages_api/base";
 import { ApiEvent } from "@server/plugins/messages_api/types";
+import { DataTransformerPluginBase } from "@server/plugins/data_transformer/base";
+import { messageToSpec } from "@server/plugins/messages_api/default/helpers/responseTransformers";
+import type { Message } from "@server/plugins/messages_api/default/entity/Message";
 
 import { ApiPluginBase } from "../base";
 import { HttpRouterV1 } from "./router/http";
@@ -14,7 +17,7 @@ import { ApiDatabase } from "./database";
 import { AuthApi } from "./common/auth";
 import { Token } from "./database/entity";
 import { Parsers } from "./helpers/parsers";
-import { ClientWsRequest, UpgradedSocket, WsRoute } from "./types";
+import { ClientWsRequest, UpgradedSocket, WsMessage, WsRoute } from "./types";
 import type { HttpRouterBase } from "./router/http/base";
 
 /**
@@ -154,8 +157,9 @@ export default class DefaultApiPlugin extends ApiPluginBase {
 
         this.app.ws("/ws/*", {
             upgrade: async (res: WS.HttpResponse, req: WS.HttpRequest, context: WS.WebSocketBehavior) => {
-                console.log(`A WebSocket connected via URL: ${req.getUrl()}!`);
+                console.log(`A WebSocket connected via URL: "${req.getUrl()}"`);
 
+                // Parse the request for headers, params, and JSON data
                 const parsed = await Parsers.parseRequest(req, res);
 
                 /**
@@ -164,6 +168,12 @@ export default class DefaultApiPlugin extends ApiPluginBase {
                  * @param auth The token data to inject
                  */
                 const next = (auth: Token): void => {
+                    // If we don't have an auth token, kill the socket connection
+                    if (!auth) {
+                        res.close();
+                        return;
+                    }
+
                     let injectedMeta = { auth, plugin: this };
                     injectedMeta = { ...injectedMeta, ...parsed };
 
@@ -176,16 +186,21 @@ export default class DefaultApiPlugin extends ApiPluginBase {
                     );
                 };
 
-                // Check for the token
+                // Check for the token & in the correct format
                 const authorization = req.getHeader("authorization");
-                if (!authorization || authorization.trim().length === 0) return next(null);
+                if (!authorization || authorization.trim().length === 0 || !authorization.startsWith("Bearer "))
+                    return next(null);
 
                 // If the token is present, get it from the DB and make sure it's not expired
-                const token = await AuthApi.getToken(this.db, authorization);
+                const tokenValue = authorization.split("Bearer ")[1];
+                const token = await AuthApi.getToken(this.db, tokenValue);
                 if (!token || token.isExpired()) return next(null);
 
                 // Pass the token on to the next handler
                 return next(token);
+            },
+            close: (_: WS.WebSocket, __: number, ___: ArrayBuffer) => {
+                console.log(`A WebSocket disconnected`);
             },
             open: (ws: WS.WebSocket) => {
                 // Re-brand to incorporate new injected fields
@@ -199,7 +214,11 @@ export default class DefaultApiPlugin extends ApiPluginBase {
             },
             message: (ws: WS.WebSocket, message: ArrayBuffer, isBinary = false) => {
                 const decoder = new TextDecoder("utf-8");
-                const msg = JSON.parse(decoder.decode(message)) as ClientWsRequest;
+                const utfMessage = decoder.decode(message);
+                this.logger.debug(`Websocket message received: "${utfMessage}"`);
+
+                const msg = JSON.parse(utfMessage) as ClientWsRequest;
+                if (!msg?.path) return;
 
                 // Let's rebrand the websocket with the injected info (this will get passed to the router)
                 const websocket = ws as UpgradedSocket;
@@ -236,52 +255,60 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         this.logger.info("Finished setting up routes...");
     }
 
+    private emitToSockets(data: WsMessage) {
+        const { event } = data;
+        this.logger.info(`Forwarding Messages API event, "${event}" to socket clients...`);
+        this.app.publish(WsRoute.NEW_MESSAGE, JSON.stringify(data));
+    }
+
     async startMessagesApiListeners(): Promise<void> {
+        // Fetch the Messages API plugin
         const apiPlugins = (await this.getPluginsByType(IPluginTypes.MESSAGES_API)) as MessagesApiPluginBase[];
         const apiPlugin = apiPlugins && apiPlugins.length > 0 ? apiPlugins[0] : null;
 
-        console.log("HERE IS THE PROB");
+        // If we don't have a messages API, log an error, we need one to listen for API Events
         if (!apiPlugin) {
-            this.logger.error("No Messages Api plugin found! Message updates will not be supported!");
+            this.logger.error("No Messages API plugin found! Message updates will not be supported!");
             return;
         }
 
-        console.log("HERE IS THE PROB 2");
+        // Get the currently set transformer plugin
+        const transformerPlugins = (await this.getPluginsByType(
+            IPluginTypes.DATA_TRANSFORMER
+        )) as DataTransformerPluginBase[];
+        const transformerPlugin = transformerPlugins && transformerPlugins.length > 0 ? transformerPlugins[0] : null;
 
-        apiPlugin.on(ApiEvent.NEW_MESSAGE, () => {
-            this.logger.info("New Message!");
+        // Message events
+        apiPlugin.on(ApiEvent.NEW_MESSAGE, data => {
+            this.emitToSockets({ event: ApiEvent.NEW_MESSAGE, data: transformMessage(transformerPlugin, data) });
+        });
+        apiPlugin.on(ApiEvent.UPDATED_MESSAGE, data => {
+            this.emitToSockets({ event: ApiEvent.UPDATED_MESSAGE, data: transformMessage(transformerPlugin, data) });
+        });
+        apiPlugin.on(ApiEvent.MESSAGE_MATCH, data => {
+            this.emitToSockets({ event: ApiEvent.MESSAGE_MATCH, data: transformMessage(transformerPlugin, data) });
         });
 
-        apiPlugin.on(ApiEvent.UPDATED_MESSAGE, () => {
-            this.logger.info("Updated Message!");
+        // Re-brand group name changes as new message events (makes it easier for the clients)
+        apiPlugin.on(ApiEvent.GROUP_NAME_CHANGE, data => {
+            this.emitToSockets({ event: ApiEvent.NEW_MESSAGE, data: transformMessage(transformerPlugin, data) });
+        });
+        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_ADDED, data => {
+            this.emitToSockets({ event: ApiEvent.NEW_MESSAGE, data: transformMessage(transformerPlugin, data) });
+        });
+        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_REMOVED, data => {
+            this.emitToSockets({ event: ApiEvent.NEW_MESSAGE, data: transformMessage(transformerPlugin, data) });
+        });
+        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_LEFT, data => {
+            this.emitToSockets({ event: ApiEvent.NEW_MESSAGE, data: transformMessage(transformerPlugin, data) });
         });
 
-        apiPlugin.on(ApiEvent.MESSAGE_MATCH, () => {
-            this.logger.info("Message Match!");
+        // Error handling
+        apiPlugin.on(ApiEvent.MESSAGE_SEND_ERROR, data => {
+            this.emitToSockets({ event: ApiEvent.MESSAGE_SEND_ERROR, data: transformMessage(transformerPlugin, data) });
         });
-
-        apiPlugin.on(ApiEvent.GROUP_NAME_CHANGE, () => {
-            this.logger.info("Group Name Change!");
-        });
-
-        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_ADDED, () => {
-            this.logger.info("Group Participant Added!");
-        });
-
-        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_REMOVED, () => {
-            this.logger.info("Group Participant Removed!");
-        });
-
-        apiPlugin.on(ApiEvent.GROUP_PARTICIPANT_LEFT, () => {
-            this.logger.info("Group Participant Left!");
-        });
-
-        apiPlugin.on(ApiEvent.MESSAGE_SEND_ERROR, () => {
-            this.logger.info("Message Send Error!");
-        });
-
-        apiPlugin.on(ApiEvent.MESSAGE_TIMEOUT, () => {
-            this.logger.info("Message Timeout!");
+        apiPlugin.on(ApiEvent.MESSAGE_TIMEOUT, data => {
+            this.emitToSockets({ event: ApiEvent.MESSAGE_TIMEOUT, data: transformMessage(transformerPlugin, data) });
         });
     }
 
@@ -298,3 +325,13 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         this.app = null;
     }
 }
+
+const transformMessage = (transformer: DataTransformerPluginBase, data: Message) => {
+    const specData = messageToSpec(data);
+    if (transformer && transformer.messageSpecToApi) {
+        // transform
+        return transformer.messageSpecToApi(specData);
+    }
+
+    return specData;
+};

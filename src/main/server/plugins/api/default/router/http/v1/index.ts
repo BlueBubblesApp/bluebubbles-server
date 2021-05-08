@@ -53,7 +53,7 @@ export class HttpRouter implements HttpRouterBase {
         this.app.get(HttpRouter.path("/plugin"), this.protected(getPlugins));
 
         // Log routes
-        this.app.get(HttpRouter.path("/log/last"), null);
+        // this.app.get(HttpRouter.path("/log/last"), null);
 
         // Catch-all for any unhandled routes (404)
         this.app.any("/*", (res, _) => Response.notFound(res));

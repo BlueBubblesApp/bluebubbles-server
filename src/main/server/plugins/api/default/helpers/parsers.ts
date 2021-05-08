@@ -1,5 +1,7 @@
 import * as QueryString from "querystring";
 import type * as WS from "@trufflesuite/uws-js-unofficial";
+import type { MessageDbSpec, MessageSpec } from "@server/specs/iMessageSpec";
+import { ApiEvent } from "@server/plugins/messages_api/types";
 import { RequestData } from "../types";
 
 export class Parsers {

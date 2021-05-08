@@ -46,7 +46,8 @@ export class IncomingMessageListener extends ChangeListener {
         });
 
         // Emit the new message
-        entries.forEach(async (entry: any) => {
+        let emitCount = 0;
+        for (const entry of entries) {
             const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
@@ -55,7 +56,10 @@ export class IncomingMessageListener extends ChangeListener {
             // Add to cache
             this.cache.add(cacheName);
             super.emit(ApiEvent.NEW_MESSAGE, this.transformEntry(entry));
-        });
+            emitCount += 1;
+        }
+
+        if (emitCount > 0) this.app.logger.debug(`Emitted ${emitCount} incoming message events`);
     }
 
     // eslint-disable-next-line class-methods-use-this

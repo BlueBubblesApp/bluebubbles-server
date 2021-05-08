@@ -39,6 +39,11 @@ export type ClientWsRequest = {
     data: any;
 };
 
+export type WsMessage = {
+    event: string;
+    data: any;
+};
+
 export enum WsRoute {
     NEW_MESSAGE = "notifications/new-message"
 }

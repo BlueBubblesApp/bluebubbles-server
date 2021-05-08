@@ -37,12 +37,13 @@ export class GroupChangeListener extends ChangeListener {
         });
 
         // Emit the new message
-        entries.forEach((entry: any) => {
+        let emitCount = 0;
+        for (const entry of entries) {
             // Skip over any that we've finished
-            if (this.cache.find(entry.ROWID)) return;
+            if (this.cache.find(entry.ROWID.toString())) return;
 
             // Add to cache
-            this.cache.add(entry.ROWID);
+            this.cache.add(entry.ROWID.toString());
 
             // Send the built message object
             if (entry.itemType === 1 && entry.groupActionType === 0) {
@@ -55,8 +56,13 @@ export class GroupChangeListener extends ChangeListener {
                 super.emit(ApiEvent.GROUP_PARTICIPANT_LEFT, this.transformEntry(entry));
             } else {
                 console.warn(`Unhandled message item type: [${entry.itemType}]`);
+                continue;
             }
-        });
+
+            emitCount += 1;
+        }
+
+        if (emitCount > 0) this.app.logger.debug(`Emitted ${emitCount} group message events`);
     }
 
     // eslint-disable-next-line class-methods-use-this

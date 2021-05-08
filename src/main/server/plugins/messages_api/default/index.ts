@@ -14,9 +14,8 @@ import {
     GetAttachmentsParams,
     GetChatsParams,
     GetHandlesParams,
-    GetMessagesParams,
-    ApiEvent
-} from "@server/plugins/messages_api/types";
+    GetMessagesParams
+} from "@server/specs/iMessageSpec";
 
 // All the custom plugin imports
 import { Chat } from "./entity/Chat";
@@ -24,8 +23,10 @@ import { Handle } from "./entity/Handle";
 import { Message } from "./entity/Message";
 import { Attachment } from "./entity/Attachment";
 import { ApiInterface } from "./interface";
+import { ApiEvent } from "../types";
 import { attachmentToSpec, chatToSpec, handleToSpec, messageToSpec } from "./helpers/responseTransformers";
 import { GroupChangeListener, IncomingMessageListener, OutgoingMessageListener } from "./listeners";
+import { messageOverview } from "./helpers/utils";
 
 // Your plugin configuration
 const configuration: IPluginConfig = {
@@ -70,6 +71,11 @@ export default class DefaultMessagesApi extends MessagesApiPluginBase {
         this.registerDbListeners();
     }
 
+    private emitMessage(event: string, data: any) {
+        this.logger.info(`Emitting event, "${event}", to socket clients. Summary: "${messageOverview(data)}"`);
+        this.emit(event, data);
+    }
+
     registerDbListeners() {
         const eventCache = new EventCache();
         const frequency = this.getProperty("poll_frequency", 1000);
@@ -81,18 +87,18 @@ export default class DefaultMessagesApi extends MessagesApiPluginBase {
         this.dbListeners = [incomingListener, outgoingListener, groupListener];
 
         // Forward everything through this plugin's emitter
-        incomingListener.on(ApiEvent.NEW_MESSAGE, data => this.emit(ApiEvent.NEW_MESSAGE, data));
-        outgoingListener.on(ApiEvent.NEW_MESSAGE, data => this.emit(ApiEvent.NEW_MESSAGE, data));
-        outgoingListener.on(ApiEvent.UPDATED_MESSAGE, data => this.emit(ApiEvent.UPDATED_MESSAGE, data));
-        outgoingListener.on(ApiEvent.MESSAGE_TIMEOUT, data => this.emit(ApiEvent.MESSAGE_TIMEOUT, data));
-        outgoingListener.on(ApiEvent.MESSAGE_MATCH, data => this.emit(ApiEvent.MESSAGE_MATCH, data));
-        outgoingListener.on(ApiEvent.MESSAGE_SEND_ERROR, data => this.emit(ApiEvent.MESSAGE_SEND_ERROR, data));
+        incomingListener.on(ApiEvent.NEW_MESSAGE, data => this.emitMessage(ApiEvent.NEW_MESSAGE, data));
+        outgoingListener.on(ApiEvent.NEW_MESSAGE, data => this.emitMessage(ApiEvent.NEW_MESSAGE, data));
+        outgoingListener.on(ApiEvent.UPDATED_MESSAGE, data => this.emitMessage(ApiEvent.UPDATED_MESSAGE, data));
+        outgoingListener.on(ApiEvent.MESSAGE_TIMEOUT, data => this.emitMessage(ApiEvent.MESSAGE_TIMEOUT, data));
+        outgoingListener.on(ApiEvent.MESSAGE_MATCH, data => this.emitMessage(ApiEvent.MESSAGE_MATCH, data));
+        outgoingListener.on(ApiEvent.MESSAGE_SEND_ERROR, data => this.emitMessage(ApiEvent.MESSAGE_SEND_ERROR, data));
 
         // Forward group events as normal message events
-        groupListener.on(ApiEvent.GROUP_PARTICIPANT_ADDED, data => this.emit(ApiEvent.NEW_MESSAGE, data));
-        groupListener.on(ApiEvent.GROUP_PARTICIPANT_REMOVED, data => this.emit(ApiEvent.NEW_MESSAGE, data));
-        groupListener.on(ApiEvent.GROUP_NAME_CHANGE, data => this.emit(ApiEvent.NEW_MESSAGE, data));
-        groupListener.on(ApiEvent.GROUP_PARTICIPANT_LEFT, data => this.emit(ApiEvent.NEW_MESSAGE, data));
+        groupListener.on(ApiEvent.GROUP_PARTICIPANT_ADDED, data => this.emitMessage(ApiEvent.NEW_MESSAGE, data));
+        groupListener.on(ApiEvent.GROUP_PARTICIPANT_REMOVED, data => this.emitMessage(ApiEvent.NEW_MESSAGE, data));
+        groupListener.on(ApiEvent.GROUP_NAME_CHANGE, data => this.emitMessage(ApiEvent.NEW_MESSAGE, data));
+        groupListener.on(ApiEvent.GROUP_PARTICIPANT_LEFT, data => this.emitMessage(ApiEvent.NEW_MESSAGE, data));
     }
 
     unregisterDbListeners() {

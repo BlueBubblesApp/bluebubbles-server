@@ -1,11 +1,12 @@
 import { Server } from "@server/index";
+import { TypeOrmWhereParam } from "@server/specs/iMessageSpec";
 import { onlyAlphaNumeric } from "@server/helpers/utils";
 import { EventCache } from "@server/helpers/eventCache";
 import { ChangeListener } from "@server/interface/changeListener";
 
 import { getCacheName } from "../helpers/utils";
 import type DefaultMessagesApi from "../index";
-import { ApiEvent, TypeOrmWhereParam } from "../../types";
+import { ApiEvent } from "../../types";
 
 export class OutgoingMessageListener extends ChangeListener {
     app: DefaultMessagesApi;
@@ -271,11 +272,8 @@ export class OutgoingMessageListener extends ChangeListener {
             ]
         });
 
-        if (entries.length > 0) {
-            this.app.logger.debug(`Detected ${entries.length} updated message(s)`);
-        }
-
         // Emit the new message
+        let emitCount = 0;
         for (const entry of entries) {
             // Compile so it's unique based on dates as well as ROWID
             const cacheName = getCacheName(entry);
@@ -288,9 +286,12 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Send the built message object
             super.emit(ApiEvent.UPDATED_MESSAGE, entry);
+            emitCount += 1;
 
-            // Add artificial delay so we don't overwhelm any listeners
-            await new Promise<void>((resolve, _) => setTimeout(() => resolve(), 200));
+            // Artifical delay so we don't emit messages too fast
+            await new Promise((resolve, _) => setTimeout(resolve, 200));
         }
+
+        if (emitCount > 0) this.app.logger.debug(`Emitted ${emitCount} updated message events`);
     }
 }

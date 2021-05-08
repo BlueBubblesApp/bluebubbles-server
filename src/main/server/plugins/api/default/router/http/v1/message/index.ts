@@ -1,6 +1,6 @@
 import * as WS from "@trufflesuite/uws-js-unofficial";
 
-import { MessageSpec, GetMessagesParams } from "@server/plugins/messages_api/types";
+import { MessageSpec, GetMessagesParams } from "@server/specs/iMessageSpec";
 import { IPluginTypes } from "@server/plugins/types";
 import { DataTransformerPluginBase } from "@server/plugins/data_transformer/base";
 
