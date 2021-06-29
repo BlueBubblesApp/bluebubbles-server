@@ -156,9 +156,9 @@
         "webpack-node-externals": "^1.7.2"
     },
     "dependencies": {
-        "@firebase/app-types": "^0.6.1",
-        "@firebase/auth-interop-types": "^0.1.5",
-        "@firebase/util": "^0.2.50",
+        "@firebase/app-types": "^0.6.2",
+        "@firebase/auth-interop-types": "^0.1.6",
+        "@firebase/util": "^1.1.0",
         "@material-ui/core": "^4.9.11",
         "@material-ui/icons": "^4.9.1",
         "better-sqlite3": "^7.1.2",
@@ -169,7 +169,7 @@
         "electron-log": "^4.2.4",
         "electron-updater": "^4.3.5",
         "find-process": "^1.4.4",
-        "firebase-admin": "^9.4.2",
+        "firebase-admin": "^9.10.0",
         "google-libphonenumber": "^3.2.10",
         "macos-version": "^5.2.0",
         "ngrok": "^3.4.0",
