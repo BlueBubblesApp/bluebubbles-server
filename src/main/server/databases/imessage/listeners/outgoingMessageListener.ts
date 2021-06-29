@@ -58,13 +58,6 @@ export class OutgoingMessageListener extends ChangeListener {
         }
 
         for (const entry of entries) {
-            // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
-            if (now - entry.dateCreated > 1000 * 60) {
-                await repo.remove(entry);
-                super.emit("message-timeout", entry);
-                continue;
-            }
-
             // The "default" where clause. Just stuff from ourselves
             let where: DBWhereItem[] = [
                 {
@@ -77,7 +70,10 @@ export class OutgoingMessageListener extends ChangeListener {
             // If the text starts with the temp GUID, we know it's an attachment
             // See /server/helpers/action.ts -> sendMessage()
             // Since it's an attachment, we want to change some of the parameters
-            if (entry.text.startsWith(entry.tempGuid)) {
+            const isAttachment: boolean = entry.text.startsWith(entry.tempGuid);
+            let timeoutMs = 1000 * 60 * 2; // 2 minute timeout for regular messages
+            if (isAttachment) {
+                timeoutMs = 1000 * 60 * 10; // 10 minute timeout for attachments
                 where = [
                     ...where,
                     {
@@ -91,6 +87,13 @@ export class OutgoingMessageListener extends ChangeListener {
                         args: { name: entry.text.split("->")[1] }
                     }
                 ];
+            }
+
+            // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
+            if (now - entry.dateCreated > timeoutMs) {
+                await repo.remove(entry);
+                super.emit("message-timeout", entry);
+                continue;
             }
 
             // Check for any message created after the "date created" of the queue item

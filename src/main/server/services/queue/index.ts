@@ -46,10 +46,10 @@ export class QueueService {
                         item.data.chunks
                     );
 
-                    // After 60 seconds, delete the attachment chunks
+                    // After 10 minutes, delete the attachment chunks
                     setTimeout(() => {
                         FileSystem.deleteChunks(item.data.attachmentGuid);
-                    }, 60000);
+                    }, 1000 * 60 * 10);
                     break;
                 default:
                     Server().log(`Unhandled queue item type: ${item.type}`, "warn");
