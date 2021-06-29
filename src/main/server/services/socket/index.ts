@@ -119,7 +119,7 @@ export class SocketService {
                     await next();
                 } catch (ex) {
                     Server().log(`Socket server error! ${ex.message}`, "error");
-                    socket.emit('exception', createServerErrorResponse(ex.message));
+                    socket.emit("exception", createServerErrorResponse(ex.message));
                     next(ex);
                 }
             });
@@ -276,7 +276,7 @@ export class SocketService {
                 withSMS: true
             });
             if (chats.length === 0) {
-                return response(cb, "error", createBadRequestResponse("Chat does not exist!"));
+                return response(cb, "error", createBadRequestResponse("Chat does not exist (get-chat)!"));
             }
 
             return response(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
@@ -301,7 +301,7 @@ export class SocketService {
                 });
 
                 if (!chats || chats.length === 0)
-                    return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                    return response(cb, "error", createBadRequestResponse("Chat does not exist (get-chat-messages)"));
 
                 const dbParams: DBMessageParams = {
                     chatGuid: chats[0].guid,
@@ -346,7 +346,7 @@ export class SocketService {
                 if (chatGuid && chatGuid.length > 0) {
                     const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
                     if (!chats || chats.length === 0)
-                        return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                        return response(cb, "error", createBadRequestResponse("Chat does not exist (get-messages)"));
                 }
 
                 const dbParams: DBMessageParams = {
@@ -481,7 +481,11 @@ export class SocketService {
 
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier, withSMS: true });
                 if (!chats || chats.length === 0)
-                    return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                    return response(
+                        cb,
+                        "error",
+                        createBadRequestResponse("Chat does not exist (get-last-chat-message)")
+                    );
 
                 const messages = await Server().iMessageRepo.getMessages({
                     chatGuid: chats[0].guid,
@@ -507,7 +511,7 @@ export class SocketService {
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier, withSMS: true });
 
                 if (!chats || chats.length === 0)
-                    return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                    return response(cb, "error", createBadRequestResponse("Chat does not exist (get-participants)"));
 
                 const handles = [];
                 for (const handle of chats[0].participants ?? []) {
@@ -551,6 +555,11 @@ export class SocketService {
                 if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
+                // Make sure the message isn't already in the queue
+                if (await Server().repo.hasQueuedMessage(tempGuid)) {
+                    return response(cb, "error", createBadRequestResponse("Message is already queued to be sent!"));
+                }
+
                 try {
                     // Send the message
                     await ActionHandler.sendMessage(
@@ -581,6 +590,11 @@ export class SocketService {
 
                 if (!chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided"));
                 if (!tempGuid) return response(cb, "error", createBadRequestResponse("No temporary GUID provided"));
+
+                // Make sure the message isn't already in the queue
+                if (await Server().repo.hasQueuedMessage(tempGuid)) {
+                    return response(cb, "error", createBadRequestResponse("Attachment is already queued to be sent!"));
+                }
 
                 // Attachment chunk parameters
                 const attachmentGuid = params?.attachmentGuid;

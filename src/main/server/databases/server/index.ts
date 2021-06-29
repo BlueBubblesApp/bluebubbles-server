@@ -143,6 +143,20 @@ export class ServerRepository extends EventEmitter {
         }
     }
 
+    public async hasQueuedMessage(tempGuid: string): Promise<boolean> {
+        const repo = this.queue();
+
+        // Get all queued items
+        let entries = await repo.find();
+        if (entries.length === 0) return false;
+
+        // Check if any have a matching tempGUID
+        entries = entries.filter(item => item.tempGuid === tempGuid || item.text.startsWith(tempGuid));
+
+        // Return if there are tempGUID matches
+        return entries.length > 0;
+    }
+
     /**
      * This sets any default database values, if the database
      * has not already been initialized
