@@ -12,7 +12,7 @@ import { ping } from "./general";
 import { getPlugins } from "./plugin";
 import { getChats } from "./chat";
 import { getHandles } from "./handle";
-import { getMessages } from "./message";
+import { getMessages, getUpdatedMessages } from "./message";
 
 export class HttpRouter implements HttpRouterBase {
     name = "v1";
@@ -47,7 +47,7 @@ export class HttpRouter implements HttpRouterBase {
 
         // Message API routes
         this.app.get(HttpRouter.path("/message"), this.protected(getMessages));
-        this.app.get(HttpRouter.path("/updatedMessages"), this.protected(getMessages));
+        this.app.get(HttpRouter.path("/updatedMessages"), this.protected(getUpdatedMessages));
 
         // Plugin routes
         this.app.get(HttpRouter.path("/plugin"), this.protected(getPlugins));

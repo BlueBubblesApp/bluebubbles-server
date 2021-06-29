@@ -148,7 +148,10 @@ export default class DefaultApiPlugin extends ApiPluginBase {
     }
 
     /**
-     * Sets up the websocket handlers for uWS.js
+     * Sets up the websocket handlers for uWS.js. The websocket will
+     * always require authentication to connect, via the Authorization header.
+     * If authentication passes, the socket is connected, and a reference
+     * to the plugin is injected into the websocket object
      */
     async setupWebsockets() {
         if (!this.app) return;
@@ -224,6 +227,7 @@ export default class DefaultApiPlugin extends ApiPluginBase {
                 const websocket = ws as UpgradedSocket;
 
                 // Handle the message paths
+                // Note: Right now, we don't have any paths. We are using HTTP to handle other requests
                 switch (msg.path) {
                     default: {
                         this.logger.warn(`Websocket route, "${msg.path}" does not exist`);
@@ -255,13 +259,25 @@ export default class DefaultApiPlugin extends ApiPluginBase {
         this.logger.info("Finished setting up routes...");
     }
 
+    /**
+     * A helper method for sending socket events. Being the "middleman",
+     * we can do any processing we need to here
+     *
+     * @param data The data to send to clients
+     */
     private emitToSockets(data: WsMessage) {
         const { event } = data;
         this.logger.info(`Forwarding Messages API event, "${event}" to socket clients...`);
         this.app.publish(WsRoute.NEW_MESSAGE, JSON.stringify(data));
     }
 
-    async startMessagesApiListeners(): Promise<void> {
+    /**
+     * Instantiates and starts listeners on the Messages API plugin.
+     * This will allow us to be notified when the Message API plugin
+     * detectes message events. Events are handled and forwarded via
+     * websockets to all clients
+     */
+    async startMessagesApiListeners() {
         // Fetch the Messages API plugin
         const apiPlugins = (await this.getPluginsByType(IPluginTypes.MESSAGES_API)) as MessagesApiPluginBase[];
         const apiPlugin = apiPlugins && apiPlugins.length > 0 ? apiPlugins[0] : null;
@@ -326,6 +342,14 @@ export default class DefaultApiPlugin extends ApiPluginBase {
     }
 }
 
+/**
+ * Helper method for transforming a DB Message Object to an API response
+ * using a transformer plugin.
+ *
+ * @param transformer The enabled transformer plugin
+ * @param data The data you want to transform
+ * @returns
+ */
 const transformMessage = (transformer: DataTransformerPluginBase, data: Message) => {
     const specData = messageToSpec(data);
     if (transformer && transformer.messageSpecToApi) {
