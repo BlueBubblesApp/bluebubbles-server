@@ -256,6 +256,7 @@ export class SocketService {
 
             const results = [];
             for (const chat of chats ?? []) {
+                if (chat.guid.startsWith("urn:")) continue;
                 const chatRes = await getChatResponse(chat);
                 results.push(chatRes);
             }
