@@ -1,5 +1,5 @@
 import { app } from "electron";
-import * as io from "socket.io";
+import { Server as SocketServer, Socket } from "socket.io";
 import * as path from "path";
 import * as fs from "fs";
 import * as zlib from "zlib";
@@ -40,7 +40,7 @@ const unknownError = "Unknown Error. Check server logs!";
  * connections and requests.
  */
 export class SocketService {
-    server: io.Server;
+    server: SocketServer;
 
     /**
      * Starts up the initial Socket.IO connection and initializes other
@@ -52,12 +52,10 @@ export class SocketService {
      * @param port The initial port for Socket.IO
      */
     constructor() {
-        this.server = io(Server().repo.getConfig("socket_port") as number, {
+        this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, {
             // 5 Minute ping timeout
-            pingTimeout: 60000,
-            path: "/"
+            pingTimeout: 60000
         });
-
         this.startStatusListener();
     }
 
@@ -100,7 +98,7 @@ export class SocketService {
             const cfgPass = String((await Server().repo.getConfig("password")) as string);
 
             // Decode the param incase it contains URL encoded characters
-            pass = decodeURI(pass);
+            pass = decodeURI(pass as string);
 
             // Basic authentication
             if (pass?.trim() === cfgPass?.trim()) {
@@ -121,7 +119,8 @@ export class SocketService {
                     await next();
                 } catch (ex) {
                     Server().log(`Socket server error! ${ex.message}`, "error");
-                    socket.error(createServerErrorResponse(ex.message));
+                    socket.emit('exception', createServerErrorResponse(ex.message));
+                    next(ex);
                 }
             });
 
@@ -135,7 +134,7 @@ export class SocketService {
      *
      * @param socket The incoming socket connection
      */
-    static routeSocket(socket: io.Socket) {
+    static routeSocket(socket: Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             const resData = data;
             resData.encrypted = false;
@@ -910,7 +909,7 @@ export class SocketService {
     restart() {
         if (this.server) {
             this.server.close();
-            this.server = io(Server().repo.getConfig("socket_port") as number, {
+            this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, {
                 // 5 Minute ping timeout
                 pingTimeout: 60000
             });

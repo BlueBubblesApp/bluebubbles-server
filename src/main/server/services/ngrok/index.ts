@@ -112,7 +112,7 @@ export class NgrokService {
             return false;
         }
 
-        const maxTries = 3;
+        const maxTries = 10;
         let tries = 0;
         let connected = false;
 
