@@ -9,32 +9,79 @@ export class BlueBubblesHelperService {
 
     helper: net.Socket;
 
+    restartCounter: number;
+
     constructor() {
+        this.restartCounter = 0;
+        this.start();
+    }
+
+    configureServer() {
         this.server = net.createServer((socket: net.Socket) => {
             this.helper = socket;
             this.helper.setDefaultEncoding("utf8");
+
             this.setupListeners();
-            Server().log("Helper connected!");
+            Server().log("Private API Helper connected!");
 
             this.helper.on("close", () => {
-                Server().log("Helper disconnected!", "error");
+                Server().log("Private API Helper disconnected!", "error");
                 this.helper = null;
             });
+
             this.helper.on("error", () => {
                 Server().log("An error occured in the BlueBubblesHelper connection! Closing...", "error");
                 if (this.helper) this.helper.destroy();
             });
         });
-        this.server.on("error", () => {
-            Server().log("An error occured in the TCP Socket! Retarting", "error");
-            this.server.close();
-            this.start();
+
+        this.server.on("error", err => {
+            Server().log("An error occured in the TCP Socket! Restarting", "error");
+
+            if (this.restartCounter <= 5) {
+                this.restartCounter += 1;
+                this.start();
+            } else {
+                Server().log("Max restart count reached for Private API listener...");
+            }
         });
     }
 
     start() {
-        this.server.close();
-        this.server.listen(45677, "localhost");
+        // Stop anything going on
+        this.stop();
+
+        // Configure & start the listener
+        Server().log("Starting Private API Helper...", "debug");
+        this.configureServer();
+
+        // Listen and reset the restart counter
+        this.server.listen(45677, "localhost", 511, () => {
+            this.restartCounter = 0;
+        });
+    }
+
+    stop() {
+        try {
+            if (this.helper && !this.helper.destroyed) {
+                this.helper.destroy();
+                this.helper = null;
+            }
+        } catch (ex) {
+            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
+        }
+
+        try {
+            if (this.server && this.server.listening) {
+                Server().log("Stopping Private API Helper...", "debug");
+
+                this.server.removeAllListeners();
+                this.server.close();
+                this.server = null;
+            }
+        } catch (ex) {
+            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
+        }
     }
 
     startTyping(chatGuid: string) {
@@ -170,6 +217,7 @@ export class BlueBubblesHelperService {
                 Server().log(`Failed to decode helper data! ${event}, ${e}`);
                 return;
             }
+
             if (data == null) return;
             if (data.event === "started-typing") {
                 Server().emitMessage("typing-indicator", { display: true, guid: data.guid });

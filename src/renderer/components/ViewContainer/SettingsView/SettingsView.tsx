@@ -35,6 +35,7 @@ interface State {
     smsSupport: boolean;
     checkForUpdates: boolean;
     autoInstallUpdates: boolean;
+    enablePrivateApi: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -62,7 +63,8 @@ class SettingsView extends React.Component<unknown, State> {
             startViaTerminal: false,
             smsSupport: false,
             checkForUpdates: true,
-            autoInstallUpdates: false
+            autoInstallUpdates: false,
+            enablePrivateApi: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -93,7 +95,8 @@ class SettingsView extends React.Component<unknown, State> {
                 startViaTerminal: config.start_via_terminal,
                 smsSupport: config.sms_support,
                 checkForUpdates: config.check_for_updates,
-                autoInstallUpdates: config.auto_install_updates
+                autoInstallUpdates: config.auto_install_updates,
+                enablePrivateApi: config.enable_private_api
             });
 
         this.getCaffeinateStatus();
@@ -178,6 +181,12 @@ class SettingsView extends React.Component<unknown, State> {
             if (!target.checked) {
                 this.setState({ showModal: true });
             }
+        }
+
+        if (id === "togglePrivateApi") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ enablePrivateApi: target.checked });
+            await ipcRenderer.invoke("toggle-private-api", target.checked!);
         }
 
         if (id === "toggleCaffeinate") {
@@ -435,6 +444,24 @@ class SettingsView extends React.Component<unknown, State> {
                             onChange={e => this.handleInputChange(e)}
                             onBlur={() => this.saveConfig()}
                         />
+                        <div className="aCheckboxDiv">
+                            <div>
+                                <h3 className="aSettingTitle">Enable Private API Features</h3>
+                                <p className="settingsHelp">
+                                    If you have set up the Private API features (via MacForge or MySIMBL), enable this
+                                    option to allow the server to communicate with the iMessage Private API.
+                                </p>
+                            </div>
+                            <label className="form-switch">
+                                <input
+                                    id="togglePrivateApi"
+                                    onChange={e => this.handleInputChange(e)}
+                                    type="checkbox"
+                                    checked={this.state.enablePrivateApi}
+                                />
+                                <i />
+                            </label>
+                        </div>
                         <div className="aCheckboxDiv">
                             <div>
                                 <h3 className="aSettingTitle">Keep MacOS Awake</h3>

@@ -85,7 +85,7 @@ class BlueBubblesServer extends EventEmitter {
 
     socket: SocketService;
 
-    blueBubblesServerHelper: BlueBubblesHelperService;
+    privateApiHelper: BlueBubblesHelperService;
 
     fcm: FCMService;
 
@@ -141,7 +141,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Services
         this.socket = null;
-        this.blueBubblesServerHelper = null;
+        this.privateApiHelper = null;
         this.fcm = null;
         this.caffeinate = null;
         this.networkChecker = null;
@@ -665,11 +665,14 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
-        try {
-            this.log("Initializing up helper service...");
-            this.blueBubblesServerHelper = new BlueBubblesHelperService();
-        } catch (ex) {
-            this.log(`Failed to setup helper service! ${ex.message}`, "error");
+        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
+        if (privateApiEnabled) {
+            try {
+                this.log("Initializing up helper service...");
+                this.privateApiHelper = new BlueBubblesHelperService();
+            } catch (ex) {
+                this.log(`Failed to setup helper service! ${ex.message}`, "error");
+            }
         }
 
         this.log("Checking Permissions...");
@@ -703,9 +706,7 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             this.log("Connecting to proxies...");
-
             this.proxyServices = [new NgrokService(), new LocalTunnelService()];
-
             await this.restartProxyServices();
         } catch (ex) {
             this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
@@ -721,8 +722,15 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting socket service...");
         this.socket.restart();
 
-        this.log("Starting helper listener...");
-        this.blueBubblesServerHelper.start();
+        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
+        if (privateApiEnabled) {
+            if (this.privateApiHelper === null) {
+                this.privateApiHelper = new BlueBubblesHelperService();
+            }
+
+            this.log("Starting helper listener...");
+            this.privateApiHelper.start();
+        }
 
         if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");
@@ -735,7 +743,7 @@ class BlueBubblesServer extends EventEmitter {
     /**
      * Restarts the server
      */
-    async hostRestart() {
+    async hotRestart() {
         this.log("Restarting the server...");
 
         // Remove all listeners
@@ -811,6 +819,12 @@ class BlueBubblesServer extends EventEmitter {
             FCMService.stop();
         } catch (ex) {
             Server().log(`There was an issue stopping the FCM service!\n${ex}`);
+        }
+
+        try {
+            await this.privateApiHelper?.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the Private API listener!\n${ex}`);
         }
 
         try {

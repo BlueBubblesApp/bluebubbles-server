@@ -33,6 +33,7 @@ import { ActionHandler } from "@server/helpers/actions";
 import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
 import { EventCache } from "@server/eventCache";
+import { restartMessages } from "@server/fileSystem/scripts";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
@@ -763,7 +764,7 @@ export class SocketService {
                 if (!params?.newName)
                     return response(cb, "error", createBadRequestResponse("No new group name provided"));
 
-                if (Server().blueBubblesServerHelper.helper) {
+                if (Server().privateApiHelper?.helper) {
                     try {
                         await ActionHandler.privateRenameGroupChat(params.identifier, params.newName);
 
@@ -865,7 +866,7 @@ export class SocketService {
                     return response(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
 
                 // If the helper is online, use it to send the tapback
-                if (Server().blueBubblesServerHelper.helper) {
+                if (Server().privateApiHelper?.helper) {
                     try {
                         await ActionHandler.togglePrivateTapback(
                             params.chatGuid,
@@ -1057,6 +1058,28 @@ export class SocketService {
                         createServerErrorResponse("Failed to update typing status!")
                     );
                 }
+            }
+        );
+
+        /**
+         * Tells the server to restart iMessages
+         */
+        socket.on(
+            "restart-messages-app",
+            async (_, cb): Promise<void> => {
+                await FileSystem.executeAppleScript(restartMessages());
+                return response(cb, "restart-messages-app", createSuccessResponse(null));
+            }
+        );
+
+        /**
+         * Tells the server to restart the Private API helper
+         */
+        socket.on(
+            "restart-private-api",
+            async (_, cb): Promise<void> => {
+                Server().privateApiHelper.start();
+                return response(cb, "restart-private-api-success", createSuccessResponse(null));
             }
         );
 

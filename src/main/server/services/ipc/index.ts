@@ -4,6 +4,7 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alert";
 import { openLogs } from "@server/fileSystem/scripts";
+import { BlueBubblesHelperService } from "../helperProcess";
 
 export class IPCService {
     /**
@@ -148,6 +149,19 @@ export class IPCService {
             await Server().restartProxyServices();
         });
 
+        ipcMain.handle("toggle-private-api", async (_, toggle) => {
+            await Server().repo.setConfig("enable_private_api", toggle);
+            if (Server().privateApiHelper === null) {
+                Server().privateApiHelper = new BlueBubblesHelperService();
+            }
+
+            if (toggle) {
+                Server().privateApiHelper.start();
+            } else {
+                Server().privateApiHelper.stop();
+            }
+        });
+
         ipcMain.handle("get-caffeinate-status", (_, __) => {
             return {
                 isCaffeinated: Server().caffeinate.isCaffeinated,
@@ -178,7 +192,7 @@ export class IPCService {
         });
 
         ipcMain.handle("restart-server", async (_, __) => {
-            await Server().hostRestart();
+            await Server().hotRestart();
         });
 
         ipcMain.handle("get-current-theme", (_, __) => {
