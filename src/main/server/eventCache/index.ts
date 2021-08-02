@@ -20,7 +20,11 @@ export class EventCache {
         return true;
     }
 
-    find(item: string) {
+    find(item: string): string {
         return this.items.find(i => i === item);
+    }
+
+    remove(item: string) {
+        this.items = this.items.filter(i => item !== i);
     }
 }

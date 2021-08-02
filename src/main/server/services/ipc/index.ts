@@ -4,6 +4,7 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alert";
 import { openLogs } from "@server/fileSystem/scripts";
+import { BlueBubblesHelperService } from "../helperProcess";
 
 export class IPCService {
     /**
@@ -137,17 +138,27 @@ export class IPCService {
             await Server().repo.setConfig("auto_caffeinate", toggle);
         });
 
-        ipcMain.handle("toggle-ngrok", async (_, toggle) => {
-            await Server().repo.setConfig("enable_ngrok", toggle);
+        ipcMain.handle("toggle-proxy-service", async (_, data) => {
+            await Server().stopProxyServices();
+            await Server().repo.setConfig("proxy_service", data.service);
 
-            if (Server().ngrok && toggle) {
-                Server().ngrok.start();
-            } else if (Server().ngrok && !toggle) {
-                console.log("Stopping ngrok");
-                Server().ngrok.stop();
+            if (data.service === "Dynamic DNS") {
+                await Server().repo.setConfig("server_address", "Dynamic DNS Enabled...");
+            }
 
-                // Revert the server address to nothing
-                await Server().repo.setConfig("server_address", "Ngrok Disabled...");
+            await Server().restartProxyServices();
+        });
+
+        ipcMain.handle("toggle-private-api", async (_, toggle) => {
+            await Server().repo.setConfig("enable_private_api", toggle);
+            if (Server().privateApiHelper === null) {
+                Server().privateApiHelper = new BlueBubblesHelperService();
+            }
+
+            if (toggle) {
+                Server().privateApiHelper.start();
+            } else {
+                Server().privateApiHelper.stop();
             }
         });
 
@@ -181,7 +192,7 @@ export class IPCService {
         });
 
         ipcMain.handle("restart-server", async (_, __) => {
-            await Server().hostRestart();
+            await Server().hotRestart();
         });
 
         ipcMain.handle("get-current-theme", (_, __) => {

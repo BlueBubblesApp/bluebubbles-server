@@ -8,11 +8,13 @@ export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
     auto_caffeinate: () => 0,
     auto_start: () => 0,
     enable_ngrok: () => 1,
+    proxy_service: () => "Ngrok",
     encrypt_coms: () => 0,
     hide_dock_icon: () => 0,
     last_fcm_restart: () => 0,
     start_via_terminal: () => 0,
     sms_support: () => 0,
     check_for_updates: () => 1,
-    auto_install_updates: () => 0
+    auto_install_updates: () => 0,
+    enable_private_api: () => 0
 };

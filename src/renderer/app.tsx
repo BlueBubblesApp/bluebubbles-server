@@ -1,7 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import { ipcRenderer } from "electron";
-import { HashRouter as Router } from "react-router-dom";
 import ViewContainer from "./components/ViewContainer/ViewContainer";
 
 import "./app.css";

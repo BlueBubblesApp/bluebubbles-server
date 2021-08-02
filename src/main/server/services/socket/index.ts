@@ -1,5 +1,6 @@
+/* eslint-disable max-len */
 import { app } from "electron";
-import * as io from "socket.io";
+import { Server as SocketServer, Socket, ServerOptions } from "socket.io";
 import * as path from "path";
 import * as fs from "fs";
 import * as zlib from "zlib";
@@ -31,6 +32,8 @@ import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
 import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
+import { EventCache } from "@server/eventCache";
+import { restartMessages } from "@server/fileSystem/scripts";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
@@ -40,7 +43,20 @@ const unknownError = "Unknown Error. Check server logs!";
  * connections and requests.
  */
 export class SocketService {
-    server: io.Server;
+    server: SocketServer;
+
+    opts: Partial<ServerOptions> = {
+        pingTimeout: 1000 * 60 * 5, // 5 Minute ping timeout
+        pingInterval: 1000 * 60, // 1 Minute ping interval
+        upgradeTimeout: 1000 * 30, // 30 Seconds
+
+        // 100 MB. 1000 == 1kb. 1000 * 1000 == 1mb
+        maxHttpBufferSize: 1000 * 1000 * 100,
+        allowEIO3: true,
+        transports: ["websocket", "polling"]
+    };
+
+    sendCache: EventCache;
 
     /**
      * Starts up the initial Socket.IO connection and initializes other
@@ -52,13 +68,14 @@ export class SocketService {
      * @param port The initial port for Socket.IO
      */
     constructor() {
-        this.server = io(Server().repo.getConfig("socket_port") as number, {
-            // 5 Minute ping timeout
-            pingTimeout: 60000,
-            path: "/"
-        });
-
+        this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, this.opts);
+        this.sendCache = new EventCache();
         this.startStatusListener();
+
+        // Every 6 hours, clear the send cache
+        setInterval(() => {
+            this.sendCache.purge();
+        }, 1000 * 60 * 60 * 6);
     }
 
     /**
@@ -100,7 +117,7 @@ export class SocketService {
             const cfgPass = String((await Server().repo.getConfig("password")) as string);
 
             // Decode the param incase it contains URL encoded characters
-            pass = decodeURI(pass);
+            pass = decodeURI(pass as string);
 
             // Basic authentication
             if (pass?.trim() === cfgPass?.trim()) {
@@ -121,7 +138,8 @@ export class SocketService {
                     await next();
                 } catch (ex) {
                     Server().log(`Socket server error! ${ex.message}`, "error");
-                    socket.error(createServerErrorResponse(ex.message));
+                    socket.emit("exception", createServerErrorResponse(ex.message));
+                    next(ex);
                 }
             });
 
@@ -135,7 +153,7 @@ export class SocketService {
      *
      * @param socket The incoming socket connection
      */
-    static routeSocket(socket: io.Socket) {
+    static routeSocket(socket: Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             const resData = data;
             resData.encrypted = false;
@@ -257,6 +275,7 @@ export class SocketService {
 
             const results = [];
             for (const chat of chats ?? []) {
+                if (chat.guid.startsWith("urn:")) continue;
                 const chatRes = await getChatResponse(chat);
                 results.push(chatRes);
             }
@@ -277,7 +296,7 @@ export class SocketService {
                 withSMS: true
             });
             if (chats.length === 0) {
-                return response(cb, "error", createBadRequestResponse("Chat does not exist!"));
+                return response(cb, "error", createBadRequestResponse("Chat does not exist (get-chat)!"));
             }
 
             return response(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
@@ -302,7 +321,7 @@ export class SocketService {
                 });
 
                 if (!chats || chats.length === 0)
-                    return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                    return response(cb, "error", createBadRequestResponse("Chat does not exist (get-chat-messages)"));
 
                 const dbParams: DBMessageParams = {
                     chatGuid: chats[0].guid,
@@ -347,7 +366,7 @@ export class SocketService {
                 if (chatGuid && chatGuid.length > 0) {
                     const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
                     if (!chats || chats.length === 0)
-                        return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                        return response(cb, "error", createBadRequestResponse("Chat does not exist (get-messages)"));
                 }
 
                 const dbParams: DBMessageParams = {
@@ -482,7 +501,11 @@ export class SocketService {
 
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier, withSMS: true });
                 if (!chats || chats.length === 0)
-                    return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                    return response(
+                        cb,
+                        "error",
+                        createBadRequestResponse("Chat does not exist (get-last-chat-message)")
+                    );
 
                 const messages = await Server().iMessageRepo.getMessages({
                     chatGuid: chats[0].guid,
@@ -508,7 +531,7 @@ export class SocketService {
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier, withSMS: true });
 
                 if (!chats || chats.length === 0)
-                    return response(cb, "error", createBadRequestResponse("Chat does not exist"));
+                    return response(cb, "error", createBadRequestResponse("Chat does not exist (get-participants)"));
 
                 const handles = [];
                 for (const handle of chats[0].participants ?? []) {
@@ -552,6 +575,14 @@ export class SocketService {
                 if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
+                // Make sure the message isn't already in the queue
+                if (Server().socket.sendCache.find(tempGuid)) {
+                    return response(cb, "error", createBadRequestResponse("Message is already queued to be sent!"));
+                }
+
+                // Add to send cache
+                Server().socket.sendCache.add(tempGuid);
+
                 try {
                     // Send the message
                     await ActionHandler.sendMessage(
@@ -565,6 +596,7 @@ export class SocketService {
 
                     return response(cb, "message-sent", createSuccessResponse(null));
                 } catch (ex) {
+                    Server().socket.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -582,6 +614,11 @@ export class SocketService {
 
                 if (!chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided"));
                 if (!tempGuid) return response(cb, "error", createBadRequestResponse("No temporary GUID provided"));
+
+                // Make sure the message isn't already in the queue
+                if (Server().socket.sendCache.find(tempGuid)) {
+                    return response(cb, "error", createBadRequestResponse("Attachment is already queued to be sent!"));
+                }
 
                 // Attachment chunk parameters
                 const attachmentGuid = params?.attachmentGuid;
@@ -618,6 +655,9 @@ export class SocketService {
                                 createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
                             );
                     }
+
+                    // Add the image to the send cache
+                    Server().socket.sendCache.add(tempGuid);
 
                     Server().queue.add({
                         type: "send-attachment",
@@ -724,6 +764,20 @@ export class SocketService {
                 if (!params?.newName)
                     return response(cb, "error", createBadRequestResponse("No new group name provided"));
 
+                if (Server().privateApiHelper?.helper) {
+                    try {
+                        await ActionHandler.privateRenameGroupChat(params.identifier, params.newName);
+
+                        const chats = await Server().iMessageRepo.getChats({
+                            chatGuid: params.identifier,
+                            withSMS: true
+                        });
+                        return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
+                    } catch (ex) {
+                        return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
+                    }
+                }
+
                 try {
                     await ActionHandler.renameGroupChat(params.identifier, params.newName);
 
@@ -788,25 +842,53 @@ export class SocketService {
             "send-reaction",
             async (params, cb): Promise<void> => {
                 if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
-                if (!params?.message) return response(cb, "error", createBadRequestResponse("No message provided!"));
-                if (!params?.actionMessage)
+                if (!params?.messageGuid || !params?.messageText)
+                    return response(cb, "error", createBadRequestResponse("No message provided!"));
+                if (!params?.actionMessageGuid || !params?.actionMessageText)
                     return response(cb, "error", createBadRequestResponse("No action message provided!"));
                 if (
                     !params?.tapback ||
-                    !["love", "like", "laugh", "dislike", "question", "emphasize"].includes(params.tapback)
+                    ![
+                        "love",
+                        "like",
+                        "dislike",
+                        "laugh",
+                        "emphasize",
+                        "question",
+                        "-love",
+                        "-like",
+                        "-dislike",
+                        "-laugh",
+                        "-emphasize",
+                        "-question"
+                    ].includes(params.tapback)
                 )
                     return response(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
 
+                // If the helper is online, use it to send the tapback
+                if (Server().privateApiHelper?.helper) {
+                    try {
+                        await ActionHandler.togglePrivateTapback(
+                            params.chatGuid,
+                            params.actionMessageGuid,
+                            params.tapback
+                        );
+                        return response(cb, "tapback-sent", createNoDataResponse());
+                    } catch (ex) {
+                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.messageText));
+                    }
+                }
+
                 // Add the reaction to the match queue
                 const item = new Queue();
-                item.tempGuid = params.message.guid;
+                item.tempGuid = params.messageGuid;
                 item.chatGuid = params.chatGuid;
                 item.dateCreated = new Date().getTime();
-                item.text = params.message.text;
+                item.text = params.messageText;
                 await Server().repo.queue().manager.save(item);
 
                 try {
-                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
+                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessageText, params.tapback);
                     return response(cb, "tapback-sent", createNoDataResponse());
                 } catch (ex) {
                     return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
@@ -897,6 +979,110 @@ export class SocketService {
             return null;
         });
 
+        /**
+         * Tells the server to start typing in a chat
+         */
+        socket.on(
+            "started-typing",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                // Dispatch it to the queue service
+                try {
+                    await ActionHandler.startOrStopTypingInChat(params.chatGuid, true);
+                    return response(cb, "started-typing-sent", createSuccessResponse(null));
+                } catch {
+                    return response(cb, "started-typing-error", createServerErrorResponse("Failed to stop typing"));
+                }
+            }
+        );
+
+        /**
+         * Tells the server to stop typing in a chat
+         * This will happen automaticaly after 10 seconds,
+         * but the client can tell the server to do so manually
+         */
+        socket.on(
+            "stopped-typing",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.startOrStopTypingInChat(params.chatGuid, false);
+                    return response(cb, "stopped-typing-sent", createSuccessResponse(null));
+                } catch {
+                    return response(cb, "stopped-typing-error", createServerErrorResponse("Failed to stop typing!"));
+                }
+            }
+        );
+        /**
+         * Tells the server to mark a chat as read
+         */
+        socket.on(
+            "mark-chat-read",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.markChatRead(params.chatGuid);
+                    return response(cb, "mark-chat-read-sent", createSuccessResponse(null));
+                } catch {
+                    return response(cb, "mark-chat-read-error", createServerErrorResponse("Failed to mark chat read!"));
+                }
+
+                // Return null so Typescript doesn't yell at us
+                return null;
+            }
+        );
+        /**
+         * Tells the server to stop typing in a chat
+         * This will happen automaticaly after 10 seconds,
+         * but the client can tell the server to do so manually
+         */
+        socket.on(
+            "update-typing-status",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.updateTypingStatus(params.chatGuid);
+                    return response(cb, "update-typing-status-sent", createSuccessResponse(null));
+                } catch {
+                    return response(
+                        cb,
+                        "update-typing-status-error",
+                        createServerErrorResponse("Failed to update typing status!")
+                    );
+                }
+            }
+        );
+
+        /**
+         * Tells the server to restart iMessages
+         */
+        socket.on(
+            "restart-messages-app",
+            async (_, cb): Promise<void> => {
+                await FileSystem.executeAppleScript(restartMessages());
+                return response(cb, "restart-messages-app", createSuccessResponse(null));
+            }
+        );
+
+        /**
+         * Tells the server to restart the Private API helper
+         */
+        socket.on(
+            "restart-private-api",
+            async (_, cb): Promise<void> => {
+                Server().privateApiHelper.start();
+                return response(cb, "restart-private-api-success", createSuccessResponse(null));
+            }
+        );
+
         socket.on("disconnect", reason => {
             Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
@@ -910,10 +1096,7 @@ export class SocketService {
     restart() {
         if (this.server) {
             this.server.close();
-            this.server = io(Server().repo.getConfig("socket_port") as number, {
-                // 5 Minute ping timeout
-                pingTimeout: 60000
-            });
+            this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, this.opts);
         }
 
         this.start();

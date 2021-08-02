@@ -30,6 +30,7 @@ import {
     AlertService,
     CaffeinateService,
     NgrokService,
+    LocalTunnelService,
     NetworkService,
     QueueService,
     IPCService
@@ -39,6 +40,8 @@ import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scr
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
+import { Proxy } from "./services/proxy";
+import { BlueBubblesHelperService } from "./services/helperProcess";
 
 const findProcess = require("find-process");
 
@@ -82,6 +85,8 @@ class BlueBubblesServer extends EventEmitter {
 
     socket: SocketService;
 
+    privateApiHelper: BlueBubblesHelperService;
+
     fcm: FCMService;
 
     alerter: AlertService;
@@ -92,7 +97,7 @@ class BlueBubblesServer extends EventEmitter {
 
     queue: QueueService;
 
-    ngrok: NgrokService;
+    proxyServices: Proxy[];
 
     actionHandler: ActionHandler;
 
@@ -136,10 +141,12 @@ class BlueBubblesServer extends EventEmitter {
 
         // Services
         this.socket = null;
+        this.privateApiHelper = null;
         this.fcm = null;
         this.caffeinate = null;
         this.networkChecker = null;
         this.queue = null;
+        this.proxyServices = [];
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -279,7 +286,7 @@ class BlueBubblesServer extends EventEmitter {
             this.networkChecker.on("status-change", connected => {
                 if (connected) {
                     this.log("Re-connected to network!");
-                    this.ngrok.restart();
+                    this.restartProxyServices();
                 } else {
                     this.log("Disconnected from network!");
                 }
@@ -288,6 +295,18 @@ class BlueBubblesServer extends EventEmitter {
             this.networkChecker.start();
         } catch (ex) {
             this.log(`Failed to setup network service! ${ex.message}`, "error");
+        }
+    }
+
+    async restartProxyServices() {
+        for (const i of this.proxyServices) {
+            await i.restart();
+        }
+    }
+
+    async stopProxyServices() {
+        for (const i of this.proxyServices) {
+            await i.disconnect();
         }
     }
 
@@ -383,11 +402,11 @@ class BlueBubblesServer extends EventEmitter {
      */
     private async handleConfigUpdate({ prevConfig, nextConfig }: ServerConfigChange) {
         // If the socket port changed, disconnect and reconnect
-        let ngrokRestarted = false;
+        let proxiesRestarted = false;
         if (prevConfig.socket_port !== nextConfig.socket_port) {
-            if (this.ngrok) await this.ngrok.restart();
+            await this.restartProxyServices();
             if (this.socket) await this.socket.restart();
-            ngrokRestarted = true;
+            proxiesRestarted = true;
         }
 
         // If the ngrok URL is different, emit the change to the listeners
@@ -397,8 +416,8 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // If the ngrok API key is different, restart the ngrok process
-        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !ngrokRestarted) {
-            if (this.ngrok) await this.ngrok.restart();
+        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !proxiesRestarted) {
+            await this.restartProxyServices();
         }
 
         // If the dock style changes
@@ -646,6 +665,16 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
+        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
+        if (privateApiEnabled) {
+            try {
+                this.log("Initializing up helper service...");
+                this.privateApiHelper = new BlueBubblesHelperService();
+            } catch (ex) {
+                this.log(`Failed to setup helper service! ${ex.message}`, "error");
+            }
+        }
+
         this.log("Checking Permissions...");
 
         // Log if we dont have accessibility access
@@ -676,9 +705,9 @@ class BlueBubblesServer extends EventEmitter {
         if (this.hasDiskAccess && !this.hasStarted) IPCService.startIpcListener();
 
         try {
-            this.log("Connecting to Ngrok...");
-            this.ngrok = new NgrokService();
-            await this.ngrok.restart();
+            this.log("Connecting to proxies...");
+            this.proxyServices = [new NgrokService(), new LocalTunnelService()];
+            await this.restartProxyServices();
         } catch (ex) {
             this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
         }
@@ -693,6 +722,16 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting socket service...");
         this.socket.restart();
 
+        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
+        if (privateApiEnabled) {
+            if (this.privateApiHelper === null) {
+                this.privateApiHelper = new BlueBubblesHelperService();
+            }
+
+            this.log("Starting helper listener...");
+            this.privateApiHelper.start();
+        }
+
         if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");
             this.startChatListener();
@@ -704,7 +743,7 @@ class BlueBubblesServer extends EventEmitter {
     /**
      * Restarts the server
      */
-    async hostRestart() {
+    async hotRestart() {
         this.log("Restarting the server...");
 
         // Remove all listeners
@@ -739,7 +778,7 @@ class BlueBubblesServer extends EventEmitter {
         Server().log("Stopping all services...");
 
         try {
-            await this.ngrok?.stop();
+            await this.stopProxyServices();
         } catch (ex) {
             Server().log(`There was an issue stopping Ngrok!\n${ex}`);
         }
@@ -780,6 +819,12 @@ class BlueBubblesServer extends EventEmitter {
             FCMService.stop();
         } catch (ex) {
             Server().log(`There was an issue stopping the FCM service!\n${ex}`);
+        }
+
+        try {
+            await this.privateApiHelper?.stop();
+        } catch (ex) {
+            Server().log(`There was an issue stopping the Private API listener!\n${ex}`);
         }
 
         try {

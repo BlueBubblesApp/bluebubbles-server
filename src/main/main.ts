@@ -83,7 +83,7 @@ const buildTray = () => {
             enabled: false
         },
         {
-            label: `Socket Connections: ${Server().socket?.server.sockets.sockets.length ?? 0}`,
+            label: `Socket Connections: ${Server().socket?.server.sockets.sockets.size ?? 0}`,
             enabled: false
         },
         {

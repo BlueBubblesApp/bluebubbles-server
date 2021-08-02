@@ -16,6 +16,7 @@ import {
     openChat,
     sendMessageFallback
 } from "@server/fileSystem/scripts";
+import { ValidRemoveTapback } from "../types";
 
 import {
     safeExecuteAppleScript,
@@ -176,6 +177,17 @@ export class ActionHandler {
         throw err;
     };
 
+    static privateRenameGroupChat = async (chatGuid: string, newName: string): Promise<void> => {
+        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!enablePrivateApi) {
+            Server().log("Private API disabled! Not executing group rename...");
+            return;
+        }
+
+        Server().log(`Executing Action: Changing chat display name (Chat: ${chatGuid}; NewName: ${newName};)`, "debug");
+        Server().privateApiHelper.setDisplayName(chatGuid, newName);
+    };
+
     /**
      * Adds a participant using an AppleScript
      *
@@ -304,6 +316,61 @@ export class ActionHandler {
 
         // If we get here, there was an issue
         throw err;
+    };
+
+    static startOrStopTypingInChat = async (chatGuid: string, isTyping: boolean): Promise<void> => {
+        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!enablePrivateApi) {
+            Server().log("Private API disabled! Not executing typing status change...");
+            return;
+        }
+
+        Server().log(`Executing Action: Change Typing Status (Chat: ${chatGuid})`, "debug");
+        if (isTyping) {
+            Server().privateApiHelper.startTyping(chatGuid);
+        } else {
+            Server().privateApiHelper.stopTyping(chatGuid);
+        }
+    };
+
+    static markChatRead = async (chatGuid: string): Promise<void> => {
+        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!enablePrivateApi) {
+            Server().log("Private API disabled! Not executing mark chat as read...");
+            return;
+        }
+
+        Server().log(`Executing Action: Marking chat as read (Chat: ${chatGuid})`, "debug");
+        Server().privateApiHelper.markChatRead(chatGuid);
+    };
+
+    static updateTypingStatus = async (chatGuid: string): Promise<void> => {
+        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!enablePrivateApi) {
+            Server().log("Private API disabled! Not executing update typing status...");
+            return;
+        }
+
+        Server().log(`Executing Action: Update Typing Status (Chat: ${chatGuid})`, "debug");
+        Server().privateApiHelper.getTypingStatus(chatGuid);
+    };
+
+    static togglePrivateTapback = async (
+        chatGuid: string,
+        actionMessageGuid: string,
+        reactionType: ValidTapback | ValidRemoveTapback
+    ): Promise<void> => {
+        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!enablePrivateApi) {
+            Server().log("Private API disabled! Not executing tapback...");
+            return;
+        }
+
+        Server().log(
+            `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`,
+            "debug"
+        );
+        Server().privateApiHelper.sendReaction(chatGuid, actionMessageGuid, reactionType);
     };
 
     /**

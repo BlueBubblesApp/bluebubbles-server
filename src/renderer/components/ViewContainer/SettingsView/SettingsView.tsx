@@ -26,6 +26,7 @@ interface State {
     showKey: boolean;
     ngrokKey: string;
     enableNgrok: boolean;
+    proxyService: string;
     showModal: boolean;
     serverUrl: string;
     encryptComs: boolean;
@@ -34,6 +35,7 @@ interface State {
     smsSupport: boolean;
     checkForUpdates: boolean;
     autoInstallUpdates: boolean;
+    enablePrivateApi: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -51,6 +53,7 @@ class SettingsView extends React.Component<unknown, State> {
             serverPassword: "",
             showPassword: false,
             showKey: false,
+            proxyService: "Dynamic DNS",
             ngrokKey: "",
             enableNgrok: false,
             showModal: false,
@@ -60,7 +63,8 @@ class SettingsView extends React.Component<unknown, State> {
             startViaTerminal: false,
             smsSupport: false,
             checkForUpdates: true,
-            autoInstallUpdates: false
+            autoInstallUpdates: false,
+            enablePrivateApi: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -83,6 +87,7 @@ class SettingsView extends React.Component<unknown, State> {
                 serverPassword: config.password,
                 showPassword: false,
                 showKey: false,
+                proxyService: config.proxy_service,
                 ngrokKey: config.ngrok_key,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
@@ -90,7 +95,8 @@ class SettingsView extends React.Component<unknown, State> {
                 startViaTerminal: config.start_via_terminal,
                 smsSupport: config.sms_support,
                 checkForUpdates: config.check_for_updates,
-                autoInstallUpdates: config.auto_install_updates
+                autoInstallUpdates: config.auto_install_updates,
+                enablePrivateApi: config.enable_private_api
             });
 
         this.getCaffeinateStatus();
@@ -149,6 +155,17 @@ class SettingsView extends React.Component<unknown, State> {
         this.setState({ showModal: false });
     };
 
+    handleProxyChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const value = e.target.value as string;
+        this.setState({ proxyService: value });
+        await ipcRenderer.invoke("toggle-proxy-service", { service: value });
+
+        if (value === "Dynamic DNS") {
+            this.setState({ showModal: true });
+        }
+    };
+
     handleInputChange = async (e: any) => {
         // eslint-disable-next-line prefer-destructuring
         const id = e.target.id;
@@ -164,6 +181,12 @@ class SettingsView extends React.Component<unknown, State> {
             if (!target.checked) {
                 this.setState({ showModal: true });
             }
+        }
+
+        if (id === "togglePrivateApi") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ enablePrivateApi: target.checked });
+            await ipcRenderer.invoke("toggle-private-api", target.checked!);
         }
 
         if (id === "toggleCaffeinate") {
@@ -210,7 +233,6 @@ class SettingsView extends React.Component<unknown, State> {
                 sms_support: target.checked
             });
         }
-
         if (id === "toggleCheckForUpdates") {
             const target = e.target as HTMLInputElement;
             this.setState({ checkForUpdates: target.checked });
@@ -393,6 +415,21 @@ class SettingsView extends React.Component<unknown, State> {
                                 <i />
                             </label>
                         </div>
+                        <span>
+                            <div>
+                                <h3 className="aSettingTitle">Proxy Service:</h3>
+                                <p className="settingsHelp">
+                                    Select which proxy service you want to use with BlueBubbles. Ngrok is the default,
+                                    however, you can use alternative solutions such as LocalTunnel. If you
+                                </p>
+                            </div>
+
+                            <select value={this.state.proxyService} onChange={e => this.handleProxyChange(e)}>
+                                <option value="Ngrok">Ngrok</option>
+                                <option value="LocalTunnel">LocalTunnel</option>
+                                <option value="Dynamic DNS">Dynamic DNS</option>
+                            </select>
+                        </span>
                         <div>
                             <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
                             <p className="settingsHelp">
@@ -407,20 +444,20 @@ class SettingsView extends React.Component<unknown, State> {
                             onChange={e => this.handleInputChange(e)}
                             onBlur={() => this.saveConfig()}
                         />
-                        <div className="aCheckboxDiv firstCheckBox">
+                        <div className="aCheckboxDiv">
                             <div>
-                                <h3 className="aSettingTitle">Enable Ngrok</h3>
+                                <h3 className="aSettingTitle">Enable Private API Features</h3>
                                 <p className="settingsHelp">
-                                    Using Ngrok allows a connection to clients without port-forwarding. Disabling Ngrok
-                                    will allow you to use port-forwarding.
+                                    If you have set up the Private API features (via MacForge or MySIMBL), enable this
+                                    option to allow the server to communicate with the iMessage Private API.
                                 </p>
                             </div>
                             <label className="form-switch">
                                 <input
-                                    id="toggleNgrok"
+                                    id="togglePrivateApi"
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
-                                    checked={this.state.enableNgrok}
+                                    checked={this.state.enablePrivateApi}
                                 />
                                 <i />
                             </label>

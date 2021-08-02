@@ -25,6 +25,8 @@ interface State {
     redirect: any;
     inputPassword: string;
     enableNgrok: boolean;
+    enablePrivateApi: boolean;
+    proxyService: string;
     showModal: boolean;
     serverUrl: string;
     smsSupport: boolean;
@@ -50,6 +52,8 @@ class PreDashboardView extends React.Component<unknown, State> {
             redirect: null,
             inputPassword: "",
             enableNgrok: true,
+            proxyService: "Ngrok",
+            enablePrivateApi: false,
             showModal: false,
             serverUrl: "",
             smsSupport: false,
@@ -73,9 +77,11 @@ class PreDashboardView extends React.Component<unknown, State> {
                 this.setState({ redirect: "/dashboard" });
             }
 
-            this.setState({ enableNgrok: config?.enable_ngrok });
-            const ngrokCheckbox: HTMLInputElement = document.getElementById("toggleNgrok") as HTMLInputElement;
-            if (ngrokCheckbox) ngrokCheckbox.checked = config.enable_ngrok;
+            this.setState({
+                enableNgrok: config?.enable_ngrok ?? true,
+                enablePrivateApi: config?.enable_private_api ?? false,
+                proxyService: config?.proxy_service ?? "Ngrok"
+            });
         } catch (ex) {
             console.log("Failed to load database config");
             console.error(ex);
@@ -235,6 +241,17 @@ class PreDashboardView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
+    handleProxyChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const value = e.target.value as string;
+        this.setState({ proxyService: value });
+        await ipcRenderer.invoke("toggle-proxy-service", { service: value });
+
+        if (value === "Dynamic DNS") {
+            this.setState({ showModal: true });
+        }
+    };
+
     openTutorialLink() {
         shell.openExternal("https://bluebubbles.app/install");
     }
@@ -257,6 +274,9 @@ class PreDashboardView extends React.Component<unknown, State> {
             if (!e.target.checked) {
                 this.setState({ showModal: true });
             }
+        } else if (e.target.id === "togglePrivateApi") {
+            this.setState({ enablePrivateApi: e.target.checked });
+            ipcRenderer.invoke("toggle-private-api", e.target.checked!);
         } else {
             ipcRenderer.invoke("set-config", {
                 [e.target.id]: e.target.checked
@@ -288,10 +308,7 @@ class PreDashboardView extends React.Component<unknown, State> {
         const password = this.state.inputPassword;
 
         if (!password || password?.trim().length === 0) return null;
-        if (this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer)) return output("Skip FCM Setup");
-        if (!this.state.enableNgrok && this.state.fcmClient && this.state.fcmServer) return output("Skip Ngrok Setup");
-        if (!this.state.enableNgrok && (!this.state.fcmClient || !this.state.fcmServer))
-            return output("Skip FCM and Ngrok Setup");
+        if (!this.state.fcmClient || !this.state.fcmServer) return output("Skip FCM Setup");
         if (this.state.fcmClient && this.state.fcmServer && this.state.abPerms === "authorized")
             return output("Continue");
 
@@ -374,12 +391,22 @@ class PreDashboardView extends React.Component<unknown, State> {
                             />
                         </div>
                         <div id="setNgrokContainer">
-                            <h3>Enable NGROK: </h3>
+                            <h3>Proxy Service: </h3>
+                            <div style={{ marginTop: "3px" }}>
+                                <select value={this.state.proxyService} onChange={e => this.handleProxyChange(e)}>
+                                    <option value="Ngrok">Ngrok</option>
+                                    <option value="LocalTunnel">LocalTunnel</option>
+                                    <option value="Dynamic DNS">Dynamic DNS</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="setNgrokContainer">
+                            <h3>Enable Private API Features: </h3>
                             <div style={{ marginTop: "3px" }}>
                                 <input
-                                    id="toggleNgrok"
-                                    checked={this.state.enableNgrok}
-                                    onChange={e => this.handleCheckboxChange(e, "enableNgrok")}
+                                    id="togglePrivateApi"
+                                    checked={this.state.enablePrivateApi}
+                                    onChange={e => this.handleCheckboxChange(e, "enablePrivateApi")}
                                     type="checkbox"
                                 />
                                 <i />
