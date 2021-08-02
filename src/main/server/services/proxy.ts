@@ -53,7 +53,14 @@ abstract class Proxy {
         if ((this.opts.autoRefresh ?? false) && this.refreshTimer) clearTimeout(this.refreshTimer);
 
         // Connect to the service
-        this.url = await this.connect();
+        try {
+            this.url = await this.connect();
+            if (this.url) {
+                await Server().repo.setConfig("server_address", this.url);
+            }
+        } catch (ex) {
+            Server().log(`Failed to connect to ${this.opts.name}! Error: ${ex.toString()}`);
+        }
 
         // Start the new refresh timer (if available)
         if (this.opts.autoRefresh ?? false) {
@@ -63,9 +70,6 @@ abstract class Proxy {
                 await this.restart();
             }, this.opts.refreshTimerMs);
         }
-
-        // Set the server address. This will emit to all listeners.
-        await Server().repo.setConfig("server_address", this.url);
     }
 
     /**
