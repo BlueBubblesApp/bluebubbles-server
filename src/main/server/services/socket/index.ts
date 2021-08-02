@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 import { app } from "electron";
 import { Server as SocketServer, Socket, ServerOptions } from "socket.io";
 import * as path from "path";
@@ -762,6 +763,20 @@ export class SocketService {
                 if (!params?.newName)
                     return response(cb, "error", createBadRequestResponse("No new group name provided"));
 
+                if (Server().blueBubblesServerHelper.helper) {
+                    try {
+                        await ActionHandler.privateRenameGroupChat(params.identifier, params.newName);
+
+                        const chats = await Server().iMessageRepo.getChats({
+                            chatGuid: params.identifier,
+                            withSMS: true
+                        });
+                        return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
+                    } catch (ex) {
+                        return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
+                    }
+                }
+
                 try {
                     await ActionHandler.renameGroupChat(params.identifier, params.newName);
 
@@ -826,25 +841,53 @@ export class SocketService {
             "send-reaction",
             async (params, cb): Promise<void> => {
                 if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
-                if (!params?.message) return response(cb, "error", createBadRequestResponse("No message provided!"));
-                if (!params?.actionMessage)
+                if (!params?.messageGuid || !params?.messageText)
+                    return response(cb, "error", createBadRequestResponse("No message provided!"));
+                if (!params?.actionMessageGuid || !params?.actionMessageText)
                     return response(cb, "error", createBadRequestResponse("No action message provided!"));
                 if (
                     !params?.tapback ||
-                    !["love", "like", "laugh", "dislike", "question", "emphasize"].includes(params.tapback)
+                    ![
+                        "love",
+                        "like",
+                        "dislike",
+                        "laugh",
+                        "emphasize",
+                        "question",
+                        "-love",
+                        "-like",
+                        "-dislike",
+                        "-laugh",
+                        "-emphasize",
+                        "-question"
+                    ].includes(params.tapback)
                 )
                     return response(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
 
+                // If the helper is online, use it to send the tapback
+                if (Server().blueBubblesServerHelper.helper) {
+                    try {
+                        await ActionHandler.togglePrivateTapback(
+                            params.chatGuid,
+                            params.actionMessageGuid,
+                            params.tapback
+                        );
+                        return response(cb, "tapback-sent", createNoDataResponse());
+                    } catch (ex) {
+                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.messageText));
+                    }
+                }
+
                 // Add the reaction to the match queue
                 const item = new Queue();
-                item.tempGuid = params.message.guid;
+                item.tempGuid = params.messageGuid;
                 item.chatGuid = params.chatGuid;
                 item.dateCreated = new Date().getTime();
-                item.text = params.message.text;
+                item.text = params.messageText;
                 await Server().repo.queue().manager.save(item);
 
                 try {
-                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessage.text, params.tapback);
+                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessageText, params.tapback);
                     return response(cb, "tapback-sent", createNoDataResponse());
                 } catch (ex) {
                     return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
@@ -934,6 +977,88 @@ export class SocketService {
             // Return null so Typescript doesn't yell at us
             return null;
         });
+
+        /**
+         * Tells the server to start typing in a chat
+         */
+        socket.on(
+            "started-typing",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                // Dispatch it to the queue service
+                try {
+                    await ActionHandler.startOrStopTypingInChat(params.chatGuid, true);
+                    return response(cb, "started-typing-sent", createSuccessResponse(null));
+                } catch {
+                    return response(cb, "started-typing-error", createServerErrorResponse("Failed to stop typing"));
+                }
+            }
+        );
+
+        /**
+         * Tells the server to stop typing in a chat
+         * This will happen automaticaly after 10 seconds,
+         * but the client can tell the server to do so manually
+         */
+        socket.on(
+            "stopped-typing",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.startOrStopTypingInChat(params.chatGuid, false);
+                    return response(cb, "stopped-typing-sent", createSuccessResponse(null));
+                } catch {
+                    return response(cb, "stopped-typing-error", createServerErrorResponse("Failed to stop typing!"));
+                }
+            }
+        );
+        /**
+         * Tells the server to mark a chat as read
+         */
+        socket.on(
+            "mark-chat-read",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.markChatRead(params.chatGuid);
+                    return response(cb, "mark-chat-read-sent", createSuccessResponse(null));
+                } catch {
+                    return response(cb, "mark-chat-read-error", createServerErrorResponse("Failed to mark chat read!"));
+                }
+
+                // Return null so Typescript doesn't yell at us
+                return null;
+            }
+        );
+        /**
+         * Tells the server to stop typing in a chat
+         * This will happen automaticaly after 10 seconds,
+         * but the client can tell the server to do so manually
+         */
+        socket.on(
+            "update-typing-status",
+            async (params, cb): Promise<void> => {
+                // Make sure we have all the required data
+                if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
+
+                try {
+                    await ActionHandler.updateTypingStatus(params.chatGuid);
+                    return response(cb, "update-typing-status-sent", createSuccessResponse(null));
+                } catch {
+                    return response(
+                        cb,
+                        "update-typing-status-error",
+                        createServerErrorResponse("Failed to update typing status!")
+                    );
+                }
+            }
+        );
 
         socket.on("disconnect", reason => {
             Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);

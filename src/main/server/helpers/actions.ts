@@ -16,6 +16,7 @@ import {
     openChat,
     sendMessageFallback
 } from "@server/fileSystem/scripts";
+import { ValidRemoveTapback } from "../types";
 
 import {
     safeExecuteAppleScript,
@@ -176,6 +177,11 @@ export class ActionHandler {
         throw err;
     };
 
+    static privateRenameGroupChat = async (chatGuid: string, newName: string): Promise<void> => {
+        Server().log(`Executing Action: Changing chat display name (Chat: ${chatGuid}; NewName: ${newName};)`, "debug");
+        Server().blueBubblesServerHelper.setDisplayName(chatGuid, newName);
+    };
+
     /**
      * Adds a participant using an AppleScript
      *
@@ -304,6 +310,37 @@ export class ActionHandler {
 
         // If we get here, there was an issue
         throw err;
+    };
+
+    static startOrStopTypingInChat = async (chatGuid: string, isTyping: boolean): Promise<void> => {
+        Server().log(`Executing Action: Change Typing Status (Chat: ${chatGuid})`, "debug");
+        if (isTyping) {
+            Server().blueBubblesServerHelper.startTyping(chatGuid);
+        } else {
+            Server().blueBubblesServerHelper.stopTyping(chatGuid);
+        }
+    };
+
+    static markChatRead = async (chatGuid: string): Promise<void> => {
+        Server().log(`Executing Action: Marking chat as read (Chat: ${chatGuid})`, "debug");
+        Server().blueBubblesServerHelper.markChatRead(chatGuid);
+    };
+
+    static updateTypingStatus = async (chatGuid: string): Promise<void> => {
+        Server().log(`Executing Action: Update Typing Status (Chat: ${chatGuid})`, "debug");
+        Server().blueBubblesServerHelper.getTypingStatus(chatGuid);
+    };
+
+    static togglePrivateTapback = async (
+        chatGuid: string,
+        actionMessageGuid: string,
+        reactionType: ValidTapback | ValidRemoveTapback
+    ): Promise<void> => {
+        Server().log(
+            `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`,
+            "debug"
+        );
+        Server().blueBubblesServerHelper.sendReaction(chatGuid, actionMessageGuid, reactionType);
     };
 
     /**

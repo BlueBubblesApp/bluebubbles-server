@@ -41,6 +41,7 @@ import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scr
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
 import { Proxy } from "./services/proxy";
+import { BlueBubblesHelperService } from "./services/helperProcess";
 
 const findProcess = require("find-process");
 
@@ -83,6 +84,8 @@ class BlueBubblesServer extends EventEmitter {
     contactsRepo: ContactRepository;
 
     socket: SocketService;
+
+    blueBubblesServerHelper: BlueBubblesHelperService;
 
     fcm: FCMService;
 
@@ -138,6 +141,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Services
         this.socket = null;
+        this.blueBubblesServerHelper = null;
         this.fcm = null;
         this.caffeinate = null;
         this.networkChecker = null;
@@ -661,6 +665,13 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
+        try {
+            this.log("Initializing up helper service...");
+            this.blueBubblesServerHelper = new BlueBubblesHelperService();
+        } catch (ex) {
+            this.log(`Failed to setup helper service! ${ex.message}`, "error");
+        }
+
         this.log("Checking Permissions...");
 
         // Log if we dont have accessibility access
@@ -709,6 +720,9 @@ class BlueBubblesServer extends EventEmitter {
 
         this.log("Starting socket service...");
         this.socket.restart();
+
+        this.log("Starting helper listener...");
+        this.blueBubblesServerHelper.start();
 
         if (this.hasDiskAccess && this.chatListeners.length === 0) {
             this.log("Starting chat listener...");
