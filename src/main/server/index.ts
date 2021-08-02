@@ -30,6 +30,7 @@ import {
     AlertService,
     CaffeinateService,
     NgrokService,
+    LocalTunnelService,
     NetworkService,
     QueueService,
     IPCService
@@ -39,6 +40,7 @@ import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scr
 
 import { ActionHandler } from "./helpers/actions";
 import { sanitizeStr } from "./helpers/utils";
+import { Proxy } from "./services/proxy";
 
 const findProcess = require("find-process");
 
@@ -92,7 +94,7 @@ class BlueBubblesServer extends EventEmitter {
 
     queue: QueueService;
 
-    ngrok: NgrokService;
+    proxyServices: Proxy[];
 
     actionHandler: ActionHandler;
 
@@ -140,6 +142,7 @@ class BlueBubblesServer extends EventEmitter {
         this.caffeinate = null;
         this.networkChecker = null;
         this.queue = null;
+        this.proxyServices = [];
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -279,7 +282,7 @@ class BlueBubblesServer extends EventEmitter {
             this.networkChecker.on("status-change", connected => {
                 if (connected) {
                     this.log("Re-connected to network!");
-                    this.ngrok.restart();
+                    this.restartProxyServices();
                 } else {
                     this.log("Disconnected from network!");
                 }
@@ -288,6 +291,18 @@ class BlueBubblesServer extends EventEmitter {
             this.networkChecker.start();
         } catch (ex) {
             this.log(`Failed to setup network service! ${ex.message}`, "error");
+        }
+    }
+
+    async restartProxyServices() {
+        for (const i of this.proxyServices) {
+            await i.restart();
+        }
+    }
+
+    async stopProxyServices() {
+        for (const i of this.proxyServices) {
+            await i.disconnect();
         }
     }
 
@@ -383,11 +398,11 @@ class BlueBubblesServer extends EventEmitter {
      */
     private async handleConfigUpdate({ prevConfig, nextConfig }: ServerConfigChange) {
         // If the socket port changed, disconnect and reconnect
-        let ngrokRestarted = false;
+        let proxiesRestarted = false;
         if (prevConfig.socket_port !== nextConfig.socket_port) {
-            if (this.ngrok) await this.ngrok.restart();
+            await this.restartProxyServices();
             if (this.socket) await this.socket.restart();
-            ngrokRestarted = true;
+            proxiesRestarted = true;
         }
 
         // If the ngrok URL is different, emit the change to the listeners
@@ -397,8 +412,8 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // If the ngrok API key is different, restart the ngrok process
-        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !ngrokRestarted) {
-            if (this.ngrok) await this.ngrok.restart();
+        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !proxiesRestarted) {
+            await this.restartProxyServices();
         }
 
         // If the dock style changes
@@ -676,9 +691,11 @@ class BlueBubblesServer extends EventEmitter {
         if (this.hasDiskAccess && !this.hasStarted) IPCService.startIpcListener();
 
         try {
-            this.log("Connecting to Ngrok...");
-            this.ngrok = new NgrokService();
-            await this.ngrok.restart();
+            this.log("Connecting to proxies...");
+
+            this.proxyServices = [new NgrokService(), new LocalTunnelService()];
+
+            await this.restartProxyServices();
         } catch (ex) {
             this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
         }
@@ -739,7 +756,7 @@ class BlueBubblesServer extends EventEmitter {
         Server().log("Stopping all services...");
 
         try {
-            await this.ngrok?.stop();
+            await this.stopProxyServices();
         } catch (ex) {
             Server().log(`There was an issue stopping Ngrok!\n${ex}`);
         }

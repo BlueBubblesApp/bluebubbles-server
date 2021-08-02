@@ -26,6 +26,7 @@ interface State {
     showKey: boolean;
     ngrokKey: string;
     enableNgrok: boolean;
+    proxyService: string;
     showModal: boolean;
     serverUrl: string;
     encryptComs: boolean;
@@ -51,6 +52,7 @@ class SettingsView extends React.Component<unknown, State> {
             serverPassword: "",
             showPassword: false,
             showKey: false,
+            proxyService: "Dynamic DNS",
             ngrokKey: "",
             enableNgrok: false,
             showModal: false,
@@ -83,6 +85,7 @@ class SettingsView extends React.Component<unknown, State> {
                 serverPassword: config.password,
                 showPassword: false,
                 showKey: false,
+                proxyService: config.proxy_service,
                 ngrokKey: config.ngrok_key,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
@@ -147,6 +150,17 @@ class SettingsView extends React.Component<unknown, State> {
         }
 
         this.setState({ showModal: false });
+    };
+
+    handleProxyChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const value = e.target.value as string;
+        this.setState({ proxyService: value });
+        await ipcRenderer.invoke("toggle-proxy-service", { service: value });
+
+        if (value === "Dynamic DNS") {
+            this.setState({ showModal: true });
+        }
     };
 
     handleInputChange = async (e: any) => {
@@ -393,6 +407,21 @@ class SettingsView extends React.Component<unknown, State> {
                                 <i />
                             </label>
                         </div>
+                        <span>
+                            <div>
+                                <h3 className="aSettingTitle">Proxy Service:</h3>
+                                <p className="settingsHelp">
+                                    Select which proxy service you want to use with BlueBubbles. Ngrok is the default,
+                                    however, you can use alternative solutions such as LocalTunnel. If you
+                                </p>
+                            </div>
+
+                            <select value={this.state.proxyService} onChange={e => this.handleProxyChange(e)}>
+                                <option value="Ngrok">Ngrok</option>
+                                <option value="LocalTunnel">LocalTunnel</option>
+                                <option value="Dynamic DNS">Dynamic DNS</option>
+                            </select>
+                        </span>
                         <div>
                             <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
                             <p className="settingsHelp">
@@ -407,24 +436,6 @@ class SettingsView extends React.Component<unknown, State> {
                             onChange={e => this.handleInputChange(e)}
                             onBlur={() => this.saveConfig()}
                         />
-                        <div className="aCheckboxDiv firstCheckBox">
-                            <div>
-                                <h3 className="aSettingTitle">Enable Ngrok</h3>
-                                <p className="settingsHelp">
-                                    Using Ngrok allows a connection to clients without port-forwarding. Disabling Ngrok
-                                    will allow you to use port-forwarding.
-                                </p>
-                            </div>
-                            <label className="form-switch">
-                                <input
-                                    id="toggleNgrok"
-                                    onChange={e => this.handleInputChange(e)}
-                                    type="checkbox"
-                                    checked={this.state.enableNgrok}
-                                />
-                                <i />
-                            </label>
-                        </div>
                         <div className="aCheckboxDiv">
                             <div>
                                 <h3 className="aSettingTitle">Keep MacOS Awake</h3>

@@ -137,18 +137,15 @@ export class IPCService {
             await Server().repo.setConfig("auto_caffeinate", toggle);
         });
 
-        ipcMain.handle("toggle-ngrok", async (_, toggle) => {
-            await Server().repo.setConfig("enable_ngrok", toggle);
+        ipcMain.handle("toggle-proxy-service", async (_, data) => {
+            await Server().stopProxyServices();
+            await Server().repo.setConfig("proxy_service", data.service);
 
-            if (Server().ngrok && toggle) {
-                Server().ngrok.start();
-            } else if (Server().ngrok && !toggle) {
-                console.log("Stopping ngrok");
-                Server().ngrok.stop();
-
-                // Revert the server address to nothing
-                await Server().repo.setConfig("server_address", "Ngrok Disabled...");
+            if (data.service === "Dynamic DNS") {
+                await Server().repo.setConfig("server_address", "Dynamic DNS Enabled...");
             }
+
+            await Server().restartProxyServices();
         });
 
         ipcMain.handle("get-caffeinate-status", (_, __) => {

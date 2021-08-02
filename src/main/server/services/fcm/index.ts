@@ -50,7 +50,12 @@ export class FCMService {
         this.listen();
 
         // Set the current ngrok URL if we are connected
-        if (Server().ngrok?.isConnected()) await this.setServerUrl(Server().ngrok.url);
+        for (const service of Server().proxyServices) {
+            if (service.isConnected()) {
+                await this.setServerUrl(service.url);
+                break;
+            }
+        }
 
         return true;
     }
@@ -62,6 +67,8 @@ export class FCMService {
      */
     async setServerUrl(serverUrl: string): Promise<void> {
         if (!(await this.start())) return;
+
+        Server().log("Updating Server Address in Firebase Database...");
 
         // Set the rules
         const source = JSON.stringify(

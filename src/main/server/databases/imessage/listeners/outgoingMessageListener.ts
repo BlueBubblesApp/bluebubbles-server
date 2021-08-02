@@ -91,7 +91,13 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // If the entry has been in there for longer than 1 minute, delete it, and send a message-timeout
             if (now - entry.dateCreated > timeoutMs) {
+                // Remove it from the queue
                 await repo.remove(entry);
+
+                // Remove from send-cache
+                Server().socket.sendCache.remove(entry.tempGuid);
+
+                // Emit the message timeout
                 super.emit("message-timeout", entry);
                 continue;
             }
@@ -131,8 +137,11 @@ export class OutgoingMessageListener extends ChangeListener {
                 // The message match cache is only "relative" to the message match method as opposed to the global one
                 this.cache.add(matchGuid);
 
-                // Remove the queue entry from the database
-                if (matches.length > 0) await repo.remove(entry);
+                // Remove the queue entry from the database & send cache
+                if (matches.length > 0) {
+                    await repo.remove(entry);
+                    Server().socket.sendCache.remove(entry.tempGuid);
+                }
 
                 // Break because we only want one
                 break;

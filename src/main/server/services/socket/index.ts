@@ -1,5 +1,5 @@
 import { app } from "electron";
-import { Server as SocketServer, Socket } from "socket.io";
+import { Server as SocketServer, Socket, ServerOptions } from "socket.io";
 import * as path from "path";
 import * as fs from "fs";
 import * as zlib from "zlib";
@@ -31,6 +31,7 @@ import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
 import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
+import { EventCache } from "@server/eventCache";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
@@ -42,6 +43,19 @@ const unknownError = "Unknown Error. Check server logs!";
 export class SocketService {
     server: SocketServer;
 
+    opts: Partial<ServerOptions> = {
+        pingTimeout: 1000 * 60 * 5, // 5 Minute ping timeout
+        pingInterval: 1000 * 60, // 1 Minute ping interval
+        upgradeTimeout: 1000 * 30, // 30 Seconds
+
+        // 100 MB. 1000 == 1kb. 1000 * 1000 == 1mb
+        maxHttpBufferSize: 1000 * 1000 * 100,
+        allowEIO3: true,
+        transports: ["websocket", "polling"]
+    };
+
+    sendCache: EventCache;
+
     /**
      * Starts up the initial Socket.IO connection and initializes other
      * required classes and variables
@@ -52,11 +66,14 @@ export class SocketService {
      * @param port The initial port for Socket.IO
      */
     constructor() {
-        this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, {
-            // 5 Minute ping timeout
-            pingTimeout: 60000
-        });
+        this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, this.opts);
+        this.sendCache = new EventCache();
         this.startStatusListener();
+
+        // Every 6 hours, clear the send cache
+        setInterval(() => {
+            this.sendCache.purge();
+        }, 1000 * 60 * 60 * 6);
     }
 
     /**
@@ -557,9 +574,12 @@ export class SocketService {
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
                 // Make sure the message isn't already in the queue
-                if (await Server().repo.hasQueuedMessage(tempGuid)) {
+                if (Server().socket.sendCache.find(tempGuid)) {
                     return response(cb, "error", createBadRequestResponse("Message is already queued to be sent!"));
                 }
+
+                // Add to send cache
+                Server().socket.sendCache.add(tempGuid);
 
                 try {
                     // Send the message
@@ -574,6 +594,7 @@ export class SocketService {
 
                     return response(cb, "message-sent", createSuccessResponse(null));
                 } catch (ex) {
+                    Server().socket.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -593,7 +614,7 @@ export class SocketService {
                 if (!tempGuid) return response(cb, "error", createBadRequestResponse("No temporary GUID provided"));
 
                 // Make sure the message isn't already in the queue
-                if (await Server().repo.hasQueuedMessage(tempGuid)) {
+                if (Server().socket.sendCache.find(tempGuid)) {
                     return response(cb, "error", createBadRequestResponse("Attachment is already queued to be sent!"));
                 }
 
@@ -632,6 +653,9 @@ export class SocketService {
                                 createBadRequestResponse(`Chat with GUID, "${chatGuid}" does not exist`)
                             );
                     }
+
+                    // Add the image to the send cache
+                    Server().socket.sendCache.add(tempGuid);
 
                     Server().queue.add({
                         type: "send-attachment",
@@ -924,10 +948,7 @@ export class SocketService {
     restart() {
         if (this.server) {
             this.server.close();
-            this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, {
-                // 5 Minute ping timeout
-                pingTimeout: 60000
-            });
+            this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, this.opts);
         }
 
         this.start();
