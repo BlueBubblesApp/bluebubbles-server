@@ -1,5 +1,5 @@
 import { Server } from "@server/index";
-import { connect, disconnect, kill, authtoken } from "ngrok";
+import { connect, disconnect, kill, authtoken, Ngrok } from "ngrok";
 import { Proxy } from "../proxy";
 
 // const sevenHours = 1000 * 60 * 60 * 7;  // This is the old ngrok timeout
@@ -21,18 +21,10 @@ export class NgrokService extends Proxy {
     async connect(): Promise<string> {
         // If there is a ngrok API key set, and we have a refresh timer going, kill it
         const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
+        let ngrokProtocol = (Server().repo.getConfig("ngrok_protocol") as Ngrok.Protocol) ?? "http";
 
-        // As long as the auth token isn't null or undefined, set it
-        if (ngrokKey !== null && ngrokKey !== undefined)
-            await authtoken({
-                authtoken: ngrokKey,
-                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
-            });
-
-        // Connect to ngrok
-        return connect({
-            port: Server().repo.getConfig("socket_port"),
-            // This is required to run ngrok in production
+        const opts: Ngrok.Options = {
+            port: Server().repo.getConfig("socket_port") ?? 1234,
             binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked"),
             onStatusChange: async (status: string) => {
                 Server().log(`Ngrok status: ${status}`);
@@ -57,7 +49,21 @@ export class NgrokService extends Proxy {
                     this.restart();
                 }
             }
-        });
+        };
+
+        // If we have a key, use it
+        if (ngrokKey !== null && ngrokKey !== undefined) {
+            opts.authtoken = ngrokKey;
+        } else {
+            // A key is required to use TCP, otherwise, default to HTTP
+            ngrokProtocol = "http";
+        }
+
+        // Set the protocol
+        opts.proto = ngrokProtocol;
+
+        // Connect to ngrok
+        return connect(opts);
     }
 
     /**

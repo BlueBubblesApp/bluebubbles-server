@@ -149,6 +149,12 @@ export class IPCService {
             await Server().restartProxyServices();
         });
 
+        ipcMain.handle("toggle-ngrok-protocol", async (_, data) => {
+            await Server().stopProxyServices();
+            await Server().repo.setConfig("ngrok_protocol", data.protocol);
+            await Server().restartProxyServices();
+        });
+
         ipcMain.handle("toggle-private-api", async (_, toggle) => {
             await Server().repo.setConfig("enable_private_api", toggle);
             if (Server().privateApiHelper === null) {

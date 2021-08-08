@@ -25,6 +25,7 @@ interface State {
     showPassword: boolean;
     showKey: boolean;
     ngrokKey: string;
+    ngrokProtocol: string;
     enableNgrok: boolean;
     proxyService: string;
     showModal: boolean;
@@ -55,6 +56,7 @@ class SettingsView extends React.Component<unknown, State> {
             showKey: false,
             proxyService: "Dynamic DNS",
             ngrokKey: "",
+            ngrokProtocol: "http",
             enableNgrok: false,
             showModal: false,
             serverUrl: "",
@@ -89,6 +91,7 @@ class SettingsView extends React.Component<unknown, State> {
                 showKey: false,
                 proxyService: config.proxy_service,
                 ngrokKey: config.ngrok_key,
+                ngrokProtocol: config.ngrok_protocol,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
@@ -164,6 +167,13 @@ class SettingsView extends React.Component<unknown, State> {
         if (value === "Dynamic DNS") {
             this.setState({ showModal: true });
         }
+    };
+
+    handleProtocolChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const value = e.target.value as string;
+        this.setState({ ngrokProtocol: value });
+        await ipcRenderer.invoke("toggle-ngrok-protocol", { protocol: value });
     };
 
     handleInputChange = async (e: any) => {
@@ -437,7 +447,8 @@ class SettingsView extends React.Component<unknown, State> {
                                     <h3 className="aSettingTitle">Ngrok Auth Token (optional):</h3>
                                     <p className="settingsHelp">
                                         Using an Auth Token will allow you to use the benefits of the upgraded Ngrok
-                                        service. This is not referring to the API Keys in Ngrok.
+                                        service. This is not referring to the API Keys in Ngrok. Note, if you want to
+                                        use TCP, an Auth Token is required.
                                     </p>
                                 </div>
                                 <input
@@ -448,6 +459,22 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     onBlur={() => this.saveConfig()}
                                 />
+                            </span>
+                        ) : null}
+                        {this.state.proxyService === "Ngrok" && (this.state.ngrokKey ?? "").length > 0 ? (
+                            <span>
+                                <div>
+                                    <h3 className="aSettingTitle">Ngrok Protocol:</h3>
+                                    <p className="settingsHelp">
+                                        Select the protocol you want to use for the Ngrok tunnel. This defaults to
+                                        &quot;HTTP&quot;, but if you are having issues, you can try &quot;TCP&quot;. An
+                                        Ngrok Auth Token is required to use TCP.
+                                    </p>
+                                </div>
+                                <select value={this.state.ngrokProtocol} onChange={e => this.handleProtocolChange(e)}>
+                                    <option value="http">HTTP</option>
+                                    <option value="tcp">TCP</option>
+                                </select>
                             </span>
                         ) : null}
                         <div className="aCheckboxDiv">

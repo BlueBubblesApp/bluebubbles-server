@@ -4,6 +4,7 @@ export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
     socket_port: () => DEFAULT_SOCKET_PORT,
     server_address: () => "",
     ngrok_key: () => "",
+    ngrok_protocol: () => "http",
     password: () => "",
     auto_caffeinate: () => 0,
     auto_start: () => 0,
