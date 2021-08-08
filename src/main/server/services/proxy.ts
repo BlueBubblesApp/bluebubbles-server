@@ -60,6 +60,7 @@ abstract class Proxy {
             }
         } catch (ex) {
             Server().log(`Failed to connect to ${this.opts.name}! Error: ${ex.toString()}`);
+            throw ex;
         }
 
         // Start the new refresh timer (if available)
