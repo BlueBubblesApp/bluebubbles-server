@@ -419,8 +419,9 @@ class SettingsView extends React.Component<unknown, State> {
                             <div>
                                 <h3 className="aSettingTitle">Proxy Service:</h3>
                                 <p className="settingsHelp">
-                                    Select which proxy service you want to use with BlueBubbles. Ngrok is the default,
-                                    however, you can use alternative solutions such as LocalTunnel. If you
+                                    Select which proxy service you want to use with BlueBubbles. If you are having
+                                    issues with Ngrok, please sign up on their website and use your account&apos;s Auth
+                                    Token. Otherwise, try out LocalTunnel.
                                 </p>
                             </div>
 
@@ -430,20 +431,25 @@ class SettingsView extends React.Component<unknown, State> {
                                 <option value="Dynamic DNS">Dynamic DNS</option>
                             </select>
                         </span>
-                        <div>
-                            <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
-                            <p className="settingsHelp">
-                                Using an API key will allow you to use the benefits of the upgraded Ngrok service
-                            </p>
-                        </div>
-                        <input
-                            id="ngrokKey"
-                            className="aInput"
-                            placeholder="No key uploaded"
-                            value={this.state.ngrokKey}
-                            onChange={e => this.handleInputChange(e)}
-                            onBlur={() => this.saveConfig()}
-                        />
+                        {this.state.proxyService === "Ngrok" ? (
+                            <span>
+                                <div>
+                                    <h3 className="aSettingTitle">Ngrok Auth Token (optional):</h3>
+                                    <p className="settingsHelp">
+                                        Using an Auth Token will allow you to use the benefits of the upgraded Ngrok
+                                        service. This is not referring to the API Keys in Ngrok.
+                                    </p>
+                                </div>
+                                <input
+                                    id="ngrokKey"
+                                    className="aInput"
+                                    placeholder="No key uploaded"
+                                    value={this.state.ngrokKey}
+                                    onChange={e => this.handleInputChange(e)}
+                                    onBlur={() => this.saveConfig()}
+                                />
+                            </span>
+                        ) : null}
                         <div className="aCheckboxDiv">
                             <div>
                                 <h3 className="aSettingTitle">Enable Private API Features</h3>
