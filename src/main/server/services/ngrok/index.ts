@@ -25,6 +25,7 @@ export class NgrokService extends Proxy {
 
         const opts: Ngrok.Options = {
             port: Server().repo.getConfig("socket_port") ?? 1234,
+            region: (Server().repo.getConfig("ngrok_region") as Ngrok.Region) ?? "us",
             binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked"),
             onStatusChange: async (status: string) => {
                 Server().log(`Ngrok status: ${status}`);
@@ -40,7 +41,18 @@ export class NgrokService extends Proxy {
 
                 // Check for any errors or other restart cases
                 if (cmp_log.includes("lvl=error") || cmp_log.includes("lvl=crit")) {
-                    Server().log(`Ngrok status: Error Detected -> Restarting...`);
+                    if (
+                        cmp_log.includes(
+                            "The authtoken you specified does not look like a proper ngrok tunnel authtoken"
+                        )
+                    ) {
+                        Server().log(`Ngrok Auth Token is invalid, removing...!`, "error");
+                        Server().repo.setConfig("ngrok_key", "");
+                    } else if (cmp_log.includes("TCP tunnels are only available after you sign up")) {
+                        Server().log(`In order to use Ngrok with TCP, you must enter an Auth Token!`, "error");
+                    } else {
+                        Server().log(`Ngrok status: Error Detected!`);
+                    }
                 } else if (log.includes("remote gone away")) {
                     Server().log(`Ngrok status: "Remote gone away" -> Restarting...`);
                     this.restart();
@@ -54,8 +66,14 @@ export class NgrokService extends Proxy {
         // If we have a key, use it
         if (ngrokKey !== null && ngrokKey !== undefined) {
             opts.authtoken = ngrokKey;
-        } else {
-            // A key is required to use TCP, otherwise, default to HTTP
+            await authtoken({
+                authtoken: ngrokKey,
+                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
+            });
+        }
+
+        // If there is no key, force http
+        if ((ngrokKey ?? "").length === 0) {
             ngrokProtocol = "http";
         }
 
@@ -73,6 +91,8 @@ export class NgrokService extends Proxy {
         try {
             await disconnect();
             await kill();
+        } catch (ex) {
+            Server().log("Failed to disconnect from Ngrok!", "warn");
         } finally {
             this.url = null;
         }

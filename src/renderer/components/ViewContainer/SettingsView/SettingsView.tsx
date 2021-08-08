@@ -26,6 +26,7 @@ interface State {
     showKey: boolean;
     ngrokKey: string;
     ngrokProtocol: string;
+    ngrokRegion: string;
     enableNgrok: boolean;
     proxyService: string;
     showModal: boolean;
@@ -57,6 +58,7 @@ class SettingsView extends React.Component<unknown, State> {
             proxyService: "Dynamic DNS",
             ngrokKey: "",
             ngrokProtocol: "http",
+            ngrokRegion: "us",
             enableNgrok: false,
             showModal: false,
             serverUrl: "",
@@ -92,6 +94,7 @@ class SettingsView extends React.Component<unknown, State> {
                 proxyService: config.proxy_service,
                 ngrokKey: config.ngrok_key,
                 ngrokProtocol: config.ngrok_protocol,
+                ngrokRegion: config.ngrok_region,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
@@ -174,6 +177,17 @@ class SettingsView extends React.Component<unknown, State> {
         const value = e.target.value as string;
         this.setState({ ngrokProtocol: value });
         await ipcRenderer.invoke("toggle-ngrok-protocol", { protocol: value });
+    };
+
+    handleRegionChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const value = e.target.value as string;
+        this.setState({ ngrokRegion: value });
+        await ipcRenderer.invoke("toggle-ngrok-region", { region: value });
+    };
+
+    setNgrokKey = async () => {
+        await ipcRenderer.invoke("set-ngrok-key", { key: this.state.ngrokKey });
     };
 
     handleInputChange = async (e: any) => {
@@ -444,6 +458,26 @@ class SettingsView extends React.Component<unknown, State> {
                         {this.state.proxyService === "Ngrok" ? (
                             <span>
                                 <div>
+                                    <h3 className="aSettingTitle">Ngrok Region:</h3>
+                                    <p className="settingsHelp">
+                                        Select the region that is closest to you. The closer the server, the better
+                                        latency will be.
+                                    </p>
+                                </div>
+                                <select value={this.state.ngrokRegion} onChange={e => this.handleRegionChange(e)}>
+                                    <option value="us">United States (Ohio)</option>
+                                    <option value="eu">Europe (Frankfurt)</option>
+                                    <option value="ap">Asia/Pacific (Singapore)</option>
+                                    <option value="au">Australia (Sydney)</option>
+                                    <option value="sa">South America (Sao Paulo)</option>
+                                    <option value="jp">Japan (Tokyo)</option>
+                                    <option value="in">India (Mumbai)</option>
+                                </select>
+                            </span>
+                        ) : null}
+                        {this.state.proxyService === "Ngrok" ? (
+                            <span>
+                                <div>
                                     <h3 className="aSettingTitle">Ngrok Auth Token (optional):</h3>
                                     <p className="settingsHelp">
                                         Using an Auth Token will allow you to use the benefits of the upgraded Ngrok
@@ -459,6 +493,9 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     onBlur={() => this.saveConfig()}
                                 />
+                                <button className="modal-button" onClick={() => this.setNgrokKey()}>
+                                    Save Key
+                                </button>
                             </span>
                         ) : null}
                         {this.state.proxyService === "Ngrok" && (this.state.ngrokKey ?? "").length > 0 ? (

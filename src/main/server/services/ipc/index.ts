@@ -138,6 +138,12 @@ export class IPCService {
             await Server().repo.setConfig("auto_caffeinate", toggle);
         });
 
+        ipcMain.handle("set-ngrok-key", async (_, data) => {
+            await Server().stopProxyServices();
+            await Server().repo.setConfig("ngrok_key", data.key);
+            await Server().restartProxyServices();
+        });
+
         ipcMain.handle("toggle-proxy-service", async (_, data) => {
             await Server().stopProxyServices();
             await Server().repo.setConfig("proxy_service", data.service);
@@ -152,6 +158,12 @@ export class IPCService {
         ipcMain.handle("toggle-ngrok-protocol", async (_, data) => {
             await Server().stopProxyServices();
             await Server().repo.setConfig("ngrok_protocol", data.protocol);
+            await Server().restartProxyServices();
+        });
+
+        ipcMain.handle("toggle-ngrok-region", async (_, data) => {
+            await Server().stopProxyServices();
+            await Server().repo.setConfig("ngrok_region", data.region);
             await Server().restartProxyServices();
         });
 
