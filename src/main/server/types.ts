@@ -77,6 +77,7 @@ export type MessageResponse = {
     associatedMessageType: string | null;
     expressiveSendStyleId: string | null;
     timeExpressiveSendStyleId: number | null;
+    replyToGuid: string | null;
 };
 
 export type HandleResponse = {
