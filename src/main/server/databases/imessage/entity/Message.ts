@@ -391,6 +391,9 @@ export class Message {
 
     @Column({ name: "message_summary_info", type: "blob", nullable: true })
     messageSummaryInfo: Blob;
+    
+    @Column({ name: "reply_to_guid", type: "text", nullable: true })
+    replyToGuid: string;
 }
 
 export const getMessageResponse = async (tableData: Message, withBlurhash = true): Promise<MessageResponse> => {
@@ -443,6 +446,7 @@ export const getMessageResponse = async (tableData: Message, withBlurhash = true
         expressiveSendStyleId: tableData.expressiveSendStyleId,
         timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
             ? tableData.timeExpressiveSendStyleId.getTime()
-            : null
+            : null,
+        replyToGuid: tableData.replyToGuid
     };
 };
