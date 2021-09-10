@@ -304,7 +304,7 @@ export class FileSystem {
     static deleteAddressBook() {
         try {
             fs.unlinkSync(FileSystem.addressBookFile);
-        } catch (ex) {
+        } catch (ex: any) {
             // Do nothing
         }
     }
@@ -326,7 +326,7 @@ export class FileSystem {
     static async getFileMetadata(filePath: string): Promise<{ [key: string]: string }> {
         try {
             return parseMetadataString(await FileSystem.execShellCommand(`mdls "${FileSystem.getRealPath(filePath)}"`));
-        } catch (ex) {
+        } catch (ex: any) {
             return null;
         }
     }
@@ -340,7 +340,7 @@ export class FileSystem {
 
             try {
                 return Number.parseFloat(num);
-            } catch (ex) {
+            } catch (ex: any) {
                 return null;
             }
         };

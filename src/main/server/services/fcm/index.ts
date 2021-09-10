@@ -12,7 +12,7 @@ export class FCMService {
     static getApp(): admin.app.App {
         try {
             return admin.app(AppName);
-        } catch (ex) {
+        } catch (ex: any) {
             return null;
         }
     }
@@ -121,7 +121,7 @@ export class FCMService {
                         // Do a restart
                         await Server().relaunch();
                     }
-                } catch (ex) {
+                } catch (ex: any) {
                     Server().log(`Failed to restart after FCM request!\n${ex}`, "error");
                 }
             });

@@ -222,7 +222,7 @@ class BlueBubblesServer extends EventEmitter {
         try {
             this.log("Launching Services..");
             await this.setupServices();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log("There was a problem launching the Server listeners.", "error");
         }
 
@@ -248,7 +248,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Initializing alert service...");
             const alerts = (await AlertService.find()).filter(item => !item.isRead);
             this.notificationCount = alerts.length;
-        } catch (ex) {
+        } catch (ex: any) {
             this.log("Failed to get initial notification count. Skipping.", "warn");
         }
 
@@ -259,7 +259,7 @@ class BlueBubblesServer extends EventEmitter {
         try {
             this.log("Initializing filesystem...");
             FileSystem.setup();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
         }
 
@@ -269,14 +269,14 @@ class BlueBubblesServer extends EventEmitter {
         try {
             this.log("Initializing queue service...");
             this.queue = new QueueService();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to setup queue service! ${ex.message}`, "error");
         }
 
         try {
             this.log("Initializing connection to Google FCM...");
             this.fcm = new FCMService();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
         }
 
@@ -293,7 +293,7 @@ class BlueBubblesServer extends EventEmitter {
             });
 
             this.networkChecker.start();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to setup network service! ${ex.message}`, "error");
         }
     }
@@ -328,7 +328,7 @@ class BlueBubblesServer extends EventEmitter {
                 Server().log("Restarting via terminal after post-check (configured)");
                 await this.restartViaTerminal();
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Failed to restart via terminal!\n${ex}`);
         }
 
@@ -389,7 +389,7 @@ class BlueBubblesServer extends EventEmitter {
             if (this.repo.getConfig("auto_caffeinate")) {
                 this.caffeinate.start();
             }
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to setup caffeinate service! ${ex.message}`, "error");
         }
     }
@@ -627,7 +627,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Connecting to iMessage database...");
             this.iMessageRepo = new MessageRepository();
             await this.iMessageRepo.initialize();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(ex, "error");
 
             const dialogOpts = {
@@ -654,14 +654,14 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Connecting to Contacts database...");
             this.contactsRepo = new ContactRepository();
             await this.contactsRepo.initialize();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
         }
 
         try {
             this.log("Initializing up sockets...");
             this.socket = new SocketService();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
@@ -670,7 +670,7 @@ class BlueBubblesServer extends EventEmitter {
             try {
                 this.log("Initializing up helper service...");
                 this.privateApiHelper = new BlueBubblesHelperService();
-            } catch (ex) {
+            } catch (ex: any) {
                 this.log(`Failed to setup helper service! ${ex.message}`, "error");
             }
         }
@@ -708,14 +708,14 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Connecting to proxies...");
             this.proxyServices = [new NgrokService(), new LocalTunnelService()];
             await this.restartProxyServices();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
         }
 
         try {
             this.log("Starting FCM service...");
             await this.fcm.start();
-        } catch (ex) {
+        } catch (ex: any) {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
 
@@ -779,19 +779,19 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             await this.stopProxyServices();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping Ngrok!\n${ex}`);
         }
 
         try {
             if (this?.socket?.server) this.socket.server.close();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the socket!\n${ex}`);
         }
 
         try {
             await this.iMessageRepo?.db?.close();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the iMessage database connection!\n${ex}`);
         }
 
@@ -799,37 +799,37 @@ class BlueBubblesServer extends EventEmitter {
             if (this.repo?.db?.isConnected) {
                 await this.repo?.db?.close();
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the server database connection!\n${ex}`);
         }
 
         try {
             await this.contactsRepo?.db?.close();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the contacts database connection!\n${ex}`);
         }
 
         try {
             if (this.networkChecker) this.networkChecker.stop();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the network checker service!\n${ex}`);
         }
 
         try {
             FCMService.stop();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the FCM service!\n${ex}`);
         }
 
         try {
             await this.privateApiHelper?.stop();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the Private API listener!\n${ex}`);
         }
 
         try {
             if (this.caffeinate) this.caffeinate.stop();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`There was an issue stopping the caffeinate service!\n${ex}`);
         }
     }

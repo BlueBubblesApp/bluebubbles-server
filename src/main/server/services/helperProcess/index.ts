@@ -67,7 +67,7 @@ export class BlueBubblesHelperService {
                 this.helper.destroy();
                 this.helper = null;
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
         }
 
@@ -79,7 +79,7 @@ export class BlueBubblesHelperService {
                 this.server.close();
                 this.server = null;
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
         }
     }

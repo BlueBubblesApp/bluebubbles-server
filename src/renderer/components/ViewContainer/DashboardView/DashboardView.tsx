@@ -133,7 +133,7 @@ class DashboardView extends React.Component<Props, State> {
             this.setState({
                 groupMsgCount: top
             });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database stats");
             console.error(ex);
         }
@@ -154,7 +154,7 @@ class DashboardView extends React.Component<Props, State> {
             this.setState({
                 individualMsgCount: top
             });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database stats");
         }
     }
@@ -164,7 +164,7 @@ class DashboardView extends React.Component<Props, State> {
             this.setState({
                 totalMsgCount: await ipcRenderer.invoke("get-message-count")
             });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database stats");
         }
     }
@@ -179,7 +179,7 @@ class DashboardView extends React.Component<Props, State> {
             });
 
             this.setState({ imageCount: top });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database stats");
         }
     }
@@ -194,7 +194,7 @@ class DashboardView extends React.Component<Props, State> {
             });
 
             this.setState({ videoCount: top });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database stats");
         }
     }
@@ -208,7 +208,7 @@ class DashboardView extends React.Component<Props, State> {
                     after
                 })
             });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database stats");
         }
     }
@@ -224,7 +224,7 @@ class DashboardView extends React.Component<Props, State> {
                     isFromMe: true
                 })
             });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database stats");
         }
     }

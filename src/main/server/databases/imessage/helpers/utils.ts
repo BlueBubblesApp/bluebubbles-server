@@ -26,7 +26,7 @@ export const getBlurHash = async (image: NativeImage) => {
 
         // Compute blurhash
         blurhash = blurHashEncode(Uint8ClampedArray.from(calcImage.toBitmap()), size.width, size.height, 3, 3);
-    } catch (ex) {
+    } catch (ex: any) {
         console.log(ex);
         Server().log(`Could not compute blurhash: ${ex.message}`, "error");
     }
@@ -50,7 +50,7 @@ export const convertAudio = async (attachment: Attachment): Promise<string> => {
         try {
             Server().log(`Converting attachment, ${theAttachment.transferName}, to an MP3...`);
             await FileSystem.convertCafToMp3(theAttachment, newPath);
-        } catch (ex) {
+        } catch (ex: any) {
             failed = true;
             Server().log(`Failed to convert CAF to MP3 for attachment, ${theAttachment.transferName}`);
             Server().log(ex, "error");
@@ -100,7 +100,7 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
                     }
                 }
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log("Failed to load size data from NativeImage!", "debug");
         }
     } else if (attachment.mimeType.startsWith("video")) {
