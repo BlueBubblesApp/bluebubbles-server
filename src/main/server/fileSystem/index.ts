@@ -52,7 +52,9 @@ export class FileSystem {
 
     public static resources = path.join(appPath, "appResources");
 
-    public static contactsVcf = `${FileSystem.contactsDir}/AddressBook.vcf`;
+    public static addressBookFile = `${FileSystem.contactsDir}/AddressBook.vcf`;
+
+    public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
 
     /**
      * Sets up all required directories and then, writes the scripts
@@ -161,6 +163,34 @@ export class FileSystem {
     }
 
     /**
+     * Saves a VCF file
+     *
+     * @param vcf The VCF data to save
+     */
+    static saveVCF(vcf: string): void {
+        // Delete the file if it exists
+        if (fs.existsSync(FileSystem.contactsFile)) {
+            fs.unlinkSync(FileSystem.contactsFile);
+        }
+
+        // Writes the file to disk
+        fs.writeFileSync(FileSystem.contactsFile, vcf);
+    }
+
+    /**
+     * Gets a VCF file
+     */
+    static getVCF(): string | null {
+        // Delete the file if it exists
+        if (!fs.existsSync(FileSystem.contactsFile)) {
+            return null;
+        }
+
+        // Reads the VCF file
+        return fs.readFileSync(FileSystem.contactsFile).toString();
+    }
+
+    /**
      * Saves the Client FCM JSON file
      *
      * @param contents The object data for the FCM client
@@ -210,7 +240,7 @@ export class FileSystem {
     static removeAttachment(name: string): void {
         try {
             fs.unlinkSync(path.join(FileSystem.attachmentsDir, name));
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Could not remove attachment: ${ex.message}`, "error");
         }
     }
@@ -271,9 +301,9 @@ export class FileSystem {
         await FileSystem.executeAppleScript(startMessages());
     }
 
-    static deleteContactsVcf() {
+    static deleteAddressBook() {
         try {
-            fs.unlinkSync(FileSystem.contactsVcf);
+            fs.unlinkSync(FileSystem.addressBookFile);
         } catch (ex) {
             // Do nothing
         }

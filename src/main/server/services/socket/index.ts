@@ -194,6 +194,31 @@ export class SocketService {
         });
 
         /**
+         * Save a VCF file
+         */
+        socket.on(
+            "save-vcf",
+            async (params, cb): Promise<void> => {
+                // Make sure we have VCF data
+                if (!params?.vcf) return response(cb, "error", createBadRequestResponse("No VCF data provided!"));
+
+                FileSystem.saveVCF(params.vcf);
+                return response(cb, "save-vcf", createSuccessResponse(null, "Successfully saved VCF"));
+            }
+        );
+
+        /**
+         * Save a VCF file
+         */
+        socket.on(
+            "get-vcf",
+            async (_, cb): Promise<void> => {
+                const vcf = FileSystem.getVCF();
+                return response(cb, "save-vcf", createSuccessResponse(vcf, "Successfully retrieved VCF"));
+            }
+        );
+
+        /**
          * Change proxy service
          */
         socket.on(
