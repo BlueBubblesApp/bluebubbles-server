@@ -96,6 +96,7 @@ export type ChatResponse = {
     guid: string;
     participants?: HandleResponse[];
     messages?: MessageResponse[];
+    lastMessage?: MessageResponse;
     style: number;
     chatIdentifier: string;
     isArchived: boolean;

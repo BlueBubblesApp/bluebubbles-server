@@ -20,6 +20,7 @@ export type DBWhereItem = {
 export type ChatParams = {
     chatGuid?: string;
     withParticipants?: boolean;
+    withLastMessage?: boolean;
     withArchived?: boolean;
     withSMS?: boolean;
     offset?: number;

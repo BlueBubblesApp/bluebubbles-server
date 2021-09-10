@@ -343,8 +343,10 @@ export class SocketService {
          * Get all chats
          */
         socket.on("get-chats", async (params, cb) => {
+            const withLastMessage = params?.withLastMessage ?? false;
             const chats = await Server().iMessageRepo.getChats({
                 withParticipants: params?.withParticipants ?? true,
+                withLastMessage,
                 withArchived: params?.withArchived ?? false,
                 withSMS: params?.withSMS ?? false,
                 limit: params?.limit ?? null,
@@ -355,6 +357,15 @@ export class SocketService {
             for (const chat of chats ?? []) {
                 if (chat.guid.startsWith("urn:")) continue;
                 const chatRes = await getChatResponse(chat);
+
+                // Set the last message, if applicable
+                if (withLastMessage && chatRes.messages && chatRes.messages.length > 0) {
+                    [chatRes.lastMessage] = chatRes.messages;
+
+                    // Remove the last message from the result
+                    delete chatRes.messages;
+                }
+
                 results.push(chatRes);
             }
 
