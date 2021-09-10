@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.1.21",
+    "version": "0.2.0",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles Android and Desktop Apps",
     "main": "./dist/main.js",
     "scripts": {
