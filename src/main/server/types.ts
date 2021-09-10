@@ -32,6 +32,7 @@ export type ServerMetadataResponse = {
     os_version: string;
     server_version: string;
     private_api: boolean;
+    helper_connected: boolean;
     proxy_service: string;
 };
 
