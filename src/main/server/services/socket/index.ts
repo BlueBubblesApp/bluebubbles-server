@@ -185,7 +185,9 @@ export class SocketService {
         socket.on("get-server-metadata", (_, cb): void => {
             const meta: ServerMetadataResponse = {
                 os_version: osVersion,
-                server_version: app.getVersion()
+                server_version: app.getVersion(),
+                private_api: Server().repo.getConfig("enable_private_api") as boolean,
+                proxy_service: Server().repo.getConfig("proxy_service") as string
             };
 
             return response(cb, "server-metadata", createSuccessResponse(meta, "Successfully fetched metadata"));
