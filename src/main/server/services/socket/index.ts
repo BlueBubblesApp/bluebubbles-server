@@ -133,10 +133,10 @@ export class SocketService {
              *
              * A console message will be printed, and a socket error will be emitted
              */
-            socket.use(async (_, next) => {
+            socket.use(async (_: any, next: Function) => {
                 try {
                     await next();
-                } catch (ex) {
+                } catch (ex: any) {
                     Server().log(`Socket server error! ${ex.message}`, "error");
                     socket.emit("exception", createServerErrorResponse(ex.message));
                     next(ex);
@@ -595,7 +595,7 @@ export class SocketService {
                     );
 
                     return response(cb, "message-sent", createSuccessResponse(null));
-                } catch (ex) {
+                } catch (ex: any) {
                     Server().socket.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
                 }
@@ -708,7 +708,7 @@ export class SocketService {
                         params?.message,
                         params?.tempGuid
                     );
-                } catch (ex) {
+                } catch (ex: any) {
                     // If there was a failure, and there is only 1 participant, and we have a message, try to fallback
                     if (participants.length === 1 && (params?.message ?? "").length > 0 && params?.tempGuid) {
                         Server().log("Universal create chat failed. Attempting single chat creation.", "debug");
@@ -720,7 +720,7 @@ export class SocketService {
                                 params?.message,
                                 params?.tempGuid
                             );
-                        } catch (ex2) {
+                        } catch (ex2: any) {
                             // If the fallback fails, return that error
                             return response(cb, "error", createBadRequestResponse(ex2?.message ?? ex2 ?? unknownError));
                         }
@@ -738,7 +738,7 @@ export class SocketService {
                 try {
                     const newChat = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
                     return response(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     let err = ex?.message ?? ex ?? unknownError;
 
                     // If it's a ROWID error, we want to handle it specifically
@@ -773,7 +773,7 @@ export class SocketService {
                             withSMS: true
                         });
                         return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
-                    } catch (ex) {
+                    } catch (ex: any) {
                         return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
                     }
                 }
@@ -783,7 +783,7 @@ export class SocketService {
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier, withSMS: true });
                     return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -806,7 +806,7 @@ export class SocketService {
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier, withSMS: true });
                     return response(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "add-participant-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -829,7 +829,7 @@ export class SocketService {
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier, withSMS: true });
                     return response(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "remove-participant-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -874,8 +874,8 @@ export class SocketService {
                             params.tapback
                         );
                         return response(cb, "tapback-sent", createNoDataResponse());
-                    } catch (ex) {
-                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.messageText));
+                    } catch (ex: any) {
+                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
                     }
                 }
 
@@ -890,7 +890,7 @@ export class SocketService {
                 try {
                     await ActionHandler.toggleTapback(params.chatGuid, params.actionMessageText, params.tapback);
                     return response(cb, "tapback-sent", createNoDataResponse());
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -939,7 +939,7 @@ export class SocketService {
                     } else {
                         response(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));
                     }
-                } catch (ex) {
+                } catch (ex: any) {
                     response(cb, "contacts-from-vcf", createServerErrorResponse(ex.message));
                 }
             }
