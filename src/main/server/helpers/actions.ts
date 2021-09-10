@@ -568,7 +568,7 @@ export class ActionHandler {
         Server().log("Executing Action: Export Contacts", "debug");
 
         try {
-            FileSystem.deleteContactsVcf();
+            FileSystem.deleteAddressBook();
             await FileSystem.executeAppleScript(exportContacts());
         } catch (ex) {
             let msg = ex.message;
