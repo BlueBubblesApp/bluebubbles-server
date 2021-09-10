@@ -138,17 +138,23 @@ export class FCMService {
         data: any,
         priority: "normal" | "high" = "normal"
     ): Promise<admin.messaging.MessagingDevicesResponse[]> {
-        if (!(await this.start())) return null;
+        try {
+            if (!(await this.start())) return null;
 
-        // Build out the notification message
-        const msg: admin.messaging.DataMessagePayload = { data };
-        const options: admin.messaging.MessagingOptions = { priority };
+            // Build out the notification message
+            const msg: admin.messaging.DataMessagePayload = { data };
+            const options: admin.messaging.MessagingOptions = { priority };
 
-        const responses: admin.messaging.MessagingDevicesResponse[] = [];
-        for (const device of devices)
-            responses.push(await FCMService.getApp().messaging().sendToDevice(device, msg, options));
+            const responses: admin.messaging.MessagingDevicesResponse[] = [];
+            for (const device of devices)
+                responses.push(await FCMService.getApp().messaging().sendToDevice(device, msg, options));
 
-        return responses;
+            return responses;
+        } catch (ex: any) {
+            Server().log(`Failed to send notification! ${ex.message}`);
+        }
+
+        return [];
     }
 
     static async stop() {
