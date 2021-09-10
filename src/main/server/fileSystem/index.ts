@@ -107,28 +107,7 @@ export class FileSystem {
     }
 
     private static readLastLines({ filePath, count = 100 }: { filePath: string; count?: number }): Promise<string> {
-        const inStream = fs.createReadStream(filePath);
-        const outStream = new stream.Writable();
-        return new Promise((resolve, reject) => {
-            const rl = readline.createInterface(inStream, outStream);
-
-            let output = "";
-            let lineCount = 0;
-            rl.on("line", line => {
-                lineCount += 1;
-                output += `${line}\n`;
-
-                if (lineCount >= count) {
-                    resolve(output);
-                }
-            });
-
-            rl.on("error", reject);
-
-            rl.on("close", () => {
-                resolve(output);
-            });
-        });
+        return FileSystem.execShellCommand(`tail -n ${count} ${filePath}`);
     }
 
     /**
