@@ -5,6 +5,7 @@ export type DBMessageParams = {
     after?: Date | number;
     before?: Date | number;
     withChats?: boolean;
+    withChatParticipants?: boolean;
     withAttachments?: boolean;
     withHandle?: boolean;
     sort?: "ASC" | "DESC";

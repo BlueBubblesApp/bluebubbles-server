@@ -168,6 +168,7 @@ export class MessageRepository {
         after = null,
         before = null,
         withChats = false,
+        withChatParticipants = false,
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
@@ -215,6 +216,10 @@ export class MessageRepository {
                 "chat",
                 "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
             );
+        }
+
+        if (withChatParticipants) {
+            query.innerJoinAndSelect("chat.participants", "chandle");
         }
 
         // Add date restraints

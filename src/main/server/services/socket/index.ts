@@ -23,7 +23,7 @@ import {
 
 // Entities
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { Device } from "@server/databases/server/entity/Device";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
@@ -477,10 +477,29 @@ export class SocketService {
                 // Get the messages
                 const messages = await Server().iMessageRepo.getMessages(dbParams);
 
-                // Do you want the blurhash? Default to true
-                const withBlurhash = params?.withBlurhash ?? true;
+                // Handle fetching the chat participants with the messages (if requested)
+                const withChatParticipants = params?.withChatParticipants ?? false;
+                const chatCache: { [key: string]: Handle[] } = {};
+                if (withChatParticipants) {
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+                    for (const i of chats) {
+                        chatCache[i.guid] = i.participants;
+                    }
+                }
+
+                // Do you want the blurhash? Default to false
+                const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
                 for (const msg of messages) {
+                    // Insert in the participants from the cache
+                    if (withChatParticipants) {
+                        for (const chat of msg.chats) {
+                            if (Object.keys(chatCache).includes(chat.guid)) {
+                                chat.participants = chatCache[chat.guid];
+                            }
+                        }
+                    }
+
                     const msgRes = await getMessageResponse(msg, withBlurhash);
                     results.push(msgRes);
                 }
