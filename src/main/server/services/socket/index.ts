@@ -194,6 +194,56 @@ export class SocketService {
         });
 
         /**
+         * Change proxy service
+         */
+        socket.on(
+            "change-proxy-service",
+            async (params, cb): Promise<void> => {
+                // Make sure we have a service
+                if (!params?.service)
+                    return response(cb, "error", createBadRequestResponse("No service name provided!"));
+
+                // Make sure the service is one that we can handle
+                const serviceOpts = ["Ngrok", "LocalTunnel", "Dynamic DNS"];
+                if (!serviceOpts.includes(params.service))
+                    return response(
+                        cb,
+                        "error",
+                        createBadRequestResponse(`Service name must be one of the following: ${serviceOpts.join(", ")}`)
+                    );
+
+                // If the service is dynamic DNS, make sure we have an address
+                if (params.service === "Dynamic DNS" && !params?.address)
+                    return response(cb, "error", createBadRequestResponse("No Dynamic DNS address provided!"));
+
+                // Send the response back before restarting
+                const res = response(
+                    cb,
+                    "change-proxy-service",
+                    createSuccessResponse(null, "Successfully set new proxy service!")
+                );
+
+                // Now, set the new proxy service
+                await Server().stopProxyServices();
+                await Server().repo.setConfig("proxy_service", params.service);
+
+                // If it's a dyn dns, set the address
+                if (params.service === "Dynamic DNS") {
+                    let addr = params.address;
+                    if (!addr.startsWith("http")) {
+                        addr = `http://${addr}`;
+                    }
+
+                    await Server().repo.setConfig("server_address", addr);
+                }
+
+                // Restart the proxy services
+                await Server().restartProxyServices();
+                return res;
+            }
+        );
+
+        /**
          * Return information about the server's config
          */
         socket.on("get-server-config", (_, cb): void => {
