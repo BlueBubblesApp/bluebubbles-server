@@ -54,7 +54,7 @@ export class QueueService {
                 default:
                     Server().log(`Unhandled queue item type: ${item.type}`, "warn");
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Failed to process queued item; Item type: ${item.type}`, "error");
             Server().log(ex.message);
         }

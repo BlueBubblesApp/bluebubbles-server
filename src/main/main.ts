@@ -239,7 +239,7 @@ const handleSet = async (parts: string[]): Promise<void> => {
     try {
         await Server().repo.setConfig(configKey, quickStrConvert(configValue));
         Server().log(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
-    } catch (ex) {
+    } catch (ex: any) {
         Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
     }
 };
@@ -259,7 +259,7 @@ const handleShow = async (parts: string[]): Promise<void> => {
     try {
         const value = await Server().repo.getConfig(configKey);
         Server().log(`${configKey} -> ${value}`);
-    } catch (ex) {
+    } catch (ex: any) {
         Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
     }
 };

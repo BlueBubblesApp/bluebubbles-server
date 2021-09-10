@@ -106,7 +106,7 @@ export class ContactRepository {
             const secondFormatted = phoneUtil.format(number, PhoneNumberFormat.NATIONAL);
 
             return firstFormatted === secondFormatted;
-        } catch (ex) {
+        } catch (ex: any) {
             return false;
         }
     }

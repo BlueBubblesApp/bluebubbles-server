@@ -48,7 +48,7 @@ class TopNav extends React.Component<Props, State> {
         try {
             const currentAlerts = await ipcRenderer.invoke("get-alerts");
             if (currentAlerts) this.setState({ alerts: currentAlerts });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load alerts");
         }
 

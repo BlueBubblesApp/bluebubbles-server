@@ -95,7 +95,7 @@ export class SocketService {
                     Server().log("Socket not listening! Restarting...", "error");
                     this.restart();
                 }
-            } catch (ex) {
+            } catch (ex: any) {
                 Server().log("Unable to start socket status listener!", "error");
                 Server().log(ex, "debug");
             }
@@ -532,7 +532,7 @@ export class SocketService {
                         try {
                             Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
                             await FileSystem.convertCafToMp3(attachment, newPath);
-                        } catch (ex) {
+                        } catch (ex: any) {
                             failed = true;
                             Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`);
                             Server().log(ex, "error");

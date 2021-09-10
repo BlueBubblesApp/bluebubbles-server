@@ -82,7 +82,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                 enablePrivateApi: config?.enable_private_api ?? false,
                 proxyService: config?.proxy_service ?? "Ngrok"
             });
-        } catch (ex) {
+        } catch (ex: any) {
             console.log("Failed to load database config");
             console.error(ex);
         }

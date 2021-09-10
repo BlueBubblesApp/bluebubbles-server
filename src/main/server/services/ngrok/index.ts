@@ -91,7 +91,7 @@ export class NgrokService extends Proxy {
         try {
             await disconnect();
             await kill();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log("Failed to disconnect from Ngrok!", "warn");
         } finally {
             this.url = null;
