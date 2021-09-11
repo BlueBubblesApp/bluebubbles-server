@@ -18,7 +18,7 @@ import { AuthMiddleware } from "../middleware/authMiddleware";
 import { GeneralRepo } from "../repo/generalRepo";
 
 export class HttpRoutesV1 {
-    static ver = "/v1";
+    static ver = "/api/v1";
 
     static createRoutes(router: KoaRouter) {
         // Misc routes
@@ -475,7 +475,7 @@ export class HttpRoutesV1 {
         });
 
         // Landing page
-        router.get("/", AuthMiddleware, async (ctx, _) => {
+        router.get("/", async (ctx, _) => {
             ctx.status = 200;
             ctx.body = `
                 <html>
