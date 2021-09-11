@@ -3,7 +3,6 @@ import { app, BrowserWindow, Tray, Menu, nativeTheme } from "electron";
 import * as process from "process";
 import * as path from "path";
 import * as url from "url";
-import * as unhandled from "electron-unhandled";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
@@ -37,12 +36,8 @@ if (!gotTheLock) {
     });
 }
 
-// Handle unhandled errors
-unhandled({
-    logger: (error: Error) => {
-        Server().log(`Unhandled Error: ${error.message}`, "error");
-    },
-    showDialog: false
+process.on("uncaughtException", error => {
+    Server().log(`Uncaught Exception: ${error.message}`, "error");
 });
 
 const handleExit = async () => {
@@ -92,7 +87,7 @@ const buildTray = () => {
             enabled: false
         },
         {
-            label: `Socket Connections: ${Server().socket?.server.sockets.sockets.size ?? 0}`,
+            label: `Socket Connections: ${Server().socket?.socketServer.sockets.sockets.size ?? 0}`,
             enabled: false
         },
         {

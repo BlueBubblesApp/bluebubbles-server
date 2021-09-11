@@ -6,6 +6,7 @@ import { ContactRepository } from "@server/databases/contacts";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { MessageRepository } from "@server/databases/imessage";
+import { Message } from "@server/databases/imessage/entity/Message";
 
 export const generateUuid = () => {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -217,6 +218,17 @@ export const parseMetadataString = (metadata: string): { [key: string]: string }
     }
 
     return output;
+};
+
+export const insertChatParticipants = async (message: Message): Promise<Message> => {
+    for (const chat of message.chats) {
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
+        if (!chats || chats.length === 0) continue;
+
+        chat.participants = chats[0].participants;
+    }
+
+    return message;
 };
 
 export const tapbackUIMap = {

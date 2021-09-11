@@ -39,7 +39,7 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
-import { sanitizeStr } from "./helpers/utils";
+import { insertChatParticipants, sanitizeStr } from "./helpers/utils";
 import { Proxy } from "./services/proxy";
 import { BlueBubblesHelperService } from "./services/helperProcess";
 
@@ -435,7 +435,7 @@ class BlueBubblesServer extends EventEmitter {
      * @param data Associated data with the notification (as a string)
      */
     async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal") {
-        this.socket.server.emit(type, data);
+        this.socket.socketServer.emit(type, data);
 
         // Send notification to devices
         if (FCMService.getApp()) {
@@ -506,7 +506,9 @@ class BlueBubblesServer extends EventEmitter {
                 : item.message.text;
 
             this.log(`Message match found for text, [${text}]`);
-            const resp = await getMessageResponse(item.message);
+
+            const newMessage = await insertChatParticipants(item.message);
+            const resp = await getMessageResponse(newMessage);
             resp.tempGuid = item.tempGuid;
 
             // We are emitting this as a new message, the only difference being the included tempGuid
@@ -522,8 +524,10 @@ class BlueBubblesServer extends EventEmitter {
             const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
             this.log(`New message from [You]: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
+            const newMessage = await insertChatParticipants(item);
+
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(item));
+            await this.emitMessage("new-message", await getMessageResponse(newMessage));
         });
 
         /**
@@ -544,8 +548,10 @@ class BlueBubblesServer extends EventEmitter {
                 )}] - [${updateType} -> ${time.toLocaleString()}]`
             );
 
+            const newMessage = await insertChatParticipants(item);
+
             // Emit it to the socket and FCM devices
-            await this.emitMessage("updated-message", await getMessageResponse(item));
+            await this.emitMessage("updated-message", await getMessageResponse(newMessage));
         });
 
         /**
@@ -585,8 +591,10 @@ class BlueBubblesServer extends EventEmitter {
                 : item.text;
             this.log(`New message from [${item.handle?.id}]: [${(text ?? "<No Text>").substring(0, 50)}]`);
 
+            const newMessage = await insertChatParticipants(item);
+
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(item), "high");
+            await this.emitMessage("new-message", await getMessageResponse(newMessage), "high");
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
@@ -740,6 +748,13 @@ class BlueBubblesServer extends EventEmitter {
         this.hasStarted = true;
     }
 
+    private removeChatListeners() {
+        // Remove all listeners
+        this.log("Removing chat listeners...");
+        for (const i of this.chatListeners) i.stop();
+        this.chatListeners = [];
+    }
+
     /**
      * Restarts the server
      */
@@ -747,13 +762,11 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Restarting the server...");
 
         // Remove all listeners
-        console.log("Removing chat listeners...");
-        for (const i of this.chatListeners) i.stop();
-        this.chatListeners = [];
+        this.removeChatListeners();
 
         // Disconnect & reconnect to the iMessage DB
         if (this.iMessageRepo.db.isConnected) {
-            console.log("Reconnecting to iMessage database...");
+            this.log("Reconnecting to iMessage database...");
             await this.iMessageRepo.db.close();
             await this.iMessageRepo.db.connect();
         }
@@ -778,35 +791,22 @@ class BlueBubblesServer extends EventEmitter {
         Server().log("Stopping all services...");
 
         try {
+            this.removeChatListeners();
+            this.removeAllListeners();
+        } catch (ex: any) {
+            Server().log(`There was an issue stopping listeners!\n${ex}`);
+        }
+
+        try {
             await this.stopProxyServices();
         } catch (ex: any) {
             Server().log(`There was an issue stopping Ngrok!\n${ex}`);
         }
 
         try {
-            if (this?.socket?.server) this.socket.server.close();
+            if (this?.socket?.socketServer) this.socket.socketServer.close();
         } catch (ex: any) {
             Server().log(`There was an issue stopping the socket!\n${ex}`);
-        }
-
-        try {
-            await this.iMessageRepo?.db?.close();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the iMessage database connection!\n${ex}`);
-        }
-
-        try {
-            if (this.repo?.db?.isConnected) {
-                await this.repo?.db?.close();
-            }
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the server database connection!\n${ex}`);
-        }
-
-        try {
-            await this.contactsRepo?.db?.close();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the contacts database connection!\n${ex}`);
         }
 
         try {
@@ -831,6 +831,26 @@ class BlueBubblesServer extends EventEmitter {
             if (this.caffeinate) this.caffeinate.stop();
         } catch (ex: any) {
             Server().log(`There was an issue stopping the caffeinate service!\n${ex}`);
+        }
+
+        try {
+            await this.contactsRepo?.db?.close();
+        } catch (ex: any) {
+            Server().log(`There was an issue stopping the contacts database connection!\n${ex}`);
+        }
+
+        try {
+            await this.iMessageRepo?.db?.close();
+        } catch (ex: any) {
+            Server().log(`There was an issue stopping the iMessage database connection!\n${ex}`);
+        }
+
+        try {
+            if (this.repo?.db?.isConnected) {
+                await this.repo?.db?.close();
+            }
+        } catch (ex: any) {
+            Server().log(`There was an issue stopping the server database connection!\n${ex}`);
         }
     }
 

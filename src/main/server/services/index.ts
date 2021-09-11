@@ -1,4 +1,4 @@
-import { SocketService } from "./socket";
+import { HttpService } from "./http";
 import { FCMService } from "./fcm";
 import { AlertService } from "./alert";
 import { CaffeinateService } from "./caffeinate";
@@ -10,7 +10,7 @@ import { QueueService } from "./queue";
 import { IPCService } from "./ipc";
 
 export {
-    SocketService,
+    HttpService as SocketService,
     FCMService,
     AlertService,
     CaffeinateService,

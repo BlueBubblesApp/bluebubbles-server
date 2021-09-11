@@ -81,6 +81,18 @@ export class MessageRepository {
         return chats;
     }
 
+    async getChatLastMessage(chatGuid: string): Promise<Message> {
+        const query = this.db.getRepository(Message).createQueryBuilder("message");
+        query.innerJoinAndSelect("message.chats", "chat");
+        query.andWhere("chat.guid = :guid", { guid: chatGuid });
+        query.orderBy("date", "DESC");
+        query.limit(1);
+
+        // Get results
+        const message = await query.getOne();
+        return message;
+    }
+
     /**
      * Get participants of a chat, in order of being added.
      * This is a weird method because of the way SQLite will auto-sort
@@ -96,7 +108,7 @@ export class MessageRepository {
     }
 
     /**
-     * Get all the chats from the DB
+     * Get an attachment from the DB
      *
      * @param attachmentGuid A specific attachment identifier to get
      * @param withMessages Whether to include the participants or not
@@ -131,6 +143,24 @@ export class MessageRepository {
 
         const attachment = await query.getOne();
         return attachment;
+    }
+
+    /**
+     * Get an attachment from the DB
+     *
+     * @param guid A specific message identifier to get
+     * @param withMessages Whether to include the participants or not
+     */
+    async getMessage(guid: string, withChats = true) {
+        const query = this.db.getRepository(Message).createQueryBuilder("message");
+        query.leftJoinAndSelect("message.handle", "handle");
+
+        if (withChats) query.leftJoinAndSelect("message.chats", "chat");
+
+        query.andWhere("message.guid = :guid", { guid });
+
+        const message = await query.getOne();
+        return message;
     }
 
     /**
@@ -453,6 +483,20 @@ export class MessageRepository {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
 
+        const count = await query.getCount();
+        return count;
+    }
+
+    async getChatCount() {
+        // Get messages with sender and the chat it's from
+        const query = this.db.getRepository(Chat).createQueryBuilder("chat");
+        const count = await query.getCount();
+        return count;
+    }
+
+    async getHandleCount() {
+        // Get messages with sender and the chat it's from
+        const query = this.db.getRepository(Handle).createQueryBuilder("handle");
         const count = await query.getCount();
         return count;
     }

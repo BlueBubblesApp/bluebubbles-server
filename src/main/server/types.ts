@@ -17,6 +17,7 @@ export type ResponseData =
     | Uint8Array
     | ServerConfig
     | string
+    | { [key: string]: any }
     | null;
 
 export type ResponseFormat = {
@@ -26,6 +27,7 @@ export type ResponseFormat = {
     error?: Error;
     // Single or list of database objects, or null
     data?: ResponseData;
+    metadata?: { [key: string]: any };
 };
 
 export type ServerMetadataResponse = {
@@ -130,7 +132,8 @@ export enum ResponseMessages {
     SERVER_ERROR = "Server Error",
     UNAUTHORIZED = "Unauthorized",
     FORBIDDEN = "Forbidden",
-    NO_DATA = "No Data"
+    NO_DATA = "No Data",
+    NOT_FOUND = "Not Found"
 }
 
 export enum ErrorTypes {
