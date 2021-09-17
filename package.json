@@ -73,7 +73,8 @@
         },
         "dmg": {
             "sign": false
-        }
+        },
+        "afterSign": "./build/notarize.js"
     },
     "repository": {
         "type": "git",
@@ -165,7 +166,9 @@
         "@material-ui/core": "^4.9.11",
         "@material-ui/icons": "^4.9.1",
         "@types/koa": "^2.13.4",
+        "@types/koa-cors": "^0.0.2",
         "@types/localtunnel": "^2.0.1",
+        "@types/node-forge": "^0.10.4",
         "better-sqlite3": "^7.4.3",
         "blurhash": "^1.1.3",
         "byte-base64": "^1.1.0",
@@ -178,12 +181,14 @@
         "google-libphonenumber": "^3.2.10",
         "koa": "^2.13.1",
         "koa-bodyparser": "^4.3.0",
+        "koa-cors": "^0.0.16",
         "koa-json": "^2.0.2",
         "koa-router": "^10.1.1",
         "localtunnel": "^2.0.1",
         "macos-version": "^5.2.0",
         "mime-types": "^2.1.32",
         "ngrok": "^4.2.2",
+        "node-forge": "^0.10.0",
         "numeral": "^2.0.6",
         "qrcode.react": "^1.0.0",
         "react": "^16.13.1",
@@ -193,6 +198,7 @@
         "react-router-transition": "^2.0.0",
         "read-chunk": "^3.2.0",
         "reflect-metadata": "^0.1.13",
+        "slugify": "^1.6.0",
         "socket.io": "3.1.2",
         "typeorm": "^0.2.29"
     },

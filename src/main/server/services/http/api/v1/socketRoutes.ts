@@ -26,7 +26,6 @@ import {
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
-import { Device } from "@server/databases/server/entity/Device";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Queue } from "@server/databases/server/entity/Queue";
@@ -35,12 +34,12 @@ import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
 import { restartMessages } from "@server/fileSystem/scripts";
 import { Socket } from "socket.io";
-import { GeneralRepo } from "../repo/generalRepo";
+import { GeneralRepo } from "./repository/generalRepo";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
 
-export class SocketRoutesV1 {
+export class SocketRoutes {
     static createRoutes(socket: Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             const resData = data;
@@ -588,12 +587,12 @@ export class SocketRoutesV1 {
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
                 // Make sure the message isn't already in the queue
-                if (Server().socket.sendCache.find(tempGuid)) {
+                if (Server().httpService.sendCache.find(tempGuid)) {
                     return response(cb, "error", createBadRequestResponse("Message is already queued to be sent!"));
                 }
 
                 // Add to send cache
-                Server().socket.sendCache.add(tempGuid);
+                Server().httpService.sendCache.add(tempGuid);
 
                 try {
                     // Send the message
@@ -608,7 +607,7 @@ export class SocketRoutesV1 {
 
                     return response(cb, "message-sent", createSuccessResponse(null));
                 } catch (ex: any) {
-                    Server().socket.sendCache.remove(tempGuid);
+                    Server().httpService.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -628,7 +627,7 @@ export class SocketRoutesV1 {
                 if (!tempGuid) return response(cb, "error", createBadRequestResponse("No temporary GUID provided"));
 
                 // Make sure the message isn't already in the queue
-                if (Server().socket.sendCache.find(tempGuid)) {
+                if (Server().httpService.sendCache.find(tempGuid)) {
                     return response(cb, "error", createBadRequestResponse("Attachment is already queued to be sent!"));
                 }
 
@@ -669,7 +668,7 @@ export class SocketRoutesV1 {
                     }
 
                     // Add the image to the send cache
-                    Server().socket.sendCache.add(tempGuid);
+                    Server().httpService.sendCache.add(tempGuid);
 
                     Server().queue.add({
                         type: "send-attachment",
@@ -1092,6 +1091,16 @@ export class SocketRoutesV1 {
             async (_, cb): Promise<void> => {
                 Server().privateApiHelper.start();
                 return response(cb, "restart-private-api-success", createSuccessResponse(null));
+            }
+        );
+
+        /**
+         * Checks for a serer update
+         */
+        socket.on(
+            "check-for-server-update",
+            async (_, cb): Promise<void> => {
+                return response(cb, "save-vcf", createSuccessResponse(await GeneralRepo.checkForUpdate()));
             }
         );
 

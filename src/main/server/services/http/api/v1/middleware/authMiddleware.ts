@@ -1,10 +1,8 @@
-import { Context } from "koa";
+import { Context, Next } from "koa";
 import { Server } from "@server/index";
 import { createServerErrorResponse, createUnauthorizedResponse } from "@server/helpers/responses";
 
-import { KoaNext } from "../types";
-
-export const AuthMiddleware = async (ctx: Context, next: KoaNext) => {
+export const AuthMiddleware = async (ctx: Context, next: Next) => {
     const params = ctx.request.query;
     ctx.status = 401; // Default
 

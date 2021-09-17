@@ -1,0 +1,49 @@
+import * as path from "path";
+import * as fs from "fs";
+import slugify from "slugify";
+import { FileSystem } from "@server/fileSystem";
+import { Server } from "@server/index";
+
+export class ThemeRepo {
+    static async saveTheme(name: string, data: any): Promise<void> {
+        const saniName = `${slugify(name)}.json`;
+        const themePath = path.join(FileSystem.themesDir, saniName);
+
+        // Delete the file if it exists
+        if (fs.existsSync(themePath)) {
+            fs.unlinkSync(themePath);
+        }
+
+        // Write the JSON file
+        fs.writeFileSync(themePath, JSON.stringify(data));
+    }
+
+    static async getThemeByName(name: string): Promise<any> {
+        const saniName = `${slugify(name)}.json`;
+        const themePath = path.join(FileSystem.themesDir, saniName);
+
+        // If the file exists, read the data, otherwise return null
+        if (fs.existsSync(themePath)) {
+            return JSON.parse(fs.readFileSync(themePath, { encoding: "utf-8" }));
+        }
+
+        return null;
+    }
+
+    static async getAllThemes(): Promise<any> {
+        const items = fs.readdirSync(FileSystem.themesDir);
+        const themes = [];
+
+        for (const i of items) {
+            const themePath = path.join(FileSystem.themesDir, i);
+
+            try {
+                themes.push(JSON.parse(fs.readFileSync(themePath, { encoding: "utf-8" })));
+            } catch (ex) {
+                Server().log(`Failed to read theme: ${themePath}`, "warn");
+            }
+        }
+
+        return themes;
+    }
+}

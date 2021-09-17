@@ -95,7 +95,7 @@ export class OutgoingMessageListener extends ChangeListener {
                 await repo.remove(entry);
 
                 // Remove from send-cache
-                Server().socket.sendCache.remove(entry.tempGuid);
+                Server().httpService.sendCache.remove(entry.tempGuid);
 
                 // Emit the message timeout
                 super.emit("message-timeout", entry);
@@ -140,7 +140,7 @@ export class OutgoingMessageListener extends ChangeListener {
                 // Remove the queue entry from the database & send cache
                 if (matches.length > 0) {
                     await repo.remove(entry);
-                    Server().socket.sendCache.remove(entry.tempGuid);
+                    Server().httpService.sendCache.remove(entry.tempGuid);
                 }
 
                 // Break because we only want one

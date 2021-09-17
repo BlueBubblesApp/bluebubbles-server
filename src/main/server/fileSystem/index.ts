@@ -44,6 +44,10 @@ export class FileSystem {
 
     public static attachmentCacheDir = path.join(FileSystem.baseDir, "Attachments", "Cached");
 
+    public static certsDir = path.join(FileSystem.baseDir, "Certs");
+
+    public static themesDir = path.join(FileSystem.baseDir, "Themes");
+
     public static contactsDir = path.join(FileSystem.baseDir, "Contacts");
 
     public static convertDir = path.join(FileSystem.baseDir, "Convert");
@@ -76,6 +80,8 @@ export class FileSystem {
         if (!fs.existsSync(FileSystem.convertDir)) fs.mkdirSync(FileSystem.convertDir);
         if (!fs.existsSync(FileSystem.contactsDir)) fs.mkdirSync(FileSystem.contactsDir);
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
+        if (!fs.existsSync(FileSystem.certsDir)) fs.mkdirSync(FileSystem.certsDir);
+        if (!fs.existsSync(FileSystem.themesDir)) fs.mkdirSync(FileSystem.themesDir);
     }
 
     static cachedAttachmentPath(attachment: Attachment, name: string) {

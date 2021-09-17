@@ -6,11 +6,9 @@ import * as url from "url";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
-import { UpdateService } from "@server/services";
 
 let win: BrowserWindow;
 let tray: Tray;
-let updateService: UpdateService;
 
 app.allowRendererProcessReuse = false;
 
@@ -67,8 +65,8 @@ const buildTray = () => {
             label: "Check for Updates",
             type: "normal",
             click: async () => {
-                if (updateService) {
-                    await updateService.checkForUpdate(true);
+                if (Server()) {
+                    await Server().updater.checkForUpdate({ showNoUpdateDialog: true });
                 }
             }
         },
@@ -87,7 +85,7 @@ const buildTray = () => {
             enabled: false
         },
         {
-            label: `Socket Connections: ${Server().socket?.socketServer.sockets.sockets.size ?? 0}`,
+            label: `Socket Connections: ${Server().httpService?.socketServer.sockets.sockets.size ?? 0}`,
             enabled: false
         },
         {
@@ -176,16 +174,6 @@ const createWindow = async () => {
 
     // Set the new window in the Server()
     Server(win);
-    Server().on("setup-complete", () => {
-        // Start the update service
-        if (!updateService) updateService = new UpdateService(win);
-
-        const check = Server().repo.getConfig("check_for_updates") as boolean;
-        if (check) {
-            updateService.start();
-            updateService.checkForUpdate(false);
-        }
-    });
 };
 
 app.on("ready", () => {

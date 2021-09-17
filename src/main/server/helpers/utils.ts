@@ -231,6 +231,25 @@ export const insertChatParticipants = async (message: Message): Promise<Message>
     return message;
 };
 
+export const fixServerUrl = (value: string) => {
+    let newValue = value;
+
+    // Strip any ending slashes
+    if (newValue.endsWith("/")) {
+        newValue = newValue.substring(0, newValue.length - 1);
+    }
+
+    // Force HTTPS
+    // if (newValue.startsWith('http://')) {
+    //     newValue = newValue.replace('http://', 'https://');
+    // }
+    if (!newValue.startsWith("http")) {
+        newValue = `http://${newValue}`;
+    }
+
+    return newValue;
+};
+
 export const tapbackUIMap = {
     love: 1,
     like: 2,

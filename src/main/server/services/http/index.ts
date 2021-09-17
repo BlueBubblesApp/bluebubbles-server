@@ -1,12 +1,13 @@
 /* eslint-disable max-len */
 import { Server as SocketServer, ServerOptions } from "socket.io";
-import * as macosVersion from "macos-version";
 
 // HTTP libraries
 import * as KoaApp from "koa";
 import * as bodyParser from "koa-bodyparser";
 import * as koaJson from "koa-json";
 import * as KoaRouter from "koa-router";
+import * as koaCors from "koa-cors";
+import * as https from "https";
 import * as http from "http";
 
 // Internal libraries
@@ -19,8 +20,8 @@ import { createServerErrorResponse } from "@server/helpers/responses";
 // Entities
 import { EventCache } from "@server/eventCache";
 
-import { HttpRoutesV1 } from "./api/httpRoutesV1";
-import { SocketRoutesV1 } from "./api/socketRoutesV1";
+import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
+import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
 
 /**
  * This service class handles all routing for incoming socket
@@ -29,7 +30,7 @@ import { SocketRoutesV1 } from "./api/socketRoutesV1";
 export class HttpService {
     koaApp: KoaApp;
 
-    httpServer: http.Server;
+    httpServer: https.Server | http.Server;
 
     socketServer: SocketServer;
 
@@ -56,10 +57,39 @@ export class HttpService {
      * @param port The initial port for Socket.IO
      */
     constructor() {
+        const opts: any = {};
+
+        // Configure certificates
+        // try {
+        //     const proxy_service = Server().repo.getConfig("proxy_service") as string;
+        //     if (proxy_service === 'Dynamic DNS') {
+        //         // Only setup certs if the proxy service is
+        //         Server().log("Starting Certificate service...");
+        //         CertificateService.start();
+
+        //         // Add the SSL/TLS PEMs to the opts
+        //         opts.cert = fs.readFileSync(CertificateService.certPath);
+        //         opts.key = fs.readFileSync(CertificateService.keyPath);
+
+        //         // Force HTTPs for the server URL as well
+        //         let serverUrl = Server().repo.getConfig("server_address") as string;
+        //         serverUrl = fixServerUrl(serverUrl);
+        //     }
+        // } catch (ex: any) {
+        //     Server().log(`Failed to start Certificate service! ${ex.message}`, "error");
+        // }
+
         // Create the HTTP server
         this.koaApp = new KoaApp();
         this.configureKoa();
-        this.httpServer = http.createServer(this.koaApp.callback());
+
+        if (opts.cert && opts.key) {
+            Server().log("Starting up HTTPS Server...");
+            this.httpServer = https.createServer(opts, this.koaApp.callback());
+        } else {
+            Server().log("Starting up HTTP Server...");
+            this.httpServer = http.createServer(this.koaApp.callback());
+        }
 
         // Create the socket server and link the http context
         this.socketServer = new SocketServer(this.httpServer, this.opts);
@@ -74,6 +104,9 @@ export class HttpService {
 
     configureKoa() {
         if (!this.koaApp) return;
+
+        // Allow cross origin requests
+        this.koaApp.use(koaCors());
 
         // Increase size limits from the default 1mb
         this.koaApp.use(

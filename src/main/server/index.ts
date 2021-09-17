@@ -25,7 +25,7 @@ import { ChangeListener } from "@server/databases/imessage/listeners/changeListe
 
 // Service Imports
 import {
-    SocketService,
+    HttpService,
     FCMService,
     AlertService,
     CaffeinateService,
@@ -33,7 +33,8 @@ import {
     LocalTunnelService,
     NetworkService,
     QueueService,
-    IPCService
+    IPCService,
+    UpdateService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
@@ -83,7 +84,7 @@ class BlueBubblesServer extends EventEmitter {
 
     contactsRepo: ContactRepository;
 
-    socket: SocketService;
+    httpService: HttpService;
 
     privateApiHelper: BlueBubblesHelperService;
 
@@ -94,6 +95,8 @@ class BlueBubblesServer extends EventEmitter {
     networkChecker: NetworkService;
 
     caffeinate: CaffeinateService;
+
+    updater: UpdateService;
 
     queue: QueueService;
 
@@ -140,13 +143,14 @@ class BlueBubblesServer extends EventEmitter {
         this.actionHandler = null;
 
         // Services
-        this.socket = null;
+        this.httpService = null;
         this.privateApiHelper = null;
         this.fcm = null;
         this.caffeinate = null;
         this.networkChecker = null;
         this.queue = null;
         this.proxyServices = [];
+        this.updater = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -229,7 +233,22 @@ class BlueBubblesServer extends EventEmitter {
         await this.startServices();
         await this.postChecks();
 
+        // Let everyone know the setup is complete
         this.emit("setup-complete");
+
+        // After setup is complete, start the update checker
+        try {
+            this.log("Initializing Update Service..");
+            this.updater = new UpdateService(this.window);
+
+            const check = Server().repo.getConfig("check_for_updates") as boolean;
+            if (check) {
+                this.updater.start();
+                this.updater.checkForUpdate();
+            }
+        } catch (ex: any) {
+            this.log("There was a problem initializing the update service.", "error");
+        }
     }
 
     /**
@@ -405,13 +424,13 @@ class BlueBubblesServer extends EventEmitter {
         let proxiesRestarted = false;
         if (prevConfig.socket_port !== nextConfig.socket_port) {
             await this.restartProxyServices();
-            if (this.socket) await this.socket.restart();
+            if (this.httpService) await this.httpService.restart();
             proxiesRestarted = true;
         }
 
         // If the ngrok URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
-            if (this.socket) await this.emitMessage("new-server", nextConfig.server_address, "high");
+            if (this.httpService) await this.emitMessage("new-server", nextConfig.server_address, "high");
             if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
         }
 
@@ -435,7 +454,7 @@ class BlueBubblesServer extends EventEmitter {
      * @param data Associated data with the notification (as a string)
      */
     async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal") {
-        this.socket.socketServer.emit(type, data);
+        this.httpService.socketServer.emit(type, data);
 
         // Send notification to devices
         if (FCMService.getApp()) {
@@ -668,7 +687,7 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             this.log("Initializing up sockets...");
-            this.socket = new SocketService();
+            this.httpService = new HttpService();
         } catch (ex: any) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
@@ -676,7 +695,7 @@ class BlueBubblesServer extends EventEmitter {
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             try {
-                this.log("Initializing up helper service...");
+                this.log("Initializing helper service...");
                 this.privateApiHelper = new BlueBubblesHelperService();
             } catch (ex: any) {
                 this.log(`Failed to setup helper service! ${ex.message}`, "error");
@@ -728,7 +747,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         this.log("Starting socket service...");
-        this.socket.restart();
+        this.httpService.restart();
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
@@ -804,7 +823,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            if (this?.socket?.socketServer) this.socket.socketServer.close();
+            if (this?.httpService?.socketServer) this.httpService.socketServer.close();
         } catch (ex: any) {
             Server().log(`There was an issue stopping the socket!\n${ex}`);
         }

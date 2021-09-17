@@ -8,9 +8,10 @@ import { LocalTunnelService } from "./localtunnel";
 import { NetworkService } from "./network";
 import { QueueService } from "./queue";
 import { IPCService } from "./ipc";
+import { CertificateService } from "./certificate";
 
 export {
-    HttpService as SocketService,
+    HttpService,
     FCMService,
     AlertService,
     CaffeinateService,
@@ -19,5 +20,6 @@ export {
     LocalTunnelService,
     NetworkService,
     QueueService,
-    IPCService
+    IPCService,
+    CertificateService
 };
