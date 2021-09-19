@@ -48,6 +48,8 @@ export class FileSystem {
 
     public static themesDir = path.join(FileSystem.baseDir, "Themes");
 
+    public static settingsDir = path.join(FileSystem.baseDir, "Settings");
+
     public static contactsDir = path.join(FileSystem.baseDir, "Contacts");
 
     public static convertDir = path.join(FileSystem.baseDir, "Convert");
@@ -82,6 +84,7 @@ export class FileSystem {
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
         if (!fs.existsSync(FileSystem.certsDir)) fs.mkdirSync(FileSystem.certsDir);
         if (!fs.existsSync(FileSystem.themesDir)) fs.mkdirSync(FileSystem.themesDir);
+        if (!fs.existsSync(FileSystem.settingsDir)) fs.mkdirSync(FileSystem.settingsDir);
     }
 
     static cachedAttachmentPath(attachment: Attachment, name: string) {

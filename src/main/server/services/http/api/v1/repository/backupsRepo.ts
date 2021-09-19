@@ -4,7 +4,7 @@ import slugify from "slugify";
 import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server/index";
 
-export class ThemeRepo {
+export class BackupsRepo {
     static async saveTheme(name: string, data: any): Promise<void> {
         const saniName = `${slugify(name)}.json`;
         const themePath = path.join(FileSystem.themesDir, saniName);
@@ -45,5 +45,48 @@ export class ThemeRepo {
         }
 
         return themes;
+    }
+
+    // Settings
+    static async saveSettings(name: string, data: any): Promise<void> {
+        const saniName = `${slugify(name)}.json`;
+        const settingsPath = path.join(FileSystem.settingsDir, saniName);
+
+        // Delete the file if it exists
+        if (fs.existsSync(settingsPath)) {
+            fs.unlinkSync(settingsPath);
+        }
+
+        // Write the JSON file
+        fs.writeFileSync(settingsPath, JSON.stringify(data));
+    }
+
+    static async getSettingsByName(name: string): Promise<any> {
+        const saniName = `${slugify(name)}.json`;
+        const settingsPath = path.join(FileSystem.settingsDir, saniName);
+
+        // If the file exists, read the data, otherwise return null
+        if (fs.existsSync(settingsPath)) {
+            return JSON.parse(fs.readFileSync(settingsPath, { encoding: "utf-8" }));
+        }
+
+        return null;
+    }
+
+    static async getAllSettings(): Promise<any> {
+        const items = fs.readdirSync(FileSystem.settingsDir);
+        const settings = [];
+
+        for (const i of items) {
+            const settingsPath = path.join(FileSystem.settingsDir, i);
+
+            try {
+                settings.push(JSON.parse(fs.readFileSync(settingsPath, { encoding: "utf-8" })));
+            } catch (ex) {
+                Server().log(`Failed to read theme: ${settingsPath}`, "warn");
+            }
+        }
+
+        return settings;
     }
 }

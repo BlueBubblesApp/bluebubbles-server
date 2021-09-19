@@ -13,6 +13,7 @@ import { FcmRouter } from "./routers/fcmRouter";
 import { ServerRouter } from "./routers/serverRouter";
 import { GeneralRouter } from "./routers/generalRouter";
 import { UiRouter } from "./routers/uiRouter";
+import { SettingsRouter } from "./routers/settingsRouter";
 
 export class HttpRoutes {
     static ver = "/api/v1";
@@ -53,10 +54,14 @@ export class HttpRoutes {
         router.get(`${this.ver}/handle/:guid`, AuthMiddleware, HandleRouter.find);
 
         // Theme routes
-        router.get(`${this.ver}/theme`, AuthMiddleware, ThemeRouter.get);
-        router.post(`${this.ver}/theme`, AuthMiddleware, ThemeRouter.create);
+        router.get(`${this.ver}/backup/theme`, AuthMiddleware, ThemeRouter.get);
+        router.post(`${this.ver}/backup/theme`, AuthMiddleware, ThemeRouter.create);
+
+        // Settings routes
+        router.get(`${this.ver}/backup/settings`, AuthMiddleware, SettingsRouter.get);
+        router.post(`${this.ver}/backup/settings`, AuthMiddleware, SettingsRouter.create);
 
         // UI Routes
-        router.get("/", async (ctx, _) => UiRouter.index);
+        router.get("/", UiRouter.index);
     }
 }

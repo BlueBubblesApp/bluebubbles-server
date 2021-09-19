@@ -4,7 +4,7 @@ import { Next } from "koa";
 import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
 import { BackupsRepo } from "../repository/backupsRepo";
 
-export class ThemeRouter {
+export class SettingsRouter {
     static async create(ctx: RouterContext, _: Next) {
         const { name, data } = ctx.request.body;
 
@@ -18,14 +18,14 @@ export class ThemeRouter {
         // Validation: Theme Data
         if (!data) {
             ctx.status = 400;
-            ctx.body = createBadRequestResponse("No theme data provided!");
+            ctx.body = createBadRequestResponse("No settings provided!");
             return;
         }
 
         // Validation: Theme Data
         if (typeof data !== "object" || Array.isArray(data)) {
             ctx.status = 400;
-            ctx.body = createBadRequestResponse("Theme data must be a JSON object!");
+            ctx.body = createBadRequestResponse("Settings must be a JSON object!");
             return;
         }
 
@@ -35,8 +35,8 @@ export class ThemeRouter {
         }
 
         // Save the theme to a file
-        await BackupsRepo.saveTheme(name, data);
-        ctx.body = createSuccessResponse("Successfully saved theme!");
+        await BackupsRepo.saveSettings(name, data);
+        ctx.body = createSuccessResponse("Successfully saved settings!");
     }
 
     static async get(ctx: RouterContext, _: Next) {
@@ -44,9 +44,9 @@ export class ThemeRouter {
         let res: any;
 
         if (name && name.length > 0) {
-            res = await BackupsRepo.getThemeByName(name);
+            res = await BackupsRepo.getSettingsByName(name);
         } else {
-            res = await BackupsRepo.getAllThemes();
+            res = await BackupsRepo.getAllSettings();
         }
 
         ctx.body = createSuccessResponse(res);
