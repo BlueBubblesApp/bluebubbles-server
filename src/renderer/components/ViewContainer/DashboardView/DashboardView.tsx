@@ -144,11 +144,13 @@ class DashboardView extends React.Component<Props, State> {
             const res = await ipcRenderer.invoke("get-individual-message-counts");
             let top = this.state.individualMsgCount;
             res.forEach((item: any) => {
-                if (item.message_count > top.count)
+                if (item.message_count > top.count) {
+                    const guid = item.chat_guid.replace("iMessage", "").replace(";+;", "").replace(";-;", "");
                     top = {
-                        name: item.chat_guid,
+                        name: item.group_name.length > 0 ? item.group_name : guid,
                         count: item.message_count
                     };
+                }
             });
 
             this.setState({
