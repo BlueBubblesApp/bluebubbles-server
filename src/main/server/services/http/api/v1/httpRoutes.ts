@@ -23,6 +23,9 @@ export class HttpRoutes {
         router.get(`${this.ver}/server/info`, AuthMiddleware, ServerRouter.getInfo);
         router.get(`${this.ver}/server/logs`, AuthMiddleware, ServerRouter.getLogs);
         router.get(`${this.ver}/server/update/check`, AuthMiddleware, ServerRouter.checkForUpdate);
+        router.get(`${this.ver}/server/statistics/totals`, AuthMiddleware, ServerRouter.getStatTotals);
+        router.get(`${this.ver}/server/statistics/media`, AuthMiddleware, ServerRouter.getStatMedia);
+        router.get(`${this.ver}/server/statistics/media/chat`, AuthMiddleware, ServerRouter.getStatMediaByChat);
 
         // FCM routes
         router.post(`${this.ver}/fcm/device`, AuthMiddleware, FcmRouter.registerDevice);

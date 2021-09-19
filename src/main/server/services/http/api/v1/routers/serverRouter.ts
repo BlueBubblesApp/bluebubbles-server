@@ -3,6 +3,7 @@ import { RouterContext } from "koa-router";
 import { createSuccessResponse } from "@server/helpers/responses";
 import { FileSystem } from "@server/fileSystem";
 import { GeneralRepo } from "../repository/generalRepo";
+import { ServerRepo } from "../repository/serverRepo";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
@@ -27,5 +28,41 @@ export class ServerRouter {
 
         const logs = await FileSystem.getLogs({ count });
         ctx.body = createSuccessResponse(logs);
+    }
+
+    static async getStatTotals(ctx: RouterContext, _: Next) {
+        const { only } = ctx.request.query;
+
+        const params: any = {};
+        if (only) {
+            params.only = (only as string).split(",");
+        }
+
+        ctx.status = 200;
+        ctx.body = createSuccessResponse(await ServerRepo.getDatabaseTotals(params));
+    }
+
+    static async getStatMedia(ctx: RouterContext, _: Next) {
+        const { only } = ctx.request.query;
+
+        const params: any = {};
+        if (only) {
+            params.only = (only as string).split(",");
+        }
+
+        ctx.status = 200;
+        ctx.body = createSuccessResponse(await ServerRepo.getMediaTotals(params));
+    }
+
+    static async getStatMediaByChat(ctx: RouterContext, _: Next) {
+        const { only } = ctx.request.query;
+
+        const params: any = {};
+        if (only) {
+            params.only = (only as string).split(",");
+        }
+
+        ctx.status = 200;
+        ctx.body = createSuccessResponse(await ServerRepo.getMediaTotalsByChat(params));
     }
 }

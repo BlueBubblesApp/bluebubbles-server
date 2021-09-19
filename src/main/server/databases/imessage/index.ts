@@ -46,7 +46,7 @@ export class MessageRepository {
         withSMS = false,
         offset = 0,
         limit = null
-    }: ChatParams) {
+    }: ChatParams = {}) {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
@@ -411,7 +411,7 @@ export class MessageRepository {
         // Get messages with sender and the chat it's from
         const result = await this.db.getRepository(Chat).query(
             `SELECT
-                chat.chat_identifier AS chat_identifier,
+                chat.guid AS chat_guid,
                 chat.display_name AS group_name,
                 COUNT(message.ROWID) AS message_count
             FROM chat
@@ -430,44 +430,44 @@ export class MessageRepository {
      *
      * @param chatStyle Whether you are fetching the count for a group or individual chat
      */
-    async getChatImageCounts() {
+    async getMediaCountsByChat({
+        mediaType = "image"
+    }: {
+        mediaType?: "image" | "video" | "location" | "other";
+    } = {}) {
         // Get messages with sender and the chat it's from
         const result = await this.db.getRepository(Chat).query(
             `SELECT
-                chat.chat_identifier AS chat_identifier,
+                chat.guid AS chat_guid,
                 chat.display_name AS group_name,
-                COUNT(attachment.ROWID) AS image_count
+                COUNT(attachment.ROWID) AS media_count
             FROM chat
             JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
             JOIN message ON message.ROWID = cmj.message_id
             JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
             JOIN attachment ON attachment.ROWID = maj.attachment_id
-            WHERE attachment.mime_type LIKE 'image%'
+            WHERE attachment.mime_type LIKE '${mediaType}%'
             GROUP BY chat.guid;`
         );
 
         return result;
     }
 
-    /**
-     * Count messages associated with different chats
-     *
-     * @param chatStyle Whether you are fetching the count for a group or individual chat
-     */
-    async getChatVideoCounts() {
+    async getMediaCounts({
+        mediaType = "image"
+    }: {
+        mediaType?: "image" | "video" | "location";
+    } = {}) {
+        let mType: string = mediaType;
+        if (mType === "location") {
+            mType = "text/x-vlocation";
+        }
+
         // Get messages with sender and the chat it's from
         const result = await this.db.getRepository(Chat).query(
-            `SELECT
-                chat.chat_identifier AS chat_identifier,
-                chat.display_name AS group_name,
-                COUNT(attachment.ROWID) AS video_count
-            FROM chat
-            JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
-            JOIN message ON message.ROWID = cmj.message_id
-            JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
-            JOIN attachment ON attachment.ROWID = maj.attachment_id
-            WHERE attachment.mime_type LIKE 'video%'
-            GROUP BY chat.guid;`
+            `SELECT COUNT(attachment.ROWID) AS media_count
+            FROM attachment
+            WHERE attachment.mime_type LIKE '${mType}%';`
         );
 
         return result;

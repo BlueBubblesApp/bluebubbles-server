@@ -14,7 +14,7 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { HandleResponse, ResponseFormat, ServerMetadataResponse } from "@server/types";
+import { ChatResponse, HandleResponse, ResponseFormat, ServerMetadataResponse } from "@server/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
@@ -215,6 +215,19 @@ export class SocketRoutes {
         socket.on("get-chats", async (params, cb) => {
             const withLastMessage = params?.withLastMessage ?? false;
             const withParticipants = !withLastMessage && (params?.withParticipants ?? true);
+            let sort = params?.sort ?? "";
+
+            // Validate sort param
+            if (typeof sort !== "string") {
+                return response(cb, "error", createBadRequestResponse("Sort parameter must be a string (get-chats)!"));
+            }
+
+            sort = sort.toLowerCase();
+            const validSorts = ["lastmessage"];
+            if (!validSorts.includes(sort)) {
+                sort = null;
+            }
+
             const chats = await Server().iMessageRepo.getChats({
                 withParticipants,
                 withLastMessage,
@@ -228,18 +241,14 @@ export class SocketRoutes {
             // We need to fetch all the chats with their participants, then cache the participants
             // so we can merge the participant list with the chats
             const chatCache: { [key: string]: Handle[] } = {};
-            if (withLastMessage) {
-                const tmpChats = await Server().iMessageRepo.getChats({
-                    withParticipants: true,
-                    withArchived: params?.withArchived ?? false,
-                    withSMS: params?.withSMS ?? false,
-                    limit: params?.limit ?? null,
-                    offset: params?.offset ?? 0
-                });
+            const tmpChats = await Server().iMessageRepo.getChats({
+                withParticipants: true,
+                withArchived: params?.withArchived ?? false,
+                withSMS: params?.withSMS ?? false
+            });
 
-                for (const chat of tmpChats) {
-                    chatCache[chat.guid] = chat.participants;
-                }
+            for (const chat of tmpChats) {
+                chatCache[chat.guid] = chat.participants;
             }
 
             const results = [];
@@ -247,19 +256,19 @@ export class SocketRoutes {
                 if (chat.guid.startsWith("urn:")) continue;
                 const chatRes = await getChatResponse(chat);
 
-                if (withLastMessage) {
-                    // Insert the cached participants from the original request
-                    if (Object.keys(chatCache).includes(chat.guid)) {
-                        chatRes.participants = await Promise.all(
-                            chatCache[chat.guid].map(
-                                async (e): Promise<HandleResponse> => {
-                                    const test = await getHandleResponse(e);
-                                    return test;
-                                }
-                            )
-                        );
-                    }
+                // Insert the cached participants from the original request
+                if (Object.keys(chatCache).includes(chat.guid)) {
+                    chatRes.participants = await Promise.all(
+                        chatCache[chat.guid].map(
+                            async (e): Promise<HandleResponse> => {
+                                const test = await getHandleResponse(e);
+                                return test;
+                            }
+                        )
+                    );
+                }
 
+                if (withLastMessage) {
                     // Set the last message, if applicable
                     if (chatRes.messages && chatRes.messages.length > 0) {
                         [chatRes.lastMessage] = chatRes.messages;
@@ -272,7 +281,20 @@ export class SocketRoutes {
                 results.push(chatRes);
             }
 
-            response(cb, "chats", createSuccessResponse(results));
+            // If we have a sort parameter, handle the cases
+            if (sort) {
+                if (sort === "lastmessage" && withLastMessage) {
+                    results.sort((a: ChatResponse, b: ChatResponse) => {
+                        const d1 = a.lastMessage?.dateCreated ?? 0;
+                        const d2 = b.lastMessage?.dateCreated ?? 0;
+                        if (d1 > d2) return -1;
+                        if (d1 < d2) return 1;
+                        return 0;
+                    });
+                }
+            }
+
+            return response(cb, "chats", createSuccessResponse(results));
         });
 
         /**
@@ -918,7 +940,7 @@ export class SocketRoutes {
                     return;
                 }
 
-                const handles = params;
+                const handles = params.map((e: any) => (typeof e === "string" ? { address: e } : e));
                 for (let i = 0; i <= handles.length; i += 1) {
                     if (!handles[i] || !handles[i].address) continue;
                     const contact = await Server().contactsRepo.getContactByAddress(handles[i].address);

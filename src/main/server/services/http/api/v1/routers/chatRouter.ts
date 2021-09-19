@@ -2,12 +2,12 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { Server } from "@server/index";
-import { createNotFoundResponse, createSuccessResponse } from "@server/helpers/responses";
+import { createBadRequestResponse, createNotFoundResponse, createSuccessResponse } from "@server/helpers/responses";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
-import { HandleResponse } from "@server/types";
+import { ChatResponse, HandleResponse } from "@server/types";
 
 import { parseNumber } from "../../../helpers";
 
@@ -123,6 +123,20 @@ export class ChatRouter {
         const withSMS = withQuery.includes("sms");
         const withArchived = withQuery.includes("archived");
         const guid = body?.guid;
+        let sort = body?.sort ?? "";
+
+        // Validate sort param
+        if (typeof sort !== "string") {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Sort parameter must be a string!");
+            return;
+        }
+
+        sort = sort.toLowerCase();
+        const validSorts = ["lastmessage"];
+        if (!validSorts.includes(sort)) {
+            sort = null;
+        }
 
         // Pull the pagination params and make sure they are correct
         let offset = parseNumber(body?.offset as string) ?? 0;
@@ -143,19 +157,15 @@ export class ChatRouter {
         // We need to fetch all the chats with their participants, then cache the participants
         // so we can merge the participant list with the chats
         const chatCache: { [key: string]: Handle[] } = {};
-        if (withLastMessage) {
-            const tmpChats = await Server().iMessageRepo.getChats({
-                chatGuid: guid as string,
-                withParticipants: true,
-                withArchived,
-                withSMS,
-                offset,
-                limit
-            });
+        const tmpChats = await Server().iMessageRepo.getChats({
+            chatGuid: guid as string,
+            withParticipants: true,
+            withArchived,
+            withSMS
+        });
 
-            for (const chat of tmpChats) {
-                chatCache[chat.guid] = chat.participants;
-            }
+        for (const chat of tmpChats) {
+            chatCache[chat.guid] = chat.participants;
         }
 
         const results = [];
@@ -163,19 +173,19 @@ export class ChatRouter {
             if (chat.guid.startsWith("urn:")) continue;
             const chatRes = await getChatResponse(chat);
 
-            if (withLastMessage) {
-                // Insert the cached participants from the original request
-                if (Object.keys(chatCache).includes(chat.guid)) {
-                    chatRes.participants = await Promise.all(
-                        chatCache[chat.guid].map(
-                            async (e): Promise<HandleResponse> => {
-                                const test = await getHandleResponse(e);
-                                return test;
-                            }
-                        )
-                    );
-                }
+            // Insert the cached participants from the original request
+            if (Object.keys(chatCache).includes(chat.guid)) {
+                chatRes.participants = await Promise.all(
+                    chatCache[chat.guid].map(
+                        async (e): Promise<HandleResponse> => {
+                            const test = await getHandleResponse(e);
+                            return test;
+                        }
+                    )
+                );
+            }
 
+            if (withLastMessage) {
                 // Set the last message, if applicable
                 if (chatRes.messages && chatRes.messages.length > 0) {
                     [chatRes.lastMessage] = chatRes.messages;
@@ -186,6 +196,19 @@ export class ChatRouter {
             }
 
             results.push(chatRes);
+        }
+
+        // If we have a sort parameter, handle the cases
+        if (sort) {
+            if (sort === "lastmessage" && withLastMessage) {
+                results.sort((a: ChatResponse, b: ChatResponse) => {
+                    const d1 = a.lastMessage?.dateCreated ?? 0;
+                    const d2 = b.lastMessage?.dateCreated ?? 0;
+                    if (d1 > d2) return -1;
+                    if (d1 < d2) return 1;
+                    return 0;
+                });
+            }
         }
 
         // Build metadata to return

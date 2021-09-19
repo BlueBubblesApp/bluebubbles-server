@@ -21,13 +21,13 @@ export class IPCService {
 
         ipcMain.handle("get-chat-image-count", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatImageCounts();
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "image" });
             return count;
         });
 
         ipcMain.handle("get-chat-video-count", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatVideoCounts();
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "video" });
             return count;
         });
 

@@ -146,7 +146,7 @@ class DashboardView extends React.Component<Props, State> {
             res.forEach((item: any) => {
                 if (item.message_count > top.count)
                     top = {
-                        name: item.chat_identifier,
+                        name: item.chat_guid,
                         count: item.message_count
                     };
             });
@@ -172,10 +172,11 @@ class DashboardView extends React.Component<Props, State> {
     async loadChatImageCounts() {
         try {
             const res = await ipcRenderer.invoke("get-chat-image-count");
+            console.log(res);
             let top = this.state.imageCount;
             res.forEach((item: any) => {
-                const identifier = item.chat_identifier.startsWith("chat") ? item.group_name : item.chat_identifier;
-                if (item.image_count > top.count) top = { name: identifier, count: item.image_count };
+                const identifier = item.group_name.length > 0 ? item.groupName : item.chat_guid;
+                if (item.media_count > top.count) top = { name: identifier, count: item.media_count };
             });
 
             this.setState({ imageCount: top });
@@ -189,8 +190,8 @@ class DashboardView extends React.Component<Props, State> {
             const res = await ipcRenderer.invoke("get-chat-video-count");
             let top = this.state.videoCount;
             res.forEach((item: any) => {
-                const identifier = item.chat_identifier.startsWith("chat") ? item.group_name : item.chat_identifier;
-                if (item.video_count > top.count) top = { name: identifier, count: item.video_count };
+                const identifier = item.group_name.length > 0 ? item.groupName : item.chat_guid;
+                if (item.media_count > top.count) top = { name: identifier, count: item.media_count };
             });
 
             this.setState({ videoCount: top });
