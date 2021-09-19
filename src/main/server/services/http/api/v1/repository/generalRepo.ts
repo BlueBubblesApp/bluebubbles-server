@@ -4,7 +4,7 @@ import * as macosVersion from "macos-version";
 import { Server } from "@server/index";
 import { ServerMetadataResponse } from "@server/types";
 import { Device } from "@server/databases/server/entity";
-import { UpdateResult } from "../types";
+import { UpdateResult } from "../../../types";
 
 const osVersion = macosVersion();
 
@@ -15,7 +15,7 @@ export class GeneralRepo {
             server_version: app.getVersion(),
             private_api: Server().repo.getConfig("enable_private_api") as boolean,
             proxy_service: Server().repo.getConfig("proxy_service") as string,
-            helper_connected: (Server().privateApiHelper?.server?.connections ?? 0) > 0
+            helper_connected: !!Server().privateApiHelper?.helper
         };
     }
 

@@ -75,7 +75,7 @@ export class SocketRoutes {
                 server_version: app.getVersion(),
                 private_api: Server().repo.getConfig("enable_private_api") as boolean,
                 proxy_service: Server().repo.getConfig("proxy_service") as string,
-                helper_connected: (Server().privateApiHelper?.server?.connections ?? 0) > 0
+                helper_connected: !!Server().privateApiHelper?.helper
             };
 
             return response(cb, "server-metadata", createSuccessResponse(meta, "Successfully fetched metadata"));
