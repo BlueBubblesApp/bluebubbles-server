@@ -83,7 +83,7 @@ export class BackupsRepo {
             try {
                 settings.push(JSON.parse(fs.readFileSync(settingsPath, { encoding: "utf-8" })));
             } catch (ex) {
-                Server().log(`Failed to read theme: ${settingsPath}`, "warn");
+                Server().log(`Failed to read settings: ${settingsPath}`, "warn");
             }
         }
 
