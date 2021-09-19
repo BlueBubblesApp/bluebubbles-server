@@ -15,14 +15,14 @@ export class SettingsRouter {
             return;
         }
 
-        // Validation: Theme Data
+        // Validation: Settings Data
         if (!data) {
             ctx.status = 400;
             ctx.body = createBadRequestResponse("No settings provided!");
             return;
         }
 
-        // Validation: Theme Data
+        // Validation: Settings Data
         if (typeof data !== "object" || Array.isArray(data)) {
             ctx.status = 400;
             ctx.body = createBadRequestResponse("Settings must be a JSON object!");
@@ -34,7 +34,7 @@ export class SettingsRouter {
             data.name = name;
         }
 
-        // Save the theme to a file
+        // Save the settings to a file
         await BackupsRepo.saveSettings(name, data);
         ctx.body = createSuccessResponse("Successfully saved settings!");
     }
