@@ -83,11 +83,13 @@ export class ContactRepository {
      * @param address A phone number
      */
     async getContactByAddress(address: string): Promise<Record> {
-        // Do some sanitization/validation
-        const addr = address.replace(/\D/g, "");
-        let lastFourDigits = addr;
-        if (addr.length >= 4) {
-            lastFourDigits = addr.substring(addr.length - 4);
+        let addr = address;
+        let lastFourDigits;
+        if (!addr.includes("@")) {
+            addr = addr.replace(/\D/g, "");
+            if (addr.length >= 4) {
+                lastFourDigits = addr.substring(addr.length - 4);
+            }
         }
 
         // Construct the query
@@ -96,8 +98,13 @@ export class ContactRepository {
         // Search by last 4 digits because we don't want to have to worry about formatting
         query.leftJoinAndSelect("record.phoneNumbers", "phoneNumber");
         query.leftJoinAndSelect("record.emails", "email");
-        query.where("phoneNumber.ZLASTFOURDIGITS = :lastFourDigits", { lastFourDigits });
-        query.orWhere("email.ZADDRESSNORMALIZED = :address", { address: addr });
+
+        // If we don't have the last 4 digits, it's an email address
+        if (lastFourDigits) {
+            query.where("phoneNumber.ZLASTFOURDIGITS = :lastFourDigits", { lastFourDigits });
+        } else {
+            query.where("email.ZADDRESSNORMALIZED = :address", { address: addr.toLocaleLowerCase() });
+        }
 
         // Fetch the results
         const records = await query.getMany();
@@ -109,6 +116,7 @@ export class ContactRepository {
             const numbers = record.phoneNumbers.filter(item =>
                 ContactRepository.sameAddress(address, item.address, item.countryCode ?? "US")
             );
+
             if (record.emails.length > 0 || numbers.length > 0) output.push(record);
         }
 
