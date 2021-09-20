@@ -14,6 +14,7 @@ import { ServerRouter } from "./routers/serverRouter";
 import { GeneralRouter } from "./routers/generalRouter";
 import { UiRouter } from "./routers/uiRouter";
 import { SettingsRouter } from "./routers/settingsRouter";
+import { ContactRouter } from "./routers/contactRouter";
 
 export class HttpRoutes {
     static ver = "/api/v1";
@@ -52,6 +53,10 @@ export class HttpRoutes {
         // Handle Routes
         router.get(`${this.ver}/handle/count`, AuthMiddleware, HandleRouter.count);
         router.get(`${this.ver}/handle/:guid`, AuthMiddleware, HandleRouter.find);
+
+        // Theme routes
+        router.get(`${this.ver}/contact`, AuthMiddleware, ContactRouter.get);
+        router.post(`${this.ver}/contact/query`, AuthMiddleware, ContactRouter.query);
 
         // Theme routes
         router.get(`${this.ver}/backup/theme`, AuthMiddleware, ThemeRouter.get);
