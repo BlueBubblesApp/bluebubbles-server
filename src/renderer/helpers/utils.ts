@@ -3,7 +3,7 @@ import { ipcRenderer } from "electron";
 export const testJson = (value: string) => {
     try {
         return JSON.parse(value);
-    } catch (ex) {
+    } catch (ex: any) {
         return false;
     }
 };

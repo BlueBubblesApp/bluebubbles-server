@@ -25,6 +25,8 @@ interface State {
     showPassword: boolean;
     showKey: boolean;
     ngrokKey: string;
+    ngrokProtocol: string;
+    ngrokRegion: string;
     enableNgrok: boolean;
     proxyService: string;
     showModal: boolean;
@@ -55,6 +57,8 @@ class SettingsView extends React.Component<unknown, State> {
             showKey: false,
             proxyService: "Dynamic DNS",
             ngrokKey: "",
+            ngrokProtocol: "http",
+            ngrokRegion: "us",
             enableNgrok: false,
             showModal: false,
             serverUrl: "",
@@ -89,6 +93,8 @@ class SettingsView extends React.Component<unknown, State> {
                 showKey: false,
                 proxyService: config.proxy_service,
                 ngrokKey: config.ngrok_key,
+                ngrokProtocol: config.ngrok_protocol,
+                ngrokRegion: config.ngrok_region,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
@@ -164,6 +170,24 @@ class SettingsView extends React.Component<unknown, State> {
         if (value === "Dynamic DNS") {
             this.setState({ showModal: true });
         }
+    };
+
+    handleProtocolChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const value = e.target.value as string;
+        this.setState({ ngrokProtocol: value });
+        await ipcRenderer.invoke("toggle-ngrok-protocol", { protocol: value });
+    };
+
+    handleRegionChange = async (e: any) => {
+        // eslint-disable-next-line prefer-destructuring
+        const value = e.target.value as string;
+        this.setState({ ngrokRegion: value });
+        await ipcRenderer.invoke("toggle-ngrok-region", { region: value });
+    };
+
+    setNgrokKey = async () => {
+        await ipcRenderer.invoke("set-ngrok-key", { key: this.state.ngrokKey });
     };
 
     handleInputChange = async (e: any) => {
@@ -419,8 +443,9 @@ class SettingsView extends React.Component<unknown, State> {
                             <div>
                                 <h3 className="aSettingTitle">Proxy Service:</h3>
                                 <p className="settingsHelp">
-                                    Select which proxy service you want to use with BlueBubbles. Ngrok is the default,
-                                    however, you can use alternative solutions such as LocalTunnel. If you
+                                    Select which proxy service you want to use with BlueBubbles. If you are having
+                                    issues with Ngrok, please sign up on their website and use your account&apos;s Auth
+                                    Token. Otherwise, try out LocalTunnel.
                                 </p>
                             </div>
 
@@ -430,20 +455,65 @@ class SettingsView extends React.Component<unknown, State> {
                                 <option value="Dynamic DNS">Dynamic DNS</option>
                             </select>
                         </span>
-                        <div>
-                            <h3 className="aSettingTitle">Ngrok API Key (optional):</h3>
-                            <p className="settingsHelp">
-                                Using an API key will allow you to use the benefits of the upgraded Ngrok service
-                            </p>
-                        </div>
-                        <input
-                            id="ngrokKey"
-                            className="aInput"
-                            placeholder="No key uploaded"
-                            value={this.state.ngrokKey}
-                            onChange={e => this.handleInputChange(e)}
-                            onBlur={() => this.saveConfig()}
-                        />
+                        {this.state.proxyService === "Ngrok" ? (
+                            <span>
+                                <div>
+                                    <h3 className="aSettingTitle">Ngrok Region:</h3>
+                                    <p className="settingsHelp">
+                                        Select the region that is closest to you. The closer the server, the better
+                                        latency will be.
+                                    </p>
+                                </div>
+                                <select value={this.state.ngrokRegion} onChange={e => this.handleRegionChange(e)}>
+                                    <option value="us">United States (Ohio)</option>
+                                    <option value="eu">Europe (Frankfurt)</option>
+                                    <option value="ap">Asia/Pacific (Singapore)</option>
+                                    <option value="au">Australia (Sydney)</option>
+                                    <option value="sa">South America (Sao Paulo)</option>
+                                    <option value="jp">Japan (Tokyo)</option>
+                                    <option value="in">India (Mumbai)</option>
+                                </select>
+                            </span>
+                        ) : null}
+                        {this.state.proxyService === "Ngrok" ? (
+                            <span>
+                                <div>
+                                    <h3 className="aSettingTitle">Ngrok Auth Token (optional):</h3>
+                                    <p className="settingsHelp">
+                                        Using an Auth Token will allow you to use the benefits of the upgraded Ngrok
+                                        service. This is not referring to the API Keys in Ngrok. Note, if you want to
+                                        use TCP, an Auth Token is required.
+                                    </p>
+                                </div>
+                                <input
+                                    id="ngrokKey"
+                                    className="aInput"
+                                    placeholder="No key uploaded"
+                                    value={this.state.ngrokKey}
+                                    onChange={e => this.handleInputChange(e)}
+                                    onBlur={() => this.saveConfig()}
+                                />
+                                <button className="modal-button" onClick={() => this.setNgrokKey()}>
+                                    Save Key
+                                </button>
+                            </span>
+                        ) : null}
+                        {this.state.proxyService === "Ngrok" && (this.state.ngrokKey ?? "").length > 0 ? (
+                            <span>
+                                <div>
+                                    <h3 className="aSettingTitle">Ngrok Protocol:</h3>
+                                    <p className="settingsHelp">
+                                        Select the protocol you want to use for the Ngrok tunnel. This defaults to
+                                        &quot;HTTP&quot;, but if you are having issues, you can try &quot;TCP&quot;. An
+                                        Ngrok Auth Token is required to use TCP.
+                                    </p>
+                                </div>
+                                <select value={this.state.ngrokProtocol} onChange={e => this.handleProtocolChange(e)}>
+                                    <option value="http">HTTP</option>
+                                    <option value="tcp">TCP</option>
+                                </select>
+                            </span>
+                        ) : null}
                         <div className="aCheckboxDiv">
                             <div>
                                 <h3 className="aSettingTitle">Enable Private API Features</h3>

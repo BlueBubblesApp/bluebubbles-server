@@ -52,7 +52,9 @@ export class FileSystem {
 
     public static resources = path.join(appPath, "appResources");
 
-    public static contactsVcf = `${FileSystem.contactsDir}/AddressBook.vcf`;
+    public static addressBookFile = `${FileSystem.contactsDir}/AddressBook.vcf`;
+
+    public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
 
     /**
      * Sets up all required directories and then, writes the scripts
@@ -105,28 +107,7 @@ export class FileSystem {
     }
 
     private static readLastLines({ filePath, count = 100 }: { filePath: string; count?: number }): Promise<string> {
-        const inStream = fs.createReadStream(filePath);
-        const outStream = new stream.Writable();
-        return new Promise((resolve, reject) => {
-            const rl = readline.createInterface(inStream, outStream);
-
-            let output = "";
-            let lineCount = 0;
-            rl.on("line", line => {
-                lineCount += 1;
-                output += `${line}\n`;
-
-                if (lineCount >= count) {
-                    resolve(output);
-                }
-            });
-
-            rl.on("error", reject);
-
-            rl.on("close", () => {
-                resolve(output);
-            });
-        });
+        return FileSystem.execShellCommand(`tail -n ${count} ${filePath}`);
     }
 
     /**
@@ -158,6 +139,34 @@ export class FileSystem {
         }
 
         return chunks;
+    }
+
+    /**
+     * Saves a VCF file
+     *
+     * @param vcf The VCF data to save
+     */
+    static saveVCF(vcf: string): void {
+        // Delete the file if it exists
+        if (fs.existsSync(FileSystem.contactsFile)) {
+            fs.unlinkSync(FileSystem.contactsFile);
+        }
+
+        // Writes the file to disk
+        fs.writeFileSync(FileSystem.contactsFile, vcf);
+    }
+
+    /**
+     * Gets a VCF file
+     */
+    static getVCF(): string | null {
+        // Delete the file if it exists
+        if (!fs.existsSync(FileSystem.contactsFile)) {
+            return null;
+        }
+
+        // Reads the VCF file
+        return fs.readFileSync(FileSystem.contactsFile).toString();
     }
 
     /**
@@ -210,7 +219,7 @@ export class FileSystem {
     static removeAttachment(name: string): void {
         try {
             fs.unlinkSync(path.join(FileSystem.attachmentsDir, name));
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Could not remove attachment: ${ex.message}`, "error");
         }
     }
@@ -271,10 +280,10 @@ export class FileSystem {
         await FileSystem.executeAppleScript(startMessages());
     }
 
-    static deleteContactsVcf() {
+    static deleteAddressBook() {
         try {
-            fs.unlinkSync(FileSystem.contactsVcf);
-        } catch (ex) {
+            fs.unlinkSync(FileSystem.addressBookFile);
+        } catch (ex: any) {
             // Do nothing
         }
     }
@@ -296,7 +305,7 @@ export class FileSystem {
     static async getFileMetadata(filePath: string): Promise<{ [key: string]: string }> {
         try {
             return parseMetadataString(await FileSystem.execShellCommand(`mdls "${FileSystem.getRealPath(filePath)}"`));
-        } catch (ex) {
+        } catch (ex: any) {
             return null;
         }
     }
@@ -310,7 +319,7 @@ export class FileSystem {
 
             try {
                 return Number.parseFloat(num);
-            } catch (ex) {
+            } catch (ex: any) {
                 return null;
             }
         };

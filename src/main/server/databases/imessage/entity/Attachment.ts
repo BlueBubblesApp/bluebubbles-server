@@ -146,7 +146,7 @@ export const getAttachmentResponse = async (
                     data = base64.bytesToBase64(data as Uint8Array);
                 }
             }
-        } catch (ex) {
+        } catch (ex: any) {
             console.log(ex);
             Server().log(`Could not read file [${fPath}]: ${ex.message}`, "error");
         }

@@ -74,7 +74,7 @@ export class ActionHandler {
                         attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
                     )
                 );
-            } catch (ex) {
+            } catch (ex: any) {
                 // Log the actual error
                 Server().log(ex);
 
@@ -124,7 +124,7 @@ export class ActionHandler {
                 attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
                 await Server().repo.queue().manager.save(attachmentItem);
             }
-        } catch (ex) {
+        } catch (ex: any) {
             let msg = ex.message;
             if (msg instanceof String) {
                 [, msg] = msg.split("execution error: ");
@@ -166,7 +166,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(renameGroupChat(oldName, newName));
-            } catch (ex) {
+            } catch (ex: any) {
                 err = ex;
                 Server().log(`Failed to rename group from [${oldName}] to [${newName}]. Trying again.`, "warn");
                 continue;
@@ -218,7 +218,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(addParticipant(name, participant));
-            } catch (ex) {
+            } catch (ex: any) {
                 err = ex;
                 Server().log(`Failed to add participant to group, [${name}]. Trying again.`, "warn");
                 continue;
@@ -263,7 +263,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(removeParticipant(name, participant));
-            } catch (ex) {
+            } catch (ex: any) {
                 err = ex;
                 Server().log(`Failed to remove participant to group, [${name}]. Trying again.`, "warn");
                 continue;
@@ -307,7 +307,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(openChat(name));
-            } catch (ex) {
+            } catch (ex: any) {
                 err = ex;
                 Server().log(`Failed to open chat, [${name}]. Trying again.`, "warn");
                 continue;
@@ -411,7 +411,7 @@ export class ActionHandler {
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(toggleTapback(name, text, tapbackId));
-            } catch (ex) {
+            } catch (ex: any) {
                 err = ex;
                 Server().log(`Failed to toggle tapback on message, [${friendlyMsg}]. Trying again.`, "warn");
                 continue;
@@ -453,7 +453,7 @@ export class ActionHandler {
                 const output = await safeExecuteAppleScript(checkTypingIndicator(name));
                 if (!output) return false;
                 return toBoolean(output.trim());
-            } catch (ex) {
+            } catch (ex: any) {
                 err = ex;
                 Server().log(`Failed to check for typing indicators for chat, [${name}]. Trying again.`, "warn");
                 continue;
@@ -494,11 +494,11 @@ export class ActionHandler {
             try {
                 // First try to send via the AppleScript using the `text chat` qualifier
                 ret = (await FileSystem.executeAppleScript(startChat(buddies, service, true))) as string;
-            } catch (ex) {
+            } catch (ex: any) {
                 // If the above command fails, try with just the `chat` qualifier
                 ret = (await FileSystem.executeAppleScript(startChat(buddies, service, false))) as string;
             }
-        } catch (ex) {
+        } catch (ex: any) {
             // If we failed to create the chat, we can try to "guess" the
             // This catch catches the 2nd attempt to start a chat
             throw new Error(`AppleScript error: ${ex}`);
@@ -521,7 +521,7 @@ export class ActionHandler {
             if (message && message.length > 0 && tempGuid && tempGuid.length > 0 && ret.startsWith(service)) {
                 await ActionHandler.sendMessage(tempGuid, ret, message);
             }
-        } catch (ex) {
+        } catch (ex: any) {
             throw new Error(`Failed to send message to chat, ${ret}!`);
         }
 
@@ -568,9 +568,9 @@ export class ActionHandler {
         Server().log("Executing Action: Export Contacts", "debug");
 
         try {
-            FileSystem.deleteContactsVcf();
+            FileSystem.deleteAddressBook();
             await FileSystem.executeAppleScript(exportContacts());
-        } catch (ex) {
+        } catch (ex: any) {
             let msg = ex.message;
             if (msg instanceof String) [, msg] = msg.split("execution error: ");
             [msg] = msg.split(". (");

@@ -23,8 +23,8 @@ export class NetworkService extends EventEmitter {
 
             this.online = online;
 
-            // Keep going every 5 seconds!
-            setTimeout(serviceLoop, 5000);
+            // Keep going every 60 seconds!
+            setTimeout(serviceLoop, 60000);
         };
 
         // Initial loop start

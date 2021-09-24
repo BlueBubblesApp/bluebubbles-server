@@ -42,6 +42,7 @@ export class MessageRepository {
         chatGuid = null,
         withParticipants = true,
         withArchived = false,
+        withLastMessage = false,
         withSMS = false,
         offset = 0,
         limit = null
@@ -51,13 +52,25 @@ export class MessageRepository {
         // Inner-join because a chat must have participants
         if (withParticipants) query.innerJoinAndSelect("chat.participants", "handle");
 
+        // Add inner join with messages if we want the last message too
+        if (withLastMessage) {
+            query.innerJoinAndSelect("chat.messages", "message");
+        }
+
         // Add default WHERE clauses
         if (!withSMS) {
-            query.andWhere("chat.service_name == 'iMessage'");
+            query.andWhere("chat.service_name = 'iMessage'");
         }
 
         if (!withArchived) query.andWhere("chat.is_archived == 0");
         if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
+
+        // Add clause to fetch with last message
+        if (withLastMessage) {
+            query.groupBy("chat.guid");
+            query.having("message.ROWID = MAX(message.ROWID)");
+            query.orderBy("message.ROWID", "DESC");
+        }
 
         // Set page params
         query.offset(offset);
@@ -155,6 +168,7 @@ export class MessageRepository {
         after = null,
         before = null,
         withChats = false,
+        withChatParticipants = false,
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
@@ -202,6 +216,10 @@ export class MessageRepository {
                 "chat",
                 "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
             );
+        }
+
+        if (withChatParticipants) {
+            query.innerJoinAndSelect("chat.participants", "chandle");
         }
 
         // Add date restraints

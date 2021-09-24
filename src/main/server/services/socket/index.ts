@@ -23,7 +23,7 @@ import {
 
 // Entities
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { Device } from "@server/databases/server/entity/Device";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
@@ -95,7 +95,7 @@ export class SocketService {
                     Server().log("Socket not listening! Restarting...", "error");
                     this.restart();
                 }
-            } catch (ex) {
+            } catch (ex: any) {
                 Server().log("Unable to start socket status listener!", "error");
                 Server().log(ex, "debug");
             }
@@ -133,10 +133,10 @@ export class SocketService {
              *
              * A console message will be printed, and a socket error will be emitted
              */
-            socket.use(async (_, next) => {
+            socket.use(async (_: any, next: Function) => {
                 try {
                     await next();
-                } catch (ex) {
+                } catch (ex: any) {
                     Server().log(`Socket server error! ${ex.message}`, "error");
                     socket.emit("exception", createServerErrorResponse(ex.message));
                     next(ex);
@@ -185,11 +185,89 @@ export class SocketService {
         socket.on("get-server-metadata", (_, cb): void => {
             const meta: ServerMetadataResponse = {
                 os_version: osVersion,
-                server_version: app.getVersion()
+                server_version: app.getVersion(),
+                private_api: Server().repo.getConfig("enable_private_api") as boolean,
+                proxy_service: Server().repo.getConfig("proxy_service") as string,
+                helper_connected: (Server().privateApiHelper?.server?.connections ?? 0) > 0
             };
 
             return response(cb, "server-metadata", createSuccessResponse(meta, "Successfully fetched metadata"));
         });
+
+        /**
+         * Save a VCF file
+         */
+        socket.on(
+            "save-vcf",
+            async (params, cb): Promise<void> => {
+                // Make sure we have VCF data
+                if (!params?.vcf) return response(cb, "error", createBadRequestResponse("No VCF data provided!"));
+
+                FileSystem.saveVCF(params.vcf);
+                return response(cb, "save-vcf", createSuccessResponse(null, "Successfully saved VCF"));
+            }
+        );
+
+        /**
+         * Save a VCF file
+         */
+        socket.on(
+            "get-vcf",
+            async (_, cb): Promise<void> => {
+                const vcf = FileSystem.getVCF();
+                return response(cb, "save-vcf", createSuccessResponse(vcf, "Successfully retrieved VCF"));
+            }
+        );
+
+        /**
+         * Change proxy service
+         */
+        socket.on(
+            "change-proxy-service",
+            async (params, cb): Promise<void> => {
+                // Make sure we have a service
+                if (!params?.service)
+                    return response(cb, "error", createBadRequestResponse("No service name provided!"));
+
+                // Make sure the service is one that we can handle
+                const serviceOpts = ["Ngrok", "LocalTunnel", "Dynamic DNS"];
+                if (!serviceOpts.includes(params.service))
+                    return response(
+                        cb,
+                        "error",
+                        createBadRequestResponse(`Service name must be one of the following: ${serviceOpts.join(", ")}`)
+                    );
+
+                // If the service is dynamic DNS, make sure we have an address
+                if (params.service === "Dynamic DNS" && !params?.address)
+                    return response(cb, "error", createBadRequestResponse("No Dynamic DNS address provided!"));
+
+                // Send the response back before restarting
+                const res = response(
+                    cb,
+                    "change-proxy-service",
+                    createSuccessResponse(null, "Successfully set new proxy service!")
+                );
+
+                // Now, set the new proxy service
+                await Server().stopProxyServices();
+                await Server().repo.setConfig("proxy_service", params.service);
+
+                // If it's a dyn dns, set the address
+                if (params.service === "Dynamic DNS") {
+                    let addr = params.address;
+                    if (!addr.startsWith("http")) {
+                        addr = `http://${addr}`;
+                    }
+
+                    await Server().repo.setConfig("server_address", addr);
+                }
+
+                // Restart the proxy services
+                await Server().restartProxyServices();
+                return res;
+            }
+        );
 
         /**
          * Return information about the server's config
@@ -265,8 +343,10 @@ export class SocketService {
          * Get all chats
          */
         socket.on("get-chats", async (params, cb) => {
+            const withLastMessage = params?.withLastMessage ?? false;
             const chats = await Server().iMessageRepo.getChats({
                 withParticipants: params?.withParticipants ?? true,
+                withLastMessage,
                 withArchived: params?.withArchived ?? false,
                 withSMS: params?.withSMS ?? false,
                 limit: params?.limit ?? null,
@@ -277,6 +357,15 @@ export class SocketService {
             for (const chat of chats ?? []) {
                 if (chat.guid.startsWith("urn:")) continue;
                 const chatRes = await getChatResponse(chat);
+
+                // Set the last message, if applicable
+                if (withLastMessage && chatRes.messages && chatRes.messages.length > 0) {
+                    [chatRes.lastMessage] = chatRes.messages;
+
+                    // Remove the last message from the result
+                    delete chatRes.messages;
+                }
+
                 results.push(chatRes);
             }
 
@@ -388,10 +477,29 @@ export class SocketService {
                 // Get the messages
                 const messages = await Server().iMessageRepo.getMessages(dbParams);
 
-                // Do you want the blurhash? Default to true
-                const withBlurhash = params?.withBlurhash ?? true;
+                // Handle fetching the chat participants with the messages (if requested)
+                const withChatParticipants = params?.withChatParticipants ?? false;
+                const chatCache: { [key: string]: Handle[] } = {};
+                if (withChatParticipants) {
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+                    for (const i of chats) {
+                        chatCache[i.guid] = i.participants;
+                    }
+                }
+
+                // Do you want the blurhash? Default to false
+                const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
                 for (const msg of messages) {
+                    // Insert in the participants from the cache
+                    if (withChatParticipants) {
+                        for (const chat of msg.chats) {
+                            if (Object.keys(chatCache).includes(chat.guid)) {
+                                chat.participants = chatCache[chat.guid];
+                            }
+                        }
+                    }
+
                     const msgRes = await getMessageResponse(msg, withBlurhash);
                     results.push(msgRes);
                 }
@@ -455,7 +563,7 @@ export class SocketService {
                         try {
                             Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
                             await FileSystem.convertCafToMp3(attachment, newPath);
-                        } catch (ex) {
+                        } catch (ex: any) {
                             failed = true;
                             Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`);
                             Server().log(ex, "error");
@@ -595,7 +703,7 @@ export class SocketService {
                     );
 
                     return response(cb, "message-sent", createSuccessResponse(null));
-                } catch (ex) {
+                } catch (ex: any) {
                     Server().socket.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
                 }
@@ -708,7 +816,7 @@ export class SocketService {
                         params?.message,
                         params?.tempGuid
                     );
-                } catch (ex) {
+                } catch (ex: any) {
                     // If there was a failure, and there is only 1 participant, and we have a message, try to fallback
                     if (participants.length === 1 && (params?.message ?? "").length > 0 && params?.tempGuid) {
                         Server().log("Universal create chat failed. Attempting single chat creation.", "debug");
@@ -720,7 +828,7 @@ export class SocketService {
                                 params?.message,
                                 params?.tempGuid
                             );
-                        } catch (ex2) {
+                        } catch (ex2: any) {
                             // If the fallback fails, return that error
                             return response(cb, "error", createBadRequestResponse(ex2?.message ?? ex2 ?? unknownError));
                         }
@@ -738,7 +846,7 @@ export class SocketService {
                 try {
                     const newChat = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
                     return response(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     let err = ex?.message ?? ex ?? unknownError;
 
                     // If it's a ROWID error, we want to handle it specifically
@@ -773,7 +881,7 @@ export class SocketService {
                             withSMS: true
                         });
                         return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
-                    } catch (ex) {
+                    } catch (ex: any) {
                         return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
                     }
                 }
@@ -783,7 +891,7 @@ export class SocketService {
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier, withSMS: true });
                     return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -806,7 +914,7 @@ export class SocketService {
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier, withSMS: true });
                     return response(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "add-participant-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -829,7 +937,7 @@ export class SocketService {
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier, withSMS: true });
                     return response(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "remove-participant-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -874,8 +982,8 @@ export class SocketService {
                             params.tapback
                         );
                         return response(cb, "tapback-sent", createNoDataResponse());
-                    } catch (ex) {
-                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.messageText));
+                    } catch (ex: any) {
+                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
                     }
                 }
 
@@ -890,7 +998,7 @@ export class SocketService {
                 try {
                     await ActionHandler.toggleTapback(params.chatGuid, params.actionMessageText, params.tapback);
                     return response(cb, "tapback-sent", createNoDataResponse());
-                } catch (ex) {
+                } catch (ex: any) {
                     return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -939,7 +1047,7 @@ export class SocketService {
                     } else {
                         response(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));
                     }
-                } catch (ex) {
+                } catch (ex: any) {
                     response(cb, "contacts-from-vcf", createServerErrorResponse(ex.message));
                 }
             }

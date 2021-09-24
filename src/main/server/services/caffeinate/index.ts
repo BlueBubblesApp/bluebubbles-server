@@ -46,7 +46,7 @@ export class CaffeinateService {
                 const killed = this.childProc.kill();
                 if (!killed) process.kill(-this.childProc.pid);
                 Server().log("Killed caffeinate process");
-            } catch (ex) {
+            } catch (ex: any) {
                 console.error(ex);
                 Server().log(`Failed to kill caffeinate process! ${ex.message}`, "error");
             } finally {

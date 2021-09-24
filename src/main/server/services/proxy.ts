@@ -58,8 +58,9 @@ abstract class Proxy {
             if (this.url) {
                 await Server().repo.setConfig("server_address", this.url);
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Failed to connect to ${this.opts.name}! Error: ${ex.toString()}`);
+            throw ex;
         }
 
         // Start the new refresh timer (if available)
@@ -128,7 +129,7 @@ abstract class Proxy {
             await this.disconnect();
             await new Promise((resolve, _) => setTimeout(resolve, wait));
             await this.start();
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Failed to restart ${this.opts.name}!\n${ex}`, "error");
 
             const errString = ex?.toString() ?? "";

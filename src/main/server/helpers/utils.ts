@@ -52,7 +52,7 @@ export const safeExecuteAppleScript = async (command: string) => {
     try {
         // Execute the command
         return (await FileSystem.executeAppleScript(command)) as string;
-    } catch (ex) {
+    } catch (ex: any) {
         let msg = ex.message;
         if (msg instanceof String) {
             [, msg] = msg.split("execution error: ");

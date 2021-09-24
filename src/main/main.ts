@@ -3,6 +3,7 @@ import { app, BrowserWindow, Tray, Menu, nativeTheme } from "electron";
 import * as process from "process";
 import * as path from "path";
 import * as url from "url";
+import * as unhandled from "electron-unhandled";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
@@ -35,6 +36,14 @@ if (!gotTheLock) {
         Server().start();
     });
 }
+
+// Handle unhandled errors
+unhandled({
+    logger: (error: Error) => {
+        Server().log(`Unhandled Error: ${error.message}`, "error");
+    },
+    showDialog: false
+});
 
 const handleExit = async () => {
     if (!Server() || Server().isStopping) return;
@@ -239,7 +248,7 @@ const handleSet = async (parts: string[]): Promise<void> => {
     try {
         await Server().repo.setConfig(configKey, quickStrConvert(configValue));
         Server().log(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
-    } catch (ex) {
+    } catch (ex: any) {
         Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
     }
 };
@@ -259,7 +268,7 @@ const handleShow = async (parts: string[]): Promise<void> => {
     try {
         const value = await Server().repo.getConfig(configKey);
         Server().log(`${configKey} -> ${value}`);
-    } catch (ex) {
+    } catch (ex: any) {
         Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
     }
 };

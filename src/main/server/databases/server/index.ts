@@ -167,7 +167,7 @@ export class ServerRepository extends EventEmitter {
                 const item = await this.hasConfig(key);
                 if (!item) await this.setConfig(key, DEFAULT_DB_ITEMS[key]());
             }
-        } catch (ex) {
+        } catch (ex: any) {
             Server().log(`Failed to setup default configurations! ${ex.message}`, "error");
         }
     }
