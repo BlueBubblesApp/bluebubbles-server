@@ -1,19 +1,20 @@
 /* eslint-disable max-len */
 import { app } from "electron";
-import { Server as SocketServer, Socket, ServerOptions } from "socket.io";
 import * as path from "path";
 import * as fs from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
-import * as macosVersion from "macos-version";
 import * as CryptoJS from "crypto-js";
+
+// HTTP libraries
+import * as macosVersion from "macos-version";
 
 // Internal libraries
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ResponseFormat, ServerMetadataResponse } from "@server/types";
+import { ChatResponse, HandleResponse, ResponseFormat, ServerMetadataResponse } from "@server/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
@@ -25,135 +26,21 @@ import {
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
-import { Device } from "@server/databases/server/entity/Device";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
 import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
-import { EventCache } from "@server/eventCache";
 import { restartMessages } from "@server/fileSystem/scripts";
+import { Socket } from "socket.io";
+import { GeneralRepo } from "./repository/generalRepo";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
 
-/**
- * This service class handles all routing for incoming socket
- * connections and requests.
- */
-export class SocketService {
-    server: SocketServer;
-
-    opts: Partial<ServerOptions> = {
-        pingTimeout: 1000 * 60 * 5, // 5 Minute ping timeout
-        pingInterval: 1000 * 60, // 1 Minute ping interval
-        upgradeTimeout: 1000 * 30, // 30 Seconds
-
-        // 100 MB. 1000 == 1kb. 1000 * 1000 == 1mb
-        maxHttpBufferSize: 1000 * 1000 * 100,
-        allowEIO3: true,
-        transports: ["websocket", "polling"]
-    };
-
-    sendCache: EventCache;
-
-    /**
-     * Starts up the initial Socket.IO connection and initializes other
-     * required classes and variables
-     *
-     * @param db The configuration database
-     * @param server The iMessage database repository
-     * @param fs The filesystem class handler
-     * @param port The initial port for Socket.IO
-     */
-    constructor() {
-        this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, this.opts);
-        this.sendCache = new EventCache();
-        this.startStatusListener();
-
-        // Every 6 hours, clear the send cache
-        setInterval(() => {
-            this.sendCache.purge();
-        }, 1000 * 60 * 60 * 6);
-    }
-
-    /**
-     * Checks to see if we are currently listening
-     */
-    startStatusListener() {
-        setInterval(async () => {
-            const port = Server().repo.getConfig("socket_port");
-
-            try {
-                // Check if there are any listening services
-                let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
-                res = (res ?? "").trim();
-
-                // If the result doesn't show anything listening,
-                if (!res.includes(port.toString())) {
-                    Server().log("Socket not listening! Restarting...", "error");
-                    this.restart();
-                }
-            } catch (ex: any) {
-                Server().log("Unable to start socket status listener!", "error");
-                Server().log(ex, "debug");
-            }
-        }, 1000 * 60); // Check every minute
-    }
-
-    /**
-     * Creates the initial connection handler for Socket.IO
-     */
-    start() {
-        // Once we start, let's send a hello-world to all the clients
-        Server().emitMessage("hello-world", null);
-
-        /**
-         * Handle all other data requests
-         */
-        this.server.on("connection", async socket => {
-            let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
-            const cfgPass = String((await Server().repo.getConfig("password")) as string);
-
-            // Decode the param incase it contains URL encoded characters
-            pass = decodeURI(pass as string);
-
-            // Basic authentication
-            if (pass?.trim() === cfgPass?.trim()) {
-                Server().log(`Client Authenticated Successfully`);
-            } else {
-                socket.disconnect();
-                Server().log(`Closing client connection. Authentication failed.`);
-            }
-
-            /**
-             * Error handling middleware for all Socket.IO requests.
-             * If there are any errors in a socket event, they will be handled here.
-             *
-             * A console message will be printed, and a socket error will be emitted
-             */
-            socket.use(async (_: any, next: Function) => {
-                try {
-                    await next();
-                } catch (ex: any) {
-                    Server().log(`Socket server error! ${ex.message}`, "error");
-                    socket.emit("exception", createServerErrorResponse(ex.message));
-                    next(ex);
-                }
-            });
-
-            // Pass to method to handle the socket events
-            SocketService.routeSocket(socket);
-        });
-    }
-
-    /**
-     * The rest of the socket event handlers
-     *
-     * @param socket The incoming socket connection
-     */
-    static routeSocket(socket: Socket) {
+export class SocketRoutes {
+    static createRoutes(socket: Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
             const resData = data;
             resData.encrypted = false;
@@ -188,7 +75,7 @@ export class SocketService {
                 server_version: app.getVersion(),
                 private_api: Server().repo.getConfig("enable_private_api") as boolean,
                 proxy_service: Server().repo.getConfig("proxy_service") as string,
-                helper_connected: (Server().privateApiHelper?.server?.connections ?? 0) > 0
+                helper_connected: !!Server().privateApiHelper?.helper
             };
 
             return response(cb, "server-metadata", createSuccessResponse(meta, "Successfully fetched metadata"));
@@ -291,24 +178,7 @@ export class SocketService {
                 if (!params?.deviceName || !params?.deviceId)
                     return response(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
-                // If the device ID exists, update the identifier
-                const device = await Server().repo.devices().findOne({ name: params.deviceName });
-                if (device) {
-                    device.identifier = params.deviceId;
-                    device.last_active = new Date().getTime();
-                    await Server().repo.devices().save(device);
-                } else {
-                    Server().log(`Registering new client with Google FCM (${params.deviceName})`);
-
-                    const item = new Device();
-                    item.name = params.deviceName;
-                    item.identifier = params.deviceId;
-                    item.last_active = new Date().getTime();
-                    await Server().repo.devices().save(item);
-                }
-
-                Server().repo.purgeOldDevices();
-
+                await GeneralRepo.addFcmDevice(params?.deviceName, params?.deviceId);
                 return response(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
             }
         );
@@ -344,8 +214,22 @@ export class SocketService {
          */
         socket.on("get-chats", async (params, cb) => {
             const withLastMessage = params?.withLastMessage ?? false;
+            const withParticipants = !withLastMessage && (params?.withParticipants ?? true);
+            let sort = params?.sort ?? "";
+
+            // Validate sort param
+            if (typeof sort !== "string") {
+                return response(cb, "error", createBadRequestResponse("Sort parameter must be a string (get-chats)!"));
+            }
+
+            sort = sort.toLowerCase();
+            const validSorts = ["lastmessage"];
+            if (!validSorts.includes(sort)) {
+                sort = null;
+            }
+
             const chats = await Server().iMessageRepo.getChats({
-                withParticipants: params?.withParticipants ?? true,
+                withParticipants,
                 withLastMessage,
                 withArchived: params?.withArchived ?? false,
                 withSMS: params?.withSMS ?? false,
@@ -353,23 +237,64 @@ export class SocketService {
                 offset: params?.offset ?? 0
             });
 
+            // If the query is with the last message, it makes the participants list 1 for each chat
+            // We need to fetch all the chats with their participants, then cache the participants
+            // so we can merge the participant list with the chats
+            const chatCache: { [key: string]: Handle[] } = {};
+            const tmpChats = await Server().iMessageRepo.getChats({
+                withParticipants: true,
+                withArchived: params?.withArchived ?? false,
+                withSMS: params?.withSMS ?? false
+            });
+
+            for (const chat of tmpChats) {
+                chatCache[chat.guid] = chat.participants;
+            }
+
             const results = [];
             for (const chat of chats ?? []) {
                 if (chat.guid.startsWith("urn:")) continue;
                 const chatRes = await getChatResponse(chat);
 
-                // Set the last message, if applicable
-                if (withLastMessage && chatRes.messages && chatRes.messages.length > 0) {
-                    [chatRes.lastMessage] = chatRes.messages;
+                // Insert the cached participants from the original request
+                if (Object.keys(chatCache).includes(chat.guid)) {
+                    chatRes.participants = await Promise.all(
+                        chatCache[chat.guid].map(
+                            async (e): Promise<HandleResponse> => {
+                                const test = await getHandleResponse(e);
+                                return test;
+                            }
+                        )
+                    );
+                }
 
-                    // Remove the last message from the result
-                    delete chatRes.messages;
+                if (withLastMessage) {
+                    // Set the last message, if applicable
+                    if (chatRes.messages && chatRes.messages.length > 0) {
+                        [chatRes.lastMessage] = chatRes.messages;
+
+                        // Remove the last message from the result
+                        delete chatRes.messages;
+                    }
                 }
 
                 results.push(chatRes);
             }
 
-            response(cb, "chats", createSuccessResponse(results));
+            // If we have a sort parameter, handle the cases
+            if (sort) {
+                if (sort === "lastmessage" && withLastMessage) {
+                    results.sort((a: ChatResponse, b: ChatResponse) => {
+                        const d1 = a.lastMessage?.dateCreated ?? 0;
+                        const d2 = b.lastMessage?.dateCreated ?? 0;
+                        if (d1 > d2) return -1;
+                        if (d1 < d2) return 1;
+                        return 0;
+                    });
+                }
+            }
+
+            return response(cb, "chats", createSuccessResponse(results));
         });
 
         /**
@@ -684,12 +609,12 @@ export class SocketService {
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
                 // Make sure the message isn't already in the queue
-                if (Server().socket.sendCache.find(tempGuid)) {
+                if (Server().httpService.sendCache.find(tempGuid)) {
                     return response(cb, "error", createBadRequestResponse("Message is already queued to be sent!"));
                 }
 
                 // Add to send cache
-                Server().socket.sendCache.add(tempGuid);
+                Server().httpService.sendCache.add(tempGuid);
 
                 try {
                     // Send the message
@@ -704,7 +629,7 @@ export class SocketService {
 
                     return response(cb, "message-sent", createSuccessResponse(null));
                 } catch (ex: any) {
-                    Server().socket.sendCache.remove(tempGuid);
+                    Server().httpService.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
                 }
             }
@@ -724,7 +649,7 @@ export class SocketService {
                 if (!tempGuid) return response(cb, "error", createBadRequestResponse("No temporary GUID provided"));
 
                 // Make sure the message isn't already in the queue
-                if (Server().socket.sendCache.find(tempGuid)) {
+                if (Server().httpService.sendCache.find(tempGuid)) {
                     return response(cb, "error", createBadRequestResponse("Attachment is already queued to be sent!"));
                 }
 
@@ -765,7 +690,7 @@ export class SocketService {
                     }
 
                     // Add the image to the send cache
-                    Server().socket.sendCache.add(tempGuid);
+                    Server().httpService.sendCache.add(tempGuid);
 
                     Server().queue.add({
                         type: "send-attachment",
@@ -1015,7 +940,7 @@ export class SocketService {
                     return;
                 }
 
-                const handles = params;
+                const handles = params.map((e: any) => (typeof e === "string" ? { address: e } : e));
                 for (let i = 0; i <= handles.length; i += 1) {
                     if (!handles[i] || !handles[i].address) continue;
                     const contact = await Server().contactsRepo.getContactByAddress(handles[i].address);
@@ -1191,22 +1116,18 @@ export class SocketService {
             }
         );
 
+        /**
+         * Checks for a serer update
+         */
+        socket.on(
+            "check-for-server-update",
+            async (_, cb): Promise<void> => {
+                return response(cb, "save-vcf", createSuccessResponse(await GeneralRepo.checkForUpdate()));
+            }
+        );
+
         socket.on("disconnect", reason => {
             Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
-    }
-
-    /**
-     * Restarts the Socket.IO connection with a new port
-     *
-     * @param port The new port to listen on
-     */
-    restart() {
-        if (this.server) {
-            this.server.close();
-            this.server = new SocketServer(Server().repo.getConfig("socket_port") as number, this.opts);
-        }
-
-        this.start();
     }
 }

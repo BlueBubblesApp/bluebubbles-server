@@ -1,11 +1,21 @@
 import { ResponseFormat, ResponseMessages, ResponseData, ErrorTypes } from "@server/types";
 
-export const createSuccessResponse = (data: ResponseData, message?: string): ResponseFormat => {
-    return {
+export const createSuccessResponse = (
+    data: ResponseData,
+    message?: string,
+    metadata?: { [key: string]: any }
+): ResponseFormat => {
+    const res: ResponseFormat = {
         status: 200,
         message: message || ResponseMessages.SUCCESS,
         data
     };
+
+    if (metadata) {
+        res.metadata = metadata;
+    }
+
+    return res;
 };
 
 export const createServerErrorResponse = (errorMessage: string, errorType?: ErrorTypes): ResponseFormat => {
@@ -41,6 +51,13 @@ export const createForbiddenResponse = (): ResponseFormat => {
     return {
         status: 403,
         message: ResponseMessages.FORBIDDEN
+    };
+};
+
+export const createNotFoundResponse = (message?: string): ResponseFormat => {
+    return {
+        status: 404,
+        message: message ?? ResponseMessages.NOT_FOUND
     };
 };
 
