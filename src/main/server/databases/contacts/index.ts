@@ -66,20 +66,45 @@ export class ContactRepository {
         return this.db;
     }
 
+    async getAllContacts(): Promise<Record[]> {
+        const query = this.db.getRepository(Record).createQueryBuilder("record");
+
+        // Search by last 4 digits because we don't want to have to worry about formatting
+        query.leftJoinAndSelect("record.phoneNumbers", "phoneNumber");
+        query.leftJoinAndSelect("record.emails", "email");
+
+        // Fetch the results
+        return query.getMany();
+    }
+
     /**
      * Get all the chats from the DB
      *
      * @param address A phone number
      */
     async getContactByAddress(address: string): Promise<Record> {
-        const lastFourDigits = address.substring(address.length - 4);
+        let addr = address;
+        let lastFourDigits;
+        if (!addr.includes("@")) {
+            addr = addr.replace(/\D/g, "");
+            if (addr.length >= 4) {
+                lastFourDigits = addr.substring(addr.length - 4);
+            }
+        }
+
+        // Construct the query
         const query = this.db.getRepository(Record).createQueryBuilder("record");
 
         // Search by last 4 digits because we don't want to have to worry about formatting
         query.leftJoinAndSelect("record.phoneNumbers", "phoneNumber");
         query.leftJoinAndSelect("record.emails", "email");
-        query.where("phoneNumber.ZLASTFOURDIGITS = :lastFourDigits", { lastFourDigits });
-        query.orWhere("email.ZADDRESSNORMALIZED = :address", { address: address.toLowerCase() });
+
+        // If we don't have the last 4 digits, it's an email address
+        if (lastFourDigits) {
+            query.where("phoneNumber.ZLASTFOURDIGITS = :lastFourDigits", { lastFourDigits });
+        } else {
+            query.where("email.ZADDRESSNORMALIZED = :address", { address: addr.toLocaleLowerCase() });
+        }
 
         // Fetch the results
         const records = await query.getMany();
@@ -88,21 +113,24 @@ export class ContactRepository {
         const output = [];
         for (const record of records) {
             // Filter out numbers that don't have an exact match
-            const numbers = record.phoneNumbers.filter(item => ContactRepository.sameAddress(address, item.address));
+            const numbers = record.phoneNumbers.filter(item =>
+                ContactRepository.sameAddress(address, item.address, item.countryCode ?? "US")
+            );
+
             if (record.emails.length > 0 || numbers.length > 0) output.push(record);
         }
 
         return output.length > 0 ? output[0] : null;
     }
 
-    static sameAddress(first: string, second: string) {
+    static sameAddress(first: string, second: string, country: string) {
         const phoneUtil = PhoneNumberUtil.getInstance();
 
         try {
             // Using national format to strip out international prefix
-            let number = phoneUtil.parseAndKeepRawInput(first, "US");
+            let number = phoneUtil.parseAndKeepRawInput(first, country);
             const firstFormatted = phoneUtil.format(number, PhoneNumberFormat.NATIONAL);
-            number = phoneUtil.parseAndKeepRawInput(second, "US");
+            number = phoneUtil.parseAndKeepRawInput(second, country);
             const secondFormatted = phoneUtil.format(number, PhoneNumberFormat.NATIONAL);
 
             return firstFormatted === secondFormatted;

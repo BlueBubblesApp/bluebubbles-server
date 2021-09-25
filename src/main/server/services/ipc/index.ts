@@ -4,6 +4,7 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alert";
 import { openLogs } from "@server/fileSystem/scripts";
+import { fixServerUrl } from "@server/helpers/utils";
 import { BlueBubblesHelperService } from "../helperProcess";
 
 export class IPCService {
@@ -20,13 +21,13 @@ export class IPCService {
 
         ipcMain.handle("get-chat-image-count", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatImageCounts();
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "image" });
             return count;
         });
 
         ipcMain.handle("get-chat-video-count", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatVideoCounts();
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "video" });
             return count;
         });
 
@@ -61,6 +62,12 @@ export class IPCService {
      */
     static startConfigIpcListeners() {
         ipcMain.handle("set-config", async (_, args) => {
+            // Make sure that the server address being sent is using https
+            if (args.server_address) {
+                // eslint-disable-next-line no-param-reassign
+                args.server_address = fixServerUrl(args.server_address);
+            }
+
             for (const item of Object.keys(args)) {
                 if (Server().repo.hasConfig(item) && Server().repo.getConfig(item) !== args[item]) {
                     Server().repo.setConfig(item, args[item]);

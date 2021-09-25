@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
-import { autoUpdater } from "electron-updater";
+import { autoUpdater, UpdateCheckResult } from "electron-updater";
 import * as semver from "semver";
 import { Server } from "@server/index";
 
@@ -13,6 +13,8 @@ export class UpdateService {
     isOpen: boolean;
 
     hasUpdate = false;
+
+    updateInfo: UpdateCheckResult;
 
     constructor(window: BrowserWindow) {
         // This won't work in dev-mode because it checks Electron's Version
@@ -60,7 +62,7 @@ export class UpdateService {
         this.timer = setInterval(async () => {
             if (this.hasUpdate) return;
 
-            await this.checkForUpdate(false);
+            await this.checkForUpdate();
         }, 1000 * 60 * 60 * 12); // Default 12 hours
     }
 
@@ -68,22 +70,25 @@ export class UpdateService {
         if (this.timer) clearInterval(this.timer);
     }
 
-    async checkForUpdate(showDialogForNoUpdate: boolean): Promise<void> {
+    async checkForUpdate({ showNoUpdateDialog = false, showUpdateDialog = true } = {}): Promise<boolean> {
         const res = await autoUpdater.checkForUpdates();
         this.hasUpdate = !!res?.updateInfo && semver.lt(this.currentVersion, res.updateInfo.version);
+        this.updateInfo = res;
 
         if (this.hasUpdate) {
             Server().emitMessage("server-update", res.updateInfo.version);
             Server().emitToUI("update-available", res.updateInfo.version);
 
-            const notification = {
-                title: "BlueBubbles Update Available!",
-                body: `BlueBubbles macOS Server v${res.updateInfo.version} is now available to be installed!`
-            };
-            new Notification(notification).show();
+            if (showUpdateDialog) {
+                const notification = {
+                    title: "BlueBubbles Update Available!",
+                    body: `BlueBubbles macOS Server v${res.updateInfo.version} is now available to be installed!`
+                };
+                new Notification(notification).show();
+            }
         }
 
-        if (!this.hasUpdate && showDialogForNoUpdate) {
+        if (!this.hasUpdate && showNoUpdateDialog) {
             const dialogOpts = {
                 type: "info",
                 title: "BlueBubbles Update",
@@ -93,5 +98,7 @@ export class UpdateService {
 
             dialog.showMessageBox(this.window, dialogOpts);
         }
+
+        return this.hasUpdate;
     }
 }

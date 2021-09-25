@@ -42,6 +42,14 @@ export class FileSystem {
 
     public static attachmentsDir = path.join(FileSystem.baseDir, "Attachments");
 
+    public static attachmentCacheDir = path.join(FileSystem.baseDir, "Attachments", "Cached");
+
+    public static certsDir = path.join(FileSystem.baseDir, "Certs");
+
+    public static themesDir = path.join(FileSystem.baseDir, "Themes");
+
+    public static settingsDir = path.join(FileSystem.baseDir, "Settings");
+
     public static contactsDir = path.join(FileSystem.baseDir, "Contacts");
 
     public static convertDir = path.join(FileSystem.baseDir, "Convert");
@@ -70,9 +78,31 @@ export class FileSystem {
     static setupDirectories(): void {
         if (!fs.existsSync(FileSystem.baseDir)) fs.mkdirSync(FileSystem.baseDir);
         if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
+        if (!fs.existsSync(FileSystem.attachmentCacheDir)) fs.mkdirSync(FileSystem.attachmentCacheDir);
         if (!fs.existsSync(FileSystem.convertDir)) fs.mkdirSync(FileSystem.convertDir);
         if (!fs.existsSync(FileSystem.contactsDir)) fs.mkdirSync(FileSystem.contactsDir);
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
+        if (!fs.existsSync(FileSystem.certsDir)) fs.mkdirSync(FileSystem.certsDir);
+        if (!fs.existsSync(FileSystem.themesDir)) fs.mkdirSync(FileSystem.themesDir);
+        if (!fs.existsSync(FileSystem.settingsDir)) fs.mkdirSync(FileSystem.settingsDir);
+    }
+
+    static cachedAttachmentPath(attachment: Attachment, name: string) {
+        return path.join(FileSystem.attachmentCacheDir, attachment.guid, name);
+    }
+
+    static cachedAttachmentExists(attachment: Attachment, name: string) {
+        const basePath = this.cachedAttachmentPath(attachment, name);
+        return fs.existsSync(basePath);
+    }
+
+    static saveCachedAttachment(attachment: Attachment, name: string, data: Buffer) {
+        const basePath = path.join(FileSystem.attachmentCacheDir, attachment.guid);
+        if (!fs.existsSync(basePath)) {
+            fs.mkdirSync(basePath, { recursive: true });
+        }
+
+        fs.writeFileSync(path.join(basePath, name), data);
     }
 
     /**

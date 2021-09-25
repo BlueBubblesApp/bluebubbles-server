@@ -13,7 +13,6 @@ export class BlueBubblesHelperService {
 
     constructor() {
         this.restartCounter = 0;
-        this.start();
     }
 
     configureServer() {
@@ -37,6 +36,7 @@ export class BlueBubblesHelperService {
 
         this.server.on("error", err => {
             Server().log("An error occured in the TCP Socket! Restarting", "error");
+            Server().log(err.toString(), "error");
 
             if (this.restartCounter <= 5) {
                 this.restartCounter += 1;

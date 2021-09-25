@@ -46,7 +46,7 @@ export class MessageRepository {
         withSMS = false,
         offset = 0,
         limit = null
-    }: ChatParams) {
+    }: ChatParams = {}) {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
@@ -81,6 +81,18 @@ export class MessageRepository {
         return chats;
     }
 
+    async getChatLastMessage(chatGuid: string): Promise<Message> {
+        const query = this.db.getRepository(Message).createQueryBuilder("message");
+        query.innerJoinAndSelect("message.chats", "chat");
+        query.andWhere("chat.guid = :guid", { guid: chatGuid });
+        query.orderBy("date", "DESC");
+        query.limit(1);
+
+        // Get results
+        const message = await query.getOne();
+        return message;
+    }
+
     /**
      * Get participants of a chat, in order of being added.
      * This is a weird method because of the way SQLite will auto-sort
@@ -96,7 +108,7 @@ export class MessageRepository {
     }
 
     /**
-     * Get all the chats from the DB
+     * Get an attachment from the DB
      *
      * @param attachmentGuid A specific attachment identifier to get
      * @param withMessages Whether to include the participants or not
@@ -131,6 +143,24 @@ export class MessageRepository {
 
         const attachment = await query.getOne();
         return attachment;
+    }
+
+    /**
+     * Get an attachment from the DB
+     *
+     * @param guid A specific message identifier to get
+     * @param withMessages Whether to include the participants or not
+     */
+    async getMessage(guid: string, withChats = true) {
+        const query = this.db.getRepository(Message).createQueryBuilder("message");
+        query.leftJoinAndSelect("message.handle", "handle");
+
+        if (withChats) query.leftJoinAndSelect("message.chats", "chat");
+
+        query.andWhere("message.guid = :guid", { guid });
+
+        const message = await query.getOne();
+        return message;
     }
 
     /**
@@ -381,7 +411,7 @@ export class MessageRepository {
         // Get messages with sender and the chat it's from
         const result = await this.db.getRepository(Chat).query(
             `SELECT
-                chat.chat_identifier AS chat_identifier,
+                chat.guid AS chat_guid,
                 chat.display_name AS group_name,
                 COUNT(message.ROWID) AS message_count
             FROM chat
@@ -400,44 +430,44 @@ export class MessageRepository {
      *
      * @param chatStyle Whether you are fetching the count for a group or individual chat
      */
-    async getChatImageCounts() {
+    async getMediaCountsByChat({
+        mediaType = "image"
+    }: {
+        mediaType?: "image" | "video" | "location" | "other";
+    } = {}) {
         // Get messages with sender and the chat it's from
         const result = await this.db.getRepository(Chat).query(
             `SELECT
-                chat.chat_identifier AS chat_identifier,
+                chat.guid AS chat_guid,
                 chat.display_name AS group_name,
-                COUNT(attachment.ROWID) AS image_count
+                COUNT(attachment.ROWID) AS media_count
             FROM chat
             JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
             JOIN message ON message.ROWID = cmj.message_id
             JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
             JOIN attachment ON attachment.ROWID = maj.attachment_id
-            WHERE attachment.mime_type LIKE 'image%'
+            WHERE attachment.mime_type LIKE '${mediaType}%'
             GROUP BY chat.guid;`
         );
 
         return result;
     }
 
-    /**
-     * Count messages associated with different chats
-     *
-     * @param chatStyle Whether you are fetching the count for a group or individual chat
-     */
-    async getChatVideoCounts() {
+    async getMediaCounts({
+        mediaType = "image"
+    }: {
+        mediaType?: "image" | "video" | "location";
+    } = {}) {
+        let mType: string = mediaType;
+        if (mType === "location") {
+            mType = "text/x-vlocation";
+        }
+
         // Get messages with sender and the chat it's from
         const result = await this.db.getRepository(Chat).query(
-            `SELECT
-                chat.chat_identifier AS chat_identifier,
-                chat.display_name AS group_name,
-                COUNT(attachment.ROWID) AS video_count
-            FROM chat
-            JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
-            JOIN message ON message.ROWID = cmj.message_id
-            JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
-            JOIN attachment ON attachment.ROWID = maj.attachment_id
-            WHERE attachment.mime_type LIKE 'video%'
-            GROUP BY chat.guid;`
+            `SELECT COUNT(attachment.ROWID) AS media_count
+            FROM attachment
+            WHERE attachment.mime_type LIKE '${mType}%';`
         );
 
         return result;
@@ -453,6 +483,20 @@ export class MessageRepository {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
 
+        const count = await query.getCount();
+        return count;
+    }
+
+    async getChatCount() {
+        // Get messages with sender and the chat it's from
+        const query = this.db.getRepository(Chat).createQueryBuilder("chat");
+        const count = await query.getCount();
+        return count;
+    }
+
+    async getHandleCount() {
+        // Get messages with sender and the chat it's from
+        const query = this.db.getRepository(Handle).createQueryBuilder("handle");
         const count = await query.getCount();
         return count;
     }

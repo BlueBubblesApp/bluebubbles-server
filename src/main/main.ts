@@ -3,15 +3,12 @@ import { app, BrowserWindow, Tray, Menu, nativeTheme } from "electron";
 import * as process from "process";
 import * as path from "path";
 import * as url from "url";
-import * as unhandled from "electron-unhandled";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
-import { UpdateService } from "@server/services";
 
 let win: BrowserWindow;
 let tray: Tray;
-let updateService: UpdateService;
 
 app.allowRendererProcessReuse = false;
 
@@ -37,12 +34,8 @@ if (!gotTheLock) {
     });
 }
 
-// Handle unhandled errors
-unhandled({
-    logger: (error: Error) => {
-        Server().log(`Unhandled Error: ${error.message}`, "error");
-    },
-    showDialog: false
+process.on("uncaughtException", error => {
+    Server().log(`Uncaught Exception: ${error.message}`, "error");
 });
 
 const handleExit = async () => {
@@ -72,8 +65,8 @@ const buildTray = () => {
             label: "Check for Updates",
             type: "normal",
             click: async () => {
-                if (updateService) {
-                    await updateService.checkForUpdate(true);
+                if (Server()) {
+                    await Server().updater.checkForUpdate({ showNoUpdateDialog: true });
                 }
             }
         },
@@ -92,7 +85,7 @@ const buildTray = () => {
             enabled: false
         },
         {
-            label: `Socket Connections: ${Server().socket?.server.sockets.sockets.size ?? 0}`,
+            label: `Socket Connections: ${Server().httpService?.socketServer.sockets.sockets.size ?? 0}`,
             enabled: false
         },
         {
@@ -181,16 +174,6 @@ const createWindow = async () => {
 
     // Set the new window in the Server()
     Server(win);
-    Server().on("setup-complete", () => {
-        // Start the update service
-        if (!updateService) updateService = new UpdateService(win);
-
-        const check = Server().repo.getConfig("check_for_updates") as boolean;
-        if (check) {
-            updateService.start();
-            updateService.checkForUpdate(false);
-        }
-    });
 };
 
 app.on("ready", () => {
