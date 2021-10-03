@@ -1,6 +1,7 @@
 import { Context, Next } from "koa";
 import { Server } from "@server/index";
 import { createServerErrorResponse, createUnauthorizedResponse } from "@server/helpers/responses";
+import { ErrorTypes } from "@server/types";
 
 export const AuthMiddleware = async (ctx: Context, next: Next) => {
     const params = ctx.request.query;
@@ -29,5 +30,7 @@ export const AuthMiddleware = async (ctx: Context, next: Next) => {
 
     // If everything passes, await the next route
     ctx.status = 200; // Revert to 200 by default
+
+    // Go to the next middleware
     await next();
 };
