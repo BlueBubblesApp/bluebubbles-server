@@ -353,11 +353,9 @@ export class SocketRoutes {
                 if (params?.where) dbParams.where = params.where;
 
                 const messages = await Server().iMessageRepo.getMessages(dbParams);
-
-                const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
                 for (const msg of messages) {
-                    const msgRes = await getMessageResponse(msg, withBlurhash);
+                    const msgRes = await getMessageResponse(msg);
                     results.push(msgRes);
                 }
 
@@ -412,8 +410,6 @@ export class SocketRoutes {
                     }
                 }
 
-                // Do you want the blurhash? Default to false
-                const withBlurhash = params?.withBlurhash ?? false;
                 const results = [];
                 for (const msg of messages) {
                     // Insert in the participants from the cache
@@ -425,7 +421,7 @@ export class SocketRoutes {
                         }
                     }
 
-                    const msgRes = await getMessageResponse(msg, withBlurhash);
+                    const msgRes = await getMessageResponse(msg);
                     results.push(msgRes);
                 }
 

@@ -393,11 +393,11 @@ export class Message {
     messageSummaryInfo: Blob;
 }
 
-export const getMessageResponse = async (tableData: Message, withBlurhash = true): Promise<MessageResponse> => {
+export const getMessageResponse = async (tableData: Message): Promise<MessageResponse> => {
     // Load attachments
     const attachments = [];
     for (const attachment of tableData?.attachments ?? []) {
-        const resData = await getAttachmentResponse(attachment, false, withBlurhash);
+        const resData = await getAttachmentResponse(attachment, false);
         attachments.push(resData);
     }
 
