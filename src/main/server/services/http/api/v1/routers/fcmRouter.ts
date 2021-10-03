@@ -3,7 +3,7 @@ import { RouterContext } from "koa-router";
 import { FileSystem } from "@server/fileSystem";
 import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
 import { Next } from "koa";
-import { GeneralRepo } from "../repository/generalRepo";
+import { GeneralRepo } from "../interfaces/generalInterface";
 
 export class FcmRouter {
     static async getClientConfig(ctx: RouterContext, _: Next) {

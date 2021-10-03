@@ -2,8 +2,8 @@ import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { createSuccessResponse } from "@server/helpers/responses";
 import { FileSystem } from "@server/fileSystem";
-import { GeneralRepo } from "../repository/generalRepo";
-import { ServerRepo } from "../repository/serverRepo";
+import { GeneralRepo } from "../interfaces/generalInterface";
+import { ServerRepo } from "../interfaces/serverInterface";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {

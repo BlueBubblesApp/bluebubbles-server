@@ -34,7 +34,7 @@ import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
 import { restartMessages } from "@server/fileSystem/scripts";
 import { Socket } from "socket.io";
-import { GeneralRepo } from "./repository/generalRepo";
+import { GeneralRepo } from "./interfaces/generalInterface";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";

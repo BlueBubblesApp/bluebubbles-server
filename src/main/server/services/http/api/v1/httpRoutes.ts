@@ -52,6 +52,7 @@ export class HttpRoutes {
 
         // Handle Routes
         router.get(`${this.ver}/handle/count`, AuthMiddleware, HandleRouter.count);
+        router.post(`${this.ver}/handle/query`, AuthMiddleware, HandleRouter.query);
         router.get(`${this.ver}/handle/:guid`, AuthMiddleware, HandleRouter.find);
 
         // Theme routes

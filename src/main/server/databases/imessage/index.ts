@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 import { createConnection, Connection } from "typeorm";
 
-import { DBMessageParams, ChatParams } from "@server/databases/imessage/types";
+import { DBMessageParams, ChatParams, HandleParams } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
@@ -168,17 +168,20 @@ export class MessageRepository {
      *
      * @param handle Get a specific handle from the DB
      */
-    async getHandles(handle: string = null) {
-        const repo = this.db.getRepository(Handle);
-        let handles = [];
+    async getHandles({ address = null, limit = 1000, offset = 0 }: HandleParams) {
+        // Start a query
+        const query = this.db.getRepository(Handle).createQueryBuilder("handle");
 
-        // Get all handles or just get one handle
-        if (handle) {
-            handles = await repo.find({ id: handle });
-        } else {
-            handles = await repo.find();
+        // Add a handle query
+        if (address) {
+            query.where("handle.id = :address", { address });
         }
 
+        // Add pagination params
+        query.offset(offset);
+        query.limit(limit);
+
+        const handles = await query.getMany();
         return handles;
     }
 

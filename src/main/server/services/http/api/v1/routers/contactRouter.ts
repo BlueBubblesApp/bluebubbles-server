@@ -2,7 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { createSuccessResponse } from "@server/helpers/responses";
-import { ContactRepo } from "../repository/contactRepo";
+import { ContactRepo } from "../interfaces/contactInterface";
 
 export class ContactRouter {
     static async get(ctx: RouterContext, _: Next) {

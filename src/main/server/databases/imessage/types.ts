@@ -27,3 +27,9 @@ export type ChatParams = {
     offset?: number;
     limit?: number;
 };
+
+export type HandleParams = {
+    address?: string;
+    offset?: number;
+    limit?: number;
+};
