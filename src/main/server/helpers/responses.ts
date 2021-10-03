@@ -18,13 +18,13 @@ export const createSuccessResponse = (
     return res;
 };
 
-export const createServerErrorResponse = (errorMessage: string, errorType?: ErrorTypes): ResponseFormat => {
+export const createServerErrorResponse = (error: string, errorType?: ErrorTypes, message?: string): ResponseFormat => {
     return {
         status: 500,
-        message: ResponseMessages.SERVER_ERROR,
+        message: message ?? ResponseMessages.SERVER_ERROR,
         error: {
             type: errorType || ErrorTypes.SERVER_ERROR,
-            message: errorMessage
+            message: error
         }
     };
 };

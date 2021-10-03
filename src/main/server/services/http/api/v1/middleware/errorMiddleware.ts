@@ -10,6 +10,6 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
         Server().log(ex.message, "error");
 
         ctx.status = 500;
-        ctx.body = createServerErrorResponse(ex.message, ErrorTypes.SERVER_ERROR);
+        ctx.body = createServerErrorResponse(ex.message, ErrorTypes.SERVER_ERROR, "An unhandled error has occurred!");
     }
 };
