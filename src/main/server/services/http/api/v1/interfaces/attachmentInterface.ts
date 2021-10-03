@@ -1,5 +1,5 @@
+import { nativeImage } from "electron";
 import { getBlurHash } from "@server/helpers/utils";
-import { nativeImage, NativeImage } from "electron";
 
 export class AttachmentInterface {
     static async getBlurhash({
