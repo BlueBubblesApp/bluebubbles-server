@@ -112,7 +112,7 @@ export type AttachmentResponse = {
     guid: string;
     messages: string[];
     data: string; // Base64 string
-    blurhash: string;
+    blurhash?: string;
     height?: number;
     width?: number;
     uti: string;

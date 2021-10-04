@@ -15,58 +15,70 @@ import { GeneralRouter } from "./routers/generalRouter";
 import { UiRouter } from "./routers/uiRouter";
 import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
+import { LogMiddleware } from "./middleware/logMiddleware";
+import { ErrorMiddleware } from "./middleware/errorMiddleware";
 
 export class HttpRoutes {
     static ver = "/api/v1";
 
+    private static get protected() {
+        return [...this.unprotected, AuthMiddleware];
+    }
+
+    private static get unprotected() {
+        return [LogMiddleware, ErrorMiddleware];
+    }
+
     static createRoutes(router: KoaRouter) {
         // Misc routes
-        router.get(`${this.ver}/ping`, AuthMiddleware, GeneralRouter.ping);
-        router.get(`${this.ver}/server/info`, AuthMiddleware, ServerRouter.getInfo);
-        router.get(`${this.ver}/server/logs`, AuthMiddleware, ServerRouter.getLogs);
-        router.get(`${this.ver}/server/update/check`, AuthMiddleware, ServerRouter.checkForUpdate);
-        router.get(`${this.ver}/server/statistics/totals`, AuthMiddleware, ServerRouter.getStatTotals);
-        router.get(`${this.ver}/server/statistics/media`, AuthMiddleware, ServerRouter.getStatMedia);
-        router.get(`${this.ver}/server/statistics/media/chat`, AuthMiddleware, ServerRouter.getStatMediaByChat);
+        router.get(`${this.ver}/ping`, ...this.protected, GeneralRouter.ping);
+        router.get(`${this.ver}/server/info`, ...this.protected, ServerRouter.getInfo);
+        router.get(`${this.ver}/server/logs`, ...this.protected, ServerRouter.getLogs);
+        router.get(`${this.ver}/server/update/check`, ...this.protected, ServerRouter.checkForUpdate);
+        router.get(`${this.ver}/server/statistics/totals`, ...this.protected, ServerRouter.getStatTotals);
+        router.get(`${this.ver}/server/statistics/media`, ...this.protected, ServerRouter.getStatMedia);
+        router.get(`${this.ver}/server/statistics/media/chat`, ...this.protected, ServerRouter.getStatMediaByChat);
 
         // FCM routes
-        router.post(`${this.ver}/fcm/device`, AuthMiddleware, FcmRouter.registerDevice);
-        router.get(`${this.ver}/fcm/client`, AuthMiddleware, FcmRouter.getClientConfig);
+        router.post(`${this.ver}/fcm/device`, ...this.protected, FcmRouter.registerDevice);
+        router.get(`${this.ver}/fcm/client`, ...this.protected, FcmRouter.getClientConfig);
 
         // Attachment Routes
-        router.get(`${this.ver}/attachment/:guid`, AuthMiddleware, AttachmentRouter.find);
-        router.get(`${this.ver}/attachment/:guid/download`, AuthMiddleware, AttachmentRouter.download);
-        router.get(`${this.ver}/attachment/count`, AuthMiddleware, AttachmentRouter.count);
+        router.get(`${this.ver}/attachment/:guid`, ...this.protected, AttachmentRouter.find);
+        router.get(`${this.ver}/attachment/:guid/download`, ...this.protected, AttachmentRouter.download);
+        router.get(`${this.ver}/attachment/:guid/blurhash`, ...this.protected, AttachmentRouter.blurhash);
+        router.get(`${this.ver}/attachment/count`, ...this.protected, AttachmentRouter.count);
 
         // Chat Routes
-        router.get(`${this.ver}/chat/count`, AuthMiddleware, ChatRouter.count);
-        router.post(`${this.ver}/chat/query`, AuthMiddleware, ChatRouter.query);
-        router.get(`${this.ver}/chat/:guid/message`, AuthMiddleware, ChatRouter.getMessages);
-        router.get(`${this.ver}/chat/:guid`, AuthMiddleware, ChatRouter.find);
+        router.get(`${this.ver}/chat/count`, ...this.protected, ChatRouter.count);
+        router.post(`${this.ver}/chat/query`, ...this.protected, ChatRouter.query);
+        router.get(`${this.ver}/chat/:guid/message`, ...this.protected, ChatRouter.getMessages);
+        router.get(`${this.ver}/chat/:guid`, ...this.protected, ChatRouter.find);
 
         // Message Routes
-        router.get(`${this.ver}/message/count`, AuthMiddleware, MessageRouter.count);
-        router.get(`${this.ver}/message/count/me`, AuthMiddleware, MessageRouter.sentCount);
-        router.post(`${this.ver}/message/query`, AuthMiddleware, MessageRouter.query);
-        router.get(`${this.ver}/message/:guid`, AuthMiddleware, MessageRouter.find);
+        router.get(`${this.ver}/message/count`, ...this.protected, MessageRouter.count);
+        router.get(`${this.ver}/message/count/me`, ...this.protected, MessageRouter.sentCount);
+        router.post(`${this.ver}/message/query`, ...this.protected, MessageRouter.query);
+        router.get(`${this.ver}/message/:guid`, ...this.protected, MessageRouter.find);
 
         // Handle Routes
-        router.get(`${this.ver}/handle/count`, AuthMiddleware, HandleRouter.count);
-        router.get(`${this.ver}/handle/:guid`, AuthMiddleware, HandleRouter.find);
+        router.get(`${this.ver}/handle/count`, ...this.protected, HandleRouter.count);
+        router.post(`${this.ver}/handle/query`, ...this.protected, HandleRouter.query);
+        router.get(`${this.ver}/handle/:guid`, ...this.protected, HandleRouter.find);
 
         // Theme routes
-        router.get(`${this.ver}/contact`, AuthMiddleware, ContactRouter.get);
-        router.post(`${this.ver}/contact/query`, AuthMiddleware, ContactRouter.query);
+        router.get(`${this.ver}/contact`, ...this.protected, ContactRouter.get);
+        router.post(`${this.ver}/contact/query`, ...this.protected, ContactRouter.query);
 
         // Theme routes
-        router.get(`${this.ver}/backup/theme`, AuthMiddleware, ThemeRouter.get);
-        router.post(`${this.ver}/backup/theme`, AuthMiddleware, ThemeRouter.create);
+        router.get(`${this.ver}/backup/theme`, ...this.protected, ThemeRouter.get);
+        router.post(`${this.ver}/backup/theme`, ...this.protected, ThemeRouter.create);
 
         // Settings routes
-        router.get(`${this.ver}/backup/settings`, AuthMiddleware, SettingsRouter.get);
-        router.post(`${this.ver}/backup/settings`, AuthMiddleware, SettingsRouter.create);
+        router.get(`${this.ver}/backup/settings`, ...this.protected, SettingsRouter.get);
+        router.post(`${this.ver}/backup/settings`, ...this.protected, SettingsRouter.create);
 
         // UI Routes
-        router.get("/", UiRouter.index);
+        router.get("/", ...this.unprotected, UiRouter.index);
     }
 }

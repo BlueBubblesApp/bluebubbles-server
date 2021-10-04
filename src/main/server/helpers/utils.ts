@@ -1,11 +1,11 @@
 /* eslint-disable no-bitwise */
+import { nativeImage, NativeImage } from "electron";
+import { encode as blurhashEncode } from "blurhash";
 import { Server } from "@server/index";
 import { PhoneNumberUtil } from "google-libphonenumber";
 import { FileSystem } from "@server/fileSystem";
-import { ContactRepository } from "@server/databases/contacts";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
-import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
 
 export const generateUuid = () => {
@@ -248,6 +248,39 @@ export const fixServerUrl = (value: string) => {
     }
 
     return newValue;
+};
+
+export const getBlurHash = async ({
+    image,
+    width = null,
+    height = null,
+    quality = "good",
+    componentX = 3,
+    componentY = 3
+}: {
+    image: NativeImage;
+    height?: number;
+    width?: number;
+    quality?: "good" | "better" | "best";
+    componentX?: number;
+    componentY?: number;
+}): Promise<string> => {
+    const resizeOpts: Electron.ResizeOptions = { quality };
+    if (width) resizeOpts.width = width;
+    if (height) resizeOpts.height = height;
+
+    // Resize the image (with new quality and size if applicable)
+    const calcImage: NativeImage = image.resize({ width, quality: "good" });
+    const size = calcImage.getSize();
+
+    // Compute and return blurhash
+    return blurhashEncode(
+        Uint8ClampedArray.from(calcImage.toBitmap()),
+        size.width,
+        size.height,
+        componentX,
+        componentY
+    );
 };
 
 export const tapbackUIMap = {

@@ -2,7 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
-import { BackupsRepo } from "../repository/backupsRepo";
+import { BackupsRepo } from "../interfaces/backupsInterface";
 
 export class SettingsRouter {
     static async create(ctx: RouterContext, _: Next) {

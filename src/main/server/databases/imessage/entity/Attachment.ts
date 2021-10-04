@@ -8,7 +8,7 @@ import { Server } from "@server/index";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { convertAudio, getAttachmentMetadata, getBlurHash } from "@server/databases/imessage/helpers/utils";
+import { convertAudio, getAttachmentMetadata } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
@@ -98,15 +98,9 @@ export class Attachment {
     hideAttachment: boolean;
 }
 
-export const getAttachmentResponse = async (
-    attachment: Attachment,
-    withData = false,
-    withBlurhash = true
-): Promise<AttachmentResponse> => {
+export const getAttachmentResponse = async (attachment: Attachment, withData = false): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
     let metadata: Metadata = null;
-    let blurhash: string = null;
-    let image: NativeImage = null;
 
     // Get the fully qualified path
     const tableData = attachment;
@@ -129,12 +123,6 @@ export const getAttachmentResponse = async (
                 // If we want data, get the data
                 if (withData) {
                     data = Uint8Array.from(fs.readFileSync(fPath));
-                }
-
-                // If the user wants the blurhash, get it for them!
-                if (withBlurhash && handledImageMimes.includes(tableData.mimeType)) {
-                    image = nativeImage.createFromPath(fPath);
-                    blurhash = await getBlurHash(image);
                 }
 
                 // Fetch the attachment metadata if there is a mimeType
@@ -161,7 +149,6 @@ export const getAttachmentResponse = async (
         data: data as string,
         height: (metadata?.height ?? 0) as number,
         width: (metadata?.width ?? 0) as number,
-        blurhash,
         uti: tableData.uti,
         mimeType: tableData.mimeType,
         transferState: tableData.transferState,

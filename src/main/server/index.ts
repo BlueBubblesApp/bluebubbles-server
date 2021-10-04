@@ -746,7 +746,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
 
-        this.log("Starting socket service...");
+        this.log("Starting HTTP service...");
         this.httpService.restart();
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;

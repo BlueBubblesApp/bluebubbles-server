@@ -58,6 +58,8 @@ export class ActionHandler {
             FileSystem.saveAttachment(attachmentName, attachment);
         }
 
+        Server().log(`Sending message "${message}" ${attachment ? "with attachment" : ""} to ${chatGuid}`, "debug");
+
         try {
             // Make sure messages is open
             await FileSystem.startMessages();

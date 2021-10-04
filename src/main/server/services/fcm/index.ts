@@ -146,8 +146,32 @@ export class FCMService {
             const options: admin.messaging.MessagingOptions = { priority };
 
             const responses: admin.messaging.MessagingDevicesResponse[] = [];
-            for (const device of devices)
-                responses.push(await FCMService.getApp().messaging().sendToDevice(device, msg, options));
+            Server().log(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`, "debug");
+            for (const device of devices) {
+                const res = await FCMService.getApp().messaging().sendToDevice(device, msg, options);
+                if (res.failureCount > 0) {
+                    Server().log(
+                        `Failed to send notification to device "${device}" ${res.failureCount} times!`,
+                        "warn"
+                    );
+                }
+
+                // Read over the errors and log the errors
+                for (const i of res.results) {
+                    if (i.error) {
+                        Server().log(
+                            `Firebase returned the following error (Code: ${i.error.code}): ${i.error.message}`,
+                            "debug"
+                        );
+
+                        if (i.error?.stack) {
+                            Server().log(`Firebase Stacktrace: ${i.error.stack}`, "debug");
+                        }
+                    }
+                }
+
+                responses.push(res);
+            }
 
             return responses;
         } catch (ex: any) {
