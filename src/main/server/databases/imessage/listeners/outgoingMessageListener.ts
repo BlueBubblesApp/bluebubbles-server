@@ -248,12 +248,33 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Add to cache
             this.cache.add(cacheName);
-            super.emit("new-entry", entry);
+
+            // Resolve the promise
+            const idx = Server().messageManager.findIndex(entry);
+            if (idx >= 0) {
+                Server().messageManager.promises[idx].resolve(entry);
+            }
         }
 
         // Emit the errored messages
         const errored = lookbackSent.filter(item => item.error > 0);
-        for (const entry of errored) super.emit("message-send-error", entry);
+        for (const entry of errored) {
+            const cacheName = getCacheName(entry);
+
+            // Skip over any that we've finished
+            if (this.cache.find(cacheName)) return;
+
+            // Add to cache
+            this.cache.add(cacheName);
+
+            // Reject the corresponding promise
+            const idx = Server().messageManager.findIndex(entry);
+            if (idx >= 0) {
+                Server().messageManager.promises[idx].reject(entry);
+            }
+
+            super.emit("message-send-error", entry);
+        }
     }
 
     async emitUpdatedMessages(after: Date, before: Date) {

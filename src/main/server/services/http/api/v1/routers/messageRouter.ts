@@ -1,11 +1,19 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
+import type { File } from "formidable";
 
 import { Server } from "@server/index";
-import { createNotFoundResponse, createSuccessResponse } from "@server/helpers/responses";
-import { getMessageResponse } from "@server/databases/imessage/entity/Message";
+import {
+    createBadRequestResponse,
+    createNotFoundResponse,
+    createServerErrorResponse,
+    createSuccessResponse
+} from "@server/helpers/responses";
+import { ErrorTypes } from "@server/types";
+import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Handle } from "@server/databases/imessage/entity/Handle";
+import { ActionHandler } from "@server/helpers/actions";
 import { parseNumber } from "../../../helpers";
 
 export class MessageRouter {
@@ -130,7 +138,7 @@ export class MessageRouter {
                 }
             }
 
-            const msgRes = await getMessageResponse(msg, false);
+            const msgRes = await getMessageResponse(msg);
             results.push(msgRes);
         }
 
@@ -141,5 +149,124 @@ export class MessageRouter {
         };
 
         ctx.body = createSuccessResponse(results, null, metadata);
+    }
+
+    static async sendText(ctx: RouterContext, _: Next) {
+        const { body } = ctx.request;
+
+        const tempGuid = body?.tempGuid;
+        const chatGuid = body?.guid;
+        const message = body?.message;
+
+        // Make sure a chat GUID is provided
+        if (!chatGuid) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Chat GUID not provided!");
+            return;
+        }
+
+        // Make sure we have a temp GUID, for matching
+        if (!tempGuid || tempGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Temporary GUID not provided!");
+            return;
+        }
+
+        // Make sure the message isn't already in the queue
+        if (Server().httpService.sendCache.find(tempGuid)) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Message is already queued to be sent!");
+            return;
+        }
+
+        // Add to send cache
+        Server().httpService.sendCache.add(tempGuid);
+
+        try {
+            // Send the message
+            const sentMessage: Message = await ActionHandler.sendMessageSync(chatGuid, message);
+            const res = await getMessageResponse(sentMessage);
+            ctx.body = createSuccessResponse(res, "Message sent!");
+        } catch (ex: any) {
+            ctx.status = 400;
+            if (ex instanceof Message) {
+                ctx.body = createServerErrorResponse(
+                    "Message Send Error",
+                    ErrorTypes.IMESSAGE_ERROR,
+                    "Failed to send message! See attached message error code.",
+                    await getMessageResponse(ex)
+                );
+            } else {
+                Server().log(`Attachment Send Error: ${ex?.message || ex.toString()}`);
+                ctx.body = createServerErrorResponse(ex?.message || ex.toString());
+            }
+        }
+    }
+
+    static async sendAttachment(ctx: RouterContext, _: Next) {
+        const { body, files } = ctx.request;
+
+        const tempGuid = body?.tempGuid;
+        const chatGuid = body?.guid;
+        const name = body?.name;
+
+        // Make sure a chat GUID is provided
+        if (!chatGuid) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Chat GUID not provided!");
+            return;
+        }
+
+        // Make sure we have a temp GUID, for matching
+        if (!tempGuid || tempGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Temporary GUID not provided!");
+            return;
+        }
+
+        // Make sure the message isn't already in the queue
+        if (Server().httpService.sendCache.find(tempGuid)) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Message is already queued to be sent!");
+            return;
+        }
+
+        // Make sure the message isn't already in the queue
+        if (!name || name.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Attachment file name not provided!");
+            return;
+        }
+
+        // Make sure the message isn't already in the queue
+        const attachment = files?.attachment as File;
+        if (!attachment || attachment.size === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Attachment not provided or was empty!");
+            return;
+        }
+
+        // Add to send cache
+        Server().httpService.sendCache.add(tempGuid);
+
+        // Send the attachment
+        try {
+            const sentMessage: Message = await ActionHandler.sendAttachmentSync(chatGuid, attachment.path, name);
+            const res = await getMessageResponse(sentMessage);
+            ctx.body = createSuccessResponse(res, "Attachment sent!");
+        } catch (ex: any) {
+            ctx.status = 400;
+            if (ex instanceof Message) {
+                ctx.body = createServerErrorResponse(
+                    "Attachment Send Error",
+                    ErrorTypes.IMESSAGE_ERROR,
+                    "Failed to send attachment! See attached message error code.",
+                    await getMessageResponse(ex)
+                );
+            } else {
+                Server().log(`Attachment Send Error: ${ex?.message || ex.toString()}`);
+                ctx.body = createServerErrorResponse(ex?.message || ex.toString());
+            }
+        }
     }
 }

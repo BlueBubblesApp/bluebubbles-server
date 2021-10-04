@@ -9,6 +9,7 @@ import { NetworkService } from "./network";
 import { QueueService } from "./queue";
 import { IPCService } from "./ipc";
 import { CertificateService } from "./certificate";
+import { MessageManager } from "./messageManager";
 
 export {
     HttpService,
@@ -21,5 +22,6 @@ export {
     NetworkService,
     QueueService,
     IPCService,
-    CertificateService
+    CertificateService,
+    MessageManager
 };

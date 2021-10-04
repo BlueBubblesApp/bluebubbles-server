@@ -3,7 +3,7 @@ import { Server as SocketServer, ServerOptions } from "socket.io";
 
 // HTTP libraries
 import * as KoaApp from "koa";
-import * as bodyParser from "koa-bodyparser";
+import * as koaBody from "koa-body";
 import * as koaJson from "koa-json";
 import * as KoaRouter from "koa-router";
 import * as koaCors from "koa-cors";
@@ -110,9 +110,14 @@ export class HttpService {
 
         // Increase size limits from the default 1mb
         this.koaApp.use(
-            bodyParser({
+            koaBody({
                 jsonLimit: "10mb",
-                textLimit: "10mb"
+                textLimit: "10mb",
+                formLimit: "101mb", // 101 to account for a 100mb attachment and some text
+                multipart: true,
+                onError: (err: Error, _: KoaApp.Context) => {
+                    Server().log(`KoaBody Parse Error: [${err.name}] ${err.message}`);
+                }
             })
         );
 

@@ -116,6 +116,18 @@ export class FileSystem {
     }
 
     /**
+     * Saves an attachment
+     *
+     * @param name Name for the attachment
+     * @param buffer The attachment bytes (buffer)
+     */
+    static copyAttachment(originalPath: string, name: string): string {
+        const newPath = path.join(FileSystem.attachmentsDir, name);
+        fs.copyFileSync(originalPath, newPath);
+        return newPath;
+    }
+
+    /**
      * Saves an attachment by chunk
      *
      * @param guid Unique identifier for the attachment
