@@ -44,10 +44,10 @@ export class HttpRoutes {
         router.get(`${this.ver}/fcm/client`, ...this.protected, FcmRouter.getClientConfig);
 
         // Attachment Routes
+        router.get(`${this.ver}/attachment/count`, ...this.protected, AttachmentRouter.count);
         router.get(`${this.ver}/attachment/:guid`, ...this.protected, AttachmentRouter.find);
         router.get(`${this.ver}/attachment/:guid/download`, ...this.protected, AttachmentRouter.download);
         router.get(`${this.ver}/attachment/:guid/blurhash`, ...this.protected, AttachmentRouter.blurhash);
-        router.get(`${this.ver}/attachment/count`, ...this.protected, AttachmentRouter.count);
 
         // Chat Routes
         router.get(`${this.ver}/chat/count`, ...this.protected, ChatRouter.count);
@@ -56,6 +56,8 @@ export class HttpRoutes {
         router.get(`${this.ver}/chat/:guid`, ...this.protected, ChatRouter.find);
 
         // Message Routes
+        router.post(`${this.ver}/message/text`, ...this.protected, MessageRouter.sendText);
+        router.post(`${this.ver}/message/attachment`, ...this.protected, MessageRouter.sendAttachment);
         router.get(`${this.ver}/message/count`, ...this.protected, MessageRouter.count);
         router.get(`${this.ver}/message/count/me`, ...this.protected, MessageRouter.sentCount);
         router.post(`${this.ver}/message/query`, ...this.protected, MessageRouter.query);

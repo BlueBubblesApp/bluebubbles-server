@@ -34,7 +34,8 @@ import {
     NetworkService,
     QueueService,
     IPCService,
-    UpdateService
+    UpdateService,
+    MessageManager
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
@@ -98,6 +99,8 @@ class BlueBubblesServer extends EventEmitter {
 
     updater: UpdateService;
 
+    messageManager: MessageManager;
+
     queue: QueueService;
 
     proxyServices: Proxy[];
@@ -151,6 +154,7 @@ class BlueBubblesServer extends EventEmitter {
         this.queue = null;
         this.proxyServices = [];
         this.updater = null;
+        this.messageManager = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -746,8 +750,19 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
 
-        this.log("Starting HTTP service...");
-        this.httpService.restart();
+        try {
+            this.log("Starting HTTP service...");
+            this.httpService.restart();
+        } catch (ex: any) {
+            this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Starting Message Manager...");
+            this.messageManager = new MessageManager();
+        } catch (ex: any) {
+            this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+        }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
