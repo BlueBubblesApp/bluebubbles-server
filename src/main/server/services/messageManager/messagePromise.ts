@@ -5,9 +5,9 @@ import { onlyAlphaNumeric } from "@server/helpers/utils";
 export class MessagePromise {
     promise: Promise<Message>;
 
-    resolve: (value: Message | PromiseLike<Message>) => void;
+    private resolvePromise: (value: Message | PromiseLike<Message>) => void;
 
-    reject: (reason?: any) => void;
+    private rejectPromise: (reason?: any) => void;
 
     text: string;
 
@@ -26,17 +26,13 @@ export class MessagePromise {
     constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number) {
         // Create a promise and save the "callbacks"
         this.promise = new Promise((resolve, reject) => {
-            this.resolve = resolve;
-            this.reject = reject;
+            this.resolvePromise = resolve;
+            this.rejectPromise = reject;
         });
 
         // Hook into the resolve and rejects so we can set flags based on the status
         this.promise
-            .then((_: any) => {
-                this.isResolved = true;
-            })
             .catch((err: any) => {
-                this.isResolved = true;
                 this.errored = true;
                 this.error = err;
             });
@@ -66,6 +62,16 @@ export class MessagePromise {
             },
             this.isAttachment ? 60000 * 3 : 30000
         );
+    }
+
+    resolve(value: Message | PromiseLike<Message>) {
+        this.isResolved = true;
+        this.resolvePromise(value);
+    }
+
+    reject(reason?: any) {
+        this.isResolved = true;
+        this.rejectPromise(reason);
     }
 
     isSame(message: Message) {

@@ -1,7 +1,6 @@
 import { Context, Next } from "koa";
 import { Server } from "@server/index";
 import { createServerErrorResponse, createUnauthorizedResponse } from "@server/helpers/responses";
-import { ErrorTypes } from "@server/types";
 
 export const AuthMiddleware = async (ctx: Context, next: Next) => {
     const params = ctx.request.query;
