@@ -5,7 +5,7 @@ import { Server } from "@server/index";
 import { createNotFoundResponse, createSuccessResponse } from "@server/helpers/responses";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { parseNumber } from "@server/services/http/helpers";
-import { HandleRepository } from "../interfaces/handleInterface";
+import { HandleInterface } from "../interfaces/handleInterface";
 
 export class HandleRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -50,7 +50,7 @@ export class HandleRouter {
             limit
         };
 
-        const results = await HandleRepository.get({
+        const results = await HandleInterface.get({
             address,
             withChats,
             withChatParticipants,

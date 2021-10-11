@@ -197,7 +197,7 @@ export class MessageRouter {
                     await getMessageResponse(ex)
                 );
             } else {
-                Server().log(`Attachment Send Error: ${ex?.message || ex.toString()}`);
+                Server().log(`Message Send Error: ${ex?.message || ex.toString()}`);
                 ctx.body = createServerErrorResponse(ex?.message || ex.toString());
             }
         }

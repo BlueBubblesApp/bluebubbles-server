@@ -8,7 +8,7 @@ import { UpdateResult } from "../../../types";
 
 const osVersion = macosVersion();
 
-export class GeneralRepo {
+export class GeneralInterface {
     static getServerMetadata(): ServerMetadataResponse {
         return {
             os_version: osVersion,
@@ -47,6 +47,7 @@ export class GeneralRepo {
         if (hasUpdate)
             return {
                 available: true,
+                current: app.getVersion(),
                 metadata: {
                     version: Server().updater.updateInfo.updateInfo.version,
                     release_date: Server().updater.updateInfo.updateInfo.releaseDate,
@@ -57,6 +58,7 @@ export class GeneralRepo {
 
         return {
             available: false,
+            current: app.getVersion(),
             metadata: null
         };
     }

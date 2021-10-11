@@ -3,7 +3,7 @@ import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Han
 import { Server } from "@server/index";
 import { ChatResponse, HandleResponse } from "@server/types";
 
-export class ChatRepository {
+export class ChatInterface {
     static async get({
         guid = null,
         withSMS = false,

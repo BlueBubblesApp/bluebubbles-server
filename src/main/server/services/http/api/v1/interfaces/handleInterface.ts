@@ -1,9 +1,9 @@
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { Server } from "@server/index";
 import { ChatResponse, HandleResponse } from "@server/types";
-import { ChatRepository } from "./chatInterface";
+import { ChatInterface } from "./chatInterface";
 
-export class HandleRepository {
+export class HandleInterface {
     static async get({
         address = null,
         withChats = false,
@@ -20,7 +20,7 @@ export class HandleRepository {
         // As long as there are results, we should fetch chats and match them
         const handleChatMap: { [key: string]: ChatResponse[] } = {};
         if (handles && withChats) {
-            const chats = await ChatRepository.get({
+            const chats = await ChatInterface.get({
                 withParticipants: true,
                 withLastMessage: false
             });

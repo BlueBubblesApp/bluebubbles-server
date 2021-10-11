@@ -1,10 +1,8 @@
-import { ParameterizedContext } from "koa";
-import * as KoaRouter from "koa-router";
-
 export type KoaNext = () => Promise<any>;
 export type ImageQuality = "good" | "better" | "best";
 export type UpdateResult = {
     available: boolean;
+    current: string,
     metadata: {
         version: string;
         release_date: string;

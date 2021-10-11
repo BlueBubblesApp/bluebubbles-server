@@ -1,34 +1,10 @@
+import { FileSystem } from "@server/fileSystem";
+import { lockMacOs } from "@server/fileSystem/scripts";
 import { Server } from "@server/index";
-import { createTextChangeRange } from "typescript";
 
-export class ServerInterface {
-    static async getDatabaseTotals({ only = ["handle", "message", "chat", "attachment"] }: { only?: string[] } = {}) {
-        // If an element ends with an 's', remove it.
-        // Also, make them all lower-cased
-        const items = only.map(e =>
-            e.toLowerCase().substring(e.length - 1, e.length) === "s"
-                ? e
-                      .substring(0, e.length - 1)
-                      .toLowerCase()
-                      .trim()
-                : e.toLowerCase().trim()
-        );
-
-        const results: any = {};
-        if (items.includes("handle")) {
-            results.handles = await Server().iMessageRepo.getHandleCount();
-        }
-        if (items.includes("message")) {
-            results.messages = await Server().iMessageRepo.getMessageCount();
-        }
-        if (items.includes("chat")) {
-            results.chats = await Server().iMessageRepo.getChatCount();
-        }
-        if (items.includes("attachment")) {
-            results.attachments = await Server().iMessageRepo.getAttachmentCount();
-        }
-
-        return results;
+export class MacOsInterface {
+    static async lock() {
+        await FileSystem.executeAppleScript(lockMacOs());
     }
 
     static async getMediaTotals({ only = ["image", "video", "location", "other"] }: { only?: string[] } = {}) {
@@ -73,21 +49,17 @@ export class ServerInterface {
 
         // Helper for adding counts to the results
         const addToResults = (result: any[], identifier: string) => {
-            const totals: any = {};
-            for (const cat of items) {
-                totals[`${cat}s`] = 0;
-            }
-
             for (const i of result) {
                 if (!Object.keys(results).includes(i.chat_guid)) {
                     results[i.chat_guid] = {
                         chatGuid: i.chat_guid,
                         groupName: i.group_name,
-                        totals
+                        totals: {}
                     };
                 }
 
                 results[i.chat_guid].totals[identifier] = i.media_count;
+                break;
             }
         };
 

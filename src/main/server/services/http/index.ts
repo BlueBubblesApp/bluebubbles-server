@@ -22,6 +22,7 @@ import { EventCache } from "@server/eventCache";
 
 import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
 import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
+import { ErrorMiddleware } from "./api/v1/middleware/errorMiddleware";
 
 /**
  * This service class handles all routing for incoming socket
@@ -108,16 +109,16 @@ export class HttpService {
         // Allow cross origin requests
         this.koaApp.use(koaCors());
 
+        // This is used here so that we can catch errors in KoaBody as well
+        this.koaApp.use(ErrorMiddleware);
+
         // Increase size limits from the default 1mb
         this.koaApp.use(
             koaBody({
                 jsonLimit: "10mb",
                 textLimit: "10mb",
                 formLimit: "101mb", // 101 to account for a 100mb attachment and some text
-                multipart: true,
-                onError: (err: Error, _: KoaApp.Context) => {
-                    Server().log(`KoaBody Parse Error: [${err.name}] ${err.message}`);
-                }
+                multipart: true
             })
         );
 

@@ -3,7 +3,7 @@ import { RouterContext } from "koa-router";
 import { FileSystem } from "@server/fileSystem";
 import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
 import { Next } from "koa";
-import { GeneralRepo } from "../interfaces/generalInterface";
+import { GeneralInterface } from "../interfaces/generalInterface";
 
 export class FcmRouter {
     static async getClientConfig(ctx: RouterContext, _: Next) {
@@ -19,7 +19,7 @@ export class FcmRouter {
             return;
         }
 
-        await GeneralRepo.addFcmDevice(body?.name, body?.identifier);
+        await GeneralInterface.addFcmDevice(body?.name, body?.identifier);
         ctx.body = createSuccessResponse(null, "Successfully added device!");
     }
 }

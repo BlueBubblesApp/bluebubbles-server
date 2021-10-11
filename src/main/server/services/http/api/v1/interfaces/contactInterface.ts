@@ -3,7 +3,7 @@ import { Record } from "@server/databases/contacts/entity/Record";
 import { PhoneNumber } from "@server/databases/contacts/entity/PhoneNumber";
 import { Email } from "@server/databases/contacts/entity/Email";
 
-export class ContactRepo {
+export class ContactInterface {
     private static mapContacts(records: Record[]): any {
         return records
             .filter((e: Record) => e.firstName || e.lastName)
@@ -35,7 +35,7 @@ export class ContactRepo {
 
     static async getAllContacts(): Promise<any[]> {
         const data: Record[] = await Server().contactsRepo.getAllContacts();
-        return ContactRepo.mapContacts(data);
+        return ContactInterface.mapContacts(data);
     }
 
     static async queryContacts(addresses: string[]): Promise<any[]> {
@@ -47,6 +47,6 @@ export class ContactRepo {
             data.push(res);
         }
 
-        return ContactRepo.mapContacts(data);
+        return ContactInterface.mapContacts(data);
     }
 }

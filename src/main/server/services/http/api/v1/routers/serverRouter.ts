@@ -2,18 +2,18 @@ import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { createSuccessResponse } from "@server/helpers/responses";
 import { FileSystem } from "@server/fileSystem";
-import { GeneralRepo } from "../interfaces/generalInterface";
-import { ServerRepo } from "../interfaces/serverInterface";
+import { GeneralInterface } from "../interfaces/generalInterface";
+import { ServerInterface } from "../interfaces/serverInterface";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
         ctx.status = 200;
-        ctx.body = createSuccessResponse(GeneralRepo.getServerMetadata());
+        ctx.body = createSuccessResponse(GeneralInterface.getServerMetadata());
     }
 
     static async checkForUpdate(ctx: RouterContext, _: Next) {
         ctx.status = 200;
-        ctx.body = createSuccessResponse(await GeneralRepo.checkForUpdate());
+        ctx.body = createSuccessResponse(await GeneralInterface.checkForUpdate());
     }
 
     static async getLogs(ctx: RouterContext, _: Next) {
@@ -39,7 +39,7 @@ export class ServerRouter {
         }
 
         ctx.status = 200;
-        ctx.body = createSuccessResponse(await ServerRepo.getDatabaseTotals(params));
+        ctx.body = createSuccessResponse(await ServerInterface.getDatabaseTotals(params));
     }
 
     static async getStatMedia(ctx: RouterContext, _: Next) {
@@ -51,7 +51,7 @@ export class ServerRouter {
         }
 
         ctx.status = 200;
-        ctx.body = createSuccessResponse(await ServerRepo.getMediaTotals(params));
+        ctx.body = createSuccessResponse(await ServerInterface.getMediaTotals(params));
     }
 
     static async getStatMediaByChat(ctx: RouterContext, _: Next) {
@@ -63,6 +63,6 @@ export class ServerRouter {
         }
 
         ctx.status = 200;
-        ctx.body = createSuccessResponse(await ServerRepo.getMediaTotalsByChat(params));
+        ctx.body = createSuccessResponse(await ServerInterface.getMediaTotalsByChat(params));
     }
 }
