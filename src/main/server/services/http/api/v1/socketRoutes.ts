@@ -34,7 +34,7 @@ import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
 import { restartMessages } from "@server/fileSystem/scripts";
 import { Socket } from "socket.io";
-import { GeneralRepo } from "./interfaces/generalInterface";
+import { GeneralInterface } from "./interfaces/generalInterface";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
@@ -178,7 +178,7 @@ export class SocketRoutes {
                 if (!params?.deviceName || !params?.deviceId)
                     return response(cb, "error", createBadRequestResponse("No device name or ID specified"));
 
-                await GeneralRepo.addFcmDevice(params?.deviceName, params?.deviceId);
+                await GeneralInterface.addFcmDevice(params?.deviceName, params?.deviceId);
                 return response(cb, "fcm-device-id-added", createSuccessResponse(null, "Successfully added device ID"));
             }
         );
@@ -1118,7 +1118,7 @@ export class SocketRoutes {
         socket.on(
             "check-for-server-update",
             async (_, cb): Promise<void> => {
-                return response(cb, "save-vcf", createSuccessResponse(await GeneralRepo.checkForUpdate()));
+                return response(cb, "save-vcf", createSuccessResponse(await GeneralInterface.checkForUpdate()));
             }
         );
 

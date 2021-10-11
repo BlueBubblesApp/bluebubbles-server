@@ -2,7 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
-import { BackupsRepo } from "../interfaces/backupsInterface";
+import { BackupsInterface } from "../interfaces/backupsInterface";
 
 export class ThemeRouter {
     static async create(ctx: RouterContext, _: Next) {
@@ -35,7 +35,7 @@ export class ThemeRouter {
         }
 
         // Save the theme to a file
-        await BackupsRepo.saveTheme(name, data);
+        await BackupsInterface.saveTheme(name, data);
         ctx.body = createSuccessResponse("Successfully saved theme!");
     }
 
@@ -44,9 +44,9 @@ export class ThemeRouter {
         let res: any;
 
         if (name && name.length > 0) {
-            res = await BackupsRepo.getThemeByName(name);
+            res = await BackupsInterface.getThemeByName(name);
         } else {
-            res = await BackupsRepo.getAllThemes();
+            res = await BackupsInterface.getAllThemes();
         }
 
         ctx.body = createSuccessResponse(res);

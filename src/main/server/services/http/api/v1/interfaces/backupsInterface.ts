@@ -4,7 +4,7 @@ import slugify from "slugify";
 import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server/index";
 
-export class BackupsRepo {
+export class BackupsInterface {
     static async saveTheme(name: string, data: any): Promise<void> {
         const saniName = `${slugify(name)}.json`;
         const themePath = path.join(FileSystem.themesDir, saniName);

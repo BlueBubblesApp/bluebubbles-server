@@ -8,7 +8,7 @@ import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 
 import { parseNumber } from "../../../helpers";
-import { ChatRepository } from "../interfaces/chatInterface";
+import { ChatInterface } from "../interfaces/chatInterface";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -143,7 +143,7 @@ export class ChatRouter {
         if (offset < 0) offset = 0;
         if (limit < 0 || limit > 1000) limit = 1000;
 
-        const results = await ChatRepository.get({
+        const results = await ChatInterface.get({
             guid,
             withSMS,
             withParticipants,

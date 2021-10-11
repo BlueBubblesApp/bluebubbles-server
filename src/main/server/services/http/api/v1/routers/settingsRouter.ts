@@ -2,7 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
-import { BackupsRepo } from "../interfaces/backupsInterface";
+import { BackupsInterface } from "../interfaces/backupsInterface";
 
 export class SettingsRouter {
     static async create(ctx: RouterContext, _: Next) {
@@ -35,7 +35,7 @@ export class SettingsRouter {
         }
 
         // Save the settings to a file
-        await BackupsRepo.saveSettings(name, data);
+        await BackupsInterface.saveSettings(name, data);
         ctx.body = createSuccessResponse("Successfully saved settings!");
     }
 
@@ -44,9 +44,9 @@ export class SettingsRouter {
         let res: any;
 
         if (name && name.length > 0) {
-            res = await BackupsRepo.getSettingsByName(name);
+            res = await BackupsInterface.getSettingsByName(name);
         } else {
-            res = await BackupsRepo.getAllSettings();
+            res = await BackupsInterface.getAllSettings();
         }
 
         ctx.body = createSuccessResponse(res);

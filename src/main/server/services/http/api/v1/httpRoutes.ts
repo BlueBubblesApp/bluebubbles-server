@@ -16,7 +16,7 @@ import { UiRouter } from "./routers/uiRouter";
 import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
 import { LogMiddleware } from "./middleware/logMiddleware";
-import { ErrorMiddleware } from "./middleware/errorMiddleware";
+import { MacOsRouter } from "./routers/macosRouter";
 
 export class HttpRoutes {
     static ver = "/api/v1";
@@ -26,12 +26,16 @@ export class HttpRoutes {
     }
 
     private static get unprotected() {
-        return [LogMiddleware, ErrorMiddleware];
+        return [LogMiddleware];
     }
 
     static createRoutes(router: KoaRouter) {
-        // Misc routes
         router.get(`${this.ver}/ping`, ...this.protected, GeneralRouter.ping);
+
+        // MacOS routes
+        router.post(`${this.ver}/mac/lock`, ...this.protected, MacOsRouter.lock);
+
+        // Server routes
         router.get(`${this.ver}/server/info`, ...this.protected, ServerRouter.getInfo);
         router.get(`${this.ver}/server/logs`, ...this.protected, ServerRouter.getLogs);
         router.get(`${this.ver}/server/update/check`, ...this.protected, ServerRouter.checkForUpdate);
@@ -68,7 +72,7 @@ export class HttpRoutes {
         router.post(`${this.ver}/handle/query`, ...this.protected, HandleRouter.query);
         router.get(`${this.ver}/handle/:guid`, ...this.protected, HandleRouter.find);
 
-        // Theme routes
+        // Contact routes
         router.get(`${this.ver}/contact`, ...this.protected, ContactRouter.get);
         router.post(`${this.ver}/contact/query`, ...this.protected, ContactRouter.query);
 
