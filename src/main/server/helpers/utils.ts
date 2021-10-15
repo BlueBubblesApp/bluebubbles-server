@@ -283,6 +283,21 @@ export const getBlurHash = async ({
     );
 };
 
+export const waitMs = async (ms: number) => {
+    return new Promise((resolve, _) => setTimeout(resolve, ms));
+};
+
+export const checkPrivateApiStatus = () => {
+    const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+    if (!enablePrivateApi) {
+        throw new Error('iMessage Private API is not enabled!');
+    }
+
+    if (!Server().privateApiHelper.server || !Server().privateApiHelper?.helper) {
+        throw new Error('iMessage Private API Helper is not connected!');
+    }
+}
+
 export const tapbackUIMap = {
     love: 1,
     like: 2,

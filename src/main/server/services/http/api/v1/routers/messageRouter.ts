@@ -15,6 +15,7 @@ import { DBMessageParams } from "@server/databases/imessage/types";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { ActionHandler } from "@server/helpers/actions";
 import { parseNumber } from "../../../helpers";
+import { MessageInterface } from "../interfaces/messageInterface";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
@@ -157,6 +158,9 @@ export class MessageRouter {
         const tempGuid = body?.tempGuid;
         const chatGuid = body?.guid;
         const message = body?.message;
+        const method = body?.method ?? 'apple-script';
+        const effectId = body?.effectId;
+        const subject = body?.subject;
 
         // Make sure a chat GUID is provided
         if (!chatGuid) {
@@ -184,7 +188,8 @@ export class MessageRouter {
 
         try {
             // Send the message
-            const sentMessage: Message = await ActionHandler.sendMessageSync(chatGuid, message);
+            const sentMessage: Message = await MessageInterface.sendMessageSync(
+                chatGuid, message, method, subject, effectId);
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Message sent!");
         } catch (ex: any) {
@@ -265,6 +270,117 @@ export class MessageRouter {
                 );
             } else {
                 Server().log(`Attachment Send Error: ${ex?.message || ex.toString()}`);
+                ctx.body = createServerErrorResponse(ex?.message || ex.toString());
+            }
+        }
+    }
+
+    static async react(ctx: RouterContext, _: Next) {
+        const { body } = ctx.request;
+
+        // Pull out the required fields
+        const chatGuid = body?.chatGuid;
+        const selectedMessageText = body?.selectedMessageText;
+        const selectedMessageGuid = body?.selectedMessageGuid;
+        const reaction = (body?.reaction ?? '').toLowerCase();
+
+        // Make sure we have a chat GUID
+        if (!chatGuid || chatGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Chat GUID not provided!");
+            return;
+        }
+
+        // Make sure we have a selected message text
+        if (!selectedMessageText || selectedMessageText.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Selected Message Text not provided!");
+            return;
+        }
+
+        // Make sure we have a selected message GUID
+        if (!selectedMessageGuid || selectedMessageGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Selected Message GUID not provided!");
+            return;
+        }
+
+        // Make sure we have a reaction
+        if (!reaction || !MessageInterface.possibleReactions.includes(reaction)) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse(
+                `Reaction was invalid or not provided! Must be one of: ${
+                    MessageInterface.possibleReactions.join(', ')}`);
+            return;
+        }
+
+        // Send the reaction
+        try {
+            const sentMessage = await MessageInterface.sendReaction(
+                chatGuid, selectedMessageGuid, selectedMessageText, reaction);
+            const res = await getMessageResponse(sentMessage);
+            ctx.body = createSuccessResponse(res, "Reaction sent!");
+        } catch (ex: any) {
+            ctx.status = 400;
+            if (ex instanceof Message) {
+                ctx.body = createServerErrorResponse(
+                    "Reaction Send Error",
+                    ErrorTypes.IMESSAGE_ERROR,
+                    "Failed to send reaction! See attached message error code.",
+                    await getMessageResponse(ex)
+                );
+            } else {
+                Server().log(`Reaction Send Error: ${ex?.message || ex.toString()}`);
+                ctx.body = createServerErrorResponse(ex?.message || ex.toString());
+            }
+        }
+    }
+
+    static async reply(ctx: RouterContext, _: Next) {
+        const { body } = ctx.request;
+
+        // Pull out the required fields
+        const chatGuid = body?.chatGuid;
+        const selectedMessageGuid = body?.selectedMessageGuid;
+        const message = body?.mnessage
+
+        // Make sure we have a chat GUID
+        if (!chatGuid || chatGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Chat GUID not provided!");
+            return;
+        }
+
+        // Make sure we have a selected message text
+        if (!message || message.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Message Text not provided!");
+            return;
+        }
+
+        // Make sure we have a selected message GUID
+        if (!selectedMessageGuid || selectedMessageGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Selected Message GUID not provided!");
+            return;
+        }
+
+        // Send the reply
+        try {
+            const sentMessage = await MessageInterface.sendReply(chatGuid, selectedMessageGuid, message);
+            const res = await getMessageResponse(sentMessage);
+            ctx.body = createSuccessResponse(res, "Reply sent!");
+        } catch (ex: any) {
+            ctx.status = 400;
+            if (ex instanceof Message) {
+                ctx.body = createServerErrorResponse(
+                    "Reply Send Error",
+                    ErrorTypes.IMESSAGE_ERROR,
+                    "Failed to send reply! See attached message error code.",
+                    await getMessageResponse(ex)
+                );
+            } else {
+                Server().log(`Reply Send Error: ${ex?.message || ex.toString()}`);
                 ctx.body = createServerErrorResponse(ex?.message || ex.toString());
             }
         }

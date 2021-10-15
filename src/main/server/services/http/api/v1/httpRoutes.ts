@@ -57,11 +57,16 @@ export class HttpRoutes {
         router.get(`${this.ver}/chat/count`, ...this.protected, ChatRouter.count);
         router.post(`${this.ver}/chat/query`, ...this.protected, ChatRouter.query);
         router.get(`${this.ver}/chat/:guid/message`, ...this.protected, ChatRouter.getMessages);
+        router.post(`${this.ver}/chat/:guid/participant/add`, ...this.protected, ChatRouter.addParticipant);
+        router.post(`${this.ver}/chat/:guid/participant/remove`, ...this.protected, ChatRouter.removeParticipant);
+        router.put(`${this.ver}/chat/:guid`, ...this.protected, ChatRouter.update);
         router.get(`${this.ver}/chat/:guid`, ...this.protected, ChatRouter.find);
 
         // Message Routes
         router.post(`${this.ver}/message/text`, ...this.protected, MessageRouter.sendText);
         router.post(`${this.ver}/message/attachment`, ...this.protected, MessageRouter.sendAttachment);
+        router.post(`${this.ver}/message/react`, ...this.protected, MessageRouter.react);
+        router.post(`${this.ver}/message/reply`, ...this.protected, MessageRouter.reply);
         router.get(`${this.ver}/message/count`, ...this.protected, MessageRouter.count);
         router.get(`${this.ver}/message/count/me`, ...this.protected, MessageRouter.sentCount);
         router.post(`${this.ver}/message/query`, ...this.protected, MessageRouter.query);

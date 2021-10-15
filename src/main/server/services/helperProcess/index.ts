@@ -84,7 +84,7 @@ export class BlueBubblesHelperService {
         }
     }
 
-    startTyping(chatGuid: string) {
+    async startTyping(chatGuid: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to start typing, BlueBubblesHelper is not running!", "error");
             return;
@@ -94,16 +94,10 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        const data = {
-            event: "start-typing",
-            data: chatGuid
-        };
-        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
-            Server().log("Failed to start typing, an error occured writing to the socket", "error");
-        }
+        await this.writeData('start-typing', chatGuid);
     }
 
-    stopTyping(chatGuid: string) {
+    async stopTyping(chatGuid: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to stop typing, BlueBubblesHelper is not running!", "error");
             return;
@@ -113,16 +107,10 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        const data = {
-            event: "stop-typing",
-            data: chatGuid
-        };
-        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
-            Server().log("Failed to stop typing, an error occured writing to the socket", "error");
-        }
+        await this.writeData('stop-typing', chatGuid);
     }
 
-    markChatRead(chatGuid: string) {
+    async markChatRead(chatGuid: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to mark chat as read, BlueBubblesHelper is not running!", "error");
             return;
@@ -132,52 +120,77 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        const data = {
-            event: "mark-chat-read",
-            data: chatGuid
-        };
-        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
-            Server().log("Failed to mark chat as read, an error occured writing to the socket", "error");
-        }
+        await this.writeData('mark-chat-read', chatGuid);
     }
 
-    sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: ValidTapback | ValidRemoveTapback) {
-        if (!this.helper || !this.server) {
-            Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");
-            return;
-        }
+    async sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: ValidTapback | ValidRemoveTapback) {
         if (!chatGuid || !actionMessageGuid || !reactionType) {
-            Server().log("Failed to send reaction. Invalid params!", "error");
-            return;
+            throw new Error("Failed to send reaction. Invalid params!");
         }
-        const data = {
-            event: "send-reaction",
-            data: `${chatGuid},${actionMessageGuid},${reactionType as string}`
-        };
-        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
-            Server().log("Failed to send reaction, an error occured writing to the socket", "error");
+
+        await this.writeData('send-reaction', `${chatGuid},${actionMessageGuid},${reactionType as string}`);
+    }
+
+    async sendMessage(chatGuid: string, message: string, subject: string = null, effectId: number = null) {
+        if (!chatGuid || !message) {
+            throw new Error("Failed to send message. Invalid params!");
+        }
+
+        if (subject !== null) {
+            await this.writeData('send-subject', `${chatGuid},${message},${subject}`);
+        } else if (effectId !== null) {
+            await this.writeData('send-effect', `${chatGuid},${message},${String(effectId)}`);
+        } else {
+            await this.writeData('send-message', `${chatGuid},${message}`);
         }
     }
 
-    setDisplayName(chatGuid: string, newName: string) {
+    async sendReply(chatGuid: string, selectedMessageGuid: string, message: string) {
+        if (!chatGuid || !selectedMessageGuid || !message) {
+            throw new Error("Failed to send message. Invalid params!");
+        }
+
+        await this.writeData('send-reply', `${chatGuid},${selectedMessageGuid},${message}`);
+    }
+
+    async addParticipant(chatGuid: string, address: string) {
+        return this.toggleParticipant(chatGuid, address, 'add');
+    }
+
+    async removeParticipant(chatGuid: string, address: string) {
+        return this.toggleParticipant(chatGuid, address, 'remove');
+    }
+
+    async toggleParticipant(chatGuid: string, address: string, action: 'add' | 'remove') {
+        const msg = `Failed to ${action} participant to chat`;
+        if (!this.helper || !this.server) {
+            Server().log(`${msg}. BlueBubblesHelper is not running!`, "error");
+            return;
+        }
+
+        if (!chatGuid || !address || !action) {
+            Server().log(`${msg}. Invalid params!`, "error");
+            return;
+        }
+
+        await this.writeData(`${action}-participant`, `${chatGuid},${address}`);
+    }
+
+    async setDisplayName(chatGuid: string, newName: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to send reaction, BlueBubblesHelper is not running!", "error");
             return;
         }
+
         if (!chatGuid || !newName) {
             Server().log("Failed to send reaction. Invalid params!", "error");
             return;
         }
-        const data = {
-            event: "set-display-name",
-            data: `${chatGuid},${newName}`
-        };
-        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
-            Server().log("Failed to set display name, an error occured writing to the socket", "error");
-        }
+
+        await this.writeData('set-display-name', `${chatGuid},${newName}`);
     }
 
-    getTypingStatus(chatGuid: string) {
+    async getTypingStatus(chatGuid: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to retreive typing status, BlueBubblesHelper is not running!", "error");
             return;
@@ -187,13 +200,7 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        const data = {
-            event: "check-typing-status",
-            data: chatGuid
-        };
-        if (!this.helper.write(`${JSON.stringify(data)}\n`)) {
-            Server().log("Failed to retreive typing status, an error occured writing to the socket", "error");
-        }
+        await this.writeData('check-typing-status', chatGuid);
     }
 
     setupListeners() {
@@ -227,5 +234,26 @@ export class BlueBubblesHelperService {
                 Server().log(`Stopped typing! ${data.guid}`);
             }
         });
+    }
+
+    private async writeData(action: string, data: string): Promise<void> {
+        const msg = 'Failed to send request to Private API!';
+
+        try {
+            await new Promise((resolve, reject) => {
+                const d = { event: action, data };
+                const res = this.helper.write(`${JSON.stringify(d)}\n`, (err: Error) => {
+                    reject(err);
+                });
+
+                if (!res) {
+                    reject(new Error('Unable to write to TCP Socket.'));
+                } else {
+                    resolve(res);
+                }
+            });
+        } catch (ex: any) {
+            Server().log(`${msg} ${ex?.message ?? ex}`);
+        }
     }
 }

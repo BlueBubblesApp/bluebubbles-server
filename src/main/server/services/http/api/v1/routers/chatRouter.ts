@@ -2,7 +2,14 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { Server } from "@server/index";
-import { createBadRequestResponse, createNotFoundResponse, createSuccessResponse } from "@server/helpers/responses";
+import { checkPrivateApiStatus } from "@server/helpers/utils";
+import { ErrorTypes } from "@server/types";
+import {
+    createBadRequestResponse,
+    createNotFoundResponse,
+    createServerErrorResponse,
+    createSuccessResponse
+} from "@server/helpers/responses";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
@@ -162,5 +169,86 @@ export class ChatRouter {
         };
 
         ctx.body = createSuccessResponse(results, null, metadata);
+    }
+
+    static async update(ctx: RouterContext, _: Next): Promise<void> {
+        const { body } = ctx.request;
+        const { guid } = ctx.params;
+        const displayName = body?.displayName;
+
+        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!enablePrivateApi) {
+            ctx.status = 404;
+            ctx.body = createServerErrorResponse("Private API is not enabled!", ErrorTypes.IMESSAGE_ERROR);
+            return;
+        }
+
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
+        if (!chats || chats.length === 0) {
+            ctx.status = 404;
+            ctx.body = createNotFoundResponse("Chat does not exist!");
+            return;
+        }
+
+        let chat = chats[0];
+
+        const updated = [];
+        const errors: string[] = [];
+        if (displayName && displayName.length !== 0) {
+            try {
+                chat = await ChatInterface.setDisplayName(chat, displayName);
+                updated.push('displayName');
+            } catch (ex: any) {
+                errors.push(ex?.message ?? ex);
+            }
+        }
+
+        if (errors && errors.length > 0) {
+            ctx.body = createServerErrorResponse(
+                errors.join(', '), ErrorTypes.IMESSAGE_ERROR, `Chat update executed with errors!`);
+        } else if (updated.length === 0) {
+            ctx.body = createSuccessResponse(
+                await getChatResponse(chat), "Chat not updated! No update information provided!");
+        } else {
+            ctx.body = createSuccessResponse(
+                await getChatResponse(chat), `Successfully updated the following fields: ${updated.join(', ')}`);
+        }
+    }
+
+    static async addParticipant(ctx: RouterContext, next: Next): Promise<void> {
+        await this.toggleParticipant(ctx, next, 'add');
+    }
+
+    static async removeParticipant(ctx: RouterContext, next: Next): Promise<void> {
+        await this.toggleParticipant(ctx, next, 'remove');
+    }
+
+    static async toggleParticipant(ctx: RouterContext, _: Next, action: 'add' | 'remove'): Promise<void> {
+        const { body } = ctx.request;
+        const { guid } = ctx.params;
+        const address = body?.address;
+
+        // Make sure we have a connection
+        checkPrivateApiStatus();
+
+        if (!address || address.length === 0) {
+            ctx.status = 404;
+            ctx.body = createNotFoundResponse("Participant address not provided!");
+            return;
+        }
+
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: false });
+        if (!chats || chats.length === 0) {
+            ctx.status = 404;
+            ctx.body = createNotFoundResponse("Chat does not exist!");
+            return;
+        }
+
+        // Add the participant to the chat
+        let chat = chats[0];
+        chat = await ChatInterface.toggleParticipant(chat, address, action)
+
+        ctx.body = createSuccessResponse(
+            await getChatResponse(chat), `Successfully added participant!`);
     }
 }
