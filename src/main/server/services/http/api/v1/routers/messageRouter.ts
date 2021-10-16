@@ -206,7 +206,7 @@ export class MessageRouter {
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Message sent!");
         } catch (ex: any) {
-            ctx.status = 400;
+            ctx.status = 500;
             if (ex instanceof Message) {
                 ctx.body = createServerErrorResponse(
                     "Message Send Error",
@@ -273,7 +273,7 @@ export class MessageRouter {
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Attachment sent!");
         } catch (ex: any) {
-            ctx.status = 400;
+            ctx.status = 500;
             if (ex instanceof Message) {
                 ctx.body = createServerErrorResponse(
                     "Attachment Send Error",
