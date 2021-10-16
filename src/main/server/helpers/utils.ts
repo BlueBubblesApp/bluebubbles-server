@@ -11,7 +11,10 @@ import { Message } from "@server/databases/imessage/entity/Message";
 
 export const isMinMonteray = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
-export const isMinSierra = macosVersion.isGreaterThanOrEqualTo("10.12.6");
+export const isMinCatalina = macosVersion.isGreaterThanOrEqualTo("10.15");
+export const isMinMojave = macosVersion.isGreaterThanOrEqualTo("10.14");
+export const isMinHighSierra = macosVersion.isGreaterThanOrEqualTo("10.13");
+export const isMinSierra = macosVersion.isGreaterThanOrEqualTo("10.12");
 
 export const generateUuid = () => {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {

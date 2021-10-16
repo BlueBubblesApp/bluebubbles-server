@@ -8,7 +8,7 @@ import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { isMinBigSur, isMinSierra } from "@server/helpers/utils";
+import { isMinBigSur, isMinCatalina, isMinSierra } from "@server/helpers/utils";
 
 @Entity("message")
 export class Message {
@@ -402,6 +402,38 @@ export class Message {
     messageSummaryInfo: Blob;
 
     @conditional(
+        isMinCatalina,
+        Column({
+            name: "reply_to_guid",
+            type: "text",
+            nullable: true
+        })
+    )
+    replyToGuid: string;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "is_corrupt",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    isCorrupt: boolean;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "is_spam",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    isSpam: boolean;
+
+    @conditional(
         isMinBigSur,
         Column({
             name: "thread_originator_guid",
@@ -473,6 +505,9 @@ export const getMessageResponse = async (tableData: Message): Promise<MessageRes
         timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
             ? tableData.timeExpressiveSendStyleId.getTime()
             : null,
+        replyToGuid: tableData.replyToGuid,
+        isCorrupt: tableData.isCorrupt,
+        isSpam: tableData.isSpam,
         threadOriginatorGuid: tableData.threadOriginatorGuid,
         threadOriginatorPart: tableData.threadOriginatorPart
     };

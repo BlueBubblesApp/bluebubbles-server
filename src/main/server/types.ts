@@ -82,6 +82,9 @@ export type MessageResponse = {
     associatedMessageType: string | null;
     expressiveSendStyleId: string | null;
     timeExpressiveSendStyleId: number | null;
+    replyToGuid?: string | null;
+    isCorrupt?: boolean;
+    isSpam?: boolean;
     threadOriginatorGuid?: string | null;
     threadOriginatorPart?: string | null;
 };
