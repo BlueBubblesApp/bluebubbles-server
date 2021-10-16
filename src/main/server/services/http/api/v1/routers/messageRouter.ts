@@ -161,10 +161,11 @@ export class MessageRouter {
         let method = body?.method ?? "apple-script";
         const effectId = body?.effectId;
         const subject = body?.subject;
+        const selectedMessageGuid = body?.selectedMessageGuid;
 
         // If we have an effectId or subject, let's imply we want to use
         // the Private API
-        if (effectId || subject) {
+        if (effectId || subject || selectedMessageGuid) {
             method = "private-api";
         }
 
@@ -199,7 +200,8 @@ export class MessageRouter {
                 message,
                 method,
                 subject,
-                effectId
+                effectId,
+                selectedMessageGuid
             );
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Message sent!");
@@ -346,56 +348,6 @@ export class MessageRouter {
                 );
             } else {
                 Server().log(`Reaction Send Error: ${ex?.message || ex.toString()}`);
-                ctx.body = createServerErrorResponse(ex?.message || ex.toString());
-            }
-        }
-    }
-
-    static async reply(ctx: RouterContext, _: Next) {
-        const { body } = ctx.request;
-
-        // Pull out the required fields
-        const chatGuid = body?.chatGuid;
-        const selectedMessageGuid = body?.selectedMessageGuid;
-        const message = body?.message;
-
-        // Make sure we have a chat GUID
-        if (!chatGuid || chatGuid.length === 0) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Chat GUID not provided!");
-            return;
-        }
-
-        // Make sure we have a selected message text
-        if (!message || message.length === 0) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Message Text not provided!");
-            return;
-        }
-
-        // Make sure we have a selected message GUID
-        if (!selectedMessageGuid || selectedMessageGuid.length === 0) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Selected Message GUID not provided!");
-            return;
-        }
-
-        // Send the reply
-        try {
-            const sentMessage = await MessageInterface.sendReply(chatGuid, selectedMessageGuid, message);
-            const res = await getMessageResponse(sentMessage);
-            ctx.body = createSuccessResponse(res, "Reply sent!");
-        } catch (ex: any) {
-            ctx.status = 400;
-            if (ex instanceof Message) {
-                ctx.body = createServerErrorResponse(
-                    "Reply Send Error",
-                    ErrorTypes.IMESSAGE_ERROR,
-                    "Failed to send reply! See attached message error code.",
-                    await getMessageResponse(ex)
-                );
-            } else {
-                Server().log(`Reply Send Error: ${ex?.message || ex.toString()}`);
                 ctx.body = createServerErrorResponse(ex?.message || ex.toString());
             }
         }

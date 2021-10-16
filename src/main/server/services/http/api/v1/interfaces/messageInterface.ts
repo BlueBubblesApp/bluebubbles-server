@@ -37,7 +37,8 @@ export class MessageInterface {
         message: string,
         method: "apple-script" | "private-api",
         subject?: string,
-        effectId?: string
+        effectId?: string,
+        selectedMessageGuid?: string
     ): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -78,7 +79,13 @@ export class MessageInterface {
                 }
             } else if (method === "private-api") {
                 checkPrivateApiStatus();
-                await Server().privateApiHelper.sendMessage(chatGuid, message, subject ?? null, effectId ?? null);
+                await Server().privateApiHelper.sendMessage(
+                    chatGuid,
+                    message,
+                    subject ?? null,
+                    effectId ?? null,
+                    selectedMessageGuid ?? null
+                );
             } else {
                 throw new Error(`Invalid send method: ${method}`);
             }
@@ -117,23 +124,6 @@ export class MessageInterface {
 
         // Send the reaction
         await Server().privateApiHelper.sendReaction(chatGuid, selectedMessageGuid, reaction);
-
-        // Return the awaiter
-        return awaiter.promise;
-    }
-
-    static async sendReply(chatGuid: string, selectedMessageGuid: string, message: string): Promise<Message> {
-        checkPrivateApiStatus();
-
-        // We need offsets here due to iMessage's save times being a bit off for some reason
-        const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise(chatGuid, message, false, now);
-
-        // Add the promise to the manager
-        Server().messageManager.add(awaiter);
-
-        // Send the reply
-        await Server().privateApiHelper.sendReply(chatGuid, selectedMessageGuid, message);
 
         // Return the awaiter
         return awaiter.promise;

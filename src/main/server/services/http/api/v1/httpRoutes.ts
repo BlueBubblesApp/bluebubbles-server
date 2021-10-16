@@ -67,7 +67,6 @@ export class HttpRoutes {
         router.post(`${this.ver}/message/text`, ...this.protected, MessageRouter.sendText);
         router.post(`${this.ver}/message/attachment`, ...this.protected, MessageRouter.sendAttachment);
         router.post(`${this.ver}/message/react`, ...this.protected, MessageRouter.react);
-        router.post(`${this.ver}/message/reply`, ...this.protected, MessageRouter.reply);
         router.get(`${this.ver}/message/count`, ...this.protected, MessageRouter.count);
         router.get(`${this.ver}/message/count/me`, ...this.protected, MessageRouter.sentCount);
         router.post(`${this.ver}/message/query`, ...this.protected, MessageRouter.query);

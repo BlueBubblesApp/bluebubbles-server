@@ -139,20 +139,18 @@ export class BlueBubblesHelperService {
         await this.writeData("create-chat", { addresses });
     }
 
-    async sendMessage(chatGuid: string, message: string, subject: string = null, effectId: string = null) {
+    async sendMessage(
+        chatGuid: string,
+        message: string,
+        subject: string = null,
+        effectId: string = null,
+        selectedMessageGuid: string = null
+    ) {
         if (!chatGuid || !message) {
             throw new Error("Failed to send message. Invalid params!");
         }
 
-        await this.writeData("send-message", { chatGuid, subject, message, effectId });
-    }
-
-    async sendReply(chatGuid: string, selectedMessageGuid: string, message: string) {
-        if (!chatGuid || !selectedMessageGuid || !message) {
-            throw new Error("Failed to send message. Invalid params!");
-        }
-
-        await this.writeData("send-reply", { chatGuid, selectedMessageGuid, message });
+        await this.writeData("send-message", { chatGuid, subject, message, effectId, selectedMessageGuid });
     }
 
     async addParticipant(chatGuid: string, address: string) {
