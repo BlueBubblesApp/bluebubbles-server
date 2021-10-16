@@ -197,7 +197,7 @@ export class ChatRouter {
         if (displayName && displayName.length !== 0) {
             try {
                 chat = await ChatInterface.setDisplayName(chat, displayName);
-                updated.push('displayName');
+                updated.push("displayName");
             } catch (ex: any) {
                 errors.push(ex?.message ?? ex);
             }
@@ -205,25 +205,48 @@ export class ChatRouter {
 
         if (errors && errors.length > 0) {
             ctx.body = createServerErrorResponse(
-                errors.join(', '), ErrorTypes.IMESSAGE_ERROR, `Chat update executed with errors!`);
+                errors.join(", "),
+                ErrorTypes.IMESSAGE_ERROR,
+                `Chat update executed with errors!`
+            );
         } else if (updated.length === 0) {
             ctx.body = createSuccessResponse(
-                await getChatResponse(chat), "Chat not updated! No update information provided!");
+                await getChatResponse(chat),
+                "Chat not updated! No update information provided!"
+            );
         } else {
             ctx.body = createSuccessResponse(
-                await getChatResponse(chat), `Successfully updated the following fields: ${updated.join(', ')}`);
+                await getChatResponse(chat),
+                `Successfully updated the following fields: ${updated.join(", ")}`
+            );
         }
     }
 
+    static async create(ctx: RouterContext, _: Next): Promise<void> {
+        const { body } = ctx.request;
+        const addresses = body?.addresses;
+
+        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        if (!enablePrivateApi) {
+            ctx.status = 404;
+            ctx.body = createServerErrorResponse("Private API is not enabled!", ErrorTypes.IMESSAGE_ERROR);
+            return;
+        }
+
+        await ChatInterface.create(addresses);
+
+        ctx.body = createSuccessResponse(null, `Successfully executed create chat command!`);
+    }
+
     static async addParticipant(ctx: RouterContext, next: Next): Promise<void> {
-        await this.toggleParticipant(ctx, next, 'add');
+        await ChatRouter.toggleParticipant(ctx, next, "add");
     }
 
     static async removeParticipant(ctx: RouterContext, next: Next): Promise<void> {
-        await this.toggleParticipant(ctx, next, 'remove');
+        await ChatRouter.toggleParticipant(ctx, next, "remove");
     }
 
-    static async toggleParticipant(ctx: RouterContext, _: Next, action: 'add' | 'remove'): Promise<void> {
+    static async toggleParticipant(ctx: RouterContext, _: Next, action: "add" | "remove"): Promise<void> {
         const { body } = ctx.request;
         const { guid } = ctx.params;
         const address = body?.address;
@@ -246,9 +269,8 @@ export class ChatRouter {
 
         // Add the participant to the chat
         let chat = chats[0];
-        chat = await ChatInterface.toggleParticipant(chat, address, action)
+        chat = await ChatInterface.toggleParticipant(chat, address, action);
 
-        ctx.body = createSuccessResponse(
-            await getChatResponse(chat), `Successfully added participant!`);
+        ctx.body = createSuccessResponse(await getChatResponse(chat), `Successfully added participant!`);
     }
 }

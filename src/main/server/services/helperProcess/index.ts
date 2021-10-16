@@ -94,7 +94,7 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        await this.writeData('start-typing', chatGuid);
+        await this.writeData("start-typing", { chatGuid });
     }
 
     async stopTyping(chatGuid: string) {
@@ -107,7 +107,7 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        await this.writeData('stop-typing', chatGuid);
+        await this.writeData("stop-typing", { chatGuid });
     }
 
     async markChatRead(chatGuid: string) {
@@ -120,29 +120,31 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        await this.writeData('mark-chat-read', chatGuid);
+        await this.writeData("mark-chat-read", { chatGuid });
     }
 
-    async sendReaction(chatGuid: string, actionMessageGuid: string, reactionType: ValidTapback | ValidRemoveTapback) {
-        if (!chatGuid || !actionMessageGuid || !reactionType) {
+    async sendReaction(chatGuid: string, selectedMessageGuid: string, reactionType: ValidTapback | ValidRemoveTapback) {
+        if (!chatGuid || !selectedMessageGuid || !reactionType) {
             throw new Error("Failed to send reaction. Invalid params!");
         }
 
-        await this.writeData('send-reaction', `${chatGuid},${actionMessageGuid},${reactionType as string}`);
+        await this.writeData("send-reaction", { chatGuid, selectedMessageGuid, reactionType });
     }
 
-    async sendMessage(chatGuid: string, message: string, subject: string = null, effectId: number = null) {
+    async createChat(addresses: string[]) {
+        if (!addresses || addresses.length === 0) {
+            throw new Error("Failed to send reaction. Invalid params!");
+        }
+
+        await this.writeData("create-chat", { addresses });
+    }
+
+    async sendMessage(chatGuid: string, message: string, subject: string = null, effectId: string = null) {
         if (!chatGuid || !message) {
             throw new Error("Failed to send message. Invalid params!");
         }
 
-        if (subject !== null) {
-            await this.writeData('send-subject', `${chatGuid},${message},${subject}`);
-        } else if (effectId !== null) {
-            await this.writeData('send-effect', `${chatGuid},${message},${String(effectId)}`);
-        } else {
-            await this.writeData('send-message', `${chatGuid},${message}`);
-        }
+        await this.writeData("send-message", { chatGuid, subject, message, effectId });
     }
 
     async sendReply(chatGuid: string, selectedMessageGuid: string, message: string) {
@@ -150,18 +152,18 @@ export class BlueBubblesHelperService {
             throw new Error("Failed to send message. Invalid params!");
         }
 
-        await this.writeData('send-reply', `${chatGuid},${selectedMessageGuid},${message}`);
+        await this.writeData("send-reply", { chatGuid, selectedMessageGuid, message });
     }
 
     async addParticipant(chatGuid: string, address: string) {
-        return this.toggleParticipant(chatGuid, address, 'add');
+        return this.toggleParticipant(chatGuid, address, "add");
     }
 
     async removeParticipant(chatGuid: string, address: string) {
-        return this.toggleParticipant(chatGuid, address, 'remove');
+        return this.toggleParticipant(chatGuid, address, "remove");
     }
 
-    async toggleParticipant(chatGuid: string, address: string, action: 'add' | 'remove') {
+    async toggleParticipant(chatGuid: string, address: string, action: "add" | "remove") {
         const msg = `Failed to ${action} participant to chat`;
         if (!this.helper || !this.server) {
             Server().log(`${msg}. BlueBubblesHelper is not running!`, "error");
@@ -173,7 +175,7 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        await this.writeData(`${action}-participant`, `${chatGuid},${address}`);
+        await this.writeData(`${action}-participant`, { chatGuid, address });
     }
 
     async setDisplayName(chatGuid: string, newName: string) {
@@ -187,7 +189,7 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        await this.writeData('set-display-name', `${chatGuid},${newName}`);
+        await this.writeData("set-display-name", { chatGuid, newName });
     }
 
     async getTypingStatus(chatGuid: string) {
@@ -200,7 +202,7 @@ export class BlueBubblesHelperService {
             return;
         }
 
-        await this.writeData('check-typing-status', chatGuid);
+        await this.writeData("check-typing-status", { chatGuid });
     }
 
     setupListeners() {
@@ -236,18 +238,18 @@ export class BlueBubblesHelperService {
         });
     }
 
-    private async writeData(action: string, data: string): Promise<void> {
-        const msg = 'Failed to send request to Private API!';
+    private async writeData(action: string, data: NodeJS.Dict<any>): Promise<void> {
+        const msg = "Failed to send request to Private API!";
 
         try {
             await new Promise((resolve, reject) => {
-                const d = { event: action, data };
+                const d = { action, data };
                 const res = this.helper.write(`${JSON.stringify(d)}\n`, (err: Error) => {
                     reject(err);
                 });
 
                 if (!res) {
-                    reject(new Error('Unable to write to TCP Socket.'));
+                    reject(new Error("Unable to write to TCP Socket."));
                 } else {
                     resolve(res);
                 }

@@ -3839,6 +3839,11 @@ concat-stream@^1.5.0, concat-stream@^1.6.2:
     readable-stream "^2.2.2"
     typedarray "^0.0.6"
 
+conditional-decorator@^0.1.7:
+  version "0.1.7"
+  resolved "https://registry.yarnpkg.com/conditional-decorator/-/conditional-decorator-0.1.7.tgz#c9c0a71435f099072b1f2c6eddaf94ff4cbcf062"
+  integrity sha1-ycCnFDXwmQcrHyxu3a+U/0y88GI=
+
 config-chain@^1.1.11:
   version "1.1.12"
   resolved "https://registry.npmjs.org/config-chain/-/config-chain-1.1.12.tgz"

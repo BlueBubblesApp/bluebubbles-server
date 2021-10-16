@@ -1,5 +1,6 @@
 /* eslint-disable no-bitwise */
-import { nativeImage, NativeImage } from "electron";
+import { NativeImage } from "electron";
+import * as macosVersion from "macos-version";
 import { encode as blurhashEncode } from "blurhash";
 import { Server } from "@server/index";
 import { PhoneNumberUtil } from "google-libphonenumber";
@@ -7,6 +8,10 @@ import { FileSystem } from "@server/fileSystem";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
+
+export const isMinMonteray = macosVersion.isGreaterThanOrEqualTo("12.0");
+export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
+export const isMinSierra = macosVersion.isGreaterThanOrEqualTo("10.12.6");
 
 export const generateUuid = () => {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -191,7 +196,7 @@ export const slugifyAddress = (val: string) => {
     let slugRegex = /[^\d]+/g; // Strip all non-digits
     if (val.includes("@"))
         // If it's an email, change the regex
-        slugRegex = /[^\w@.]+/g; // Strip non-alphanumeric except @ and .
+        slugRegex = /[^\w@.-_]+/g; // Strip non-alphanumeric except @, ., _, and -
 
     return val
         .toLowerCase()
@@ -290,13 +295,13 @@ export const waitMs = async (ms: number) => {
 export const checkPrivateApiStatus = () => {
     const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
     if (!enablePrivateApi) {
-        throw new Error('iMessage Private API is not enabled!');
+        throw new Error("iMessage Private API is not enabled!");
     }
 
     if (!Server().privateApiHelper.server || !Server().privateApiHelper?.helper) {
-        throw new Error('iMessage Private API Helper is not connected!');
+        throw new Error("iMessage Private API Helper is not connected!");
     }
-}
+};
 
 export const tapbackUIMap = {
     love: 1,

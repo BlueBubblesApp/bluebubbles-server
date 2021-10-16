@@ -158,9 +158,15 @@ export class MessageRouter {
         const tempGuid = body?.tempGuid;
         const chatGuid = body?.guid;
         const message = body?.message;
-        const method = body?.method ?? 'apple-script';
+        let method = body?.method ?? "apple-script";
         const effectId = body?.effectId;
         const subject = body?.subject;
+
+        // If we have an effectId or subject, let's imply we want to use
+        // the Private API
+        if (effectId || subject) {
+            method = "private-api";
+        }
 
         // Make sure a chat GUID is provided
         if (!chatGuid) {
@@ -189,7 +195,12 @@ export class MessageRouter {
         try {
             // Send the message
             const sentMessage: Message = await MessageInterface.sendMessageSync(
-                chatGuid, message, method, subject, effectId);
+                chatGuid,
+                message,
+                method,
+                subject,
+                effectId
+            );
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Message sent!");
         } catch (ex: any) {
@@ -282,7 +293,7 @@ export class MessageRouter {
         const chatGuid = body?.chatGuid;
         const selectedMessageText = body?.selectedMessageText;
         const selectedMessageGuid = body?.selectedMessageGuid;
-        const reaction = (body?.reaction ?? '').toLowerCase();
+        const reaction = (body?.reaction ?? "").toLowerCase();
 
         // Make sure we have a chat GUID
         if (!chatGuid || chatGuid.length === 0) {
@@ -309,15 +320,19 @@ export class MessageRouter {
         if (!reaction || !MessageInterface.possibleReactions.includes(reaction)) {
             ctx.status = 400;
             ctx.body = createBadRequestResponse(
-                `Reaction was invalid or not provided! Must be one of: ${
-                    MessageInterface.possibleReactions.join(', ')}`);
+                `Reaction was invalid or not provided! Must be one of: ${MessageInterface.possibleReactions.join(", ")}`
+            );
             return;
         }
 
         // Send the reaction
         try {
             const sentMessage = await MessageInterface.sendReaction(
-                chatGuid, selectedMessageGuid, selectedMessageText, reaction);
+                chatGuid,
+                selectedMessageGuid,
+                selectedMessageText,
+                reaction
+            );
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Reaction sent!");
         } catch (ex: any) {
@@ -342,7 +357,7 @@ export class MessageRouter {
         // Pull out the required fields
         const chatGuid = body?.chatGuid;
         const selectedMessageGuid = body?.selectedMessageGuid;
-        const message = body?.mnessage
+        const message = body?.message;
 
         // Make sure we have a chat GUID
         if (!chatGuid || chatGuid.length === 0) {

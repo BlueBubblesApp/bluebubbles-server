@@ -1,6 +1,6 @@
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
-import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
+import { checkPrivateApiStatus, slugifyAddress, waitMs } from "@server/helpers/utils";
 import { Server } from "@server/index";
 import { ChatResponse, HandleResponse } from "@server/types";
 
@@ -94,7 +94,7 @@ export class ChatInterface {
 
         // Make sure we are executing this on a group chat
         if (chat.participants.length === 1) {
-            throw new Error('Chat is not a group chat!');
+            throw new Error("Chat is not a group chat!");
         }
 
         await Server().privateApiHelper.setDisplayName(theChat.guid, displayName);
@@ -120,13 +120,26 @@ export class ChatInterface {
 
         // Check if the name changed
         if (newName === prevName) {
-            throw new Error('Failed to set new display name! Operation took longer than 5 seconds!');
+            throw new Error("Failed to set new display name! Operation took longer than 5 seconds!");
         }
 
         return theChat;
     }
 
-    static async toggleParticipant(chat: Chat, address: string, action: 'add' | 'remove'): Promise<Chat> {
+    static async create(addresses: string[]): Promise<void> {
+        checkPrivateApiStatus();
+
+        // Make sure we are executing this on a group chat
+        if (addresses.length === 0) {
+            throw new Error("No addresses provided!");
+        }
+
+        // Sanitize the addresses
+        const theAddrs = addresses.map(e => slugifyAddress(e));
+        await Server().privateApiHelper.createChat(theAddrs);
+    }
+
+    static async toggleParticipant(chat: Chat, address: string, action: "add" | "remove"): Promise<Chat> {
         let theChat = chat;
         const prevCount = chat.participants.length;
         let newCount = chat.participants.length;
@@ -135,7 +148,7 @@ export class ChatInterface {
 
         // Make sure we are executing this on a group chat
         if (chat.participants.length === 1) {
-            throw new Error('Chat is not a group chat!');
+            throw new Error("Chat is not a group chat!");
         }
 
         await Server().privateApiHelper.toggleParticipant(theChat.guid, address, action);
@@ -161,7 +174,7 @@ export class ChatInterface {
 
         // Check if the name changed
         if (newCount === prevCount) {
-            throw new Error('Failed to set new display name! Operation took longer than 5 seconds!');
+            throw new Error("Failed to set new display name! Operation took longer than 5 seconds!");
         }
 
         return theChat;

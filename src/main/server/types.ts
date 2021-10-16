@@ -82,6 +82,8 @@ export type MessageResponse = {
     associatedMessageType: string | null;
     expressiveSendStyleId: string | null;
     timeExpressiveSendStyleId: number | null;
+    threadOriginatorGuid?: string | null;
+    threadOriginatorPart?: string | null;
 };
 
 export type HandleResponse = {

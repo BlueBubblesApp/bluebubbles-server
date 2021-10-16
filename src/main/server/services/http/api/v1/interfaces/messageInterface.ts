@@ -32,12 +32,12 @@ export class MessageInterface {
      *
      * @returns The command line response
      */
-     static async sendMessageSync(
+    static async sendMessageSync(
         chatGuid: string,
         message: string,
-        method: 'apple-script' | 'private-api',
+        method: "apple-script" | "private-api",
         subject?: string,
-        effectId?: number
+        effectId?: string
     ): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -55,7 +55,7 @@ export class MessageInterface {
             Server().messageManager.add(awaiter);
 
             // Try to send the iMessage
-            if (method === 'apple-script') {
+            if (method === "apple-script") {
                 try {
                     await FileSystem.executeAppleScript(sendMessage(chatGuid, message ?? "", null));
                 } catch (ex: any) {
@@ -76,7 +76,7 @@ export class MessageInterface {
                         await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, message ?? "", null));
                     }
                 }
-            } else if (method === 'private-api') {
+            } else if (method === "private-api") {
                 checkPrivateApiStatus();
                 await Server().privateApiHelper.sendMessage(chatGuid, message, subject ?? null, effectId ?? null);
             } else {
@@ -87,7 +87,7 @@ export class MessageInterface {
         } catch (ex: any) {
             let msg = ex?.message ?? ex;
             if (msg instanceof String) {
-                if (msg.includes('execution error: ')) {
+                if (msg.includes("execution error: ")) {
                     [, msg] = msg.split("execution error: ");
                     [msg] = msg.split(". (");
                     Server().log(msg, "warn");
@@ -95,7 +95,7 @@ export class MessageInterface {
                     Server().log(msg, "error");
                 }
             }
-            
+
             throw new Error(msg);
         }
     }
@@ -122,11 +122,7 @@ export class MessageInterface {
         return awaiter.promise;
     }
 
-    static async sendReply(
-        chatGuid: string,
-        selectedMessageGuid: string,
-        message: string
-    ): Promise<Message> {
+    static async sendReply(chatGuid: string, selectedMessageGuid: string, message: string): Promise<Message> {
         checkPrivateApiStatus();
 
         // We need offsets here due to iMessage's save times being a bit off for some reason

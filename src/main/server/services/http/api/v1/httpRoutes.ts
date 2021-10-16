@@ -54,6 +54,7 @@ export class HttpRoutes {
         router.get(`${this.ver}/attachment/:guid/blurhash`, ...this.protected, AttachmentRouter.blurhash);
 
         // Chat Routes
+        router.post(`${this.ver}/chat/new`, ...this.protected, ChatRouter.create);
         router.get(`${this.ver}/chat/count`, ...this.protected, ChatRouter.count);
         router.post(`${this.ver}/chat/query`, ...this.protected, ChatRouter.query);
         router.get(`${this.ver}/chat/:guid/message`, ...this.protected, ChatRouter.getMessages);
