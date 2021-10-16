@@ -126,7 +126,7 @@ export class ChatInterface {
         return theChat;
     }
 
-    static async create(addresses: string[]): Promise<void> {
+    static async create(addresses: string[], message: string): Promise<void> {
         checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
@@ -136,7 +136,7 @@ export class ChatInterface {
 
         // Sanitize the addresses
         const theAddrs = addresses.map(e => slugifyAddress(e));
-        await Server().privateApiHelper.createChat(theAddrs);
+        await Server().privateApiHelper.createChat(theAddrs, message);
     }
 
     static async toggleParticipant(chat: Chat, address: string, action: "add" | "remove"): Promise<Chat> {

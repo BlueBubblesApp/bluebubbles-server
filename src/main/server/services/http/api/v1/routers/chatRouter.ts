@@ -225,6 +225,7 @@ export class ChatRouter {
     static async create(ctx: RouterContext, _: Next): Promise<void> {
         const { body } = ctx.request;
         const addresses = body?.addresses;
+        const message = body?.message;
 
         const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
         if (!enablePrivateApi) {
@@ -233,7 +234,7 @@ export class ChatRouter {
             return;
         }
 
-        await ChatInterface.create(addresses);
+        await ChatInterface.create(addresses, message);
 
         ctx.body = createSuccessResponse(null, `Successfully executed create chat command!`);
     }

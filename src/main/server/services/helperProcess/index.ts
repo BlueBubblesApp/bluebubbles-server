@@ -131,12 +131,12 @@ export class BlueBubblesHelperService {
         await this.writeData("send-reaction", { chatGuid, selectedMessageGuid, reactionType });
     }
 
-    async createChat(addresses: string[]) {
+    async createChat(addresses: string[], message: string | null) {
         if (!addresses || addresses.length === 0) {
             throw new Error("Failed to send reaction. Invalid params!");
         }
 
-        await this.writeData("create-chat", { addresses });
+        await this.writeData("create-chat", { addresses, message });
     }
 
     async sendMessage(
