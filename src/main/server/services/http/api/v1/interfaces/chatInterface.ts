@@ -114,7 +114,7 @@ export class ChatInterface {
             theChat = chats[0] ?? theChat;
 
             // Save the new name
-            newName = chat.displayName;
+            newName = theChat.displayName;
             if (newName !== prevName) break;
         }
 
@@ -168,7 +168,7 @@ export class ChatInterface {
             theChat = chats[0] ?? theChat;
 
             // Save the new name
-            newCount = chat.participants.length;
+            newCount = theChat.participants.length;
             if (newCount !== prevCount) break;
         }
 
