@@ -252,16 +252,13 @@ export class ChatRouter {
         const { guid } = ctx.params;
         const address = body?.address;
 
-        // Make sure we have a connection
-        checkPrivateApiStatus();
-
         if (!address || address.length === 0) {
             ctx.status = 404;
             ctx.body = createNotFoundResponse("Participant address not provided!");
             return;
         }
 
-        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: false });
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
         if (!chats || chats.length === 0) {
             ctx.status = 404;
             ctx.body = createNotFoundResponse("Chat does not exist!");
