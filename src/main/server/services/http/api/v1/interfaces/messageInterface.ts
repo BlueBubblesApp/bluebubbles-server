@@ -7,6 +7,7 @@ import { checkPrivateApiStatus } from "@server/helpers/utils";
 import { restartMessages, sendMessage, sendMessageFallback } from "@server/fileSystem/scripts";
 import { negativeReactionTextMap, reactionTextMap } from "@server/helpers/mappings";
 import { invisibleMediaChar } from "@server/services/http/constants";
+import { Queue } from "@server/databases/server/entity";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -146,9 +147,16 @@ export class MessageInterface {
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
         const awaiter = new MessagePromise(chatGuid, messageText, false, now);
-
-        // Add the promise to the manager
         Server().messageManager.add(awaiter);
+
+        // Add the reaction to the match queue
+        // NOTE: This can be removed when we move away from socket-style matching
+        const item = new Queue();
+        item.tempGuid = message.guid;
+        item.chatGuid = chatGuid;
+        item.dateCreated = new Date().getTime();
+        item.text = messageText;
+        await Server().repo.queue().manager.save(item);
 
         // Send the reaction
         await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);

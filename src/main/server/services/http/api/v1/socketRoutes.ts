@@ -35,6 +35,7 @@ import { basename } from "path";
 import { restartMessages } from "@server/fileSystem/scripts";
 import { Socket } from "socket.io";
 import { GeneralInterface } from "./interfaces/generalInterface";
+import { MessageInterface } from "./interfaces/messageInterface";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
@@ -894,34 +895,35 @@ export class SocketRoutes {
                 )
                     return response(cb, "error", createBadRequestResponse("Invalid tapback descriptor provided!"));
 
+                // Fetch the message we are reacting to
+                const message = await Server().iMessageRepo.getMessage(params.actionMessageGuid, false, true);
+                if (!message) {
+                    return response(cb, "error", createBadRequestResponse("Selected message does not exist!"));
+                }
+
                 // If the helper is online, use it to send the tapback
                 if (Server().privateApiHelper?.helper) {
                     try {
-                        await ActionHandler.togglePrivateTapback(
+                        const sentMessage = await MessageInterface.sendReaction(
                             params.chatGuid,
-                            params.actionMessageGuid,
+                            message,
                             params.tapback
                         );
-                        return response(cb, "tapback-sent", createNoDataResponse());
+                        return response(
+                            cb,
+                            "tapback-sent",
+                            createSuccessResponse(sentMessage, "Successfully sent reaction!")
+                        );
                     } catch (ex: any) {
                         return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
                     }
                 }
 
-                // Add the reaction to the match queue
-                const item = new Queue();
-                item.tempGuid = params.messageGuid;
-                item.chatGuid = params.chatGuid;
-                item.dateCreated = new Date().getTime();
-                item.text = params.messageText;
-                await Server().repo.queue().manager.save(item);
-
-                try {
-                    await ActionHandler.toggleTapback(params.chatGuid, params.actionMessageText, params.tapback);
-                    return response(cb, "tapback-sent", createNoDataResponse());
-                } catch (ex: any) {
-                    return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
-                }
+                return response(
+                    cb,
+                    "send-tapback-error",
+                    createServerErrorResponse("iMessage Private API Helper is not connected!")
+                );
             }
         );
 
