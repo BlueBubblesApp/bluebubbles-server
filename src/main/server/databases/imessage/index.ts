@@ -151,11 +151,19 @@ export class MessageRepository {
      * @param guid A specific message identifier to get
      * @param withMessages Whether to include the participants or not
      */
-    async getMessage(guid: string, withChats = true) {
+    async getMessage(guid: string, withChats = true, withAttachments = false) {
         const query = this.db.getRepository(Message).createQueryBuilder("message");
         query.leftJoinAndSelect("message.handle", "handle");
 
         if (withChats) query.leftJoinAndSelect("message.chats", "chat");
+
+        if (withAttachments)
+            query.leftJoinAndSelect(
+                "message.attachments",
+                "attachment",
+                "message.ROWID = message_attachment.message_id AND " +
+                    "attachment.ROWID = message_attachment.attachment_id"
+            );
 
         query.andWhere("message.guid = :guid", { guid });
 

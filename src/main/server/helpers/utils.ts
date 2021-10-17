@@ -8,6 +8,7 @@ import { FileSystem } from "@server/fileSystem";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
+import { invisibleMediaChar } from "@server/services/http/constants";
 
 export const isMinMonteray = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
@@ -181,12 +182,11 @@ export const onlyAlphaNumeric = (input: string) => {
 
 export const sanitizeStr = (val: string) => {
     if (!val) return val;
-    const objChar = String.fromCharCode(65532);
 
     // Recursively replace all "obj" hidden characters
     let output = val;
-    while (output.includes(objChar)) {
-        output = output.replace(objChar, "");
+    while (output.includes(invisibleMediaChar)) {
+        output = output.replace(invisibleMediaChar, "");
     }
 
     return output.trim();

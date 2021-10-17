@@ -6,6 +6,7 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import { checkPrivateApiStatus } from "@server/helpers/utils";
 import { restartMessages, sendMessage, sendMessageFallback } from "@server/fileSystem/scripts";
 import { negativeReactionTextMap, reactionTextMap } from "@server/helpers/mappings";
+import { invisibleMediaChar } from "@server/services/http/constants";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -110,8 +111,7 @@ export class MessageInterface {
 
     static async sendReaction(
         chatGuid: string,
-        selectedMessageGuid: string,
-        selectedMessageText: string,
+        message: Message,
         reaction: ValidTapback | ValidRemoveTapback
     ): Promise<Message> {
         checkPrivateApiStatus();
@@ -121,7 +121,27 @@ export class MessageInterface {
         const prefix = (reaction as string).startsWith("-")
             ? negativeReactionTextMap[reaction as string]
             : reactionTextMap[reaction as string];
-        const messageText = `${prefix} “${selectedMessageText}”`;
+
+        // If the message text is just the invisible char, we know it's probably just an attachment
+        const isOnlyMedia = message.text.length === 1 && message.text === invisibleMediaChar;
+
+        // Default the message to the other message surrounded by greek quotes
+        let msg = `“${message.text}”`;
+
+        // If it's a media-only message and we have at least 1 attachment,
+        // set the message according to the first attachment's MIME type
+        if (isOnlyMedia && (message.attachments ?? []).length > 0) {
+            if (message.attachments[0].mimeType.startsWith("image")) {
+                msg = `an image`;
+            } else if (message.attachments[0].mimeType.startsWith("video")) {
+                msg = `a movie`;
+            } else {
+                msg = `an attachment`;
+            }
+        }
+
+        // Build the final message to match on
+        const messageText = `${prefix} ${msg}`;
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
@@ -131,7 +151,7 @@ export class MessageInterface {
         Server().messageManager.add(awaiter);
 
         // Send the reaction
-        await Server().privateApiHelper.sendReaction(chatGuid, selectedMessageGuid, reaction);
+        await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);
 
         // Return the awaiter
         return awaiter.promise;

@@ -36,9 +36,10 @@ export class MessageRouter {
             .map(e => e.trim());
         const withChats = withQuery.includes("chats") || withQuery.includes("chat");
         const withParticipants = withQuery.includes("chats.participants") || withQuery.includes("chat.participants");
+        const withAttachments = withQuery.includes("attachments") || withQuery.includes("attachment");
 
         // Fetch the info for the message by GUID
-        const message = await Server().iMessageRepo.getMessage(guid, withChats);
+        const message = await Server().iMessageRepo.getMessage(guid, withChats, withAttachments);
         if (!message) {
             ctx.status = 404;
             ctx.body = createNotFoundResponse("Message does not exist!");
@@ -320,7 +321,7 @@ export class MessageRouter {
         }
 
         // Fetch the message we are reacting to
-        const message = await Server().iMessageRepo.getMessage(selectedMessageGuid);
+        const message = await Server().iMessageRepo.getMessage(selectedMessageGuid, false, true);
         if (!message) {
             ctx.status = 400;
             ctx.body = createBadRequestResponse("Selected message does not exist!");
@@ -329,12 +330,7 @@ export class MessageRouter {
 
         // Send the reaction
         try {
-            const sentMessage = await MessageInterface.sendReaction(
-                chatGuid,
-                selectedMessageGuid,
-                message.text,
-                reaction
-            );
+            const sentMessage = await MessageInterface.sendReaction(chatGuid, message, reaction);
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Reaction sent!");
         } catch (ex: any) {
