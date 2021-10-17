@@ -305,12 +305,3 @@ export const checkPrivateApiStatus = () => {
         throw new Error("iMessage Private API Helper is not connected!");
     }
 };
-
-export const tapbackUIMap = {
-    love: 1,
-    like: 2,
-    dislike: 3,
-    laugh: 4,
-    emphasize: 5,
-    question: 6
-};

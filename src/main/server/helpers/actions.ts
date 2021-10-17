@@ -24,10 +24,10 @@ import {
     safeExecuteAppleScript,
     generateChatNameList,
     getiMessageNumberFormat,
-    tapbackUIMap,
     toBoolean,
     slugifyAddress
 } from "./utils";
+import { tapbackUIMap } from "./mappings";
 
 /**
  * This class handles all actions that require an AppleScript execution.

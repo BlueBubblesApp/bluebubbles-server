@@ -156,7 +156,7 @@ export class MessageRouter {
         const { body } = ctx.request;
 
         const tempGuid = body?.tempGuid;
-        const chatGuid = body?.guid;
+        const chatGuid = body?.chatGuid ?? body?.guid;
         const message = body?.message;
         let method = body?.method ?? "apple-script";
         const effectId = body?.effectId;
@@ -225,7 +225,7 @@ export class MessageRouter {
         const { body, files } = ctx.request;
 
         const tempGuid = body?.tempGuid;
-        const chatGuid = body?.guid;
+        const chatGuid = body?.chatGuid ?? body?.guid;
         const name = body?.name;
 
         // Make sure a chat GUID is provided
@@ -292,8 +292,7 @@ export class MessageRouter {
         const { body } = ctx.request;
 
         // Pull out the required fields
-        const chatGuid = body?.chatGuid;
-        const selectedMessageText = body?.selectedMessageText;
+        const chatGuid = body?.chatGuid ?? body?.guid;
         const selectedMessageGuid = body?.selectedMessageGuid;
         const reaction = (body?.reaction ?? "").toLowerCase();
 
@@ -301,13 +300,6 @@ export class MessageRouter {
         if (!chatGuid || chatGuid.length === 0) {
             ctx.status = 400;
             ctx.body = createBadRequestResponse("Chat GUID not provided!");
-            return;
-        }
-
-        // Make sure we have a selected message text
-        if (!selectedMessageText || selectedMessageText.length === 0) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Selected Message Text not provided!");
             return;
         }
 
@@ -327,12 +319,20 @@ export class MessageRouter {
             return;
         }
 
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(selectedMessageGuid);
+        if (!message) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Selected message does not exist!");
+            return;
+        }
+
         // Send the reaction
         try {
             const sentMessage = await MessageInterface.sendReaction(
                 chatGuid,
                 selectedMessageGuid,
-                selectedMessageText,
+                message.text,
                 reaction
             );
             const res = await getMessageResponse(sentMessage);

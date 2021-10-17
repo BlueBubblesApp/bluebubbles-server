@@ -5,6 +5,7 @@ import { ValidRemoveTapback, ValidTapback } from "@server/types";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { checkPrivateApiStatus } from "@server/helpers/utils";
 import { restartMessages, sendMessage, sendMessageFallback } from "@server/fileSystem/scripts";
+import { negativeReactionTextMap, reactionTextMap } from "@server/helpers/mappings";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -115,9 +116,16 @@ export class MessageInterface {
     ): Promise<Message> {
         checkPrivateApiStatus();
 
+        // Rebuild the selected message text to make it what the reaction text
+        // would be in the database
+        const prefix = (reaction as string).startsWith("-")
+            ? negativeReactionTextMap[reaction as string]
+            : reactionTextMap[reaction as string];
+        const messageText = `${prefix} “${selectedMessageText}”`;
+
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise(chatGuid, selectedMessageText, false, now);
+        const awaiter = new MessagePromise(chatGuid, messageText, false, now);
 
         // Add the promise to the manager
         Server().messageManager.add(awaiter);
