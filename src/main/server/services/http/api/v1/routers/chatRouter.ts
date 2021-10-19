@@ -234,9 +234,14 @@ export class ChatRouter {
             return;
         }
 
-        await ChatInterface.create(addresses, message);
+        const chat = await ChatInterface.create(addresses, message);
+        if (!chat) {
+            ctx.status = 404;
+            ctx.body = createServerErrorResponse("Failed to create chat!", ErrorTypes.IMESSAGE_ERROR);
+            return;
+        }
 
-        ctx.body = createSuccessResponse(null, `Successfully executed create chat command!`);
+        ctx.body = createSuccessResponse(await getChatResponse(chat), `Successfully executed create chat command!`);
     }
 
     static async addParticipant(ctx: RouterContext, next: Next): Promise<void> {

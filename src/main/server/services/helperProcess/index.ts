@@ -101,7 +101,7 @@ export class BlueBubblesHelperService {
             this.helper.setDefaultEncoding("utf8");
 
             this.setupListeners();
-            this.helper.on("connection", () => {
+            this.helper.on("connect", () => {
                 Server().log("Private API Helper connected!");
             });
 
@@ -291,7 +291,9 @@ export class BlueBubblesHelperService {
                 return;
             }
 
+            Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
             let data;
+
             try {
                 data = JSON.parse(event);
             } catch (e) {
@@ -332,6 +334,11 @@ export class BlueBubblesHelperService {
         transaction?: TransactionPromise
     ): Promise<TransactionResult> {
         const msg = "Failed to send request to Private API!";
+
+        // If we have a transaction, add it to the manager
+        if (transaction) {
+            this.transactionManager.add(transaction);
+        }
 
         try {
             await new Promise((resolve, reject) => {
