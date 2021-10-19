@@ -126,7 +126,7 @@ export class ChatInterface {
         return theChat;
     }
 
-    static async create(addresses: string[], message: string): Promise<void> {
+    static async create(addresses: string[], message: string): Promise<Chat> {
         checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
@@ -136,7 +136,18 @@ export class ChatInterface {
 
         // Sanitize the addresses
         const theAddrs = addresses.map(e => slugifyAddress(e));
-        await Server().privateApiHelper.createChat(theAddrs, message);
+        const result = await Server().privateApiHelper.createChat(theAddrs, message);
+        if (!result?.identifier) {
+            throw new Error("Failed to create chat!");
+        }
+
+        // Fetch the chat based on the return data
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: result.identifier, withParticipants: true });
+        if (!chats || chats.length === 0) {
+            throw new Error(`Failed to find Chat with GUID: ${result.identifier}`);
+        }
+
+        return chats[0];
     }
 
     static async toggleParticipant(chat: Chat, address: string, action: "add" | "remove"): Promise<Chat> {

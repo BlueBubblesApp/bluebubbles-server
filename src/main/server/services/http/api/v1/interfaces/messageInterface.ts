@@ -51,15 +51,16 @@ export class MessageInterface {
             // Make sure messages is open
             await FileSystem.startMessages();
 
-            // We need offsets here due to iMessage's save times being a bit off for some reason
-            const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-            const awaiter = new MessagePromise(chatGuid, message, false, now);
-
-            // Add the promise to the manager
-            Server().messageManager.add(awaiter);
-
             // Try to send the iMessage
             if (method === "apple-script") {
+                // NOTE: Moved to only apple script so we can use transactions for other
+                // We need offsets here due to iMessage's save times being a bit off for some reason
+                const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
+                const awaiter = new MessagePromise(chatGuid, message, false, now);
+
+                // Add the promise to the manager
+                Server().messageManager.add(awaiter);
+
                 try {
                     await FileSystem.executeAppleScript(sendMessage(chatGuid, message ?? "", null));
                 } catch (ex: any) {
@@ -80,20 +81,34 @@ export class MessageInterface {
                         await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, message ?? "", null));
                     }
                 }
-            } else if (method === "private-api") {
+
+                return awaiter.promise;
+            }
+
+            if (method === "private-api") {
                 checkPrivateApiStatus();
-                await Server().privateApiHelper.sendMessage(
+                const result = await Server().privateApiHelper.sendMessage(
                     chatGuid,
                     message,
                     subject ?? null,
                     effectId ?? null,
                     selectedMessageGuid ?? null
                 );
-            } else {
-                throw new Error(`Invalid send method: ${method}`);
+
+                if (!result?.identifier) {
+                    throw new Error("Failed to send message!");
+                }
+
+                // Fetch the chat based on the return data
+                const retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
+                if (!retMessage) {
+                    throw new Error(`Failed to find Message with GUID: ${result.identifier}`);
+                }
+
+                return retMessage;
             }
 
-            return awaiter.promise;
+            throw new Error(`Invalid send method: ${method}`);
         } catch (ex: any) {
             let msg = ex?.message ?? ex;
             if (msg instanceof String) {
@@ -145,10 +160,11 @@ export class MessageInterface {
         // Build the final message to match on
         const messageText = `${prefix} ${msg}`;
 
+        // NOTE: Removed to test transaction system
         // We need offsets here due to iMessage's save times being a bit off for some reason
-        const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise(chatGuid, messageText, false, now);
-        Server().messageManager.add(awaiter);
+        // const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
+        // const awaiter = new MessagePromise(chatGuid, messageText, false, now);
+        // Server().messageManager.add(awaiter);
 
         // Add the reaction to the match queue
         // NOTE: This can be removed when we move away from socket-style matching
@@ -162,9 +178,18 @@ export class MessageInterface {
         }
 
         // Send the reaction
-        await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);
+        const result = await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);
+        if (!result?.identifier) {
+            throw new Error("Failed to send reaction!");
+        }
 
-        // Return the awaiter
-        return awaiter.promise;
+        // Fetch the chat based on the return data
+        const retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
+        if (!retMessage) {
+            throw new Error(`Failed to find Message with GUID: ${result.identifier}`);
+        }
+
+        // Return the message
+        return retMessage;
     }
 }

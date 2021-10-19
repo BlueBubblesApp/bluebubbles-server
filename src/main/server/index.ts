@@ -443,6 +443,11 @@ class BlueBubblesServer extends EventEmitter {
             await this.restartProxyServices();
         }
 
+        // Install the bundle if the Private API is turned on
+        if (!prevConfig.enable_private_api && nextConfig.enable_private_api) {
+            BlueBubblesHelperService.installBundle();
+        }
+
         // If the dock style changes
         if (prevConfig.hide_dock_icon !== nextConfig.hide_dock_icon) {
             this.setDockIcon();
