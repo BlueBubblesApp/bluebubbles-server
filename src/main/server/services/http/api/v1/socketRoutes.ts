@@ -28,7 +28,6 @@ import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Han
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { DBMessageParams } from "@server/databases/imessage/types";
-import { Queue } from "@server/databases/server/entity/Queue";
 import { ActionHandler } from "@server/helpers/actions";
 import { QueueItem } from "@server/services/queue/index";
 import { basename } from "path";
@@ -872,7 +871,11 @@ export class SocketRoutes {
             "send-reaction",
             async (params, cb): Promise<void> => {
                 if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
-                if (!params?.messageGuid || !params?.messageText)
+                // Make sure we have a temp GUID, for matching
+                const tempGuid = params?.tempGuid || params?.messageGuid;
+                if (!tempGuid || (tempGuid ?? "").length === 0)
+                    return response(cb, "error", createBadRequestResponse("No temporary GUID provided with message!"));
+                if (!tempGuid || !params?.messageText)
                     return response(cb, "error", createBadRequestResponse("No message provided!"));
                 if (!params?.actionMessageGuid || !params?.actionMessageText)
                     return response(cb, "error", createBadRequestResponse("No action message provided!"));
@@ -907,12 +910,13 @@ export class SocketRoutes {
                         const sentMessage = await MessageInterface.sendReaction(
                             params.chatGuid,
                             message,
-                            params.tapback
+                            params.tapback,
+                            tempGuid
                         );
                         return response(
                             cb,
                             "tapback-sent",
-                            createSuccessResponse(sentMessage, "Successfully sent reaction!")
+                            createSuccessResponse(await getMessageResponse(sentMessage), "Successfully sent reaction!")
                         );
                     } catch (ex: any) {
                         return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));

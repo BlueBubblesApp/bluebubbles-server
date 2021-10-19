@@ -309,8 +309,7 @@ class PreDashboardView extends React.Component<unknown, State> {
 
         if (!password || password?.trim().length === 0) return null;
         if (!this.state.fcmClient || !this.state.fcmServer) return output("Skip FCM Setup");
-        if (this.state.fcmClient && this.state.fcmServer && this.state.abPerms === "authorized")
-            return output("Continue");
+        if (this.state.fcmClient && this.state.fcmServer) return output("Continue");
 
         return null;
     }

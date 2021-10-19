@@ -1,10 +1,10 @@
 export const negativeReactionTextMap: NodeJS.Dict<string> = {
     "-love": "Removed a heart",
-    "-like": "a like",
-    "-dislike": "a dislike",
-    "-laugh": "a laugh",
-    "-emphasize": "an exclamation",
-    "-question": "a question mark"
+    "-like": "Removed a like",
+    "-dislike": "Removed a dislike",
+    "-laugh": "Removed a laugh",
+    "-emphasize": "Removed an exclamation",
+    "-question": "Removed a question mark"
 };
 
 export const reactionTextMap: NodeJS.Dict<string> = {

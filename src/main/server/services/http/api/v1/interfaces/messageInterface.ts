@@ -113,7 +113,8 @@ export class MessageInterface {
     static async sendReaction(
         chatGuid: string,
         message: Message,
-        reaction: ValidTapback | ValidRemoveTapback
+        reaction: ValidTapback | ValidRemoveTapback,
+        tempGuid?: string | null
     ): Promise<Message> {
         checkPrivateApiStatus();
 
@@ -151,12 +152,14 @@ export class MessageInterface {
 
         // Add the reaction to the match queue
         // NOTE: This can be removed when we move away from socket-style matching
-        const item = new Queue();
-        item.tempGuid = message.guid;
-        item.chatGuid = chatGuid;
-        item.dateCreated = new Date().getTime();
-        item.text = messageText;
-        await Server().repo.queue().manager.save(item);
+        if (tempGuid && tempGuid.length > 0) {
+            const item = new Queue();
+            item.tempGuid = tempGuid;
+            item.chatGuid = chatGuid;
+            item.dateCreated = new Date().getTime();
+            item.text = messageText;
+            await Server().repo.queue().manager.save(item);
+        }
 
         // Send the reaction
         await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);
