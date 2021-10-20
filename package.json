@@ -1,7 +1,7 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.3.0",
-    "description": "BlueBubbles Server is the app that powers the BlueBubbles Android and Desktop Apps",
+    "version": "0.3.0-alpha.1",
+    "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "main": "./dist/main.js",
     "scripts": {
         "build-main": "cross-env NODE_ENV=production webpack --config webpack.main.prod.config.js",

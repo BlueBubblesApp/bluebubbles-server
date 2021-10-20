@@ -138,13 +138,28 @@ export class ChatInterface {
         const theAddrs = addresses.map(e => slugifyAddress(e));
         const result = await Server().privateApiHelper.createChat(theAddrs, message);
         if (!result?.identifier) {
-            throw new Error("Failed to create chat!");
+            throw new Error("Failed to create chat! Invalid transaction response!");
         }
 
         // Fetch the chat based on the return data
-        const chats = await Server().iMessageRepo.getChats({ chatGuid: result.identifier, withParticipants: true });
-        if (!chats || chats.length === 0) {
-            throw new Error(`Failed to find Chat with GUID: ${result.identifier}`);
+        let chats = await Server().iMessageRepo.getChats({ chatGuid: result.identifier, withParticipants: true });
+        let tryCount = 0;
+        while (chats.length === 0) {
+            tryCount += 1;
+
+            // If we've tried 10 times and there is no change, break out (~5 seconds)
+            if (tryCount >= 10) break;
+
+            // Give it a bit to execute
+            await waitMs(500);
+
+            // Re-fetch the chat with the updated information
+            chats = await Server().iMessageRepo.getChats({ chatGuid: result.identifier, withParticipants: true });
+        }
+
+        // Check if the name changed
+        if (chats.length === 0) {
+            throw new Error("Failed to create new chat! Chat not found after 5 seconds!");
         }
 
         return chats[0];

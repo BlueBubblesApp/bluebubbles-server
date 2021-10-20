@@ -3,7 +3,7 @@ import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/services/messageManager/messagePromise";
 import { ValidRemoveTapback, ValidTapback } from "@server/types";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus } from "@server/helpers/utils";
+import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
 import { restartMessages, sendMessage, sendMessageFallback } from "@server/fileSystem/scripts";
 import { negativeReactionTextMap, reactionTextMap } from "@server/helpers/mappings";
 import { invisibleMediaChar } from "@server/services/http/constants";
@@ -86,26 +86,13 @@ export class MessageInterface {
             }
 
             if (method === "private-api") {
-                checkPrivateApiStatus();
-                const result = await Server().privateApiHelper.sendMessage(
+                return MessageInterface.sendMessagePrivateApi(
                     chatGuid,
                     message,
-                    subject ?? null,
-                    effectId ?? null,
-                    selectedMessageGuid ?? null
+                    subject,
+                    effectId,
+                    selectedMessageGuid
                 );
-
-                if (!result?.identifier) {
-                    throw new Error("Failed to send message!");
-                }
-
-                // Fetch the chat based on the return data
-                const retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
-                if (!retMessage) {
-                    throw new Error(`Failed to find Message with GUID: ${result.identifier}`);
-                }
-
-                return retMessage;
             }
 
             throw new Error(`Invalid send method: ${method}`);
@@ -123,6 +110,50 @@ export class MessageInterface {
 
             throw new Error(msg);
         }
+    }
+
+    static async sendMessagePrivateApi(
+        chatGuid: string,
+        message: string,
+        subject?: string | null,
+        effectId?: string | null,
+        selectedMessageGuid?: string | null
+    ) {
+        checkPrivateApiStatus();
+        const result = await Server().privateApiHelper.sendMessage(
+            chatGuid,
+            message,
+            subject ?? null,
+            effectId ?? null,
+            selectedMessageGuid ?? null
+        );
+
+        if (!result?.identifier) {
+            throw new Error("Failed to send message!");
+        }
+
+        // Fetch the chat based on the return data
+        let retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
+        let tryCount = 0;
+        while (!retMessage) {
+            tryCount += 1;
+
+            // If we've tried 10 times and there is no change, break out (~5 seconds)
+            if (tryCount >= 10) break;
+
+            // Give it a bit to execute
+            await waitMs(500);
+
+            // Re-fetch the message with the updated information
+            retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
+        }
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error("Failed to send message! Message not found after 5 seconds!");
+        }
+
+        return retMessage;
     }
 
     static async sendReaction(
@@ -184,9 +215,24 @@ export class MessageInterface {
         }
 
         // Fetch the chat based on the return data
-        const retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
+        let retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
+        let tryCount = 0;
+        while (!retMessage) {
+            tryCount += 1;
+
+            // If we've tried 10 times and there is no change, break out (~5 seconds)
+            if (tryCount >= 10) break;
+
+            // Give it a bit to execute
+            await waitMs(500);
+
+            // Re-fetch the message with the updated information
+            retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
+        }
+
+        // Check if the name changed
         if (!retMessage) {
-            throw new Error(`Failed to find Message with GUID: ${result.identifier}`);
+            throw new Error("Failed to send reaction! Message not found after 5 seconds!");
         }
 
         // Return the message

@@ -6,6 +6,7 @@ import { parse as ParsePlist } from "plist";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
+import { isMinBigSur, isMinMonteray } from "@server/helpers/utils";
 
 import * as net from "net";
 import { ValidRemoveTapback } from "../../types";
@@ -32,7 +33,9 @@ export class BlueBubblesHelperService {
         const pApiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
         if (!pApiEnabled) return;
 
-        const localPath = path.join(FileSystem.resources, "private-api", "BlueBubblesHelper.bundle");
+        // eslint-disable-next-line no-nested-ternary
+        const macVer = isMinMonteray ? "macos12" : isMinBigSur ? "macos11" : "macos10";
+        const localPath = path.join(FileSystem.resources, "private-api", macVer, "BlueBubblesHelper.bundle");
         const localInfo = path.join(localPath, "Contents/Info.plist");
 
         // If the local bundle doesn't exist, don't do anything
