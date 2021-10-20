@@ -15,6 +15,7 @@ import { DBMessageParams } from "@server/databases/imessage/types";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { ActionHandler } from "@server/helpers/actions";
 import { parseNumber } from "../../../helpers";
+import { MessageInterface } from "../interfaces/messageInterface";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
@@ -35,9 +36,10 @@ export class MessageRouter {
             .map(e => e.trim());
         const withChats = withQuery.includes("chats") || withQuery.includes("chat");
         const withParticipants = withQuery.includes("chats.participants") || withQuery.includes("chat.participants");
+        const withAttachments = withQuery.includes("attachments") || withQuery.includes("attachment");
 
         // Fetch the info for the message by GUID
-        const message = await Server().iMessageRepo.getMessage(guid, withChats);
+        const message = await Server().iMessageRepo.getMessage(guid, withChats, withAttachments);
         if (!message) {
             ctx.status = 404;
             ctx.body = createNotFoundResponse("Message does not exist!");
@@ -155,8 +157,18 @@ export class MessageRouter {
         const { body } = ctx.request;
 
         const tempGuid = body?.tempGuid;
-        const chatGuid = body?.guid;
+        const chatGuid = body?.chatGuid ?? body?.guid;
         const message = body?.message;
+        let method = body?.method ?? "apple-script";
+        const effectId = body?.effectId;
+        const subject = body?.subject;
+        const selectedMessageGuid = body?.selectedMessageGuid;
+
+        // If we have an effectId or subject, let's imply we want to use
+        // the Private API
+        if (effectId || subject || selectedMessageGuid) {
+            method = "private-api";
+        }
 
         // Make sure a chat GUID is provided
         if (!chatGuid) {
@@ -184,11 +196,18 @@ export class MessageRouter {
 
         try {
             // Send the message
-            const sentMessage: Message = await ActionHandler.sendMessageSync(chatGuid, message);
+            const sentMessage: Message = await MessageInterface.sendMessageSync(
+                chatGuid,
+                message,
+                method,
+                subject,
+                effectId,
+                selectedMessageGuid
+            );
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Message sent!");
         } catch (ex: any) {
-            ctx.status = 400;
+            ctx.status = 500;
             if (ex instanceof Message) {
                 ctx.body = createServerErrorResponse(
                     "Message Send Error",
@@ -207,7 +226,7 @@ export class MessageRouter {
         const { body, files } = ctx.request;
 
         const tempGuid = body?.tempGuid;
-        const chatGuid = body?.guid;
+        const chatGuid = body?.chatGuid ?? body?.guid;
         const name = body?.name;
 
         // Make sure a chat GUID is provided
@@ -255,7 +274,7 @@ export class MessageRouter {
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Attachment sent!");
         } catch (ex: any) {
-            ctx.status = 400;
+            ctx.status = 500;
             if (ex instanceof Message) {
                 ctx.body = createServerErrorResponse(
                     "Attachment Send Error",
@@ -265,6 +284,66 @@ export class MessageRouter {
                 );
             } else {
                 Server().log(`Attachment Send Error: ${ex?.message || ex.toString()}`);
+                ctx.body = createServerErrorResponse(ex?.message || ex.toString());
+            }
+        }
+    }
+
+    static async react(ctx: RouterContext, _: Next) {
+        const { body } = ctx.request;
+
+        // Pull out the required fields
+        const chatGuid = body?.chatGuid ?? body?.guid;
+        const selectedMessageGuid = body?.selectedMessageGuid;
+        const reaction = (body?.reaction ?? "").toLowerCase();
+
+        // Make sure we have a chat GUID
+        if (!chatGuid || chatGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Chat GUID not provided!");
+            return;
+        }
+
+        // Make sure we have a selected message GUID
+        if (!selectedMessageGuid || selectedMessageGuid.length === 0) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Selected Message GUID not provided!");
+            return;
+        }
+
+        // Make sure we have a reaction
+        if (!reaction || !MessageInterface.possibleReactions.includes(reaction)) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse(
+                `Reaction was invalid or not provided! Must be one of: ${MessageInterface.possibleReactions.join(", ")}`
+            );
+            return;
+        }
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(selectedMessageGuid, false, true);
+        if (!message) {
+            ctx.status = 400;
+            ctx.body = createBadRequestResponse("Selected message does not exist!");
+            return;
+        }
+
+        // Send the reaction
+        try {
+            const sentMessage = await MessageInterface.sendReaction(chatGuid, message, reaction);
+            const res = await getMessageResponse(sentMessage);
+            ctx.body = createSuccessResponse(res, "Reaction sent!");
+        } catch (ex: any) {
+            ctx.status = 400;
+            if (ex instanceof Message) {
+                ctx.body = createServerErrorResponse(
+                    "Reaction Send Error",
+                    ErrorTypes.IMESSAGE_ERROR,
+                    "Failed to send reaction! See attached message error code.",
+                    await getMessageResponse(ex)
+                );
+            } else {
+                Server().log(`Reaction Send Error: ${ex?.message || ex.toString()}`);
                 ctx.body = createServerErrorResponse(ex?.message || ex.toString());
             }
         }

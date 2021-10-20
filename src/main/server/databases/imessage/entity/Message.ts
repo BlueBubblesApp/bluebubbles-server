@@ -1,4 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
+import { conditional } from "conditional-decorator";
+
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
@@ -6,6 +8,7 @@ import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
+import { isMinBigSur, isMinCatalina, isMinSierra } from "@server/helpers/utils";
 
 @Entity("message")
 export class Message {
@@ -343,19 +346,25 @@ export class Message {
     })
     messageSource: number;
 
-    @Column({
-        name: "associated_message_guid",
-        type: "text",
-        nullable: true
-    })
+    @conditional(
+        isMinSierra,
+        Column({
+            name: "associated_message_guid",
+            type: "text",
+            nullable: true
+        })
+    )
     associatedMessageGuid: string;
 
-    @Column({
-        name: "associated_message_type",
-        type: "text",
-        transformer: MessageTypeTransformer,
-        nullable: true
-    })
+    @conditional(
+        isMinSierra,
+        Column({
+            name: "associated_message_type",
+            type: "text",
+            transformer: MessageTypeTransformer,
+            nullable: true
+        })
+    )
     associatedMessageType: string;
 
     @Column({ name: "balloon_bundle_id", type: "text", nullable: true })
@@ -391,6 +400,58 @@ export class Message {
 
     @Column({ name: "message_summary_info", type: "blob", nullable: true })
     messageSummaryInfo: Blob;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "reply_to_guid",
+            type: "text",
+            nullable: true
+        })
+    )
+    replyToGuid: string;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "is_corrupt",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    isCorrupt: boolean;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "is_spam",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    isSpam: boolean;
+
+    @conditional(
+        isMinBigSur,
+        Column({
+            name: "thread_originator_guid",
+            type: "text",
+            nullable: true
+        })
+    )
+    threadOriginatorGuid: string;
+
+    @conditional(
+        isMinBigSur,
+        Column({
+            name: "thread_originator_part",
+            type: "text",
+            nullable: true
+        })
+    )
+    threadOriginatorPart: string;
 }
 
 export const getMessageResponse = async (tableData: Message): Promise<MessageResponse> => {
@@ -443,6 +504,11 @@ export const getMessageResponse = async (tableData: Message): Promise<MessageRes
         expressiveSendStyleId: tableData.expressiveSendStyleId,
         timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
             ? tableData.timeExpressiveSendStyleId.getTime()
-            : null
+            : null,
+        replyToGuid: tableData.replyToGuid,
+        isCorrupt: tableData.isCorrupt,
+        isSpam: tableData.isSpam,
+        threadOriginatorGuid: tableData.threadOriginatorGuid,
+        threadOriginatorPart: tableData.threadOriginatorPart
     };
 };

@@ -126,6 +126,12 @@ export class OutgoingMessageListener extends ChangeListener {
                 // If we've already emitted this message-match, skip it
                 if (this.cache.find(matchGuid)) continue;
 
+                // Resolve the promise
+                const idx = Server().messageManager.findIndex(match);
+                if (idx >= 0) {
+                    Server().messageManager.promises[idx].resolve(match);
+                }
+
                 // Emit the message match to listeners
                 super.emit("message-match", { tempGuid: entry.tempGuid, message: match });
 

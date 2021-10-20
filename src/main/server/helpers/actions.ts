@@ -24,10 +24,10 @@ import {
     safeExecuteAppleScript,
     generateChatNameList,
     getiMessageNumberFormat,
-    tapbackUIMap,
     toBoolean,
     slugifyAddress
 } from "./utils";
+import { tapbackUIMap } from "./mappings";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -128,67 +128,6 @@ export class ActionHandler {
                 attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
                 await Server().repo.queue().manager.save(attachmentItem);
             }
-        } catch (ex: any) {
-            let msg = ex.message;
-            if (msg instanceof String) {
-                [, msg] = msg.split("execution error: ");
-                [msg] = msg.split(". (");
-            }
-
-            Server().log(msg, "warn");
-            throw new Error(msg);
-        }
-    };
-
-    /**
-     * Sends a message by executing the sendMessage AppleScript
-     *
-     * @param chatGuid The GUID for the chat
-     * @param message The message to send
-     * @param attachmentName The name of the attachment to send (optional)
-     * @param attachment The bytes (buffer) for the attachment
-     *
-     * @returns The command line response
-     */
-    static sendMessageSync = async (chatGuid: string, message: string): Promise<Message> => {
-        if (!chatGuid) throw new Error("No chat GUID provided");
-
-        Server().log(`Sending message "${message}" to ${chatGuid}`, "debug");
-
-        try {
-            // Make sure messages is open
-            await FileSystem.startMessages();
-
-            // We need offsets here due to iMessage's save times being a bit off for some reason
-            const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-            const awaiter = new MessagePromise(chatGuid, message, false, now);
-
-            // Add the promise to the manager
-            Server().messageManager.add(awaiter);
-
-            // Try to send the iMessage
-            try {
-                await FileSystem.executeAppleScript(sendMessage(chatGuid, message ?? "", null));
-            } catch (ex: any) {
-                // Log the actual error
-                Server().log(ex);
-
-                const errMsg = (ex?.message ?? "") as string;
-                const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
-
-                if (retry) {
-                    // If it's a plain ole retry case, retry after restarting Messages
-                    Server().log("Message send error. Trying to re-send message...");
-                    await FileSystem.executeAppleScript(restartMessages());
-                    await FileSystem.executeAppleScript(sendMessage(chatGuid, message ?? "", null));
-                } else if (errMsg.includes("-1728") && chatGuid.includes(";-;")) {
-                    // If our error has to do with not getting the chat ID, run the fallback script
-                    Server().log("Message send error (can't get chat id). Running fallback send script...");
-                    await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, message ?? "", null));
-                }
-            }
-
-            return awaiter.promise;
         } catch (ex: any) {
             let msg = ex.message;
             if (msg instanceof String) {
@@ -460,9 +399,9 @@ export class ActionHandler {
 
         Server().log(`Executing Action: Change Typing Status (Chat: ${chatGuid})`, "debug");
         if (isTyping) {
-            Server().privateApiHelper.startTyping(chatGuid);
+            await Server().privateApiHelper.startTyping(chatGuid);
         } else {
-            Server().privateApiHelper.stopTyping(chatGuid);
+            await Server().privateApiHelper.stopTyping(chatGuid);
         }
     };
 
@@ -474,7 +413,7 @@ export class ActionHandler {
         }
 
         Server().log(`Executing Action: Marking chat as read (Chat: ${chatGuid})`, "debug");
-        Server().privateApiHelper.markChatRead(chatGuid);
+        await Server().privateApiHelper.markChatRead(chatGuid);
     };
 
     static updateTypingStatus = async (chatGuid: string): Promise<void> => {
@@ -485,7 +424,7 @@ export class ActionHandler {
         }
 
         Server().log(`Executing Action: Update Typing Status (Chat: ${chatGuid})`, "debug");
-        Server().privateApiHelper.getTypingStatus(chatGuid);
+        await Server().privateApiHelper.getTypingStatus(chatGuid);
     };
 
     static togglePrivateTapback = async (
@@ -503,7 +442,7 @@ export class ActionHandler {
             `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`,
             "debug"
         );
-        Server().privateApiHelper.sendReaction(chatGuid, actionMessageGuid, reactionType);
+        await Server().privateApiHelper.sendReaction(chatGuid, actionMessageGuid, reactionType);
     };
 
     /**

@@ -13,7 +13,7 @@ const osVersion = macosVersion();
 
 export const lockMacOs = () => {
     return `tell application "System Events" to keystroke "q" using {control down, command down}`;
-}
+};
 
 /**
  * The AppleScript used to send a message with or without an attachment
@@ -74,7 +74,7 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
 
     // Extract the address from the phone number
     let address = chatGuid;
-    let service = "iMessage";
+    let service = address.startsWith("SMS") ? "SMS" : "iMessage";
     if (!address.includes(";-;")) throw new Error("Cannot send message via fallback script");
     [service, address] = address.split(";-;");
 

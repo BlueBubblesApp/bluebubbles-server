@@ -17,9 +17,14 @@ import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
 import { LogMiddleware } from "./middleware/logMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
+import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
 
 export class HttpRoutes {
     static ver = "/api/v1";
+
+    private static get privateApi() {
+        return [...this.protected, PrivateApiMiddleware];
+    }
 
     private static get protected() {
         return [...this.unprotected, AuthMiddleware];
@@ -54,14 +59,19 @@ export class HttpRoutes {
         router.get(`${this.ver}/attachment/:guid/blurhash`, ...this.protected, AttachmentRouter.blurhash);
 
         // Chat Routes
+        router.post(`${this.ver}/chat/new`, ...this.privateApi, ChatRouter.create);
         router.get(`${this.ver}/chat/count`, ...this.protected, ChatRouter.count);
         router.post(`${this.ver}/chat/query`, ...this.protected, ChatRouter.query);
         router.get(`${this.ver}/chat/:guid/message`, ...this.protected, ChatRouter.getMessages);
+        router.post(`${this.ver}/chat/:guid/participant/add`, ...this.privateApi, ChatRouter.addParticipant);
+        router.post(`${this.ver}/chat/:guid/participant/remove`, ...this.privateApi, ChatRouter.removeParticipant);
+        router.put(`${this.ver}/chat/:guid`, ...this.privateApi, ChatRouter.update);
         router.get(`${this.ver}/chat/:guid`, ...this.protected, ChatRouter.find);
 
         // Message Routes
         router.post(`${this.ver}/message/text`, ...this.protected, MessageRouter.sendText);
         router.post(`${this.ver}/message/attachment`, ...this.protected, MessageRouter.sendAttachment);
+        router.post(`${this.ver}/message/react`, ...this.privateApi, MessageRouter.react);
         router.get(`${this.ver}/message/count`, ...this.protected, MessageRouter.count);
         router.get(`${this.ver}/message/count/me`, ...this.protected, MessageRouter.sentCount);
         router.post(`${this.ver}/message/query`, ...this.protected, MessageRouter.query);

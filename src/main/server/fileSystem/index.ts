@@ -33,6 +33,10 @@ if (process.env.NODE_ENV !== "production") {
     moddir = "";
 }
 
+export const userHomeDir = () => {
+    return process?.env?.HOME ?? process?.env?.HOMEPATH ?? process?.env?.USERPROFILE;
+};
+
 /**
  * The class used to handle all communications to the App's "filesystem".
  * The filesystem is the directory dedicated to the app-specific files
@@ -63,6 +67,21 @@ export class FileSystem {
     public static addressBookFile = `${FileSystem.contactsDir}/AddressBook.vcf`;
 
     public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
+
+    // Private API directories
+    public static usrMySimblPlugins = path.join(userHomeDir(), "Library", "Application Support", "SIMBL", "Plugins");
+
+    public static libMySimblPlugins = `/${path.join("Library", "Application Support", "SIMBL", "Plugins")}`;
+
+    public static usrMacForgePlugins = path.join(
+        userHomeDir(),
+        "Library",
+        "Application Support",
+        "MacEnhance",
+        "Plugins"
+    );
+
+    public static libMacForgePlugins = `/${path.join("Library", "Application Support", "MacEnhance", "Plugins")}`;
 
     /**
      * Sets up all required directories and then, writes the scripts
