@@ -47,9 +47,9 @@ export class BlueBubblesHelperService {
         // If we find any of the directories, we should install to them
         const opts = [
             FileSystem.libMacForgePlugins,
-            FileSystem.usrMacForgePlugins,
-            FileSystem.libMySimblPlugins,
-            FileSystem.usrMySimblPlugins
+            // FileSystem.usrMacForgePlugins,
+            FileSystem.libMySimblPlugins
+            // FileSystem.usrMySimblPlugins
         ];
 
         // For each of the paths, write the bundle to them (assuming the paths exist & the bundle is newer)
