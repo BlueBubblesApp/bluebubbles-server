@@ -158,7 +158,8 @@ export class FCMService {
 
                 // Read over the errors and log the errors
                 for (const i of res.results) {
-                    if (i.error) {
+                    // Ignore token not registered errors
+                    if (i.error && i.error.code !== "messaging/registration-token-not-registered") {
                         Server().log(
                             `Firebase returned the following error (Code: ${i.error.code}): ${i.error.message}`,
                             "debug"
