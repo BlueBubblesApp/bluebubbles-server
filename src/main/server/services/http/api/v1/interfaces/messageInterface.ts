@@ -164,33 +164,6 @@ export class MessageInterface {
     ): Promise<Message> {
         checkPrivateApiStatus();
 
-        // Rebuild the selected message text to make it what the reaction text
-        // would be in the database
-        const prefix = (reaction as string).startsWith("-")
-            ? negativeReactionTextMap[reaction as string]
-            : reactionTextMap[reaction as string];
-
-        // If the message text is just the invisible char, we know it's probably just an attachment
-        const isOnlyMedia = message.text.length === 1 && message.text === invisibleMediaChar;
-
-        // Default the message to the other message surrounded by greek quotes
-        let msg = `“${message.text}”`;
-
-        // If it's a media-only message and we have at least 1 attachment,
-        // set the message according to the first attachment's MIME type
-        if (isOnlyMedia && (message.attachments ?? []).length > 0) {
-            if (message.attachments[0].mimeType.startsWith("image")) {
-                msg = `an image`;
-            } else if (message.attachments[0].mimeType.startsWith("video")) {
-                msg = `a movie`;
-            } else {
-                msg = `an attachment`;
-            }
-        }
-
-        // Build the final message to match on
-        const messageText = `${prefix} ${msg}`;
-
         // NOTE: Removed to test transaction system
         // We need offsets here due to iMessage's save times being a bit off for some reason
         // const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
@@ -200,6 +173,34 @@ export class MessageInterface {
         // Add the reaction to the match queue
         // NOTE: This can be removed when we move away from socket-style matching
         if (tempGuid && tempGuid.length > 0) {
+            // Rebuild the selected message text to make it what the reaction text
+            // would be in the database
+            const prefix = (reaction as string).startsWith("-")
+                ? negativeReactionTextMap[reaction as string]
+                : reactionTextMap[reaction as string];
+
+            // If the message text is just the invisible char, we know it's probably just an attachment
+            const isOnlyMedia = message.text.length === 1 && message.text === invisibleMediaChar;
+
+            // Default the message to the other message surrounded by greek quotes
+            let msg = `“${message.text}”`;
+
+            // If it's a media-only message and we have at least 1 attachment,
+            // set the message according to the first attachment's MIME type
+            if (isOnlyMedia && (message.attachments ?? []).length > 0) {
+                if (message.attachments[0].mimeType.startsWith("image")) {
+                    msg = `an image`;
+                } else if (message.attachments[0].mimeType.startsWith("video")) {
+                    msg = `a movie`;
+                } else {
+                    msg = `an attachment`;
+                }
+            }
+
+            // Build the final message to match on
+            const messageText = `${prefix} ${msg}`;
+            Server().log(`Adding message to match queue with text: ${messageText}`, "debug");
+
             const item = new Queue();
             item.tempGuid = tempGuid;
             item.chatGuid = chatGuid;
@@ -211,7 +212,9 @@ export class MessageInterface {
         // Send the reaction
         const result = await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);
         if (!result?.identifier) {
-            throw new Error("Failed to send reaction!");
+            throw new Error("Failed to send reaction! No message GUID returned.");
+        } else {
+            Server().log(`Reaction sent with Message GUID: ${result.identifier}`, "debug");
         }
 
         // Fetch the chat based on the return data

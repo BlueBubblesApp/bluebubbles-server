@@ -204,6 +204,8 @@ export class MessageRouter {
                 effectId,
                 selectedMessageGuid
             );
+
+            // Conver to a response and respond
             const res = await getMessageResponse(sentMessage);
             ctx.body = createSuccessResponse(res, "Message sent!");
         } catch (ex: any) {

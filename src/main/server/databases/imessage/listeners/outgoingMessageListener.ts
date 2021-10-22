@@ -116,7 +116,8 @@ export class OutgoingMessageListener extends ChangeListener {
             // Filter down the results to only that match the sanitized value
             // Only if it's a message, not an attachment
             if (!entry.text.startsWith(entry.tempGuid)) {
-                matches = matches.filter(msg => onlyAlphaNumeric(entry.text) === onlyAlphaNumeric(msg.text));
+                const anTxt = onlyAlphaNumeric(entry.text);
+                matches = matches.filter(msg => anTxt === onlyAlphaNumeric(msg.text));
             }
 
             // Find the first non-emitted match
