@@ -57,6 +57,21 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
     end try`;
 };
 
+const buildServiceScript = (inputService: string) => {
+    // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
+    let theService = inputService;
+    if (!isMinBigSur && theService !== "iMessage") {
+        theService = `"${theService}"`;
+    }
+
+    let serviceScript = `set targetService to 1st service whose service type = ${theService}`;
+    if (!isMinBigSur && theService !== "iMessage") {
+        serviceScript = `set targetService to service ${theService}`;
+    }
+
+    return serviceScript;
+};
+
 export const sendMessageFallback = (chatGuid: string, message: string, attachment: string) => {
     if (!chatGuid || (!message && !attachment)) return null;
 
@@ -78,13 +93,9 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
     if (!address.includes(";-;")) throw new Error("Cannot send message via fallback script");
     [service, address] = address.split(";-;");
 
-    // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
-    let theService = service;
-    if (!isMinBigSur && theService !== "iMessage") {
-        theService = `"${theService}"`;
-    }
+    const serviceScript = buildServiceScript(service);
     return `tell application "Messages"
-        set targetService to 1st service whose service type = ${theService}
+        ${serviceScript}
         set targetBuddy to buddy "${address}" of targetService
         
         ${attachmentScpt}
@@ -116,14 +127,9 @@ export const startChat = (participants: string[], service: string, useTextChat: 
     const buddies = formatted.join(", ");
 
     const qualifier = useTextChat ? " text " : " ";
-
-    // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
-    let theService = service;
-    if (!isMinBigSur && theService !== "iMessage") {
-        theService = `"${theService}"`;
-    }
+    const serviceScript = buildServiceScript(service);
     return `tell application "Messages"
-        set targetService to 1st service whose service type = ${theService}
+        ${serviceScript}
 
         (* Start the new chat with all the recipients *)
         set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}
