@@ -1,19 +1,16 @@
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
-import { createServerErrorResponse, createSuccessResponse } from "@server/helpers/responses";
-import { ErrorTypes } from "@server/types";
 import { MacOsInterface } from "../interfaces/macosInterface";
-
+import { Success } from "../responses/success";
+import { ServerError } from "../responses/errors";
 
 export class MacOsRouter {
     static async lock(ctx: RouterContext, _: Next) {
         try {
             await MacOsInterface.lock();
-            ctx.body = createSuccessResponse('Successfully executed lock command!');
+            return new Success(ctx, { message: "Successfully executed lock command!" }).send();
         } catch (ex: any) {
-            ctx.status = 500;
-            ctx.body = createServerErrorResponse(
-                ex?.message ?? ex, ErrorTypes.SERVER_ERROR, 'Failed to execute AppleScript!');
+            throw new ServerError({ message: "Failed to execute AppleScript!", error: ex?.message ?? ex.toString() });
         }
     }
 }

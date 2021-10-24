@@ -125,6 +125,8 @@ class BlueBubblesServer extends EventEmitter {
 
     isStopping: boolean;
 
+    lastConnection: number;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -766,7 +768,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Starting Message Manager...");
             this.messageManager = new MessageManager();
         } catch (ex: any) {
-            this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+            this.log(`Failed to start Message Manager service! ${ex.message}`, "error");
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;

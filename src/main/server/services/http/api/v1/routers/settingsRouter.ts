@@ -1,33 +1,16 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
-import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
 import { BackupsInterface } from "../interfaces/backupsInterface";
+import { ValidateInput, ValidateJSON } from "../validators";
+import { SettingsValidator } from "../validators/settingsValidator";
+import { Success } from "../responses/success";
 
 export class SettingsRouter {
     static async create(ctx: RouterContext, _: Next) {
-        const { name, data } = ctx.request.body;
-
-        // Validation: Name
-        if (!name) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("No name provided!");
-            return;
-        }
-
-        // Validation: Settings Data
-        if (!data) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("No settings provided!");
-            return;
-        }
-
-        // Validation: Settings Data
-        if (typeof data !== "object" || Array.isArray(data)) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Settings must be a JSON object!");
-            return;
-        }
+        // Validation
+        const { name, data } = ValidateInput(ctx.request.body, SettingsValidator.rules);
+        ValidateJSON(data, "Settings");
 
         // Safety to always have a name in the JSON dict if not provided
         if (!Object.keys(data).includes("name")) {
@@ -36,7 +19,7 @@ export class SettingsRouter {
 
         // Save the settings to a file
         await BackupsInterface.saveSettings(name, data);
-        ctx.body = createSuccessResponse("Successfully saved settings!");
+        return new Success(ctx, { message: "Successfully saved settings!" }).send();
     }
 
     static async get(ctx: RouterContext, _: Next) {
@@ -45,10 +28,12 @@ export class SettingsRouter {
 
         if (name && name.length > 0) {
             res = await BackupsInterface.getSettingsByName(name);
+            if (!res) return new Success(ctx, { message: "No settings found!" }).send();
         } else {
             res = await BackupsInterface.getAllSettings();
+            if (!res) return new Success(ctx, { message: "No saved settings!" }).send();
         }
 
-        ctx.body = createSuccessResponse(res);
+        return new Success(ctx, { message: "Successfully fetched settings!", data: res }).send();
     }
 }

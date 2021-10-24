@@ -78,8 +78,9 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
     if (!address.includes(";-;")) throw new Error("Cannot send message via fallback script");
     [service, address] = address.split(";-;");
 
+    const theService = service === "iMessage" ? service : `"${service}"`;
     return `tell application "Messages"
-        set targetService to 1st service whose service type = ${service}
+        set targetService to 1st service whose service type = ${theService}
         set targetBuddy to buddy "${address}" of targetService
         
         ${attachmentScpt}
@@ -111,8 +112,9 @@ export const startChat = (participants: string[], service: string, useTextChat: 
     const buddies = formatted.join(", ");
 
     const qualifier = useTextChat ? " text " : " ";
+    const theService = service === "iMessage" ? service : `"${service}"`;
     return `tell application "Messages"
-        set targetService to 1st service whose service type = ${service}
+        set targetService to 1st service whose service type = ${theService}
 
         (* Start the new chat with all the recipients *)
         set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}

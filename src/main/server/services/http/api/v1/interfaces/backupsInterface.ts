@@ -35,6 +35,7 @@ export class BackupsInterface {
         const themes = [];
 
         for (const i of items) {
+            if (!i.endsWith(".json")) continue;
             const themePath = path.join(FileSystem.themesDir, i);
 
             try {
@@ -78,6 +79,7 @@ export class BackupsInterface {
         const settings = [];
 
         for (const i of items) {
+            if (!i.endsWith(".json")) continue;
             const settingsPath = path.join(FileSystem.settingsDir, i);
 
             try {

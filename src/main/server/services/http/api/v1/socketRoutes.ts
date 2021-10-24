@@ -14,7 +14,8 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 
 // Helpers
-import { ChatResponse, HandleResponse, ResponseFormat, ServerMetadataResponse } from "@server/types";
+import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
+import { ResponseFormat } from "@server/services/http/api/v1/responses/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,

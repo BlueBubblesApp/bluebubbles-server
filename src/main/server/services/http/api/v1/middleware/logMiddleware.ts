@@ -13,6 +13,10 @@ export const LogMiddleware = async (ctx: Context, next: Next) => {
     const log = `Request to ${ctx.request.path.toString()} (URL Params: ${JSON.stringify(params)})`;
     Server().log(log, "debug");
 
+    // Log the last request time to the server
+    // This is used by the proxy services to not auto-refresh while we have recent connections
+    Server().lastConnection = new Date().getTime();
+
     // Go to the next middleware
     await next();
 };

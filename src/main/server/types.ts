@@ -1,35 +1,5 @@
 import { ServerConfig } from "./databases/server";
 
-export type ValidStatuses = 200 | 201 | 400 | 401 | 403 | 404 | 500;
-
-export type Error = {
-    type: ErrorTypes;
-    message: string;
-};
-
-export type ResponseData =
-    | ServerMetadataResponse
-    | MessageResponse
-    | HandleResponse
-    | ChatResponse
-    | AttachmentResponse
-    | (MessageResponse | HandleResponse | ChatResponse | AttachmentResponse)[]
-    | Uint8Array
-    | ServerConfig
-    | string
-    | { [key: string]: any }
-    | null;
-
-export type ResponseFormat = {
-    status: ValidStatuses;
-    encrypted?: boolean;
-    message: ResponseMessages | string;
-    error?: Error;
-    // Single or list of database objects, or null
-    data?: ResponseData;
-    metadata?: { [key: string]: any };
-};
-
 export type ServerMetadataResponse = {
     os_version: string;
     server_version: string;
@@ -130,24 +100,6 @@ export type AttachmentResponse = {
     hideAttachment: boolean;
     metadata: { [key: string]: string | boolean | number };
 };
-
-export enum ResponseMessages {
-    SUCCESS = "Success",
-    BAD_REQUEST = "Bad Request",
-    SERVER_ERROR = "Server Error",
-    UNAUTHORIZED = "Unauthorized",
-    FORBIDDEN = "Forbidden",
-    NO_DATA = "No Data",
-    NOT_FOUND = "Not Found"
-}
-
-export enum ErrorTypes {
-    SERVER_ERROR = "Server Error",
-    DATABSE_ERROR = "Database Error",
-    IMESSAGE_ERROR = "iMessage Error",
-    SOCKET_ERROR = "Socket Error",
-    VALIDATION_ERROR = "Validation Error"
-}
 
 export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";
 export type ValidRemoveTapback = "-love" | "-like" | "-dislike" | "-laugh" | "-emphasize" | "-question";
