@@ -3,7 +3,7 @@ import * as macosVersion from "macos-version";
 import * as compareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
-import { escapeOsaExp } from "@server/helpers/utils";
+import { escapeOsaExp, isMinBigSur } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
@@ -78,8 +78,13 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
     if (!address.includes(";-;")) throw new Error("Cannot send message via fallback script");
     [service, address] = address.split(";-;");
 
+    // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
+    let theService = service;
+    if (!isMinBigSur && theService !== "iMessage") {
+        theService = `"${theService}"`;
+    }
     return `tell application "Messages"
-        set targetService to 1st service whose service type = ${service}
+        set targetService to 1st service whose service type = ${theService}
         set targetBuddy to buddy "${address}" of targetService
         
         ${attachmentScpt}
@@ -111,8 +116,14 @@ export const startChat = (participants: string[], service: string, useTextChat: 
     const buddies = formatted.join(", ");
 
     const qualifier = useTextChat ? " text " : " ";
+
+    // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
+    let theService = service;
+    if (!isMinBigSur && theService !== "iMessage") {
+        theService = `"${theService}"`;
+    }
     return `tell application "Messages"
-        set targetService to 1st service whose service type = ${service}
+        set targetService to 1st service whose service type = ${theService}
 
         (* Start the new chat with all the recipients *)
         set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}
