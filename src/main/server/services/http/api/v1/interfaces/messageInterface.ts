@@ -8,6 +8,7 @@ import { restartMessages, sendMessage, sendMessageFallback } from "@server/fileS
 import { negativeReactionTextMap, reactionTextMap } from "@server/helpers/mappings";
 import { invisibleMediaChar } from "@server/services/http/constants";
 import { Queue } from "@server/databases/server/entity";
+import { ActionHandler } from "@server/helpers/actions";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -47,69 +48,70 @@ export class MessageInterface {
 
         Server().log(`Sending message "${message}" to ${chatGuid}`, "debug");
 
-        try {
-            // Make sure messages is open
-            await FileSystem.startMessages();
+        // Make sure messages is open
+        await FileSystem.startMessages();
 
-            // Try to send the iMessage
-            if (method === "apple-script") {
-                // NOTE: Moved to only apple script so we can use transactions for other
-                // We need offsets here due to iMessage's save times being a bit off for some reason
-                const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-                const awaiter = new MessagePromise(chatGuid, message, false, now);
+        // Try to send the iMessage
+        if (method === "apple-script") {
+            // NOTE: Moved to only apple script so we can use transactions for other
+            // We need offsets here due to iMessage's save times being a bit off for some reason
+            const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
+            const awaiter = new MessagePromise(chatGuid, message, false, now);
 
-                // Add the promise to the manager
-                Server().messageManager.add(awaiter);
+            // Add the promise to the manager
+            Server().messageManager.add(awaiter);
 
-                try {
-                    await FileSystem.executeAppleScript(sendMessage(chatGuid, message ?? "", null));
-                } catch (ex: any) {
-                    // Log the actual error
-                    Server().log(ex);
+            // Attempt to send the message
+            await ActionHandler.sendMessageHandler(chatGuid, message ?? "", null);
 
-                    const errMsg = (ex?.message ?? "") as string;
-                    const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
-
-                    if (retry) {
-                        // If it's a plain ole retry case, retry after restarting Messages
-                        Server().log("Message send error. Trying to re-send message...");
-                        await FileSystem.executeAppleScript(restartMessages());
-                        await FileSystem.executeAppleScript(sendMessage(chatGuid, message ?? "", null));
-                    } else if (errMsg.includes("-1728") && chatGuid.includes(";-;")) {
-                        // If our error has to do with not getting the chat ID, run the fallback script
-                        Server().log("Message send error (can't get chat id). Running fallback send script...");
-                        await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, message ?? "", null));
-                    }
-                }
-
-                return awaiter.promise;
-            }
-
-            if (method === "private-api") {
-                return MessageInterface.sendMessagePrivateApi(
-                    chatGuid,
-                    message,
-                    subject,
-                    effectId,
-                    selectedMessageGuid
-                );
-            }
-
-            throw new Error(`Invalid send method: ${method}`);
-        } catch (ex: any) {
-            let msg = ex?.message ?? ex;
-            if (msg instanceof String) {
-                if (msg.includes("execution error: ")) {
-                    [, msg] = msg.split("execution error: ");
-                    [msg] = msg.split(". (");
-                    Server().log(msg, "warn");
-                } else {
-                    Server().log(msg, "error");
-                }
-            }
-
-            throw new Error(msg);
+            // Return the promise
+            return awaiter.promise;
         }
+
+        if (method === "private-api") {
+            return MessageInterface.sendMessagePrivateApi(chatGuid, message, subject, effectId, selectedMessageGuid);
+        }
+
+        throw new Error(`Invalid send method: ${method}`);
+    }
+
+    /**
+     * Sends a message by executing the sendMessage AppleScript
+     *
+     * @param chatGuid The GUID for the chat
+     * @param message The message to send
+     * @param attachmentName The name of the attachment to send (optional)
+     * @param attachment The bytes (buffer) for the attachment
+     *
+     * @returns The command line response
+     */
+    static async sendAttachmentSync(
+        chatGuid: string,
+        attachmentPath: string,
+        attachmentName?: string
+    ): Promise<Message> {
+        if (!chatGuid) throw new Error("No chat GUID provided");
+
+        // Copy the attachment to a more permanent storage
+        const newPath = FileSystem.copyAttachment(attachmentPath, attachmentName);
+
+        Server().log(`Sending attachment "${attachmentName}" to ${chatGuid}`, "debug");
+
+        // Make sure messages is open
+        await FileSystem.startMessages();
+
+        // We need offsets here due to iMessage's save times being a bit off for some reason
+        const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
+        const awaiter = new MessagePromise(chatGuid, `->${attachmentName}`, true, now);
+
+        // Add the promise to the manager
+        Server().messageManager.add(awaiter);
+
+        // Send the message
+        await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
+
+        // Return the promise
+        return awaiter.promise;
     }
 
     static async sendMessagePrivateApi(

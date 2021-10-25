@@ -181,7 +181,7 @@ export class MessageRouter {
 
         // Send the attachment
         try {
-            const sentMessage: Message = await ActionHandler.sendAttachmentSync(chatGuid, attachment.path, name);
+            const sentMessage: Message = await MessageInterface.sendAttachmentSync(chatGuid, attachment.path, name);
             return new Success(ctx, {
                 message: "Attachment sent!",
                 data: await getMessageResponse(sentMessage)

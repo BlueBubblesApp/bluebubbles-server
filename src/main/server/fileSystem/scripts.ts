@@ -7,12 +7,79 @@ import { escapeOsaExp, isMinBigSur } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
+const buildServiceScript = (inputService: string) => {
+    // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
+    let theService = inputService;
+    if (!isMinBigSur && theService !== "iMessage") {
+        theService = `"${theService}"`;
+    }
+
+    let serviceScript = `set targetService to 1st service whose service type = ${theService}`;
+    if (!isMinBigSur && theService !== "iMessage") {
+        serviceScript = `set targetService to service ${theService}`;
+    }
+
+    return serviceScript;
+};
+
+const buildMessageScript = (message: string, target = "targetBuddy") => {
+    let messageScpt = "";
+    if (message && message.length > 0) {
+        messageScpt = `send "${escapeOsaExp(message)}" to ${target}`;
+    }
+
+    return messageScpt;
+};
+
+const buildAttachmentScript = (attachment: string, variable = "theAttachment", target = "targetBuddy") => {
+    let attachmentScpt = "";
+    if (attachment && attachment.length > 0) {
+        attachmentScpt = `set ${variable} to "${escapeOsaExp(attachment)}" as POSIX file
+            send theAttachment to ${target}
+            delay 1`;
+    }
+
+    return attachmentScpt;
+};
+
+const getAddressFromInput = (value: string) => {
+    // This should always produce an array of minimum length, 1
+    const valSplit = value.split(";");
+
+    // If somehow the length is 0, just return the input
+    if (valSplit.length === 0) return value;
+
+    // Return the "last" index in the array (or the 0th)
+    return valSplit[valSplit.length - 1];
+};
+
+const getServiceFromInput = (value: string) => {
+    // This should always produce an array of minimum length, 1
+    const valSplit = value.split(";");
+
+    // If we have 0 or 1 items, it means there is no `;` character
+    // so we should default to iMessage
+    if (valSplit.length <= 1) return "iMessage";
+
+    // Otherwise, return the "first" index in the array,
+    // which should contain the service (i.e. SMS)
+    return valSplit[0];
+};
+
 /**
  * Locks the macOS account so credentials are needed to be used
  */
-
 export const lockMacOs = () => {
     return `tell application "System Events" to keystroke "q" using {control down, command down}`;
+};
+
+/**
+ * Hides the Messages app
+ */
+export const hideMessages = () => {
+    return `try
+        tell application "System Events" to tell process "Messages" to set visible to false
+    end try`;
 };
 
 /**
@@ -33,78 +100,48 @@ export const startMessages = () => {
 export const sendMessage = (chatGuid: string, message: string, attachment: string) => {
     if (!chatGuid || (!message && !attachment)) return null;
 
-    let attachmentScpt = "";
-    if (attachment && attachment.length > 0) {
-        attachmentScpt = `set theAttachment to "${escapeOsaExp(attachment)}" as POSIX file
-            send theAttachment to targetChat
-            delay 0.5`;
-    }
+    // Build the sending scripts
+    const attachmentScpt = buildAttachmentScript(attachment, "theAttachment", "targetChat");
+    const messageScpt = buildMessageScript(message, "targetChat");
 
-    let messageScpt = "";
-    if (message && message.length > 0) {
-        messageScpt = `send "${escapeOsaExp(message)}" to targetChat`;
-    }
+    // If it's not a GUID, throw an error
+    if (!chatGuid.includes(";")) throw new Error(`Invalid GUID! Can't send message to: ${chatGuid}`);
 
+    // Return the script
     return `tell application "Messages"
         set targetChat to a reference to chat id "${chatGuid}"
 
         ${attachmentScpt}
         ${messageScpt}
-    end tell
-
-    try
-        tell application "System Events" to tell process "Messages" to set visible to false
-    end try`;
-};
-
-const buildServiceScript = (inputService: string) => {
-    // Wrap the service in quotes if we are on < macOS 11 and it's not iMessage
-    let theService = inputService;
-    if (!isMinBigSur && theService !== "iMessage") {
-        theService = `"${theService}"`;
-    }
-
-    let serviceScript = `set targetService to 1st service whose service type = ${theService}`;
-    if (!isMinBigSur && theService !== "iMessage") {
-        serviceScript = `set targetService to service ${theService}`;
-    }
-
-    return serviceScript;
+    end tell`;
 };
 
 export const sendMessageFallback = (chatGuid: string, message: string, attachment: string) => {
     if (!chatGuid || (!message && !attachment)) return null;
 
-    let attachmentScpt = "";
-    if (attachment && attachment.length > 0) {
-        attachmentScpt = `set theAttachment to "${escapeOsaExp(attachment)}" as POSIX file
-            send theAttachment to targetBuddy
-            delay 0.5`;
+    // Build the sending scripts
+    const attachmentScpt = buildAttachmentScript(attachment);
+    const messageScpt = buildMessageScript(message);
+
+    // Extract the address and service from the input address/GUID
+    const address = getAddressFromInput(chatGuid);
+    const service = getServiceFromInput(chatGuid);
+
+    // If it starts with `chat`, it's a group chat, and we can't use this script for that
+    if (address.startsWith("chat")) {
+        throw new Error("Can't use the send message (fallback) script to text a group chat!");
     }
 
-    let messageScpt = "";
-    if (message && message.length > 0) {
-        messageScpt = `send "${escapeOsaExp(message)}" to targetBuddy`;
-    }
-
-    // Extract the address from the phone number
-    let address = chatGuid;
-    let service = address.startsWith("SMS") ? "SMS" : "iMessage";
-    if (!address.includes(";-;")) throw new Error("Cannot send message via fallback script");
-    [service, address] = address.split(";-;");
-
+    // Support older OS versions with their old naming scheme
+    const participant = isMinBigSur ? "participant" : "buddy";
     const serviceScript = buildServiceScript(service);
     return `tell application "Messages"
         ${serviceScript}
-        set targetBuddy to buddy "${address}" of targetService
+        set targetBuddy to ${participant} "${address}" of targetService
         
         ${attachmentScpt}
         ${messageScpt}
-    end tell
-
-    try
-        tell application "System Events" to tell process "Messages" to set visible to false
-    end try`;
+    end tell`;
 };
 
 /**
@@ -113,9 +150,9 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
 export const restartMessages = () => {
     return `tell application "Messages"
         quit
-        delay 0.5
+        delay 1
         reopen
-        delay 0.5
+        delay 1
     end tell`;
 };
 
