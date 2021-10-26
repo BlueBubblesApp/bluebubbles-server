@@ -49,6 +49,8 @@ export class ActionHandler {
             // Try to send the message
             await FileSystem.executeAppleScript(messageScript);
         } catch (ex: any) {
+            error = ex;
+
             const errMsg = (ex?.message ?? "") as string;
             const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
 

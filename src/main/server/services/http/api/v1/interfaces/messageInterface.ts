@@ -42,7 +42,8 @@ export class MessageInterface {
         method: "apple-script" | "private-api",
         subject?: string,
         effectId?: string,
-        selectedMessageGuid?: string
+        selectedMessageGuid?: string,
+        tempGuid?: string
     ): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -63,6 +64,16 @@ export class MessageInterface {
 
             // Attempt to send the message
             await ActionHandler.sendMessageHandler(chatGuid, message ?? "", null);
+
+            // If we have a tempGuid, it means we should add an item to the queue
+            if (tempGuid) {
+                const item = new Queue();
+                item.tempGuid = tempGuid;
+                item.chatGuid = chatGuid;
+                item.dateCreated = now;
+                item.text = message ?? "";
+                await Server().repo.queue().manager.save(item);
+            }
 
             // Return the promise
             return awaiter.promise;
@@ -88,7 +99,8 @@ export class MessageInterface {
     static async sendAttachmentSync(
         chatGuid: string,
         attachmentPath: string,
-        attachmentName?: string
+        attachmentName?: string,
+        attachmentGuid?: string
     ): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -109,6 +121,16 @@ export class MessageInterface {
 
         // Send the message
         await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
+
+        // If we were given a GUID (tempGuid), it means we have to add a "queue" item
+        if (attachmentGuid) {
+            const attachmentItem = new Queue();
+            attachmentItem.tempGuid = attachmentGuid;
+            attachmentItem.chatGuid = chatGuid;
+            attachmentItem.dateCreated = now;
+            attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
+            await Server().repo.queue().manager.save(attachmentItem);
+        }
 
         // Return the promise
         return awaiter.promise;

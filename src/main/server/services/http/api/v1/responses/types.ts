@@ -29,17 +29,16 @@ export type ErrorBody = {
     message: string;
 };
 
-export type ResponseFormat =
-    | {
-          status: ValidStatuses;
-          message: ResponseMessages | string;
-          encrypted?: boolean;
-          error?: ErrorBody;
-          data?: ResponseData;
-          metadata?: { [key: string]: any };
-      }
-    | string
-    | fs.ReadStream;
+export type ResponseJson = {
+    status: ValidStatuses;
+    message: ResponseMessages | string;
+    encrypted?: boolean;
+    error?: ErrorBody;
+    data?: ResponseData;
+    metadata?: { [key: string]: any };
+};
+
+export type ResponseFormat = ResponseJson | string | fs.ReadStream;
 
 export type ResponseParams = {
     message?: string;

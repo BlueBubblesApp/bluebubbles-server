@@ -15,7 +15,7 @@ import { FileSystem } from "@server/fileSystem";
 
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
-import { ResponseFormat } from "@server/services/http/api/v1/responses/types";
+import { ResponseFormat, ResponseJson } from "@server/services/http/api/v1/responses/types";
 import {
     createSuccessResponse,
     createServerErrorResponse,
@@ -43,7 +43,7 @@ const unknownError = "Unknown Error. Check server logs!";
 export class SocketRoutes {
     static createRoutes(socket: Socket) {
         const response = (callback: Function | null, channel: string | null, data: ResponseFormat): void => {
-            const resData = data;
+            const resData = data as ResponseJson;
             resData.encrypted = false;
 
             // Only encrypt coms enabled
@@ -52,11 +52,11 @@ export class SocketRoutes {
 
             // Don't encrypt the attachment, it's already encrypted
             if (encrypt) {
-                if (typeof data.data === "string" && channel !== "attachment-chunk") {
-                    resData.data = CryptoJS.AES.encrypt(data.data, passphrase).toString();
+                if (typeof resData.data === "string" && channel !== "attachment-chunk") {
+                    resData.data = CryptoJS.AES.encrypt(resData.data, passphrase).toString();
                     resData.encrypted = true;
                 } else if (channel !== "attachment-chunk") {
-                    resData.data = CryptoJS.AES.encrypt(JSON.stringify(data.data), passphrase).toString();
+                    resData.data = CryptoJS.AES.encrypt(JSON.stringify(resData.data), passphrase).toString();
                     resData.encrypted = true;
                 }
             }
@@ -64,7 +64,7 @@ export class SocketRoutes {
             if (callback) callback(resData);
             else socket.emit(channel, resData);
 
-            if (data.error) Server().log(data.error.message, "error");
+            if (resData.error) Server().log(resData.error.message, "error");
         };
 
         /**
@@ -615,16 +615,8 @@ export class SocketRoutes {
 
                 try {
                     // Send the message
-                    await ActionHandler.sendMessage(
-                        tempGuid,
-                        chatGuid,
-                        message,
-                        params?.attachmentGuid,
-                        params?.attachmentName,
-                        params?.attachment ? base64.base64ToBytes(params.attachment) : null
-                    );
-
-                    return response(cb, "message-sent", createSuccessResponse(null));
+                    const sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, "apple-script");
+                    return response(cb, "message-sent", createSuccessResponse(sentMessage));
                 } catch (ex: any) {
                     Server().httpService.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
@@ -669,7 +661,7 @@ export class SocketRoutes {
                 if (!hasMore && !tempGuid && (!message || message.length === 0))
                     return response(cb, "error", createBadRequestResponse("No temp GUID provided with message!"));
 
-                // If it's the last chunk, make sure there is a message
+                // If it's the last chunk, make sure there an attachment name
                 if (!hasMore && attachmentGuid && !params?.attachmentName)
                     return response(cb, "error", createBadRequestResponse("No attachment name provided"));
 
@@ -689,6 +681,10 @@ export class SocketRoutes {
                     // Add the image to the send cache
                     Server().httpService.sendCache.add(tempGuid);
 
+                    // Save the attachment parts to a file
+                    const attachmentPath = FileSystem.buildAttachmentChunks(attachmentGuid, params?.attachmentName);
+
+                    // Add the action to the queue
                     Server().queue.add({
                         type: "send-attachment",
                         data: {
@@ -697,7 +693,7 @@ export class SocketRoutes {
                             message,
                             attachmentGuid,
                             attachmentName: params?.attachmentName,
-                            chunks: attachmentGuid ? FileSystem.buildAttachmentChunks(attachmentGuid) : null
+                            attachmentPath
                         }
                     });
 
