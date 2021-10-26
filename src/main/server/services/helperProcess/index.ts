@@ -7,6 +7,7 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
 import { isMinBigSur, isMinMonteray } from "@server/helpers/utils";
+import { restartMessages } from "@server/fileSystem/scripts";
 
 import * as net from "net";
 import { ValidRemoveTapback } from "../../types";
@@ -94,6 +95,9 @@ export class BlueBubblesHelperService {
         if (writeCount === 0) {
             Server().log("Private API is enabled, but neither MySIMBL nor MacForge (MacEnhance) was found!", "warn");
         } else {
+            // Restart iMessage to "apply" the changes
+            Server().log("Restarting iMessage to apply Helper updates...");
+            await FileSystem.executeAppleScript(restartMessages());
             Server().log("Successfully installed latest Private API Helper Bundle!");
         }
     }

@@ -13,4 +13,13 @@ export class MacOsRouter {
             throw new ServerError({ message: "Failed to execute AppleScript!", error: ex?.message ?? ex.toString() });
         }
     }
+
+    static async restartMessagesApp(ctx: RouterContext, _: Next) {
+        try {
+            await MacOsInterface.restartMessagesApp();
+            return new Success(ctx, { message: "Successfully executed lock command!" }).send();
+        } catch (ex: any) {
+            throw new ServerError({ message: "Failed to execute AppleScript!", error: ex?.message ?? ex.toString() });
+        }
+    }
 }
