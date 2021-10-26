@@ -61,6 +61,11 @@ export class HttpRoutes {
                         method: HttpMethod.POST,
                         path: "lock",
                         controller: MacOsRouter.lock
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "imessage/restart",
+                        controller: MacOsRouter.restartMessagesApp
                     }
                 ]
             },

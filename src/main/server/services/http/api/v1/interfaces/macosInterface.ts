@@ -1,10 +1,14 @@
 import { FileSystem } from "@server/fileSystem";
-import { lockMacOs } from "@server/fileSystem/scripts";
+import { lockMacOs, restartMessages } from "@server/fileSystem/scripts";
 import { Server } from "@server/index";
 
 export class MacOsInterface {
     static async lock() {
         await FileSystem.executeAppleScript(lockMacOs());
+    }
+
+    static async restartMessagesApp() {
+        await FileSystem.executeAppleScript(restartMessages());
     }
 
     static async getMediaTotals({ only = ["image", "video", "location", "other"] }: { only?: string[] } = {}) {

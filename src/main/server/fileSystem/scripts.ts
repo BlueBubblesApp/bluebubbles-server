@@ -147,12 +147,11 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
 /**
  * The AppleScript used to restart iMessage
  */
-export const restartMessages = () => {
+export const restartMessages = (delaySeconds = 5) => {
     return `tell application "Messages"
         quit
-        delay 1
+        delay ${delaySeconds}
         reopen
-        delay 1
     end tell`;
 };
 

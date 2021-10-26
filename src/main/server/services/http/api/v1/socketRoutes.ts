@@ -616,7 +616,7 @@ export class SocketRoutes {
                 try {
                     // Send the message
                     const sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, "apple-script");
-                    return response(cb, "message-sent", createSuccessResponse(sentMessage));
+                    return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
                 } catch (ex: any) {
                     Server().httpService.sendCache.remove(tempGuid);
                     return response(cb, "send-message-error", createServerErrorResponse(ex.message));
