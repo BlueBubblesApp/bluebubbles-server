@@ -615,7 +615,15 @@ export class SocketRoutes {
 
                 try {
                     // Send the message
-                    const sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, "apple-script");
+                    const sentMessage = await MessageInterface.sendMessageSync(
+                        chatGuid,
+                        message,
+                        "apple-script",
+                        null,
+                        null,
+                        null,
+                        tempGuid
+                    );
                     return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
                 } catch (ex: any) {
                     Server().httpService.sendCache.remove(tempGuid);
