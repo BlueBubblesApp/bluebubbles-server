@@ -1,6 +1,7 @@
 import { FileSystem } from "@server/fileSystem";
 import { ActionHandler } from "@server/helpers/actions";
 import { Server } from "@server/index";
+import { MessageInterface } from "../http/api/v1/interfaces/messageInterface";
 
 export type QueueItem = {
     type: string;
@@ -37,19 +38,31 @@ export class QueueService {
                     await ActionHandler.openChat(item.data);
                     break;
                 case "send-attachment":
-                    await ActionHandler.sendMessage(
-                        item.data.tempGuid,
+                    // Send the attachment first
+                    await MessageInterface.sendAttachmentSync(
                         item.data.chatGuid,
-                        item.data.message,
-                        item.data.attachmentGuid,
+                        item.data.attachmentPath,
                         item.data.attachmentName,
-                        item.data.chunks
+                        item.data.attachmentGuid
                     );
 
-                    // After 10 minutes, delete the attachment chunks
+                    // Then send the message (if required)
+                    if (item.data.message && item.data.message.length > 0) {
+                        await MessageInterface.sendMessageSync(
+                            item.data.chatGuid,
+                            item.data.message,
+                            "apple-script",
+                            null,
+                            null,
+                            null,
+                            item.data.tempGuid
+                        );
+                    }
+
+                    // After 30 minutes, delete the attachment chunks
                     setTimeout(() => {
                         FileSystem.deleteChunks(item.data.attachmentGuid);
-                    }, 1000 * 60 * 10);
+                    }, 1000 * 60 * 30);
                     break;
                 default:
                     Server().log(`Unhandled queue item type: ${item.type}`, "warn");

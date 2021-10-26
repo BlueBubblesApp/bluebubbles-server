@@ -186,7 +186,7 @@ export class FileSystem {
      *
      * @param guid Unique identifier for the attachment
      */
-    static buildAttachmentChunks(guid: string): Uint8Array {
+    static buildAttachmentChunks(guid: string, name: string): string {
         let chunks = new Uint8Array(0);
 
         // Get the files in ascending order
@@ -199,7 +199,11 @@ export class FileSystem {
             chunks = concatUint8Arrays(chunks, Uint8Array.from(fileData));
         }
 
-        return chunks;
+        // Write the final file to disk
+        const outFile = path.join(FileSystem.attachmentsDir, guid, name);
+        fs.writeFileSync(outFile, chunks);
+
+        return outFile;
     }
 
     /**

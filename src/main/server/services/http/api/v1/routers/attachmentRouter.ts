@@ -2,19 +2,18 @@ import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { nativeImage } from "electron";
 import * as mime from "mime-types";
-import * as fs from "fs";
 
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { parseNumber, parseQuality } from "@server/services/http/helpers";
-import { createBadRequestResponse, createNotFoundResponse, createSuccessResponse } from "@server/helpers/responses";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { AttachmentInterface } from "../interfaces/attachmentInterface";
+import { FileStream, Success } from "../responses/success";
+import { NotFound } from "../responses/errors";
 
 export class AttachmentRouter {
     static async count(ctx: RouterContext, _: Next) {
         const total = await Server().iMessageRepo.getAttachmentCount();
-        ctx.body = createSuccessResponse({ total });
+        return new Success(ctx, { data: { total } }).send();
     }
 
     static async find(ctx: RouterContext, _: Next) {
@@ -22,13 +21,8 @@ export class AttachmentRouter {
 
         // Fetch the info for the attachment by GUID
         const attachment = await Server().iMessageRepo.getAttachment(guid);
-        if (!attachment) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Attachment does not exist!");
-            return;
-        }
-
-        ctx.body = createSuccessResponse(await getAttachmentResponse(attachment));
+        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
+        return new Success(ctx, { data: await getAttachmentResponse(attachment) }).send();
     }
 
     static async download(ctx: RouterContext, _: Next) {
@@ -37,11 +31,7 @@ export class AttachmentRouter {
 
         // Fetch the info for the attachment by GUID
         const attachment = await Server().iMessageRepo.getAttachment(guid);
-        if (!attachment) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Attachment does not exist!");
-            return;
-        }
+        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
 
         let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.mimeType ?? mime.lookup(aPath);
@@ -54,14 +44,13 @@ export class AttachmentRouter {
             const opts: Partial<Electron.ResizeOptions> = {};
 
             // Parse opts
-            const parsedWidth = parseNumber(width as string);
-            const parsedHeight = parseNumber(height as string);
-            const parsedQuality = parseQuality(quality as string);
+            const parsedWidth = width ? Number.parseInt(width as string, 10) : null;
+            const parsedHeight = height ? Number.parseInt(height as string, 10) : null;
 
             let newName = attachment.transferName;
-            if (parsedQuality) {
-                newName += `.${parsedQuality}`;
-                opts.quality = parsedQuality;
+            if (quality) {
+                newName += `.${quality as string}`;
+                opts.quality = quality as string;
             }
             if (parsedHeight) {
                 newName += `.${parsedHeight}`;
@@ -86,9 +75,7 @@ export class AttachmentRouter {
             mimeType = "image/png";
         }
 
-        const src = fs.createReadStream(aPath);
-        ctx.response.set("Content-Type", mimeType as string);
-        ctx.body = src;
+        return new FileStream(ctx, aPath, mimeType).send();
     }
 
     static async blurhash(ctx: RouterContext, _: Next) {
@@ -97,36 +84,21 @@ export class AttachmentRouter {
 
         // Fetch the info for the attachment by GUID
         const attachment = await Server().iMessageRepo.getAttachment(guid);
-        if (!attachment) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Attachment does not exist!");
-            return;
-        }
+        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
 
         const aPath = FileSystem.getRealPath(attachment.filePath);
         const mimeType = attachment.mimeType ?? mime.lookup(aPath);
 
         // Double-check the mime-type to make sure it's a valid attachment for that
         if (!mimeType || !mimeType.startsWith("image")) {
-            if (!attachment) {
-                ctx.status = 400;
-                ctx.body = createBadRequestResponse("This attachment is not an image!");
-                return;
-            }
-        }
-
-        // Validate the quality
-        if (quality && !["good", "better", "best"].includes(quality as string)) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Invalid quality! Must be one of: good, better, best");
-            return;
+            throw new NotFound({ error: "Attachment is not an image!" });
         }
 
         // Validate and set defaults for invalid values
-        let trueHeight = parseNumber(height as string);
-        let trueWidth = parseNumber(width as string);
-        if (trueHeight && trueHeight <= 0) trueHeight = 320;
-        if (trueWidth && trueWidth <= 0) trueWidth = 480;
+        let trueWidth = width ? Number.parseInt(width as string, 10) : null;
+        let trueHeight = height ? Number.parseInt(height as string, 10) : null;
+        if (!trueHeight || trueHeight <= 0) trueHeight = 320;
+        if (!trueWidth || trueWidth <= 0) trueWidth = 480;
 
         const blurhash = await AttachmentInterface.getBlurhash({
             filePath: aPath,
@@ -135,6 +107,6 @@ export class AttachmentRouter {
             quality
         });
 
-        ctx.body = createSuccessResponse(blurhash);
+        return new Success(ctx, { data: blurhash }).send();
     }
 }

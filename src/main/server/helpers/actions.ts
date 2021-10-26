@@ -6,7 +6,7 @@ import { MessagePromise } from "@server/services/messageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { ValidTapback } from "@server/types";
 import {
-    sendMessage,
+    sendMessage as buildSendMessageScript,
     startChat,
     renameGroupChat,
     addParticipant,
@@ -35,6 +35,65 @@ import { tapbackUIMap } from "./mappings";
  * variables
  */
 export class ActionHandler {
+    static sendMessageHandler = async (chatGuid: string, message: string, attachment: string) => {
+        // Build the message script
+        let messageScript = buildSendMessageScript(chatGuid, message ?? "", attachment);
+
+        // Start the message send workflow
+        //  1: Try sending using the input Chat GUID
+        //    1.a: If there is a timeout error, we should restart the Messages App and retry
+        //  2: If we still have an error, use the send message fallback script (only works for DMs)
+        //  3: If we still have an error, throw the error
+        let error;
+        try {
+            // Try to send the message
+            await FileSystem.executeAppleScript(messageScript);
+        } catch (ex: any) {
+            error = ex;
+
+            const errMsg = (ex?.message ?? "") as string;
+            const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
+
+            // If we hit specific errors, we should retry after restarting the Messages App
+            if (retry) {
+                try {
+                    await FileSystem.executeAppleScript(restartMessages());
+                    await FileSystem.executeAppleScript(messageScript);
+                } catch (ex2: any) {
+                    error = ex2;
+                }
+            }
+        }
+
+        // If we have an error, we should attempt to use the fallback script
+        if (error) {
+            // Clear the error
+            error = null;
+
+            try {
+                // Generate the new send script
+                messageScript = sendMessageFallback(chatGuid, message ?? "", attachment);
+                await FileSystem.executeAppleScript(messageScript);
+            } catch (ex: any) {
+                error = ex;
+            }
+        }
+
+        if (error) {
+            let msg = error?.message ?? error;
+
+            // If the error is a string and contains a specific error message,
+            // Re-throw the shortened error
+            if (msg instanceof String && msg.includes("execution error: ")) {
+                [, msg] = msg.split("execution error: ");
+                [msg] = msg.split(". (");
+            }
+
+            Server().log(msg, "warn");
+            throw new Error(msg);
+        }
+    };
+
     /**
      * Sends a message by executing the sendMessage AppleScript
      *
@@ -62,149 +121,34 @@ export class ActionHandler {
 
         Server().log(`Sending message "${message}" ${attachment ? "with attachment" : ""} to ${chatGuid}`, "debug");
 
-        try {
-            // Make sure messages is open
-            await FileSystem.startMessages();
+        // Make sure messages is open
+        await FileSystem.startMessages();
 
-            // We need offsets here due to iMessage's save times being a bit off for some reason
-            const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
+        // We need offsets here due to iMessage's save times being a bit off for some reason
+        const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
 
-            // Try to send the iMessage
-            try {
-                await FileSystem.executeAppleScript(
-                    sendMessage(
-                        chatGuid,
-                        message ?? "",
-                        attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
-                    )
-                );
-            } catch (ex: any) {
-                // Log the actual error
-                Server().log(ex);
+        // Build the send script
+        const theAttachment = attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null;
+        await ActionHandler.sendMessageHandler(chatGuid, message, theAttachment);
 
-                const errMsg = (ex?.message ?? "") as string;
-                const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
-
-                if (retry) {
-                    // If it's a plain ole retry case, retry after restarting Messages
-                    Server().log("Message send error. Trying to re-send message...");
-                    await FileSystem.executeAppleScript(restartMessages());
-                    await FileSystem.executeAppleScript(
-                        sendMessage(
-                            chatGuid,
-                            message ?? "",
-                            attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
-                        )
-                    );
-                } else if (errMsg.includes("-1728") && chatGuid.includes(";-;")) {
-                    // If our error has to do with not getting the chat ID, run the fallback script
-                    Server().log("Message send error (can't get chat id). Running fallback send script...");
-                    await FileSystem.executeAppleScript(
-                        sendMessageFallback(
-                            chatGuid,
-                            message ?? "",
-                            attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null
-                        )
-                    );
-                }
-            }
-
-            // Add queued item
-            if (message && message.length > 0) {
-                const item = new Queue();
-                item.tempGuid = tempGuid;
-                item.chatGuid = chatGuid;
-                item.dateCreated = now;
-                item.text = message ?? "";
-                await Server().repo.queue().manager.save(item);
-            }
-
-            // If there is an attachment, add that to the queue too
-            if (attachment && attachmentName) {
-                const attachmentItem = new Queue();
-                attachmentItem.tempGuid = attachmentGuid;
-                attachmentItem.chatGuid = chatGuid;
-                attachmentItem.dateCreated = now;
-                attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
-                await Server().repo.queue().manager.save(attachmentItem);
-            }
-        } catch (ex: any) {
-            let msg = ex.message;
-            if (msg instanceof String) {
-                [, msg] = msg.split("execution error: ");
-                [msg] = msg.split(". (");
-            }
-
-            Server().log(msg, "warn");
-            throw new Error(msg);
+        // If all is good (no errors), we should add the message to the outgoing queue)
+        if (message && message.length > 0) {
+            const item = new Queue();
+            item.tempGuid = tempGuid;
+            item.chatGuid = chatGuid;
+            item.dateCreated = now;
+            item.text = message ?? "";
+            await Server().repo.queue().manager.save(item);
         }
-    };
 
-    /**
-     * Sends a message by executing the sendMessage AppleScript
-     *
-     * @param chatGuid The GUID for the chat
-     * @param message The message to send
-     * @param attachmentName The name of the attachment to send (optional)
-     * @param attachment The bytes (buffer) for the attachment
-     *
-     * @returns The command line response
-     */
-    static sendAttachmentSync = async (
-        chatGuid: string,
-        attachmentPath: string,
-        attachmentName?: string
-    ): Promise<Message> => {
-        if (!chatGuid) throw new Error("No chat GUID provided");
-
-        // Copy the attachment to a more permanent storage
-        const newPath = FileSystem.copyAttachment(attachmentPath, attachmentName);
-
-        Server().log(`Sending attachment "${attachmentName}" to ${chatGuid}`, "debug");
-
-        try {
-            // Make sure messages is open
-            await FileSystem.startMessages();
-
-            // We need offsets here due to iMessage's save times being a bit off for some reason
-            const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-            const awaiter = new MessagePromise(chatGuid, `->${attachmentName}`, true, now);
-
-            // Add the promise to the manager
-            Server().messageManager.add(awaiter);
-
-            // Try to send the iMessage
-            try {
-                await FileSystem.executeAppleScript(sendMessage(chatGuid, "", newPath));
-            } catch (ex: any) {
-                // Log the actual error
-                Server().log(ex);
-
-                const errMsg = (ex?.message ?? "") as string;
-                const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
-
-                if (retry) {
-                    // If it's a plain ole retry case, retry after restarting Messages
-                    Server().log("Message send error. Trying to re-send message...");
-                    await FileSystem.executeAppleScript(restartMessages());
-                    await FileSystem.executeAppleScript(sendMessage(chatGuid, "", newPath));
-                } else if (errMsg.includes("-1728") && chatGuid.includes(";-;")) {
-                    // If our error has to do with not getting the chat ID, run the fallback script
-                    Server().log("Message send error (can't get chat id). Running fallback send script...");
-                    await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, "", newPath));
-                }
-            }
-
-            return awaiter.promise;
-        } catch (ex: any) {
-            let msg = ex.message;
-            if (msg instanceof String) {
-                [, msg] = msg.split("execution error: ");
-                [msg] = msg.split(". (");
-            }
-
-            Server().log(msg, "warn");
-            throw new Error(msg);
+        // If there is an attachment, add that to the queue too
+        if (attachment && attachmentName) {
+            const attachmentItem = new Queue();
+            attachmentItem.tempGuid = attachmentGuid;
+            attachmentItem.chatGuid = chatGuid;
+            attachmentItem.dateCreated = now;
+            attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
+            await Server().repo.queue().manager.save(attachmentItem);
         }
     };
 

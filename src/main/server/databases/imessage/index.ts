@@ -182,7 +182,7 @@ export class MessageRepository {
 
         // Add a handle query
         if (address) {
-            query.where("handle.id = :address", { address });
+            query.where("handle.id LIKE :address", { address: `%${address.replace("+", "")}` });
         }
 
         // Add pagination params

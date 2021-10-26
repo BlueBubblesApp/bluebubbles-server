@@ -1,13 +1,13 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
-import { createSuccessResponse } from "@server/helpers/responses";
 import { ContactInterface } from "../interfaces/contactInterface";
+import { Success } from "../responses/success";
 
 export class ContactRouter {
     static async get(ctx: RouterContext, _: Next) {
         const contacts = await ContactInterface.getAllContacts();
-        ctx.body = createSuccessResponse(contacts);
+        return new Success(ctx, { data: contacts }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
@@ -21,6 +21,6 @@ export class ContactRouter {
             res = await ContactInterface.queryContacts(addresses);
         }
 
-        ctx.body = createSuccessResponse(res);
+        return new Success(ctx, { data: res }).send();
     }
 }

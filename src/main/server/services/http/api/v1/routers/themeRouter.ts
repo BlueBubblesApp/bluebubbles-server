@@ -1,33 +1,12 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
-import { createBadRequestResponse, createSuccessResponse } from "@server/helpers/responses";
 import { BackupsInterface } from "../interfaces/backupsInterface";
+import { Success } from "../responses/success";
 
 export class ThemeRouter {
     static async create(ctx: RouterContext, _: Next) {
         const { name, data } = ctx.request.body;
-
-        // Validation: Name
-        if (!name) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("No name provided!");
-            return;
-        }
-
-        // Validation: Theme Data
-        if (!data) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("No theme data provided!");
-            return;
-        }
-
-        // Validation: Theme Data
-        if (typeof data !== "object" || Array.isArray(data)) {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Theme data must be a JSON object!");
-            return;
-        }
 
         // Safety to always have a name in the JSON dict if not provided
         if (!Object.keys(data).includes("name")) {
@@ -36,7 +15,7 @@ export class ThemeRouter {
 
         // Save the theme to a file
         await BackupsInterface.saveTheme(name, data);
-        ctx.body = createSuccessResponse("Successfully saved theme!");
+        return new Success(ctx, { message: "Successfully saved theme!" }).send();
     }
 
     static async get(ctx: RouterContext, _: Next) {
@@ -45,10 +24,12 @@ export class ThemeRouter {
 
         if (name && name.length > 0) {
             res = await BackupsInterface.getThemeByName(name);
+            if (!res) return new Success(ctx, { message: "No theme found!" }).send();
         } else {
             res = await BackupsInterface.getAllThemes();
+            if (!res) return new Success(ctx, { message: "No saved themes!" }).send();
         }
 
-        ctx.body = createSuccessResponse(res);
+        return new Success(ctx, { message: "Successfully fetched theme(s)!", data: res }).send();
     }
 }

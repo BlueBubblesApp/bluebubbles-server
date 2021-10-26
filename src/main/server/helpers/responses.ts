@@ -1,4 +1,9 @@
-import { ResponseFormat, ResponseMessages, ResponseData, ErrorTypes } from "@server/types";
+import {
+    ResponseFormat,
+    ResponseMessages,
+    ResponseData,
+    ErrorTypes
+} from "@server/services/http/api/v1/responses/types";
 
 export const createSuccessResponse = (
     data: ResponseData,

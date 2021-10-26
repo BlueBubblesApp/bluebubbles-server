@@ -2,20 +2,13 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { Server } from "@server/index";
-import { checkPrivateApiStatus } from "@server/helpers/utils";
-import { ErrorTypes } from "@server/types";
-import {
-    createBadRequestResponse,
-    createNotFoundResponse,
-    createServerErrorResponse,
-    createSuccessResponse
-} from "@server/helpers/responses";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 
-import { parseNumber } from "../../../helpers";
 import { ChatInterface } from "../interfaces/chatInterface";
+import { Success } from "../responses/success";
+import { IMessageError, NotFound } from "../responses/errors";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -29,10 +22,8 @@ export class ChatRouter {
             serviceCounts[chat.serviceName] += 1;
         }
 
-        ctx.body = createSuccessResponse({
-            total: chats.length,
-            breakdown: serviceCounts
-        });
+        const data = { total: chats.length, breakdown: serviceCounts };
+        return new Success(ctx, { data }).send();
     }
 
     static async find(ctx: RouterContext, _: Next) {
@@ -49,18 +40,14 @@ export class ChatRouter {
             withParticipants
         });
 
-        if (!chats || chats.length === 0) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Chat does not exist!");
-            return;
-        }
+        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
 
         const res = await getChatResponse(chats[0]);
         if (withLastMessage) {
             res.lastMessage = await getMessageResponse(await Server().iMessageRepo.getChatLastMessage(ctx.params.guid));
         }
 
-        ctx.body = createSuccessResponse(res);
+        return new Success(ctx, { data: res }).send();
     }
 
     static async getMessages(ctx: RouterContext, _: Next) {
@@ -71,17 +58,7 @@ export class ChatRouter {
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
         const withSMS = withQuery.includes("sms");
-        const sort = ["DESC", "ASC"].includes(((ctx.request.query?.sort as string) ?? "").toLowerCase())
-            ? ctx.request.query?.sort
-            : "DESC";
-        const after = ctx.request.query?.after;
-        const before = ctx.request.query?.before;
-
-        // Pull the pagination params and make sure they are correct
-        let offset = parseNumber(ctx.request.query?.offset as string) ?? 0;
-        let limit = parseNumber(ctx.request.query?.limit as string) ?? 100;
-        if (offset < 0) offset = 0;
-        if (limit < 0 || limit > 1000) limit = 1000;
+        const { sort, before, after, offset, limit } = ctx?.request.query;
 
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
@@ -89,22 +66,18 @@ export class ChatRouter {
             withParticipants: false
         });
 
-        if (!chats || chats.length === 0) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Chat does not exist!");
-            return;
-        }
+        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
 
         const opts: DBMessageParams = {
             chatGuid: ctx.params.guid,
             withAttachments,
             withHandle,
             withSMS,
-            offset,
-            limit,
+            offset: offset ? Number.parseInt(offset as string, 10) : 0,
+            limit: limit ? Number.parseInt(limit as string, 10) : 100,
             sort: sort as "ASC" | "DESC",
-            before: Number.parseInt(before as string, 10),
-            after: Number.parseInt(after as string, 10)
+            before: before ? Number.parseInt(before as string, 10) : null,
+            after: after ? Number.parseInt(after as string, 10) : null
         };
 
         // Fetch the info for the message by GUID
@@ -114,7 +87,7 @@ export class ChatRouter {
             results.push(await getMessageResponse(msg));
         }
 
-        ctx.body = createSuccessResponse(results);
+        return new Success(ctx, { data: results }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
@@ -129,35 +102,17 @@ export class ChatRouter {
         const withSMS = withQuery.includes("sms");
         const withArchived = withQuery.includes("archived");
         const guid = body?.guid;
-        let sort = body?.sort ?? "";
+        const { sort, offset, limit } = body;
 
-        // Validate sort param
-        if (typeof sort !== "string") {
-            ctx.status = 400;
-            ctx.body = createBadRequestResponse("Sort parameter must be a string!");
-            return;
-        }
-
-        sort = sort.toLowerCase();
-        const validSorts = ["lastmessage"];
-        if (!validSorts.includes(sort)) {
-            sort = null;
-        }
-
-        // Pull the pagination params and make sure they are correct
-        let offset = parseNumber(body?.offset as string) ?? 0;
-        let limit = parseNumber(body?.limit as string) ?? 1000;
-        if (offset < 0) offset = 0;
-        if (limit < 0 || limit > 1000) limit = 1000;
-
+        // Fetch the chats
         const results = await ChatInterface.get({
             guid,
             withSMS,
             withParticipants,
             withLastMessage,
             withArchived,
-            offset,
-            limit,
+            offset: offset ? Number.parseInt(offset, 10) : 0,
+            limit: limit ? Number.parseInt(limit, 10) : 1000,
             sort
         });
 
@@ -168,7 +123,7 @@ export class ChatRouter {
             limit
         };
 
-        ctx.body = createSuccessResponse(results, null, metadata);
+        return new Success(ctx, { data: results, metadata }).send();
     }
 
     static async update(ctx: RouterContext, _: Next): Promise<void> {
@@ -176,25 +131,13 @@ export class ChatRouter {
         const { guid } = ctx.params;
         const displayName = body?.displayName;
 
-        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
-        if (!enablePrivateApi) {
-            ctx.status = 404;
-            ctx.body = createServerErrorResponse("Private API is not enabled!", ErrorTypes.IMESSAGE_ERROR);
-            return;
-        }
-
         const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
-        if (!chats || chats.length === 0) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Chat does not exist!");
-            return;
-        }
+        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
 
         let chat = chats[0];
-
         const updated = [];
         const errors: string[] = [];
-        if (displayName && displayName.length !== 0) {
+        if (displayName) {
             try {
                 chat = await ChatInterface.setDisplayName(chat, displayName);
                 updated.push("displayName");
@@ -204,22 +147,18 @@ export class ChatRouter {
         }
 
         if (errors && errors.length > 0) {
-            ctx.body = createServerErrorResponse(
-                errors.join(", "),
-                ErrorTypes.IMESSAGE_ERROR,
-                `Chat update executed with errors!`
-            );
-        } else if (updated.length === 0) {
-            ctx.body = createSuccessResponse(
-                await getChatResponse(chat),
-                "Chat not updated! No update information provided!"
-            );
-        } else {
-            ctx.body = createSuccessResponse(
-                await getChatResponse(chat),
-                `Successfully updated the following fields: ${updated.join(", ")}`
-            );
+            throw new IMessageError({ message: "Chat update executed with errors!", error: errors.join(", ") });
         }
+
+        const data = await getChatResponse(chat);
+        if (updated.length === 0) {
+            return new Success(ctx, { data, message: "Chat not updated! No update information provided!" }).send();
+        }
+
+        return new Success(ctx, {
+            message: `Successfully updated the following fields: ${updated.join(", ")}`,
+            data
+        }).send();
     }
 
     static async create(ctx: RouterContext, _: Next): Promise<void> {
@@ -227,21 +166,10 @@ export class ChatRouter {
         const addresses = body?.addresses;
         const message = body?.message;
 
-        const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
-        if (!enablePrivateApi) {
-            ctx.status = 404;
-            ctx.body = createServerErrorResponse("Private API is not enabled!", ErrorTypes.IMESSAGE_ERROR);
-            return;
-        }
-
         const chat = await ChatInterface.create(addresses, message);
-        if (!chat) {
-            ctx.status = 404;
-            ctx.body = createServerErrorResponse("Failed to create chat!", ErrorTypes.IMESSAGE_ERROR);
-            return;
-        }
+        if (!chat) throw new IMessageError({ error: "Failed to create chat!" });
 
-        ctx.body = createSuccessResponse(await getChatResponse(chat), `Successfully executed create chat command!`);
+        return new Success(ctx, { data: await getChatResponse(chat), message: "Successfully created chat!" }).send();
     }
 
     static async addParticipant(ctx: RouterContext, next: Next): Promise<void> {
@@ -257,23 +185,13 @@ export class ChatRouter {
         const { guid } = ctx.params;
         const address = body?.address;
 
-        if (!address || address.length === 0) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Participant address not provided!");
-            return;
-        }
-
         const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
-        if (!chats || chats.length === 0) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Chat does not exist!");
-            return;
-        }
+        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
 
         // Add the participant to the chat
         let chat = chats[0];
         chat = await ChatInterface.toggleParticipant(chat, address, action);
 
-        ctx.body = createSuccessResponse(await getChatResponse(chat), `Successfully added participant!`);
+        return new Success(ctx, { data: await getChatResponse(chat) }).send();
     }
 }
