@@ -67,6 +67,7 @@ export class FCMService {
      */
     async setServerUrl(serverUrl: string): Promise<void> {
         if (!(await this.start())) return;
+        if (!serverUrl) return;
 
         Server().log("Updating Server Address in Firebase Database...");
 
@@ -158,15 +159,24 @@ export class FCMService {
 
                 // Read over the errors and log the errors
                 for (const i of res.results) {
-                    // Ignore token not registered errors
-                    if (i.error && i.error.code !== "messaging/registration-token-not-registered") {
-                        Server().log(
-                            `Firebase returned the following error (Code: ${i.error.code}): ${i.error.message}`,
-                            "debug"
-                        );
+                    if (i.error) {
+                        if (i.error.code === "messaging/payload-size-limit-exceeded") {
+                            // Manually handle the size limit error
+                            Server().log(
+                                "Could not send Firebase Notification due to payload exceeding size limits!",
+                                "warn"
+                            );
+                            Server().log(`Failed notification Payload: ${JSON.stringify(data)}`, "debug");
+                        } else if (i.error.code !== "messaging/registration-token-not-registered") {
+                            // Ignore token not registered errors
+                            Server().log(
+                                `Firebase returned the following error (Code: ${i.error.code}): ${i.error.message}`,
+                                "debug"
+                            );
 
-                        if (i.error?.stack) {
-                            Server().log(`Firebase Stacktrace: ${i.error.stack}`, "debug");
+                            if (i.error?.stack) {
+                                Server().log(`Firebase Stacktrace: ${i.error.stack}`, "debug");
+                            }
                         }
                     }
                 }

@@ -155,9 +155,10 @@ export class HttpService {
                     Server().log("Socket not listening! Restarting...", "error");
                     this.restart();
                 }
-            } catch (ex: any) {
-                Server().log("Unable to start socket status listener!", "error");
-                Server().log(ex, "debug");
+            } catch {
+                // Don't show an error, I believe this throws a "false error".
+                // For instance, if the proxy service doesn't start, and the command returns
+                // nothing, it thinks it's an actual error, which it isn't
             }
         }, 1000 * 60); // Check every minute
     }

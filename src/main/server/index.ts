@@ -41,7 +41,7 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
-import { insertChatParticipants, sanitizeStr } from "./helpers/utils";
+import { insertChatParticipants, isMinBigSur, sanitizeStr } from "./helpers/utils";
 import { Proxy } from "./services/proxy";
 import { BlueBubblesHelperService } from "./services/helperProcess";
 
@@ -358,13 +358,13 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Log some server metadata
+        this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
 
         // Check if on Big Sur. If we are, then create a log/alert saying that
-        const isBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
-        if (isBigSur) {
-            this.log("Warning: macOS Big Sur does NOT support creating chats due to API limitations!", "warn");
+        if (isMinBigSur) {
+            this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "warn");
         }
 
         this.log("Finished pre-start checks...");
