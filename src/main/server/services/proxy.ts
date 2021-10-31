@@ -28,7 +28,7 @@ abstract class Proxy {
         if (!lastConn) return true;
 
         const threshold = 1000 * 60 * 2; // 2 minutes
-        return lastConn - now > threshold;
+        return now - lastConn > threshold;
     }
 
     constructor(opts: ProxyOptions) {
