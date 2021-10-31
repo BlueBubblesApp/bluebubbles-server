@@ -3,7 +3,7 @@ import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
 import { getCacheName } from "@server/databases/imessage/helpers/utils";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { onlyAlphaNumeric } from "@server/helpers/utils";
+import { onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
 import { ChangeListener } from "./changeListener";
 
 export class OutgoingMessageListener extends ChangeListener {
@@ -133,17 +133,22 @@ export class OutgoingMessageListener extends ChangeListener {
             // Add to cache
             this.cache.add(cacheName);
 
-            // Resolve the promise
+            // Resolve the promise for sent messages from a client
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
                 Server().messageManager.promises[idx].resolve(entry);
+
+                // If we have a message match, we want the message match event to
+                // get to the clients first, so I'm adding an artificial delay.
+                // This _only_ applies when a message match is found, meaning you
+                // sent it from a client
+                setTimeout(() => {
+                    super.emit("new-entry", entry);
+                }, 1000);
             }
 
-            // Emit the message
-            super.emit("new-entry", entry);
-
             // Add artificial delay so we don't overwhelm any listeners
-            await new Promise<void>((resolve, _) => setTimeout(() => resolve(), 200));
+            await waitMs(200);
         }
 
         // Emit the errored messages
@@ -166,7 +171,7 @@ export class OutgoingMessageListener extends ChangeListener {
             super.emit("message-send-error", entry);
 
              // Add artificial delay so we don't overwhelm any listeners
-             await new Promise<void>((resolve, _) => setTimeout(() => resolve(), 200));
+             await waitMs(200);
         }
     }
 
@@ -185,10 +190,6 @@ export class OutgoingMessageListener extends ChangeListener {
                 }
             ]
         });
-
-        if (entries.length > 0) {
-            Server().log(`Detected ${entries.length} updated message(s)`, "debug");
-        }
 
         // Emit the new message
         for (const entry of entries) {
@@ -211,7 +212,7 @@ export class OutgoingMessageListener extends ChangeListener {
             super.emit("updated-entry", entry);
 
             // Add artificial delay so we don't overwhelm any listeners
-            await new Promise<void>((resolve, _) => setTimeout(() => resolve(), 200));
+            await waitMs(200);
         }
     }
 }

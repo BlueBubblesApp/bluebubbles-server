@@ -579,7 +579,7 @@ export class SocketRoutes {
         socket.on(
             "send-message",
             async (params, cb): Promise<void> => {
-                const tempGuid = params?.tempGuid;
+                let tempGuid = params?.tempGuid;
                 const chatGuid = params?.guid;
                 const message = params?.message;
 
@@ -609,6 +609,10 @@ export class SocketRoutes {
                 if (Server().httpService.sendCache.find(tempGuid)) {
                     return response(cb, "error", createBadRequestResponse(
                         `Message is already queued to be sent (Temp GUID: ${tempGuid})!`));
+                }
+
+                if (typeof tempGuid === 'number') {
+                    tempGuid = String(tempGuid);
                 }
 
                 if (tempGuid && tempGuid.trim().length > 0) {
