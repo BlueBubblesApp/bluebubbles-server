@@ -15,6 +15,7 @@ export class EventCache {
     }
 
     add(item: string): boolean {
+        if (!item || item.trim().length === 0) return false;
         if (this.items.includes(item)) return false;
         this.items.push(item);
         return true;

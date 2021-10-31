@@ -1,9 +1,7 @@
 /* eslint-disable max-len */
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { Queue } from "@server/databases/server/entity/Queue";
 import { MessagePromise } from "@server/services/messageManager/messagePromise";
-import { Message } from "@server/databases/imessage/entity/Message";
 import { ValidTapback } from "@server/types";
 import {
     sendMessage as buildSendMessageScript,
@@ -28,6 +26,7 @@ import {
     slugifyAddress
 } from "./utils";
 import { tapbackUIMap } from "./mappings";
+
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -127,28 +126,44 @@ export class ActionHandler {
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
 
+        // Create the awaiter
+        let messageAwaiter = null;
+        if (message && message.length > 0) {
+            messageAwaiter = new MessagePromise(chatGuid, message, false, now);
+            Server().log(`Adding await for chat: "${chatGuid}"; text: ${messageAwaiter.text}`);
+            Server().messageManager.add(messageAwaiter);
+        }
+
+        // Create the awaiter
+        let attachmentAwaiter = null;
+        if (attachment && attachmentName) {
+            attachmentAwaiter = new MessagePromise(chatGuid, `->${attachmentName}`, true, now);
+            Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${attachmentName}`);
+            Server().messageManager.add(attachmentAwaiter);
+        }
+
         // Build the send script
         const theAttachment = attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null;
         await ActionHandler.sendMessageHandler(chatGuid, message, theAttachment);
 
-        // If all is good (no errors), we should add the message to the outgoing queue)
-        if (message && message.length > 0) {
-            const item = new Queue();
-            item.tempGuid = tempGuid;
-            item.chatGuid = chatGuid;
-            item.dateCreated = now;
-            item.text = message ?? "";
-            await Server().repo.queue().manager.save(item);
+        // Wait for the attachment first
+        if (attachmentAwaiter) {
+            const sentAttachment = await attachmentAwaiter.promise;
+
+            // If we have a sent message and we have a tempGuid, we need to emit the message match event
+            if (sentAttachment && attachmentGuid && attachmentGuid.trim().length > 0) {
+                Server().emitMessageMatch(sentAttachment, attachmentGuid);
+            }
         }
 
-        // If there is an attachment, add that to the queue too
-        if (attachment && attachmentName) {
-            const attachmentItem = new Queue();
-            attachmentItem.tempGuid = attachmentGuid;
-            attachmentItem.chatGuid = chatGuid;
-            attachmentItem.dateCreated = now;
-            attachmentItem.text = `${attachmentGuid}->${attachmentName}`;
-            await Server().repo.queue().manager.save(attachmentItem);
+        // Next, wait for the message
+        if (messageAwaiter) {
+            const sentMessage = await messageAwaiter.promise;
+
+            // If we have a sent message and we have a tempGuid, we need to emit the message match event
+            if (sentMessage && tempGuid && tempGuid.trim().length > 0) {
+                Server().emitMessageMatch(sentMessage, tempGuid);
+            }
         }
     };
 

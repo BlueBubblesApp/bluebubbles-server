@@ -607,7 +607,12 @@ export class SocketRoutes {
 
                 // Make sure the message isn't already in the queue
                 if (Server().httpService.sendCache.find(tempGuid)) {
-                    return response(cb, "error", createBadRequestResponse("Message is already queued to be sent!"));
+                    return response(cb, "error", createBadRequestResponse(
+                        `Message is already queued to be sent (Temp GUID: ${tempGuid})!`));
+                }
+
+                if (tempGuid && tempGuid.trim().length > 0) {
+                    Server().log(`Sending message using Temp GUID: ${tempGuid}`, 'debug');
                 }
 
                 // Add to send cache

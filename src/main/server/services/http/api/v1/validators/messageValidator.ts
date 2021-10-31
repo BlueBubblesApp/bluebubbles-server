@@ -50,7 +50,7 @@ export class MessageValidator {
 
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
-            throw new BadRequest({ error: "Message is already queued to be sent!" });
+            throw new BadRequest({ error: `Message is already queued to be sent! (Temp GUID: ${tempGuid})` });
         }
 
         await next();
@@ -68,7 +68,7 @@ export class MessageValidator {
 
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
-            throw new BadRequest({ error: "Message is already queued to be sent!" });
+            throw new BadRequest({ error: "Attachment is already queued to be sent!" });
         }
 
         // Make sure the message isn't already in the queue

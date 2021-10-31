@@ -316,10 +316,10 @@ export class BlueBubblesHelperService {
             // Handle events sent from
             if (data.event) {
                 if (data.event === "started-typing") {
-                    Server().emitMessage("typing-indicator", { display: true, guid: data.guid });
+                    Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
                     Server().log(`Started typing! ${data.guid}`);
                 } else if (data.event === "stopped-typing") {
-                    Server().emitMessage("typing-indicator", { display: false, guid: data.guid });
+                    Server().emitMessage("typing-indicator", { display: false, guid: data.guid }, "normal", false);
                     Server().log(`Stopped typing! ${data.guid}`);
                 }
             }

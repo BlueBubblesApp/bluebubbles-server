@@ -171,7 +171,7 @@ export class FCMService {
                             // Ignore token not registered errors
                             Server().log(
                                 `Firebase returned the following error (Code: ${i.error.code}): ${i.error.message}`,
-                                "debug"
+                                "error"
                             );
 
                             if (i.error?.stack) {
