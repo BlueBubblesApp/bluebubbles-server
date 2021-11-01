@@ -134,14 +134,7 @@ export class MessageRouter {
     static async sendText(ctx: RouterContext, _: Next) {
         let { tempGuid, message, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
 
-        // Default the method to AppleScript
-        method = method ?? "apple-script";
-
-        // If we have an effectId or subject, let's imply we want to use
-        // the Private API
-        if (effectId || subject || selectedMessageGuid) {
-            method = "private-api";
-        }
+        
 
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
