@@ -37,7 +37,7 @@ export class MessageValidator {
 
     static sendTextRules = {
         chatGuid: "required|string",
-        tempGuid: "required|string",
+        tempGuid: "string",
         message: "present|string",
         method: "string|in:apple-script,private-api",
         effectId: "string",
@@ -46,11 +46,30 @@ export class MessageValidator {
     };
 
     static async validateText(ctx: RouterContext, next: Next) {
-        const { tempGuid } = ValidateInput(ctx.request.body, MessageValidator.sendTextRules);
+        const { tempGuid, method, effectId, subject, selectedMessageGuid } = ValidateInput(
+            ctx.request.body, MessageValidator.sendTextRules);
+        let saniMethod = method;
+
+        // Default the method to AppleScript
+        saniMethod = saniMethod ?? "apple-script";
+
+        // If we have an effectId or subject, let's imply we want to use
+        // the Private API
+        if (effectId || subject || selectedMessageGuid) {
+            saniMethod = "private-api";
+        }
+
+        // If we are sending via apple-script, we require a tempGuid
+        if (saniMethod === 'apple-script' && (!tempGuid ||tempGuid.trim().length === 0)) {
+            throw new BadRequest({ error: `A 'tempGuid' is required when sending via AppleScript` });
+        }
+
+        // Inject the method (we have to force it to thing it's anything)
+        (ctx.request.body as any).method = saniMethod;
 
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
-            throw new BadRequest({ error: "Message is already queued to be sent!" });
+            throw new BadRequest({ error: `Message is already queued to be sent! (Temp GUID: ${tempGuid})` });
         }
 
         await next();
@@ -68,7 +87,7 @@ export class MessageValidator {
 
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
-            throw new BadRequest({ error: "Message is already queued to be sent!" });
+            throw new BadRequest({ error: "Attachment is already queued to be sent!" });
         }
 
         // Make sure the message isn't already in the queue

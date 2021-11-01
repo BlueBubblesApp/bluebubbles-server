@@ -186,7 +186,7 @@
         "koa-cors": "^0.0.16",
         "koa-json": "^2.0.2",
         "koa-router": "^10.1.1",
-        "localtunnel": "^2.0.1",
+        "localtunnel": "^2.0.2",
         "macos-version": "^5.2.0",
         "mime-types": "^2.1.32",
         "ngrok": "^4.2.2",

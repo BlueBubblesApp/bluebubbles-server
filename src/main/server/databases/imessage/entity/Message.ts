@@ -8,10 +8,48 @@ import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { isMinBigSur, isMinCatalina, isMinSierra } from "@server/helpers/utils";
+import { isMinBigSur, isMinCatalina, isMinSierra, sanitizeStr } from "@server/helpers/utils";
+import { invisibleMediaChar } from "@server/services/http/constants";
 
 @Entity("message")
 export class Message {
+    contentString(maxText = 15): string {
+        let text = sanitizeStr((this.text ?? '').replace(invisibleMediaChar, ''));
+        const textLen = text.length;
+        const attachments = this.attachments ?? [];
+        const attachmentsLen = attachments.length;
+        let subject = this.subject ?? '';
+        const subjectLen = subject.length;
+
+        // Build the content
+        const parts = [];
+
+        // If we have text, add it, but with the max length taken into account
+        if (textLen > 0) {
+            if (textLen > maxText) {
+                text = `${text.substring(0, maxText)}...`;
+            }
+
+            parts.push(`"${text}"`);
+        } else {
+            parts.push(`<No Text>`);
+        }
+
+        // If we have a subject, add it, but with the max length taken into account
+        if (subjectLen > 0) {
+            if (subjectLen > maxText) {
+                subject = `${subject.substring(0, maxText)}...`;
+            }
+
+            parts.push(`Subject: "${subject}"`);
+        }
+
+        // If we have attachments, print those out
+        if (attachmentsLen > 0) parts.push(`Attachments: ${attachmentsLen}`);
+
+        return parts.join('; ');
+    }
+
     @PrimaryGeneratedColumn({ name: "ROWID" })
     ROWID: number;
 

@@ -103,8 +103,8 @@ export class ChatInterface {
         while (newName === prevName) {
             tryCount += 1;
 
-            // If we've tried 10 times and there is no change, break out (~5 seconds)
-            if (tryCount >= 10) break;
+            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            if (tryCount >= 20) break;
 
             // Give it a bit to execute
             await waitMs(500);
@@ -147,8 +147,8 @@ export class ChatInterface {
         while (chats.length === 0) {
             tryCount += 1;
 
-            // If we've tried 10 times and there is no change, break out (~5 seconds)
-            if (tryCount >= 10) break;
+            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            if (tryCount >= 20) break;
 
             // Give it a bit to execute
             await waitMs(500);
@@ -183,8 +183,8 @@ export class ChatInterface {
         while (newCount === prevCount) {
             tryCount += 1;
 
-            // If we've tried 10 times and there is no change, break out (~5 seconds)
-            if (tryCount >= 10) break;
+            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            if (tryCount >= 20) break;
 
             // Give it a bit to execute
             await waitMs(500);

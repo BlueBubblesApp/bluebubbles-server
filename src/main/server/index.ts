@@ -41,7 +41,7 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
-import { insertChatParticipants, sanitizeStr } from "./helpers/utils";
+import { insertChatParticipants, isMinBigSur, sanitizeStr } from "./helpers/utils";
 import { Proxy } from "./services/proxy";
 import { BlueBubblesHelperService } from "./services/helperProcess";
 
@@ -358,13 +358,13 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Log some server metadata
+        this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
 
         // Check if on Big Sur. If we are, then create a log/alert saying that
-        const isBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
-        if (isBigSur) {
-            this.log("Warning: macOS Big Sur does NOT support creating chats due to API limitations!", "warn");
+        if (isMinBigSur) {
+            this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "warn");
         }
 
         this.log("Finished pre-start checks...");
@@ -464,11 +464,11 @@ class BlueBubblesServer extends EventEmitter {
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal") {
+    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal", sendFcmMessage = true) {
         this.httpService.socketServer.emit(type, data);
 
         // Send notification to devices
-        if (FCMService.getApp()) {
+        if (sendFcmMessage && FCMService.getApp()) {
             const devices = await this.repo.devices().find();
             if (!devices || devices.length === 0) return;
 
@@ -493,6 +493,17 @@ class BlueBubblesServer extends EventEmitter {
         } else {
             this.emitToUI("theme-update", "light");
         }
+    }
+
+    async emitMessageMatch(message: Message, tempGuid: string) {
+        const newMessage = await insertChatParticipants(message);
+        this.log(`Message match found for text, [${newMessage.contentString()}]`);
+
+        const resp = await getMessageResponse(newMessage);
+        resp.tempGuid = tempGuid;
+
+        // We are emitting this as a new message, the only difference being the included tempGuid
+        await this.emitMessage("new-message", resp);
     }
 
     /**
@@ -528,33 +539,13 @@ class BlueBubblesServer extends EventEmitter {
         this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
 
         /**
-         * Message listener for when we find matches for a given sent message
-         */
-        outgoingMsgListener.on("message-match", async (item: { tempGuid: string; message: Message }) => {
-            const text = item.message.cacheHasAttachments
-                ? `Attachment: ${sanitizeStr(item.message.text) || "<No Text>"}`
-                : item.message.text;
-
-            this.log(`Message match found for text, [${text}]`);
-
-            const newMessage = await insertChatParticipants(item.message);
-            const resp = await getMessageResponse(newMessage);
-            resp.tempGuid = item.tempGuid;
-
-            // We are emitting this as a new message, the only difference being the included tempGuid
-            await this.emitMessage("new-message", resp);
-        });
-
-        /**
          * Message listener for my messages only. We need this because messages from ourselves
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
         outgoingMsgListener.on("new-entry", async (item: Message) => {
-            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
-            this.log(`New message from [You]: [${(text ?? "<No Text>").substring(0, 50)}]`);
-
             const newMessage = await insertChatParticipants(item);
+            this.log(`New Message from You, ${newMessage.contentString()}`)
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(newMessage));
@@ -565,44 +556,26 @@ class BlueBubblesServer extends EventEmitter {
          * delivered date or read date have changed since the last time we checked the database.
          */
         outgoingMsgListener.on("updated-entry", async (item: Message) => {
+            const newMessage = await insertChatParticipants(item);
+
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
-            const from = item.isFromMe ? "You" : item.handle?.id;
-            const time = item.dateDelivered || item.dateRead;
-            const updateType = item.dateRead ? "Text Read" : "Text Delivered";
-            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
-            this.log(
-                `Updated message from [${from}]: [${(text ?? "<No Text>").substring(
-                    0,
-                    50
-                )}] - [${updateType} -> ${time.toLocaleString()}]`
+            const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
+            const time = newMessage.dateDelivered || newMessage.dateRead;
+            const updateType = newMessage.dateRead ? "Text Read" : "Text Delivered";
+            this.log(`Updated message from [${from}]: [${
+                newMessage.contentString()}] - [${updateType} -> ${time.toLocaleString()}]`
             );
-
-            const newMessage = await insertChatParticipants(item);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("updated-message", await getMessageResponse(newMessage));
         });
 
         /**
-         * Message listener for outgoing messages that timedout
-         */
-        outgoingMsgListener.on("message-timeout", async (item: Queue) => {
-            const text = (item.text ?? "").startsWith(item.tempGuid) ? "image" : `text, [${item.text ?? "<No Text>"}]`;
-            this.log(`Message send timeout for ${text}`, "warn");
-            await this.emitMessage("message-timeout", item);
-        });
-
-        /**
          * Message listener for messages that have errored out
          */
         outgoingMsgListener.on("message-send-error", async (item: Message) => {
-            const text = item.cacheHasAttachments
-                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
-                : item.text;
-            this.log(`Failed to send message: [${(text ?? "<No Text>").substring(0, 50)}]`);
-
-            // Emit it to the socket and FCM devices
+            this.log(`Failed to send message: [${item.contentString()}]`);
 
             /**
              * ERROR CODES:
@@ -616,12 +589,8 @@ class BlueBubblesServer extends EventEmitter {
          * for why we separate them out into two separate listeners.
          */
         incomingMsgListener.on("new-entry", async (item: Message) => {
-            const text = item.cacheHasAttachments
-                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
-                : item.text;
-            this.log(`New message from [${item.handle?.id}]: [${(text ?? "<No Text>").substring(0, 50)}]`);
-
             const newMessage = await insertChatParticipants(item);
+            this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(newMessage), "high");

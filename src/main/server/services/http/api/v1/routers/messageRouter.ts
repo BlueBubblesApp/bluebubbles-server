@@ -134,14 +134,7 @@ export class MessageRouter {
     static async sendText(ctx: RouterContext, _: Next) {
         let { tempGuid, message, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
 
-        // Default the method to AppleScript
-        method = method ?? "apple-script";
-
-        // If we have an effectId or subject, let's imply we want to use
-        // the Private API
-        if (effectId || subject || selectedMessageGuid) {
-            method = "private-api";
-        }
+        
 
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
@@ -154,10 +147,13 @@ export class MessageRouter {
                 method,
                 subject,
                 effectId,
-                selectedMessageGuid
+                selectedMessageGuid,
+                tempGuid
             );
 
-            return new Success(ctx, { message: "Message sent!", data: await getMessageResponse(sentMessage) }).send();
+            // Convert to an API response
+            const data = await getMessageResponse(sentMessage);
+            return new Success(ctx, { message: "Message sent!", data }).send();
         } catch (ex: any) {
             if (ex instanceof Message) {
                 throw new IMessageError({
@@ -181,11 +177,12 @@ export class MessageRouter {
 
         // Send the attachment
         try {
-            const sentMessage: Message = await MessageInterface.sendAttachmentSync(chatGuid, attachment.path, name);
-            return new Success(ctx, {
-                message: "Attachment sent!",
-                data: await getMessageResponse(sentMessage)
-            }).send();
+            const sentMessage: Message = await MessageInterface.sendAttachmentSync(
+                chatGuid, attachment.path, name, tempGuid);
+
+            // Convert to an API response
+            const data = await getMessageResponse(sentMessage);
+            return new Success(ctx, { message: "Attachment sent!", data }).send();
         } catch (ex: any) {
             if (ex instanceof Message) {
                 throw new IMessageError({

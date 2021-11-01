@@ -1,3 +1,4 @@
+import { Server } from "@server/index";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { onlyAlphaNumeric } from "@server/helpers/utils";
@@ -23,7 +24,7 @@ export class MessagePromise {
 
     isAttachment: boolean;
 
-    constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number) {
+    constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number, subject?: string) {
         // Create a promise and save the "callbacks"
         this.promise = new Promise((resolve, reject) => {
             this.resolvePromise = resolve;
@@ -38,7 +39,7 @@ export class MessagePromise {
             });
 
         this.chatGuid = chatGuid;
-        this.text = text;
+        this.text = `${subject ?? ''}${text ?? ''}`;
         this.isAttachment = isAttachment;
 
         // Subtract 10 seconds to account for any "delay" in the sending process (somehow)
@@ -78,7 +79,8 @@ export class MessagePromise {
         // We can only set one attachment at a time, so we will check that one
         // Images will have an invisible character as the text (of length 1)
         // So if it's an attachment, and doesn't meet the criteria, return false
-        if (this.isAttachment && ((message.attachments ?? []).length > 1 || (message.text ?? "").length > 1)) {
+        const matchTxt = `${message.subject ?? ''}${message.text ?? ''}`
+        if (this.isAttachment && ((message.attachments ?? []).length > 1 || matchTxt.length > 1)) {
             return false;
         }
 
@@ -89,7 +91,7 @@ export class MessagePromise {
 
         // If this is an attachment, we need to match it slightly differently
         if (this.isAttachment) {
-            if ((message.attachments ?? []).length > 1 || (message.text ?? "").length > 1) {
+            if ((message.attachments ?? []).length > 1 || matchTxt.length > 1) {
                 return false;
             }
 

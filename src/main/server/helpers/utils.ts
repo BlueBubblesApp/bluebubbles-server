@@ -229,14 +229,19 @@ export const parseMetadataString = (metadata: string): { [key: string]: string }
 };
 
 export const insertChatParticipants = async (message: Message): Promise<Message> => {
-    for (const chat of message.chats) {
+    let theMessage = message;
+    if (!theMessage.chats || theMessage.chats.length === 0) {
+        theMessage = await Server().iMessageRepo.getMessage(message.guid, true, true);
+    }
+
+    for (const chat of theMessage.chats) {
         const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
         if (!chats || chats.length === 0) continue;
 
         chat.participants = chats[0].participants;
     }
 
-    return message;
+    return theMessage;
 };
 
 export const fixServerUrl = (value: string) => {

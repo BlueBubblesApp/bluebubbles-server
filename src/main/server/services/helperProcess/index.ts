@@ -66,6 +66,7 @@ export class BlueBubblesHelperService {
                 if (!fs.existsSync(remotePath)) {
                     Server().log(`Private API Bundle does not exist. Writing to ${remotePath}`, "debug");
                     await cpr(localPath, remotePath, { overwrite: true, dot: true });
+                    writeCount += 1;
                 } else {
                     // Pull the version for the local bundle
                     let parsed = ParsePlist(fs.readFileSync(localInfo).toString("utf-8"));
@@ -81,11 +82,11 @@ export class BlueBubblesHelperService {
                     if (CompareVersion(localVersion, remoteVersion) === 1) {
                         Server().log(`Private API Bundle has an update. Writing to ${remotePath}`, "debug");
                         await cpr(localPath, remotePath, { overwrite: true, dot: true });
+                        writeCount += 1;
                     }
                 }
 
-                // If it was a success, count it for later
-                writeCount += 1;
+                
             } catch (ex: any) {
                 Server().log(`Failed to write to ${remotePath}: ${ex?.message ?? ex}`);
             }
@@ -316,10 +317,10 @@ export class BlueBubblesHelperService {
             // Handle events sent from
             if (data.event) {
                 if (data.event === "started-typing") {
-                    Server().emitMessage("typing-indicator", { display: true, guid: data.guid });
+                    Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
                     Server().log(`Started typing! ${data.guid}`);
                 } else if (data.event === "stopped-typing") {
-                    Server().emitMessage("typing-indicator", { display: false, guid: data.guid });
+                    Server().emitMessage("typing-indicator", { display: false, guid: data.guid }, "normal", false);
                     Server().log(`Stopped typing! ${data.guid}`);
                 }
             }
