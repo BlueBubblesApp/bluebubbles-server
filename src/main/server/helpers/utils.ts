@@ -34,8 +34,8 @@ export const concatUint8Arrays = (a: Uint8Array, b: Uint8Array): Uint8Array => {
 
 export const getiMessageNumberFormat = (address: string) => {
     const phoneUtil = PhoneNumberUtil.getInstance();
-    const number = phoneUtil.parseAndKeepRawInput(address, "US");
-    const formatted = phoneUtil.formatOutOfCountryCallingNumber(number, "US");
+    const number = phoneUtil.parseAndKeepRawInput(address, address.includes('+') ? null : "US");
+    const formatted = phoneUtil.formatOutOfCountryCallingNumber(number, address.includes('+') ? null : "US");
     return `+${formatted}`;
 };
 
@@ -196,7 +196,7 @@ export const slugifyAddress = (val: string) => {
     if (!val) return val;
 
     // If we want to strip the dashes
-    let slugRegex = /[^\d]+/g; // Strip all non-digits
+    let slugRegex = /[^\d+]+/g; // Strip all non-digits (except +)
     if (val.includes("@"))
         // If it's an email, change the regex
         slugRegex = /[^\w@.-_]+/g; // Strip non-alphanumeric except @, ., _, and -

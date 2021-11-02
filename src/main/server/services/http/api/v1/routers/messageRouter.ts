@@ -134,8 +134,6 @@ export class MessageRouter {
     static async sendText(ctx: RouterContext, _: Next) {
         let { tempGuid, message, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
 
-        
-
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
 
@@ -151,10 +149,16 @@ export class MessageRouter {
                 tempGuid
             );
 
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
             // Convert to an API response
             const data = await getMessageResponse(sentMessage);
             return new Success(ctx, { message: "Message sent!", data }).send();
         } catch (ex: any) {
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
             if (ex instanceof Message) {
                 throw new IMessageError({
                     message: "Message Send Error",
@@ -180,10 +184,16 @@ export class MessageRouter {
             const sentMessage: Message = await MessageInterface.sendAttachmentSync(
                 chatGuid, attachment.path, name, tempGuid);
 
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
             // Convert to an API response
             const data = await getMessageResponse(sentMessage);
             return new Success(ctx, { message: "Attachment sent!", data }).send();
         } catch (ex: any) {
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
             if (ex instanceof Message) {
                 throw new IMessageError({
                     message: "Attachment Send Error",

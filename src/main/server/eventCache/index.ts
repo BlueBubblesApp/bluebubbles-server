@@ -26,6 +26,7 @@ export class EventCache {
     }
 
     remove(item: string) {
+        if (!item) return;
         this.items = this.items.filter(i => item !== i);
     }
 }

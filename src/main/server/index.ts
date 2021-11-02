@@ -496,9 +496,11 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async emitMessageMatch(message: Message, tempGuid: string) {
+        // Insert chat & participants
         const newMessage = await insertChatParticipants(message);
         this.log(`Message match found for text, [${newMessage.contentString()}]`);
 
+        // Convert to a response JSON
         const resp = await getMessageResponse(newMessage);
         resp.tempGuid = tempGuid;
 

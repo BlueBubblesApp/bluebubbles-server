@@ -39,24 +39,36 @@ export class QueueService {
                     break;
                 case "send-attachment":
                     // Send the attachment first
-                    await MessageInterface.sendAttachmentSync(
-                        item.data.chatGuid,
-                        item.data.attachmentPath,
-                        item.data.attachmentName,
-                        item.data.attachmentGuid
-                    );
+                    try {
+                        await MessageInterface.sendAttachmentSync(
+                            item.data.chatGuid,
+                            item.data.attachmentPath,
+                            item.data.attachmentName,
+                            item.data.attachmentGuid
+                        );
+                        Server().httpService.sendCache.remove(item?.data?.attachmentGuid);
+                    } catch (ex: any) {
+                        // Re-throw the error after removing from cache
+                        Server().httpService.sendCache.remove(item?.data?.attachmentGuid);
+                        throw ex;
+                    }
 
                     // Then send the message (if required)
                     if (item.data.message && item.data.message.length > 0) {
-                        await MessageInterface.sendMessageSync(
-                            item.data.chatGuid,
-                            item.data.message,
-                            "apple-script",
-                            null,
-                            null,
-                            null,
-                            item.data.tempGuid
-                        );
+                        try {
+                            await MessageInterface.sendMessageSync(
+                                item.data.chatGuid,
+                                item.data.message,
+                                "apple-script",
+                                null,
+                                null,
+                                null,
+                                item.data.tempGuid
+                            );
+                        } finally {
+                            // Remove from cache
+                            Server().httpService.sendCache.remove(item?.data?.tempGuid);
+                        }
                     }
 
                     // After 30 minutes, delete the attachment chunks

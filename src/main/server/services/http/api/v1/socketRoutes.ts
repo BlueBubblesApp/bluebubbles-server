@@ -605,18 +605,19 @@ export class SocketRoutes {
                 if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
-                // Make sure the message isn't already in the queue
-                if (Server().httpService.sendCache.find(tempGuid)) {
-                    return response(cb, "error", createBadRequestResponse(
-                        `Message is already queued to be sent (Temp GUID: ${tempGuid})!`));
-                }
-
                 if (typeof tempGuid === 'number') {
                     tempGuid = String(tempGuid);
                 }
 
+                // Debug logging
                 if (tempGuid && tempGuid.trim().length > 0) {
-                    Server().log(`Sending message using Temp GUID: ${tempGuid}`, 'debug');
+                    Server().log(`Attempting to send message using Temp GUID: ${tempGuid}`, 'debug');
+                }
+
+                // Make sure the message isn't already in the queue
+                if (Server().httpService.sendCache.find(tempGuid)) {
+                    return response(cb, "error", createBadRequestResponse(
+                        `Message is already queued to be sent (Temp GUID: ${tempGuid})!`));
                 }
 
                 // Add to send cache
@@ -633,6 +634,8 @@ export class SocketRoutes {
                         null,
                         tempGuid
                     );
+
+                    Server().httpService.sendCache.remove(tempGuid);
                     return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
                 } catch (ex: any) {
                     Server().httpService.sendCache.remove(tempGuid);
@@ -927,6 +930,7 @@ export class SocketRoutes {
                             params.tapback,
                             tempGuid
                         );
+
                         return response(
                             cb,
                             "tapback-sent",

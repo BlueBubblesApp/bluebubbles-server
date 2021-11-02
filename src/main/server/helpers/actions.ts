@@ -152,6 +152,7 @@ export class ActionHandler {
 
             // If we have a sent message and we have a tempGuid, we need to emit the message match event
             if (sentAttachment && attachmentGuid && attachmentGuid.trim().length > 0) {
+                Server().httpService.sendCache.remove(attachmentGuid);
                 Server().emitMessageMatch(sentAttachment, attachmentGuid);
             }
         }
@@ -162,6 +163,7 @@ export class ActionHandler {
 
             // If we have a sent message and we have a tempGuid, we need to emit the message match event
             if (sentMessage && tempGuid && tempGuid.trim().length > 0) {
+                Server().httpService.sendCache.remove(tempGuid);
                 Server().emitMessageMatch(sentMessage, tempGuid);
             }
         }
