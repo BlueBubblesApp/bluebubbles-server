@@ -43,7 +43,6 @@ export class MessageRepository {
         withParticipants = true,
         withArchived = false,
         withLastMessage = false,
-        withSMS = false,
         offset = 0,
         limit = null
     }: ChatParams = {}) {
@@ -55,11 +54,6 @@ export class MessageRepository {
         // Add inner join with messages if we want the last message too
         if (withLastMessage) {
             query.innerJoinAndSelect("chat.messages", "message");
-        }
-
-        // Add default WHERE clauses
-        if (!withSMS) {
-            query.andWhere("chat.service_name = 'iMessage'");
         }
 
         if (!withArchived) query.andWhere("chat.is_archived == 0");
@@ -213,12 +207,7 @@ export class MessageRepository {
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
-        withSMS = false,
         where = [
-            {
-                statement: "message.service = 'iMessage'",
-                args: null
-            },
             {
                 statement: "message.text IS NOT NULL",
                 args: null
@@ -274,11 +263,6 @@ export class MessageRepository {
             });
 
         if (where && where.length > 0) {
-            // If withSMS is enabled, remove any statements specifying the message service
-            if (withSMS) {
-                where = where.filter(item => item.statement !== `message.service = 'iMessage'`);
-            }
-
             for (const item of where) {
                 query.andWhere(item.statement, item.args);
             }
@@ -339,9 +323,6 @@ export class MessageRepository {
             );
         }
 
-        // Add default WHERE clauses
-        query.andWhere("message.service == 'iMessage'");
-
         // Add any custom WHERE clauses
         if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
 
@@ -390,7 +371,6 @@ export class MessageRepository {
 
         // Add default WHERE clauses
         query
-            .andWhere("message.service == 'iMessage'")
             .andWhere("message.text IS NOT NULL")
             .andWhere("associated_message_type == 0");
 

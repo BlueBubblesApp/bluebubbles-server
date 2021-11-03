@@ -62,7 +62,6 @@ const getServiceFromInput = (value: string) => {
     if (valSplit.length <= 1) return "iMessage";
 
     // Otherwise, return the "first" index in the array,
-    // which should contain the service (i.e. SMS)
     return valSplit[0];
 };
 

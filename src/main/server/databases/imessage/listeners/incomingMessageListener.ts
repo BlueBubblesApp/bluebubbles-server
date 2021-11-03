@@ -1,7 +1,6 @@
 import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
-import { Server } from "@server/index";
 import { ChangeListener } from "./changeListener";
 import { getCacheName } from "../helpers/utils";
 
@@ -26,15 +25,6 @@ export class IncomingMessageListener extends ChangeListener {
                 args: { fromMe: 0 }
             }
         ];
-
-        // If SMS support isn't enabled, add the iMessage server specifier
-        const smsSupport = Server().repo.getConfig("sms_support") as boolean;
-        if (!smsSupport) {
-            query.push({
-                statement: "message.service = 'iMessage'",
-                args: null
-            });
-        }
 
         const entries = await this.repo.getMessages({
             after: offsetDate,

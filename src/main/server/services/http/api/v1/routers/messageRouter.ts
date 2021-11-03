@@ -7,7 +7,6 @@ import { Server } from "@server/index";
 import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Handle } from "@server/databases/imessage/entity/Handle";
-import { ActionHandler } from "@server/helpers/actions";
 import { MessageInterface } from "../interfaces/messageInterface";
 import { Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
@@ -44,7 +43,6 @@ export class MessageRouter {
                     chatGuid: i.guid,
                     withParticipants,
                     withLastMessage: false,
-                    withSMS: true,
                     withArchived: true
                 });
 
@@ -64,7 +62,6 @@ export class MessageRouter {
         const withChats = withQuery.includes("chat") || withQuery.includes("chats");
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle");
-        const withSMS = withQuery.includes("sms");
         const withChatParticipants =
             withQuery.includes("chat.participants") || withQuery.includes("chats.participants");
 
@@ -74,7 +71,7 @@ export class MessageRouter {
         limit = limit ? Number.parseInt(limit, 10) : 100;
 
         if (chatGuid) {
-            const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
+            const chats = await Server().iMessageRepo.getChats({ chatGuid });
             if (!chats || chats.length === 0)
                 return new Success(ctx, {
                     message: `No chat found with GUID: ${chatGuid}`,
@@ -87,7 +84,6 @@ export class MessageRouter {
             withChats,
             withAttachments,
             withHandle,
-            withSMS,
             offset,
             limit,
             sort,
