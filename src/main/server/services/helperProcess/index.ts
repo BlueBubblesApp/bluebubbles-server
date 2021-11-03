@@ -66,7 +66,6 @@ export class BlueBubblesHelperService {
                 if (!fs.existsSync(remotePath)) {
                     Server().log(`Private API Bundle does not exist. Writing to ${remotePath}`, "debug");
                     await cpr(localPath, remotePath, { overwrite: true, dot: true });
-                    writeCount += 1;
                 } else {
                     // Pull the version for the local bundle
                     let parsed = ParsePlist(fs.readFileSync(localInfo).toString("utf-8"));
@@ -82,11 +81,12 @@ export class BlueBubblesHelperService {
                     if (CompareVersion(localVersion, remoteVersion) === 1) {
                         Server().log(`Private API Bundle has an update. Writing to ${remotePath}`, "debug");
                         await cpr(localPath, remotePath, { overwrite: true, dot: true });
-                        writeCount += 1;
+                    } else {
+                        Server().log(`Private API Bundle does not need to be updated`, "debug");
                     }
                 }
 
-                
+                writeCount += 1;
             } catch (ex: any) {
                 Server().log(`Failed to write to ${remotePath}: ${ex?.message ?? ex}`);
             }
