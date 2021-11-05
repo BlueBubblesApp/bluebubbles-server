@@ -1,5 +1,6 @@
 import { Context, Next } from "koa";
 import { Server } from "@server/index";
+import { safeTrim } from "@server/helpers/utils";
 import { ServerError, Unauthorized } from "../responses/errors";
 
 export const AuthMiddleware = async (ctx: Context, next: Next) => {
@@ -16,7 +17,7 @@ export const AuthMiddleware = async (ctx: Context, next: Next) => {
     }
 
     // Validate the passwords match
-    if (password.trim() !== token.trim()) {
+    if (safeTrim(password) !== safeTrim(token)) {
         if (!token) throw new Unauthorized();
     }
 

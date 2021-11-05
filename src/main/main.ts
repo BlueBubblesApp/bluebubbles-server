@@ -6,7 +6,7 @@ import * as url from "url";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
-import { isEmpty } from "@server/helpers/utils";
+import { isEmpty, safeTrim } from "@server/helpers/utils";
 
 let win: BrowserWindow;
 let tray: Tray;
@@ -283,7 +283,7 @@ Available Commands:
 };
 
 process.stdin.on("data", chunk => {
-    const line = chunk.toString().trim();
+    const line = safeTrim(chunk.toString());
     if (!Server() || isEmpty(line)) return;
     Server().log(`Handling STDIN: ${line}`, "debug");
 

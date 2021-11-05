@@ -13,8 +13,7 @@ import * as http from "http";
 // Internal libraries
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-
-// Entities
+import { safeTrim } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";
 
 import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
@@ -146,7 +145,7 @@ export class HttpService {
             try {
                 // Check if there are any listening services
                 let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
-                res = (res ?? "").trim();
+                res = safeTrim(res);
 
                 // If the result doesn't show anything listening,
                 if (!res.includes(port.toString())) {
@@ -176,7 +175,7 @@ export class HttpService {
             pass = decodeURI(pass as string);
 
             // Basic authentication
-            if (pass?.trim() === cfgPass?.trim()) {
+            if (safeTrim(pass) === safeTrim(cfgPass)) {
                 Server().log(`Client Authenticated Successfully`);
             } else {
                 socket.disconnect();

@@ -5,7 +5,7 @@ import { Server } from "@server/index";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
-import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
 import { Success } from "../responses/success";
@@ -31,7 +31,7 @@ export class ChatRouter {
         const withQuery = ((ctx.request.query.with ?? "") as string)
             .toLowerCase()
             .split(",")
-            .map(e => e.trim());
+            .map(e => safeTrim(e));
         const withParticipants = withQuery.includes("participants");
         const withLastMessage = withQuery.includes("lastmessage");
 
@@ -54,7 +54,7 @@ export class ChatRouter {
         const withQuery = ((ctx.request.query.with ?? "") as string)
             .toLowerCase()
             .split(",")
-            .map(e => e.trim());
+            .map(e => safeTrim(e));
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
         const { sort, before, after, offset, limit } = ctx?.request.query;
@@ -93,7 +93,7 @@ export class ChatRouter {
         // Pull out the filters
         const withQuery = (body?.with ?? [])
             .filter((e: any) => typeof e === "string")
-            .map((e: string) => e.toLowerCase().trim());
+            .map((e: string) => safeTrim(e.toLowerCase()));
         const withParticipants = withQuery.includes("participants");
         const withLastMessage = withQuery.includes("lastmessage");
         const withArchived = withQuery.includes("archived");

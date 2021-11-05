@@ -6,7 +6,14 @@ import { transports } from "electron-log";
 import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server/index";
-import { escapeDoubleQuote, concatUint8Arrays, parseMetadataString, isNotEmpty, isEmpty } from "@server/helpers/utils";
+import {
+    escapeDoubleQuote,
+    concatUint8Arrays,
+    parseMetadataString,
+    isNotEmpty,
+    isEmpty,
+    safeTrim
+} from "@server/helpers/utils";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
 import { startMessages } from "../api/v1/apple/scripts";
@@ -329,7 +336,7 @@ export class FileSystem {
 
         let parts = cmd.split("\n");
         parts = parts
-            .map(i => escapeDoubleQuote(i).trim())
+            .map(i => safeTrim(escapeDoubleQuote(i)))
             .filter(i => isNotEmpty(i))
             .map(i => `"${i}"`);
 

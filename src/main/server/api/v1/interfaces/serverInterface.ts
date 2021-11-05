@@ -1,3 +1,4 @@
+import { safeTrim } from "@server/helpers/utils";
 import { Server } from "@server/index";
 import { createTextChangeRange } from "typescript";
 
@@ -7,11 +8,8 @@ export class ServerInterface {
         // Also, make them all lower-cased
         const items = only.map(e =>
             e.toLowerCase().substring(e.length - 1, e.length) === "s"
-                ? e
-                      .substring(0, e.length - 1)
-                      .toLowerCase()
-                      .trim()
-                : e.toLowerCase().trim()
+                ? safeTrim(e.substring(0, e.length - 1).toLowerCase())
+                : safeTrim(e.toLowerCase())
         );
 
         const results: any = {};
@@ -36,11 +34,8 @@ export class ServerInterface {
         // Also, make them all lower-cased
         const items = only.map(e =>
             e.toLowerCase().substring(e.length - 1, e.length) === "s"
-                ? e
-                      .substring(0, e.length - 1)
-                      .toLowerCase()
-                      .trim()
-                : e.toLowerCase().trim()
+                ? safeTrim(e.substring(0, e.length - 1).toLowerCase())
+                : safeTrim(e.toLowerCase())
         );
 
         const results: any = {};
@@ -62,11 +57,8 @@ export class ServerInterface {
         // Also, make them all lower-cased
         const items = only.map(e =>
             e.toLowerCase().substring(e.length - 1, e.length) === "s"
-                ? e
-                      .substring(0, e.length - 1)
-                      .toLowerCase()
-                      .trim()
-                : e.toLowerCase().trim()
+                ? safeTrim(e.substring(0, e.length - 1).toLowerCase())
+                : safeTrim(e.toLowerCase())
         );
 
         const results: any = {};

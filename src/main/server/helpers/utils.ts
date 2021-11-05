@@ -189,7 +189,7 @@ export const sanitizeStr = (val: string) => {
         output = output.replace(invisibleMediaChar, "");
     }
 
-    return output.trim();
+    return safeTrim(output);
 };
 
 export const slugifyAddress = (val: string) => {
@@ -201,11 +201,10 @@ export const slugifyAddress = (val: string) => {
         // If it's an email, change the regex
         slugRegex = /[^\w@.-_]+/g; // Strip non-alphanumeric except @, ., _, and -
 
-    return val
+    return safeTrim(val
         .toLowerCase()
         .replace(/\s+/g, "") // Replace spaces with nothing
-        .replace(slugRegex, "")
-        .trim();
+        .replace(slugRegex, ""));
 };
 
 export const parseMetadataString = (metadata: string): { [key: string]: string } => {
@@ -218,11 +217,11 @@ export const parseMetadataString = (metadata: string): { [key: string]: string }
         const items = line.split(" = ");
         if (items.length < 2) continue;
 
-        const value = items[1].replace(/"/g, "").trim();
+        const value = safeTrim(items[1].replace(/"/g, ""));
         if (isEmpty(value) || value === "(") continue;
 
         // If all conditions to parse pass, save the key/value pair
-        output[items[0].trim()] = value;
+        output[safeTrim(items[0])] = value;
     }
 
     return output;
@@ -339,3 +338,8 @@ export const shortenString = (value: string, maxLen = 25): string => {
     if (value.length < maxLen) return value;
     return `${value.substring(0, maxLen)}...`;
 };
+
+// Safely trims a string
+export const safeTrim = (value: string) => {
+    return (value ?? '').trim();
+}

@@ -4,7 +4,7 @@ import { Next } from "koa";
 import type { File } from "formidable";
 
 import { Server } from "@server/index";
-import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { DBMessageParams } from "@server/databases/imessage/types";
@@ -28,7 +28,7 @@ export class MessageRouter {
         const withQuery = ((ctx.request.query.with ?? "") as string)
             .toLowerCase()
             .split(",")
-            .map(e => e.trim());
+            .map(e => safeTrim(e));
         const withChats = withQuery.includes("chats") || withQuery.includes("chat");
         const withParticipants = withQuery.includes("chats.participants") || withQuery.includes("chat.participants");
         const withAttachments = withQuery.includes("attachments") || withQuery.includes("attachment");
@@ -59,7 +59,7 @@ export class MessageRouter {
         let { chatGuid, with: withQuery, offset, limit, where, sort, after, before } = ctx?.request?.body;
 
         // Pull out the filters
-        withQuery = withQuery.filter((e: any) => typeof e === "string").map((e: string) => e.toLowerCase().trim());
+        withQuery = withQuery.filter((e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
         const withChats = withQuery.includes("chat") || withQuery.includes("chats");
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle");

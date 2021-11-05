@@ -1,4 +1,4 @@
-import { isEmpty } from "@server/helpers/utils";
+import { isEmpty, safeTrim } from "@server/helpers/utils";
 import { Server } from "@server/index";
 import { connect, disconnect, kill, authtoken, Ngrok } from "ngrok";
 import { Proxy } from "../proxy";
@@ -67,9 +67,9 @@ export class NgrokService extends Proxy {
 
         // If we have a key, use it
         if (ngrokKey !== null && ngrokKey !== undefined) {
-            opts.authtoken = ngrokKey.trim();
+            opts.authtoken = safeTrim(ngrokKey);
             await authtoken({
-                authtoken: ngrokKey.trim(),
+                authtoken: safeTrim(ngrokKey),
                 binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
             });
         }

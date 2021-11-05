@@ -14,7 +14,7 @@ import * as macosVersion from "macos-version";
 // Internal libraries
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
@@ -841,7 +841,7 @@ export class SocketRoutes {
 
                 try {
                     const result = await ActionHandler.addParticipant(params.identifier, params.address);
-                    if (result.trim() !== "success") return response(cb, "error", createBadRequestResponse(result));
+                    if (safeTrim(result) !== "success") return response(cb, "error", createBadRequestResponse(result));
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return response(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
@@ -864,7 +864,7 @@ export class SocketRoutes {
 
                 try {
                     const result = await ActionHandler.removeParticipant(params.identifier, params.address);
-                    if (result.trim() !== "success") return response(cb, "error", createBadRequestResponse(result));
+                    if (safeTrim(result) !== "success") return response(cb, "error", createBadRequestResponse(result));
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return response(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));

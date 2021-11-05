@@ -1,6 +1,7 @@
 import { FileSystem } from "@server/fileSystem";
 import { lockMacOs, restartMessages } from "@server/api/v1/apple/scripts";
 import { Server } from "@server/index";
+import { safeTrim } from "@server/helpers/utils";
 
 export class MacOsInterface {
     static async lock() {
@@ -16,11 +17,8 @@ export class MacOsInterface {
         // Also, make them all lower-cased
         const items = only.map(e =>
             e.toLowerCase().substring(e.length - 1, e.length) === "s"
-                ? e
-                      .substring(0, e.length - 1)
-                      .toLowerCase()
-                      .trim()
-                : e.toLowerCase().trim()
+                ? safeTrim(e.substring(0, e.length - 1).toLowerCase())
+                : safeTrim(e.toLowerCase())
         );
 
         const results: any = {};
@@ -42,11 +40,8 @@ export class MacOsInterface {
         // Also, make them all lower-cased
         const items = only.map(e =>
             e.toLowerCase().substring(e.length - 1, e.length) === "s"
-                ? e
-                      .substring(0, e.length - 1)
-                      .toLowerCase()
-                      .trim()
-                : e.toLowerCase().trim()
+                ? safeTrim(e.substring(0, e.length - 1).toLowerCase())
+                : safeTrim(e.toLowerCase())
         );
 
         const results: any = {};

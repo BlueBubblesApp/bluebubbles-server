@@ -4,7 +4,7 @@ import { Next } from "koa";
 import { Server } from "@server/index";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { HandleInterface } from "@server/api/v1/interfaces/handleInterface";
-import { isEmpty } from "@server/helpers/utils";
+import { isEmpty, safeTrim } from "@server/helpers/utils";
 import { Success } from "../responses/success";
 import { NotFound } from "../responses/errors";
 
@@ -27,7 +27,7 @@ export class HandleRouter {
         // Pull out the filters
         const withQuery = (body?.with ?? [])
             .filter((e: any) => typeof e === "string")
-            .map((e: string) => e.toLowerCase().trim());
+            .map((e: string) => safeTrim(e.toLowerCase()));
         const withChats = withQuery.includes("chat") || withQuery.includes("chats");
         const withChatParticipants =
             withQuery.includes("chat.participants") || withQuery.includes("chats.participants");

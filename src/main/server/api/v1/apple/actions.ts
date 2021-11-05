@@ -25,7 +25,8 @@ import {
     toBoolean,
     slugifyAddress,
     isNotEmpty,
-    isEmpty
+    isEmpty,
+    safeTrim
 } from "../../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
 
@@ -487,7 +488,7 @@ export class ActionHandler {
                 // This needs await here, or else it will fail
                 const output = await safeExecuteAppleScript(checkTypingIndicator(name));
                 if (!output) return false;
-                return toBoolean(output.trim());
+                return toBoolean(safeTrim(output));
             } catch (ex: any) {
                 err = ex;
                 Server().log(`Failed to check for typing indicators for chat, [${name}]. Trying again.`, "warn");
@@ -541,9 +542,9 @@ export class ActionHandler {
 
         // Get the chat GUID that was created
         if (ret.includes("text chat id")) {
-            ret = ret.split("text chat id")[1].trim();
+            ret = safeTrim(ret.split("text chat id")[1]);
         } else if (ret.includes("chat id")) {
-            ret = ret.split("chat id")[1].trim();
+            ret = safeTrim(ret.split("chat id")[1]);
         }
 
         // If no chat ID found, throw an error
