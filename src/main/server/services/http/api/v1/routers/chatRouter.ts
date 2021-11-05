@@ -6,8 +6,8 @@ import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
-import { ChatInterface } from "../interfaces/chatInterface";
 import { Success } from "../responses/success";
 import { IMessageError, NotFound } from "../responses/errors";
 

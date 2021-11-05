@@ -333,3 +333,9 @@ export const isNotEmpty = (value: string | Array<any> | NodeJS.Dict<any>, trim =
 export const isEmpty = (value: string | Array<any> | NodeJS.Dict<any>, trim = true): boolean => {
     return !isNotEmpty(value, trim);
 };
+
+export const shortenString = (value: string, maxLen = 25): string => {
+    if (!value || (typeof value) !== 'string') return '';
+    if (value.length < maxLen) return value;
+    return `${value.substring(0, maxLen)}...`;
+};

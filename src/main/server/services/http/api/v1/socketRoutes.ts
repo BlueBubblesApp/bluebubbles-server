@@ -1,10 +1,12 @@
 /* eslint-disable max-len */
 import { app } from "electron";
 import * as path from "path";
+import { basename } from "path";
 import * as fs from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
 import * as CryptoJS from "crypto-js";
+import { Socket } from "socket.io";
 
 // HTTP libraries
 import * as macosVersion from "macos-version";
@@ -17,12 +19,6 @@ import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
 import { ResponseFormat, ResponseJson } from "@server/services/http/api/v1/responses/types";
-import {
-    createSuccessResponse,
-    createServerErrorResponse,
-    createBadRequestResponse,
-    createNoDataResponse
-} from "@server/helpers/responses";
 
 // Entities
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
@@ -30,13 +26,18 @@ import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Han
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { DBMessageParams } from "@server/databases/imessage/types";
-import { ActionHandler } from "@server/helpers/actions";
+import { ActionHandler } from "@server/api/v1/apple/actions";
 import { QueueItem } from "@server/services/queue/index";
-import { basename } from "path";
-import { restartMessages } from "@server/fileSystem/scripts";
-import { Socket } from "socket.io";
-import { GeneralInterface } from "./interfaces/generalInterface";
-import { MessageInterface } from "./interfaces/messageInterface";
+import { restartMessages } from "@server/api/v1/apple/scripts";
+import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
+import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
+
+import {
+    createSuccessResponse,
+    createServerErrorResponse,
+    createBadRequestResponse,
+    createNoDataResponse
+} from "./responses";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";

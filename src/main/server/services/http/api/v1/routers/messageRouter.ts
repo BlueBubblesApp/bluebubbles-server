@@ -6,9 +6,9 @@ import type { File } from "formidable";
 import { Server } from "@server/index";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
+import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Handle } from "@server/databases/imessage/entity/Handle";
-import { MessageInterface } from "../interfaces/messageInterface";
 import { Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
 

@@ -1,5 +1,5 @@
 import { FileSystem } from "@server/fileSystem";
-import { lockMacOs, restartMessages } from "@server/fileSystem/scripts";
+import { lockMacOs, restartMessages } from "@server/api/v1/apple/scripts";
 import { Server } from "@server/index";
 
 export class MacOsInterface {

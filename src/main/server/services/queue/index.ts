@@ -1,8 +1,8 @@
+import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { FileSystem } from "@server/fileSystem";
-import { ActionHandler } from "@server/helpers/actions";
+import { ActionHandler } from "@server/api/v1/apple/actions";
 import { isNotEmpty } from "@server/helpers/utils";
 import { Server } from "@server/index";
-import { MessageInterface } from "../http/api/v1/interfaces/messageInterface";
 
 export type QueueItem = {
     type: string;

@@ -4,9 +4,9 @@ import { MessagePromise } from "@server/services/messageManager/messagePromise";
 import { ValidRemoveTapback, ValidTapback } from "@server/types";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { checkPrivateApiStatus, isNotEmpty, waitMs } from "@server/helpers/utils";
-import { negativeReactionTextMap, reactionTextMap } from "@server/helpers/mappings";
+import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
 import { invisibleMediaChar } from "@server/services/http/constants";
-import { ActionHandler } from "@server/helpers/actions";
+import { ActionHandler } from "@server/api/v1/apple/actions";
 
 export class MessageInterface {
     static possibleReactions: string[] = [

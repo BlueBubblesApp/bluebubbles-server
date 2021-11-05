@@ -1,6 +1,6 @@
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
-import { MacOsInterface } from "../interfaces/macosInterface";
+import { MacOsInterface } from "@server/api/v1/interfaces/macosInterface";
 import { Success } from "../responses/success";
 import { ServerError } from "../responses/errors";
 

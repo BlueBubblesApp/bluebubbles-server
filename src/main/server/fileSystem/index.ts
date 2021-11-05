@@ -1,6 +1,4 @@
 import * as fs from "fs";
-import * as stream from "stream";
-import * as readline from "readline";
 
 import * as path from "path";
 import * as child_process from "child_process";
@@ -11,7 +9,7 @@ import { Server } from "@server/index";
 import { escapeDoubleQuote, concatUint8Arrays, parseMetadataString, isNotEmpty, isEmpty } from "@server/helpers/utils";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
-import { startMessages } from "./scripts";
+import { startMessages } from "../api/v1/apple/scripts";
 import {
     AudioMetadata,
     AudioMetadataKeys,

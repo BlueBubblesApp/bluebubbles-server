@@ -1,17 +1,16 @@
 /* eslint-disable max-classes-per-file */
-import { ResponseParams, ErrorTypes, ResponseFormat, ResponseMessages, ValidStatuses } from "./types";
+import { ResponseParams, ErrorTypes, ResponseFormat, ResponseMessages, ValidStatuses, ResponseJson } from "./types";
 
 export class HTTPError extends Error {
     response: ResponseFormat;
 
     status: ValidStatuses;
 
-    constructor(response: ResponseFormat) {
+    constructor(response: ResponseJson) {
         super(`[${response.status}] ${response.message}`);
-
         this.name = this.constructor.name;
         this.response = response;
-        this.status = response.status;
+        
         Error.captureStackTrace(this, this.constructor);
     }
 }

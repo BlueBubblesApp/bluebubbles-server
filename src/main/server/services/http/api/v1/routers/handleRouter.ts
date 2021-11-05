@@ -3,8 +3,8 @@ import { Next } from "koa";
 
 import { Server } from "@server/index";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { HandleInterface } from "@server/api/v1/interfaces/handleInterface";
 import { isEmpty } from "@server/helpers/utils";
-import { HandleInterface } from "../interfaces/handleInterface";
 import { Success } from "../responses/success";
 import { NotFound } from "../responses/errors";
 

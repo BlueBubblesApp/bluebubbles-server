@@ -15,8 +15,8 @@ import {
     restartMessages,
     openChat,
     sendMessageFallback
-} from "@server/fileSystem/scripts";
-import { ValidRemoveTapback } from "../types";
+} from "@server/api/v1/apple/scripts";
+import { ValidRemoveTapback } from "../../../types";
 
 import {
     safeExecuteAppleScript,
@@ -26,7 +26,7 @@ import {
     slugifyAddress,
     isNotEmpty,
     isEmpty
-} from "./utils";
+} from "../../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
 
 

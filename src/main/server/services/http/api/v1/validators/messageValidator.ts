@@ -3,9 +3,9 @@ import { Next } from "koa";
 import type { File } from "formidable";
 import { Server } from "@server/index";
 import { isEmpty } from "@server/helpers/utils";
+import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 
 import { ValidateInput } from "./index";
-import { MessageInterface } from "../interfaces/messageInterface";
 import { BadRequest } from "../responses/errors";
 
 export class MessageValidator {

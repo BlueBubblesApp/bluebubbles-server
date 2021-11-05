@@ -1,8 +1,8 @@
 import { Context, Next } from "koa";
 import { Server } from "@server/index";
-import { createServerErrorResponse } from "@server/helpers/responses";
 import { ErrorTypes } from "@server/services/http/api/v1/responses/types";
 import { HTTPError } from "../responses/errors";
+import { createServerErrorResponse } from "../responses";
 
 export const ErrorMiddleware = async (ctx: Context, next: Next) => {
     try {

@@ -2,7 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { isEmpty } from "@server/helpers/utils";
-import { ContactInterface } from "../interfaces/contactInterface";
+import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { Success } from "../responses/success";
 
 export class ContactRouter {

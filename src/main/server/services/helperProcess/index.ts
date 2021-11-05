@@ -7,12 +7,12 @@ import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
 import { isEmpty, isMinBigSur, isMinMonteray } from "@server/helpers/utils";
-import { restartMessages } from "@server/fileSystem/scripts";
+import { restartMessages } from "@server/api/v1/apple/scripts";
 
 import * as net from "net";
 import { ValidRemoveTapback } from "../../types";
-import { TransactionManager } from "../transactionManager";
-import { TransactionResult, TransactionPromise, TransactionType } from "../transactionManager/transactionPromise";
+import { TransactionManager } from "./transactionManager";
+import { TransactionResult, TransactionPromise, TransactionType } from "./transactionManager/transactionPromise";
 
 export class BlueBubblesHelperService {
     server: net.Server;

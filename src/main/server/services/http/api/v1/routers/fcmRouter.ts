@@ -2,7 +2,7 @@ import { Next } from "koa";
 import { RouterContext } from "koa-router";
 
 import { FileSystem } from "@server/fileSystem";
-import { GeneralInterface } from "../interfaces/generalInterface";
+import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { Success } from "../responses/success";
 
 export class FcmRouter {

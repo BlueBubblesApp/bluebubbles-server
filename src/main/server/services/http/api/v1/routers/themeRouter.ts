@@ -2,7 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { isNotEmpty } from "@server/helpers/utils";
-import { BackupsInterface } from "../interfaces/backupsInterface";
+import { BackupsInterface } from "@server/api/v1/interfaces/backupsInterface";
 import { Success } from "../responses/success";
 
 export class ThemeRouter {

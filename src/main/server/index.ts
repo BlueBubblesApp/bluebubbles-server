@@ -7,7 +7,6 @@ import { EventEmitter } from "events";
 import * as macosVersion from "macos-version";
 
 // Configuration/Filesytem Imports
-import { Queue } from "@server/databases/server/entity/Queue";
 import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS } from "@server/constants";
 
@@ -38,10 +37,10 @@ import {
     MessageManager
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
+import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
 
-import { ActionHandler } from "./helpers/actions";
-import { insertChatParticipants, isEmpty, isMinBigSur, isNotEmpty, sanitizeStr } from "./helpers/utils";
+import { ActionHandler } from "./api/v1/apple/actions";
+import { insertChatParticipants, isEmpty, isMinBigSur, isNotEmpty } from "./helpers/utils";
 import { Proxy } from "./services/proxy";
 import { BlueBubblesHelperService } from "./services/helperProcess";
 

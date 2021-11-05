@@ -5,8 +5,8 @@ import * as mime from "mime-types";
 
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
+import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { AttachmentInterface } from "../interfaces/attachmentInterface";
 import { FileStream, Success } from "../responses/success";
 import { NotFound } from "../responses/errors";
 
