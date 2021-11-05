@@ -23,7 +23,9 @@ import {
     generateChatNameList,
     getiMessageNumberFormat,
     toBoolean,
-    slugifyAddress
+    slugifyAddress,
+    isNotEmpty,
+    isEmpty
 } from "./utils";
 import { tapbackUIMap } from "./mappings";
 
@@ -128,7 +130,7 @@ export class ActionHandler {
 
         // Create the awaiter
         let messageAwaiter = null;
-        if (message && message.length > 0) {
+        if (isNotEmpty(message)) {
             messageAwaiter = new MessagePromise(chatGuid, message, false, now);
             Server().log(`Adding await for chat: "${chatGuid}"; text: ${messageAwaiter.text}`);
             Server().messageManager.add(messageAwaiter);
@@ -136,7 +138,7 @@ export class ActionHandler {
 
         // Create the awaiter
         let attachmentAwaiter = null;
-        if (attachment && attachmentName) {
+        if (attachment && isNotEmpty(attachmentName)) {
             attachmentAwaiter = new MessagePromise(chatGuid, `->${attachmentName}`, true, now);
             Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${attachmentName}`);
             Server().messageManager.add(attachmentAwaiter);
@@ -151,7 +153,7 @@ export class ActionHandler {
             const sentAttachment = await attachmentAwaiter.promise;
 
             // If we have a sent message and we have a tempGuid, we need to emit the message match event
-            if (sentAttachment && attachmentGuid && attachmentGuid.trim().length > 0) {
+            if (sentAttachment && isNotEmpty(attachmentGuid)) {
                 Server().httpService.sendCache.remove(attachmentGuid);
                 Server().emitMessageMatch(sentAttachment, attachmentGuid);
             }
@@ -162,7 +164,7 @@ export class ActionHandler {
             const sentMessage = await messageAwaiter.promise;
 
             // If we have a sent message and we have a tempGuid, we need to emit the message match event
-            if (sentMessage && tempGuid && tempGuid.trim().length > 0) {
+            if (sentMessage && isNotEmpty(tempGuid)) {
                 Server().httpService.sendCache.remove(tempGuid);
                 Server().emitMessageMatch(sentMessage, tempGuid);
             }
@@ -318,7 +320,7 @@ export class ActionHandler {
         Server().log(`Executing Action: Open Chat (Chat: ${chatGuid})`, "debug");
 
         const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-        if (!chats || chats.length === 0) throw new Error("Chat does not exist");
+        if (isEmpty(chats)) throw new Error("Chat does not exist");
         if (chats[0].participants.length > 1) throw new Error("Chat is a group chat");
 
         const names = await generateChatNameList(chatGuid);
@@ -512,7 +514,7 @@ export class ActionHandler {
     ): Promise<string> => {
         Server().log(`Executing Action: Create Chat Universal (Participants: ${participants.join(", ")})`, "debug");
 
-        if (participants.length === 0) throw new Error("No participants specified!");
+        if (isEmpty(participants)) throw new Error("No participants specified!");
 
         // Add members to the chat
         const buddies = participants.map(item => slugifyAddress(item));
@@ -545,13 +547,13 @@ export class ActionHandler {
         }
 
         // If no chat ID found, throw an error
-        if (!ret || ret.length === 0) {
+        if (isEmpty(ret)) {
             throw new Error("Failed to get Chat GUID from AppleScript response!");
         }
 
         // If there is a message attached, try to send it
         try {
-            if (message && message.length > 0 && tempGuid && tempGuid.length > 0 && ret.startsWith(service)) {
+            if (isNotEmpty(message) && isNotEmpty(tempGuid)) {
                 await ActionHandler.sendMessage(tempGuid, ret, message);
             }
         } catch (ex: any) {

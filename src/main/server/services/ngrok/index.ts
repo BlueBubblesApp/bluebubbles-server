@@ -1,3 +1,4 @@
+import { isEmpty } from "@server/helpers/utils";
 import { Server } from "@server/index";
 import { connect, disconnect, kill, authtoken, Ngrok } from "ngrok";
 import { Proxy } from "../proxy";
@@ -74,7 +75,7 @@ export class NgrokService extends Proxy {
         }
 
         // If there is no key, force http
-        if ((ngrokKey ?? "").length === 0) {
+        if (isEmpty(ngrokKey)) {
             ngrokProtocol = "http";
         }
 

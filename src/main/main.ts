@@ -6,6 +6,7 @@ import * as url from "url";
 import { FileSystem } from "@server/fileSystem";
 
 import { Server } from "@server/index";
+import { isEmpty } from "@server/helpers/utils";
 
 let win: BrowserWindow;
 let tray: Tray;
@@ -283,12 +284,12 @@ Available Commands:
 
 process.stdin.on("data", chunk => {
     const line = chunk.toString().trim();
-    if (!Server() || !line || line.length === 0) return;
+    if (!Server() || isEmpty(line)) return;
     Server().log(`Handling STDIN: ${line}`, "debug");
 
     // Handle the standard input
     const parts = chunk ? line.split(" ") : [];
-    if (parts.length === 0) {
+    if (isEmpty(parts)) {
         Server().log("Invalid command", "debug");
         return;
     }

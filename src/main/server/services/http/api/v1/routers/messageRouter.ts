@@ -4,6 +4,7 @@ import { Next } from "koa";
 import type { File } from "formidable";
 
 import { Server } from "@server/index";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Handle } from "@server/databases/imessage/entity/Handle";
@@ -46,7 +47,7 @@ export class MessageRouter {
                     withArchived: true
                 });
 
-                if (!chats || chats.length === 0) continue;
+                if (isEmpty(chats)) continue;
                 i.participants = chats[0].participants;
             }
         }
@@ -72,7 +73,7 @@ export class MessageRouter {
 
         if (chatGuid) {
             const chats = await Server().iMessageRepo.getChats({ chatGuid });
-            if (!chats || chats.length === 0)
+            if (isEmpty(chats))
                 return new Success(ctx, {
                     message: `No chat found with GUID: ${chatGuid}`,
                     data: []
@@ -92,7 +93,7 @@ export class MessageRouter {
         };
 
         // Since we have a default value for `where`, we have to set it conditionally
-        if (where && where.length > 0) opts.where = where;
+        if (isNotEmpty(where)) opts.where = where;
 
         // Fetch the info for the message by GUID
         const messages = await Server().iMessageRepo.getMessages(opts);

@@ -1,7 +1,7 @@
 import { Server } from "@server/index";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { onlyAlphaNumeric } from "@server/helpers/utils";
+import { isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
 
 export class MessagePromise {
     promise: Promise<Message>;
@@ -85,7 +85,7 @@ export class MessagePromise {
         }
 
         // If we have chats, we need to make sure this promise is for that chat
-        if (message.chats.length > 0 && !message.chats.some((c: Chat) => c.guid === this.chatGuid)) {
+        if (isNotEmpty(message.chats) && !message.chats.some((c: Chat) => c.guid === this.chatGuid)) {
             return false;
         }
 

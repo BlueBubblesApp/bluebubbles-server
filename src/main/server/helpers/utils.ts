@@ -92,7 +92,7 @@ export const generateChatNameList = async (chatGuid: string) => {
     if (!chatGuid) throw new Error("No chat GUID provided");
     // First, lets get the members of the chat
     const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-    if (!chats || chats.length === 0) throw new Error("Chat does not exist");
+    if (isEmpty(chats)) throw new Error("Chat does not exist");
 
     const chat = chats[0];
     const order = await Server().iMessageRepo.getParticipantOrder(chat.ROWID);
@@ -219,7 +219,7 @@ export const parseMetadataString = (metadata: string): { [key: string]: string }
         if (items.length < 2) continue;
 
         const value = items[1].replace(/"/g, "").trim();
-        if (value.length === 0 || value === "(") continue;
+        if (isEmpty(value) || value === "(") continue;
 
         // If all conditions to parse pass, save the key/value pair
         output[items[0].trim()] = value;
@@ -230,13 +230,13 @@ export const parseMetadataString = (metadata: string): { [key: string]: string }
 
 export const insertChatParticipants = async (message: Message): Promise<Message> => {
     let theMessage = message;
-    if (!theMessage.chats || theMessage.chats.length === 0) {
+    if (isEmpty(theMessage.chats)) {
         theMessage = await Server().iMessageRepo.getMessage(message.guid, true, true);
     }
 
     for (const chat of theMessage.chats) {
         const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
-        if (!chats || chats.length === 0) continue;
+        if (isEmpty(chats)) continue;
 
         chat.participants = chats[0].participants;
     }
@@ -309,4 +309,27 @@ export const checkPrivateApiStatus = () => {
     if (!Server().privateApiHelper.server || !Server().privateApiHelper?.helper) {
         throw new Error("iMessage Private API Helper is not connected!");
     }
+};
+
+export const isNotEmpty = (value: string | Array<any> | NodeJS.Dict<any>, trim = true): boolean => {
+    if (!value) return false;
+
+    // Handle if the input is a string
+    if ((typeof value) === 'string' && (trim ? (value as string).trim() : value).length > 0) return true;
+
+    // Handle if the input is a list
+    if ((typeof value === 'object') && Array.isArray(value)) {
+        if (trim) return value.filter(i => isNotEmpty(i)).length > 0;
+        return value.length > 0;
+    }
+
+    // Handle if the input is a dictionary
+    if ((typeof value === 'object') && !Array.isArray(value)) return Object.keys(value).length > 0;
+
+    // If all fails, it's not empty
+    return true;
+};
+
+export const isEmpty = (value: string | Array<any> | NodeJS.Dict<any>, trim = true): boolean => {
+    return !isNotEmpty(value, trim);
 };

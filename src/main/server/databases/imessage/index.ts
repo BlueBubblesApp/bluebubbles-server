@@ -7,6 +7,7 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import { isNotEmpty } from "@server/helpers/utils";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -262,7 +263,7 @@ export class MessageRepository {
                 before: convertDateTo2001Time(before as Date)
             });
 
-        if (where && where.length > 0) {
+        if (isNotEmpty(where)) {
             for (const item of where) {
                 query.andWhere(item.statement, item.args);
             }
@@ -324,7 +325,7 @@ export class MessageRepository {
         }
 
         // Add any custom WHERE clauses
-        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
+        if (isNotEmpty(where)) for (const item of where) query.andWhere(item.statement, item.args);
 
         // Add date_delivered constraints
         if (after)
@@ -348,7 +349,7 @@ export class MessageRepository {
 
         // Add any custom WHERE clauses
         // We have to do this here so that it matches both before the OR and after the OR
-        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
+        if (isNotEmpty(where)) for (const item of where) query.andWhere(item.statement, item.args);
 
         // Add pagination params
         query.orderBy("message.date", sort);

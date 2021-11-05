@@ -8,7 +8,7 @@ import { transports } from "electron-log";
 import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server/index";
-import { escapeDoubleQuote, concatUint8Arrays, parseMetadataString } from "@server/helpers/utils";
+import { escapeDoubleQuote, concatUint8Arrays, parseMetadataString, isNotEmpty, isEmpty } from "@server/helpers/utils";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
 import { startMessages } from "./scripts";
@@ -327,12 +327,12 @@ export class FileSystem {
     }
 
     static async executeAppleScript(cmd: string) {
-        if (!cmd || cmd.length === 0) return null;
+        if (isEmpty(cmd)) return null;
 
         let parts = cmd.split("\n");
         parts = parts
             .map(i => escapeDoubleQuote(i).trim())
-            .filter(i => i && i.length > 0)
+            .filter(i => isNotEmpty(i))
             .map(i => `"${i}"`);
 
         return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);

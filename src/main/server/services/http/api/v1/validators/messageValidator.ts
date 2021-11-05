@@ -2,6 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 import type { File } from "formidable";
 import { Server } from "@server/index";
+import { isEmpty } from "@server/helpers/utils";
 
 import { ValidateInput } from "./index";
 import { MessageInterface } from "../interfaces/messageInterface";
@@ -60,7 +61,7 @@ export class MessageValidator {
         }
 
         // If we are sending via apple-script, we require a tempGuid
-        if (saniMethod === 'apple-script' && (!tempGuid ||tempGuid.trim().length === 0)) {
+        if (saniMethod === 'apple-script' && (isEmpty(tempGuid))) {
             throw new BadRequest({ error: `A 'tempGuid' is required when sending via AppleScript` });
         }
 

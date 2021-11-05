@@ -41,7 +41,7 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
 
 import { ActionHandler } from "./helpers/actions";
-import { insertChatParticipants, isMinBigSur, sanitizeStr } from "./helpers/utils";
+import { insertChatParticipants, isEmpty, isMinBigSur, isNotEmpty, sanitizeStr } from "./helpers/utils";
 import { Proxy } from "./services/proxy";
 import { BlueBubblesHelperService } from "./services/helperProcess";
 
@@ -345,7 +345,7 @@ class BlueBubblesServer extends EventEmitter {
             // Restart via terminal if configured
             const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
             const parentProc = await findProcess("pid", process.ppid);
-            const parentName = parentProc && parentProc.length > 0 ? parentProc[0].name : null;
+            const parentName = isNotEmpty(parentProc) ? parentProc[0].name : null;
 
             // Restart if enabled and the parent process is the app being launched
             if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
@@ -376,7 +376,7 @@ class BlueBubblesServer extends EventEmitter {
         // Make sure a password is set
         const password = this.repo.getConfig("password") as string;
         const tutorialFinished = this.repo.getConfig("tutorial_is_done") as boolean;
-        if (tutorialFinished && (!password || password.length === 0)) {
+        if (tutorialFinished && isEmpty(password)) {
             dialog.showMessageBox(this.window, {
                 type: "warning",
                 buttons: ["OK"],
@@ -470,7 +470,7 @@ class BlueBubblesServer extends EventEmitter {
         // Send notification to devices
         if (sendFcmMessage && FCMService.getApp()) {
             const devices = await this.repo.devices().find();
-            if (!devices || devices.length === 0) return;
+            if (isEmpty(devices)) return;
 
             const notifData = JSON.stringify(data);
             await this.fcm.sendNotification(
@@ -752,7 +752,7 @@ class BlueBubblesServer extends EventEmitter {
             this.privateApiHelper.start();
         }
 
-        if (this.hasDiskAccess && this.chatListeners.length === 0) {
+        if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
             this.log("Starting chat listener...");
             this.startChatListener();
         }

@@ -12,6 +12,7 @@ import * as macosVersion from "macos-version";
 // Internal libraries
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
@@ -269,7 +270,7 @@ export class SocketRoutes {
 
                 if (withLastMessage) {
                     // Set the last message, if applicable
-                    if (chatRes.messages && chatRes.messages.length > 0) {
+                    if (isNotEmpty(chatRes.messages)) {
                         [chatRes.lastMessage] = chatRes.messages;
 
                         // Remove the last message from the result
@@ -307,7 +308,7 @@ export class SocketRoutes {
                 chatGuid,
                 withParticipants: params?.withParticipants ?? true
             });
-            if (chats.length === 0) {
+            if (isEmpty(chats)) {
                 return response(cb, "error", createBadRequestResponse("Chat does not exist (get-chat)!"));
             }
 
@@ -331,7 +332,7 @@ export class SocketRoutes {
                     chatGuid: params?.identifier
                 });
 
-                if (!chats || chats.length === 0)
+                if (isEmpty(chats))
                     return response(cb, "error", createBadRequestResponse("Chat does not exist (get-chat-messages)"));
 
                 const dbParams: DBMessageParams = {
@@ -371,9 +372,9 @@ export class SocketRoutes {
 
                 // See if there is a chat and make sure it exists
                 const chatGuid = params?.chatGuid;
-                if (chatGuid && chatGuid.length > 0) {
+                if (isNotEmpty(chatGuid)) {
                     const chats = await Server().iMessageRepo.getChats({ chatGuid });
-                    if (!chats || chats.length === 0)
+                    if (isEmpty(chats))
                         return response(cb, "error", createBadRequestResponse("Chat does not exist (get-messages)"));
                 }
 
@@ -524,7 +525,7 @@ export class SocketRoutes {
                     return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
-                if (!chats || chats.length === 0)
+                if (isEmpty(chats))
                     return response(
                         cb,
                         "error",
@@ -535,7 +536,7 @@ export class SocketRoutes {
                     chatGuid: chats[0].guid,
                     limit: 1
                 });
-                if (!messages || messages.length === 0)
+                if (isEmpty(messages))
                     return response(cb, "last-chat-message", createNoDataResponse());
 
                 const result = await getMessageResponse(messages[0]);
@@ -554,7 +555,7 @@ export class SocketRoutes {
 
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
 
-                if (!chats || chats.length === 0)
+                if (isEmpty(chats))
                     return response(cb, "error", createBadRequestResponse("Chat does not exist (get-participants)"));
 
                 const handles = [];
@@ -583,7 +584,7 @@ export class SocketRoutes {
                 // Make sure the chat exists (if group chat)
                 if (chatGuid.includes(";+;")) {
                     const chats = await Server().iMessageRepo.getChats({ chatGuid });
-                    if (!chats || chats.length === 0)
+                    if (isEmpty(chats))
                         return response(
                             cb,
                             "error",
@@ -592,7 +593,7 @@ export class SocketRoutes {
                 }
 
                 // Make sure we have a temp GUID, for matching
-                if ((tempGuid && (!message || message.length === 0)) || (!tempGuid && message))
+                if ((tempGuid && (isEmpty(message))) || (!tempGuid && message))
                     return response(cb, "error", createBadRequestResponse("No temporary GUID provided with message"));
 
                 // Make sure that if we have an attachment, there is also a guid and name
@@ -604,7 +605,7 @@ export class SocketRoutes {
                 }
 
                 // Debug logging
-                if (tempGuid && tempGuid.trim().length > 0) {
+                if (isNotEmpty(tempGuid)) {
                     Server().log(`Attempting to send message using Temp GUID: ${tempGuid}`, 'debug');
                 }
 
@@ -672,7 +673,7 @@ export class SocketRoutes {
 
                 // If it's the last chunk, but no message, default it to an empty string
                 if (!hasMore && !message) message = "";
-                if (!hasMore && !tempGuid && (!message || message.length === 0))
+                if (!hasMore && !tempGuid && (isEmpty(message)))
                     return response(cb, "error", createBadRequestResponse("No temp GUID provided with message!"));
 
                 // If it's the last chunk, make sure there an attachment name
@@ -684,7 +685,7 @@ export class SocketRoutes {
                     // Make sure the chat exists before we send the response
                     if (chatGuid.includes(";+;")) {
                         const chats = await Server().iMessageRepo.getChats({ chatGuid });
-                        if (!chats || chats.length === 0)
+                        if (isEmpty(chats))
                             return response(
                                 cb,
                                 "error",
@@ -726,7 +727,7 @@ export class SocketRoutes {
             async (params, cb): Promise<void> => {
                 let participants = params?.participants;
 
-                if (!participants || participants.length === 0) {
+                if (isEmpty(participants)) {
                     return response(cb, "error", createBadRequestResponse("No participants specified"));
                 }
 
@@ -750,7 +751,7 @@ export class SocketRoutes {
                     );
                 } catch (ex: any) {
                     // If there was a failure, and there is only 1 participant, and we have a message, try to fallback
-                    if (participants.length === 1 && (params?.message ?? "").length > 0 && params?.tempGuid) {
+                    if (participants.length === 1 && isNotEmpty(params?.message) && isNotEmpty(params?.tempGuid)) {
                         Server().log("Universal create chat failed. Attempting single chat creation.", "debug");
 
                         try {
@@ -771,7 +772,7 @@ export class SocketRoutes {
                 }
 
                 // Make sure we have a chat GUID
-                if (!chatGuid || chatGuid.length === 0) {
+                if (isEmpty(chatGuid)) {
                     return response(cb, "error", createBadRequestResponse("Failed to create chat! Check server logs!"));
                 }
 
@@ -881,7 +882,7 @@ export class SocketRoutes {
                 if (!params?.chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided!"));
                 // Make sure we have a temp GUID, for matching
                 const tempGuid = params?.tempGuid || params?.messageGuid;
-                if (!tempGuid || (tempGuid ?? "").length === 0)
+                if (isEmpty(tempGuid))
                     return response(cb, "error", createBadRequestResponse("No temporary GUID provided with message!"));
                 if (!tempGuid || !params?.messageText)
                     return response(cb, "error", createBadRequestResponse("No message provided!"));

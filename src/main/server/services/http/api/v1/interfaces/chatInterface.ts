@@ -1,6 +1,6 @@
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
-import { checkPrivateApiStatus, slugifyAddress, waitMs } from "@server/helpers/utils";
+import { checkPrivateApiStatus, isEmpty, isNotEmpty, slugifyAddress, waitMs } from "@server/helpers/utils";
 import { Server } from "@server/index";
 import { ChatResponse, HandleResponse } from "@server/types";
 
@@ -55,7 +55,7 @@ export class ChatInterface {
 
             if (withLastMessage) {
                 // Set the last message, if applicable
-                if (chatRes.messages && chatRes.messages.length > 0) {
+                if (isNotEmpty(chatRes.messages)) {
                     [chatRes.lastMessage] = chatRes.messages;
 
                     // Remove the last message from the result
@@ -127,7 +127,7 @@ export class ChatInterface {
         checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
-        if (addresses.length === 0) {
+        if (isEmpty(addresses)) {
             throw new Error("No addresses provided!");
         }
 
@@ -141,7 +141,7 @@ export class ChatInterface {
         // Fetch the chat based on the return data
         let chats = await Server().iMessageRepo.getChats({ chatGuid: result.identifier, withParticipants: true });
         let tryCount = 0;
-        while (chats.length === 0) {
+        while (isEmpty(chats)) {
             tryCount += 1;
 
             // If we've tried 10 times and there is no change, break out (~10 seconds)
@@ -155,7 +155,7 @@ export class ChatInterface {
         }
 
         // Check if the name changed
-        if (chats.length === 0) {
+        if (isEmpty(chats)) {
             throw new Error("Failed to create new chat! Chat not found after 5 seconds!");
         }
 

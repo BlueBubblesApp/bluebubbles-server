@@ -1,5 +1,6 @@
 import * as KoaRouter from "koa-router";
 import { Server } from "@server/index";
+import { isNotEmpty } from "@server/helpers/utils";
 
 // Middleware
 import { AuthMiddleware } from "./middleware/authMiddleware";
@@ -385,7 +386,7 @@ export class HttpRoutes {
         middleware: KoaMiddleware[]
     ) {
         // Sanitize the path parts so we can accurately build them
-        const parts = pathParts.map(i => (i ?? "").replace(/(^\/)|(\/$)/g, "")).filter(i => i && i.length > 0);
+        const parts = pathParts.map(i => (i ?? "").replace(/(^\/)|(\/$)/g, "")).filter(i => isNotEmpty(i));
 
         // Build the path
         const path = `/${parts.join("/")}`;

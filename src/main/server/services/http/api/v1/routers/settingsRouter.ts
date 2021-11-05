@@ -1,6 +1,7 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
+import { isNotEmpty } from "@server/helpers/utils";
 import { BackupsInterface } from "../interfaces/backupsInterface";
 import { ValidateInput, ValidateJSON } from "../validators";
 import { SettingsValidator } from "../validators/settingsValidator";
@@ -26,7 +27,7 @@ export class SettingsRouter {
         const name = ctx.query.name as string;
         let res: any;
 
-        if (name && name.length > 0) {
+        if (isNotEmpty(name)) {
             res = await BackupsInterface.getSettingsByName(name);
             if (!res) return new Success(ctx, { message: "No settings found!" }).send();
         } else {

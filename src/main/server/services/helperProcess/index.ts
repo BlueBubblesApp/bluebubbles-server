@@ -6,7 +6,7 @@ import { parse as ParsePlist } from "plist";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
-import { isMinBigSur, isMinMonteray } from "@server/helpers/utils";
+import { isEmpty, isMinBigSur, isMinMonteray } from "@server/helpers/utils";
 import { restartMessages } from "@server/fileSystem/scripts";
 
 import * as net from "net";
@@ -227,7 +227,7 @@ export class BlueBubblesHelperService {
     }
 
     async createChat(addresses: string[], message: string | null): Promise<TransactionResult> {
-        if (!addresses || addresses.length === 0) {
+        if (isEmpty(addresses)) {
             throw new Error("Failed to send reaction. Invalid params!");
         }
 

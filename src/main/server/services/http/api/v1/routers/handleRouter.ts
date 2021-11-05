@@ -3,6 +3,7 @@ import { Next } from "koa";
 
 import { Server } from "@server/index";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { isEmpty } from "@server/helpers/utils";
 import { HandleInterface } from "../interfaces/handleInterface";
 import { Success } from "../responses/success";
 import { NotFound } from "../responses/errors";
@@ -16,7 +17,7 @@ export class HandleRouter {
     static async find(ctx: RouterContext, _: Next) {
         const address = ctx.params.guid;
         const handles = await Server().iMessageRepo.getHandles({ address });
-        if (!handles || handles.length === 0) throw new NotFound({ error: "Handle not found!" });
+        if (isEmpty(handles)) throw new NotFound({ error: "Handle not found!" });
         return new Success(ctx, { data: await getHandleResponse(handles[0]) }).send();
     }
 

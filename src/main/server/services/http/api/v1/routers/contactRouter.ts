@@ -1,6 +1,7 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
+import { isEmpty } from "@server/helpers/utils";
 import { ContactInterface } from "../interfaces/contactInterface";
 import { Success } from "../responses/success";
 
@@ -15,7 +16,7 @@ export class ContactRouter {
         const addresses = body?.addresses ?? [];
 
         let res = [];
-        if (!addresses || !Array.isArray(addresses) || addresses.length === 0) {
+        if (isEmpty(addresses) || !Array.isArray(addresses)) {
             res = await ContactInterface.getAllContacts();
         } else {
             res = await ContactInterface.queryContacts(addresses);

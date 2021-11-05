@@ -1,6 +1,7 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
+import { isNotEmpty } from "@server/helpers/utils";
 import { BackupsInterface } from "../interfaces/backupsInterface";
 import { Success } from "../responses/success";
 
@@ -22,7 +23,7 @@ export class ThemeRouter {
         const name = ctx.query.name as string;
         let res: any;
 
-        if (name && name.length > 0) {
+        if (isNotEmpty(name)) {
             res = await BackupsInterface.getThemeByName(name);
             if (!res) return new Success(ctx, { message: "No theme found!" }).send();
         } else {

@@ -1,10 +1,11 @@
 import { ValidationErrors } from "validatorjs";
 import * as Validator from "validatorjs";
+import { isNotEmpty } from "@server/helpers/utils";
 import { BadRequest } from "../responses/errors";
 
 export const getFirstError = (errors: ValidationErrors) => {
     for (const err of Object.keys(errors)) {
-        if (errors[err].length > 0) {
+        if (isNotEmpty(errors[err])) {
             return errors[err][0];
         }
     }

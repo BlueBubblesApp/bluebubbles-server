@@ -2,6 +2,7 @@ import { app } from "electron";
 import { EventEmitter } from "events";
 import { createConnection, Connection } from "typeorm";
 import { Server } from "@server/index";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Config, Alert, Device, Queue } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 
@@ -133,7 +134,7 @@ export class ServerRepository extends EventEmitter {
         );
 
         // Delete the devices
-        if (devicesToDelete.length > 0) {
+        if (isNotEmpty(devicesToDelete)) {
             Server().log(`Automatically purging ${devicesToDelete.length} devices from your server`);
             for (const item of devicesToDelete) {
                 const dateStr = item.last_active ? new Date(item.last_active).toLocaleDateString() : "N/A";
@@ -148,13 +149,13 @@ export class ServerRepository extends EventEmitter {
 
         // Get all queued items
         let entries = await repo.find();
-        if (entries.length === 0) return false;
+        if (isEmpty(entries)) return false;
 
         // Check if any have a matching tempGUID
         entries = entries.filter(item => item.tempGuid === tempGuid || item.text.startsWith(tempGuid));
 
         // Return if there are tempGUID matches
-        return entries.length > 0;
+        return isNotEmpty(entries);
     }
 
     /**

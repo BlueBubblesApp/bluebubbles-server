@@ -1,5 +1,6 @@
 import { FileSystem } from "@server/fileSystem";
 import { ActionHandler } from "@server/helpers/actions";
+import { isNotEmpty } from "@server/helpers/utils";
 import { Server } from "@server/index";
 import { MessageInterface } from "../http/api/v1/interfaces/messageInterface";
 
@@ -54,7 +55,7 @@ export class QueueService {
                     }
 
                     // Then send the message (if required)
-                    if (item.data.message && item.data.message.length > 0) {
+                    if (isNotEmpty(item.data.message)) {
                         try {
                             await MessageInterface.sendMessageSync(
                                 item.data.chatGuid,
@@ -85,7 +86,7 @@ export class QueueService {
         }
 
         // Check and see if there are any other items to process
-        if (this.items.length > 0) {
+        if (isNotEmpty(this.items)) {
             const nextItem: QueueItem = this.items.shift();
             await this.process(nextItem);
         } else {

@@ -3,7 +3,7 @@ import * as macosVersion from "macos-version";
 import * as compareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
-import { escapeOsaExp, isMinBigSur } from "@server/helpers/utils";
+import { escapeOsaExp, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
@@ -24,7 +24,7 @@ const buildServiceScript = (inputService: string) => {
 
 const buildMessageScript = (message: string, target = "targetBuddy") => {
     let messageScpt = "";
-    if (message && message.length > 0) {
+    if (isNotEmpty(message)) {
         messageScpt = `send "${escapeOsaExp(message)}" to ${target}`;
     }
 
@@ -33,7 +33,7 @@ const buildMessageScript = (message: string, target = "targetBuddy") => {
 
 const buildAttachmentScript = (attachment: string, variable = "theAttachment", target = "targetBuddy") => {
     let attachmentScpt = "";
-    if (attachment && attachment.length > 0) {
+    if (isNotEmpty(attachment)) {
         attachmentScpt = `set ${variable} to "${escapeOsaExp(attachment)}" as POSIX file
             send theAttachment to ${target}
             delay 1`;
@@ -47,7 +47,7 @@ const getAddressFromInput = (value: string) => {
     const valSplit = value.split(";");
 
     // If somehow the length is 0, just return the input
-    if (valSplit.length === 0) return value;
+    if (isEmpty(valSplit)) return value;
 
     // Return the "last" index in the array (or the 0th)
     return valSplit[valSplit.length - 1];

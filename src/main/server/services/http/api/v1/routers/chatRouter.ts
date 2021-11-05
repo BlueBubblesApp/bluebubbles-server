@@ -5,6 +5,7 @@ import { Server } from "@server/index";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 
 import { ChatInterface } from "../interfaces/chatInterface";
 import { Success } from "../responses/success";
@@ -39,7 +40,7 @@ export class ChatRouter {
             withParticipants
         });
 
-        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         const res = await getChatResponse(chats[0]);
         if (withLastMessage) {
@@ -63,7 +64,7 @@ export class ChatRouter {
             withParticipants: false
         });
 
-        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         const opts: DBMessageParams = {
             chatGuid: ctx.params.guid,
@@ -126,7 +127,7 @@ export class ChatRouter {
         const displayName = body?.displayName;
 
         const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
-        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         let chat = chats[0];
         const updated = [];
@@ -140,12 +141,12 @@ export class ChatRouter {
             }
         }
 
-        if (errors && errors.length > 0) {
+        if (isNotEmpty(errors)) {
             throw new IMessageError({ message: "Chat update executed with errors!", error: errors.join(", ") });
         }
 
         const data = await getChatResponse(chat);
-        if (updated.length === 0) {
+        if (isEmpty(updated)) {
             return new Success(ctx, { data, message: "Chat not updated! No update information provided!" }).send();
         }
 
@@ -180,7 +181,7 @@ export class ChatRouter {
         const address = body?.address;
 
         const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
-        if (!chats || chats.length === 0) throw new NotFound({ error: "Chat does not exist!" });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         // Add the participant to the chat
         let chat = chats[0];

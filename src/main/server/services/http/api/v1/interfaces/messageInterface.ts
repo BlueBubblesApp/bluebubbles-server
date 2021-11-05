@@ -3,7 +3,7 @@ import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/services/messageManager/messagePromise";
 import { ValidRemoveTapback, ValidTapback } from "@server/types";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
+import { checkPrivateApiStatus, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { negativeReactionTextMap, reactionTextMap } from "@server/helpers/mappings";
 import { invisibleMediaChar } from "@server/services/http/constants";
 import { ActionHandler } from "@server/helpers/actions";
@@ -72,7 +72,7 @@ export class MessageInterface {
         }
 
         // If we have a sent message and we have a tempGuid, we need to emit the message match event
-        if (sentMessage && tempGuid && tempGuid.trim().length > 0) {
+        if (sentMessage && isNotEmpty(tempGuid)) {
             Server().emitMessageMatch(sentMessage, tempGuid);
         }
 
@@ -117,7 +117,7 @@ export class MessageInterface {
         const sentMessage = await awaiter.promise;
 
         // If we have a sent message and we have a tempGuid, we need to emit the message match event
-        if (sentMessage && attachmentGuid && attachmentGuid.trim().length > 0) {
+        if (sentMessage && isNotEmpty(attachmentGuid)) {
             Server().emitMessageMatch(sentMessage, attachmentGuid);
         }
 
@@ -190,7 +190,7 @@ export class MessageInterface {
 
         // If it's a media-only message and we have at least 1 attachment,
         // set the message according to the first attachment's MIME type
-        if (isOnlyMedia && (message.attachments ?? []).length > 0) {
+        if (isOnlyMedia && isNotEmpty(message.attachments)) {
             if (message.attachments[0].mimeType.startsWith("image")) {
                 msg = `an image`;
             } else if (message.attachments[0].mimeType.startsWith("video")) {
@@ -243,7 +243,7 @@ export class MessageInterface {
         }
 
         // If we have a sent message and we have a tempGuid, we need to emit the message match event
-        if (retMessage && tempGuid && tempGuid.trim().length > 0) {
+        if (retMessage && isNotEmpty(tempGuid)) {
             Server().emitMessageMatch(retMessage, tempGuid);
         }
 

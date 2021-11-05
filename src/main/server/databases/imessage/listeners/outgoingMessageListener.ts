@@ -3,7 +3,7 @@ import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
 import { getCacheName } from "@server/databases/imessage/helpers/utils";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
+import { isNotEmpty, onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
 import { ChangeListener } from "./changeListener";
 
 export class OutgoingMessageListener extends ChangeListener {
@@ -67,7 +67,7 @@ export class OutgoingMessageListener extends ChangeListener {
             ]
         });
 
-        if (newUnsent.length > 0) {
+        if (isNotEmpty(newUnsent)) {
             Server().log(`Detected ${newUnsent.length} unsent outgoing message(s)`, "debug");
         }
 
@@ -112,7 +112,7 @@ export class OutgoingMessageListener extends ChangeListener {
             ]
         });
 
-        if (lookbackSent.length > 0) {
+        if (isNotEmpty(lookbackSent)) {
             Server().log(`Detected ${lookbackSent.length} sent (previously unsent) message(s)`, "debug");
         }
 
