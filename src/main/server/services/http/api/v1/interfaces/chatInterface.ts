@@ -7,7 +7,6 @@ import { ChatResponse, HandleResponse } from "@server/types";
 export class ChatInterface {
     static async get({
         guid = null,
-        withSMS = false,
         withParticipants = true,
         withArchived = false,
         withLastMessage = false,
@@ -17,7 +16,6 @@ export class ChatInterface {
     }: any): Promise<ChatResponse[]> {
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
-            withSMS,
             withParticipants,
             withLastMessage,
             offset,
@@ -31,8 +29,7 @@ export class ChatInterface {
         const tmpChats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
             withParticipants: true,
-            withArchived,
-            withSMS
+            withArchived
         });
 
         for (const chat of tmpChats) {

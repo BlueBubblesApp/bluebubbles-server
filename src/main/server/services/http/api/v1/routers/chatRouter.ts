@@ -12,7 +12,7 @@ import { IMessageError, NotFound } from "../responses/errors";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
-        const chats = await Server().iMessageRepo.getChats({ withSMS: true });
+        const chats = await Server().iMessageRepo.getChats();
         const serviceCounts: { [key: string]: number } = {};
         for (const chat of chats) {
             if (!Object.keys(serviceCounts).includes(chat.serviceName)) {
@@ -36,7 +36,6 @@ export class ChatRouter {
 
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
-            withSMS: true,
             withParticipants
         });
 
@@ -57,12 +56,10 @@ export class ChatRouter {
             .map(e => e.trim());
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
-        const withSMS = withQuery.includes("sms");
         const { sort, before, after, offset, limit } = ctx?.request.query;
 
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
-            withSMS: true,
             withParticipants: false
         });
 
@@ -72,7 +69,6 @@ export class ChatRouter {
             chatGuid: ctx.params.guid,
             withAttachments,
             withHandle,
-            withSMS,
             offset: offset ? Number.parseInt(offset as string, 10) : 0,
             limit: limit ? Number.parseInt(limit as string, 10) : 100,
             sort: sort as "ASC" | "DESC",
@@ -99,7 +95,6 @@ export class ChatRouter {
             .map((e: string) => e.toLowerCase().trim());
         const withParticipants = withQuery.includes("participants");
         const withLastMessage = withQuery.includes("lastmessage");
-        const withSMS = withQuery.includes("sms");
         const withArchived = withQuery.includes("archived");
         const guid = body?.guid;
         const { sort, offset, limit } = body;
@@ -107,7 +102,6 @@ export class ChatRouter {
         // Fetch the chats
         const results = await ChatInterface.get({
             guid,
-            withSMS,
             withParticipants,
             withLastMessage,
             withArchived,
