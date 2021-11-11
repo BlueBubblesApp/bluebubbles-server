@@ -150,7 +150,8 @@ export class BlueBubblesHelperService {
         // we'll base this off the users uid (a unique id for each user, starting from 501)
         // we'll subtract 501 to get an id starting at 0, incremented for each user
         // then we add this to the base port to get a unique port for the socket
-        const port = 45770 + os.userInfo().uid - 501;
+        const port = 45670 + os.userInfo().uid - 501;
+        Server().log(`Starting Socket server on port ${port}`);
         // Listen and reset the restart counter
         this.server.listen(port, "localhost", 511, () => {
             this.restartCounter = 0;
