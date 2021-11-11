@@ -9,7 +9,6 @@ export type DBMessageParams = {
     withAttachments?: boolean;
     withHandle?: boolean;
     sort?: "ASC" | "DESC";
-    withSMS?: boolean;
     where?: DBWhereItem[];
 };
 
@@ -23,7 +22,12 @@ export type ChatParams = {
     withParticipants?: boolean;
     withLastMessage?: boolean;
     withArchived?: boolean;
-    withSMS?: boolean;
+    offset?: number;
+    limit?: number;
+};
+
+export type HandleParams = {
+    address?: string;
     offset?: number;
     limit?: number;
 };

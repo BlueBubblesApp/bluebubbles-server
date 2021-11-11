@@ -1,19 +1,17 @@
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
-import { createSuccessResponse } from "@server/helpers/responses";
 import { FileSystem } from "@server/fileSystem";
-import { GeneralRepo } from "../repository/generalRepo";
-import { ServerRepo } from "../repository/serverRepo";
+import { ServerInterface } from "@server/api/v1/interfaces/serverInterface";
+import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
+import { Success } from "../responses/success";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
-        ctx.status = 200;
-        ctx.body = createSuccessResponse(GeneralRepo.getServerMetadata());
+        return new Success(ctx, { data: GeneralInterface.getServerMetadata() }).send();
     }
 
     static async checkForUpdate(ctx: RouterContext, _: Next) {
-        ctx.status = 200;
-        ctx.body = createSuccessResponse(await GeneralRepo.checkForUpdate());
+        return new Success(ctx, { data: await GeneralInterface.checkForUpdate() }).send();
     }
 
     static async getLogs(ctx: RouterContext, _: Next) {
@@ -27,7 +25,7 @@ export class ServerRouter {
         }
 
         const logs = await FileSystem.getLogs({ count });
-        ctx.body = createSuccessResponse(logs);
+        return new Success(ctx, { data: logs }).send();
     }
 
     static async getStatTotals(ctx: RouterContext, _: Next) {
@@ -38,8 +36,7 @@ export class ServerRouter {
             params.only = (only as string).split(",");
         }
 
-        ctx.status = 200;
-        ctx.body = createSuccessResponse(await ServerRepo.getDatabaseTotals(params));
+        return new Success(ctx, { data: await ServerInterface.getDatabaseTotals(params) }).send();
     }
 
     static async getStatMedia(ctx: RouterContext, _: Next) {
@@ -50,8 +47,7 @@ export class ServerRouter {
             params.only = (only as string).split(",");
         }
 
-        ctx.status = 200;
-        ctx.body = createSuccessResponse(await ServerRepo.getMediaTotals(params));
+        return new Success(ctx, { data: await ServerInterface.getMediaTotals(params) }).send();
     }
 
     static async getStatMediaByChat(ctx: RouterContext, _: Next) {
@@ -62,7 +58,6 @@ export class ServerRouter {
             params.only = (only as string).split(",");
         }
 
-        ctx.status = 200;
-        ctx.body = createSuccessResponse(await ServerRepo.getMediaTotalsByChat(params));
+        return new Success(ctx, { data: await await ServerInterface.getMediaTotalsByChat(params) }).send();
     }
 }

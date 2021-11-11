@@ -1,3 +1,5 @@
+import { isEmpty } from "@server/helpers/utils";
+
 /**
  * A VERY simple helper class for caching items
  */
@@ -5,7 +7,7 @@ export class EventCache {
     items: string[] = [];
 
     purge() {
-        if (this.items.length === 0) return;
+        if (isEmpty(this.items)) return;
         console.info(`Purging ${this.size()} items from cache...`);
         this.items = [];
     }
@@ -15,6 +17,7 @@ export class EventCache {
     }
 
     add(item: string): boolean {
+        if (isEmpty(item)) return false;
         if (this.items.includes(item)) return false;
         this.items.push(item);
         return true;
@@ -25,6 +28,7 @@ export class EventCache {
     }
 
     remove(item: string) {
+        if (!item) return;
         this.items = this.items.filter(i => item !== i);
     }
 }

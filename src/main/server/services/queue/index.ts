@@ -1,5 +1,7 @@
+import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { FileSystem } from "@server/fileSystem";
-import { ActionHandler } from "@server/helpers/actions";
+import { ActionHandler } from "@server/api/v1/apple/actions";
+import { isNotEmpty } from "@server/helpers/utils";
 import { Server } from "@server/index";
 
 export type QueueItem = {
@@ -37,19 +39,43 @@ export class QueueService {
                     await ActionHandler.openChat(item.data);
                     break;
                 case "send-attachment":
-                    await ActionHandler.sendMessage(
-                        item.data.tempGuid,
-                        item.data.chatGuid,
-                        item.data.message,
-                        item.data.attachmentGuid,
-                        item.data.attachmentName,
-                        item.data.chunks
-                    );
+                    // Send the attachment first
+                    try {
+                        await MessageInterface.sendAttachmentSync(
+                            item.data.chatGuid,
+                            item.data.attachmentPath,
+                            item.data.attachmentName,
+                            item.data.attachmentGuid
+                        );
+                        Server().httpService.sendCache.remove(item?.data?.attachmentGuid);
+                    } catch (ex: any) {
+                        // Re-throw the error after removing from cache
+                        Server().httpService.sendCache.remove(item?.data?.attachmentGuid);
+                        throw ex;
+                    }
 
-                    // After 10 minutes, delete the attachment chunks
+                    // Then send the message (if required)
+                    if (isNotEmpty(item.data.message)) {
+                        try {
+                            await MessageInterface.sendMessageSync(
+                                item.data.chatGuid,
+                                item.data.message,
+                                "apple-script",
+                                null,
+                                null,
+                                null,
+                                item.data.tempGuid
+                            );
+                        } finally {
+                            // Remove from cache
+                            Server().httpService.sendCache.remove(item?.data?.tempGuid);
+                        }
+                    }
+
+                    // After 30 minutes, delete the attachment chunks
                     setTimeout(() => {
                         FileSystem.deleteChunks(item.data.attachmentGuid);
-                    }, 1000 * 60 * 10);
+                    }, 1000 * 60 * 30);
                     break;
                 default:
                     Server().log(`Unhandled queue item type: ${item.type}`, "warn");
@@ -60,7 +86,7 @@ export class QueueService {
         }
 
         // Check and see if there are any other items to process
-        if (this.items.length > 0) {
+        if (isNotEmpty(this.items)) {
             const nextItem: QueueItem = this.items.shift();
             await this.process(nextItem);
         } else {

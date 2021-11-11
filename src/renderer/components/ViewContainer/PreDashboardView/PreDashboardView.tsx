@@ -29,7 +29,6 @@ interface State {
     proxyService: string;
     showModal: boolean;
     serverUrl: string;
-    smsSupport: boolean;
     showUpdateToast: boolean;
     checkForUpdates: boolean;
     autoInstallUpdates: boolean;
@@ -56,7 +55,6 @@ class PreDashboardView extends React.Component<unknown, State> {
             enablePrivateApi: false,
             showModal: false,
             serverUrl: "",
-            smsSupport: false,
             showUpdateToast: true,
             checkForUpdates: true,
             autoInstallUpdates: false
@@ -309,8 +307,7 @@ class PreDashboardView extends React.Component<unknown, State> {
 
         if (!password || password?.trim().length === 0) return null;
         if (!this.state.fcmClient || !this.state.fcmServer) return output("Skip FCM Setup");
-        if (this.state.fcmClient && this.state.fcmServer && this.state.abPerms === "authorized")
-            return output("Continue");
+        if (this.state.fcmClient && this.state.fcmServer) return output("Continue");
 
         return null;
     }
@@ -431,18 +428,6 @@ class PreDashboardView extends React.Component<unknown, State> {
                                     id="auto_install_updates"
                                     checked={this.state.autoInstallUpdates}
                                     onChange={e => this.handleCheckboxChange(e, "autoInstallUpdates")}
-                                    type="checkbox"
-                                />
-                                <i />
-                            </div>
-                        </div>
-                        <div id="setNgrokContainer">
-                            <h3>SMS Support (Desktop Client): </h3>
-                            <div style={{ marginTop: "3px" }}>
-                                <input
-                                    id="sms_support"
-                                    checked={this.state.smsSupport}
-                                    onChange={e => this.handleCheckboxChange(e, "smsSupport")}
                                     type="checkbox"
                                 />
                                 <i />

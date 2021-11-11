@@ -76,5 +76,5 @@ export abstract class ChangeListener extends EventEmitter {
         setTimeout(() => this.checkForNewEntries(), waitTime);
     }
 
-    abstract async getEntries(after: Date, before: Date): Promise<void>;
+    abstract getEntries(after: Date, before: Date): Promise<void>;
 }

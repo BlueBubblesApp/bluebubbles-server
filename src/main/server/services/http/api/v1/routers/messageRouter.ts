@@ -1,22 +1,26 @@
+/* eslint-disable prefer-const */
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
+import type { File } from "formidable";
 
 import { Server } from "@server/index";
-import { createNotFoundResponse, createSuccessResponse } from "@server/helpers/responses";
-import { getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
+import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
+import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { Handle } from "@server/databases/imessage/entity/Handle";
-import { parseNumber } from "../../../helpers";
+import { Success } from "../responses/success";
+import { BadRequest, IMessageError, NotFound } from "../responses/errors";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
         const total = await Server().iMessageRepo.getMessageCount(null, null, true);
-        ctx.body = createSuccessResponse({ total });
+        return new Success(ctx, { data: { total } }).send();
     }
 
     static async count(ctx: RouterContext, _: Next) {
         const total = await Server().iMessageRepo.getMessageCount();
-        ctx.body = createSuccessResponse({ total });
+        return new Success(ctx, { data: { total } }).send();
     }
 
     static async find(ctx: RouterContext, _: Next) {
@@ -24,17 +28,14 @@ export class MessageRouter {
         const withQuery = ((ctx.request.query.with ?? "") as string)
             .toLowerCase()
             .split(",")
-            .map(e => e.trim());
+            .map(e => safeTrim(e));
         const withChats = withQuery.includes("chats") || withQuery.includes("chat");
         const withParticipants = withQuery.includes("chats.participants") || withQuery.includes("chat.participants");
+        const withAttachments = withQuery.includes("attachments") || withQuery.includes("attachment");
 
         // Fetch the info for the message by GUID
-        const message = await Server().iMessageRepo.getMessage(guid, withChats);
-        if (!message) {
-            ctx.status = 404;
-            ctx.body = createNotFoundResponse("Message does not exist!");
-            return;
-        }
+        const message = await Server().iMessageRepo.getMessage(guid, withChats, withAttachments);
+        if (!message) throw new NotFound({ error: "Message does not exist!" });
 
         // If we want participants of the chat, fetch them
         if (withParticipants) {
@@ -43,49 +44,40 @@ export class MessageRouter {
                     chatGuid: i.guid,
                     withParticipants,
                     withLastMessage: false,
-                    withSMS: true,
                     withArchived: true
                 });
 
-                if (!chats || chats.length === 0) continue;
+                if (isEmpty(chats)) continue;
                 i.participants = chats[0].participants;
             }
         }
 
-        ctx.body = createSuccessResponse(await getMessageResponse(message));
+        return new Success(ctx, { data: await getMessageResponse(message) }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
-        const { body } = ctx.request;
+        let { chatGuid, with: withQuery, offset, limit, where, sort, after, before } = ctx?.request?.body;
 
         // Pull out the filters
-        const withQuery = (body?.with ?? [])
-            .filter((e: any) => typeof e === "string")
-            .map((e: string) => e.toLowerCase().trim());
+        withQuery = withQuery.filter((e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
         const withChats = withQuery.includes("chat") || withQuery.includes("chats");
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle");
-        const withSMS = withQuery.includes("sms");
         const withChatParticipants =
             withQuery.includes("chat.participants") || withQuery.includes("chats.participants");
-        const where = (body?.where ?? []).filter((e: any) => e.statement && e.args);
-        const sort = ["DESC", "ASC"].includes((body?.sort ?? "").toLowerCase()) ? body?.sort : "DESC";
-        const after = body?.after;
-        const before = body?.before;
-        const chatGuid = body?.chatGuid;
 
-        // Pull the pagination params and make sure they are correct
-        let offset = parseNumber(body?.offset as string) ?? 0;
-        let limit = parseNumber(body?.limit as string) ?? 100;
-        if (offset < 0) offset = 0;
-        if (limit < 0 || limit > 1000) limit = 1000;
+        // We don't need to worry about it not being a number because
+        // the validator checks for that. It also checks for min values.
+        offset = offset ? Number.parseInt(offset, 10) : 0;
+        limit = limit ? Number.parseInt(limit, 10) : 100;
 
         if (chatGuid) {
-            const chats = await Server().iMessageRepo.getChats({ chatGuid, withSMS: true });
-            if (!chats || chats.length === 0) {
-                ctx.body = createSuccessResponse([]);
-                return;
-            }
+            const chats = await Server().iMessageRepo.getChats({ chatGuid });
+            if (isEmpty(chats))
+                return new Success(ctx, {
+                    message: `No chat found with GUID: ${chatGuid}`,
+                    data: []
+                });
         }
 
         const opts: DBMessageParams = {
@@ -93,7 +85,6 @@ export class MessageRouter {
             withChats,
             withAttachments,
             withHandle,
-            withSMS,
             offset,
             limit,
             sort,
@@ -102,9 +93,7 @@ export class MessageRouter {
         };
 
         // Since we have a default value for `where`, we have to set it conditionally
-        if (where && where.length > 0) {
-            opts.where = where;
-        }
+        if (isNotEmpty(where)) opts.where = where;
 
         // Fetch the info for the message by GUID
         const messages = await Server().iMessageRepo.getMessages(opts);
@@ -119,7 +108,7 @@ export class MessageRouter {
         }
 
         // Do you want the blurhash? Default to false
-        const results = [];
+        const data = [];
         for (const msg of messages) {
             // Insert in the participants from the cache
             if (withChatParticipants) {
@@ -130,16 +119,111 @@ export class MessageRouter {
                 }
             }
 
-            const msgRes = await getMessageResponse(msg, false);
-            results.push(msgRes);
+            const msgRes = await getMessageResponse(msg);
+            data.push(msgRes);
         }
 
         // Build metadata to return
-        const metadata = {
-            offset,
-            limit
-        };
+        const metadata = { offset, limit };
+        return new Success(ctx, { data, message: "Successfully fetched messages!", metadata }).send();
+    }
 
-        ctx.body = createSuccessResponse(results, null, metadata);
+    static async sendText(ctx: RouterContext, _: Next) {
+        let { tempGuid, message, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
+
+        // Add to send cache
+        Server().httpService.sendCache.add(tempGuid);
+
+        try {
+            // Send the message
+            const sentMessage = await MessageInterface.sendMessageSync(
+                chatGuid,
+                message,
+                method,
+                subject,
+                effectId,
+                selectedMessageGuid,
+                tempGuid
+            );
+
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
+            // Convert to an API response
+            const data = await getMessageResponse(sentMessage);
+            return new Success(ctx, { message: "Message sent!", data }).send();
+        } catch (ex: any) {
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
+            if (ex instanceof Message) {
+                throw new IMessageError({
+                    message: "Message Send Error",
+                    data: await getMessageResponse(ex),
+                    error: "Failed to send message! See attached message error code."
+                });
+            } else {
+                throw new IMessageError({ message: "Message Send Error", error: ex?.message ?? ex.toString() });
+            }
+        }
+    }
+
+    static async sendAttachment(ctx: RouterContext, _: Next) {
+        const { files } = ctx.request;
+        const { tempGuid, chatGuid, name } = ctx.request?.body;
+        const attachment = files?.attachment as File;
+
+        // Add to send cache
+        Server().httpService.sendCache.add(tempGuid);
+
+        // Send the attachment
+        try {
+            const sentMessage: Message = await MessageInterface.sendAttachmentSync(
+                chatGuid, attachment.path, name, tempGuid);
+
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
+            // Convert to an API response
+            const data = await getMessageResponse(sentMessage);
+            return new Success(ctx, { message: "Attachment sent!", data }).send();
+        } catch (ex: any) {
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
+            if (ex instanceof Message) {
+                throw new IMessageError({
+                    message: "Attachment Send Error",
+                    data: await getMessageResponse(ex),
+                    error: "Failed to send attachment! See attached message error code."
+                });
+            } else {
+                throw new IMessageError({ message: "Attachment Send Error", error: ex?.message ?? ex.toString() });
+            }
+        }
+    }
+
+    static async react(ctx: RouterContext, _: Next) {
+        const { chatGuid, selectedMessageGuid, reaction } = ctx?.request?.body;
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(selectedMessageGuid, false, true);
+        if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+
+        // Send the reaction
+        try {
+            const sentMessage = await MessageInterface.sendReaction(chatGuid, message, reaction);
+            return new Success(ctx, { message: "Reaction sent!", data: await getMessageResponse(sentMessage) }).send();
+        } catch (ex: any) {
+            if (ex instanceof Message) {
+                throw new IMessageError({
+                    message: "Reaction Send Error",
+                    data: await getMessageResponse(ex),
+                    error: "Failed to send reaction! See attached message error code."
+                });
+            } else {
+                throw new IMessageError({ message: "Reaction Send Error", error: ex?.message ?? ex.toString() });
+            }
+        }
     }
 }

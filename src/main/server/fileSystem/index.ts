@@ -1,6 +1,4 @@
 import * as fs from "fs";
-import * as stream from "stream";
-import * as readline from "readline";
 
 import * as path from "path";
 import * as child_process from "child_process";
@@ -8,10 +6,17 @@ import { transports } from "electron-log";
 import { app } from "electron";
 import { sync } from "read-chunk";
 import { Server } from "@server/index";
-import { escapeDoubleQuote, concatUint8Arrays, parseMetadataString } from "@server/helpers/utils";
+import {
+    escapeDoubleQuote,
+    concatUint8Arrays,
+    parseMetadataString,
+    isNotEmpty,
+    isEmpty,
+    safeTrim
+} from "@server/helpers/utils";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
-import { startMessages } from "./scripts";
+import { startMessages } from "../api/v1/apple/scripts";
 import {
     AudioMetadata,
     AudioMetadataKeys,
@@ -32,6 +37,10 @@ if (process.env.NODE_ENV !== "production") {
     subdir = "bluebubbles-server";
     moddir = "";
 }
+
+export const userHomeDir = () => {
+    return process?.env?.HOME ?? process?.env?.HOMEPATH ?? process?.env?.USERPROFILE;
+};
 
 /**
  * The class used to handle all communications to the App's "filesystem".
@@ -63,6 +72,21 @@ export class FileSystem {
     public static addressBookFile = `${FileSystem.contactsDir}/AddressBook.vcf`;
 
     public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
+
+    // Private API directories
+    public static usrMySimblPlugins = path.join(userHomeDir(), "Library", "Application Support", "SIMBL", "Plugins");
+
+    public static libMySimblPlugins = `/${path.join("Library", "Application Support", "SIMBL", "Plugins")}`;
+
+    public static usrMacForgePlugins = path.join(
+        userHomeDir(),
+        "Library",
+        "Application Support",
+        "MacEnhance",
+        "Plugins"
+    );
+
+    public static libMacForgePlugins = `/${path.join("Library", "Application Support", "MacEnhance", "Plugins")}`;
 
     /**
      * Sets up all required directories and then, writes the scripts
@@ -116,6 +140,18 @@ export class FileSystem {
     }
 
     /**
+     * Saves an attachment
+     *
+     * @param name Name for the attachment
+     * @param buffer The attachment bytes (buffer)
+     */
+    static copyAttachment(originalPath: string, name: string): string {
+        const newPath = path.join(FileSystem.attachmentsDir, name);
+        fs.copyFileSync(originalPath, newPath);
+        return newPath;
+    }
+
+    /**
      * Saves an attachment by chunk
      *
      * @param guid Unique identifier for the attachment
@@ -155,7 +191,7 @@ export class FileSystem {
      *
      * @param guid Unique identifier for the attachment
      */
-    static buildAttachmentChunks(guid: string): Uint8Array {
+    static buildAttachmentChunks(guid: string, name: string): string {
         let chunks = new Uint8Array(0);
 
         // Get the files in ascending order
@@ -168,7 +204,11 @@ export class FileSystem {
             chunks = concatUint8Arrays(chunks, Uint8Array.from(fileData));
         }
 
-        return chunks;
+        // Write the final file to disk
+        const outFile = path.join(FileSystem.attachmentsDir, guid, name);
+        fs.writeFileSync(outFile, chunks);
+
+        return outFile;
     }
 
     /**
@@ -292,12 +332,12 @@ export class FileSystem {
     }
 
     static async executeAppleScript(cmd: string) {
-        if (!cmd || cmd.length === 0) return null;
+        if (isEmpty(cmd)) return null;
 
         let parts = cmd.split("\n");
         parts = parts
-            .map(i => escapeDoubleQuote(i).trim())
-            .filter(i => i && i.length > 0)
+            .map(i => safeTrim(escapeDoubleQuote(i)))
+            .filter(i => isNotEmpty(i))
             .map(i => `"${i}"`);
 
         return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);

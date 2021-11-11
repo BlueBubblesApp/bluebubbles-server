@@ -34,7 +34,6 @@ interface State {
     encryptComs: boolean;
     hideDockIcon: boolean;
     startViaTerminal: boolean;
-    smsSupport: boolean;
     checkForUpdates: boolean;
     autoInstallUpdates: boolean;
     enablePrivateApi: boolean;
@@ -65,7 +64,6 @@ class SettingsView extends React.Component<unknown, State> {
             encryptComs: false,
             hideDockIcon: false,
             startViaTerminal: false,
-            smsSupport: false,
             checkForUpdates: true,
             autoInstallUpdates: false,
             enablePrivateApi: false
@@ -99,7 +97,6 @@ class SettingsView extends React.Component<unknown, State> {
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
                 startViaTerminal: config.start_via_terminal,
-                smsSupport: config.sms_support,
                 checkForUpdates: config.check_for_updates,
                 autoInstallUpdates: config.auto_install_updates,
                 enablePrivateApi: config.enable_private_api
@@ -250,13 +247,6 @@ class SettingsView extends React.Component<unknown, State> {
             });
         }
 
-        if (id === "toggleSmsSupport") {
-            const target = e.target as HTMLInputElement;
-            this.setState({ smsSupport: target.checked });
-            await ipcRenderer.invoke("set-config", {
-                sms_support: target.checked
-            });
-        }
         if (id === "toggleCheckForUpdates") {
             const target = e.target as HTMLInputElement;
             this.setState({ checkForUpdates: target.checked });
@@ -598,24 +588,6 @@ class SettingsView extends React.Component<unknown, State> {
                                     onChange={e => this.handleInputChange(e)}
                                     type="checkbox"
                                     checked={this.state.autoInstallUpdates}
-                                />
-                                <i />
-                            </label>
-                        </div>
-                        <div className="aCheckboxDiv">
-                            <div>
-                                <h3 className="aSettingTitle">SMS Support (Desktop Client)</h3>
-                                <p className="settingsHelp">
-                                    Enabling this will allow the server to `emit` SMS message notifications
-                                </p>
-                            </div>
-                            <label className="form-switch">
-                                <input
-                                    title="Test Test"
-                                    id="toggleSmsSupport"
-                                    onChange={e => this.handleInputChange(e)}
-                                    type="checkbox"
-                                    checked={this.state.smsSupport}
                                 />
                                 <i />
                             </label>

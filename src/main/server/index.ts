@@ -7,7 +7,6 @@ import { EventEmitter } from "events";
 import * as macosVersion from "macos-version";
 
 // Configuration/Filesytem Imports
-import { Queue } from "@server/databases/server/entity/Queue";
 import { FileSystem } from "@server/fileSystem";
 import { DEFAULT_POLL_FREQUENCY_MS } from "@server/constants";
 
@@ -34,13 +33,14 @@ import {
     NetworkService,
     QueueService,
     IPCService,
-    UpdateService
+    UpdateService,
+    MessageManager
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { runTerminalScript, openSystemPreferences } from "@server/fileSystem/scripts";
+import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
 
-import { ActionHandler } from "./helpers/actions";
-import { insertChatParticipants, sanitizeStr } from "./helpers/utils";
+import { ActionHandler } from "./api/v1/apple/actions";
+import { insertChatParticipants, isEmpty, isMinBigSur, isNotEmpty } from "./helpers/utils";
 import { Proxy } from "./services/proxy";
 import { BlueBubblesHelperService } from "./services/helperProcess";
 
@@ -98,6 +98,8 @@ class BlueBubblesServer extends EventEmitter {
 
     updater: UpdateService;
 
+    messageManager: MessageManager;
+
     queue: QueueService;
 
     proxyServices: Proxy[];
@@ -121,6 +123,8 @@ class BlueBubblesServer extends EventEmitter {
     isRestarting: boolean;
 
     isStopping: boolean;
+
+    lastConnection: number;
 
     /**
      * Constructor to just initialize everything to null pretty much
@@ -151,6 +155,7 @@ class BlueBubblesServer extends EventEmitter {
         this.queue = null;
         this.proxyServices = [];
         this.updater = null;
+        this.messageManager = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -339,7 +344,7 @@ class BlueBubblesServer extends EventEmitter {
             // Restart via terminal if configured
             const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
             const parentProc = await findProcess("pid", process.ppid);
-            const parentName = parentProc && parentProc.length > 0 ? parentProc[0].name : null;
+            const parentName = isNotEmpty(parentProc) ? parentProc[0].name : null;
 
             // Restart if enabled and the parent process is the app being launched
             if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
@@ -352,13 +357,13 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Log some server metadata
+        this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
 
         // Check if on Big Sur. If we are, then create a log/alert saying that
-        const isBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
-        if (isBigSur) {
-            this.log("Warning: macOS Big Sur does NOT support creating chats due to API limitations!", "warn");
+        if (isMinBigSur) {
+            this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "warn");
         }
 
         this.log("Finished pre-start checks...");
@@ -370,7 +375,7 @@ class BlueBubblesServer extends EventEmitter {
         // Make sure a password is set
         const password = this.repo.getConfig("password") as string;
         const tutorialFinished = this.repo.getConfig("tutorial_is_done") as boolean;
-        if (tutorialFinished && (!password || password.length === 0)) {
+        if (tutorialFinished && isEmpty(password)) {
             dialog.showMessageBox(this.window, {
                 type: "warning",
                 buttons: ["OK"],
@@ -439,6 +444,11 @@ class BlueBubblesServer extends EventEmitter {
             await this.restartProxyServices();
         }
 
+        // Install the bundle if the Private API is turned on
+        if (!prevConfig.enable_private_api && nextConfig.enable_private_api) {
+            BlueBubblesHelperService.installBundle();
+        }
+
         // If the dock style changes
         if (prevConfig.hide_dock_icon !== nextConfig.hide_dock_icon) {
             this.setDockIcon();
@@ -453,13 +463,13 @@ class BlueBubblesServer extends EventEmitter {
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal") {
+    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal", sendFcmMessage = true) {
         this.httpService.socketServer.emit(type, data);
 
         // Send notification to devices
-        if (FCMService.getApp()) {
+        if (sendFcmMessage && FCMService.getApp()) {
             const devices = await this.repo.devices().find();
-            if (!devices || devices.length === 0) return;
+            if (isEmpty(devices)) return;
 
             const notifData = JSON.stringify(data);
             await this.fcm.sendNotification(
@@ -482,6 +492,19 @@ class BlueBubblesServer extends EventEmitter {
         } else {
             this.emitToUI("theme-update", "light");
         }
+    }
+
+    async emitMessageMatch(message: Message, tempGuid: string) {
+        // Insert chat & participants
+        const newMessage = await insertChatParticipants(message);
+        this.log(`Message match found for text, [${newMessage.contentString()}]`);
+
+        // Convert to a response JSON
+        const resp = await getMessageResponse(newMessage);
+        resp.tempGuid = tempGuid;
+
+        // We are emitting this as a new message, the only difference being the included tempGuid
+        await this.emitMessage("new-message", resp);
     }
 
     /**
@@ -517,33 +540,13 @@ class BlueBubblesServer extends EventEmitter {
         this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
 
         /**
-         * Message listener for when we find matches for a given sent message
-         */
-        outgoingMsgListener.on("message-match", async (item: { tempGuid: string; message: Message }) => {
-            const text = item.message.cacheHasAttachments
-                ? `Attachment: ${sanitizeStr(item.message.text) || "<No Text>"}`
-                : item.message.text;
-
-            this.log(`Message match found for text, [${text}]`);
-
-            const newMessage = await insertChatParticipants(item.message);
-            const resp = await getMessageResponse(newMessage);
-            resp.tempGuid = item.tempGuid;
-
-            // We are emitting this as a new message, the only difference being the included tempGuid
-            await this.emitMessage("new-message", resp);
-        });
-
-        /**
          * Message listener for my messages only. We need this because messages from ourselves
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
         outgoingMsgListener.on("new-entry", async (item: Message) => {
-            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
-            this.log(`New message from [You]: [${(text ?? "<No Text>").substring(0, 50)}]`);
-
             const newMessage = await insertChatParticipants(item);
+            this.log(`New Message from You, ${newMessage.contentString()}`)
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(newMessage));
@@ -554,44 +557,26 @@ class BlueBubblesServer extends EventEmitter {
          * delivered date or read date have changed since the last time we checked the database.
          */
         outgoingMsgListener.on("updated-entry", async (item: Message) => {
+            const newMessage = await insertChatParticipants(item);
+
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
-            const from = item.isFromMe ? "You" : item.handle?.id;
-            const time = item.dateDelivered || item.dateRead;
-            const updateType = item.dateRead ? "Text Read" : "Text Delivered";
-            const text = item.cacheHasAttachments ? `Attachment: ${sanitizeStr(item.text) || "<No Text>"}` : item.text;
-            this.log(
-                `Updated message from [${from}]: [${(text ?? "<No Text>").substring(
-                    0,
-                    50
-                )}] - [${updateType} -> ${time.toLocaleString()}]`
+            const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
+            const time = newMessage.dateDelivered || newMessage.dateRead;
+            const updateType = newMessage.dateRead ? "Text Read" : "Text Delivered";
+            this.log(`Updated message from [${from}]: [${
+                newMessage.contentString()}] - [${updateType} -> ${time.toLocaleString()}]`
             );
-
-            const newMessage = await insertChatParticipants(item);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("updated-message", await getMessageResponse(newMessage));
         });
 
         /**
-         * Message listener for outgoing messages that timedout
-         */
-        outgoingMsgListener.on("message-timeout", async (item: Queue) => {
-            const text = (item.text ?? "").startsWith(item.tempGuid) ? "image" : `text, [${item.text ?? "<No Text>"}]`;
-            this.log(`Message send timeout for ${text}`, "warn");
-            await this.emitMessage("message-timeout", item);
-        });
-
-        /**
          * Message listener for messages that have errored out
          */
         outgoingMsgListener.on("message-send-error", async (item: Message) => {
-            const text = item.cacheHasAttachments
-                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
-                : item.text;
-            this.log(`Failed to send message: [${(text ?? "<No Text>").substring(0, 50)}]`);
-
-            // Emit it to the socket and FCM devices
+            this.log(`Failed to send message: [${item.contentString()}]`);
 
             /**
              * ERROR CODES:
@@ -605,12 +590,8 @@ class BlueBubblesServer extends EventEmitter {
          * for why we separate them out into two separate listeners.
          */
         incomingMsgListener.on("new-entry", async (item: Message) => {
-            const text = item.cacheHasAttachments
-                ? `Attachment: ${(item.text ?? " ").slice(1, item.text.length) || "<No Text>"}`
-                : item.text;
-            this.log(`New message from [${item.handle?.id}]: [${(text ?? "<No Text>").substring(0, 50)}]`);
-
             const newMessage = await insertChatParticipants(item);
+            this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(newMessage), "high");
@@ -746,8 +727,19 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
 
-        this.log("Starting socket service...");
-        this.httpService.restart();
+        try {
+            this.log("Starting HTTP service...");
+            this.httpService.restart();
+        } catch (ex: any) {
+            this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Starting Message Manager...");
+            this.messageManager = new MessageManager();
+        } catch (ex: any) {
+            this.log(`Failed to start Message Manager service! ${ex.message}`, "error");
+        }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
@@ -759,7 +751,7 @@ class BlueBubblesServer extends EventEmitter {
             this.privateApiHelper.start();
         }
 
-        if (this.hasDiskAccess && this.chatListeners.length === 0) {
+        if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
             this.log("Starting chat listener...");
             this.startChatListener();
         }

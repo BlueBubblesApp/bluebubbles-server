@@ -1,3 +1,4 @@
+import { isEmpty, safeTrim } from "@server/helpers/utils";
 import { Server } from "@server/index";
 import { connect, disconnect, kill, authtoken, Ngrok } from "ngrok";
 import { Proxy } from "../proxy";
@@ -44,7 +45,8 @@ export class NgrokService extends Proxy {
                     if (
                         cmp_log.includes(
                             "The authtoken you specified does not look like a proper ngrok tunnel authtoken"
-                        )
+                        ) ||
+                        cmp_log.includes("The authtoken you specified is properly formed, but it is invalid")
                     ) {
                         Server().log(`Ngrok Auth Token is invalid, removing...!`, "error");
                         Server().repo.setConfig("ngrok_key", "");
@@ -65,15 +67,15 @@ export class NgrokService extends Proxy {
 
         // If we have a key, use it
         if (ngrokKey !== null && ngrokKey !== undefined) {
-            opts.authtoken = ngrokKey;
+            opts.authtoken = safeTrim(ngrokKey);
             await authtoken({
-                authtoken: ngrokKey,
+                authtoken: safeTrim(ngrokKey),
                 binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
             });
         }
 
         // If there is no key, force http
-        if ((ngrokKey ?? "").length === 0) {
+        if (isEmpty(ngrokKey)) {
             ngrokProtocol = "http";
         }
 

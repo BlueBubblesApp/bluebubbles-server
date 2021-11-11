@@ -3,7 +3,7 @@ import { Server as SocketServer, ServerOptions } from "socket.io";
 
 // HTTP libraries
 import * as KoaApp from "koa";
-import * as bodyParser from "koa-bodyparser";
+import * as koaBody from "koa-body";
 import * as koaJson from "koa-json";
 import * as KoaRouter from "koa-router";
 import * as koaCors from "koa-cors";
@@ -13,15 +13,13 @@ import * as http from "http";
 // Internal libraries
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-
-// Helpers
-import { createServerErrorResponse } from "@server/helpers/responses";
-
-// Entities
+import { safeTrim } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";
 
 import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
 import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
+import { ErrorMiddleware } from "./api/v1/middleware/errorMiddleware";
+import { createServerErrorResponse } from "./api/v1/responses";
 
 /**
  * This service class handles all routing for incoming socket
@@ -108,11 +106,16 @@ export class HttpService {
         // Allow cross origin requests
         this.koaApp.use(koaCors());
 
+        // This is used here so that we can catch errors in KoaBody as well
+        this.koaApp.use(ErrorMiddleware);
+
         // Increase size limits from the default 1mb
         this.koaApp.use(
-            bodyParser({
+            koaBody({
                 jsonLimit: "10mb",
-                textLimit: "10mb"
+                textLimit: "10mb",
+                formLimit: "101mb", // 101 to account for a 100mb attachment and some text
+                multipart: true
             })
         );
 
@@ -142,16 +145,17 @@ export class HttpService {
             try {
                 // Check if there are any listening services
                 let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
-                res = (res ?? "").trim();
+                res = safeTrim(res);
 
                 // If the result doesn't show anything listening,
                 if (!res.includes(port.toString())) {
                     Server().log("Socket not listening! Restarting...", "error");
                     this.restart();
                 }
-            } catch (ex: any) {
-                Server().log("Unable to start socket status listener!", "error");
-                Server().log(ex, "debug");
+            } catch {
+                // Don't show an error, I believe this throws a "false error".
+                // For instance, if the proxy service doesn't start, and the command returns
+                // nothing, it thinks it's an actual error, which it isn't
             }
         }, 1000 * 60); // Check every minute
     }
@@ -171,7 +175,7 @@ export class HttpService {
             pass = decodeURI(pass as string);
 
             // Basic authentication
-            if (pass?.trim() === cfgPass?.trim()) {
+            if (safeTrim(pass) === safeTrim(cfgPass)) {
                 Server().log(`Client Authenticated Successfully`);
             } else {
                 socket.disconnect();

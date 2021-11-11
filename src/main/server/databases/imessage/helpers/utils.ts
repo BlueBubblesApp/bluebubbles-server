@@ -1,8 +1,7 @@
 import * as fs from "fs";
 
-import { nativeImage, NativeImage } from "electron";
+import { nativeImage } from "electron";
 import { basename } from "path";
-import { encode as blurHashEncode } from "blurhash";
 
 import { Server } from "@server/index";
 import { Message } from "@server/databases/imessage/entity/Message";
@@ -10,29 +9,6 @@ import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
-
-export const getBlurHash = async (image: NativeImage) => {
-    let blurhash: string = null;
-    let calcImage = image;
-
-    try {
-        let size = calcImage.getSize();
-
-        // If the image is "too big", rescale it so blurhash is computed faster
-        if (size.width > 320) {
-            calcImage = calcImage.resize({ width: 320, quality: "good" });
-            size = calcImage.getSize();
-        }
-
-        // Compute blurhash
-        blurhash = blurHashEncode(Uint8ClampedArray.from(calcImage.toBitmap()), size.width, size.height, 3, 3);
-    } catch (ex: any) {
-        console.log(ex);
-        Server().log(`Could not compute blurhash: ${ex.message}`, "error");
-    }
-
-    return blurhash;
-};
 
 export const getCacheName = (message: Message) => {
     const delivered = message.dateDelivered ? message.dateDelivered.getTime() : 0;

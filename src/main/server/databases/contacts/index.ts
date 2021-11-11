@@ -6,6 +6,7 @@ import { PhoneNumberUtil, PhoneNumberFormat } from "google-libphonenumber";
 import { Record } from "@server/databases/contacts/entity/Record";
 import { PhoneNumber } from "@server/databases/contacts/entity/PhoneNumber";
 import { Email } from "@server/databases/contacts/entity/Email";
+import { isNotEmpty } from "@server/helpers/utils";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -117,10 +118,10 @@ export class ContactRepository {
                 ContactRepository.sameAddress(address, item.address, item.countryCode ?? "US")
             );
 
-            if (record.emails.length > 0 || numbers.length > 0) output.push(record);
+            if (isNotEmpty(record.emails) || isNotEmpty(numbers)) output.push(record);
         }
 
-        return output.length > 0 ? output[0] : null;
+        return isNotEmpty(output) ? output[0] : null;
     }
 
     static sameAddress(first: string, second: string, country: string) {

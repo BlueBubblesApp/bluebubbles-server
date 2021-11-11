@@ -1,4 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
+import { conditional } from "conditional-decorator";
+
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
@@ -6,9 +8,48 @@ import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
+import { isMinBigSur, isMinCatalina, isMinSierra, sanitizeStr } from "@server/helpers/utils";
+import { invisibleMediaChar } from "@server/services/http/constants";
 
 @Entity("message")
 export class Message {
+    contentString(maxText = 15): string {
+        let text = sanitizeStr((this.text ?? '').replace(invisibleMediaChar, ''));
+        const textLen = text.length;
+        const attachments = this.attachments ?? [];
+        const attachmentsLen = attachments.length;
+        let subject = this.subject ?? '';
+        const subjectLen = subject.length;
+
+        // Build the content
+        const parts = [];
+
+        // If we have text, add it, but with the max length taken into account
+        if (textLen > 0) {
+            if (textLen > maxText) {
+                text = `${text.substring(0, maxText)}...`;
+            }
+
+            parts.push(`"${text}"`);
+        } else {
+            parts.push(`<No Text>`);
+        }
+
+        // If we have a subject, add it, but with the max length taken into account
+        if (subjectLen > 0) {
+            if (subjectLen > maxText) {
+                subject = `${subject.substring(0, maxText)}...`;
+            }
+
+            parts.push(`Subject: "${subject}"`);
+        }
+
+        // If we have attachments, print those out
+        if (attachmentsLen > 0) parts.push(`Attachments: ${attachmentsLen}`);
+
+        return parts.join('; ');
+    }
+
     @PrimaryGeneratedColumn({ name: "ROWID" })
     ROWID: number;
 
@@ -343,19 +384,25 @@ export class Message {
     })
     messageSource: number;
 
-    @Column({
-        name: "associated_message_guid",
-        type: "text",
-        nullable: true
-    })
+    @conditional(
+        isMinSierra,
+        Column({
+            name: "associated_message_guid",
+            type: "text",
+            nullable: true
+        })
+    )
     associatedMessageGuid: string;
 
-    @Column({
-        name: "associated_message_type",
-        type: "text",
-        transformer: MessageTypeTransformer,
-        nullable: true
-    })
+    @conditional(
+        isMinSierra,
+        Column({
+            name: "associated_message_type",
+            type: "text",
+            transformer: MessageTypeTransformer,
+            nullable: true
+        })
+    )
     associatedMessageType: string;
 
     @Column({ name: "balloon_bundle_id", type: "text", nullable: true })
@@ -391,13 +438,65 @@ export class Message {
 
     @Column({ name: "message_summary_info", type: "blob", nullable: true })
     messageSummaryInfo: Blob;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "reply_to_guid",
+            type: "text",
+            nullable: true
+        })
+    )
+    replyToGuid: string;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "is_corrupt",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    isCorrupt: boolean;
+
+    @conditional(
+        isMinCatalina,
+        Column({
+            name: "is_spam",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    isSpam: boolean;
+
+    @conditional(
+        isMinBigSur,
+        Column({
+            name: "thread_originator_guid",
+            type: "text",
+            nullable: true
+        })
+    )
+    threadOriginatorGuid: string;
+
+    @conditional(
+        isMinBigSur,
+        Column({
+            name: "thread_originator_part",
+            type: "text",
+            nullable: true
+        })
+    )
+    threadOriginatorPart: string;
 }
 
-export const getMessageResponse = async (tableData: Message, withBlurhash = true): Promise<MessageResponse> => {
+export const getMessageResponse = async (tableData: Message): Promise<MessageResponse> => {
     // Load attachments
     const attachments = [];
     for (const attachment of tableData?.attachments ?? []) {
-        const resData = await getAttachmentResponse(attachment, false, withBlurhash);
+        const resData = await getAttachmentResponse(attachment, false);
         attachments.push(resData);
     }
 
@@ -443,6 +542,11 @@ export const getMessageResponse = async (tableData: Message, withBlurhash = true
         expressiveSendStyleId: tableData.expressiveSendStyleId,
         timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
             ? tableData.timeExpressiveSendStyleId.getTime()
-            : null
+            : null,
+        replyToGuid: tableData.replyToGuid,
+        isCorrupt: tableData.isCorrupt,
+        isSpam: tableData.isSpam,
+        threadOriginatorGuid: tableData.threadOriginatorGuid,
+        threadOriginatorPart: tableData.threadOriginatorPart
     };
 };

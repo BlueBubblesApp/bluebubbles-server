@@ -3,7 +3,7 @@ import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alert";
-import { openLogs } from "@server/fileSystem/scripts";
+import { openLogs } from "@server/api/v1/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
 import { BlueBubblesHelperService } from "../helperProcess";
 

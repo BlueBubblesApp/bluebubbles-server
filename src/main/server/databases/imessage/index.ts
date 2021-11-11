@@ -1,12 +1,13 @@
 /* eslint-disable no-param-reassign */
 import { createConnection, Connection } from "typeorm";
 
-import { DBMessageParams, ChatParams } from "@server/databases/imessage/types";
+import { DBMessageParams, ChatParams, HandleParams } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import { isNotEmpty } from "@server/helpers/utils";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -43,7 +44,6 @@ export class MessageRepository {
         withParticipants = true,
         withArchived = false,
         withLastMessage = false,
-        withSMS = false,
         offset = 0,
         limit = null
     }: ChatParams = {}) {
@@ -55,11 +55,6 @@ export class MessageRepository {
         // Add inner join with messages if we want the last message too
         if (withLastMessage) {
             query.innerJoinAndSelect("chat.messages", "message");
-        }
-
-        // Add default WHERE clauses
-        if (!withSMS) {
-            query.andWhere("chat.service_name = 'iMessage'");
         }
 
         if (!withArchived) query.andWhere("chat.is_archived == 0");
@@ -151,11 +146,19 @@ export class MessageRepository {
      * @param guid A specific message identifier to get
      * @param withMessages Whether to include the participants or not
      */
-    async getMessage(guid: string, withChats = true) {
+    async getMessage(guid: string, withChats = true, withAttachments = false) {
         const query = this.db.getRepository(Message).createQueryBuilder("message");
         query.leftJoinAndSelect("message.handle", "handle");
 
         if (withChats) query.leftJoinAndSelect("message.chats", "chat");
+
+        if (withAttachments)
+            query.leftJoinAndSelect(
+                "message.attachments",
+                "attachment",
+                "message.ROWID = message_attachment.message_id AND " +
+                    "attachment.ROWID = message_attachment.attachment_id"
+            );
 
         query.andWhere("message.guid = :guid", { guid });
 
@@ -168,17 +171,20 @@ export class MessageRepository {
      *
      * @param handle Get a specific handle from the DB
      */
-    async getHandles(handle: string = null) {
-        const repo = this.db.getRepository(Handle);
-        let handles = [];
+    async getHandles({ address = null, limit = 1000, offset = 0 }: HandleParams) {
+        // Start a query
+        const query = this.db.getRepository(Handle).createQueryBuilder("handle");
 
-        // Get all handles or just get one handle
-        if (handle) {
-            handles = await repo.find({ id: handle });
-        } else {
-            handles = await repo.find();
+        // Add a handle query
+        if (address) {
+            query.where("handle.id LIKE :address", { address: `%${address.replace("+", "")}` });
         }
 
+        // Add pagination params
+        query.offset(offset);
+        query.limit(limit);
+
+        const handles = await query.getMany();
         return handles;
     }
 
@@ -202,12 +208,7 @@ export class MessageRepository {
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
-        withSMS = false,
         where = [
-            {
-                statement: "message.service = 'iMessage'",
-                args: null
-            },
             {
                 statement: "message.text IS NOT NULL",
                 args: null
@@ -262,12 +263,7 @@ export class MessageRepository {
                 before: convertDateTo2001Time(before as Date)
             });
 
-        if (where && where.length > 0) {
-            // If withSMS is enabled, remove any statements specifying the message service
-            if (withSMS) {
-                where = where.filter(item => item.statement !== `message.service = 'iMessage'`);
-            }
-
+        if (isNotEmpty(where)) {
             for (const item of where) {
                 query.andWhere(item.statement, item.args);
             }
@@ -328,11 +324,8 @@ export class MessageRepository {
             );
         }
 
-        // Add default WHERE clauses
-        query.andWhere("message.service == 'iMessage'");
-
         // Add any custom WHERE clauses
-        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
+        if (isNotEmpty(where)) for (const item of where) query.andWhere(item.statement, item.args);
 
         // Add date_delivered constraints
         if (after)
@@ -356,7 +349,7 @@ export class MessageRepository {
 
         // Add any custom WHERE clauses
         // We have to do this here so that it matches both before the OR and after the OR
-        if (where && where.length > 0) for (const item of where) query.andWhere(item.statement, item.args);
+        if (isNotEmpty(where)) for (const item of where) query.andWhere(item.statement, item.args);
 
         // Add pagination params
         query.orderBy("message.date", sort);
@@ -379,7 +372,6 @@ export class MessageRepository {
 
         // Add default WHERE clauses
         query
-            .andWhere("message.service == 'iMessage'")
             .andWhere("message.text IS NOT NULL")
             .andWhere("associated_message_type == 0");
 

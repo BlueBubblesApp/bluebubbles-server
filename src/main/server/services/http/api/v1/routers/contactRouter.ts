@@ -1,13 +1,14 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
-import { createSuccessResponse } from "@server/helpers/responses";
-import { ContactRepo } from "../repository/contactRepo";
+import { isEmpty } from "@server/helpers/utils";
+import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
+import { Success } from "../responses/success";
 
 export class ContactRouter {
     static async get(ctx: RouterContext, _: Next) {
-        const contacts = await ContactRepo.getAllContacts();
-        ctx.body = createSuccessResponse(contacts);
+        const contacts = await ContactInterface.getAllContacts();
+        return new Success(ctx, { data: contacts }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
@@ -15,12 +16,12 @@ export class ContactRouter {
         const addresses = body?.addresses ?? [];
 
         let res = [];
-        if (!addresses || !Array.isArray(addresses) || addresses.length === 0) {
-            res = await ContactRepo.getAllContacts();
+        if (isEmpty(addresses) || !Array.isArray(addresses)) {
+            res = await ContactInterface.getAllContacts();
         } else {
-            res = await ContactRepo.queryContacts(addresses);
+            res = await ContactInterface.queryContacts(addresses);
         }
 
-        ctx.body = createSuccessResponse(res);
+        return new Success(ctx, { data: res }).send();
     }
 }

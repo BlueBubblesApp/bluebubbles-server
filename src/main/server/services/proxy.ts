@@ -1,3 +1,4 @@
+import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server/index";
 
 type ProxyOptions = {
@@ -14,6 +15,21 @@ abstract class Proxy {
     url: string;
 
     refreshTimer: NodeJS.Timeout = null;
+
+    /**
+     * Determines if we "should" restart the service.
+     * This means that we haven't had a recent connection.
+     * We do this so we do not accidentally interrupt a download process
+     * or API request.
+     */
+    static get shouldRestart(): boolean {
+        const now = new Date().getTime();
+        const lastConn = Server().lastConnection;
+        if (!lastConn) return true;
+
+        const threshold = 1000 * 60 * 2; // 2 minutes
+        return now - lastConn > threshold;
+    }
 
     constructor(opts: ProxyOptions) {
         this.opts = opts;
@@ -67,10 +83,36 @@ abstract class Proxy {
         if (this.opts.autoRefresh ?? false) {
             Server().log(`Starting ${this.opts.name} refresh timer. Waiting ${this.opts.refreshTimerMs} ms`, "debug");
             this.refreshTimer = setTimeout(async () => {
-                Server().log(`Restarting ${this.opts.name} process due to session timeout...`, "debug");
+                const success = await Proxy.waitForIdle();
+                if (!success) {
+                    Server().log(`Restarting ${this.opts.name} process due to session & idle timeout...`, "debug");
+                } else {
+                    Server().log(`Restarting ${this.opts.name} process due to session timeout...`, "debug");
+                }
+
                 await this.restart();
             }, this.opts.refreshTimerMs);
         }
+    }
+
+    static async waitForIdle(): Promise<boolean> {
+        let canRestart = false;
+        let tryCount = 0;
+        while (!canRestart) {
+            tryCount += 1;
+            canRestart = Proxy.shouldRestart;
+
+            if (!canRestart) {
+                // If we can't restart and we've tried 20 times (10 minutes),
+                // return out and force a restart
+                if (tryCount >= 20) return false;
+
+                // Wait 30 seconds to check again
+                await waitMs(1000 * 30);
+            }
+        }
+
+        return true;
     }
 
     /**

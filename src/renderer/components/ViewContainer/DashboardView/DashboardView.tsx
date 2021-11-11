@@ -177,7 +177,7 @@ class DashboardView extends React.Component<Props, State> {
             console.log(res);
             let top = this.state.imageCount;
             res.forEach((item: any) => {
-                const identifier = item.group_name.length > 0 ? item.groupName : item.chat_guid;
+                const identifier = item.group_name.length > 0 ? item.group_name : item.chat_guid;
                 if (item.media_count > top.count) top = { name: identifier, count: item.media_count };
             });
 
@@ -192,7 +192,7 @@ class DashboardView extends React.Component<Props, State> {
             const res = await ipcRenderer.invoke("get-chat-video-count");
             let top = this.state.videoCount;
             res.forEach((item: any) => {
-                const identifier = item.group_name.length > 0 ? item.groupName : item.chat_guid;
+                const identifier = item.group_name.length > 0 ? item.group_name : item.chat_guid;
                 if (item.media_count > top.count) top = { name: identifier, count: item.media_count };
             });
 

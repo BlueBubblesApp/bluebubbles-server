@@ -27,7 +27,7 @@ export const getDateUsing2001 = (timestamp: number): Date => {
         else ts += timestamp * 1000;
 
         return new Date(ts);
-    } catch (e) {
+    } catch (e: any) {
         console.log(e.message);
         return null;
     }
@@ -47,7 +47,7 @@ export const convertDateTo2001Time = (date: Date): number => {
         else ts /= 1000;
 
         return ts;
-    } catch (e) {
+    } catch (e: any) {
         console.log(e.message);
         return null;
     }

@@ -67,6 +67,7 @@ export class FCMService {
      */
     async setServerUrl(serverUrl: string): Promise<void> {
         if (!(await this.start())) return;
+        if (!serverUrl) return;
 
         Server().log("Updating Server Address in Firebase Database...");
 
@@ -146,8 +147,42 @@ export class FCMService {
             const options: admin.messaging.MessagingOptions = { priority };
 
             const responses: admin.messaging.MessagingDevicesResponse[] = [];
-            for (const device of devices)
-                responses.push(await FCMService.getApp().messaging().sendToDevice(device, msg, options));
+            Server().log(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`, "debug");
+            for (const device of devices) {
+                const res = await FCMService.getApp().messaging().sendToDevice(device, msg, options);
+                if (res.failureCount > 0) {
+                    Server().log(
+                        `Failed to send notification to device "${device}" ${res.failureCount} times!`,
+                        "warn"
+                    );
+                }
+
+                // Read over the errors and log the errors
+                for (const i of res.results) {
+                    if (i.error) {
+                        if (i.error.code === "messaging/payload-size-limit-exceeded") {
+                            // Manually handle the size limit error
+                            Server().log(
+                                "Could not send Firebase Notification due to payload exceeding size limits!",
+                                "warn"
+                            );
+                            Server().log(`Failed notification Payload: ${JSON.stringify(data)}`, "debug");
+                        } else if (i.error.code !== "messaging/registration-token-not-registered") {
+                            // Ignore token not registered errors
+                            Server().log(
+                                `Firebase returned the following error (Code: ${i.error.code}): ${i.error.message}`,
+                                "error"
+                            );
+
+                            if (i.error?.stack) {
+                                Server().log(`Firebase Stacktrace: ${i.error.stack}`, "debug");
+                            }
+                        }
+                    }
+                }
+
+                responses.push(res);
+            }
 
             return responses;
         } catch (ex: any) {
