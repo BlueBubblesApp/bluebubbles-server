@@ -17,9 +17,7 @@ export const AuthMiddleware = async (ctx: Context, next: Next) => {
     }
 
     // Validate the passwords match
-    if (safeTrim(password) !== safeTrim(token)) {
-        if (!token) throw new Unauthorized();
-    }
+    if (safeTrim(password) !== safeTrim(token)) throw new Unauthorized();
 
     // Go to the next middleware
     await next();
