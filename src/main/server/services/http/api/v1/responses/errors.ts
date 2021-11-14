@@ -10,7 +10,8 @@ export class HTTPError extends Error {
         super(`[${response.status}] ${response.message}`);
         this.name = this.constructor.name;
         this.response = response;
-        
+        this.status = response.status;
+
         Error.captureStackTrace(this, this.constructor);
     }
 }

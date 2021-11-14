@@ -32,14 +32,13 @@ export class MessagePromise {
         });
 
         // Hook into the resolve and rejects so we can set flags based on the status
-        this.promise
-            .catch((err: any) => {
-                this.errored = true;
-                this.error = err;
-            });
+        this.promise.catch((err: any) => {
+            this.errored = true;
+            this.error = err;
+        });
 
         this.chatGuid = chatGuid;
-        this.text = `${subject ?? ''}${text ?? ''}`;
+        this.text = `${subject ?? ""}${text ?? ""}`;
         this.isAttachment = isAttachment;
 
         // Subtract 10 seconds to account for any "delay" in the sending process (somehow)
@@ -79,13 +78,14 @@ export class MessagePromise {
         // We can only set one attachment at a time, so we will check that one
         // Images will have an invisible character as the text (of length 1)
         // So if it's an attachment, and doesn't meet the criteria, return false
-        const matchTxt = `${message.subject ?? ''}${message.text ?? ''}`
+        const matchTxt = `${message.subject ?? ""}${message.text ?? ""}`;
         if (this.isAttachment && ((message.attachments ?? []).length > 1 || matchTxt.length > 1)) {
             return false;
         }
 
         // If we have chats, we need to make sure this promise is for that chat
-        if (isNotEmpty(message.chats) && !message.chats.some((c: Chat) => c.guid === this.chatGuid)) {
+        // We use endsWith to support when the chatGuid is just an address
+        if (isNotEmpty(message.chats) && !message.chats.some((c: Chat) => c.guid.endsWith(this.chatGuid))) {
             return false;
         }
 
