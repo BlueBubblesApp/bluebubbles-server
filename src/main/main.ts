@@ -107,8 +107,9 @@ const buildTray = () => {
 };
 
 const createTray = () => {
-    let iconPath = path.join(FileSystem.resources, "macos", "tray-icon-dark.png");
-    if (!nativeTheme.shouldUseDarkColors) iconPath = path.join(FileSystem.resources, "macos", "tray-icon-light.png");
+    let iconPath = path.join(FileSystem.resources, "macos", "icons", "tray-icon-dark.png");
+    if (!nativeTheme.shouldUseDarkColors)
+        iconPath = path.join(FileSystem.resources, "macos", "icons", "tray-icon-light.png");
 
     // If the tray is already created, just change the icon color
     if (tray) {
