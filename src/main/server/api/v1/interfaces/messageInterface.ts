@@ -1,11 +1,11 @@
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { MessagePromise } from "@server/services/messageManager/messagePromise";
+import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { ValidRemoveTapback, ValidTapback } from "@server/types";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { checkPrivateApiStatus, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
-import { invisibleMediaChar } from "@server/services/http/constants";
+import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ActionHandler } from "@server/api/v1/apple/actions";
 
 export class MessageInterface {
@@ -66,7 +66,12 @@ export class MessageInterface {
             sentMessage = await awaiter.promise;
         } else if (method === "private-api") {
             sentMessage = await MessageInterface.sendMessagePrivateApi(
-                chatGuid, message, subject, effectId, selectedMessageGuid);
+                chatGuid,
+                message,
+                subject,
+                effectId,
+                selectedMessageGuid
+            );
         } else {
             throw new Error(`Invalid send method: ${method}`);
         }

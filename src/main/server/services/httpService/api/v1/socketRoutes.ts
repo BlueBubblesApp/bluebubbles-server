@@ -18,7 +18,7 @@ import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
-import { ResponseFormat, ResponseJson } from "@server/services/http/api/v1/responses/types";
+import { ResponseFormat, ResponseJson } from "@server/services/httpService/api/v1/responses/types";
 
 // Entities
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
@@ -537,8 +537,7 @@ export class SocketRoutes {
                     chatGuid: chats[0].guid,
                     limit: 1
                 });
-                if (isEmpty(messages))
-                    return response(cb, "last-chat-message", createNoDataResponse());
+                if (isEmpty(messages)) return response(cb, "last-chat-message", createNoDataResponse());
 
                 const result = await getMessageResponse(messages[0]);
                 return response(cb, "last-chat-message", createSuccessResponse(result));
@@ -594,26 +593,29 @@ export class SocketRoutes {
                 }
 
                 // Make sure we have a temp GUID, for matching
-                if ((tempGuid && (isEmpty(message))) || (!tempGuid && message))
+                if ((tempGuid && isEmpty(message)) || (!tempGuid && message))
                     return response(cb, "error", createBadRequestResponse("No temporary GUID provided with message"));
 
                 // Make sure that if we have an attachment, there is also a guid and name
                 if (params?.attachment && (!params.attachmentName || !params.attachmentGuid))
                     return response(cb, "error", createBadRequestResponse("No attachment name or GUID provided"));
 
-                if (typeof tempGuid === 'number') {
+                if (typeof tempGuid === "number") {
                     tempGuid = String(tempGuid);
                 }
 
                 // Debug logging
                 if (isNotEmpty(tempGuid)) {
-                    Server().log(`Attempting to send message using Temp GUID: ${tempGuid}`, 'debug');
+                    Server().log(`Attempting to send message using Temp GUID: ${tempGuid}`, "debug");
                 }
 
                 // Make sure the message isn't already in the queue
                 if (Server().httpService.sendCache.find(tempGuid)) {
-                    return response(cb, "error", createBadRequestResponse(
-                        `Message is already queued to be sent (Temp GUID: ${tempGuid})!`));
+                    return response(
+                        cb,
+                        "error",
+                        createBadRequestResponse(`Message is already queued to be sent (Temp GUID: ${tempGuid})!`)
+                    );
                 }
 
                 // Add to send cache
@@ -674,7 +676,7 @@ export class SocketRoutes {
 
                 // If it's the last chunk, but no message, default it to an empty string
                 if (!hasMore && !message) message = "";
-                if (!hasMore && !tempGuid && (isEmpty(message)))
+                if (!hasMore && !tempGuid && isEmpty(message))
                     return response(cb, "error", createBadRequestResponse("No temp GUID provided with message!"));
 
                 // If it's the last chunk, make sure there an attachment name

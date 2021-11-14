@@ -33,16 +33,16 @@ import {
     NetworkService,
     QueueService,
     IPCService,
-    UpdateService,
-    MessageManager
+    UpdateService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
 
 import { ActionHandler } from "./api/v1/apple/actions";
 import { insertChatParticipants, isEmpty, isMinBigSur, isNotEmpty } from "./helpers/utils";
-import { Proxy } from "./services/proxy";
-import { BlueBubblesHelperService } from "./services/helperProcess";
+import { Proxy } from "./services/proxyServices/proxy";
+import { BlueBubblesHelperService } from "./services/privateApi";
+import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 
 const findProcess = require("find-process");
 
@@ -98,7 +98,7 @@ class BlueBubblesServer extends EventEmitter {
 
     updater: UpdateService;
 
-    messageManager: MessageManager;
+    messageManager: OutgoingMessageManager;
 
     queue: QueueService;
 
@@ -546,7 +546,7 @@ class BlueBubblesServer extends EventEmitter {
          */
         outgoingMsgListener.on("new-entry", async (item: Message) => {
             const newMessage = await insertChatParticipants(item);
-            this.log(`New Message from You, ${newMessage.contentString()}`)
+            this.log(`New Message from You, ${newMessage.contentString()}`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("new-message", await getMessageResponse(newMessage));
@@ -564,9 +564,11 @@ class BlueBubblesServer extends EventEmitter {
             const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
             const time = newMessage.dateDelivered || newMessage.dateRead;
             const updateType = newMessage.dateRead ? "Text Read" : "Text Delivered";
-            this.log(`Updated message from [${from}]: [${
-                newMessage.contentString()}] - [${updateType} -> ${time.toLocaleString()}]`
-            );
+
+            // Husky pre-commit validator was complaining, so I created vars
+            const content = newMessage.contentString();
+            const localeTime = time.toLocaleString();
+            this.log(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
 
             // Emit it to the socket and FCM devices
             await this.emitMessage("updated-message", await getMessageResponse(newMessage));
@@ -736,7 +738,7 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             this.log("Starting Message Manager...");
-            this.messageManager = new MessageManager();
+            this.messageManager = new OutgoingMessageManager();
         } catch (ex: any) {
             this.log(`Failed to start Message Manager service! ${ex.message}`, "error");
         }

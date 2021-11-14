@@ -1,7 +1,7 @@
 import { Message } from "@server/databases/imessage/entity/Message";
 import { MessagePromise } from "./messagePromise";
 
-export class MessageManager {
+export class OutgoingMessageManager {
     promises: MessagePromise[] = [];
 
     add(promise: MessagePromise) {

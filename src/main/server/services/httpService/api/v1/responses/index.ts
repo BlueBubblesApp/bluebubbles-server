@@ -3,7 +3,7 @@ import {
     ResponseMessages,
     ResponseData,
     ErrorTypes
-} from "@server/services/http/api/v1/responses/types";
+} from "@server/services/httpService/api/v1/responses/types";
 
 export const createSuccessResponse = (
     data: ResponseData,

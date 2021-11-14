@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { MessagePromise } from "@server/services/messageManager/messagePromise";
+import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { ValidTapback } from "@server/types";
 import {
     sendMessage as buildSendMessageScript,

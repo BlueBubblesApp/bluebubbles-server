@@ -179,7 +179,11 @@ export class MessageRouter {
         // Send the attachment
         try {
             const sentMessage: Message = await MessageInterface.sendAttachmentSync(
-                chatGuid, attachment.path, name, tempGuid);
+                chatGuid,
+                attachment.path,
+                name,
+                tempGuid
+            );
 
             // Remove from cache
             Server().httpService.sendCache.remove(tempGuid);

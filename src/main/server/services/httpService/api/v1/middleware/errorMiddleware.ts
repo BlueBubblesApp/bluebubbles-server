@@ -1,6 +1,6 @@
 import { Context, Next } from "koa";
 import { Server } from "@server/index";
-import { ErrorTypes } from "@server/services/http/api/v1/responses/types";
+import { ErrorTypes } from "@server/services/httpService/api/v1/responses/types";
 import { HTTPError } from "../responses/errors";
 import { createServerErrorResponse } from "../responses";
 

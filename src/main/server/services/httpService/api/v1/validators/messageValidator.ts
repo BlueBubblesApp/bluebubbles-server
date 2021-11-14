@@ -48,7 +48,9 @@ export class MessageValidator {
 
     static async validateText(ctx: RouterContext, next: Next) {
         const { tempGuid, method, effectId, subject, selectedMessageGuid } = ValidateInput(
-            ctx.request.body, MessageValidator.sendTextRules);
+            ctx.request.body,
+            MessageValidator.sendTextRules
+        );
         let saniMethod = method;
 
         // Default the method to AppleScript
@@ -61,7 +63,7 @@ export class MessageValidator {
         }
 
         // If we are sending via apple-script, we require a tempGuid
-        if (saniMethod === 'apple-script' && (isEmpty(tempGuid))) {
+        if (saniMethod === "apple-script" && isEmpty(tempGuid)) {
             throw new BadRequest({ error: `A 'tempGuid' is required when sending via AppleScript` });
         }
 
