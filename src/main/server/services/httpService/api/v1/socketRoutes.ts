@@ -27,7 +27,7 @@ import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { ActionHandler } from "@server/api/v1/apple/actions";
-import { QueueItem } from "@server/services/queue/index";
+import { QueueItem } from "@server/services/queueService";
 import { restartMessages } from "@server/api/v1/apple/scripts";
 import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
@@ -120,7 +120,7 @@ export class SocketRoutes {
                     return response(cb, "error", createBadRequestResponse("No service name provided!"));
 
                 // Make sure the service is one that we can handle
-                const serviceOpts = ["Ngrok", "LocalTunnel", "Dynamic DNS"];
+                const serviceOpts = ["Ngrok", "Cloudflare", "LocalTunnel", "Dynamic DNS"];
                 if (!serviceOpts.includes(params.service))
                     return response(
                         cb,

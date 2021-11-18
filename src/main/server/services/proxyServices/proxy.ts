@@ -55,6 +55,12 @@ abstract class Proxy {
         return enabledProxy.toLowerCase() === this.opts.name.toLowerCase();
     }
 
+    async applyAddress(address?: string) {
+        if (address || this.url) {
+            await Server().repo.setConfig("server_address", address ?? this.url);
+        }
+    }
+
     /**
      * Sets up a connection to the Ngrok servers, opening a secure
      * tunnel between the internet and your Mac (iMessage server)
@@ -71,9 +77,7 @@ abstract class Proxy {
         // Connect to the service
         try {
             this.url = await this.connect();
-            if (this.url) {
-                await Server().repo.setConfig("server_address", this.url);
-            }
+            this.applyAddress(this.url);
         } catch (ex: any) {
             Server().log(`Failed to connect to ${this.opts.name}! Error: ${ex.toString()}`);
             throw ex;

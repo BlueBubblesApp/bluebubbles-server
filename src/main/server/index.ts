@@ -33,7 +33,8 @@ import {
     NetworkService,
     QueueService,
     IPCService,
-    UpdateService
+    UpdateService,
+    CloudflareService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -716,7 +717,7 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             this.log("Connecting to proxies...");
-            this.proxyServices = [new NgrokService(), new LocalTunnelService()];
+            this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
             await this.restartProxyServices();
         } catch (ex: any) {
             this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");

@@ -5,6 +5,7 @@ import { CaffeinateService } from "./caffeinateService";
 import { UpdateService } from "./updateService";
 import { NgrokService } from "./proxyServices/ngrokService";
 import { LocalTunnelService } from "./proxyServices/localTunnelService";
+import { CloudflareService } from "./proxyServices/cloudflareService";
 import { NetworkCheckerService } from "./networkCheckerService";
 import { QueueService } from "./queueService";
 import { IPCService } from "./ipcService";
@@ -21,5 +22,6 @@ export {
     NetworkCheckerService as NetworkService,
     QueueService,
     IPCService,
-    CertificateService
+    CertificateService,
+    CloudflareService
 };
