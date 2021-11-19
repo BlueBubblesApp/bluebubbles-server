@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { MessagePromise } from "@server/services/messageManager/messagePromise";
+import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { ValidTapback } from "@server/types";
 import {
     sendMessage as buildSendMessageScript,
@@ -30,7 +30,6 @@ import {
 } from "../../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
 
-
 /**
  * This class handles all actions that require an AppleScript execution.
  * Pretty much, using command line to execute a script, passing any required
@@ -38,8 +37,7 @@ import { tapbackUIMap } from "./mappings";
  */
 export class ActionHandler {
     static sendMessageHandler = async (chatGuid: string, message: string, attachment: string) => {
-        // Build the message script
-        let messageScript = buildSendMessageScript(chatGuid, message ?? "", attachment);
+        let messageScript;
 
         // Start the message send workflow
         //  1: Try sending using the input Chat GUID
@@ -48,10 +46,14 @@ export class ActionHandler {
         //  3: If we still have an error, throw the error
         let error;
         try {
+            // Build the message script
+            messageScript = buildSendMessageScript(chatGuid, message ?? "", attachment);
+
             // Try to send the message
             await FileSystem.executeAppleScript(messageScript);
         } catch (ex: any) {
             error = ex;
+            Server().log(`Failed to send text via main AppleScript: ${error?.message ?? error}`, "debug");
 
             const errMsg = (ex?.message ?? "") as string;
             const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
@@ -59,6 +61,7 @@ export class ActionHandler {
             // If we hit specific errors, we should retry after restarting the Messages App
             if (retry) {
                 try {
+                    Server().log(`[Retry] Sending AppleScript text after Messages restart...`, "debug");
                     await FileSystem.executeAppleScript(restartMessages());
                     await FileSystem.executeAppleScript(messageScript);
                 } catch (ex2: any) {
@@ -74,6 +77,7 @@ export class ActionHandler {
 
             try {
                 // Generate the new send script
+                Server().log(`Sending AppleScript text using fallback script...`, "debug");
                 messageScript = sendMessageFallback(chatGuid, message ?? "", attachment);
                 await FileSystem.executeAppleScript(messageScript);
             } catch (ex: any) {

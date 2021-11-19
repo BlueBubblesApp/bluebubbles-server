@@ -1,15 +1,15 @@
-import { HttpService } from "./http";
-import { FCMService } from "./fcm";
-import { AlertService } from "./alert";
-import { CaffeinateService } from "./caffeinate";
-import { UpdateService } from "./update";
-import { NgrokService } from "./ngrok";
-import { LocalTunnelService } from "./localtunnel";
-import { NetworkService } from "./network";
-import { QueueService } from "./queue";
-import { IPCService } from "./ipc";
-import { CertificateService } from "./certificate";
-import { MessageManager } from "./messageManager";
+import { HttpService } from "./httpService";
+import { FCMService } from "./fcmService";
+import { AlertService } from "./alertService";
+import { CaffeinateService } from "./caffeinateService";
+import { UpdateService } from "./updateService";
+import { NgrokService } from "./proxyServices/ngrokService";
+import { LocalTunnelService } from "./proxyServices/localTunnelService";
+import { CloudflareService } from "./proxyServices/cloudflareService";
+import { NetworkCheckerService } from "./networkCheckerService";
+import { QueueService } from "./queueService";
+import { IPCService } from "./ipcService";
+import { CertificateService } from "./certificateService";
 
 export {
     HttpService,
@@ -19,9 +19,9 @@ export {
     UpdateService,
     NgrokService,
     LocalTunnelService,
-    NetworkService,
+    NetworkCheckerService as NetworkService,
     QueueService,
     IPCService,
     CertificateService,
-    MessageManager
+    CloudflareService
 };

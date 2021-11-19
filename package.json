@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "main": "./dist/main.js",
     "scripts": {
@@ -201,7 +201,8 @@
         "slugify": "^1.6.0",
         "socket.io": "3.1.2",
         "typeorm": "^0.2.29",
-        "validatorjs": "^3.22.1"
+        "validatorjs": "^3.22.1",
+        "zx": "^4.2.0"
     },
     "devEngines": {
         "node": ">=14.x",

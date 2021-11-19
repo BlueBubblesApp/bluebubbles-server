@@ -8,7 +8,7 @@ import { FileSystem } from "@server/fileSystem";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { invisibleMediaChar } from "@server/services/http/constants";
+import { invisibleMediaChar } from "@server/services/httpService/constants";
 
 export const isMinMonteray = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
@@ -34,8 +34,8 @@ export const concatUint8Arrays = (a: Uint8Array, b: Uint8Array): Uint8Array => {
 
 export const getiMessageNumberFormat = (address: string) => {
     const phoneUtil = PhoneNumberUtil.getInstance();
-    const number = phoneUtil.parseAndKeepRawInput(address, address.includes('+') ? null : "US");
-    const formatted = phoneUtil.formatOutOfCountryCallingNumber(number, address.includes('+') ? null : "US");
+    const number = phoneUtil.parseAndKeepRawInput(address, address.includes("+") ? null : "US");
+    const formatted = phoneUtil.formatOutOfCountryCallingNumber(number, address.includes("+") ? null : "US");
     return `+${formatted}`;
 };
 
@@ -201,10 +201,12 @@ export const slugifyAddress = (val: string) => {
         // If it's an email, change the regex
         slugRegex = /[^\w@.-_]+/g; // Strip non-alphanumeric except @, ., _, and -
 
-    return safeTrim(val
-        .toLowerCase()
-        .replace(/\s+/g, "") // Replace spaces with nothing
-        .replace(slugRegex, ""));
+    return safeTrim(
+        val
+            .toLowerCase()
+            .replace(/\s+/g, "") // Replace spaces with nothing
+            .replace(slugRegex, "")
+    );
 };
 
 export const parseMetadataString = (metadata: string): { [key: string]: string } => {
@@ -314,16 +316,16 @@ export const isNotEmpty = (value: string | Array<any> | NodeJS.Dict<any>, trim =
     if (!value) return false;
 
     // Handle if the input is a string
-    if ((typeof value) === 'string' && (trim ? (value as string).trim() : value).length > 0) return true;
+    if (typeof value === "string" && (trim ? (value as string).trim() : value).length > 0) return true;
 
     // Handle if the input is a list
-    if ((typeof value === 'object') && Array.isArray(value)) {
+    if (typeof value === "object" && Array.isArray(value)) {
         if (trim) return value.filter(i => isNotEmpty(i)).length > 0;
         return value.length > 0;
     }
 
     // Handle if the input is a dictionary
-    if ((typeof value === 'object') && !Array.isArray(value)) return Object.keys(value).length > 0;
+    if (typeof value === "object" && !Array.isArray(value)) return Object.keys(value).length > 0;
 
     // If all fails, it's not empty
     return true;
@@ -334,12 +336,12 @@ export const isEmpty = (value: string | Array<any> | NodeJS.Dict<any>, trim = tr
 };
 
 export const shortenString = (value: string, maxLen = 25): string => {
-    if (!value || (typeof value) !== 'string') return '';
+    if (!value || typeof value !== "string") return "";
     if (value.length < maxLen) return value;
     return `${value.substring(0, maxLen)}...`;
 };
 
 // Safely trims a string
 export const safeTrim = (value: string) => {
-    return (value ?? '').trim();
-}
+    return (value ?? "").trim();
+};

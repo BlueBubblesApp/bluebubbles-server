@@ -392,6 +392,7 @@ class PreDashboardView extends React.Component<unknown, State> {
                             <div style={{ marginTop: "3px" }}>
                                 <select value={this.state.proxyService} onChange={e => this.handleProxyChange(e)}>
                                     <option value="Ngrok">Ngrok</option>
+                                    <option value="Cloudflare">Cloudflare</option>
                                     <option value="LocalTunnel">LocalTunnel</option>
                                     <option value="Dynamic DNS">Dynamic DNS</option>
                                 </select>
