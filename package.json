@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "main": "./dist/main.js",
     "scripts": {
