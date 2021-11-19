@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "main": "./dist/main.js",
     "scripts": {
@@ -127,7 +127,7 @@
         "babel-loader": "^8.1.0",
         "cross-env": "^7.0.2",
         "css-loader": "^3.5.2",
-        "electron": "^11.1.1",
+        "electron": "^11.5.0",
         "electron-builder": "^22.9.1",
         "electron-notarize": "^1.0.0",
         "eslint": "^6.8.0",
@@ -201,7 +201,8 @@
         "slugify": "^1.6.0",
         "socket.io": "3.1.2",
         "typeorm": "^0.2.29",
-        "validatorjs": "^3.22.1"
+        "validatorjs": "^3.22.1",
+        "zx": "^4.2.0"
     },
     "devEngines": {
         "node": ">=14.x",

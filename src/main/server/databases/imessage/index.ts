@@ -294,6 +294,7 @@ export class MessageRepository {
         after = null,
         before = null,
         withChats = false,
+        withAttachments = true,
         sort = "DESC",
         where = []
     }: DBMessageParams) {
@@ -306,6 +307,14 @@ export class MessageRepository {
             .getRepository(Message)
             .createQueryBuilder("message")
             .leftJoinAndSelect("message.handle", "handle");
+
+        if (withAttachments)
+            query.leftJoinAndSelect(
+                "message.attachments",
+                "attachment",
+                "message.ROWID = message_attachment.message_id AND " +
+                    "attachment.ROWID = message_attachment.attachment_id"
+            );
 
         // Inner-join because all messages will have a chat
         if (chatGuid) {
@@ -371,9 +380,7 @@ export class MessageRepository {
         const query = this.db.getRepository(Message).createQueryBuilder("message");
 
         // Add default WHERE clauses
-        query
-            .andWhere("message.text IS NOT NULL")
-            .andWhere("associated_message_type == 0");
+        query.andWhere("message.text IS NOT NULL").andWhere("associated_message_type == 0");
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 

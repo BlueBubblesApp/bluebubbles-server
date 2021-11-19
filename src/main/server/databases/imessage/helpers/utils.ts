@@ -28,8 +28,8 @@ export const convertAudio = async (attachment: Attachment): Promise<string> => {
             await FileSystem.convertCafToMp3(theAttachment, newPath);
         } catch (ex: any) {
             failed = true;
-            Server().log(`Failed to convert CAF to MP3 for attachment, ${theAttachment.transferName}`);
-            Server().log(ex, "error");
+            Server().log(`Failed to convert CAF to MP3 for attachment, ${theAttachment.transferName}`, "debug");
+            Server().log(ex?.message ?? ex, "error");
         }
     }
 

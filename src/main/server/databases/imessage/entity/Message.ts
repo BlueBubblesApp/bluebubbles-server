@@ -9,16 +9,16 @@ import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Han
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { isMinBigSur, isMinCatalina, isMinSierra, sanitizeStr } from "@server/helpers/utils";
-import { invisibleMediaChar } from "@server/services/http/constants";
+import { invisibleMediaChar } from "@server/services/httpService/constants";
 
 @Entity("message")
 export class Message {
     contentString(maxText = 15): string {
-        let text = sanitizeStr((this.text ?? '').replace(invisibleMediaChar, ''));
+        let text = sanitizeStr((this.text ?? "").replace(invisibleMediaChar, ""));
         const textLen = text.length;
         const attachments = this.attachments ?? [];
         const attachmentsLen = attachments.length;
-        let subject = this.subject ?? '';
+        let subject = this.subject ?? "";
         const subjectLen = subject.length;
 
         // Build the content
@@ -47,7 +47,10 @@ export class Message {
         // If we have attachments, print those out
         if (attachmentsLen > 0) parts.push(`Attachments: ${attachmentsLen}`);
 
-        return parts.join('; ');
+        // Lastly, add the date
+        parts.push(`Date: ${this.dateCreated.toLocaleString()}`);
+
+        return parts.join("; ");
     }
 
     @PrimaryGeneratedColumn({ name: "ROWID" })
