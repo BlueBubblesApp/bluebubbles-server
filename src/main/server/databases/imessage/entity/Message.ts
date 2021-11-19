@@ -47,6 +47,9 @@ export class Message {
         // If we have attachments, print those out
         if (attachmentsLen > 0) parts.push(`Attachments: ${attachmentsLen}`);
 
+        // Lastly, add the date
+        parts.push(`Date: ${this.dateCreated.toLocaleString()}`);
+
         return parts.join("; ");
     }
 
