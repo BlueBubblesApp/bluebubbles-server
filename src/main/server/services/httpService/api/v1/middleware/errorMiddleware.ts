@@ -9,7 +9,7 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
         await next();
     } catch (ex: any) {
         // Log the error, no matter what it is
-        Server().log(ex.message, "error");
+        Server().log(`API Error: ${ex?.message ?? ex}`, "error");
 
         // Use the custom HTTPError handler
         if (ex instanceof HTTPError) {
