@@ -53,6 +53,7 @@ export class ActionHandler {
             await FileSystem.executeAppleScript(messageScript);
         } catch (ex: any) {
             error = ex;
+            Server().log(`Failed to send text via main AppleScript: ${error?.message ?? error}`, "debug");
 
             const errMsg = (ex?.message ?? "") as string;
             const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
@@ -60,6 +61,7 @@ export class ActionHandler {
             // If we hit specific errors, we should retry after restarting the Messages App
             if (retry) {
                 try {
+                    Server().log(`[Retry] Sending AppleScript text after Messages restart...`, "debug");
                     await FileSystem.executeAppleScript(restartMessages());
                     await FileSystem.executeAppleScript(messageScript);
                 } catch (ex2: any) {
@@ -75,6 +77,7 @@ export class ActionHandler {
 
             try {
                 // Generate the new send script
+                Server().log(`Sending AppleScript text using fallback script...`, "debug");
                 messageScript = sendMessageFallback(chatGuid, message ?? "", attachment);
                 await FileSystem.executeAppleScript(messageScript);
             } catch (ex: any) {
