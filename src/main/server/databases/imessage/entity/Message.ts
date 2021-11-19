@@ -8,7 +8,7 @@ import { MessageResponse } from "@server/types";
 import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { isMinBigSur, isMinCatalina, isMinSierra, sanitizeStr } from "@server/helpers/utils";
+import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinSierra, sanitizeStr } from "@server/helpers/utils";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 
 @Entity("message")
@@ -408,7 +408,7 @@ export class Message {
     )
     associatedMessageType: string;
 
-    @Column({ name: "balloon_bundle_id", type: "text", nullable: true })
+    @conditional(isMinHighSierra, Column({ name: "balloon_bundle_id", type: "text", nullable: true }))
     balloonBundleId: string;
 
     @Column({ name: "payload_data", type: "blob", nullable: true })
