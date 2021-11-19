@@ -169,12 +169,16 @@ export class OutgoingMessageListener extends ChangeListener {
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
                 Server().messageManager.promises[idx].reject(entry);
+
+                setTimeout(() => {
+                    super.emit("message-send-error", entry);
+                }, 1000);
+            } else {
+                super.emit("message-send-error", entry);
+
+                // Add artificial delay so we don't overwhelm any listeners
+                await waitMs(200);
             }
-
-            super.emit("message-send-error", entry);
-
-            // Add artificial delay so we don't overwhelm any listeners
-            await waitMs(200);
         }
     }
 
@@ -209,13 +213,17 @@ export class OutgoingMessageListener extends ChangeListener {
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
                 Server().messageManager.promises[idx].resolve(entry);
+
+                setTimeout(() => {
+                    super.emit("updated-entry", entry);
+                }, 1000);
+            } else {
+                // Emit the message
+                super.emit("updated-entry", entry);
+
+                // Add artificial delay so we don't overwhelm any listeners
+                await waitMs(200);
             }
-
-            // Emit the message
-            super.emit("updated-entry", entry);
-
-            // Add artificial delay so we don't overwhelm any listeners
-            await waitMs(200);
         }
     }
 }
