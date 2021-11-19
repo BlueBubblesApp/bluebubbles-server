@@ -153,7 +153,7 @@ export class FCMService {
                 if (res.failureCount > 0) {
                     Server().log(
                         `Failed to send notification to device "${device}" ${res.failureCount} times!`,
-                        "warn"
+                        "debug"
                     );
                 }
 
