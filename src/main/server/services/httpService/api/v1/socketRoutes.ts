@@ -31,6 +31,7 @@ import { QueueItem } from "@server/services/queueService";
 import { restartMessages } from "@server/api/v1/apple/scripts";
 import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
+import { convertAudio } from "@server/databases/imessage/helpers/utils";
 
 import {
     createSuccessResponse,
@@ -473,30 +474,7 @@ export class SocketRoutes {
 
                 // If the attachment is a caf, let's convert it
                 if (attachment.uti === "com.apple.coreaudio-format") {
-                    const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp3`;
-
-                    // If the path doesn't exist, let's convert the attachment
-                    let failed = false;
-                    if (!fs.existsSync(newPath)) {
-                        try {
-                            Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
-                            await FileSystem.convertCafToMp3(attachment, newPath);
-                        } catch (ex: any) {
-                            failed = true;
-                            Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`);
-                            Server().log(ex, "error");
-                        }
-                    }
-
-                    if (!failed) {
-                        // If conversion is successful, we need to modify the attachment a bit
-                        attachment.mimeType = "audio/mp3";
-                        attachment.filePath = newPath;
-                        attachment.transferName = basename(newPath).replace(".caf", ".mp3");
-
-                        // Set the fPath to the newly converted path
-                        fPath = newPath;
-                    }
+                    fPath = await convertAudio(attachment);
                 }
 
                 // Check if the file exists before trying to read it

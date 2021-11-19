@@ -82,7 +82,7 @@ export class QueueService {
             }
         } catch (ex: any) {
             Server().log(`Failed to process queued item; Item type: ${item.type}`, "error");
-            Server().log(ex.message);
+            Server().log(ex?.message ?? ex, "debug");
         }
 
         // Check and see if there are any other items to process
