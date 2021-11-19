@@ -32,7 +32,11 @@ export class CloudflareService extends Proxy {
             if (url === this.url) return;
 
             this.url = url;
-            this.applyAddress(this.url);
+
+            // 3 second delay to allow DNS records to update
+            setTimeout(() => {
+                this.applyAddress(this.url);
+            }, 5000);
         });
 
         // Change the update timer for when the update frequency changes
