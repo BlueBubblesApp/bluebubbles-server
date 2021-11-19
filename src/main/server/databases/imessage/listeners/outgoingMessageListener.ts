@@ -145,10 +145,13 @@ export class OutgoingMessageListener extends ChangeListener {
                 setTimeout(() => {
                     super.emit("new-entry", entry);
                 }, 1000);
-            }
+            } else {
+                // If it's not associated with a promise, emit it as normal
+                super.emit("new-entry", entry);
 
-            // Add artificial delay so we don't overwhelm any listeners
-            await waitMs(200);
+                // Add artificial delay so we don't overwhelm any listeners
+                await waitMs(200);
+            }
         }
 
         // Emit the errored messages
@@ -170,8 +173,8 @@ export class OutgoingMessageListener extends ChangeListener {
 
             super.emit("message-send-error", entry);
 
-             // Add artificial delay so we don't overwhelm any listeners
-             await waitMs(200);
+            // Add artificial delay so we don't overwhelm any listeners
+            await waitMs(200);
         }
     }
 
