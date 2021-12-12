@@ -145,10 +145,13 @@ export class OutgoingMessageListener extends ChangeListener {
                 setTimeout(() => {
                     super.emit("new-entry", entry);
                 }, 1000);
-            }
+            } else {
+                // If it's not associated with a promise, emit it as normal
+                super.emit("new-entry", entry);
 
-            // Add artificial delay so we don't overwhelm any listeners
-            await waitMs(200);
+                // Add artificial delay so we don't overwhelm any listeners
+                await waitMs(200);
+            }
         }
 
         // Emit the errored messages
@@ -166,12 +169,16 @@ export class OutgoingMessageListener extends ChangeListener {
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
                 Server().messageManager.promises[idx].reject(entry);
+
+                setTimeout(() => {
+                    super.emit("message-send-error", entry);
+                }, 1000);
+            } else {
+                super.emit("message-send-error", entry);
+
+                // Add artificial delay so we don't overwhelm any listeners
+                await waitMs(200);
             }
-
-            super.emit("message-send-error", entry);
-
-             // Add artificial delay so we don't overwhelm any listeners
-             await waitMs(200);
         }
     }
 
@@ -206,13 +213,17 @@ export class OutgoingMessageListener extends ChangeListener {
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
                 Server().messageManager.promises[idx].resolve(entry);
+
+                setTimeout(() => {
+                    super.emit("updated-entry", entry);
+                }, 1000);
+            } else {
+                // Emit the message
+                super.emit("updated-entry", entry);
+
+                // Add artificial delay so we don't overwhelm any listeners
+                await waitMs(200);
             }
-
-            // Emit the message
-            super.emit("updated-entry", entry);
-
-            // Add artificial delay so we don't overwhelm any listeners
-            await waitMs(200);
         }
     }
 }
