@@ -527,8 +527,9 @@ class SettingsView extends React.Component<unknown, State> {
                             <div>
                                 <h3 className="aSettingTitle">Keep MacOS Awake</h3>
                                 <p className="settingsHelp">
-                                    When enabled, you mac will not fall asleep due to inactivity, with the caveat of
-                                    when you close your laptop
+                                    When enabled, you mac will not fall asleep due to inactivity or a screen screen saver. 
+                                    However, your computer lid&apos;s close action may override this. Make sure your computer does not
+                                    go to sleep when the lid is closed. 
                                 </p>
                             </div>
                             <label className="form-switch">
