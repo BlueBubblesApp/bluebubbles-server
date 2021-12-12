@@ -1,4 +1,5 @@
 import * as path from "path";
+import * as os from "os";
 import * as fs from "fs";
 import * as CompareVersion from "compare-versions";
 import cpr from "recursive-copy";
@@ -145,8 +146,14 @@ export class BlueBubblesHelperService {
         Server().log("Starting Private API Helper...", "debug");
         this.configureServer();
 
+        // we need to get the port to open the server on (to allow multiple users to use the bundle)
+        // we'll base this off the users uid (a unique id for each user, starting from 501)
+        // we'll subtract 501 to get an id starting at 0, incremented for each user
+        // then we add this to the base port to get a unique port for the socket
+        const port = 45670 + os.userInfo().uid - 501;
+        Server().log(`Starting Socket server on port ${port}`);
         // Listen and reset the restart counter
-        this.server.listen(45677, "localhost", 511, () => {
+        this.server.listen(port, "localhost", 511, () => {
             this.restartCounter = 0;
         });
     }
