@@ -19,7 +19,10 @@ export class MessageRouter {
     }
 
     static async count(ctx: RouterContext, _: Next) {
-        const total = await Server().iMessageRepo.getMessageCount();
+        const { after, before, chatGuid } = ctx.request.query;
+        const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
+        const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
+        const total = await Server().iMessageRepo.getMessageCount(afterDate, beforeDate, false, chatGuid as string);
         return new Success(ctx, { data: { total } }).send();
     }
 

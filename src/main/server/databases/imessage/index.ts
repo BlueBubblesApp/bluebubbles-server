@@ -375,9 +375,20 @@ export class MessageRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getMessageCount(after?: Date, before?: Date, isFromMe = false) {
+    async getMessageCount(after?: Date, before?: Date, isFromMe = false, chatGuid: string = null) {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Message).createQueryBuilder("message");
+
+        // Add chatGuid (if applicable)
+        if (isNotEmpty(chatGuid)) {
+            query
+                .innerJoinAndSelect(
+                    "message.chats",
+                    "chat",
+                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                )
+                .andWhere("chat.guid = :guid", { guid: chatGuid });
+        }
 
         // Add default WHERE clauses
         query.andWhere("message.text IS NOT NULL").andWhere("associated_message_type == 0");
@@ -481,7 +492,6 @@ export class MessageRepository {
     async getAttachmentCount() {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
-
         const count = await query.getCount();
         return count;
     }
