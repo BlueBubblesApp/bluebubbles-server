@@ -1,6 +1,4 @@
-import { nativeImage, NativeImage } from "electron";
 import * as fs from "fs";
-import * as path from "path";
 import * as base64 from "byte-base64";
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 
@@ -8,11 +6,11 @@ import { Server } from "@server/index";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { convertAudio, getAttachmentMetadata } from "@server/databases/imessage/helpers/utils";
+import { convertAudio, convertImage, getAttachmentMetadata } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
-import { handledImageMimes } from "../helpers/constants";
+import { isNotEmpty } from "@server/helpers/utils";
 
 @Entity("attachment")
 export class Attachment {
@@ -115,6 +113,14 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
             if (tableData.uti === "com.apple.coreaudio-format") {
                 const newPath = await convertAudio(tableData);
                 fPath = newPath ?? fPath;
+            }
+
+            if (isNotEmpty(tableData?.mimeType)) {
+                // If the attachment is a HEIC, convert it to a JPEG
+                if (tableData.mimeType.startsWith("image/heic")) {
+                    const newPath = await convertImage(tableData);
+                    fPath = newPath ?? fPath;
+                }
             }
 
             // If the attachment exists, do some things
