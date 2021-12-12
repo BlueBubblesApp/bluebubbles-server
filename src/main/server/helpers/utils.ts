@@ -253,10 +253,13 @@ export const fixServerUrl = (value: string) => {
         newValue = newValue.substring(0, newValue.length - 1);
     }
 
-    // Force HTTPS
-    // if (newValue.startsWith('http://')) {
-    //     newValue = newValue.replace('http://', 'https://');
-    // }
+    // Force HTTPS if enabled
+    const use_custom_cert = Server().repo.getConfig('use_custom_certificate') as boolean;
+    if (use_custom_cert && newValue.startsWith('http://')) {
+        newValue = newValue.replace('http://', 'https://');
+    }
+
+    // Auto add scheme
     if (!newValue.startsWith("http")) {
         newValue = `http://${newValue}`;
     }
