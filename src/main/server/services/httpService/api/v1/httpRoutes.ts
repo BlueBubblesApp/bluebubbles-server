@@ -250,6 +250,12 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: "count/updated",
+                        validators: [MessageValidator.validateUpdatedCount],
+                        controller: MessageRouter.countUpdated
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: "count/me",
                         controller: MessageRouter.sentCount
                     },

@@ -16,7 +16,18 @@ export class MessageValidator {
     };
 
     static async validateCount(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx?.params?.query, MessageValidator.countParamRules);
+        ValidateInput(ctx?.request?.query, MessageValidator.countParamRules);
+        await next();
+    }
+
+    static updatedCountParamRules = {
+        chatGuid: "string",
+        after: "required|numeric|min:0",
+        before: "numeric|min:1"
+    };
+
+    static async validateUpdatedCount(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx?.request?.query, MessageValidator.updatedCountParamRules);
         await next();
     }
 

@@ -376,7 +376,7 @@ export class MessageRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getMessageCount(after?: Date, before?: Date, isFromMe = false, chatGuid: string = null) {
+    async getMessageCount(after?: Date, before?: Date, isFromMe = false, chatGuid: string = null, updated = false) {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Message).createQueryBuilder("message");
 
@@ -397,14 +397,35 @@ export class MessageRepository {
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 
         // Add date restraints
-        if (after)
-            query.andWhere("message.date >= :after", {
-                after: convertDateTo2001Time(after)
-            });
-        if (before)
-            query.andWhere("message.date < :before", {
-                before: convertDateTo2001Time(before)
-            });
+        if (updated) {
+            if (after)
+                query.andWhere("message.date_delivered >= :after", {
+                    after: convertDateTo2001Time(after as Date)
+                });
+            if (before)
+                query.andWhere("message.date_delivered < :before", {
+                    before: convertDateTo2001Time(before as Date)
+                });
+
+            // Add date_read constraints
+            if (after)
+                query.orWhere("message.date_read >= :after", {
+                    after: convertDateTo2001Time(after as Date)
+                });
+            if (before)
+                query.andWhere("message.date_read < :before", {
+                    before: convertDateTo2001Time(before as Date)
+                });
+        } else {
+            if (after)
+                query.andWhere("message.date >= :after", {
+                    after: convertDateTo2001Time(after)
+                });
+            if (before)
+                query.andWhere("message.date < :before", {
+                    before: convertDateTo2001Time(before)
+                });
+        }
 
         // Add pagination params
         query.orderBy("message.date", "DESC");

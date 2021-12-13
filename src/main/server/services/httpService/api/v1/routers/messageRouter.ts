@@ -26,6 +26,15 @@ export class MessageRouter {
         return new Success(ctx, { data: { total } }).send();
     }
 
+    static async countUpdated(ctx: RouterContext, _: Next) {
+        const { after, before, chatGuid } = ctx.request.query;
+        const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
+        const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
+        const total = await Server().iMessageRepo.getMessageCount(
+            afterDate, beforeDate, false, chatGuid as string, true);
+        return new Success(ctx, { data: { total } }).send();
+    }
+
     static async find(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
         const withQuery = ((ctx.request.query.with ?? "") as string)
