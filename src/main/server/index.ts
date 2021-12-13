@@ -40,7 +40,7 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
 
 import { ActionHandler } from "./api/v1/apple/actions";
-import { insertChatParticipants, isEmpty, isMinBigSur, isNotEmpty } from "./helpers/utils";
+import { insertChatParticipants, isEmpty, isMinBigSur, isMinSierra, isNotEmpty } from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -365,6 +365,12 @@ class BlueBubblesServer extends EventEmitter {
         // Check if on Big Sur. If we are, then create a log/alert saying that
         if (isMinBigSur) {
             this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "warn");
+        }
+
+        // If the user is on el capitan, we need to force cloudflare
+        const proxyService = this.repo.getConfig("proxy_service") as string;
+        if (!isMinSierra && proxyService === 'Ngrok') {
+            await this.repo.setConfig("proxy_service", "Cloudflare");
         }
 
         this.log("Finished pre-start checks...");
