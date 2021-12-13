@@ -411,35 +411,44 @@ export class Message {
     @conditional(isMinHighSierra, Column({ name: "balloon_bundle_id", type: "text", nullable: true }))
     balloonBundleId: string;
 
-    @Column({ name: "payload_data", type: "blob", nullable: true })
+    @conditional(isMinHighSierra, Column({ name: "payload_data", type: "blob", nullable: true }))
     payloadData: Blob;
 
-    @Column({ name: "expressive_send_style_id", type: "text", nullable: true })
+    @conditional(isMinHighSierra, Column({ name: "expressive_send_style_id", type: "text", nullable: true }))
     expressiveSendStyleId: string;
 
-    @Column({
-        name: "associated_message_range_location",
-        type: "integer",
-        default: 0
-    })
+    @conditional(
+        isMinHighSierra,
+        Column({
+            name: "associated_message_range_location",
+            type: "integer",
+            default: 0
+        })
+    )
     associatedMessageRangeLocation: number;
 
-    @Column({
-        name: "associated_message_range_length",
-        type: "integer",
-        default: 0
-    })
+    @conditional(
+        isMinHighSierra,
+        Column({
+            name: "associated_message_range_length",
+            type: "integer",
+            default: 0
+        })
+    )
     associatedMessageRangeLength: number;
 
-    @Column({
-        name: "time_expressive_send_played",
-        type: "integer",
-        transformer: DateTransformer,
-        default: 0
-    })
+    @conditional(
+        isMinHighSierra,
+        Column({
+            name: "time_expressive_send_played",
+            type: "integer",
+            transformer: DateTransformer,
+            default: 0
+        })
+    )
     timeExpressiveSendStyleId: Date;
 
-    @Column({ name: "message_summary_info", type: "blob", nullable: true })
+    @conditional(isMinHighSierra, Column({ name: "message_summary_info", type: "blob", nullable: true }))
     messageSummaryInfo: Blob;
 
     @conditional(

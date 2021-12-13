@@ -434,6 +434,12 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
+        // If we toggle the custom cert option, restart the http service
+        if (prevConfig.use_custom_certificate !== nextConfig.use_custom_certificate && !proxiesRestarted) {
+            if (this.httpService) await this.httpService.restart(true);
+            proxiesRestarted = true;
+        }
+
         // If the ngrok URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
             if (this.httpService) await this.emitMessage("new-server", nextConfig.server_address, "high");
