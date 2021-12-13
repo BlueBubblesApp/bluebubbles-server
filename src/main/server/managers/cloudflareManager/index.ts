@@ -32,7 +32,6 @@ export class CloudflareManager extends EventEmitter {
     }
 
     private async connectHandler(): Promise<string> {
-        console.log("hello,my name ches");
         return new Promise((resolve, reject) => {
             const port = Server().repo.getConfig("socket_port") as string;
             this.proc = $`${this.daemonPath} tunnel --url localhost:${port} --config ${this.cfgPath}`;

@@ -9,6 +9,17 @@ import { ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
 
 export class MessageValidator {
+    static countParamRules = {
+        chatGuid: "string",
+        after: "numeric|min:0",
+        before: "numeric|min:1"
+    };
+
+    static async validateCount(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx?.params?.query, MessageValidator.countParamRules);
+        await next();
+    }
+
     static findParamRules = {
         guid: "required|string"
     };

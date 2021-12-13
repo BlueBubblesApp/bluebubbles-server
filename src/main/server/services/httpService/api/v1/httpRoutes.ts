@@ -239,6 +239,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "count",
+                        validators: [MessageValidator.validateCount],
                         controller: MessageRouter.count
                     },
                     {
