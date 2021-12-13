@@ -202,7 +202,7 @@ export class HttpService {
                     await next();
                 } catch (ex: any) {
                     Server().log(`Socket server error! ${ex.message}`, "error");
-                    socket.emit("exception", createServerErrorResponse(ex.message));
+                    socket.emit("exception", createServerErrorResponse(ex?.message ?? ex));
                     next(ex);
                 }
             });

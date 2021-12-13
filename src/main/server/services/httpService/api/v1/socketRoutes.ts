@@ -18,7 +18,7 @@ import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
-import { ResponseFormat, ResponseJson } from "@server/services/httpService/api/v1/responses/types";
+import { ErrorTypes, ResponseFormat, ResponseJson } from "@server/services/httpService/api/v1/responses/types";
 
 // Entities
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
@@ -600,22 +600,50 @@ export class SocketRoutes {
                 Server().httpService.sendCache.add(tempGuid);
 
                 try {
-                    // Send the message
-                    const sentMessage = await MessageInterface.sendMessageSync(
-                        chatGuid,
-                        message,
-                        "apple-script",
-                        null,
-                        null,
-                        null,
-                        tempGuid
-                    );
+                    let sentMessage = null;
+                    if (params?.attachment && params?.attachmentName && params?.attachmentGuid) {
+                        // Save the attachment data
+                        const b = base64.base64ToBytes(params.attachment)
+                        // eslint-disable-next-line no-param-reassign
+                        const newPath = FileSystem.saveAttachment(
+                            params.attachmentName, b);
+
+                        // Send the attachment first
+                        sentMessage = await MessageInterface.sendAttachmentSync(
+                            chatGuid,
+                            newPath,
+                            params?.attachmentName,
+                            params?.attachmentGuid
+                        );
+                    }
+                    
+                    // If we have a message, send it second
+                    if (isNotEmpty(message)) {
+                        sentMessage = await MessageInterface.sendMessageSync(
+                            chatGuid,
+                            message,
+                            "apple-script",
+                            null,
+                            null,
+                            null,
+                            tempGuid
+                        );
+                    }
 
                     Server().httpService.sendCache.remove(tempGuid);
                     return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
                 } catch (ex: any) {
                     Server().httpService.sendCache.remove(tempGuid);
-                    return response(cb, "send-message-error", createServerErrorResponse(ex.message));
+                    if (ex?.ROWID) {
+                        return response(cb, "send-message-error", createServerErrorResponse(
+                            "Message failed to send!",
+                            ErrorTypes.IMESSAGE_ERROR,
+                            "See error code for more details",
+                            ex
+                        ));
+                    }
+                    
+                    return response(cb, "send-message-error", createServerErrorResponse(ex?.message ?? ex));
                 }
             }
         );
@@ -793,7 +821,7 @@ export class SocketRoutes {
                         const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                         return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
                     } catch (ex: any) {
-                        return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
+                        return response(cb, "rename-group-error", createServerErrorResponse(ex?.message ?? ex));
                     }
                 }
 
@@ -803,7 +831,7 @@ export class SocketRoutes {
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex: any) {
-                    return response(cb, "rename-group-error", createServerErrorResponse(ex.message));
+                    return response(cb, "rename-group-error", createServerErrorResponse(ex?.message ?? ex));
                 }
             }
         );
@@ -826,7 +854,7 @@ export class SocketRoutes {
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return response(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex: any) {
-                    return response(cb, "add-participant-error", createServerErrorResponse(ex.message));
+                    return response(cb, "add-participant-error", createServerErrorResponse(ex?.message ?? ex));
                 }
             }
         );
@@ -849,7 +877,7 @@ export class SocketRoutes {
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return response(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));
                 } catch (ex: any) {
-                    return response(cb, "remove-participant-error", createServerErrorResponse(ex.message));
+                    return response(cb, "remove-participant-error", createServerErrorResponse(ex?.message ?? ex));
                 }
             }
         );
@@ -910,7 +938,7 @@ export class SocketRoutes {
                             createSuccessResponse(await getMessageResponse(sentMessage), "Successfully sent reaction!")
                         );
                     } catch (ex: any) {
-                        return response(cb, "send-tapback-error", createServerErrorResponse(ex.message));
+                        return response(cb, "send-tapback-error", createServerErrorResponse(ex?.message ?? ex));
                     }
                 }
 
@@ -966,7 +994,7 @@ export class SocketRoutes {
                         response(cb, "contacts-from-vcf", createServerErrorResponse("Failed to export Address Book!"));
                     }
                 } catch (ex: any) {
-                    response(cb, "contacts-from-vcf", createServerErrorResponse(ex.message));
+                    response(cb, "contacts-from-vcf", createServerErrorResponse(ex?.message ?? ex));
                 }
             }
         );
