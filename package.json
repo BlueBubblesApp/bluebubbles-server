@@ -173,7 +173,7 @@
         "conditional-decorator": "^0.1.7",
         "crypto-js": "^4.0.0",
         "electron-log": "^4.2.4",
-        "electron-updater": "^4.3.5",
+        "electron-updater": "4.3.9",
         "find-process": "^1.4.4",
         "firebase-admin": "^9.10.0",
         "google-libphonenumber": "^3.2.10",
