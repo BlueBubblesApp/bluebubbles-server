@@ -7,6 +7,7 @@ import { Server } from "@server/index";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
+import { isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
 
@@ -38,6 +39,43 @@ export const convertAudio = async (attachment: Attachment): Promise<string> => {
         theAttachment.mimeType = "audio/mp3";
         theAttachment.filePath = newPath;
         theAttachment.transferName = basename(newPath).replace(".caf", ".mp3");
+
+        // Set the fPath to the newly converted path
+        return newPath;
+    }
+
+    return null;
+};
+
+export const convertImage = async (attachment: Attachment): Promise<string> => {
+    const newPath = `${FileSystem.convertDir}/${attachment.guid}.jpg`;
+    const theAttachment = attachment;
+
+    // If the path doesn't exist, let's convert the attachment
+    let failed = false;
+    let ext = null;
+
+    if (!fs.existsSync(newPath)) {
+        try {
+            Server().log(`Converting attachment, ${theAttachment.transferName}, to an JPG...`);
+            if (isNotEmpty(attachment?.mimeType)) {
+                if (attachment.mimeType.startsWith("image/heic")) {
+                    await FileSystem.convertToJpg("heic", theAttachment, newPath);
+                    ext = "heic";
+                }
+            }
+        } catch (ex: any) {
+            failed = true;
+            Server().log(`Failed to convert image to JPG for attachment, ${theAttachment.transferName}`, "debug");
+            Server().log(ex?.message ?? ex, "error");
+        }
+    }
+
+    if (!failed && ext) {
+        // If conversion is successful, we need to modify the attachment a bit
+        theAttachment.mimeType = "image/jpg";
+        theAttachment.filePath = newPath;
+        theAttachment.transferName = basename(newPath).replace(`.${ext}`, ".jpg");
 
         // Set the fPath to the newly converted path
         return newPath;
