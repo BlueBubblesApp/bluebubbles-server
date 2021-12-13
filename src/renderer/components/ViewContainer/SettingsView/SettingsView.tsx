@@ -426,10 +426,10 @@ class SettingsView extends React.Component<unknown, State> {
 
                         <div className="aCheckboxDiv firstCheckBox">
                             <div>
-                                <h3 className="aSettingTitle">Encrypt Communications (Do not use with Desktop App)</h3>
+                                <h3 className="aSettingTitle">Encrypt Communications</h3>
                                 <p className="settingsHelp">
                                     Messages sent back to the clients will be encrypted using AES password-based
-                                    encryption. The Desktop app does not yet support this option!
+                                    encryption.
                                 </p>
                             </div>
                             <label className="form-switch">
