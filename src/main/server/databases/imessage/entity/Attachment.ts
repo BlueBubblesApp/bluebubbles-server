@@ -11,6 +11,8 @@ import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
 import { isNotEmpty } from "@server/helpers/utils";
+import { isMinSierra } from "@server/helpers/utils";
+import { conditional } from "conditional-decorator";
 
 @Entity("attachment")
 export class Attachment {
@@ -73,26 +75,46 @@ export class Attachment {
     @Column({ type: "integer", name: "total_bytes", default: 0 })
     totalBytes: number;
 
-    @Column({
-        type: "integer",
-        name: "is_sticker",
-        default: 0,
-        transformer: BooleanTransformer
-    })
+    @conditional(
+        isMinSierra,
+        Column({
+            type: "integer",
+            name: "is_sticker",
+            default: 0,
+            transformer: BooleanTransformer
+        })
+    )
     isSticker: boolean;
 
-    @Column({ type: "blob", name: "sticker_user_info", nullable: true })
+    @conditional(
+        isMinSierra,
+        Column({
+            type: "blob",
+            name: "sticker_user_info",
+            nullable: true
+        })
+    )
     stickerUserInfo: Blob;
 
-    @Column({ type: "blob", name: "attribution_info", nullable: true })
+    @conditional(
+        isMinSierra,
+        Column({
+            type: "blob",
+            name: "attribution_info",
+            nullable: true
+        })
+    )
     attributionInfo: Blob;
 
-    @Column({
-        type: "integer",
-        name: "hide_attachment",
-        default: 0,
-        transformer: BooleanTransformer
-    })
+    @conditional(
+        isMinSierra,
+        Column({
+            type: "integer",
+            name: "hide_attachment",
+            default: 0,
+            transformer: BooleanTransformer
+        })
+    )
     hideAttachment: boolean;
 }
 

@@ -19,7 +19,7 @@ export class ChatValidator {
     }
 
     static queryRules = {
-        with: "array|in:participants,lastMessage,archived",
+        with: "array|in:participants,lastMessage,lastmessage,archived",
         sort: "string|in:lastmessage",
         offset: "numeric|min:0",
         limit: "numeric|min:1|max:1000"

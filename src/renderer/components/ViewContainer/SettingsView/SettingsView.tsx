@@ -37,6 +37,7 @@ interface State {
     checkForUpdates: boolean;
     autoInstallUpdates: boolean;
     enablePrivateApi: boolean;
+    use_custom_certificate: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -66,7 +67,8 @@ class SettingsView extends React.Component<unknown, State> {
             startViaTerminal: false,
             checkForUpdates: true,
             autoInstallUpdates: false,
-            enablePrivateApi: false
+            enablePrivateApi: false,
+            use_custom_certificate: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -99,7 +101,8 @@ class SettingsView extends React.Component<unknown, State> {
                 startViaTerminal: config.start_via_terminal,
                 checkForUpdates: config.check_for_updates,
                 autoInstallUpdates: config.auto_install_updates,
-                enablePrivateApi: config.enable_private_api
+                enablePrivateApi: config.enable_private_api,
+                use_custom_certificate: config.use_custom_certificate
             });
 
         this.getCaffeinateStatus();
@@ -260,6 +263,16 @@ class SettingsView extends React.Component<unknown, State> {
             this.setState({ autoInstallUpdates: target.checked });
             await ipcRenderer.invoke("set-config", {
                 auto_install_updates: target.checked
+            });
+        }
+
+        if (id === "toggleCustomCertificate") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ use_custom_certificate: target.checked });
+            console.log("SETTING");
+            console.log(target.checked);
+            await ipcRenderer.invoke("set-config", {
+                use_custom_certificate: target.checked
             });
         }
     };
@@ -505,6 +518,30 @@ class SettingsView extends React.Component<unknown, State> {
                                 </select>
                             </span>
                         ) : null}
+                        {this.state.proxyService === "Dynamic DNS" ? (
+                            <div className="aCheckboxDiv">
+                                <div>
+                                    <h3 className="aSettingTitle">Use HTTPS (custom certificate)</h3>
+                                    <p className="settingsHelp">
+                                        This will install a self-signed certificate at &apos;~/Library/Application\
+                                        Support/bluebubbles-server/Certs&apos;.&nbsp;
+                                        <b>
+                                            Note: Only use this this option if you have your own certificate! Replace
+                                            the certificates in
+                                        </b>
+                                    </p>
+                                </div>
+                                <label className="form-switch">
+                                    <input
+                                        id="toggleCustomCertificate"
+                                        onChange={e => this.handleInputChange(e)}
+                                        type="checkbox"
+                                        checked={this.state.use_custom_certificate}
+                                    />
+                                    <i />
+                                </label>
+                            </div>
+                        ) : null}
                         <div className="aCheckboxDiv">
                             <div>
                                 <h3 className="aSettingTitle">Enable Private API Features</h3>
@@ -527,8 +564,9 @@ class SettingsView extends React.Component<unknown, State> {
                             <div>
                                 <h3 className="aSettingTitle">Keep MacOS Awake</h3>
                                 <p className="settingsHelp">
-                                    When enabled, you mac will not fall asleep due to inactivity, with the caveat of
-                                    when you close your laptop
+                                    When enabled, you mac will not fall asleep due to inactivity or a screen screen saver. 
+                                    However, your computer lid&apos;s close action may override this. Make sure your computer does not
+                                    go to sleep when the lid is closed. 
                                 </p>
                             </div>
                             <label className="form-switch">

@@ -6,6 +6,7 @@ export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
     ngrok_key: () => "",
     ngrok_protocol: () => "http",
     ngrok_region: () => "us",
+    use_custom_certificate: () => 0,
     password: () => "",
     auto_caffeinate: () => 0,
     auto_start: () => 0,
