@@ -199,6 +199,12 @@ export class HttpRoutes {
                         controller: ChatRouter.removeParticipant
                     },
                     {
+                        method: HttpMethod.GET,
+                        path: ":guid/icon",
+                        middleware: [...HttpRoutes.protected],
+                        controller: ChatRouter.getGroupIcon
+                    },
+                    {
                         method: HttpMethod.PUT,
                         path: ":guid",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],

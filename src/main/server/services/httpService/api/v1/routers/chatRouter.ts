@@ -2,13 +2,14 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { Server } from "@server/index";
+import { FileSystem } from "@server/fileSystem";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
-import { Success } from "../responses/success";
+import { FileStream, Success } from "../responses/success";
 import { IMessageError, NotFound } from "../responses/errors";
 
 export class ChatRouter {
@@ -188,5 +189,23 @@ export class ChatRouter {
         chat = await ChatInterface.toggleParticipant(chat, address, action);
 
         return new Success(ctx, { data: await getChatResponse(chat) }).send();
+    }
+
+    static async getGroupIcon(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: false });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        const chat = chats[0];
+        const iconPath = await Server().iMessageRepo.getGroupIconPath(chat.guid);
+        if (!iconPath) {
+            throw new NotFound({
+                message: 'The requested resource was not found',
+                error: 'Unable to find icon for the selected chat'
+            })
+        }
+
+        return new FileStream(ctx, FileSystem.getRealPath(iconPath), "image/jfif").send();
     }
 }
