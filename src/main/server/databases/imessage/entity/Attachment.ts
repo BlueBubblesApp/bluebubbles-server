@@ -10,8 +10,7 @@ import { convertAudio, convertImage, getAttachmentMetadata } from "@server/datab
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
-import { isNotEmpty } from "@server/helpers/utils";
-import { isMinSierra } from "@server/helpers/utils";
+import { isNotEmpty, isMinSierra } from "@server/helpers/utils";
 import { conditional } from "conditional-decorator";
 
 @Entity("attachment")
