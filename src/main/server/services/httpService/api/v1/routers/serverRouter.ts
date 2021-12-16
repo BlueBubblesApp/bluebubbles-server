@@ -1,6 +1,7 @@
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { FileSystem } from "@server/fileSystem";
+import { Server } from "@server/index";
 import { ServerInterface } from "@server/api/v1/interfaces/serverInterface";
 import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { Success } from "../responses/success";
@@ -12,6 +13,16 @@ export class ServerRouter {
 
     static async checkForUpdate(ctx: RouterContext, _: Next) {
         return new Success(ctx, { data: await GeneralInterface.checkForUpdate() }).send();
+    }
+
+    static async restartServices(ctx: RouterContext, _: Next) {
+        Server().hotRestart();
+        return new Success(ctx, { message: "Successfully kicked off services restart!" }).send();
+    }
+
+    static async restartAll(ctx: RouterContext, _: Next) {
+        Server().relaunch();
+        return new Success(ctx, { message: "Successfully kicked off re-launch process!" }).send();
     }
 
     static async getLogs(ctx: RouterContext, _: Next) {

@@ -111,7 +111,7 @@ export class IPCService {
             await Server().repo.setConfig("tutorial_is_done", toggle);
 
             if (toggle) {
-                await Server().setupServices();
+                await Server().initServices();
                 await Server().startServices();
             }
         });

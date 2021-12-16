@@ -87,6 +87,16 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: "restart/soft",
+                        controller: ServerRouter.restartServices
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "restart/hard",
+                        controller: ServerRouter.restartAll
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: "update/check",
                         controller: ServerRouter.checkForUpdate
                     },

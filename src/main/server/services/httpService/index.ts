@@ -35,8 +35,8 @@ export class HttpService {
     socketServer: SocketServer;
 
     socketOpts: Partial<ServerOptions> = {
-        pingTimeout: 1000 * 60 * 5, // 5 Minute ping timeout
-        pingInterval: 1000 * 60, // 1 Minute ping interval
+        pingTimeout: 1000 * 60 * 2, // 2 Minute ping timeout
+        pingInterval: 1000 * 30, // 30 Second ping interval
         upgradeTimeout: 1000 * 30, // 30 Seconds
 
         // 100 MB. 1000 == 1kb. 1000 * 1000 == 1mb
@@ -48,19 +48,6 @@ export class HttpService {
     httpOpts: any;
 
     sendCache: EventCache;
-
-    /**
-     * Starts up the initial Socket.IO connection and initializes other
-     * required classes and variables
-     *
-     * @param db The configuration database
-     * @param server The iMessage database repository
-     * @param fs The filesystem class handler
-     * @param port The initial port for Socket.IO
-     */
-    constructor() {
-        this.initialize();
-    }
 
     initialize() {
         this.httpOpts = {};
@@ -177,6 +164,10 @@ export class HttpService {
          * Handle all other data requests
          */
         this.socketServer.on("connection", async socket => {
+            socket.on("disconnect", (_: any) => {
+                Server().log(`Client disconnected (Total Clients: ${this.socketServer.sockets.sockets.size})`);
+            });
+
             let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
             const cfgPass = String((await Server().repo.getConfig("password")) as string);
 
@@ -185,7 +176,9 @@ export class HttpService {
 
             // Basic authentication
             if (safeTrim(pass) === safeTrim(cfgPass)) {
-                Server().log(`Client Authenticated Successfully`);
+                Server().log(
+                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
+                );
             } else {
                 socket.disconnect();
                 Server().log(`Closing client connection. Authentication failed.`);
@@ -223,7 +216,9 @@ export class HttpService {
     private async closeSocket(): Promise<void> {
         return new Promise((resolve, reject): void => {
             if (this.socketServer) {
+                this.socketServer.removeAllListeners();
                 this.socketServer.close((err: Error) => {
+                    this.socketServer = null;
                     if (err) {
                         reject(err);
                     } else {
@@ -253,6 +248,8 @@ export class HttpService {
     }
 
     async stop(): Promise<void> {
+        Server().log("Stopping HTTP Service...");
+
         try {
             await this.closeSocket();
         } catch (ex: any) {

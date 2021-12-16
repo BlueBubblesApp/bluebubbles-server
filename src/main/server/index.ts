@@ -212,31 +212,250 @@ class BlueBubblesServer extends EventEmitter {
         });
     }
 
+    async initServer(): Promise<void> {
+        // If we've already started up, don't do anything
+        if (this.hasStarted) return;
+
+        this.log("Performing initial setup...");
+
+        // Get the current macOS theme
+        this.getTheme();
+
+        // Initialize and connect to the server database
+        await this.initDatabase();
+
+        // Do some pre-flight checks
+        // Make sure settings are correct and all things are a go
+        await this.preChecks();
+
+        if (!this.isRestarting) {
+            await this.initServerComponents();
+        }
+    }
+
+    async initDatabase(): Promise<void> {
+        this.log("Initializing server database...");
+        this.repo = new ServerRepository();
+        this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
+        await this.repo.initialize();
+
+        try {
+            this.log("Connecting to iMessage database...");
+            this.iMessageRepo = new MessageRepository();
+            await this.iMessageRepo.initialize();
+        } catch (ex: any) {
+            this.log(ex, "error");
+
+            const dialogOpts = {
+                type: "error",
+                buttons: ["Restart", "Open System Preferences", "Ignore"],
+                title: "BlueBubbles Error",
+                message: "Full-Disk Access Permission Required!",
+                detail:
+                    `In order to function correctly, BlueBubbles requires full-disk access. ` +
+                    `Please enable Full-Disk Access in System Preferences > Security & Privacy.`
+            };
+
+            dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
+                if (returnValue.response === 0) {
+                    this.relaunch();
+                } else if (returnValue.response === 1) {
+                    FileSystem.executeAppleScript(openSystemPreferences());
+                    app.quit();
+                }
+            });
+        }
+
+        try {
+            this.log("Connecting to Contacts database...");
+            this.contactsRepo = new ContactRepository();
+            await this.contactsRepo.initialize();
+        } catch (ex: any) {
+            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
+        }
+    }
+
+    async initServices(): Promise<void> {
+        try {
+            this.log("Initializing connection to Google FCM...");
+            this.fcm = new FCMService();
+        } catch (ex: any) {
+            this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Initializing up sockets...");
+            this.httpService = new HttpService();
+        } catch (ex: any) {
+            this.log(`Failed to setup socket service! ${ex.message}`, "error");
+        }
+
+        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
+        if (privateApiEnabled) {
+            try {
+                this.log("Initializing helper service...");
+                this.privateApiHelper = new BlueBubblesHelperService();
+            } catch (ex: any) {
+                this.log(`Failed to setup helper service! ${ex.message}`, "error");
+            }
+        }
+
+        try {
+            this.log("Initializing proxy services...");
+            this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
+        } catch (ex: any) {
+            this.log(`Failed to initialize proxy services! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Initializing Message Manager...");
+            this.messageManager = new OutgoingMessageManager();
+        } catch (ex: any) {
+            this.log(`Failed to start Message Manager service! ${ex.message}`, "error");
+        }
+    }
+
+    /**
+     * Helper method for starting the message services
+     *
+     */
+    async startServices(): Promise<void> {
+        try {
+            this.log("Starting HTTP service...");
+            this.httpService.initialize();
+            this.httpService.start();
+        } catch (ex: any) {
+            this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+        }
+
+        try {
+            await this.startProxyServices();
+        } catch (ex: any) {
+            this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Starting FCM service...");
+            await this.fcm.start();
+        } catch (ex: any) {
+            this.log(`Failed to start FCM service! ${ex.message}`, "error");
+        }
+
+        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
+        if (privateApiEnabled) {
+            this.log("Starting Private API Helper listener...");
+            this.privateApiHelper.start();
+        }
+
+        if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
+            this.log("Starting iMessage Database listeners...");
+            this.startChatListeners();
+        }
+    }
+
+    async stopServices(): Promise<void> {
+        this.isStopping = true;
+        this.log("Stopping services...");
+
+        try {
+            FCMService.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop FCM service! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            this.removeChatListeners();
+            this.removeAllListeners();
+        } catch (ex: any) {
+            this.log(`Failed to stop iMessage database listeners! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            await this.privateApiHelper?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Private API Helper service! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            await this.stopProxyServices();
+        } catch (ex: any) {
+            this.log(`Failed to stop Proxy services! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            this.log("Stopping HTTP service...");
+            await this.httpService?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
+        }
+
+        this.log("Finished stopping services...");
+    }
+
+    async stopServerComponents() {
+        this.isStopping = true;
+        this.log("Stopping all server components...");
+
+        try {
+            if (this.networkChecker) this.networkChecker.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Network Checker service! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            if (this.caffeinate) this.caffeinate.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Caffeinate service! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            await this.contactsRepo?.db?.close();
+        } catch (ex: any) {
+            this.log(`Failed to close Contacts Database connection! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            await this.iMessageRepo?.db?.close();
+        } catch (ex: any) {
+            this.log(`Failed to close iMessage Database connection! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            if (this.repo?.db?.isConnected) {
+                await this.repo?.db?.close();
+            }
+        } catch (ex: any) {
+            this.log(`Failed to close Server Database connection! ${ex?.message ?? ex}`);
+        }
+
+        this.log("Finished stopping all server components...");
+    }
+
     /**
      * Officially starts the server. First, runs the setup,
      * then starts all of the services required for the server
      */
     async start(): Promise<void> {
-        if (!this.hasStarted) {
-            this.getTheme();
-            await this.setupServer();
+        // Initialize server components (i.e. database, caches, listeners, etc.)
+        await this.initServer();
+        if (this.isRestarting) return;
 
-            // Do some pre-flight checks
-            await this.preChecks();
-            if (this.isRestarting) return;
+        // Initialize the services (FCM, HTTP, Proxy, etc.)
+        this.log("Initializing Services...");
+        await this.initServices();
 
-            this.log("Starting Configuration IPC Listeners..");
-            IPCService.startConfigIpcListeners();
-        }
-
-        try {
-            this.log("Launching Services..");
-            await this.setupServices();
-        } catch (ex: any) {
-            this.log("There was a problem launching the Server listeners.", "error");
-        }
-
+        // Start the services
+        this.log("Starting Services...");
         await this.startServices();
+
+        // Start the rest of the IPC listeners
+        // This handles all the listeners that depend on services
+        if (this.hasDiskAccess) {
+            this.log("Starting IPC Listeners..");
+            IPCService.startIpcListener();
+        }
+
+        // Perform any post-setup tasks/checks
         await this.postChecks();
 
         // Let everyone know the setup is complete
@@ -261,12 +480,13 @@ class BlueBubblesServer extends EventEmitter {
      * Performs the initial setup for the server.
      * Mainly, instantiation of a bunch of classes/handlers
      */
-    private async setupServer(): Promise<void> {
-        this.log("Performing initial setup...");
-        this.log("Initializing server database...");
-        this.repo = new ServerRepository();
-        this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
-        await this.repo.initialize();
+    private async initServerComponents(): Promise<void> {
+        this.log("Initializing Server Components...");
+
+        if (this.hasDiskAccess) {
+            this.log("Starting Configuration IPC Listeners..");
+            IPCService.startConfigIpcListeners();
+        }
 
         // Load notification count
         try {
@@ -299,13 +519,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Initializing connection to Google FCM...");
-            this.fcm = new FCMService();
-        } catch (ex: any) {
-            this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
-        }
-
-        try {
             this.log("Initializing network service...");
             this.networkChecker = new NetworkService();
             this.networkChecker.on("status-change", connected => {
@@ -323,13 +536,22 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
+    async startProxyServices() {
+        this.log("Starting Proxy Services...");
+        for (const i of this.proxyServices) {
+            await i.start();
+        }
+    }
+
     async restartProxyServices() {
+        this.log("Restarting Proxy Services...");
         for (const i of this.proxyServices) {
             await i.restart();
         }
     }
 
     async stopProxyServices() {
+        this.log("Stopping Proxy Services...");
         for (const i of this.proxyServices) {
             await i.disconnect();
         }
@@ -350,11 +572,11 @@ class BlueBubblesServer extends EventEmitter {
             // Restart if enabled and the parent process is the app being launched
             if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
                 this.isRestarting = true;
-                Server().log("Restarting via terminal after post-check (configured)");
+                this.log("Restarting via terminal after post-check (configured)");
                 await this.restartViaTerminal();
             }
         } catch (ex: any) {
-            Server().log(`Failed to restart via terminal!\n${ex}`);
+            this.log(`Failed to restart via terminal!\n${ex}`);
         }
 
         // Log some server metadata
@@ -369,8 +591,26 @@ class BlueBubblesServer extends EventEmitter {
 
         // If the user is on el capitan, we need to force cloudflare
         const proxyService = this.repo.getConfig("proxy_service") as string;
-        if (!isMinSierra && proxyService === 'Ngrok') {
+        if (!isMinSierra && proxyService === "Ngrok") {
             await this.repo.setConfig("proxy_service", "Cloudflare");
+        }
+
+        this.log("Checking Permissions...");
+
+        // Log if we dont have accessibility access
+        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
+            this.hasAccessibilityAccess = true;
+            this.log("Accessibility permissions are enabled");
+        } else {
+            this.log("Accessibility permissions are required for certain actions!", "error");
+        }
+
+        // Log if we dont have accessibility access
+        if (this.iMessageRepo?.db) {
+            this.hasDiskAccess = true;
+            this.log("Full-disk access permissions are enabled");
+        } else {
+            this.log("Full-disk access permissions are required!", "error");
         }
 
         this.log("Finished pre-start checks...");
@@ -395,7 +635,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         this.setDockIcon();
-
         this.log("Finished post-start checks...");
     }
 
@@ -525,7 +764,7 @@ class BlueBubblesServer extends EventEmitter {
      * iMessages from your chat database. Anytime there is a new message,
      * we will emit a message to the socket, as well as the FCM server
      */
-    private startChatListener() {
+    private startChatListeners() {
         if (!this.iMessageRepo?.db) {
             AlertService.create(
                 "info",
@@ -640,140 +879,6 @@ class BlueBubblesServer extends EventEmitter {
         groupEventListener.on("error", (error: Error) => this.log(error.message, "error"));
     }
 
-    /**
-     * Helper method for running setup on the message services
-     */
-    async setupServices() {
-        if (this.hasSetup) return;
-
-        try {
-            this.log("Connecting to iMessage database...");
-            this.iMessageRepo = new MessageRepository();
-            await this.iMessageRepo.initialize();
-        } catch (ex: any) {
-            this.log(ex, "error");
-
-            const dialogOpts = {
-                type: "error",
-                buttons: ["Restart", "Open System Preferences", "Ignore"],
-                title: "BlueBubbles Error",
-                message: "Full-Disk Access Permission Required!",
-                detail:
-                    `In order to function correctly, BlueBubbles requires full-disk access. ` +
-                    `Please enable Full-Disk Access in System Preferences > Security & Privacy.`
-            };
-
-            dialog.showMessageBox(this.window, dialogOpts).then(returnValue => {
-                if (returnValue.response === 0) {
-                    this.relaunch();
-                } else if (returnValue.response === 1) {
-                    FileSystem.executeAppleScript(openSystemPreferences());
-                    app.quit();
-                }
-            });
-        }
-
-        try {
-            this.log("Connecting to Contacts database...");
-            this.contactsRepo = new ContactRepository();
-            await this.contactsRepo.initialize();
-        } catch (ex: any) {
-            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
-        }
-
-        try {
-            this.log("Initializing up sockets...");
-            this.httpService = new HttpService();
-        } catch (ex: any) {
-            this.log(`Failed to setup socket service! ${ex.message}`, "error");
-        }
-
-        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
-        if (privateApiEnabled) {
-            try {
-                this.log("Initializing helper service...");
-                this.privateApiHelper = new BlueBubblesHelperService();
-            } catch (ex: any) {
-                this.log(`Failed to setup helper service! ${ex.message}`, "error");
-            }
-        }
-
-        this.log("Checking Permissions...");
-
-        // Log if we dont have accessibility access
-        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
-            this.hasAccessibilityAccess = true;
-            this.log("Accessibility permissions are enabled");
-        } else {
-            this.log("Accessibility permissions are required for certain actions!", "error");
-        }
-
-        // Log if we dont have accessibility access
-        if (this.iMessageRepo?.db) {
-            this.hasDiskAccess = true;
-            this.log("Full-disk access permissions are enabled");
-        } else {
-            this.log("Full-disk access permissions are required!", "error");
-        }
-
-        this.hasSetup = true;
-    }
-
-    /**
-     * Helper method for starting the message services
-     *
-     */
-    async startServices() {
-        // Start the IPC listener first for the UI
-        if (this.hasDiskAccess && !this.hasStarted) IPCService.startIpcListener();
-
-        try {
-            this.log("Connecting to proxies...");
-            this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
-            await this.restartProxyServices();
-        } catch (ex: any) {
-            this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
-        }
-
-        try {
-            this.log("Starting FCM service...");
-            await this.fcm.start();
-        } catch (ex: any) {
-            this.log(`Failed to start FCM service! ${ex.message}`, "error");
-        }
-
-        try {
-            this.log("Starting HTTP service...");
-            this.httpService.restart();
-        } catch (ex: any) {
-            this.log(`Failed to start HTTP service! ${ex.message}`, "error");
-        }
-
-        try {
-            this.log("Starting Message Manager...");
-            this.messageManager = new OutgoingMessageManager();
-        } catch (ex: any) {
-            this.log(`Failed to start Message Manager service! ${ex.message}`, "error");
-        }
-
-        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
-        if (privateApiEnabled) {
-            if (this.privateApiHelper === null) {
-                this.privateApiHelper = new BlueBubblesHelperService();
-            }
-
-            this.log("Starting helper listener...");
-            this.privateApiHelper.start();
-        }
-
-        if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
-            this.log("Starting chat listener...");
-            this.startChatListener();
-        }
-
-        this.hasStarted = true;
-    }
-
     private removeChatListeners() {
         // Remove all listeners
         this.log("Removing chat listeners...");
@@ -787,9 +892,6 @@ class BlueBubblesServer extends EventEmitter {
     async hotRestart() {
         this.log("Restarting the server...");
 
-        // Remove all listeners
-        this.removeChatListeners();
-
         // Disconnect & reconnect to the iMessage DB
         if (this.iMessageRepo.db.isConnected) {
             this.log("Reconnecting to iMessage database...");
@@ -797,94 +899,31 @@ class BlueBubblesServer extends EventEmitter {
             await this.iMessageRepo.db.connect();
         }
 
-        // Start the server up again
-        await this.start();
+        await this.stopServices();
+        await this.startServices();
     }
 
     async relaunch() {
         this.isRestarting = true;
 
         // Close everything gracefully
-        await this.stopServices();
+        await this.stopAll();
 
         // Relaunch the process
         app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
         app.exit(0);
     }
 
-    async stopServices() {
-        this.isStopping = true;
-        Server().log("Stopping all services...");
-
-        try {
-            this.removeChatListeners();
-            this.removeAllListeners();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping listeners!\n${ex}`);
-        }
-
-        try {
-            await this.stopProxyServices();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping Ngrok!\n${ex}`);
-        }
-
-        try {
-            if (this?.httpService?.socketServer) this.httpService.socketServer.close();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the socket!\n${ex}`);
-        }
-
-        try {
-            if (this.networkChecker) this.networkChecker.stop();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the network checker service!\n${ex}`);
-        }
-
-        try {
-            FCMService.stop();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the FCM service!\n${ex}`);
-        }
-
-        try {
-            await this.privateApiHelper?.stop();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the Private API listener!\n${ex}`);
-        }
-
-        try {
-            if (this.caffeinate) this.caffeinate.stop();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the caffeinate service!\n${ex}`);
-        }
-
-        try {
-            await this.contactsRepo?.db?.close();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the contacts database connection!\n${ex}`);
-        }
-
-        try {
-            await this.iMessageRepo?.db?.close();
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the iMessage database connection!\n${ex}`);
-        }
-
-        try {
-            if (this.repo?.db?.isConnected) {
-                await this.repo?.db?.close();
-            }
-        } catch (ex: any) {
-            Server().log(`There was an issue stopping the server database connection!\n${ex}`);
-        }
+    async stopAll() {
+        await this.stopServices();
+        await this.stopServerComponents();
     }
 
     async restartViaTerminal() {
         this.isRestarting = true;
 
         // Close everything gracefully
-        await this.stopServices();
+        await this.stopAll();
 
         // Kick off the restart script
         FileSystem.executeAppleScript(runTerminalScript(process.execPath));
