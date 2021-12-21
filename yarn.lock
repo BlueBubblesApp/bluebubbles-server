@@ -1426,12 +1426,12 @@
   resolved "https://registry.yarnpkg.com/@types/aria-query/-/aria-query-5.0.0.tgz#df2d64b5cc73cca0d75e2a7793d6b5c199c2f7b2"
   integrity sha512-P+dkdFu0n08PDIvw+9nT9ByQnd+Udc8DaWPb9HKfaPwCvWvQpC5XaMRx2xLWECm9x1VKNps6vEAlirjA6+uNrQ==
 
-"@types/better-sqlite3@^5.4.3":
-  version "5.4.3"
-  resolved "https://registry.yarnpkg.com/@types/better-sqlite3/-/better-sqlite3-5.4.3.tgz#4f1142c02db111627d9c5792f8aa349fcf46d100"
-  integrity sha512-d4T8Htgz3sQL3u5oVwkWipZLBYUooKEA4fhU9Sp4F6VDIhifQo1NR/IDtnAIID0Y9IXV3TQnNhv6S+m8TnkEdg==
+"@types/better-sqlite3@^7.4.2":
+  version "7.4.2"
+  resolved "https://registry.yarnpkg.com/@types/better-sqlite3/-/better-sqlite3-7.4.2.tgz#d847464797bba607d499578c4ae708e8389e0b5b"
+  integrity sha512-HUXWMOmRgOrXJ0SKt6kxqUaZtGkr0HCuaEt/76LojT6bkTu0lb0uhr3K1su9T09mskDKyQwNMvT7WithFN10PQ==
   dependencies:
-    "@types/integer" "*"
+    "@types/node" "*"
 
 "@types/body-parser@*":
   version "1.19.2"
@@ -1629,11 +1629,6 @@
   version "1.8.1"
   resolved "https://registry.yarnpkg.com/@types/http-errors/-/http-errors-1.8.1.tgz#e81ad28a60bee0328c6d2384e029aec626f1ae67"
   integrity sha512-e+2rjEwK6KDaNOm5Aa9wNGgyS9oSZU/4pfSMMPYNOfjvFI0WVXm29+ITRFr6aKDvvKo7uU1jV68MW4ScsfDi7Q==
-
-"@types/integer@*":
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/@types/integer/-/integer-4.0.1.tgz#022f2c77a899e383e6d3dd374142416c22a5b9df"
-  integrity sha512-QQojPymFcV1hrvWXA1h0pP9RmFBFNuWikZcUEjjVsS19IyKO+jqOX24lp2ZHF4A21EmkosJhJDX7CLG67F2s7A==
 
 "@types/json-schema@^7.0.3", "@types/json-schema@^7.0.5", "@types/json-schema@^7.0.8":
   version "7.0.9"
@@ -2939,7 +2934,7 @@ bcrypt-pbkdf@^1.0.0:
   dependencies:
     tweetnacl "^0.14.3"
 
-better-sqlite3@^7.4.3:
+better-sqlite3@^7.4.5:
   version "7.4.5"
   resolved "https://registry.yarnpkg.com/better-sqlite3/-/better-sqlite3-7.4.5.tgz#acfc48d786114227f550a0a45e22ace51336e2d0"
   integrity sha512-mybC3dgrtJeHkIRGP36tST7wjBlIMgTRAXhhO4bMpPZ17EG23FZxZeFcwKWy6o8mV1SKQFnQNyeAZlQpGrgheQ==
@@ -13073,7 +13068,7 @@ typedarray@^0.0.6:
   resolved "https://registry.yarnpkg.com/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
-typeorm@^0.2.29:
+typeorm@^0.2.41:
   version "0.2.41"
   resolved "https://registry.yarnpkg.com/typeorm/-/typeorm-0.2.41.tgz#88758101ac158dc0a0a903d70eaacea2974281cc"
   integrity sha512-/d8CLJJxKPgsnrZWiMyPI0rz2MFZnBQrnQ5XP3Vu3mswv2WPexb58QM6BEtmRmlTMYN5KFWUz8SKluze+wS9xw==
