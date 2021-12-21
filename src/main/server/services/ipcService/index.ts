@@ -9,58 +9,9 @@ import { BlueBubblesHelperService } from "../privateApi";
 
 export class IPCService {
     /**
-     * Starts the inter-process-communication handlers. Basically, a router
-     * for all requests sent by the Electron front-end
-     */
-    static startIpcListener() {
-        ipcMain.handle("get-message-count", async (event, args) => {
-            if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
-            return count;
-        });
-
-        ipcMain.handle("get-chat-image-count", async (event, args) => {
-            if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "image" });
-            return count;
-        });
-
-        ipcMain.handle("get-chat-video-count", async (event, args) => {
-            if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "video" });
-            return count;
-        });
-
-        ipcMain.handle("get-group-message-counts", async (event, args) => {
-            if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatMessageCounts("group");
-            return count;
-        });
-
-        ipcMain.handle("get-individual-message-counts", async (event, args) => {
-            if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatMessageCounts("individual");
-            return count;
-        });
-
-        ipcMain.handle("get-devices", async (event, args) => {
-            // eslint-disable-next-line no-return-await
-            return await Server().repo.devices().find();
-        });
-
-        ipcMain.handle("get-fcm-server", (event, args) => {
-            return FileSystem.getFCMServer();
-        });
-
-        ipcMain.handle("get-fcm-client", (event, args) => {
-            return FileSystem.getFCMClient();
-        });
-    }
-
-    /**
      * Starts configuration related inter-process-communication handlers.
      */
-    static startConfigIpcListeners() {
+    static startIpcListeners() {
         ipcMain.handle("set-config", async (_, args) => {
             // Make sure that the server address being sent is using https
             if (args.server_address) {
@@ -107,6 +58,19 @@ export class IPCService {
             await Server().fcm.start();
         });
 
+        ipcMain.handle("get-devices", async (event, args) => {
+            // eslint-disable-next-line no-return-await
+            return await Server().repo.devices().find();
+        });
+
+        ipcMain.handle("get-fcm-server", (event, args) => {
+            return FileSystem.getFCMServer();
+        });
+
+        ipcMain.handle("get-fcm-client", (event, args) => {
+            return FileSystem.getFCMClient();
+        });
+
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {
             await Server().repo.setConfig("tutorial_is_done", toggle);
 
@@ -114,6 +78,36 @@ export class IPCService {
                 await Server().initServices();
                 await Server().startServices();
             }
+        });
+
+        ipcMain.handle("get-message-count", async (event, args) => {
+            if (!Server().iMessageRepo?.db) return 0;
+            const count = await Server().iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
+            return count;
+        });
+
+        ipcMain.handle("get-chat-image-count", async (event, args) => {
+            if (!Server().iMessageRepo?.db) return 0;
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "image" });
+            return count;
+        });
+
+        ipcMain.handle("get-chat-video-count", async (event, args) => {
+            if (!Server().iMessageRepo?.db) return 0;
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "video" });
+            return count;
+        });
+
+        ipcMain.handle("get-group-message-counts", async (event, args) => {
+            if (!Server().iMessageRepo?.db) return 0;
+            const count = await Server().iMessageRepo.getChatMessageCounts("group");
+            return count;
+        });
+
+        ipcMain.handle("get-individual-message-counts", async (event, args) => {
+            if (!Server().iMessageRepo?.db) return 0;
+            const count = await Server().iMessageRepo.getChatMessageCounts("individual");
+            return count;
         });
 
         ipcMain.handle("check_perms", async (_, __) => {

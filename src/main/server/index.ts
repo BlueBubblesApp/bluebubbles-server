@@ -224,6 +224,9 @@ class BlueBubblesServer extends EventEmitter {
         // Initialize and connect to the server database
         await this.initDatabase();
 
+        this.log("Starting IPC Listeners..");
+        IPCService.startIpcListeners();
+
         // Do some pre-flight checks
         // Make sure settings are correct and all things are a go
         await this.preChecks();
@@ -236,8 +239,10 @@ class BlueBubblesServer extends EventEmitter {
     async initDatabase(): Promise<void> {
         this.log("Initializing server database...");
         this.repo = new ServerRepository();
-        this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
         await this.repo.initialize();
+
+        // Handle when something in the config changes
+        this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
 
         try {
             this.log("Connecting to iMessage database...");
@@ -448,13 +453,6 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting Services...");
         await this.startServices();
 
-        // Start the rest of the IPC listeners
-        // This handles all the listeners that depend on services
-        if (this.hasDiskAccess) {
-            this.log("Starting IPC Listeners..");
-            IPCService.startIpcListener();
-        }
-
         // Perform any post-setup tasks/checks
         await this.postChecks();
 
@@ -482,11 +480,6 @@ class BlueBubblesServer extends EventEmitter {
      */
     private async initServerComponents(): Promise<void> {
         this.log("Initializing Server Components...");
-
-        if (this.hasDiskAccess) {
-            this.log("Starting Configuration IPC Listeners..");
-            IPCService.startConfigIpcListeners();
-        }
 
         // Load notification count
         try {
@@ -584,14 +577,10 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
 
-        // Check if on Big Sur. If we are, then create a log/alert saying that
-        if (isMinBigSur) {
-            this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "warn");
-        }
-
         // If the user is on el capitan, we need to force cloudflare
         const proxyService = this.repo.getConfig("proxy_service") as string;
         if (!isMinSierra && proxyService === "Ngrok") {
+            this.log("El Capitan detected. Forcing Cloudflare Proxy");
             await this.repo.setConfig("proxy_service", "Cloudflare");
         }
 
@@ -635,6 +624,12 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         this.setDockIcon();
+
+        // Check if on Big Sur. If we are, then create a log/alert saying that
+        if (isMinBigSur) {
+            this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "warn");
+        }
+
         this.log("Finished post-start checks...");
     }
 
