@@ -186,23 +186,26 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
             delay 0.8
             keystroke "${i}"
             delay 0.5
-            keystroke return`
-        );
+            keystroke return`);
     }
 
-    return `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
+    // Caffeinate is so we don't let the computer sleep while this is running
+    return `do shell script "caffeinate -u -t 2"
+        delay 2.0
+        tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
         tell application "System Events" to tell application process "Messages"
+            set frontmost to true
             keystroke "n" using {command down}
-            ${recipientCommands.join('\n')}
+            ${recipientCommands.join("\n")}
             delay 0.1
             keystroke tab
             delay 0.1
             set the clipboard to theFile
             keystroke "v" using {command down}
-            delay 0.5
+            delay 2.0
             keystroke return
         end tell`;
-}
+};
 
 /**
  * The AppleScript used to rename a group chat

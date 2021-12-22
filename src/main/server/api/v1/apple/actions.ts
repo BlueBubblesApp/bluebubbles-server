@@ -28,7 +28,7 @@ import {
     isNotEmpty,
     isEmpty,
     safeTrim,
-    isMinMonteray
+    isMinMonterey
 } from "../../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
 
@@ -49,7 +49,7 @@ export class ActionHandler {
         let error;
         try {
             // Build the message script
-            if (isMinMonteray) {
+            if (isMinMonterey) {
                 // If it's monteray, we can't send attachments normally. We need to use accessibility
                 // Make the first script send the image using accessibility. Then the second script sends
                 // just the message
@@ -60,7 +60,7 @@ export class ActionHandler {
                         const participants = chats[0].participants.map(i => i.id);
                         messageScript = sendAttachmentAccessibility(attachment, participants);
                         await FileSystem.executeAppleScript(messageScript);
-                    }   
+                    }
                 }
 
                 messageScript = buildSendMessageScript(chatGuid, message ?? "", null);
