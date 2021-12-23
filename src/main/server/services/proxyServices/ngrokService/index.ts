@@ -87,8 +87,8 @@ export class NgrokService extends Proxy {
 
         // If there is a user and password and they are not empty
         if (enableNgrokBasicAuth && !isEmpty(ngrokBasicAuthPass) && !isEmpty(ngrokBasicAuthUser)) {
+            // set the ngrok auth option to user:pass
             opts.auth = `${ngrokBasicAuthUser}:${ngrokBasicAuthPass}`;
-            console.log(`Using ${opts.auth}`);
         }
         // Set the protocol
         opts.proto = ngrokProtocol;
