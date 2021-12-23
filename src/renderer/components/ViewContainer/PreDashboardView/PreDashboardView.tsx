@@ -250,6 +250,10 @@ class PreDashboardView extends React.Component<unknown, State> {
         }
     };
 
+    restartNgrok = async () => {
+        await ipcRenderer.invoke("toggle-proxy-service", { service: "Ngrok" });
+    };
+
     openTutorialLink() {
         shell.openExternal("https://bluebubbles.app/install");
     }

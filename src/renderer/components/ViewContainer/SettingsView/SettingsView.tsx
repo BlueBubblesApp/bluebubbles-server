@@ -27,6 +27,10 @@ interface State {
     ngrokKey: string;
     ngrokProtocol: string;
     ngrokRegion: string;
+    enableNgrokBasicAuth: boolean;
+    ngrokBasicUser: string;
+    ngrokBasicPass: string;
+    showNgrokPass: boolean;
     enableNgrok: boolean;
     proxyService: string;
     showModal: boolean;
@@ -58,6 +62,10 @@ class SettingsView extends React.Component<unknown, State> {
             ngrokKey: "",
             ngrokProtocol: "http",
             ngrokRegion: "us",
+            enableNgrokBasicAuth: false,
+            ngrokBasicUser: "",
+            ngrokBasicPass: "",
+            showNgrokPass: false,
             enableNgrok: false,
             showModal: false,
             serverUrl: "",
@@ -93,6 +101,9 @@ class SettingsView extends React.Component<unknown, State> {
                 ngrokKey: config.ngrok_key,
                 ngrokProtocol: config.ngrok_protocol,
                 ngrokRegion: config.ngrok_region,
+                enableNgrokBasicAuth: config.enable_ngrok_basic_auth,
+                ngrokBasicUser: config.ngrok_basic_auth_user,
+                ngrokBasicPass: config.ngrok_basic_auth_pass,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
@@ -187,10 +198,37 @@ class SettingsView extends React.Component<unknown, State> {
         await ipcRenderer.invoke("set-ngrok-key", { key: this.state.ngrokKey });
     };
 
+    clearNgrokAuth = async () => {
+        this.setState({ ngrokBasicUser: "", ngrokBasicPass: "" });
+        await ipcRenderer.invoke("set-config", {
+            ngrok_basic_auth_user: "",
+            ngrok_basic_auth_pass: ""
+        });
+        await this.restartNgrok();
+    };
+
+    restartNgrok = async () => {
+        await ipcRenderer.invoke("toggle-proxy-service", { service: "Ngrok" });
+    };
+
+    saveNgrokBasicUser = async (user: string) => {
+        await ipcRenderer.invoke("set-config", {
+            ngrok_basic_auth_user: user
+        });
+    };
+
+    saveNgrokBasicPass = async (pass: string) => {
+        await ipcRenderer.invoke("set-config", {
+            ngrok_basic_auth_pass: pass
+        });
+    };
+
     handleInputChange = async (e: any) => {
         // eslint-disable-next-line prefer-destructuring
         const id = e.target.id;
-        if (["serverPort", "serverPassword", "ngrokKey", "serverUrl"].includes(id)) {
+        if (
+            ["serverPort", "serverPassword", "ngrokKey", "serverUrl", "ngrokBasicUser", "ngrokBasicPass"].includes(id)
+        ) {
             this.setState({ [id]: e.target.value } as any);
         }
 
@@ -362,6 +400,23 @@ class SettingsView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
+    handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>, stateVar: string) {
+        this.setState({ [stateVar]: e.target.checked } as any);
+        if (e.target.id === "toggleNgrokAuth") {
+            this.setState({ enableNgrokBasicAuth: e.target.checked });
+            ipcRenderer.invoke("set-config", {
+                enable_ngrok_basic_auth: e.target.checked
+            });
+            if (!e.target.checked) {
+                this.clearNgrokAuth();
+            }
+        } else {
+            ipcRenderer.invoke("set-config", {
+                [e.target.id]: e.target.checked
+            });
+        }
+    }
+
     render() {
         return (
             <div id="SettingsView" data-theme="light">
@@ -503,6 +558,68 @@ class SettingsView extends React.Component<unknown, State> {
                                     <option value="http">HTTP</option>
                                     <option value="tcp">TCP</option>
                                 </select>
+                            </span>
+                        ) : null}
+                        {this.state.ngrokKey ?? "".length > 0 ? (
+                            <span>
+                                <div>
+                                    <h3 className="aSettingTitle">Enable Ngrok Basic Auth (optional)</h3>
+                                    <p className="settingsHelp">
+                                        Enable this if you want to add an additional username/password to the Ngrok
+                                        tunnel.
+                                    </p>
+                                </div>
+                                <label className="form-switch">
+                                    <input
+                                        id="toggleNgrokAuth"
+                                        onChange={e => this.handleCheckboxChange(e, "enableNgrokBasicAuth")}
+                                        disabled={this.state.proxyService !== "Ngrok"}
+                                        checked={this.state.enableNgrokBasicAuth}
+                                        type="checkbox"
+                                    />
+                                    <i />
+                                </label>
+                            </span>
+                        ) : null}
+                        {this.state.enableNgrokBasicAuth ? (
+                            <span>
+                                <input
+                                    id="ngrokBasicUser"
+                                    className="aInput"
+                                    placeholder="Enter a username"
+                                    name="inputPassword"
+                                    value={this.state.ngrokBasicUser}
+                                    onChange={e => this.handleInputChange(e)}
+                                    onBlur={e => this.saveNgrokBasicUser(e.target.value)}
+                                />
+                                <input
+                                    id="ngrokBasicPass"
+                                    className="aInput"
+                                    placeholder="Enter a password"
+                                    name="inputPassword"
+                                    value={this.state.ngrokBasicPass}
+                                    onChange={e => this.handleInputChange(e)}
+                                    onBlur={e => this.saveNgrokBasicPass(e.target.value)}
+                                    type={this.state.showNgrokPass ? "text" : "password"}
+                                />
+                                <svg
+                                    id="ngrokPassView"
+                                    viewBox="0 0 512 512"
+                                    onClick={() => this.setState({ showNgrokPass: !this.state.showNgrokPass })}
+                                >
+                                    <g>
+                                        <path d="M234.667,170.667c-35.307,0-64,28.693-64,64s28.693,64,64,64s64-28.693,64-64S269.973,170.667,234.667,170.667z" />
+                                        <path
+                                            d="M234.667,74.667C128,74.667,36.907,141.013,0,234.667c36.907,93.653,128,160,234.667,160
+                                        c106.773,0,197.76-66.347,234.667-160C432.427,141.013,341.44,74.667,234.667,74.667z M234.667,341.333
+                                        c-58.88,0-106.667-47.787-106.667-106.667S175.787,128,234.667,128s106.667,47.787,106.667,106.667
+                                        S293.547,341.333,234.667,341.333z"
+                                        />
+                                    </g>
+                                </svg>
+                                <button className="modal-button" onClick={() => this.restartNgrok()}>
+                                    Enable Ngrok Auth
+                                </button>
                             </span>
                         ) : null}
                         <div className="aCheckboxDiv">
