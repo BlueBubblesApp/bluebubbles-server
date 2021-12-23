@@ -9,12 +9,14 @@ import * as KoaRouter from "koa-router";
 import * as koaCors from "koa-cors";
 import * as https from "https";
 import * as http from "http";
+import * as fs from "fs";
 
 // Internal libraries
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { safeTrim } from "@server/helpers/utils";
+import { fixServerUrl, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";
+import { CertificateService } from "@server/services/certificateService";
 
 import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
 import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
@@ -32,9 +34,9 @@ export class HttpService {
 
     socketServer: SocketServer;
 
-    opts: Partial<ServerOptions> = {
-        pingTimeout: 1000 * 60 * 5, // 5 Minute ping timeout
-        pingInterval: 1000 * 60, // 1 Minute ping interval
+    socketOpts: Partial<ServerOptions> = {
+        pingTimeout: 1000 * 60 * 2, // 2 Minute ping timeout
+        pingInterval: 1000 * 30, // 30 Second ping interval
         upgradeTimeout: 1000 * 30, // 30 Seconds
 
         // 100 MB. 1000 == 1kb. 1000 * 1000 == 1mb
@@ -43,54 +45,48 @@ export class HttpService {
         transports: ["websocket", "polling"]
     };
 
+    httpOpts: any;
+
     sendCache: EventCache;
 
-    /**
-     * Starts up the initial Socket.IO connection and initializes other
-     * required classes and variables
-     *
-     * @param db The configuration database
-     * @param server The iMessage database repository
-     * @param fs The filesystem class handler
-     * @param port The initial port for Socket.IO
-     */
-    constructor() {
-        const opts: any = {};
+    initialize() {
+        this.httpOpts = {};
 
         // Configure certificates
-        // try {
-        //     const proxy_service = Server().repo.getConfig("proxy_service") as string;
-        //     if (proxy_service === 'Dynamic DNS') {
-        //         // Only setup certs if the proxy service is
-        //         Server().log("Starting Certificate service...");
-        //         CertificateService.start();
+        try {
+            const use_custom_cert = Server().repo.getConfig("use_custom_certificate") as boolean;
+            const proxy_service = Server().repo.getConfig("proxy_service") as string;
+            if (proxy_service === "Dynamic DNS" && use_custom_cert) {
+                // Only setup certs if the proxy service is
+                Server().log("Starting Certificate service...");
+                CertificateService.start();
 
-        //         // Add the SSL/TLS PEMs to the opts
-        //         opts.cert = fs.readFileSync(CertificateService.certPath);
-        //         opts.key = fs.readFileSync(CertificateService.keyPath);
+                // Add the SSL/TLS PEMs to the opts
+                this.httpOpts.cert = fs.readFileSync(CertificateService.certPath);
+                this.httpOpts.key = fs.readFileSync(CertificateService.keyPath);
 
-        //         // Force HTTPs for the server URL as well
-        //         let serverUrl = Server().repo.getConfig("server_address") as string;
-        //         serverUrl = fixServerUrl(serverUrl);
-        //     }
-        // } catch (ex: any) {
-        //     Server().log(`Failed to start Certificate service! ${ex.message}`, "error");
-        // }
+                // Force HTTPs for the server URL as well
+                let serverUrl = Server().repo.getConfig("server_address") as string;
+                serverUrl = fixServerUrl(serverUrl);
+            }
+        } catch (ex: any) {
+            Server().log(`Failed to start Certificate service! ${ex.message}`, "error");
+        }
 
         // Create the HTTP server
         this.koaApp = new KoaApp();
         this.configureKoa();
 
-        if (opts.cert && opts.key) {
+        if (this.httpOpts.cert && this.httpOpts.key) {
             Server().log("Starting up HTTPS Server...");
-            this.httpServer = https.createServer(opts, this.koaApp.callback());
+            this.httpServer = https.createServer(this.httpOpts, this.koaApp.callback());
         } else {
             Server().log("Starting up HTTP Server...");
             this.httpServer = http.createServer(this.koaApp.callback());
         }
 
         // Create the socket server and link the http context
-        this.socketServer = new SocketServer(this.httpServer, this.opts);
+        this.socketServer = new SocketServer(this.httpServer, this.socketOpts);
         this.sendCache = new EventCache();
         this.startStatusListener();
 
@@ -168,6 +164,10 @@ export class HttpService {
          * Handle all other data requests
          */
         this.socketServer.on("connection", async socket => {
+            socket.on("disconnect", (_: any) => {
+                Server().log(`Client disconnected (Total Clients: ${this.socketServer.sockets.sockets.size})`);
+            });
+
             let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
             const cfgPass = String((await Server().repo.getConfig("password")) as string);
 
@@ -176,7 +176,9 @@ export class HttpService {
 
             // Basic authentication
             if (safeTrim(pass) === safeTrim(cfgPass)) {
-                Server().log(`Client Authenticated Successfully`);
+                Server().log(
+                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
+                );
             } else {
                 socket.disconnect();
                 Server().log(`Closing client connection. Authentication failed.`);
@@ -193,7 +195,7 @@ export class HttpService {
                     await next();
                 } catch (ex: any) {
                     Server().log(`Socket server error! ${ex.message}`, "error");
-                    socket.emit("exception", createServerErrorResponse(ex.message));
+                    socket.emit("exception", createServerErrorResponse(ex?.message ?? ex));
                     next(ex);
                 }
             });
@@ -204,7 +206,7 @@ export class HttpService {
 
         // Start the server
         this.httpServer.listen(Server().repo.getConfig("socket_port") as number, () => {
-            Server().log("Successfully started HTTP server");
+            Server().log(`Successfully started HTTP${isNotEmpty(this.httpOpts) ? "S" : ""} server`);
 
             // Once we start, let's send a hello-world to all the clients
             Server().emitMessage("hello-world", null);
@@ -214,7 +216,9 @@ export class HttpService {
     private async closeSocket(): Promise<void> {
         return new Promise((resolve, reject): void => {
             if (this.socketServer) {
+                this.socketServer.removeAllListeners();
                 this.socketServer.close((err: Error) => {
+                    this.socketServer = null;
                     if (err) {
                         reject(err);
                     } else {
@@ -243,12 +247,9 @@ export class HttpService {
         });
     }
 
-    /**
-     * Restarts the Socket.IO connection with a new port
-     *
-     * @param port The new port to listen on
-     */
-    async restart(): Promise<void> {
+    async stop(): Promise<void> {
+        Server().log("Stopping HTTP Service...");
+
         try {
             await this.closeSocket();
         } catch (ex: any) {
@@ -264,7 +265,16 @@ export class HttpService {
                 Server().log(`Failed to close HTTP server: ${ex.message}`);
             }
         }
+    }
 
-        this.start();
+    /**
+     * Restarts the Socket.IO connection with a new port
+     *
+     * @param port The new port to listen on
+     */
+    async restart(reinitialize = false): Promise<void> {
+        await this.stop();
+        if (reinitialize) this.initialize();
+        await this.start();
     }
 }

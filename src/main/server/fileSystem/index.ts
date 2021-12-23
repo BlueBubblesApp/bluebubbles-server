@@ -135,8 +135,10 @@ export class FileSystem {
      * @param name Name for the attachment
      * @param buffer The attachment bytes (buffer)
      */
-    static saveAttachment(name: string, buffer: Uint8Array): void {
-        fs.writeFileSync(path.join(FileSystem.attachmentsDir, name), buffer);
+    static saveAttachment(name: string, buffer: Uint8Array): string {
+        const newPath = path.join(FileSystem.attachmentsDir, name);
+        fs.writeFileSync(newPath, buffer);
+        return newPath;
     }
 
     /**
@@ -147,7 +149,9 @@ export class FileSystem {
      */
     static copyAttachment(originalPath: string, name: string): string {
         const newPath = path.join(FileSystem.attachmentsDir, name);
-        fs.copyFileSync(originalPath, newPath);
+        if (newPath !== originalPath) {
+            fs.copyFileSync(originalPath, newPath);
+        }
         return newPath;
     }
 
@@ -370,6 +374,14 @@ export class FileSystem {
     static async convertCafToMp3(attachment: Attachment, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(attachment.filePath);
         await FileSystem.execShellCommand(`/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`);
+    }
+
+    static async convertToJpg(format: string, attachment: Attachment, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(attachment.filePath);
+        await FileSystem.execShellCommand(
+            `/usr/bin/sips --setProperty "format" "${format}" "${oldPath}" --out "${outputPath}"`
+        );
+        console.log(outputPath);
     }
 
     static async getFileMetadata(filePath: string): Promise<{ [key: string]: string }> {

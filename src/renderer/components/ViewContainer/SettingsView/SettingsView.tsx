@@ -41,6 +41,7 @@ interface State {
     checkForUpdates: boolean;
     autoInstallUpdates: boolean;
     enablePrivateApi: boolean;
+    use_custom_certificate: boolean;
 }
 
 class SettingsView extends React.Component<unknown, State> {
@@ -74,7 +75,8 @@ class SettingsView extends React.Component<unknown, State> {
             startViaTerminal: false,
             checkForUpdates: true,
             autoInstallUpdates: false,
-            enablePrivateApi: false
+            enablePrivateApi: false,
+            use_custom_certificate: false
         };
 
         this.handleInputChange = this.handleInputChange.bind(this);
@@ -110,7 +112,8 @@ class SettingsView extends React.Component<unknown, State> {
                 startViaTerminal: config.start_via_terminal,
                 checkForUpdates: config.check_for_updates,
                 autoInstallUpdates: config.auto_install_updates,
-                enablePrivateApi: config.enable_private_api
+                enablePrivateApi: config.enable_private_api,
+                use_custom_certificate: config.use_custom_certificate
             });
 
         this.getCaffeinateStatus();
@@ -127,6 +130,23 @@ class SettingsView extends React.Component<unknown, State> {
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+    }
+
+    handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>, stateVar: string) {
+        this.setState({ [stateVar]: e.target.checked } as any);
+        if (e.target.id === "toggleNgrokAuth") {
+            this.setState({ enableNgrokBasicAuth: e.target.checked });
+            ipcRenderer.invoke("set-config", {
+                enable_ngrok_basic_auth: e.target.checked
+            });
+            if (!e.target.checked) {
+                this.clearNgrokAuth();
+            }
+        } else {
+            ipcRenderer.invoke("set-config", {
+                [e.target.id]: e.target.checked
+            });
+        }
     }
 
     async setTheme(currentTheme: string) {
@@ -300,6 +320,16 @@ class SettingsView extends React.Component<unknown, State> {
                 auto_install_updates: target.checked
             });
         }
+
+        if (id === "toggleCustomCertificate") {
+            const target = e.target as HTMLInputElement;
+            this.setState({ use_custom_certificate: target.checked });
+            console.log("SETTING");
+            console.log(target.checked);
+            await ipcRenderer.invoke("set-config", {
+                use_custom_certificate: target.checked
+            });
+        }
     };
 
     saveConfig = async () => {
@@ -400,23 +430,6 @@ class SettingsView extends React.Component<unknown, State> {
         reader.readAsText(acceptedFiles[0]);
     };
 
-    handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>, stateVar: string) {
-        this.setState({ [stateVar]: e.target.checked } as any);
-        if (e.target.id === "toggleNgrokAuth") {
-            this.setState({ enableNgrokBasicAuth: e.target.checked });
-            ipcRenderer.invoke("set-config", {
-                enable_ngrok_basic_auth: e.target.checked
-            });
-            if (!e.target.checked) {
-                this.clearNgrokAuth();
-            }
-        } else {
-            ipcRenderer.invoke("set-config", {
-                [e.target.id]: e.target.checked
-            });
-        }
-    }
-
     render() {
         return (
             <div id="SettingsView" data-theme="light">
@@ -468,10 +481,10 @@ class SettingsView extends React.Component<unknown, State> {
 
                         <div className="aCheckboxDiv firstCheckBox">
                             <div>
-                                <h3 className="aSettingTitle">Encrypt Communications (Do not use with Desktop App)</h3>
+                                <h3 className="aSettingTitle">Encrypt Communications</h3>
                                 <p className="settingsHelp">
                                     Messages sent back to the clients will be encrypted using AES password-based
-                                    encryption. The Desktop app does not yet support this option!
+                                    encryption.
                                 </p>
                             </div>
                             <label className="form-switch">
@@ -520,6 +533,30 @@ class SettingsView extends React.Component<unknown, State> {
                                     <option value="in">India (Mumbai)</option>
                                 </select>
                             </span>
+                        ) : null}
+                        {this.state.proxyService === "Dynamic DNS" ? (
+                            <div className="aCheckboxDiv">
+                                <div>
+                                    <h3 className="aSettingTitle">Use HTTPS (custom certificate)</h3>
+                                    <p className="settingsHelp">
+                                        This will install a self-signed certificate at &apos;~/Library/Application\
+                                        Support/bluebubbles-server/Certs&apos;.&nbsp;
+                                        <b>
+                                            Note: Only use this this option if you have your own certificate! Replace
+                                            the certificates in
+                                        </b>
+                                    </p>
+                                    <label className="form-switch">
+                                        <input
+                                            id="toggleCustomCertificate"
+                                            onChange={e => this.handleInputChange(e)}
+                                            type="checkbox"
+                                            checked={this.state.use_custom_certificate}
+                                        />
+                                        <i />
+                                    </label>
+                                </div>
+                            </div>
                         ) : null}
                         {this.state.proxyService === "Ngrok" ? (
                             <span>
@@ -644,8 +681,9 @@ class SettingsView extends React.Component<unknown, State> {
                             <div>
                                 <h3 className="aSettingTitle">Keep MacOS Awake</h3>
                                 <p className="settingsHelp">
-                                    When enabled, you mac will not fall asleep due to inactivity, with the caveat of
-                                    when you close your laptop
+                                    When enabled, you mac will not fall asleep due to inactivity or a screen screen
+                                    saver. However, your computer lid&apos;s close action may override this. Make sure
+                                    your computer does not go to sleep when the lid is closed.
                                 </p>
                             </div>
                             <label className="form-switch">

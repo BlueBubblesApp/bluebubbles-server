@@ -177,6 +177,37 @@ export const startChat = (participants: string[], service: string, useTextChat: 
 };
 
 /**
+ * Send an attachment on Monteray via Accessibility
+ */
+export const sendAttachmentAccessibility = (attachmentPath: string, participants: string[]) => {
+    const recipientCommands = [];
+    for (const i of participants) {
+        recipientCommands.push(`
+            delay 0.8
+            keystroke "${i}"
+            delay 0.5
+            keystroke return`);
+    }
+
+    // Caffeinate is so we don't let the computer sleep while this is running
+    return `do shell script "caffeinate -u -t 2"
+        delay 2.0
+        tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
+        tell application "System Events" to tell application process "Messages"
+            set frontmost to true
+            keystroke "n" using {command down}
+            ${recipientCommands.join("\n")}
+            delay 0.1
+            keystroke tab
+            delay 0.1
+            set the clipboard to theFile
+            keystroke "v" using {command down}
+            delay 2.0
+            keystroke return
+        end tell`;
+};
+
+/**
  * The AppleScript used to rename a group chat
  */
 export const openChat = (name: string) => {

@@ -8,6 +8,7 @@ import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import { isNotEmpty } from "@server/helpers/utils";
+import { isEmpty } from "@firebase/util";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -375,9 +376,20 @@ export class MessageRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getMessageCount(after?: Date, before?: Date, isFromMe = false) {
+    async getMessageCount(after?: Date, before?: Date, isFromMe = false, chatGuid: string = null, updated = false) {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Message).createQueryBuilder("message");
+
+        // Add chatGuid (if applicable)
+        if (isNotEmpty(chatGuid)) {
+            query
+                .innerJoinAndSelect(
+                    "message.chats",
+                    "chat",
+                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                )
+                .andWhere("chat.guid = :guid", { guid: chatGuid });
+        }
 
         // Add default WHERE clauses
         query.andWhere("message.text IS NOT NULL").andWhere("associated_message_type == 0");
@@ -385,14 +397,35 @@ export class MessageRepository {
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 
         // Add date restraints
-        if (after)
-            query.andWhere("message.date >= :after", {
-                after: convertDateTo2001Time(after)
-            });
-        if (before)
-            query.andWhere("message.date < :before", {
-                before: convertDateTo2001Time(before)
-            });
+        if (updated) {
+            if (after)
+                query.andWhere("message.date_delivered >= :after", {
+                    after: convertDateTo2001Time(after as Date)
+                });
+            if (before)
+                query.andWhere("message.date_delivered < :before", {
+                    before: convertDateTo2001Time(before as Date)
+                });
+
+            // Add date_read constraints
+            if (after)
+                query.orWhere("message.date_read >= :after", {
+                    after: convertDateTo2001Time(after as Date)
+                });
+            if (before)
+                query.andWhere("message.date_read < :before", {
+                    before: convertDateTo2001Time(before as Date)
+                });
+        } else {
+            if (after)
+                query.andWhere("message.date >= :after", {
+                    after: convertDateTo2001Time(after)
+                });
+            if (before)
+                query.andWhere("message.date < :before", {
+                    before: convertDateTo2001Time(before)
+                });
+        }
 
         // Add pagination params
         query.orderBy("message.date", "DESC");
@@ -472,6 +505,36 @@ export class MessageRepository {
         return result;
     }
 
+    async getGroupIconPath(chatGuid: string) {
+        if (!chatGuid.includes(";+;")) {
+            throw new Error("Chat must be a group chat to change the icon!");
+        }
+
+        // Get messages with sender and the chat it's from
+        // Credits: Ian Welker (Creator of SMServer)
+        const result = await this.db.getRepository(Chat).query(
+            `SELECT
+                ROWID,
+                filename
+            FROM attachment
+            WHERE ROWID IN (
+                SELECT attachment_id FROM message_attachment_join
+                WHERE message_id in (
+                    SELECT ROWID FROM message
+                    WHERE group_action_type is 1 AND cache_has_attachments IS 1 AND ROWID in (
+                        SELECT message_id FROM chat_message_join WHERE chat_id in (
+                            SELECT ROWID FROM chat
+                            WHERE guid is '${chatGuid}'
+                        )
+                    )
+                    ORDER BY date DESC
+                )
+            );`
+        );
+
+        return isEmpty(result) ? null : result[0].filename;
+    }
+
     /**
      * Gets message counts associated with a chat
      *
@@ -481,7 +544,6 @@ export class MessageRepository {
     async getAttachmentCount() {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
-
         const count = await query.getCount();
         return count;
     }

@@ -10,7 +10,7 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 
-export const isMinMonteray = macosVersion.isGreaterThanOrEqualTo("12.0");
+export const isMinMonterey = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
 export const isMinCatalina = macosVersion.isGreaterThanOrEqualTo("10.15");
 export const isMinMojave = macosVersion.isGreaterThanOrEqualTo("10.14");
@@ -253,10 +253,13 @@ export const fixServerUrl = (value: string) => {
         newValue = newValue.substring(0, newValue.length - 1);
     }
 
-    // Force HTTPS
-    // if (newValue.startsWith('http://')) {
-    //     newValue = newValue.replace('http://', 'https://');
-    // }
+    // Force HTTPS if enabled
+    const use_custom_cert = Server().repo.getConfig("use_custom_certificate") as boolean;
+    if (use_custom_cert && newValue.startsWith("http://")) {
+        newValue = newValue.replace("http://", "https://");
+    }
+
+    // Auto add scheme
     if (!newValue.startsWith("http")) {
         newValue = `http://${newValue}`;
     }

@@ -1,4 +1,5 @@
 import * as path from "path";
+import * as os from "os";
 import * as fs from "fs";
 import * as CompareVersion from "compare-versions";
 import cpr from "recursive-copy";
@@ -6,7 +7,7 @@ import { parse as ParsePlist } from "plist";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
-import { isEmpty, isMinBigSur, isMinMonteray } from "@server/helpers/utils";
+import { isEmpty, isMinBigSur, isMinMonterey } from "@server/helpers/utils";
 import { restartMessages } from "@server/api/v1/apple/scripts";
 import {
     TransactionPromise,
@@ -39,7 +40,7 @@ export class BlueBubblesHelperService {
         if (!pApiEnabled) return;
 
         // eslint-disable-next-line no-nested-ternary
-        const macVer = isMinMonteray ? "macos12" : isMinBigSur ? "macos11" : "macos10";
+        const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
         const localPath = path.join(FileSystem.resources, "private-api", macVer, "BlueBubblesHelper.bundle");
         const localInfo = path.join(localPath, "Contents/Info.plist");
 
@@ -149,8 +150,14 @@ export class BlueBubblesHelperService {
         Server().log("Starting Private API Helper...", "debug");
         this.configureServer();
 
+        // we need to get the port to open the server on (to allow multiple users to use the bundle)
+        // we'll base this off the users uid (a unique id for each user, starting from 501)
+        // we'll subtract 501 to get an id starting at 0, incremented for each user
+        // then we add this to the base port to get a unique port for the socket
+        const port = 45670 + os.userInfo().uid - 501;
+        Server().log(`Starting Socket server on port ${port}`);
         // Listen and reset the restart counter
-        this.server.listen(45677, "localhost", 511, () => {
+        this.server.listen(port, "localhost", 511, () => {
             this.restartCounter = 0;
         });
     }

@@ -87,6 +87,16 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: "restart/soft",
+                        controller: ServerRouter.restartServices
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "restart/hard",
+                        controller: ServerRouter.restartAll
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: "update/check",
                         controller: ServerRouter.checkForUpdate
                     },
@@ -199,6 +209,12 @@ export class HttpRoutes {
                         controller: ChatRouter.removeParticipant
                     },
                     {
+                        method: HttpMethod.GET,
+                        path: ":guid/icon",
+                        middleware: [...HttpRoutes.protected],
+                        controller: ChatRouter.getGroupIcon
+                    },
+                    {
                         method: HttpMethod.PUT,
                         path: ":guid",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
@@ -239,7 +255,14 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "count",
+                        validators: [MessageValidator.validateCount],
                         controller: MessageRouter.count
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "count/updated",
+                        validators: [MessageValidator.validateUpdatedCount],
+                        controller: MessageRouter.countUpdated
                     },
                     {
                         method: HttpMethod.GET,
