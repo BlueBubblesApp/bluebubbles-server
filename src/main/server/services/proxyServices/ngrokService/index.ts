@@ -22,6 +22,12 @@ export class NgrokService extends Proxy {
     async connect(): Promise<string> {
         // If there is a ngrok API key set, and we have a refresh timer going, kill it
         const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
+
+        // Try to load ngrok basic auth details
+        const enableNgrokBasicAuth = Server().repo.getConfig("enable_ngrok_basic_auth") as boolean;
+        const ngrokBasicAuthUser = Server().repo.getConfig("ngrok_basic_auth_user") as string;
+        const ngrokBasicAuthPass = Server().repo.getConfig("ngrok_basic_auth_pass") as string;
+
         let ngrokProtocol = (Server().repo.getConfig("ngrok_protocol") as Ngrok.Protocol) ?? "http";
 
         const opts: Ngrok.Options = {
@@ -79,6 +85,11 @@ export class NgrokService extends Proxy {
             ngrokProtocol = "http";
         }
 
+        // If there is a user and password and they are not empty
+        if (enableNgrokBasicAuth && !isEmpty(ngrokBasicAuthPass) && !isEmpty(ngrokBasicAuthUser)) {
+            // set the ngrok auth option to user:pass
+            opts.auth = `${ngrokBasicAuthUser}:${ngrokBasicAuthPass}`;
+        }
         // Set the protocol
         opts.proto = ngrokProtocol;
 

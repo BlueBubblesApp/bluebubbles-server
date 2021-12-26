@@ -27,6 +27,10 @@ interface State {
     ngrokKey: string;
     ngrokProtocol: string;
     ngrokRegion: string;
+    enableBasicAuth: boolean;
+    basicAuthUser: string;
+    basicAuthPass: string;
+    showBasicAuthPass: boolean;
     enableNgrok: boolean;
     proxyService: string;
     showModal: boolean;
@@ -59,6 +63,10 @@ class SettingsView extends React.Component<unknown, State> {
             ngrokKey: "",
             ngrokProtocol: "http",
             ngrokRegion: "us",
+            enableBasicAuth: false,
+            basicAuthUser: "",
+            basicAuthPass: "",
+            showBasicAuthPass: false,
             enableNgrok: false,
             showModal: false,
             serverUrl: "",
@@ -95,6 +103,9 @@ class SettingsView extends React.Component<unknown, State> {
                 ngrokKey: config.ngrok_key,
                 ngrokProtocol: config.ngrok_protocol,
                 ngrokRegion: config.ngrok_region,
+                enableBasicAuth: config.enable_basic_auth,
+                basicAuthUser: config.basic_auth_user,
+                basicAuthPass: config.basic_auth_pass,
                 enableNgrok: config.enable_ngrok,
                 encryptComs: config.encrypt_coms,
                 hideDockIcon: config.hide_dock_icon,
@@ -119,6 +130,23 @@ class SettingsView extends React.Component<unknown, State> {
 
     componentWillUnmount() {
         ipcRenderer.removeAllListeners("config-update");
+    }
+
+    handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>, stateVar: string) {
+        this.setState({ [stateVar]: e.target.checked } as any);
+        if (e.target.id === "toggleBasicAuth") {
+            this.setState({ enableBasicAuth: e.target.checked });
+            ipcRenderer.invoke("set-config", {
+                enable_basic_auth: e.target.checked
+            });
+            if (!e.target.checked) {
+                this.clearBasicAuth();
+            }
+        } else {
+            ipcRenderer.invoke("set-config", {
+                [e.target.id]: e.target.checked
+            });
+        }
     }
 
     async setTheme(currentTheme: string) {
@@ -190,10 +218,43 @@ class SettingsView extends React.Component<unknown, State> {
         await ipcRenderer.invoke("set-ngrok-key", { key: this.state.ngrokKey });
     };
 
+    clearBasicAuth = async () => {
+        this.setState({ basicAuthUser: "", basicAuthPass: "" });
+        await ipcRenderer.invoke("set-config", {
+            basic_auth_user: "",
+            basic_auth_pass: ""
+        });
+        await this.restartProxy();
+    };
+
+    restartProxy = async () => {
+        await ipcRenderer.invoke("toggle-proxy-service", { service: this.state.proxyService });
+    };
+
+    basicAuthAvailable = async () => {
+        // right now only Ngrok is supported and users must supply their own auth key
+        if (this.state.proxyService === "Ngrok" && (this.state.ngrokKey ?? "".length > 0)) {
+            return true;
+        }
+        return false;
+    };
+
+    saveNgrokBasicUser = async (user: string) => {
+        await ipcRenderer.invoke("set-config", {
+            ngrok_basic_auth_user: user
+        });
+    };
+
+    saveNgrokBasicPass = async (pass: string) => {
+        await ipcRenderer.invoke("set-config", {
+            ngrok_basic_auth_pass: pass
+        });
+    };
+
     handleInputChange = async (e: any) => {
         // eslint-disable-next-line prefer-destructuring
         const id = e.target.id;
-        if (["serverPort", "serverPassword", "ngrokKey", "serverUrl"].includes(id)) {
+        if (["serverPort", "serverPassword", "ngrokKey", "serverUrl", "basicAuthUser", "basicAuthPass"].includes(id)) {
             this.setState({ [id]: e.target.value } as any);
         }
 
@@ -479,6 +540,30 @@ class SettingsView extends React.Component<unknown, State> {
                                 </select>
                             </span>
                         ) : null}
+                        {this.state.proxyService === "Dynamic DNS" ? (
+                            <div className="aCheckboxDiv">
+                                <div>
+                                    <h3 className="aSettingTitle">Use HTTPS (custom certificate)</h3>
+                                    <p className="settingsHelp">
+                                        This will install a self-signed certificate at &apos;~/Library/Application\
+                                        Support/bluebubbles-server/Certs&apos;.&nbsp;
+                                        <b>
+                                            Note: Only use this this option if you have your own certificate! Replace
+                                            the certificates in
+                                        </b>
+                                    </p>
+                                    <label className="form-switch">
+                                        <input
+                                            id="toggleCustomCertificate"
+                                            onChange={e => this.handleInputChange(e)}
+                                            type="checkbox"
+                                            checked={this.state.use_custom_certificate}
+                                        />
+                                        <i />
+                                    </label>
+                                </div>
+                            </div>
+                        ) : null}
                         {this.state.proxyService === "Ngrok" ? (
                             <span>
                                 <div>
@@ -518,29 +603,66 @@ class SettingsView extends React.Component<unknown, State> {
                                 </select>
                             </span>
                         ) : null}
-                        {this.state.proxyService === "Dynamic DNS" ? (
-                            <div className="aCheckboxDiv">
+                        {this.basicAuthAvailable() ? (
+                            <span>
                                 <div>
-                                    <h3 className="aSettingTitle">Use HTTPS (custom certificate)</h3>
+                                    <h3 className="aSettingTitle">Enable Basic Auth on Tunnel(optional)</h3>
                                     <p className="settingsHelp">
-                                        This will install a self-signed certificate at &apos;~/Library/Application\
-                                        Support/bluebubbles-server/Certs&apos;.&nbsp;
-                                        <b>
-                                            Note: Only use this this option if you have your own certificate! Replace
-                                            the certificates in
-                                        </b>
+                                        Enable this if you want to add an additional username/password to the tunnel.
                                     </p>
                                 </div>
                                 <label className="form-switch">
                                     <input
-                                        id="toggleCustomCertificate"
-                                        onChange={e => this.handleInputChange(e)}
+                                        id="toggleBasicAuth"
+                                        onChange={e => this.handleCheckboxChange(e, "enableBasicAuth")}
+                                        disabled={this.state.proxyService !== "Ngrok"}
+                                        checked={this.state.enableBasicAuth}
                                         type="checkbox"
-                                        checked={this.state.use_custom_certificate}
                                     />
                                     <i />
                                 </label>
-                            </div>
+                            </span>
+                        ) : null}
+                        {this.state.enableBasicAuth ? (
+                            <span>
+                                <input
+                                    id="basicAuthUser"
+                                    className="aInput"
+                                    placeholder="Enter a username"
+                                    name="inputPassword"
+                                    value={this.state.basicAuthUser}
+                                    onChange={e => this.handleInputChange(e)}
+                                    onBlur={e => this.saveNgrokBasicUser(e.target.value)}
+                                />
+                                <input
+                                    id="basicAuthPass"
+                                    className="aInput"
+                                    placeholder="Enter a password"
+                                    name="inputPassword"
+                                    value={this.state.basicAuthPass}
+                                    onChange={e => this.handleInputChange(e)}
+                                    onBlur={e => this.saveNgrokBasicPass(e.target.value)}
+                                    type={this.state.showBasicAuthPass ? "text" : "password"}
+                                />
+                                <svg
+                                    id="ngrokPassView"
+                                    viewBox="0 0 512 512"
+                                    onClick={() => this.setState({ showBasicAuthPass: !this.state.showBasicAuthPass })}
+                                >
+                                    <g>
+                                        <path d="M234.667,170.667c-35.307,0-64,28.693-64,64s28.693,64,64,64s64-28.693,64-64S269.973,170.667,234.667,170.667z" />
+                                        <path
+                                            d="M234.667,74.667C128,74.667,36.907,141.013,0,234.667c36.907,93.653,128,160,234.667,160
+                                        c106.773,0,197.76-66.347,234.667-160C432.427,141.013,341.44,74.667,234.667,74.667z M234.667,341.333
+                                        c-58.88,0-106.667-47.787-106.667-106.667S175.787,128,234.667,128s106.667,47.787,106.667,106.667
+                                        S293.547,341.333,234.667,341.333z"
+                                        />
+                                    </g>
+                                </svg>
+                                <button className="modal-button" onClick={() => this.restartProxy()}>
+                                    Enable Ngrok Auth
+                                </button>
+                            </span>
                         ) : null}
                         <div className="aCheckboxDiv">
                             <div>
@@ -564,9 +686,9 @@ class SettingsView extends React.Component<unknown, State> {
                             <div>
                                 <h3 className="aSettingTitle">Keep MacOS Awake</h3>
                                 <p className="settingsHelp">
-                                    When enabled, you mac will not fall asleep due to inactivity or a screen screen saver. 
-                                    However, your computer lid&apos;s close action may override this. Make sure your computer does not
-                                    go to sleep when the lid is closed. 
+                                    When enabled, you mac will not fall asleep due to inactivity or a screen screen
+                                    saver. However, your computer lid&apos;s close action may override this. Make sure
+                                    your computer does not go to sleep when the lid is closed.
                                 </p>
                             </div>
                             <label className="form-switch">

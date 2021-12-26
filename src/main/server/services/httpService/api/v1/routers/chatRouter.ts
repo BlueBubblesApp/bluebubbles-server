@@ -201,9 +201,9 @@ export class ChatRouter {
         const iconPath = await Server().iMessageRepo.getGroupIconPath(chat.guid);
         if (!iconPath) {
             throw new NotFound({
-                message: 'The requested resource was not found',
-                error: 'Unable to find icon for the selected chat'
-            })
+                message: "The requested resource was not found",
+                error: "Unable to find icon for the selected chat"
+            });
         }
 
         return new FileStream(ctx, FileSystem.getRealPath(iconPath), "image/jfif").send();

@@ -379,8 +379,9 @@ export class FileSystem {
     static async convertToJpg(format: string, attachment: Attachment, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(attachment.filePath);
         await FileSystem.execShellCommand(
-            `/usr/bin/sips --setProperty "format" "${format}" "${oldPath}" --out "${outputPath}"`);
-        console.log(outputPath)
+            `/usr/bin/sips --setProperty "format" "${format}" "${oldPath}" --out "${outputPath}"`
+        );
+        console.log(outputPath);
     }
 
     static async getFileMetadata(filePath: string): Promise<{ [key: string]: string }> {

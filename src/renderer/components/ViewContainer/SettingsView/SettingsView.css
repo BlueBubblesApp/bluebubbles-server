@@ -215,6 +215,13 @@ span > #serverPassword {
     cursor: pointer;
 }
 
+#ngrokPassView {
+    height: 28px;
+    width: 28px;
+    fill: grey;
+    cursor: pointer;
+}
+
 /* The Modal (background) */
 .modal {
     position: fixed; /* Stay in place */

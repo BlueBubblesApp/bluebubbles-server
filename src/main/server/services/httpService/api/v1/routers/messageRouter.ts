@@ -31,7 +31,12 @@ export class MessageRouter {
         const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
         const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
         const total = await Server().iMessageRepo.getMessageCount(
-            afterDate, beforeDate, false, chatGuid as string, true);
+            afterDate,
+            beforeDate,
+            false,
+            chatGuid as string,
+            true
+        );
         return new Success(ctx, { data: { total } }).send();
     }
 
