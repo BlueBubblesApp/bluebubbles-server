@@ -110,9 +110,15 @@ export class MessageInterface {
         // Make sure messages is open
         await FileSystem.startMessages();
 
+        // Since we convert mp3s to cafs we need to correct the name for the awaiter
+        let aName = attachmentName;
+        if (aName !== null && aName.endsWith('.mp3')) {
+            aName = `${aName.substring(0, aName.length - 4)}.caf`;
+        }
+
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise(chatGuid, `->${attachmentName}`, true, now);
+        const awaiter = new MessagePromise(chatGuid, `->${aName}`, true, now);
 
         // Add the promise to the manager
         Server().messageManager.add(awaiter);

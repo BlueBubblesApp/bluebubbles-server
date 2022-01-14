@@ -376,6 +376,12 @@ export class FileSystem {
         await FileSystem.execShellCommand(`/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`);
     }
 
+    static async convertMp3ToCaf(inputPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(inputPath);
+        await FileSystem.execShellCommand(
+            `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`);
+    }
+
     static async convertToJpg(format: string, attachment: Attachment, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(attachment.filePath);
         await FileSystem.execShellCommand(

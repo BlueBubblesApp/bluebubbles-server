@@ -41,6 +41,17 @@ export class ActionHandler {
     static sendMessageHandler = async (chatGuid: string, message: string, attachment: string) => {
         let messageScript;
 
+        let theAttachment = attachment;
+        if (theAttachment !== null && theAttachment.endsWith('.mp3')) {
+            try {
+                const newPath = `${theAttachment.substring(0, theAttachment.length - 4)}.caf`;
+                await FileSystem.convertMp3ToCaf(theAttachment, newPath);
+                theAttachment = newPath;
+            } catch (ex) {
+                Server().log('Failed to convert MP3 to CAF!', 'warn');
+            }
+        }
+
         // Start the message send workflow
         //  1: Try sending using the input Chat GUID
         //    1.a: If there is a timeout error, we should restart the Messages App and retry
@@ -53,19 +64,19 @@ export class ActionHandler {
                 // If it's monteray, we can't send attachments normally. We need to use accessibility
                 // Make the first script send the image using accessibility. Then the second script sends
                 // just the message
-                if (isNotEmpty(attachment)) {
+                if (isNotEmpty(theAttachment)) {
                     // Fetch participants of the chat and get handles (addresses)
                     const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
                     if (isNotEmpty(chats) && isNotEmpty(chats[0]?.participants)) {
                         const participants = chats[0].participants.map(i => i.id);
-                        messageScript = sendAttachmentAccessibility(attachment, participants);
+                        messageScript = sendAttachmentAccessibility(theAttachment, participants);
                         await FileSystem.executeAppleScript(messageScript);
                     }
                 }
 
                 messageScript = buildSendMessageScript(chatGuid, message ?? "", null);
             } else {
-                messageScript = buildSendMessageScript(chatGuid, message ?? "", attachment);
+                messageScript = buildSendMessageScript(chatGuid, message ?? "", theAttachment);
             }
 
             // Try to send the message
@@ -97,7 +108,7 @@ export class ActionHandler {
             try {
                 // Generate the new send script
                 Server().log(`Sending AppleScript text using fallback script...`, "debug");
-                messageScript = sendMessageFallback(chatGuid, message ?? "", attachment);
+                messageScript = sendMessageFallback(chatGuid, message ?? "", theAttachment);
                 await FileSystem.executeAppleScript(messageScript);
             } catch (ex: any) {
                 error = ex;
@@ -160,15 +171,22 @@ export class ActionHandler {
             Server().messageManager.add(messageAwaiter);
         }
 
+        // Since we convert mp3s to cafs, we need to modify the attachment name here too
+        // This is mainly just for the awaiter
+        let aName = attachmentName;
+        if (aName !== null && aName.endsWith('.mp3')) {
+            aName = `${aName.substring(0, aName.length - 4)}.caf`;
+        }
+
         // Create the awaiter
         let attachmentAwaiter = null;
-        if (attachment && isNotEmpty(attachmentName)) {
-            attachmentAwaiter = new MessagePromise(chatGuid, `->${attachmentName}`, true, now);
-            Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${attachmentName}`);
+        if (attachment && isNotEmpty(aName)) {
+            attachmentAwaiter = new MessagePromise(chatGuid, `->${aName}`, true, now);
+            Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${aName}`);
             Server().messageManager.add(attachmentAwaiter);
         }
 
-        // Build the send script
+        // Hande-off params to send handler to actually send
         const theAttachment = attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null;
         await ActionHandler.sendMessageHandler(chatGuid, message, theAttachment);
 
