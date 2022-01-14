@@ -266,13 +266,7 @@ class PreDashboardView extends React.Component<unknown, State> {
     handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>, stateVar: string) {
         this.setState({ [stateVar]: e.target.checked } as any);
 
-        if (e.target.id === "toggleNgrok") {
-            ipcRenderer.invoke("toggle-ngrok", e.target.checked);
-
-            if (!e.target.checked) {
-                this.setState({ showModal: true });
-            }
-        } else if (e.target.id === "togglePrivateApi") {
+        if (e.target.id === "togglePrivateApi") {
             this.setState({ enablePrivateApi: e.target.checked });
             ipcRenderer.invoke("toggle-private-api", e.target.checked!);
         } else {
