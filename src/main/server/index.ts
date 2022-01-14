@@ -584,6 +584,13 @@ class BlueBubblesServer extends EventEmitter {
             await this.repo.setConfig("proxy_service", "Cloudflare");
         }
 
+        // If the user is using tcp, force back to http
+        const ngrokProtocol = this.repo.getConfig("ngrok_protocol") as string;
+        if (ngrokProtocol === "tcp") {
+            this.log("TCP protocol detected. Forcing HTTP protocol");
+            await this.repo.setConfig("ngrok_protocol", "http");
+        }
+
         this.log("Checking Permissions...");
 
         // Log if we dont have accessibility access
