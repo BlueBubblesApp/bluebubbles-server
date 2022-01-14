@@ -215,7 +215,7 @@ export class HttpService {
 
     async emitChatReadStatus(chatGuid: string, status: boolean) {
         if (this.socketServer == null) return;
-        this.socketServer.emit("chat-read-status", {
+        await Server().emitMessage('chat-read-status', {
             chatGuid,
             read: status
         });
