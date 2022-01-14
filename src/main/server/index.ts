@@ -501,8 +501,15 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
         }
 
-        this.log("Initializing caffeinate service...");
-        await this.setupCaffeinate();
+        try {
+            this.log("Initializing caffeinate service...");
+            this.caffeinate = new CaffeinateService();
+            if (this.repo.getConfig("auto_caffeinate")) {
+                this.caffeinate.start();
+            }
+        } catch (ex: any) {
+            this.log(`Failed to setup caffeinate service! ${ex.message}`, "error");
+        }
 
         try {
             this.log("Initializing queue service...");
@@ -550,6 +557,17 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
+    async getTimeSync() {
+        try {
+            return await FileSystem.execShellCommand(`sntp time.apple.com`);
+        } catch (ex) {
+            this.log('Failed to sync time with time servers!', 'warn');
+            this.log(ex)
+        }
+
+        return null;
+    }
+
     private async preChecks(): Promise<void> {
         this.log("Running pre-start checks...");
 
@@ -576,6 +594,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
+        this.log(`Server Metadata -> Time Synchronization: ${await this.getTimeSync()}`, "debug");
 
         // If the user is on el capitan, we need to force cloudflare
         const proxyService = this.repo.getConfig("proxy_service") as string;
@@ -630,6 +649,21 @@ class BlueBubblesServer extends EventEmitter {
             });
         }
 
+        // Show a warning if the time is off by a reasonable amount (1 minute)
+        const syncString = await this.getTimeSync();
+        if (syncString !== null) {
+            try {
+                const spl = syncString.split('+/-');
+                const left = spl[0].split(' ').slice(0, -1);
+                const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace('+', '').replace('-', '')));
+                if (offset >= 15) {
+                    this.log(`Your macOS time is not synchronized! Offset: ${offset}`, 'warn');
+                }
+            } catch (ex) {
+                this.log('Unable to parse time synchronization offset!', 'debug');
+            }
+        }
+
         this.setDockIcon();
 
         // Check if on Big Sur. If we are, then create a log/alert saying that
@@ -649,20 +683,6 @@ class BlueBubblesServer extends EventEmitter {
             app.show();
         } else {
             app.dock.show();
-        }
-    }
-
-    /**
-     * Sets up the caffeinate service
-     */
-    private async setupCaffeinate(): Promise<void> {
-        try {
-            this.caffeinate = new CaffeinateService();
-            if (this.repo.getConfig("auto_caffeinate")) {
-                this.caffeinate.start();
-            }
-        } catch (ex: any) {
-            this.log(`Failed to setup caffeinate service! ${ex.message}`, "error");
         }
     }
 
