@@ -9,7 +9,16 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
         await next();
     } catch (ex: any) {
         // Log the error, no matter what it is
-        Server().log(`API Error: ${ex?.message ?? ex}`, "error");
+        let errStr = `API Error: ${ex?.message ?? ex}`;
+        if (ex?.error?.message) {
+            errStr = `${errStr} -> ${ex?.error?.message}`;
+        }
+        if (ex?.data) {
+            errStr = `${errStr} (has data: true)`;
+        }
+
+        Server().log(errStr, "error");
+        Server().log(ex?.stack, 'debug');
 
         // Use the custom HTTPError handler
         if (ex instanceof HTTPError) {

@@ -20,7 +20,7 @@ export class Unauthorized extends HTTPError {
     constructor(response?: ResponseParams) {
         super({
             status: 401,
-            message: response.message ?? "You are not authorized to access this resource",
+            message: response?.message ?? "You are not authorized to access this resource",
             error: {
                 type: ErrorTypes.AUTHENTICATION_ERROR,
                 message: response?.error ?? ResponseMessages.UNAUTHORIZED
