@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as fs from "fs";
+import * as x509 from "@peculiar/x509";
 import { pki, md } from "node-forge";
 
 import { ServerConfigChange } from "@server/databases/server";
@@ -40,19 +41,28 @@ export class CertificateService {
         if (!shouldRefresh) {
             try {
                 const pem = fs.readFileSync(CertificateService.certPath, { encoding: "utf-8" });
-                const cert = pki.certificateFromPem(pem);
                 const now = new Date().getTime();
-                if (now > cert.validity.notAfter.getTime()) {
-                    shouldRefresh = true;
+                if (pem.includes('BEGIN EC PRIVATE KEY')) {
+                    const cert = new x509.X509Certificate(pem);
+                    if (now > cert.notAfter.getTime()) {
+                        shouldRefresh = true;
+                    }
+                } else {
+                    const cert = pki.certificateFromPem(pem);
+                    if (now > cert.validity.notAfter.getTime()) {
+                        shouldRefresh = true;
+                    }
                 }
+                
             } catch (ex: any) {
                 Server().log("Failed to read certificate expiration! It may have been modified.", "warn");
+                Server().log(`Error: ${ex?.message ?? ex ?? 'Unknown Error'}`, "warn");
                 shouldRefresh = true;
             }
         }
 
         // If the certificate doesn't exist, create it
-        if (!CertificateService.certificateExists()) {
+        if (shouldRefresh) {
             Server().log("Certificate doesn't exist or is expired! Regenerating...");
             CertificateService.generateCertificate();
             Server().httpService.restart();
