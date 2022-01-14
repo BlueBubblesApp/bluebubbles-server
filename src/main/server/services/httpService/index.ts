@@ -213,6 +213,14 @@ export class HttpService {
         });
     }
 
+    async emitChatReadStatus(chatGuid: string, status: boolean) {
+        if (this.socketServer == null) return;
+        this.socketServer.emit("chat-read-status", {
+            chatGuid,
+            read: status
+        });
+    }
+
     private async closeSocket(): Promise<void> {
         return new Promise((resolve, reject): void => {
             if (this.socketServer) {

@@ -196,6 +196,11 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/read",
+                        controller: ChatRouter.markRead
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/participant/add",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
