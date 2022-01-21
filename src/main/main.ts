@@ -277,6 +277,7 @@ Available Commands:
                             -> hide_dock_icon: boolean
                             -> last_fcm_restart: number
                             -> start_via_terminal: boolean
+                            -> incoming_message_poll_rate: number
     - show:             Show the current configuration for an item -> \`show <config item>\`
 \n[===============================================================================]`;
 

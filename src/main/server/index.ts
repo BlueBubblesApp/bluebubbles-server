@@ -8,7 +8,6 @@ import * as macosVersion from "macos-version";
 
 // Configuration/Filesytem Imports
 import { FileSystem } from "@server/fileSystem";
-import { DEFAULT_POLL_FREQUENCY_MS } from "@server/constants";
 
 // Database Imports
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
@@ -767,21 +766,23 @@ class BlueBubblesServer extends EventEmitter {
             );
             return;
         }
+        // Retrieve the poll rate from server config
+        const poll_rate_frequency = Server().repo.getConfig("incoming_message_poll_rate") as number;
 
         // Create a listener to listen for new/updated messages
         const incomingMsgListener = new IncomingMessageListener(
             this.iMessageRepo,
             this.eventCache,
-            DEFAULT_POLL_FREQUENCY_MS
+            poll_rate_frequency
         );
         const outgoingMsgListener = new OutgoingMessageListener(
             this.iMessageRepo,
             this.eventCache,
-            DEFAULT_POLL_FREQUENCY_MS * 2
+            poll_rate_frequency * 2
         );
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority
-        const groupEventListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
+        const groupEventListener = new GroupChangeListener(this.iMessageRepo, poll_rate_frequency * 2);
 
         // Add to listeners
         this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
