@@ -6,11 +6,12 @@ import App from './app/App';
 import { ChakraProvider, extendTheme, ColorModeScript, localStorageManager } from '@chakra-ui/react';
 import { baseTheme } from './theme';
 import { store } from './app/store';
-import { checkPermissions, getAlerts, getConfig, getDevices, getFcmConfig, getPrivateApiRequirements } from './app/utils/IpcUtils';
+import { checkPermissions, getAlerts, getConfig, getDevices, getFcmConfig, getPrivateApiRequirements, getWebhooks } from './app/utils/IpcUtils';
 import { setConfigBulk, ConfigItem, setConfig } from './app/slices/ConfigSlice';
 import { addAll as addAllDevices } from './app/slices/DevicesSlice';
 import { DeviceItem } from './app/slices/DevicesSlice';
 import { add as addLog } from './app/slices/LogsSlice';
+import { addAll as addAllWebhooks } from './app/slices/WebhooksSlice';
 import { add as addAlert, addAll as addAllAlerts, NotificationItem } from './app/slices/NotificationsSlice';
 import { ipcRenderer } from 'electron';
 import { getRandomInt } from './app/utils/GenericUtils';
@@ -90,6 +91,12 @@ getPrivateApiRequirements().then(requirements => {
 checkPermissions().then(permissions => {
     if (!permissions) return;
     store.dispatch(setConfig({ name: 'permissions', value: permissions }));
+});
+
+// Load the alerts from the server
+getWebhooks().then(hooks => {
+    if (!hooks) return;
+    store.dispatch(addAllWebhooks(hooks));
 });
 
 ipcRenderer.on('new-log', (_: any, data: any) => {

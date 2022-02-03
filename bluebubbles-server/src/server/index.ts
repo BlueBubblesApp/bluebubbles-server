@@ -34,7 +34,8 @@ import {
     QueueService,
     IPCService,
     UpdateService,
-    CloudflareService
+    CloudflareService,
+    WebhookService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -106,6 +107,8 @@ class BlueBubblesServer extends EventEmitter {
 
     proxyServices: Proxy[];
 
+    webhookService: WebhookService;
+
     actionHandler: ActionHandler;
 
     chatListeners: ChangeListener[];
@@ -158,6 +161,7 @@ class BlueBubblesServer extends EventEmitter {
         this.proxyServices = [];
         this.updater = null;
         this.messageManager = null;
+        this.webhookService = null;
 
         this.hasDiskAccess = true;
         this.hasAccessibilityAccess = false;
@@ -166,9 +170,6 @@ class BlueBubblesServer extends EventEmitter {
         this.notificationCount = 0;
         this.isRestarting = false;
         this.isStopping = false;
-
-        console.log('HERE');
-        console.log(process.execPath);
     }
 
     emitToUI(event: string, data: any) {
@@ -321,6 +322,13 @@ class BlueBubblesServer extends EventEmitter {
             this.messageManager = new OutgoingMessageManager();
         } catch (ex: any) {
             this.log(`Failed to start Message Manager service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Initializing Webhook Service...");
+            this.webhookService = new WebhookService();
+        } catch (ex: any) {
+            this.log(`Failed to start Webhook service! ${ex.message}`, "error");
         }
     }
 
@@ -790,6 +798,9 @@ class BlueBubblesServer extends EventEmitter {
                 priority
             );
         }
+
+        // Dispatch the webhook
+        this.webhookService.dispatch({ type, data });
     }
 
     private getTheme() {

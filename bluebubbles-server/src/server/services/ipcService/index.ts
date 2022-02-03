@@ -88,6 +88,21 @@ export class IPCService {
             return FileSystem.getFCMClient();
         });
 
+        ipcMain.handle("get-webhooks", async (event, args) => {
+            const res = await Server().repo.getWebhooks();
+            return res.map((e) => ({ id: e.id, url: e.url, created: e.created }))
+        });
+
+        ipcMain.handle("create-webhook", async (event, url) => {
+            const res = await Server().repo.addWebhook(url);
+            const output = { id: res.id, url: res.url, created: res.created };
+            return output;
+        });
+
+        ipcMain.handle("delete-webhook", async (event, args) => {
+            return await Server().repo.deleteWebhook({ url: args.url, id: args.id });
+        });
+
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {
             await Server().repo.setConfig("tutorial_is_done", toggle);
 

@@ -59,6 +59,18 @@ export const checkPermissions = async () => {
     return await ipcRenderer.invoke('check-permissions');
 };
 
+export const getWebhooks = async () => {
+    return await ipcRenderer.invoke('get-webhooks');
+};
+
+export const createWebhook = async (url: string) => {
+    return await ipcRenderer.invoke('create-webhook', url);
+};
+
+export const deleteWebhook = async ({ url = null, id = null }: { url?: string | null, id?: number | null }) => {
+    return await ipcRenderer.invoke('delete-webhook', { url, id });
+};
+
 export const reinstallHelperBundle = async () => {
     const res = await ipcRenderer.invoke('reinstall-helper-bundle');
     if (res.success) {

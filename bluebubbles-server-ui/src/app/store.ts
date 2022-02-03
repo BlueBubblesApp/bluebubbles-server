@@ -4,6 +4,7 @@ import NotificationsSlice from './slices/NotificationsSlice';
 import LogsSlice from './slices/LogsSlice';
 import DevicesSlice from './slices/DevicesSlice';
 import StatsSlice from './slices/StatsSlice';
+import WebhooksSlice from './slices/WebhooksSlice';
 
 export const store = configureStore({
     reducer: {
@@ -11,7 +12,8 @@ export const store = configureStore({
         notificationStore: NotificationsSlice,
         logStore: LogsSlice,
         deviceStore: DevicesSlice,
-        statistics: StatsSlice
+        statistics: StatsSlice,
+        webhookStore: WebhooksSlice
     },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware({
         serializableCheck: false

@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import { createConnection, Connection } from "typeorm";
 import { Server } from "@server/index";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { Config, Alert, Device, Queue } from "./entity";
+import { Config, Alert, Device, Queue, Webhook } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
@@ -39,7 +39,7 @@ export class ServerRepository extends EventEmitter {
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
-            entities: [Config, Alert, Device, Queue],
+            entities: [Config, Alert, Device, Queue, Webhook],
             // We should really use migrations for this.
             // This is me being lazy. Maybe someday...
             synchronize: true
@@ -77,6 +77,13 @@ export class ServerRepository extends EventEmitter {
      */
     configs() {
         return this.db.getRepository(Config);
+    }
+
+    /**
+     * Get the webhooks repo
+     */
+    webhooks() {
+        return this.db.getRepository(Webhook);
     }
 
     private async loadConfig() {
@@ -142,6 +149,29 @@ export class ServerRepository extends EventEmitter {
                 await this.devices().delete({ name: item.name, identifier: item.identifier });
             }
         }
+    }
+
+    public async getWebhooks(): Promise<Array<Webhook>> {
+        const repo = this.webhooks();
+        return await repo.find();
+    }
+
+    public async addWebhook(url: string): Promise<Webhook> {
+        const repo = this.webhooks();
+        const item = await repo.findOne({ url });
+
+        // If the webhook exists, don't re-add it, just return it
+        if (item) return item;
+
+        const webhook = repo.create({ url });
+        return await repo.save(webhook);
+    }
+
+    public async deleteWebhook({ url = null, id = null }: { url: string | null, id: number | null }): Promise<void> {
+        const repo = this.webhooks();
+        const item = (url) ? await repo.findOne({ url }) : await repo.findOne({ id });
+        if (!item) return;
+        await repo.delete(item.id);
     }
 
     public async hasQueuedMessage(tempGuid: string): Promise<boolean> {

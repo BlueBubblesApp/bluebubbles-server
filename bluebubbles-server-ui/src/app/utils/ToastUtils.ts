@@ -10,7 +10,7 @@ export type ConfirmationItems = {
     [key: string]: {
         message: string,
         shouldDispatch?: boolean,
-        func: () => void | AnyAction | Promise<void>
+        func: (args?: NodeJS.Dict<any>) => void | AnyAction | Promise<void>
     }
 };
 

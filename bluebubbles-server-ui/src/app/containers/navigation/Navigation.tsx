@@ -34,7 +34,7 @@ import {
 } from '@chakra-ui/react';
 import { FiHome, FiSettings, FiMenu, FiBell, FiMonitor, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
 import { FaDiscord } from 'react-icons/fa';
-import { AiOutlineBug, AiOutlineHome } from 'react-icons/ai';
+import { AiOutlineBug, AiOutlineHome, AiOutlineApi } from 'react-icons/ai';
 import { BsChevronDown, BsCheckAll } from 'react-icons/bs';
 import { BiNotification } from 'react-icons/bi';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
@@ -46,6 +46,7 @@ import { DevicesLayout } from '../../layouts/devices/DevicesLayout';
 import { LogsLayout } from '../../layouts/logs/LogsLayout';
 import { SettingsLayout } from '../../layouts/settings/SettingsLayout';
 import { FcmLayout } from '../../layouts/fcm/FcmLayout';
+import { ApiLayout } from '../../layouts/api/ApiLayout';
 import logo from '../../../images/logo/icon-64.png';
 import { NotificationsTable } from '../../components/tables/NotificationsTable';
 import './styles.css';
@@ -63,6 +64,7 @@ const LinkItems: Array<LinkItemProps> = [
     { name: 'Devices', icon: FiMonitor, to: '/devices' },
     { name: 'Debug & Logs', icon: AiOutlineBug, to: '/logs' },
     { name: 'Google FCM', icon: BiNotification, to: '/fcm' },
+    { name: 'API & Webhooks', icon: AiOutlineApi, to: '/webhooks' },
     { name: 'Settings', icon: FiSettings, to: '/settings' }
 ];
 
@@ -108,6 +110,7 @@ export const Navigation = (): JSX.Element => {
                         <Route path="/logs"element={<LogsLayout />} />
                         <Route path="/fcm"element={<FcmLayout />} />
                         <Route path="/devices"element={<DevicesLayout />} />
+                        <Route path="/webhooks"element={<ApiLayout />} />
                         <Route path="/" element={<HomeLayout />} />
                     </Routes>
                 </Box>

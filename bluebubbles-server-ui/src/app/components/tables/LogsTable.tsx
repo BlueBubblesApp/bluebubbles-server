@@ -13,7 +13,7 @@ import { LogItem } from '../../slices/LogsSlice';
 
 export const LogsTable = ({ logs }: { logs: Array<LogItem> }): JSX.Element => {
     return (
-        <Table variant="striped" colorScheme="blue">
+        <Table variant="striped" colorScheme="blue" size='sm'>
             <TableCaption>Logs will stream in as they come in</TableCaption>
             <Thead>
                 <Tr>
