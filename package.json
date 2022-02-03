@@ -9,7 +9,7 @@
     ],
     "scripts": {
         "start": "concurrently \"cd ./bluebubbles-server-ui && npm run start\" \"cd ./bluebubbles-server && npm run start\"",
-        "build-ui": "cd ./bluebubbles-server-ui && npm run build && sed -i '' -e 's/href=\"/href=\"./g' ./build/index.html && sed -i '' -e 's/src=\"/src=\"./g' ./build/index.html && cp -R ./build/* ../bluebubbles-server/dist/ && cd ../",
+        "build-ui": "cd ./bluebubbles-server-ui && npm run build && cp -R ./build/* ../bluebubbles-server/dist/ && cd ../",
         "build-server": "cd ./bluebubbles-server && npm run dist && cd ../",
         "build": "npm run build-ui && npm run build-server && rm -rf ./dist && mkdir ./dist && cp -R ./bluebubbles-server/release/* ./dist/ && rm -rf ./bluebubbles-server/release/ && rm -rf ./bluebubbles-server-ui/build/"
     },

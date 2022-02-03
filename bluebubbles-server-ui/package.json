@@ -2,6 +2,7 @@
   "name": "bluebubbles-server-ui",
   "version": "1.0.0",
   "private": true,
+  "homepage": "./",
   "scripts": {
     "start": "export BROWSER=none && react-app-rewired start",
     "build": "export NODE_ENV=production && react-app-rewired build"
