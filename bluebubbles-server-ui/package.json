@@ -1,24 +1,10 @@
 {
     "name": "bluebubbles-server-ui",
-    "version": "0.5.0",
+    "version": "1.0.0",
     "private": true,
     "scripts": {
         "start": "export BROWSER=none && react-app-rewired start",
-        "build": "export NODE_ENV=production && react-app-rewired build",
-        "test": "react-scripts test",
-        "eject": "react-scripts eject"
-    },
-    "browserslist": {
-        "production": [
-            ">0.2%",
-            "not dead",
-            "not op_mini all"
-        ],
-        "development": [
-            "last 1 chrome version",
-            "last 1 firefox version",
-            "last 1 safari version"
-        ]
+        "build": "export NODE_ENV=production && react-app-rewired build"
     },
     "devDependencies": {
         "@babel/core": "^7.0.0",

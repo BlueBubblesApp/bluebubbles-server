@@ -1,7 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.5.0",
-    "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
+    "version": "1.0.0",
     "main": "./dist/main.js",
     "scripts": {
         "build": "export NODE_ENV=production && webpack --config ./scripts/webpack.main.prod.config.js",
