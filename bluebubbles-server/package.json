@@ -54,7 +54,7 @@
                 }
             ],
             "type": "distribution",
-            "icon": "./icons/regular/icon-512.png",
+            "icon": "../icons/regular/icon-512.png",
             "darkModeSupport": true,
             "hardenedRuntime": true,
             "entitlements": "./scripts/entitlements.mac.plist",

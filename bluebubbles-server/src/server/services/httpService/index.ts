@@ -78,7 +78,6 @@ export class HttpService {
         // Create the HTTP server
         this.koaApp = new KoaApp();
         this.configureKoa();
-        console.log()
 
         if (this.httpOpts.cert && this.httpOpts.key) {
             Server().log("Starting up HTTPS Server...");
@@ -163,7 +162,8 @@ export class HttpService {
      * Creates the initial connection handler for Socket.IO
      */
     start() {
-        if (!this.socketServer)
+        if (!this.socketServer) return;
+
         /**
          * Handle all other data requests
          */
@@ -181,8 +181,7 @@ export class HttpService {
             // Basic authentication
             if (safeTrim(pass) === safeTrim(cfgPass)) {
                 Server().log(
-                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
-                );
+                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`);
             } else {
                 socket.disconnect();
                 Server().log(`Closing client connection. Authentication failed.`);

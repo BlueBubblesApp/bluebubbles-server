@@ -16,9 +16,11 @@ export const SettingsLayout = (): JSX.Element => {
                 <UpdateSettings />
                 <ResetSettings />
 
-                <Text fontSize='2xl'>Permission Status</Text>
-                <Divider orientation='horizontal' my={3}/>
-                <PermissionRequirements />
+                <Box p={2}>
+                    <Text fontSize='2xl'>Permission Status</Text>
+                    <Divider orientation='horizontal' my={3}/>
+                    <PermissionRequirements />
+                </Box>
             </Box>
         </section>
     );
