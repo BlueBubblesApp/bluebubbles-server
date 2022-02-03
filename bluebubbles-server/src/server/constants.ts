@@ -1,0 +1,1 @@
+export const DEFAULT_POLL_FREQUENCY_MS = 1000;
