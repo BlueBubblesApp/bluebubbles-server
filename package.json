@@ -1,76 +1,17 @@
 {
     "name": "bluebubbles-server",
-    "version": "0.5.0",
+    "version": "1.0.0",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
-    "main": "./dist/main.js",
+    "private": true,
+    "workspaces": [
+        "bluebubbles-server",
+        "bluebubbles-server-ui"
+    ],
     "scripts": {
-        "build-main": "cross-env NODE_ENV=production webpack --config webpack.main.prod.config.js",
-        "build-renderer": "cross-env NODE_ENV=production webpack --config webpack.renderer.prod.config.js",
-        "build": "npm run build-main && npm run build-renderer",
-        "start-renderer-dev": "webpack-dev-server --config webpack.renderer.dev.config.js",
-        "start-main-dev": "webpack --config webpack.main.config.js && electron ./dist/main.js",
-        "start-dev": "cross-env START_HOT=1 NODE_ENV=development npm run start-renderer-dev",
-        "lint": "eslint --ext=jsx,js,tsx,ts src",
-        "dist": "yarn build && electron-builder build --mac --publish never",
-        "postinstall": "electron-builder install-app-deps"
-    },
-    "husky": {
-        "hooks": {
-            "pre-commit": "lint-staged"
-        }
-    },
-    "lint-staged": {
-        "{src,test,mocks}/**/*.{json,css,scss,md}": [
-            "prettier --config ./.prettierrc --ignore-path ./.prettierignore --write"
-        ],
-        "{src,test,mocks}/**/*.{js,ts,tsx}": [
-            "prettier --config ./.prettierrc --ignore-path ./.prettierignore --write",
-            "eslint --ext=jsx,js,ts,tsx --fix src"
-        ]
-    },
-    "build": {
-        "productName": "BlueBubbles",
-        "appId": "com.BlueBubbles.BlueBubbles-Server",
-        "directories": {
-            "output": "release",
-            "buildResources": "appResources"
-        },
-        "files": [
-            "dist/",
-            "node_modules/",
-            "appResources/",
-            "package.json"
-        ],
-        "asar": true,
-        "asarUnpack": [
-            "**/node_modules/ngrok/bin/**"
-        ],
-        "extraResources": [
-            "**/appResources/**"
-        ],
-        "mac": {
-            "category": "public.app-category.social-networking",
-            "target": [
-                {
-                    "target": "dmg"
-                },
-                {
-                    "target": "zip"
-                }
-            ],
-            "type": "distribution",
-            "icon": "./icons/regular/icon-512.png",
-            "darkModeSupport": true,
-            "hardenedRuntime": true,
-            "entitlements": "./build/entitlements.mac.plist",
-            "entitlementsInherit": "./build/entitlements.mac.plist",
-            "gatekeeperAssess": false,
-            "minimumSystemVersion": "10.11.6"
-        },
-        "dmg": {
-            "sign": false
-        },
-        "afterSign": "./build/notarize.js"
+        "start": "concurrently \"cd ./bluebubbles-server-ui && npm run start\" \"cd ./bluebubbles-server && npm run start\"",
+        "build-ui": "cd ./bluebubbles-server-ui && npm run build && cp -R ./build/* ../bluebubbles-server/dist/ && cd ../",
+        "build-server": "cd ./bluebubbles-server && npm run dist && cd ../",
+        "build": "npm run build-ui && npm run build-server && rm -rf ./dist && mkdir ./dist && cp -R ./bluebubbles-server/release/* ./dist/ && rm -rf ./bluebubbles-server/release/ && rm -rf ./bluebubbles-server-ui/build/"
     },
     "repository": {
         "type": "git",
@@ -85,129 +26,12 @@
         "url": "https://www.github.com/BlueBubblesApp/BlueBubbles-Server/issues"
     },
     "homepage": "https://www.bluebubbles.app",
-    "devDependencies": {
-        "@babel/core": "^7.12.10",
-        "@babel/plugin-proposal-class-properties": "^7.12.1",
-        "@babel/plugin-proposal-decorators": "^7.12.1",
-        "@babel/polyfill": "^7.12.1",
-        "@babel/preset-env": "^7.12.11",
-        "@babel/preset-react": "^7.12.10",
-        "@babel/preset-typescript": "^7.12.7",
-        "@hot-loader/react-dom": "^16.13.0",
-        "@types/better-sqlite3": "^7.4.2",
-        "@types/chartist": "^0.9.48",
-        "@types/classnames": "^2.2.10",
-        "@types/crypto-js": "^4.0.1",
-        "@types/electron-devtools-installer": "^2.2.0",
-        "@types/find-process": "^1.2.0",
-        "@types/google-libphonenumber": "^7.4.18",
-        "@types/history": "^4.7.5",
-        "@types/koa": "^2.13.4",
-        "@types/koa-cors": "^0.0.2",
-        "@types/koa-json": "^2.0.20",
-        "@types/koa-router": "^7.4.4",
-        "@types/localtunnel": "^2.0.1",
-        "@types/mime-types": "^2.1.1",
-        "@types/node": "^13.13.15",
-        "@types/node-forge": "^0.10.10",
-        "@types/numeral": "^0.0.26",
-        "@types/plist": "^3.0.2",
-        "@types/qrcode.react": "^1.0.0",
-        "@types/react": "^16.9.34",
-        "@types/react-dom": "^16.9.6",
-        "@types/react-redux": "^7.1.7",
-        "@types/react-router-dom": "^5.1.4",
-        "@types/react-test-renderer": "^16.9.2",
-        "@types/socket.io": "^2.1.4",
-        "@types/validatorjs": "^3.15.0",
-        "@types/webdriverio": "^5.0.0",
-        "@types/webpack-env": "^1.15.1",
-        "@typescript-eslint/eslint-plugin": "^2.28.0",
-        "@typescript-eslint/parser": "^2.28.0",
-        "babel-loader": "^8.1.0",
-        "cross-env": "^7.0.2",
-        "css-loader": "^3.5.2",
-        "electron": "^11.5.0",
-        "electron-builder": "^22.9.1",
-        "electron-notarize": "^1.0.0",
-        "eslint": "^6.8.0",
-        "eslint-config-airbnb": "^18.2.0",
-        "eslint-config-prettier": "^6.10.1",
-        "eslint-plugin-import": "^2.22.0",
-        "eslint-plugin-jsx-a11y": "^6.3.1",
-        "eslint-plugin-prettier": "^3.1.3",
-        "eslint-plugin-react": "^7.20.1",
-        "eslint-plugin-react-hooks": "^3.0.0",
-        "file-loader": "^6.0.0",
-        "fork-ts-checker-webpack-plugin": "^4.1.3",
-        "html-webpack-plugin": "^4.2.0",
-        "husky": "^4.2.5",
-        "image-webpack-loader": "^6.0.0",
-        "lint-staged": "^10.1.5",
-        "node-pre-gyp": "^0.15.0",
-        "node-sass": "^4.13.1",
-        "prettier": "^2.0.4",
-        "react-hot-loader": "^4.12.20",
-        "react-test-renderer": "^16.13.1",
-        "sass-loader": "^8.0.2",
-        "source-map-loader": "^0.2.4",
-        "spectron": "^10.0.1",
-        "style-loader": "^1.1.4",
-        "typescript": "^4.1.3",
-        "webpack": "^4.42.1",
-        "webpack-cli": "^3.3.11",
-        "webpack-dev-server": "^3.10.3",
-        "webpack-merge": "^4.2.2",
-        "webpack-node-externals": "^1.7.2"
-    },
-    "dependencies": {
-        "@firebase/app-types": "^0.6.2",
-        "@firebase/auth-interop-types": "^0.1.6",
-        "@firebase/util": "^1.1.0",
-        "@material-ui/core": "^4.9.11",
-        "@material-ui/icons": "^4.9.1",
-        "@peculiar/x509": "^1.6.1",
-        "better-sqlite3": "^7.4.5",
-        "blurhash": "^1.1.3",
-        "byte-base64": "^1.1.0",
-        "compare-versions": "^3.6.0",
-        "conditional-decorator": "^0.1.7",
-        "crypto-js": "^4.0.0",
-        "electron-log": "^4.2.4",
-        "electron-updater": "4.3.9",
-        "find-process": "^1.4.4",
-        "firebase-admin": "^9.10.0",
-        "google-libphonenumber": "^3.2.10",
-        "koa": "^2.13.1",
-        "koa-body": "^4.2.0",
-        "koa-cors": "^0.0.16",
-        "koa-json": "^2.0.2",
-        "koa-router": "^10.1.1",
-        "localtunnel": "^2.0.2",
-        "macos-version": "^5.2.0",
-        "mime-types": "^2.1.32",
-        "ngrok": "^4.2.2",
-        "node-forge": "^0.10.0",
-        "numeral": "^2.0.6",
-        "plist": "^3.0.4",
-        "qrcode.react": "^1.0.0",
-        "react": "^16.13.1",
-        "react-dom": "^16.13.1",
-        "react-dropzone": "^10.2.2",
-        "react-router-dom": "^5.2.0",
-        "react-router-transition": "^2.0.0",
-        "read-chunk": "^3.2.0",
-        "recursive-copy": "^2.0.13",
-        "reflect-metadata": "^0.1.13",
-        "slugify": "^1.6.0",
-        "socket.io": "3.1.2",
-        "typeorm": "^0.2.41",
-        "validatorjs": "^3.22.1",
-        "zx": "^4.2.0"
-    },
     "devEngines": {
-        "node": ">=14.x",
-        "npm": ">=6.x",
+        "node": ">=16.x",
+        "npm": ">=7.x",
         "yarn": ">=1.x"
+    },
+    "devDependencies": {
+        "concurrently": "^7.0.0"
     }
 }
