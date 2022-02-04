@@ -25,8 +25,6 @@ export const WebhooksSlice = createSlice({
     reducers: {
         addAll: (state, action: PayloadAction<Array<WebhookItem>>) => {
             for (const i of action.payload) {
-                console.log('adding');
-                console.log(i);
                 state.webhooks.push(i);
             }
         },

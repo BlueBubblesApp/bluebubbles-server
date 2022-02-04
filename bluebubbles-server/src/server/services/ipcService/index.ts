@@ -94,7 +94,6 @@ export class IPCService {
         });
 
         ipcMain.handle("create-webhook", async (event, payload) => {
-            console.log(payload);
             const res = await Server().repo.addWebhook(payload.url, payload.events);
             const output = { id: res.id, url: res.url, events: res.events, created: res.created };
             return output;
