@@ -354,7 +354,9 @@ export class BlueBubblesHelperService {
 
             // Handle events sent from
             if (data.event) {
-                if (data.event === "started-typing") {
+                if (data.event === 'ping') {
+                    Server().log("Private API Helper connected!");
+                } else if (data.event === "started-typing") {
                     Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
                     Server().log(`Started typing! ${data.guid}`);
                 } else if (data.event === "stopped-typing") {
