@@ -55,22 +55,6 @@ export const GuidesLayout = (): JSX.Element => {
                     <WrapItem>
                         <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
-                                https://documenter.getpostman.com
-                            </Text>
-                            <Heading size='md' my={2}>
-                                <LinkOverlay href='https://documenter.getpostman.com/view/765844/UV5RnfwM' target='_blank'>
-                                    REST API
-                                </LinkOverlay>
-                            </Heading>
-                            <Text>
-                                If you're a developer looking to utilize the REST API to interact with iMessage in unique
-                                ways, look no further. Perform automation, orchestration, or basic scripting!
-                            </Text>
-                        </LinkBox>
-                    </WrapItem>
-                    <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
-                            <Text color='gray'>
                                 https://bluebubbles.app/faq
                             </Text>
                             <Heading size='md' my={2}>
@@ -81,6 +65,38 @@ export const GuidesLayout = (): JSX.Element => {
                             <Text>
                                 If you have any questions, someone else has likely already asked them! View our frequently
                                 asked questions to figure out how you may be able to solve an issue.
+                            </Text>
+                        </LinkBox>
+                    </WrapItem>
+                    <WrapItem>
+                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                            <Text color='gray'>
+                                https://docs.bluebubbles.app/private-api
+                            </Text>
+                            <Heading size='md' my={2}>
+                                <LinkOverlay href='https://docs.bluebubbles.app/private-api/installation' target='_blank'>
+                                    Private API Setup Guide
+                                </LinkOverlay>
+                            </Heading>
+                            <Text>
+                                If you want to have the ability to send reactions, replies, effects, subjects, etc. Read
+                                this guide to figure out how to setup the Private API features.
+                            </Text>
+                        </LinkBox>
+                    </WrapItem>
+                    <WrapItem>
+                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                            <Text color='gray'>
+                                https://documenter.getpostman.com
+                            </Text>
+                            <Heading size='md' my={2}>
+                                <LinkOverlay href='https://documenter.getpostman.com/view/765844/UV5RnfwM' target='_blank'>
+                                    REST API
+                                </LinkOverlay>
+                            </Heading>
+                            <Text>
+                                If you're a developer looking to utilize the REST API to interact with iMessage in unique
+                                ways, look no further. Perform automation, orchestration, or basic scripting!
                             </Text>
                         </LinkBox>
                     </WrapItem>
