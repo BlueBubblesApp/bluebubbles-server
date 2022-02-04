@@ -77,7 +77,7 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
                     setCompletedSteps([...completedSteps, step]);
                 }}/>
             </Box>
-            <Box position='fixed' bottom={0} left={0} width='100%' height='80px' bg={useColorModeValue('white', 'gray.900')}>
+            <Box position='fixed' bottom={0} left={0} width='100%' height='80px'>
                 <Divider />
                 <Flex justifyContent='space-between' alignItems='center' mx={5}>
                     <Button

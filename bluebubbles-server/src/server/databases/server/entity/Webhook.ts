@@ -8,6 +8,10 @@ export class Webhook {
     @Column("text", { name: "url", nullable: false, unique: true })
     url: string;
 
+    // JSON String
+    @Column("text", { name: "events", nullable: false })
+    events: string;
+
     @CreateDateColumn()
     created: Date;
 }

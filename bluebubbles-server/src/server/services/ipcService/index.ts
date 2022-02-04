@@ -90,12 +90,13 @@ export class IPCService {
 
         ipcMain.handle("get-webhooks", async (event, args) => {
             const res = await Server().repo.getWebhooks();
-            return res.map((e) => ({ id: e.id, url: e.url, created: e.created }))
+            return res.map((e) => ({ id: e.id, url: e.url, events: e.events, created: e.created }))
         });
 
-        ipcMain.handle("create-webhook", async (event, url) => {
-            const res = await Server().repo.addWebhook(url);
-            const output = { id: res.id, url: res.url, created: res.created };
+        ipcMain.handle("create-webhook", async (event, payload) => {
+            console.log(payload);
+            const res = await Server().repo.addWebhook(payload.url, payload.events);
+            const output = { id: res.id, url: res.url, events: res.events, created: res.created };
             return output;
         });
 

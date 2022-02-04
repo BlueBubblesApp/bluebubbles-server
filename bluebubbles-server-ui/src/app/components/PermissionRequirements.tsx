@@ -68,11 +68,11 @@ export const PermissionRequirements = (): JSX.Element => {
             <UnorderedList mt={2} ml={8}>
                 {permissions.map(e => (
                     <ListItem key={e.name}>
-                        <Stack direction='row'>
+                        <Stack direction='row' align='center'>
                             <Text fontSize='md'><strong>{e.name}</strong>:&nbsp;
                                 <Box as='span' color={e.pass ? 'green' : 'red'}>{e.pass ? 'Pass' : 'Fail'}</Box>
                             </Text>
-                            {(!e.pass) ? (
+                            {(e.pass) ? (
                                 <Popover trigger='hover'>
                                     <PopoverTrigger>
                                         <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>

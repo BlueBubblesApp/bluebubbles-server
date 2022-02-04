@@ -13,6 +13,7 @@ import {
 import { FiTrash } from 'react-icons/fi';
 import { remove, WebhookItem } from '../../slices/WebhooksSlice';
 import { useAppDispatch } from '../../hooks';
+import { webhookEventValueToLabel } from '../../utils/GenericUtils';
 
 
 export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): JSX.Element => {
@@ -23,6 +24,7 @@ export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): J
             <Thead>
                 <Tr>
                     <Th>URL</Th>
+                    <Th>Events</Th>
                     <Th isNumeric>Delete</Th>
                 </Tr>
             </Thead>
@@ -30,6 +32,7 @@ export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): J
                 {webhooks.map(item => (
                     <Tr key={item.id}>
                         <Td>{item.url}</Td>
+                        <Td>{JSON.parse(item.events).map((e: string) => webhookEventValueToLabel(e)).join(', ')}</Td>
                         <Td isNumeric>
                             <Box _hover={{ cursor: 'pointer' }} onClick={() => dispatch(remove(item.id))}>
                                 <Icon as={FiTrash} />

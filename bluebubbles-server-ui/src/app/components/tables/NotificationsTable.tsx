@@ -11,7 +11,7 @@ import {
     Flex,
     Text
 } from '@chakra-ui/react';
-import { VscError } from 'react-icons/vsc';
+import { BiErrorAlt } from 'react-icons/bi';
 import { AiOutlineWarning, AiOutlineInfoCircle } from 'react-icons/ai';
 import { BsCheckAll } from 'react-icons/bs';
 import { NotificationItem } from '../../slices/NotificationsSlice';
@@ -20,7 +20,7 @@ import { IconType } from 'react-icons';
 const AlertTypeIcon: NodeJS.Dict<IconType> = {
     warn: AiOutlineWarning,
     info: AiOutlineInfoCircle,
-    error: VscError
+    error: BiErrorAlt
 };
 
 export const NotificationsTable = ({ notifications }: { notifications: Array<NotificationItem> }): JSX.Element => {

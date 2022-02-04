@@ -58,7 +58,7 @@ export const FeatureSettings = (): JSX.Element => {
                                 <Checkbox id='start_via_terminal' isChecked={useTerminal} onChange={onCheckboxToggle}>Always Start via Terminal</Checkbox>
                                 <FormHelperText>
                                     When BlueBubbles starts up, it will auto-reload itself in terminal mode.
-                                    When in terminal, type `help` for command information.
+                                    When in terminal, type "help" for command information.
                                 </FormHelperText>
                             </FormControl>
                         </AccordionPanel>

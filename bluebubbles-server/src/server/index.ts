@@ -866,8 +866,11 @@ class BlueBubblesServer extends EventEmitter {
             },
             {
                 name: 'Full Disk Access',
-                pass: await FileSystem.hasFullDiskAccess(),
-                solution: 'Open System Preferences > Security > Privacy > Full Disk Access, then add BlueBubbles'
+                pass: this.hasDiskAccess,
+                solution: (
+                    'Open System Preferences > Security > Privacy > Full Disk Access, ' +
+                    'then add BlueBubbles. Lastly, restart BlueBubbles.'
+                )
             }
         ];
 

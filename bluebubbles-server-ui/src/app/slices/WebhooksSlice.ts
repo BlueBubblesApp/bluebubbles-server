@@ -1,11 +1,13 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { store } from '../store';
+import { MultiSelectValue } from '../types';
 import { createWebhook, deleteWebhook } from '../utils/IpcUtils';
 import { showErrorToast, showSuccessToast } from '../utils/ToastUtils';
 
 export interface WebhookItem {
     id: number;
     url: string;
+    events: string;
     created: Date;
 }
 
@@ -23,11 +25,13 @@ export const WebhooksSlice = createSlice({
     reducers: {
         addAll: (state, action: PayloadAction<Array<WebhookItem>>) => {
             for (const i of action.payload) {
+                console.log('adding');
+                console.log(i);
                 state.webhooks.push(i);
             }
         },
-        create: (state, action: PayloadAction<string>) => {
-            createWebhook(action.payload).then((e) => {
+        create: (state, action: PayloadAction<{ url: string, events: Array<MultiSelectValue> }>) => {
+            createWebhook(action.payload).then((e: any) => {
                 store.dispatch(addAll([e]));
                 showSuccessToast({
                     id: 'webhooks',

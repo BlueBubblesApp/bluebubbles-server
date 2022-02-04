@@ -1,11 +1,6 @@
 import React, { useEffect } from 'react';
 import { ipcRenderer } from 'electron';
 import {
-    Accordion,
-    AccordionItem,
-    AccordionButton,
-    AccordionPanel,
-    AccordionIcon,
     Spacer,
     Box,
     Badge,
@@ -14,7 +9,6 @@ import {
     SimpleGrid,
     Stack,
     Text,
-    Center,
     IconButton,
     Popover,
     PopoverCloseButton,
@@ -25,10 +19,11 @@ import {
     PopoverTrigger,
     UnorderedList,
     ListItem,
-    SkeletonText
+    SkeletonText,
+    Tooltip
 } from '@chakra-ui/react';
 import QRCode from 'react-qr-code';
-import { AiOutlineInfoCircle } from 'react-icons/ai';
+import { AiOutlineInfoCircle, AiOutlineQrcode } from 'react-icons/ai';
 
 import './styles.css';
 import { useAppDispatch, useAppSelector } from '../../hooks';
@@ -155,13 +150,45 @@ export const HomeLayout = (): JSX.Element => {
                                 ) : (
                                     <Text fontSize='md'>{address}</Text>
                                 )}
-                                <IconButton
-                                    ml={3}
-                                    size='xs'
-                                    aria-label='Copy address'
-                                    icon={<BiCopy />}
-                                    onClick={() => copyToClipboard(address)}
-                                />
+                                <Tooltip label='Show QR Code'>
+                                    <IconButton
+                                        ml={3}
+                                        size='md'
+                                        aria-label='Copy address'
+                                        icon={<BiCopy size='22px' />}
+                                        onClick={() => copyToClipboard(address)}
+                                    />
+                                </Tooltip>
+                                <Popover placement='bottom'>
+                                    <PopoverTrigger>
+                                        <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }} >
+                                            <Tooltip label='Show QR Code'>
+                                                <IconButton
+                                                    ml={1}
+                                                    size='md'
+                                                    aria-label='Show QR Code'
+                                                    icon={<AiOutlineQrcode size='24px' />}
+                                                />
+                                            </Tooltip>
+                                        </Box>
+                                    </PopoverTrigger>
+                                    <PopoverContent>
+                                        <PopoverArrow />
+                                        <PopoverCloseButton />
+                                        <PopoverHeader>QR Code</PopoverHeader>
+                                        <PopoverBody>
+                                            <Flex justifyContent='center' flexDirection='column' alignItems='center'>
+                                                <Text>
+                                                    Your QR Code contains your server configuration so that clients can connect.
+                                                    Your QR Code should remain <strong>private</strong> as it contains sensitive information!
+                                                </Text>
+                                                <Box border="5px solid" borderColor='white' mt={4} height='266px' width='266px'>
+                                                    {(qrCode) ? <QRCode value={qrCode as string} /> : null}
+                                                </Box>
+                                            </Flex>
+                                        </PopoverBody>
+                                    </PopoverContent>
+                                </Popover>
                             </Flex>
                             <Flex flexDirection="row">
                                 <Text fontSize='md' fontWeight='bold' mr={2}>Local Port: </Text>
@@ -173,45 +200,6 @@ export const HomeLayout = (): JSX.Element => {
                             </Flex>
                         </Stack>
                         <Divider orientation="vertical" />
-                        <Flex flexDirection='row' alignItems='center' justifyContent='flex-start'>
-                            <Popover trigger='hover'>
-                                <PopoverTrigger>
-                                    <Box mr={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
-                                        <AiOutlineInfoCircle />
-                                    </Box>
-                                </PopoverTrigger>
-                                <PopoverContent>
-                                    <PopoverArrow />
-                                    <PopoverCloseButton />
-                                    <PopoverHeader>Information</PopoverHeader>
-                                    <PopoverBody>
-                                        <Text>
-                                            Your QR Code contains your server configuration so that clients can connect.
-                                            Your QR Code should remain <strong>private</strong> as it contains sensitive information!
-                                        </Text>
-                                    </PopoverBody>
-                                </PopoverContent>
-                            </Popover>
-                            <Accordion allowMultiple>
-                                <AccordionItem>
-                                    <AccordionButton>
-                                        <Box textAlign='left' width="15.5em">
-                                            <Text>Show / Hide Your QR Code</Text>
-                                        </Box>
-                                        <AccordionIcon />
-                                    </AccordionButton>
-                                    <AccordionPanel pb={4}>
-                                        {qrCode
-                                            ? (
-                                                <Box border="5px solid" borderColor='white'>
-                                                    <QRCode value={qrCode as string} />
-                                                </Box>
-                                            ) : <Center><Text color='red'>Please complete the setup!</Text></Center>
-                                        }
-                                    </AccordionPanel>
-                                </AccordionItem>
-                            </Accordion>
-                        </Flex>
                     </Flex>
                 </Stack>
                 <Stack direction='column' p={5}>
@@ -249,12 +237,11 @@ export const HomeLayout = (): JSX.Element => {
                                 color='gray.500'
                                 fontWeight='semibold'
                                 letterSpacing='wide'
-                                fontSize='3xl'
                             >
                                 {(totalMessages === null) ? (
                                     <SkeletonText height={20} mt={2} noOfLines={3} />
                                 ) : (
-                                    <Text>{formatNumber(totalMessages)}</Text>
+                                    <Text fontSize='2vw'>{formatNumber(totalMessages)}</Text>
                                 )}
                             </Box>
                         </Box>
@@ -267,12 +254,11 @@ export const HomeLayout = (): JSX.Element => {
                                 color='gray.500'
                                 fontWeight='semibold'
                                 letterSpacing='wide'
-                                fontSize='3xl'
                             >
                                 {(topGroup === null) ? (
                                     <SkeletonText height={20} mt={2} noOfLines={3} />
                                 ) : (
-                                    <Text>{topGroup}</Text>
+                                    <Text fontSize='2vw'>{topGroup}</Text>
                                 )}
                             </Box>
                         </Box>
@@ -285,12 +271,11 @@ export const HomeLayout = (): JSX.Element => {
                                 color='gray.500'
                                 fontWeight='semibold'
                                 letterSpacing='wide'
-                                fontSize='3xl'
                             >
                                 {(bestFriend === null) ? (
                                     <SkeletonText height={20} mt={2} noOfLines={3} />
                                 ) : (
-                                    <Text>{bestFriend}</Text>
+                                    <Text fontSize='2vw'>{bestFriend}</Text>
                                 )}
                             </Box>
                         </Box>
@@ -303,12 +288,11 @@ export const HomeLayout = (): JSX.Element => {
                                 color='gray.500'
                                 fontWeight='semibold'
                                 letterSpacing='wide'
-                                fontSize='3xl'
                             >
                                 {(dailyMessages === null) ? (
                                     <SkeletonText height={20} mt={2} noOfLines={3} />
                                 ) : (
-                                    <Text>{formatNumber(dailyMessages)}</Text>
+                                    <Text fontSize='2vw'>{formatNumber(dailyMessages)}</Text>
                                 )}
                             </Box>
                         </Box>
@@ -321,12 +305,11 @@ export const HomeLayout = (): JSX.Element => {
                                 color='gray.500'
                                 fontWeight='semibold'
                                 letterSpacing='wide'
-                                fontSize='3xl'
                             >
                                 {(totalPictures === null) ? (
                                     <SkeletonText height={20} mt={2} noOfLines={3} />
                                 ) : (
-                                    <Text>{formatNumber(totalPictures)}</Text>
+                                    <Text fontSize='2vw'>{formatNumber(totalPictures)}</Text>
                                 )}
                             </Box>
                         </Box>
@@ -339,12 +322,11 @@ export const HomeLayout = (): JSX.Element => {
                                 color='gray.500'
                                 fontWeight='semibold'
                                 letterSpacing='wide'
-                                fontSize='3xl'
                             >
                                 {(totalVideos === null) ? (
                                     <SkeletonText height={20} mt={2} noOfLines={3} />
                                 ) : (
-                                    <Text>{formatNumber(totalVideos)}</Text>
+                                    <Text fontSize='2vw'>{formatNumber(totalVideos)}</Text>
                                 )}
                             </Box>
                         </Box>

@@ -67,7 +67,7 @@ export class SocketRoutes {
             if (callback) callback(resData);
             else socket.emit(channel, resData);
 
-            if (resData.error) Server().log(resData.error.message, "error");
+            if (resData.error) Server().log(resData.error.message, "debug");
         };
 
         /**

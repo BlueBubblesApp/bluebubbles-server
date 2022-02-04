@@ -211,14 +211,14 @@ export const FcmLayout = (): JSX.Element => {
 
                 <SimpleGrid columns={2} spacing={5}>
                     <DropZone
-                        text="Drag n' Drop google-services.json"
-                        loadedText="google-services.json Successfully Loaded!"
+                        text="Drag n' Drop Google Services JSON"
+                        loadedText="Google Services JSON Successfully Loaded!"
                         isDragging={isDragging}
                         isLoaded={clientLoaded}
                     />
                     <DropZone
-                        text="Drag n' Drop *-firebase-adminsdk-*.json"
-                        loadedText="*-firebase-adminsdk-*.json Successfully Loaded!"
+                        text="Drag n' Drop Admin SDK JSON"
+                        loadedText="Admin SDK JSON Successfully Loaded!"
                         isDragging={isDragging}
                         isLoaded={serverLoaded}
                     />

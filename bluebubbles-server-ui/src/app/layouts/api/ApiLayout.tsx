@@ -101,21 +101,22 @@ export const ApiLayout = (): JSX.Element => {
                     </Flex>
                     <Divider orientation='horizontal' />
                     <Spacer />
-                    <Menu>
-                        <MenuButton
-                            as={Button}
-                            rightIcon={<BsChevronDown />}
-                            width="12em"
-                            mr={5}
-                        >
-                            Manage
-                        </MenuButton>
-                        <MenuList>
-                            <MenuItem icon={<AiOutlinePlus />} onClick={setDialogOpen.on}>
-                                Add Webhook
-                            </MenuItem>
-                        </MenuList>
-                    </Menu>
+                    <Box>
+                        <Menu>
+                            <MenuButton
+                                as={Button}
+                                rightIcon={<BsChevronDown />}
+                                width="12em"
+                            >
+                                Manage
+                            </MenuButton>
+                            <MenuList>
+                                <MenuItem icon={<AiOutlinePlus />} onClick={setDialogOpen.on}>
+                                    Add Webhook
+                                </MenuItem>
+                            </MenuList>
+                        </Menu>
+                    </Box>
                     <Spacer />
                     <WebhooksTable webhooks={webhooks} />
                 </Stack>
@@ -123,7 +124,7 @@ export const ApiLayout = (): JSX.Element => {
 
             <AddWebhookDialog
                 modalRef={dialogRef}
-                onConfirm={(url) => dispatch(createWebhook(url))}
+                onConfirm={(url, events) => dispatch(createWebhook({ url, events }))}
                 isOpen={dialogOpen}
                 onClose={() => setDialogOpen.off()}
             />

@@ -55,20 +55,22 @@ export const DevicesLayout = (): JSX.Element => {
             <Stack direction='column' p={5}>
                 <Text fontSize='2xl'>Controls</Text>
                 <Divider orientation='horizontal' />
-                <Menu>
-                    <MenuButton
-                        as={Button}
-                        rightIcon={<BsChevronDown />}
-                        width="12em"mr={5}
-                    >
-                        Manage
-                    </MenuButton>
-                    <MenuList>
-                        <MenuItem icon={<FiTrash />} onClick={() => confirm('clearDevices')}>
-                            Clear Devices
-                        </MenuItem>
-                    </MenuList>
-                </Menu>
+                <Box>
+                    <Menu>
+                        <MenuButton
+                            as={Button}
+                            rightIcon={<BsChevronDown />}
+                            width="12em"mr={5}
+                        >
+                            Manage
+                        </MenuButton>
+                        <MenuList>
+                            <MenuItem icon={<FiTrash />} onClick={() => confirm('clearDevices')}>
+                                Clear Devices
+                            </MenuItem>
+                        </MenuList>
+                    </Menu>
+                </Box>
             </Stack>
             <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>

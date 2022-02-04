@@ -175,7 +175,7 @@ export class ChatRouter {
     static async markRead(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
         await Server().privateApiHelper.markChatRead(guid);
-        await Server().emitMessage('chat-read-status', {
+        await Server().emitMessage('chat-read-status-changed', {
             chatGuid: guid,
             read: true
         });

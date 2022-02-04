@@ -4,6 +4,7 @@ import { ConnectionSettings } from './connection/ConnectionSettings';
 import { FeatureSettings } from './features/FeatureSettings';
 import { UpdateSettings } from './update/UpdateSettings';
 import { ResetSettings } from './reset/ResetSettings';
+import { ThemeSettings } from './theme/ThemeSettings';
 import { PermissionRequirements } from '../../components/PermissionRequirements';
 
 
@@ -14,13 +15,13 @@ export const SettingsLayout = (): JSX.Element => {
                 <ConnectionSettings />
                 <FeatureSettings />
                 <UpdateSettings />
-                <ResetSettings />
-
+                <ThemeSettings />
                 <Box p={2}>
                     <Text fontSize='2xl'>Permission Status</Text>
                     <Divider orientation='horizontal' my={3}/>
                     <PermissionRequirements />
                 </Box>
+                <ResetSettings />
             </Box>
         </section>
     );

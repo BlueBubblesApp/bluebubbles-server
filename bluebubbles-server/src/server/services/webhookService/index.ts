@@ -16,6 +16,9 @@ export class WebhookService {
     async dispatch(event: WebhookEvent) {
         const webhooks = await Server().repo.getWebhooks();
         for (const i of webhooks) {
+            const eventTypes = JSON.parse(i.events) as Array<string>;
+            console.log(eventTypes);
+            if (!eventTypes.includes('*') && !eventTypes.includes(event.type)) continue;
             Server().log(`Dispatching event to webhook: ${i.url}`, 'debug');
 
             // We don't need to await this

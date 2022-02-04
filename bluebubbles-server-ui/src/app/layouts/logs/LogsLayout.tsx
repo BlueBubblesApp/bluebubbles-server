@@ -124,6 +124,12 @@ export const LogsLayout = (): JSX.Element => {
                                 Manage
                             </MenuButton>
                             <MenuList>
+                                <MenuItem icon={<VscDebugRestart />} onClick={() => confirm('restartServices')}>
+                                    Restart Services
+                                </MenuItem>
+                                <MenuItem icon={<BsBootstrapReboot />} onClick={() => confirm('fullRestart')}>
+                                    Full Restart
+                                </MenuItem>
                                 <MenuItem icon={<FiExternalLink />} onClick={() => openLogLocation()}>
                                     Open Log Location
                                 </MenuItem>
@@ -144,12 +150,6 @@ export const LogsLayout = (): JSX.Element => {
                             <MenuList>
                                 <MenuItem icon={<BsTerminal />} onClick={() => confirm('restartViaTerminal')}>
                                     Restart via Terminal
-                                </MenuItem>
-                                <MenuItem icon={<VscDebugRestart />} onClick={() => confirm('restartServices')}>
-                                    Restart Services
-                                </MenuItem>
-                                <MenuItem icon={<BsBootstrapReboot />} onClick={() => confirm('fullRestart')}>
-                                    Full Restart
                                 </MenuItem>
                                 <MenuItem icon={<AiOutlineClear />} onClick={() => confirm('clearEventCache')}>
                                     Clear Event Cache

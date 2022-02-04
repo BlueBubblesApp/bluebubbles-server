@@ -156,14 +156,14 @@ export class ServerRepository extends EventEmitter {
         return await repo.find();
     }
 
-    public async addWebhook(url: string): Promise<Webhook> {
+    public async addWebhook(url: string, events: Array<{ label: string, value: string }>): Promise<Webhook> {
         const repo = this.webhooks();
         const item = await repo.findOne({ url });
 
         // If the webhook exists, don't re-add it, just return it
         if (item) return item;
 
-        const webhook = repo.create({ url });
+        const webhook = repo.create({ url, events: JSON.stringify(events.map(e => e.value)) });
         return await repo.save(webhook);
     }
 

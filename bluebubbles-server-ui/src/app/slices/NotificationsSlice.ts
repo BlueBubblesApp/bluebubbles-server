@@ -24,19 +24,30 @@ export const NotificationsSlice = createSlice({
     initialState,
     reducers: {
         add: (state, action: PayloadAction<NotificationItem>) => {
-            state.notifications.push(action.payload);
-            state.notifications.sort((a, b) => a.timestamp > b.timestamp ? 1 : -1);
-            state.notifications = state.notifications.slice(0, state.max);
-            state.notifications = state.notifications.reverse();
+            const exists = state.notifications.find(e => e.id === action.payload.id);
+            if (!exists) {
+                state.notifications.push(action.payload);
+                state.notifications.sort((a, b) => a.timestamp > b.timestamp ? 1 : -1);
+                state.notifications = state.notifications.slice(0, state.max);
+                state.notifications = state.notifications.reverse();
+            }
         },
         addAll: (state, action: PayloadAction<Array<NotificationItem>>) => {
+            let added = 0;
             for (const i of action.payload) {
-                state.notifications.push(i);
+                const exists = state.notifications.find(e => e.id === i.id);
+                if (!exists) {
+                    state.notifications.push(i);
+                    added += 1;
+                }
+                
             }
             
-            state.notifications.sort((a, b) => a.timestamp > b.timestamp ? 1 : -1);
-            state.notifications = state.notifications.slice(0, state.max);
-            state.notifications = state.notifications.reverse();
+            if (added > 0) {
+                state.notifications.sort((a, b) => a.timestamp > b.timestamp ? 1 : -1);
+                state.notifications = state.notifications.slice(0, state.max);
+                state.notifications = state.notifications.reverse();
+            }
         },
         prune: (state) => {
             state.notifications = state.notifications.slice(0, state.max);

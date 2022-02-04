@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+import { MultiSelectValue } from '../types';
 import { showErrorToast, showSuccessToast } from './ToastUtils';
 
 export const getConfig = async () => {
@@ -63,8 +64,8 @@ export const getWebhooks = async () => {
     return await ipcRenderer.invoke('get-webhooks');
 };
 
-export const createWebhook = async (url: string) => {
-    return await ipcRenderer.invoke('create-webhook', url);
+export const createWebhook = async (payload: { url: string, events: Array<MultiSelectValue> }) => {
+    return await ipcRenderer.invoke('create-webhook', payload);
 };
 
 export const deleteWebhook = async ({ url = null, id = null }: { url?: string | null, id?: number | null }) => {

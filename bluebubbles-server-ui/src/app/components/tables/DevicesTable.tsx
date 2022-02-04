@@ -13,7 +13,7 @@ import { DeviceItem } from '../../slices/DevicesSlice';
 
 export const DevicesTable = ({ devices }: { devices: Array<DeviceItem> }): JSX.Element => {
     return (
-        <Table variant="striped" colorScheme="blue">
+        <Table variant="striped" colorScheme="blue" size='sm'>
             <TableCaption>Devices registered for notifications over Google Play Services</TableCaption>
             <Thead>
                 <Tr>
@@ -25,9 +25,9 @@ export const DevicesTable = ({ devices }: { devices: Array<DeviceItem> }): JSX.E
             <Tbody>
                 {devices.map(item => (
                     <Tr key={item.name}>
-                        <Td maxWidth='300px'>{item.name}</Td>
-                        <Td maxWidth='400px'>{`${item.id.substring(0, 100)}...`}</Td>
-                        <Td maxWidth='50px' isNumeric>{new Date(item.lastActive).toLocaleString()}</Td>
+                        <Td wordBreak='break-all'>{item.name}</Td>
+                        <Td wordBreak='break-all'>{`${item.id.substring(0, 100)}...`}</Td>
+                        <Td isNumeric>{new Date(item.lastActive).toLocaleString()}</Td>
                     </Tr>
                 ))}
             </Tbody>

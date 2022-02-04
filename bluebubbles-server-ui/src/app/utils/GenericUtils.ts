@@ -1,3 +1,4 @@
+import { webhookEventOptions } from '../constants';
 import { showSuccessToast } from './ToastUtils';
 
 export const testJson = (value: string): NodeJS.Dict<any> | null => {
@@ -56,4 +57,9 @@ export const copyToClipboard = async (data: string) => {
     showSuccessToast({
         description: 'Copied to clipboard!'
     });
+};
+
+export const webhookEventValueToLabel = (value: string) => {
+    const output = webhookEventOptions.filter(e => e.value === value).map(e => e.label);
+    return output && output.length > 0 ? output[0] : 'Unknown';
 };

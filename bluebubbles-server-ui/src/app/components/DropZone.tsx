@@ -42,6 +42,7 @@ export const DropZone = ({ text, isDragging = false, isLoaded = false, loadedTex
                         color={dragColor}
                         transition='all .2s ease'
                         fontSize={dragFontSize}
+                        textAlign='center'
                     >
                         {isLoaded && !isDragging ? loadedText : text}
                     </Text>

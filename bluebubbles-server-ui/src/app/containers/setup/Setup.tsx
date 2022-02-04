@@ -40,7 +40,6 @@ const NavBar = (): JSX.Element => {
         <Flex
             height="20"
             alignItems="center"
-            bg={useColorModeValue('white', 'gray.900')}
             borderBottomWidth="1px"
             borderBottomColor={useColorModeValue('gray.200', 'gray.700')}
             justifyContent='space-between'
