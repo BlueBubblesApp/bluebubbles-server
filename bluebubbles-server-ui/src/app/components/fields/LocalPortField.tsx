@@ -43,7 +43,7 @@ export const LocalPortField = ({ helpText }: LocalPortFieldProps): JSX.Element =
             return;
         }
 
-        dispatch(setConfig({ name: 'socket_port', value: newPort }));
+        dispatch(setConfig({ name: 'socket_port', value: theNewPort }));
         if (hasPortError) setPortError('');
         showSuccessToast({
             id: 'settings',

@@ -39,8 +39,10 @@ export const AddWebhookDialog = ({
     const [url, setUrl] = useState('');
     const [selectedEvents, setSelectedEvents] = useState(
         webhookEventOptions.filter((option: any) => option.label === 'All Events') as Array<MultiSelectValue>);
-    const [error, setError] = useState('');
-    const isInvalid = (error ?? '').length > 0;
+    const [urlError, setUrlError] = useState('');
+    const isUrlInvalid = (urlError ?? '').length > 0;
+    const [eventsError, setEventsError] = useState('');
+    const isEventsError = (eventsError ?? '').length > 0;
 
     return (
         <AlertDialog
@@ -56,7 +58,7 @@ export const AddWebhookDialog = ({
 
                     <AlertDialogBody>
                         <Text>Enter a URL to receive a POST request callback when an event occurs</Text>
-                        <FormControl isInvalid={isInvalid} mt={5}>
+                        <FormControl isInvalid={isUrlInvalid} mt={5}>
                             <FormLabel htmlFor='url'>URL</FormLabel>
                             <Input
                                 id='url'
@@ -64,23 +66,29 @@ export const AddWebhookDialog = ({
                                 value={url}
                                 placeholder='https://<your URL path>'
                                 onChange={(e) => {
-                                    setError('');
+                                    setUrlError('');
                                     setUrl(e.target.value);
                                 }}
                             />
-                            {isInvalid ? (
-                                <FormErrorMessage>{error}</FormErrorMessage>
+                            {isUrlInvalid ? (
+                                <FormErrorMessage>{urlError}</FormErrorMessage>
                             ) : null}
                         </FormControl>
-                        <FormControl isInvalid={isInvalid} mt={5}>
-                            <FormLabel htmlFor='permissions'>Events</FormLabel>
+                        <FormControl isInvalid={isEventsError} mt={5}>
+                            <FormLabel htmlFor='permissions'>Event Subscriptions</FormLabel>
                             <MultiSelect
                                 size='md'
                                 isMulti={true}
                                 options={webhookEventOptions}
                                 value={selectedEvents}
-                                onChange={(newValues) => setSelectedEvents(newValues as Array<MultiSelectValue>)}
+                                onChange={(newValues) => {
+                                    setEventsError('');
+                                    setSelectedEvents(newValues as Array<MultiSelectValue>);
+                                }}
                             />
+                            {isEventsError ? (
+                                <FormErrorMessage>{eventsError}</FormErrorMessage>
+                            ) : null}
                         </FormControl>
                         
                     </AlertDialogBody>
@@ -102,7 +110,12 @@ export const AddWebhookDialog = ({
                             ref={modalRef as React.LegacyRef<HTMLButtonElement> | undefined}
                             onClick={() => {
                                 if (url.length === 0) {
-                                    setError('Please enter a webhook URL!');
+                                    setUrlError('Please enter a webhook URL!');
+                                    return;
+                                }
+
+                                if (selectedEvents.length === 0) {
+                                    setEventsError('Please select at least 1 event to subscribe to!');
                                     return;
                                 }
 

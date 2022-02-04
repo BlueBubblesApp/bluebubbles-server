@@ -8,7 +8,6 @@ import * as macosVersion from "macos-version";
 
 // Configuration/Filesytem Imports
 import { FileSystem } from "@server/fileSystem";
-import { DEFAULT_POLL_FREQUENCY_MS } from "@server/constants";
 
 // Database Imports
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
@@ -726,6 +725,12 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
+        // If the poll interval changed, we need to restart the listeners
+        if (prevConfig.db_poll_interval !== nextConfig.db_poll_interval) {
+            this.removeChatListeners();
+            this.startChatListeners();
+        }
+
         // If the URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
             if (this.httpService) await this.emitMessage("new-server", nextConfig.server_address, "high");
@@ -891,20 +896,23 @@ class BlueBubblesServer extends EventEmitter {
             return;
         }
 
+        this.log('Starting chat listeners...');
+        const pollInterval = (this.repo.getConfig('db_poll_interval') as number) ?? 1000;
+
         // Create a listener to listen for new/updated messages
         const incomingMsgListener = new IncomingMessageListener(
             this.iMessageRepo,
             this.eventCache,
-            DEFAULT_POLL_FREQUENCY_MS
+            pollInterval
         );
         const outgoingMsgListener = new OutgoingMessageListener(
             this.iMessageRepo,
             this.eventCache,
-            DEFAULT_POLL_FREQUENCY_MS * 2
+            pollInterval * 1.5
         );
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority
-        const groupEventListener = new GroupChangeListener(this.iMessageRepo, DEFAULT_POLL_FREQUENCY_MS * 2);
+        const groupEventListener = new GroupChangeListener(this.iMessageRepo, pollInterval * 2);
 
         // Add to listeners
         this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];

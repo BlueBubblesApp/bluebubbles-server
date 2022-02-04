@@ -5,6 +5,7 @@ import { FeatureSettings } from './features/FeatureSettings';
 import { UpdateSettings } from './update/UpdateSettings';
 import { ResetSettings } from './reset/ResetSettings';
 import { ThemeSettings } from './theme/ThemeSettings';
+import { DatabaseSettings } from './database/DatabaseSettings';
 import { PermissionRequirements } from '../../components/PermissionRequirements';
 
 
@@ -14,6 +15,7 @@ export const SettingsLayout = (): JSX.Element => {
             <Box p={3} borderRadius={10}>  
                 <ConnectionSettings />
                 <FeatureSettings />
+                <DatabaseSettings />
                 <UpdateSettings />
                 <ThemeSettings />
                 <Box p={5}>
