@@ -239,15 +239,15 @@ class SettingsView extends React.Component<unknown, State> {
         return false;
     };
 
-    saveNgrokBasicUser = async (user: string) => {
+    saveBasicAuthUser = async (user: string) => {
         await ipcRenderer.invoke("set-config", {
-            ngrok_basic_auth_user: user
+            basic_auth_user: user
         });
     };
 
-    saveNgrokBasicPass = async (pass: string) => {
+    saveBasicAuthPass = async (pass: string) => {
         await ipcRenderer.invoke("set-config", {
-            ngrok_basic_auth_pass: pass
+            basic_auth_pass: pass
         });
     };
 
@@ -632,7 +632,7 @@ class SettingsView extends React.Component<unknown, State> {
                                     name="inputPassword"
                                     value={this.state.basicAuthUser}
                                     onChange={e => this.handleInputChange(e)}
-                                    onBlur={e => this.saveNgrokBasicUser(e.target.value)}
+                                    onBlur={e => this.saveBasicAuthUser(e.target.value)}
                                 />
                                 <input
                                     id="basicAuthPass"
@@ -641,7 +641,7 @@ class SettingsView extends React.Component<unknown, State> {
                                     name="inputPassword"
                                     value={this.state.basicAuthPass}
                                     onChange={e => this.handleInputChange(e)}
-                                    onBlur={e => this.saveNgrokBasicPass(e.target.value)}
+                                    onBlur={e => this.saveBasicAuthPass(e.target.value)}
                                     type={this.state.showBasicAuthPass ? "text" : "password"}
                                 />
                                 <svg

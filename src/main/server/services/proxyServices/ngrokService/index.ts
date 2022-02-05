@@ -24,9 +24,9 @@ export class NgrokService extends Proxy {
         const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
 
         // Try to load ngrok basic auth details
-        const enableNgrokBasicAuth = Server().repo.getConfig("enable_ngrok_basic_auth") as boolean;
-        const ngrokBasicAuthUser = Server().repo.getConfig("ngrok_basic_auth_user") as string;
-        const ngrokBasicAuthPass = Server().repo.getConfig("ngrok_basic_auth_pass") as string;
+        const enableNgrokBasicAuth = Server().repo.getConfig("enable_basic_auth") as boolean;
+        const ngrokBasicAuthUser = Server().repo.getConfig("basic_auth_user") as string;
+        const ngrokBasicAuthPass = Server().repo.getConfig("basic_auth_pass") as string;
 
         let ngrokProtocol = (Server().repo.getConfig("ngrok_protocol") as Ngrok.Protocol) ?? "http";
 
@@ -85,8 +85,10 @@ export class NgrokService extends Proxy {
             ngrokProtocol = "http";
         }
 
+        Server().log(`Enable NGROK auth: ${enableNgrokBasicAuth}`);
         // If there is a user and password and they are not empty
         if (enableNgrokBasicAuth && !isEmpty(ngrokBasicAuthPass) && !isEmpty(ngrokBasicAuthUser)) {
+            Server().log("using basic authentication");
             // set the ngrok auth option to user:pass
             opts.auth = `${ngrokBasicAuthUser}:${ngrokBasicAuthPass}`;
         }
