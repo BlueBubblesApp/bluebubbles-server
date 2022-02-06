@@ -33,7 +33,7 @@ export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): J
                 <Thead>
                     <Tr>
                         <Th>URL</Th>
-                        <Th>Events</Th>
+                        <Th>Event Subscriptions</Th>
                         <Th isNumeric>Actions</Th>
                     </Tr>
                 </Thead>
