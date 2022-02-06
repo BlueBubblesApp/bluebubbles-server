@@ -40,7 +40,7 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
 
 import { ActionHandler } from "./api/v1/apple/actions";
-import { insertChatParticipants, isEmpty, isMinBigSur, isMinMojave, isMinSierra, isNotEmpty } from "./helpers/utils";
+import { insertChatParticipants, isEmpty, isMinBigSur, isMinMojave, isMinMonterey, isMinSierra, isNotEmpty } from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -678,8 +678,10 @@ class BlueBubblesServer extends EventEmitter {
 
         this.setDockIcon();
 
-        // Check if on Big Sur. If we are, then create a log/alert saying that
-        if (isMinBigSur) {
+        // Check if on Big Sur+. If we are, then create a log/alert saying that
+        if (isMinMonterey) {
+            this.log("Warning: macOS Monterey does NOT support creating group chats due to API limitations!", "debug");
+        } else if (isMinBigSur) {
             this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "debug");
         }
 
