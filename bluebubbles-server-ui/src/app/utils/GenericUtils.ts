@@ -1,4 +1,5 @@
 import { webhookEventOptions } from '../constants';
+import { MultiSelectValue } from '../types';
 import { showSuccessToast } from './ToastUtils';
 
 export const testJson = (value: string): NodeJS.Dict<any> | null => {
@@ -62,4 +63,16 @@ export const copyToClipboard = async (data: string) => {
 export const webhookEventValueToLabel = (value: string) => {
     const output = webhookEventOptions.filter(e => e.value === value).map(e => e.label);
     return output && output.length > 0 ? output[0] : 'Unknown';
+};
+
+export const convertMultiSelectValues = (values: Array<string>): Array<MultiSelectValue> => {
+    const output: Array<MultiSelectValue> = [];
+    for (const i of values) {
+        output.push({
+            value: i,
+            label: webhookEventValueToLabel(i)
+        });
+    }
+
+    return output;
 };

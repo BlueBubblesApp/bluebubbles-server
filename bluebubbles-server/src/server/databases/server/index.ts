@@ -167,6 +167,22 @@ export class ServerRepository extends EventEmitter {
         return await repo.save(webhook);
     }
 
+    public async updateWebhook({
+        id,
+        url = null,
+        events = null
+    }: { id: number, url: string, events: Array<{ label: string, value: string }> }): Promise<Webhook> {
+        const repo = this.webhooks();
+        const item = await repo.findOne({ id });
+        if (!item) throw new Error('Failed to update webhook! Existing webhook does not exist!');
+
+        if (url) item.url = url;
+        if (events) item.events = JSON.stringify(events.map(e => e.value));
+
+        await repo.update(id, item);
+        return item;
+    }
+
     public async deleteWebhook({ url = null, id = null }: { url: string | null, id: number | null }): Promise<void> {
         const repo = this.webhooks();
         const item = (url) ? await repo.findOne({ url }) : await repo.findOne({ id });

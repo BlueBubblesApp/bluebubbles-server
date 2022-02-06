@@ -103,6 +103,10 @@ export class IPCService {
             return await Server().repo.deleteWebhook({ url: args.url, id: args.id });
         });
 
+        ipcMain.handle("update-webhook", async (event, args) => {
+            return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events });
+        });
+
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {
             await Server().repo.setConfig("tutorial_is_done", toggle);
 

@@ -72,6 +72,10 @@ export const deleteWebhook = async ({ url = null, id = null }: { url?: string | 
     return await ipcRenderer.invoke('delete-webhook', { url, id });
 };
 
+export const updateWebhook = async ({ id, url, events }: { id: number, url?: string, events?: Array<MultiSelectValue> }) => {
+    return await ipcRenderer.invoke('update-webhook', { id, url, events });
+};
+
 export const reinstallHelperBundle = async () => {
     const res = await ipcRenderer.invoke('reinstall-helper-bundle');
     if (res.success) {
