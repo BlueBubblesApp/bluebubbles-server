@@ -52,7 +52,7 @@ export class MessageInterface {
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise(chatGuid, message, false, now, subject);
+        const awaiter = new MessagePromise(chatGuid, message, false, now, subject, tempGuid);
 
         // Add the promise to the manager
         Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}`);
@@ -74,11 +74,6 @@ export class MessageInterface {
             );
         } else {
             throw new Error(`Invalid send method: ${method}`);
-        }
-
-        // If we have a sent message and we have a tempGuid, we need to emit the message match event
-        if (sentMessage && isNotEmpty(tempGuid)) {
-            Server().emitMessageMatch(sentMessage, tempGuid);
         }
 
         return sentMessage;
@@ -118,21 +113,14 @@ export class MessageInterface {
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise(chatGuid, `->${aName}`, true, now);
+        const awaiter = new MessagePromise(chatGuid, `->${aName}`, true, now, attachmentGuid);
 
         // Add the promise to the manager
         Server().messageManager.add(awaiter);
 
         // Send the message
         await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
-        const sentMessage = await awaiter.promise;
-
-        // If we have a sent message and we have a tempGuid, we need to emit the message match event
-        if (sentMessage && isNotEmpty(attachmentGuid)) {
-            Server().emitMessageMatch(sentMessage, attachmentGuid);
-        }
-
-        return sentMessage;
+        return await awaiter.promise;
     }
 
     static async sendMessagePrivateApi(
@@ -216,7 +204,7 @@ export class MessageInterface {
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise(chatGuid, messageText, false, now);
+        const awaiter = new MessagePromise(chatGuid, messageText, false, now, tempGuid);
         Server().messageManager.add(awaiter);
 
         // Send the reaction
@@ -253,10 +241,6 @@ export class MessageInterface {
             throw new Error("Failed to send reaction! Message not found after 5 seconds!");
         }
 
-        // If we have a sent message and we have a tempGuid, we need to emit the message match event
-        if (retMessage && isNotEmpty(tempGuid)) {
-            Server().emitMessageMatch(retMessage, tempGuid);
-        }
 
         // Return the message
         return retMessage;

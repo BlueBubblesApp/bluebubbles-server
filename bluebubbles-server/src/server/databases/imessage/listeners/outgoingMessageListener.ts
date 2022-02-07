@@ -136,21 +136,17 @@ export class OutgoingMessageListener extends ChangeListener {
             // Resolve the promise for sent messages from a client
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
-                Server().messageManager.promises[idx].resolve(entry);
+                await Server().messageManager.promises[idx].resolve(entry);
+                // After the MessageMatchEmit event reaches client, then emmit new-entry to fcm
 
-                // If we have a message match, we want the message match event to
-                // get to the clients first, so I'm adding an artificial delay.
-                // This _only_ applies when a message match is found, meaning you
-                // sent it from a client
-                setTimeout(() => {
-                    super.emit("new-entry", entry);
-                }, 1000);
+                super.emit("new-entry", entry);
+
             } else {
                 // If it's not associated with a promise, emit it as normal
                 super.emit("new-entry", entry);
 
                 // Add artificial delay so we don't overwhelm any listeners
-                await waitMs(200);
+                // Not need, not even included in the incoming message listener
             }
         }
 
@@ -170,7 +166,7 @@ export class OutgoingMessageListener extends ChangeListener {
             if (idx >= 0) {
                 Server().messageManager.promises[idx].reject(entry);
 
-                setTimeout(() => {
+                setTimeout(() => { // Is this needed? What is the functionality of errors on receive
                     super.emit("message-send-error", entry);
                 }, 1000);
             } else {
@@ -212,17 +208,16 @@ export class OutgoingMessageListener extends ChangeListener {
             // Resolve the promise
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
-                Server().messageManager.promises[idx].resolve(entry);
+                await Server().messageManager.promises[idx].resolve(entry);
 
-                setTimeout(() => {
-                    super.emit("updated-entry", entry);
-                }, 1000);
+                super.emit("updated-entry", entry);
+
             } else {
                 // Emit the message
                 super.emit("updated-entry", entry);
 
                 // Add artificial delay so we don't overwhelm any listeners
-                await waitMs(200);
+                // Not need, not even included in the incoming message listener
             }
         }
     }
