@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import { autoUpdater, UpdateCheckResult } from "electron-updater";
 import * as semver from "semver";
-import { Server } from "@server/index";
+import { Server } from "@server";
 
 export class UpdateService {
     window: BrowserWindow;

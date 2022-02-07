@@ -20,12 +20,10 @@ import { BsChevronDown } from 'react-icons/bs';
 import { AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
 import { WebhooksTable } from '../../components/tables/WebhooksTable';
 import { AddWebhookDialog } from '../../components/modals/AddWebhookDialog';
-import { useAppSelector , useAppDispatch} from '../../hooks';
-import { create as createWebhook } from '../../slices/WebhooksSlice';
+import { useAppSelector } from '../../hooks';
 
 
 export const ApiLayout = (): JSX.Element => {
-    const dispatch = useAppDispatch();
     const dialogRef = useRef(null);
     const [dialogOpen, setDialogOpen] = useBoolean();
     const webhooks = useAppSelector(state => state.webhookStore.webhooks);
@@ -124,7 +122,6 @@ export const ApiLayout = (): JSX.Element => {
 
             <AddWebhookDialog
                 modalRef={dialogRef}
-                onConfirm={(url, events) => dispatch(createWebhook({ url, events }))}
                 isOpen={dialogOpen}
                 onClose={() => setDialogOpen.off()}
             />

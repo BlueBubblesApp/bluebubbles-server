@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     AlertDialog,
     AlertDialogOverlay,
@@ -17,32 +17,46 @@ import { Select as MultiSelect } from 'chakra-react-select';
 import { FocusableElement } from '@chakra-ui/utils';
 import { webhookEventOptions } from '../../constants';
 import { MultiSelectValue } from '../../types';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { create, update } from '../../slices/WebhooksSlice';
+import { convertMultiSelectValues } from '../../utils/GenericUtils';
 
 
 interface AddWebhookDialogProps {
     onCancel?: () => void;
-    onConfirm?: (url: string, events: Array<MultiSelectValue>) => void;
     isOpen: boolean;
     modalRef: React.RefObject<FocusableElement> | undefined;
     onClose: () => void;
+    existingId?: number;
 }
-
 
 
 export const AddWebhookDialog = ({
     onCancel,
-    onConfirm,
     isOpen,
     modalRef,
-    onClose
+    onClose,
+    existingId,
 }: AddWebhookDialogProps): JSX.Element => {
     const [url, setUrl] = useState('');
+    const dispatch = useAppDispatch();
+    const webhooks = useAppSelector(state => state.webhookStore.webhooks) ?? [];
     const [selectedEvents, setSelectedEvents] = useState(
         webhookEventOptions.filter((option: any) => option.label === 'All Events') as Array<MultiSelectValue>);
     const [urlError, setUrlError] = useState('');
     const isUrlInvalid = (urlError ?? '').length > 0;
     const [eventsError, setEventsError] = useState('');
     const isEventsError = (eventsError ?? '').length > 0;
+
+    useEffect(() => {
+        if (!existingId) return;
+
+        const webhook = webhooks.find(e => e.id === existingId);
+        if (webhook) {
+            setUrl(webhook.url);
+            setSelectedEvents(convertMultiSelectValues(JSON.parse(webhook.events)));
+        }
+    }, [existingId]);
 
     return (
         <AlertDialog
@@ -119,7 +133,12 @@ export const AddWebhookDialog = ({
                                     return;
                                 }
 
-                                if (onConfirm) onConfirm(url, selectedEvents);
+                                if (existingId) {
+                                    dispatch(update({ id: existingId, url, events: selectedEvents }));
+                                } else {
+                                    dispatch(create({ url, events: selectedEvents }));
+                                }
+
                                 setUrl('');
                                 onClose();
                             }}

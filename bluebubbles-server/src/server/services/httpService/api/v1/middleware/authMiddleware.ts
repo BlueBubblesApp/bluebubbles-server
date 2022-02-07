@@ -1,5 +1,5 @@
 import { Context, Next } from "koa";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { safeTrim } from "@server/helpers/utils";
 import { ServerError, Unauthorized } from "../responses/errors";
 

@@ -3,6 +3,7 @@
         /* Basic Options */
         "baseUrl": "./src",
         "paths": {
+            "@server": ["server/index"],
             "@server/*": ["server/*"],
         },
         "target": "es5" /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', or 'ESNEXT'. */,

@@ -1,5 +1,5 @@
 import { onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
-import { Server } from "@server/index";
+import { Server } from "@server";
 
 type ProxyOptions = {
     name: string;

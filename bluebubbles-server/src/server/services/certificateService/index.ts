@@ -4,7 +4,7 @@ import * as x509 from "@peculiar/x509";
 import { pki, md } from "node-forge";
 
 import { ServerConfigChange } from "@server/databases/server";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { certSubject, validForDays, millisADay } from "./constants";
 import { onlyAlphaNumeric } from "@server/helpers/utils";

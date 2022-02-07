@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 
 const AppName = "BlueBubbles";

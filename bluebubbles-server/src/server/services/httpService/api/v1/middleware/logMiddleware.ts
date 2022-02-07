@@ -1,5 +1,5 @@
 import { Context, Next } from "koa";
-import { Server } from "@server/index";
+import { Server } from "@server";
 
 export const LogMiddleware = async (ctx: Context, next: Next) => {
     const paramStr = JSON.stringify(ctx.request.query);

@@ -93,7 +93,7 @@ export const NgrokAuthTokenField = ({ helpText }: NgrokAuthTokenFieldProps): JSX
                             service. This can improve connection stability and reliability. If you do not have
                             an Ngrok Account, sign up for free here:&nbsp;
                             <Box as='span' color={baseTheme.colors.brand.primary}>
-                                <Link to='https://dashboard.ngrok.com/get-started/your-authtoken' target='_blank'>ngrok.com</Link>
+                                <Link href='https://dashboard.ngrok.com/get-started/your-authtoken' target='_blank'>ngrok.com</Link>
                             </Box>
                         </Text>
                     )}

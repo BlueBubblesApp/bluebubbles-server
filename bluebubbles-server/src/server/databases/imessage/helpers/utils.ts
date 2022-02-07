@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { nativeImage } from "electron";
 import { basename } from "path";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";

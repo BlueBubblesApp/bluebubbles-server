@@ -19,7 +19,8 @@ import {
     PopoverBody,
     PopoverArrow,
     PopoverTrigger,
-    useBoolean
+    useBoolean,
+    Link
 } from '@chakra-ui/react';
 import { BsChevronDown } from 'react-icons/bs';
 import { FiTrash } from 'react-icons/fi';
@@ -32,7 +33,6 @@ import { hasKey, readFile } from '../../utils/GenericUtils';
 import { clearFcmConfiguration, saveFcmClient, saveFcmServer } from '../../actions/FcmActions';
 import { setConfig } from '../../slices/ConfigSlice';
 import { AiOutlineInfoCircle } from 'react-icons/ai';
-import { Link } from 'react-router-dom';
 import { baseTheme } from '../../../theme';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 
@@ -193,7 +193,7 @@ export const FcmLayout = (): JSX.Element => {
                                     Drag and drop your JSON configuration files from your Google Firebase Console. If you
                                     do not have these configuration files. Please go to
                                     <span style={{ color: baseTheme.colors.brand.primary }}>
-                                        <Link to='https://bluebubbles.app/install' color='brand.primary' target='_blank'> Our Website </Link>
+                                        <Link href='https://bluebubbles.app/install' color='brand.primary' target='_blank'> Our Website </Link>
                                     </span>
                                     to learn how.
                                 </Text>

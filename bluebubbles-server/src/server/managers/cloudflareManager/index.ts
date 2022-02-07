@@ -2,7 +2,7 @@ import { $, ProcessOutput, ProcessPromise } from "zx";
 import * as path from "path";
 import { EventEmitter } from "events";
 import { FileSystem } from "@server/fileSystem";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 
 export class CloudflareManager extends EventEmitter {
