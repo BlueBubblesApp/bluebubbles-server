@@ -183,26 +183,29 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
     const recipientCommands = [];
     for (const i of participants) {
         recipientCommands.push(`
-            delay 0.8
+            delay 1
             keystroke "${i}"
-            delay 0.5
+            delay 1
             keystroke return`);
     }
 
     // Caffeinate is so we don't let the computer sleep while this is running
-    return `do shell script "caffeinate -u -t 2"
-        delay 2.0
+    return `try
+            do shell script "caffeinate -u -t 2"
+            delay 2.0
+        end try
+        
         tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
         tell application "System Events" to tell application process "Messages"
             set frontmost to true
             keystroke "n" using {command down}
             ${recipientCommands.join("\n")}
-            delay 0.1
+            delay 1
             keystroke tab
-            delay 0.1
+            delay 0.5
             set the clipboard to theFile
             keystroke "v" using {command down}
-            delay 2.0
+            delay 3.0
             keystroke return
         end tell`;
 };
