@@ -28,6 +28,9 @@ import {
     ImageMetadataKeys
 } from "./types";
 
+// Patch in original user data directory
+app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', 'bluebubbles-server'));
+
 // Directory modifiers based on the environment
 let subdir = "";
 let moddir = "app.asar.unpacked";

@@ -8,7 +8,7 @@ import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
 
 // Patch in original user data directory
-app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', 'bluebubbles-server'))
+app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', 'bluebubbles-server'));
 
 let win: BrowserWindow;
 let tray: Tray;
