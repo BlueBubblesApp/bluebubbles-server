@@ -128,7 +128,7 @@ export class OutgoingMessageListener extends ChangeListener {
             const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
-            if (this.cache.find(cacheName)) return;
+            if (this.cache.find(cacheName)) continue;
 
             // Add to cache
             this.cache.add(cacheName);
@@ -160,7 +160,7 @@ export class OutgoingMessageListener extends ChangeListener {
             const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
-            if (this.cache.find(cacheName)) return;
+            if (this.cache.find(cacheName)) continue;
 
             // Add to cache
             this.cache.add(cacheName);
@@ -204,7 +204,7 @@ export class OutgoingMessageListener extends ChangeListener {
             const cacheName = `updated-${getCacheName(entry)}`;
 
             // Skip over any that we've finished
-            if (this.cache.find(cacheName)) return;
+            if (this.cache.find(cacheName)) continue;
 
             // Add to cache
             this.cache.add(cacheName);
