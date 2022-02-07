@@ -1,5 +1,5 @@
 import { isEmpty, safeTrim } from "@server/helpers/utils";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { connect, disconnect, kill, authtoken, Ngrok } from "ngrok";
 import { Proxy } from "../proxy";
 

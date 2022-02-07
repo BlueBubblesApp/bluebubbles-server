@@ -1,5 +1,5 @@
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { ChatResponse, HandleResponse } from "@server/types";
 import { ChatInterface } from "./chatInterface";
 

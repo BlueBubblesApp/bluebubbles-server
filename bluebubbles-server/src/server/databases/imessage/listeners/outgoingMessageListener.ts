@@ -1,4 +1,4 @@
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
 import { getCacheName } from "@server/databases/imessage/helpers/utils";

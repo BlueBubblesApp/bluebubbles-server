@@ -1,4 +1,4 @@
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";

@@ -2,7 +2,7 @@ import * as path from "path";
 import * as fs from "fs";
 import slugify from "slugify";
 import { FileSystem } from "@server/fileSystem";
-import { Server } from "@server/index";
+import { Server } from "@server";
 
 export class BackupsInterface {
     static async saveTheme(name: string, data: any): Promise<void> {

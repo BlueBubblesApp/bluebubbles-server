@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as base64 from "byte-base64";
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";

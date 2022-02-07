@@ -1,7 +1,7 @@
 import * as process from "process";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import axios from "axios";
-import { Server } from "@server/index";
+import { Server } from "@server";
 
 export type WebhookEvent = {
     type: string;

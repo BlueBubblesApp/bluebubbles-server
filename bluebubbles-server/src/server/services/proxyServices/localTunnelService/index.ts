@@ -1,4 +1,4 @@
-import { Server } from "@server/index";
+import { Server } from "@server";
 import * as LocalTunnel from "localtunnel";
 import { Proxy } from "../proxy";
 

@@ -1,10 +1,11 @@
 import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alertService";
 import { openLogs } from "@server/api/v1/apple/scripts";
 import { fixServerUrl, onlyAlphaNumeric } from "@server/helpers/utils";
+import { ContactInterface } from '@server/api/v1/interfaces/contactInterface';
 import { BlueBubblesHelperService } from "../privateApi";
 
 export class IPCService {
@@ -101,6 +102,15 @@ export class IPCService {
 
         ipcMain.handle("delete-webhook", async (event, args) => {
             return await Server().repo.deleteWebhook({ url: args.url, id: args.id });
+        });
+
+        ipcMain.handle("update-webhook", async (event, args) => {
+            return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events });
+        });
+
+        ipcMain.handle("get-contact-name", async (event, address) => {
+            const res = await ContactInterface.queryContacts([address]);
+            return res && res.length > 0 ? res[0] : null;
         });
 
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {

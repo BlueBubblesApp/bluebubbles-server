@@ -1,4 +1,4 @@
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { Alert } from "@server/databases/server/entity/Alert";
 
 import { AlertTypes } from "./types";

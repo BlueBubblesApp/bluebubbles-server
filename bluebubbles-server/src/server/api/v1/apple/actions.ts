@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { ValidTapback } from "@server/types";

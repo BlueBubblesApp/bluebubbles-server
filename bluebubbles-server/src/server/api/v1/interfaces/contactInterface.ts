@@ -1,4 +1,4 @@
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { Record } from "@server/databases/contacts/entity/Record";
 import { PhoneNumber } from "@server/databases/contacts/entity/PhoneNumber";
 import { Email } from "@server/databases/contacts/entity/Email";

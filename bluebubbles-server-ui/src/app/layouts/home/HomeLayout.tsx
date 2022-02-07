@@ -66,7 +66,14 @@ export const HomeLayout = (): JSX.Element => {
                     currentTop = item.group_name.length > 0 ? item.group_name : guid;
                 }
             });
-            dispatch(setStat({ name: 'best_friend', value: currentTop }));
+
+            ipcRenderer.invoke('get-contact-name', currentTop).then(e => {
+                if (!e && !e.firstName) {
+                    dispatch(setStat({ name: 'best_friend', value: currentTop }));
+                } else {
+                    dispatch(setStat({ name: 'best_friend', value: `${e.firstName} ${e?.lastName ?? ''}`.trim() }));
+                }
+            });
         });
         
         ipcRenderer.invoke('get-group-message-counts').then((groupCounts) => {

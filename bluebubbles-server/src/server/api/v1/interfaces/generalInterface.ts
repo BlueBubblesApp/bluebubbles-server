@@ -1,10 +1,11 @@
 import { app } from "electron";
 import * as macosVersion from "macos-version";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { ServerMetadataResponse } from "@server/types";
 import { Device } from "@server/databases/server/entity";
 import { UpdateResult } from "@server/services/httpService/types";
+import { FileSystem } from "@server/fileSystem";
 
 const osVersion = macosVersion();
 
@@ -61,5 +62,18 @@ export class GeneralInterface {
             current: app.getVersion(),
             metadata: null
         };
+    }
+
+    static async isMessagesRunning(): Promise<boolean> {
+        let output = await FileSystem.execShellCommand(`ps aux | grep -v grep | grep -c "Messages.app"`);
+        output = output.trim();
+
+        // It should be a number, so we need to test for that
+        try {
+            const count = Number.parseInt(output);
+            return count > 0;
+        } catch (ex) {
+            return false;
+        }
     }
 }

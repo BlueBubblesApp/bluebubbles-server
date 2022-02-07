@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as CompareVersion from "compare-versions";
 import cpr from "recursive-copy";
 import { parse as ParsePlist } from "plist";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
 import { isEmpty, isMinBigSur, isMinMonterey } from "@server/helpers/utils";
@@ -37,6 +37,18 @@ export class BlueBubblesHelperService {
         this.restartCounter = 0;
         this.transactionManager = new TransactionManager();
         BlueBubblesHelperService.installBundle();
+
+        // Make sure that Messages is always running
+        // We'll check every 15 seconds. No specific reason other than that it seems like a good interval
+        const msgCheckInterval = setInterval(async () => {
+            try {
+                // This won't start it if it's already open
+                await FileSystem.startMessages();
+            } catch (ex: any) {
+                Server().log(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
+                clearInterval(msgCheckInterval);
+            }
+        }, 15000);
     }
 
     static async installBundle(force = false): Promise<BundleStatus> {
@@ -412,7 +424,7 @@ export class BlueBubblesHelperService {
             // If we have a transaction, wait until the transaction is fulfilled to return
             if (transaction) return transaction.promise;
         } catch (ex: any) {
-            Server().log(`${msg} ${ex?.message ?? ex}`);
+            Server().log(`${msg} ${ex?.message ?? ex}`, 'debug');
         }
 
         return null;

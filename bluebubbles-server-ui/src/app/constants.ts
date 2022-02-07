@@ -40,7 +40,7 @@ export const webhookEventOptions = [
         value: 'typing-indicator'
     },
     {
-        label: 'Serrver Update',
+        label: 'Server Update',
         value: 'server-update'
     },
     {

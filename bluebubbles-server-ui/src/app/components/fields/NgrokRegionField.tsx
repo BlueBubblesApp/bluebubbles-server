@@ -31,7 +31,7 @@ export const NgrokRegionField = ({ helpText }: NgrokRegionFieldProps): JSX.Eleme
                         onSelectChange(e);
                     }}
                 >
-                    <option value='us'>United States</option>
+                    <option value='us'>North America</option>
                     <option value='eu'>Europe</option>
                     <option value='ap'>Asia/Pacific</option>
                     <option value='au'>Australia</option>

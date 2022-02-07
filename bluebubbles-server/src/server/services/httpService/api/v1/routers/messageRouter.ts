@@ -3,7 +3,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 import type { File } from "formidable";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";

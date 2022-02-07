@@ -1,6 +1,6 @@
 import * as process from "process";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
-import { Server } from "@server/index";
+import { Server } from "@server";
 
 /**
  * Service that spawns the caffeinate process so that

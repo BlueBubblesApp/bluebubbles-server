@@ -1,7 +1,7 @@
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
 import { checkPrivateApiStatus, isEmpty, isNotEmpty, slugifyAddress, waitMs } from "@server/helpers/utils";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { ChatResponse, HandleResponse } from "@server/types";
 
 export class ChatInterface {

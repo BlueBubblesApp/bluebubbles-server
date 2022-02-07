@@ -5,7 +5,7 @@ import * as child_process from "child_process";
 import { transports } from "electron-log";
 import { app } from "electron";
 import { sync } from "read-chunk";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import {
     escapeDoubleQuote,
     concatUint8Arrays,

@@ -1,5 +1,5 @@
 import * as KoaRouter from "koa-router";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { isNotEmpty } from "@server/helpers/utils";
 
 // Middleware
