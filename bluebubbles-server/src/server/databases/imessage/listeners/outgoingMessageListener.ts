@@ -140,13 +140,11 @@ export class OutgoingMessageListener extends ChangeListener {
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
                 // After the MessageMatchEmit event reaches client, then emmit new-entry to fcm
-                await Server().messageManager.promises[idx].resolve(entry)
-                super.emit("new-entry", entry);
-
-            } else {
-                // If it's not associated with a promise, emit it as normal
-                super.emit("new-entry", entry);
+                await Server().messageManager.promises[idx].resolve(entry);
             }
+
+            // Emit it as normal entry
+            super.emit("new-entry", entry);
         }
 
         // Emit the errored messages
@@ -165,11 +163,10 @@ export class OutgoingMessageListener extends ChangeListener {
             if (idx >= 0) {
                 // After the MessageMatchEmit event reaches client, then emmit message-send-error to fcm
                 await Server().messageManager.promises[idx].reject(entry);
-                super.emit("message-send-error", entry);
-            } else {
-                // If it's not associated with a promise, emit it as normal
-                super.emit("message-send-error", entry);
             }
+
+            //Emit it as normal error
+            super.emit("message-send-error", entry);
         }
     }
 
@@ -205,12 +202,10 @@ export class OutgoingMessageListener extends ChangeListener {
             if (idx >= 0) {
                 // After the MessageMatchEmit event reaches client, then emmit updated-entry to fcm
                 await Server().messageManager.promises[idx].resolve(entry);
-                super.emit("updated-entry", entry);
-
-            } else {
-                // Emit the message
-                super.emit("updated-entry", entry);
             }
+
+            // Emit it as a normal update
+            super.emit("updated-entry", entry);
         }
     }
 }
