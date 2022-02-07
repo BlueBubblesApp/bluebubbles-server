@@ -1,5 +1,5 @@
 import { safeTrim } from "@server/helpers/utils";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { createTextChangeRange } from "typescript";
 
 export class ServerInterface {

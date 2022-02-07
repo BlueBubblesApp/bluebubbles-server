@@ -1,7 +1,7 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";

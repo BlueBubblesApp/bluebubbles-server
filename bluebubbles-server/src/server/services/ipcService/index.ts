@@ -1,6 +1,6 @@
 import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alertService";
 import { openLogs } from "@server/api/v1/apple/scripts";

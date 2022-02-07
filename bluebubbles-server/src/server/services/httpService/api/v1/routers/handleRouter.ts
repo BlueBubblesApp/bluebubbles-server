@@ -1,7 +1,7 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { HandleInterface } from "@server/api/v1/interfaces/handleInterface";
 import { isEmpty, safeTrim } from "@server/helpers/utils";

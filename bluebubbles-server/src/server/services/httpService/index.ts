@@ -12,7 +12,7 @@ import * as http from "http";
 import * as fs from "fs";
 
 // Internal libraries
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { fixServerUrl, isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";

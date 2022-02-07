@@ -1,7 +1,7 @@
 import { app } from "electron";
 import { EventEmitter } from "events";
 import { createConnection, Connection } from "typeorm";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Config, Alert, Device, Queue, Webhook } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";

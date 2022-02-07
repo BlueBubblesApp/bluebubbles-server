@@ -4,7 +4,7 @@ import * as process from "process";
 import * as path from "path";
 import { FileSystem } from "@server/fileSystem";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
 
 let win: BrowserWindow;

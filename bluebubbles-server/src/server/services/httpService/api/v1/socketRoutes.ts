@@ -12,7 +12,7 @@ import { Socket } from "socket.io";
 import * as macosVersion from "macos-version";
 
 // Internal libraries
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { isEmpty, isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
 

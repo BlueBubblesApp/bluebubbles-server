@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as CompareVersion from "compare-versions";
 import cpr from "recursive-copy";
 import { parse as ParsePlist } from "plist";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
 import { isEmpty, isMinBigSur, isMinMonterey } from "@server/helpers/utils";

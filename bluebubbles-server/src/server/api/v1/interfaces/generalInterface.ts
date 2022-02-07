@@ -1,7 +1,7 @@
 import { app } from "electron";
 import * as macosVersion from "macos-version";
 
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { ServerMetadataResponse } from "@server/types";
 import { Device } from "@server/databases/server/entity";
 import { UpdateResult } from "@server/services/httpService/types";

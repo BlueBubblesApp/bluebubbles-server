@@ -2,7 +2,7 @@
 import { NativeImage } from "electron";
 import * as macosVersion from "macos-version";
 import { encode as blurhashEncode } from "blurhash";
-import { Server } from "@server/index";
+import { Server } from "@server";
 import { PhoneNumberUtil } from "google-libphonenumber";
 import { FileSystem } from "@server/fileSystem";
 import { Handle } from "@server/databases/imessage/entity/Handle";
