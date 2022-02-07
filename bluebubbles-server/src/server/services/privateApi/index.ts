@@ -37,6 +37,18 @@ export class BlueBubblesHelperService {
         this.restartCounter = 0;
         this.transactionManager = new TransactionManager();
         BlueBubblesHelperService.installBundle();
+
+        // Make sure that Messages is always running
+        // We'll check every 15 seconds. No specific reason other than that it seems like a good interval
+        const msgCheckInterval = setInterval(async () => {
+            try {
+                // This won't start it if it's already open
+                await FileSystem.startMessages();
+            } catch (ex: any) {
+                Server().log(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
+                clearInterval(msgCheckInterval);
+            }
+        }, 15000);
     }
 
     static async installBundle(force = false): Promise<BundleStatus> {
