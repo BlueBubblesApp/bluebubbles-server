@@ -590,7 +590,6 @@ class BlueBubblesServer extends EventEmitter {
             const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
             const parentProc = await findProcess("pid", process.ppid);
             const parentName = isNotEmpty(parentProc) ? parentProc[0].name : null;
-            console.log(parentName);
 
             // Restart if enabled and the parent process is the app being launched
             if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
