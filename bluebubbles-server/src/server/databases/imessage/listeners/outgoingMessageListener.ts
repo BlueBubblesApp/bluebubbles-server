@@ -40,12 +40,10 @@ export class OutgoingMessageListener extends ChangeListener {
     async getEntries(after: Date, before: Date): Promise<void> {
         // Second, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
         let afterOffsetDate = new Date(after.getTime() - 15000);
-
         await this.emitOutgoingMessages(afterOffsetDate);
 
         // Third, check for updated messages
         let afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
-
         await this.emitUpdatedMessages(afterUpdateOffsetDate);
     }
 
@@ -141,17 +139,13 @@ export class OutgoingMessageListener extends ChangeListener {
             // Resolve the promise for sent messages from a client
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
-                await Server().messageManager.promises[idx].resolve(entry);
                 // After the MessageMatchEmit event reaches client, then emmit new-entry to fcm
-
+                await Server().messageManager.promises[idx].resolve(entry)
                 super.emit("new-entry", entry);
 
             } else {
                 // If it's not associated with a promise, emit it as normal
                 super.emit("new-entry", entry);
-
-                // Add artificial delay so we don't overwhelm any listeners
-                // Not need, not even included in the incoming message listener
             }
         }
 
@@ -169,14 +163,12 @@ export class OutgoingMessageListener extends ChangeListener {
             // Reject the corresponding promise
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
+                // After the MessageMatchEmit event reaches client, then emmit message-send-error to fcm
                 await Server().messageManager.promises[idx].reject(entry);
-
                 super.emit("message-send-error", entry);
-
             } else {
-
+                // If it's not associated with a promise, emit it as normal
                 super.emit("message-send-error", entry);
-
             }
         }
     }
@@ -211,16 +203,13 @@ export class OutgoingMessageListener extends ChangeListener {
             // Resolve the promise
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
+                // After the MessageMatchEmit event reaches client, then emmit updated-entry to fcm
                 await Server().messageManager.promises[idx].resolve(entry);
-
                 super.emit("updated-entry", entry);
 
             } else {
                 // Emit the message
                 super.emit("updated-entry", entry);
-
-                // Add artificial delay so we don't overwhelm any listeners
-                // Not need, not even included in the incoming message listener
             }
         }
     }
