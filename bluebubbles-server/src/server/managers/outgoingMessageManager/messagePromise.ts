@@ -26,10 +26,10 @@ export class MessagePromise {
 
     private tempGuid?: string | null;
 
-    constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number, subject?: string, tempGUID?: string) {
+    constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number, subject?: string, tempGuid?: string) {
 
         // Used to temporarily update the guid
-        this.tempGuid = tempGUID;
+        this.tempGuid = tempGuid;
 
         // Create a promise and save the "callbacks"
         this.promise = new Promise((resolve, reject) => {
