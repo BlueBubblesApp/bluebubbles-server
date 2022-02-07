@@ -157,11 +157,11 @@ export const HomeLayout = (): JSX.Element => {
                                 ) : (
                                     <Text fontSize='md'>{address}</Text>
                                 )}
-                                <Tooltip label='Show QR Code'>
+                                <Tooltip label='Copy Address'>
                                     <IconButton
                                         ml={3}
                                         size='md'
-                                        aria-label='Copy address'
+                                        aria-label='Copy Address'
                                         icon={<BiCopy size='22px' />}
                                         onClick={() => copyToClipboard(address)}
                                     />
