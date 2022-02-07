@@ -3,7 +3,7 @@ import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
 import { getCacheName } from "@server/databases/imessage/helpers/utils";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { isNotEmpty, onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
+import { isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ChangeListener } from "./changeListener";
 
 export class OutgoingMessageListener extends ChangeListener {
@@ -35,13 +35,18 @@ export class OutgoingMessageListener extends ChangeListener {
      * 6. Emit messages that have errored out
      *
      * @param after
+     * @param before The time right before get Entries run
      */
     async getEntries(after: Date, before: Date): Promise<void> {
         // Second, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
-        await this.emitOutgoingMessages(new Date(after.getTime() - 15000));
+        let afterOffsetDate = new Date(after.getTime() - 15000);
+
+        await this.emitOutgoingMessages(afterOffsetDate);
 
         // Third, check for updated messages
-        await this.emitUpdatedMessages(new Date(after.getTime() - this.pollFrequency));
+        let afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
+
+        await this.emitUpdatedMessages(afterUpdateOffsetDate);
     }
 
     async emitOutgoingMessages(after: Date) {
