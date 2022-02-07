@@ -3,7 +3,7 @@ import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
 import { getCacheName } from "@server/databases/imessage/helpers/utils";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { isNotEmpty, onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
+import { isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ChangeListener } from "./changeListener";
 
 export class OutgoingMessageListener extends ChangeListener {
@@ -35,13 +35,16 @@ export class OutgoingMessageListener extends ChangeListener {
      * 6. Emit messages that have errored out
      *
      * @param after
+     * @param before The time right before get Entries run
      */
     async getEntries(after: Date, before: Date): Promise<void> {
         // Second, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
-        await this.emitOutgoingMessages(new Date(after.getTime() - 15000));
+        let afterOffsetDate = new Date(after.getTime() - 15000);
+        await this.emitOutgoingMessages(afterOffsetDate);
 
         // Third, check for updated messages
-        await this.emitUpdatedMessages(new Date(after.getTime() - this.pollFrequency));
+        let afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
+        await this.emitUpdatedMessages(afterUpdateOffsetDate);
     }
 
     async emitOutgoingMessages(after: Date) {
@@ -128,7 +131,7 @@ export class OutgoingMessageListener extends ChangeListener {
             const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
-            if (this.cache.find(cacheName)) return;
+            if (this.cache.find(cacheName)) continue;
 
             // Add to cache
             this.cache.add(cacheName);
@@ -136,22 +139,12 @@ export class OutgoingMessageListener extends ChangeListener {
             // Resolve the promise for sent messages from a client
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
-                Server().messageManager.promises[idx].resolve(entry);
-
-                // If we have a message match, we want the message match event to
-                // get to the clients first, so I'm adding an artificial delay.
-                // This _only_ applies when a message match is found, meaning you
-                // sent it from a client
-                setTimeout(() => {
-                    super.emit("new-entry", entry);
-                }, 1000);
-            } else {
-                // If it's not associated with a promise, emit it as normal
-                super.emit("new-entry", entry);
-
-                // Add artificial delay so we don't overwhelm any listeners
-                await waitMs(200);
+                // After the MessageMatchEmit event reaches client, then emmit new-entry to fcm
+                await Server().messageManager.promises[idx].resolve(entry);
             }
+
+            // Emit it as normal entry
+            super.emit("new-entry", entry);
         }
 
         // Emit the errored messages
@@ -160,7 +153,7 @@ export class OutgoingMessageListener extends ChangeListener {
             const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
-            if (this.cache.find(cacheName)) return;
+            if (this.cache.find(cacheName)) continue;
 
             // Add to cache
             this.cache.add(cacheName);
@@ -168,17 +161,12 @@ export class OutgoingMessageListener extends ChangeListener {
             // Reject the corresponding promise
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
-                Server().messageManager.promises[idx].reject(entry);
-
-                setTimeout(() => {
-                    super.emit("message-send-error", entry);
-                }, 1000);
-            } else {
-                super.emit("message-send-error", entry);
-
-                // Add artificial delay so we don't overwhelm any listeners
-                await waitMs(200);
+                // After the MessageMatchEmit event reaches client, then emmit message-send-error to fcm
+                await Server().messageManager.promises[idx].reject(entry);
             }
+
+            //Emit it as normal error
+            super.emit("message-send-error", entry);
         }
     }
 
@@ -204,7 +192,7 @@ export class OutgoingMessageListener extends ChangeListener {
             const cacheName = `updated-${getCacheName(entry)}`;
 
             // Skip over any that we've finished
-            if (this.cache.find(cacheName)) return;
+            if (this.cache.find(cacheName)) continue;
 
             // Add to cache
             this.cache.add(cacheName);
@@ -212,18 +200,12 @@ export class OutgoingMessageListener extends ChangeListener {
             // Resolve the promise
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
-                Server().messageManager.promises[idx].resolve(entry);
-
-                setTimeout(() => {
-                    super.emit("updated-entry", entry);
-                }, 1000);
-            } else {
-                // Emit the message
-                super.emit("updated-entry", entry);
-
-                // Add artificial delay so we don't overwhelm any listeners
-                await waitMs(200);
+                // After the MessageMatchEmit event reaches client, then emmit updated-entry to fcm
+                await Server().messageManager.promises[idx].resolve(entry);
             }
+
+            // Emit it as a normal update
+            super.emit("updated-entry", entry);
         }
     }
 }
