@@ -191,4 +191,6 @@ abstract class Proxy {
     }
 }
 
-export { Proxy, ProxyOptions };
+export { Proxy };
+export type { ProxyOptions };
+

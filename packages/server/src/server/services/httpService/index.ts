@@ -2,11 +2,11 @@
 import { Server as SocketServer, ServerOptions } from "socket.io";
 
 // HTTP libraries
-import * as KoaApp from "koa";
-import * as koaBody from "koa-body";
-import * as koaJson from "koa-json";
-import * as KoaRouter from "koa-router";
-import * as koaCors from "koa-cors";
+import KoaApp from "koa";
+import koaBody from "koa-body";
+import koaJson from "koa-json";
+import KoaRouter from "koa-router";
+import koaCors from "koa-cors";
 import * as https from "https";
 import * as http from "http";
 import * as fs from "fs";

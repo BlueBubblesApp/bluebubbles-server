@@ -9,8 +9,7 @@ import {
     SliderThumb,
     SliderMark,
     Button,
-    Flex,
-    useColorModeValue
+    Flex
 } from '@chakra-ui/react';
 import { IntroWalkthrough } from './intro/IntroWalkthrough';
 import { ConnectionWalkthrough } from './connection/ConnectionWalkthrough';

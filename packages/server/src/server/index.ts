@@ -4,7 +4,7 @@ import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "elec
 import ServerLog from "electron-log";
 import * as process from "process";
 import { EventEmitter } from "events";
-import * as macosVersion from "macos-version";
+import macosVersion from "macos-version";
 
 // Configuration/Filesytem Imports
 import { FileSystem } from "@server/fileSystem";

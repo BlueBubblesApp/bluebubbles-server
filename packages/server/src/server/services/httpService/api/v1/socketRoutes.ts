@@ -1,7 +1,6 @@
 /* eslint-disable max-len */
 import { app } from "electron";
 import * as path from "path";
-import { basename } from "path";
 import * as fs from "fs";
 import * as zlib from "zlib";
 import * as base64 from "byte-base64";
@@ -9,7 +8,7 @@ import * as CryptoJS from "crypto-js";
 import { Socket } from "socket.io";
 
 // HTTP libraries
-import * as macosVersion from "macos-version";
+import macosVersion from "macos-version";
 
 // Internal libraries
 import { Server } from "@server";

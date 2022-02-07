@@ -1,5 +1,5 @@
 import { Server } from "@server";
-import * as LocalTunnel from "localtunnel";
+import LocalTunnel from "localtunnel";
 import { Proxy } from "../proxy";
 
 const threeHours = 1000 * 60 * 60 * 3;

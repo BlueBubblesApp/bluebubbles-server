@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import * as CompareVersion from "compare-versions";
+import CompareVersions from "compare-versions";
 import cpr from "recursive-copy";
 import { parse as ParsePlist } from "plist";
 import { Server } from "@server";
@@ -114,7 +114,7 @@ export class BlueBubblesHelperService {
                     const remoteVersion = metadata.CFBundleShortVersionString;
 
                     // Compare the local version to the remote version and overwrite if newer
-                    if (CompareVersion(localVersion, remoteVersion) === 1) {
+                    if (CompareVersions(localVersion, remoteVersion) === 1) {
                         Server().log(`Private API Bundle has an update. Writing to ${remotePath}`, "debug");
                         await cpr(localPath, remotePath, { overwrite: true, dot: true });
                     } else {

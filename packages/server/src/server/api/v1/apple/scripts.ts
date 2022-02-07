@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
-import * as macosVersion from "macos-version";
-import * as compareVersions from "compare-versions";
+import macosVersion from "macos-version";
+import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
 import { escapeOsaExp, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
@@ -748,7 +748,7 @@ export const checkTypingIndicator = (chatName: string) => {
 export const exportContacts = () => {
     let contactsApp = "Contacts";
     // If the OS Version is earlier than or equal to 10.7.0, use "Address Book"
-    if (osVersion && compareVersions(osVersion, "10.7.0") <= 0) contactsApp = "Address Book";
+    if (osVersion && CompareVersions(osVersion, "10.7.0") <= 0) contactsApp = "Address Book";
 
     return `set contactsPath to POSIX file "${FileSystem.contactsDir}/AddressBook.vcf" as string
         tell application "${contactsApp}"

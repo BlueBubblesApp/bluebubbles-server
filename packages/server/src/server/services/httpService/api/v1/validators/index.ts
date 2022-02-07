@@ -1,5 +1,5 @@
 import { ValidationErrors } from "validatorjs";
-import * as Validator from "validatorjs";
+import Validator from "validatorjs";
 import { isNotEmpty } from "@server/helpers/utils";
 import { BadRequest } from "../responses/errors";
 

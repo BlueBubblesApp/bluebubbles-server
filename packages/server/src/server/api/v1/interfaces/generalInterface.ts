@@ -1,5 +1,5 @@
 import { app } from "electron";
-import * as macosVersion from "macos-version";
+import macosVersion from "macos-version";
 
 import { Server } from "@server";
 import { ServerMetadataResponse } from "@server/types";

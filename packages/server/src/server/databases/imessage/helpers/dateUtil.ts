@@ -1,5 +1,5 @@
-import * as macosVersion from "macos-version";
-import * as compareVersions from "compare-versions";
+import macosVersion from "macos-version";
+import CompareVersions from "compare-versions";
 
 const osVersion = macosVersion();
 const MULTIPLIER = 10 ** 6;
@@ -23,7 +23,7 @@ export const getDateUsing2001 = (timestamp: number): Date => {
 
     try {
         let ts = get2001Time();
-        if (!osVersion || compareVersions(osVersion, "10.13.0") >= 0) ts += timestamp / MULTIPLIER;
+        if (!osVersion || CompareVersions(osVersion, "10.13.0") >= 0) ts += timestamp / MULTIPLIER;
         else ts += timestamp * 1000;
 
         return new Date(ts);
@@ -43,7 +43,7 @@ export const convertDateTo2001Time = (date: Date): number => {
 
     try {
         let ts = date.getTime() - get2001Time();
-        if (!osVersion || compareVersions(osVersion, "10.13.0") >= 0) ts *= MULTIPLIER;
+        if (!osVersion || CompareVersions(osVersion, "10.13.0") >= 0) ts *= MULTIPLIER;
         else ts /= 1000;
 
         return ts;
