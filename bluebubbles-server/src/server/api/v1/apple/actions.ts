@@ -166,7 +166,7 @@ export class ActionHandler {
         // Create the awaiter
         let messageAwaiter = null;
         if (isNotEmpty(message)) {
-            messageAwaiter = new MessagePromise(chatGuid, message, false, now);
+            messageAwaiter = new MessagePromise(chatGuid, message, false, now, tempGuid);
             Server().log(`Adding await for chat: "${chatGuid}"; text: ${messageAwaiter.text}`);
             Server().messageManager.add(messageAwaiter);
         }
@@ -181,7 +181,7 @@ export class ActionHandler {
         // Create the awaiter
         let attachmentAwaiter = null;
         if (attachment && isNotEmpty(aName)) {
-            attachmentAwaiter = new MessagePromise(chatGuid, `->${aName}`, true, now);
+            attachmentAwaiter = new MessagePromise(chatGuid, `->${aName}`, true, now, attachmentGuid);
             Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${aName}`);
             Server().messageManager.add(attachmentAwaiter);
         }
@@ -192,24 +192,13 @@ export class ActionHandler {
 
         // Wait for the attachment first
         if (attachmentAwaiter) {
-            const sentAttachment = await attachmentAwaiter.promise;
+            await attachmentAwaiter.promise;
 
-            // If we have a sent message and we have a tempGuid, we need to emit the message match event
-            if (sentAttachment && isNotEmpty(attachmentGuid)) {
-                Server().httpService.sendCache.remove(attachmentGuid);
-                Server().emitMessageMatch(sentAttachment, attachmentGuid);
-            }
         }
 
         // Next, wait for the message
         if (messageAwaiter) {
-            const sentMessage = await messageAwaiter.promise;
-
-            // If we have a sent message and we have a tempGuid, we need to emit the message match event
-            if (sentMessage && isNotEmpty(tempGuid)) {
-                Server().httpService.sendCache.remove(tempGuid);
-                Server().emitMessageMatch(sentMessage, tempGuid);
-            }
+            await messageAwaiter.promise;
         }
     };
 

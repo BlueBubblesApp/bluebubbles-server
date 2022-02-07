@@ -24,7 +24,13 @@ export class MessagePromise {
 
     isAttachment: boolean;
 
-    constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number, subject?: string) {
+    private tempGUID?: string | null;
+
+    constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number, subject?: string, tempGUID?: string) {
+
+        // Used to temporarily update the guid
+        this.tempGUID = tempGUID;
+
         // Create a promise and save the "callbacks"
         this.promise = new Promise((resolve, reject) => {
             this.resolvePromise = resolve;
@@ -64,14 +70,23 @@ export class MessagePromise {
         );
     }
 
-    resolve(value: Message | PromiseLike<Message>) {
+    async resolve(value: Message) {
         this.isResolved = true;
+        await this.updateMessageMatch(value);
         this.resolvePromise(value);
     }
 
     reject(reason?: any) {
         this.isResolved = true;
         this.rejectPromise(reason);
+    }
+
+    async updateMessageMatch(sentMessage: Message) {
+        // If we have a sent message and we have a tempGuid, we need to emit the message match event
+        if (sentMessage && isNotEmpty(this.tempGUID)) {
+            Server().httpService.sendCache.remove(this.tempGUID);
+            await Server().emitMessageMatch(sentMessage, this.tempGUID);
+        }
     }
 
     isSame(message: Message) {
