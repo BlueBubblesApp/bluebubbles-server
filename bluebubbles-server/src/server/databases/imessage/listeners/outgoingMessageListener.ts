@@ -169,16 +169,14 @@ export class OutgoingMessageListener extends ChangeListener {
             // Reject the corresponding promise
             const idx = Server().messageManager.findIndex(entry);
             if (idx >= 0) {
-                Server().messageManager.promises[idx].reject(entry);
+                await Server().messageManager.promises[idx].reject(entry);
 
-                setTimeout(() => { // Is this needed? What is the functionality of errors on receive
-                    super.emit("message-send-error", entry);
-                }, 1000);
-            } else {
                 super.emit("message-send-error", entry);
 
-                // Add artificial delay so we don't overwhelm any listeners
-                await waitMs(200);
+            } else {
+
+                super.emit("message-send-error", entry);
+
             }
         }
     }
