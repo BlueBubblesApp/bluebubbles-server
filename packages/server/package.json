@@ -64,7 +64,8 @@
         },
         "dmg": {
             "sign": false
-        }
+        },
+        "afterSign": "./scripts/notarize.js"
     },
     "devDependencies": {
         "@babel/core": "^7.16.12",
