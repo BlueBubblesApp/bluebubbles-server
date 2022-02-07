@@ -319,8 +319,7 @@ export class BlueBubblesHelperService {
             throw new Error("Failed to retreive typing status, no chatGuid specified!");
         }
 
-        const request = new TransactionPromise(TransactionType.CHAT);
-        return this.writeData("check-typing-status", { chatGuid }, request);
+        return this.writeData("check-typing-status", { chatGuid });
     }
 
     setupListeners() {
