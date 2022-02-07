@@ -424,7 +424,7 @@ export class BlueBubblesHelperService {
             // If we have a transaction, wait until the transaction is fulfilled to return
             if (transaction) return transaction.promise;
         } catch (ex: any) {
-            Server().log(`${msg} ${ex?.message ?? ex}`);
+            Server().log(`${msg} ${ex?.message ?? ex}`, 'debug');
         }
 
         return null;
