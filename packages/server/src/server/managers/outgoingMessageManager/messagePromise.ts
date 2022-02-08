@@ -26,7 +26,7 @@ export class MessagePromise {
 
     private tempGuid?: string | null;
 
-    constructor({chatGuid, text, isAttachment, sentAt, subject, tempGuid}: MessagePromiseConstructorParameters) {
+    constructor({ chatGuid, text, isAttachment, sentAt, subject, tempGuid }: MessagePromiseConstructorParameters) {
 
         // Used to temporarily update the guid
         this.tempGuid = tempGuid;
