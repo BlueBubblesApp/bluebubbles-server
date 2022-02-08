@@ -26,7 +26,7 @@ export class MessagePromise {
 
     private tempGuid?: string | null;
 
-    constructor(chatGuid: string, text: string, isAttachment: boolean, sentAt: Date | number, subject?: string, tempGuid?: string) {
+    constructor({chatGuid, text, isAttachment, sentAt, subject, tempGuid}: MessagePromiseConstructorParameters) {
 
         // Used to temporarily update the guid
         this.tempGuid = tempGuid;
@@ -116,4 +116,12 @@ export class MessagePromise {
 
         return this.text === onlyAlphaNumeric(message.text) && this.sentAt < message.dateCreated.getTime();
     }
+}
+interface MessagePromiseConstructorParameters {
+    chatGuid: string;
+    text: string;
+    isAttachment: boolean;
+    sentAt: Date | number;
+    subject?: string;
+    tempGuid?: string;
 }

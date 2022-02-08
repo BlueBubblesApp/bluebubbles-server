@@ -166,7 +166,7 @@ export class ActionHandler {
         // Create the awaiter
         let messageAwaiter = null;
         if (isNotEmpty(message)) {
-            messageAwaiter = new MessagePromise(chatGuid, message, false, now, undefined, tempGuid);
+            messageAwaiter = new MessagePromise({chatGuid: chatGuid, text:message, isAttachment: false, sentAt:now,  tempGuid:tempGuid});
             Server().log(`Adding await for chat: "${chatGuid}"; text: ${messageAwaiter.text}`);
             Server().messageManager.add(messageAwaiter);
         }
@@ -181,7 +181,7 @@ export class ActionHandler {
         // Create the awaiter
         let attachmentAwaiter = null;
         if (attachment && isNotEmpty(aName)) {
-            attachmentAwaiter = new MessagePromise(chatGuid, `->${aName}`, true, now, undefined, attachmentGuid);
+            attachmentAwaiter = new MessagePromise({chatGuid: chatGuid,text: `->${aName}`, isAttachment:true, sentAt:now, tempGuid:attachmentGuid});
             Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${aName}`);
             Server().messageManager.add(attachmentAwaiter);
         }
