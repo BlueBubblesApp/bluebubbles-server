@@ -138,7 +138,7 @@
         "localtunnel": "^2.0.2",
         "macos-version": "^5.2.0",
         "mime-types": "^2.1.32",
-        "ngrok": "^4.2.2",
+        "ngrok": "^4.3.0",
         "node-forge": "^0.10.0",
         "numeral": "^2.0.6",
         "plist": "^3.0.4",
