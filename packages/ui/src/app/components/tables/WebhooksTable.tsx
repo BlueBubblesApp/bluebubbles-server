@@ -25,7 +25,6 @@ export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): J
     const dispatch = useAppDispatch();
     const dialogRef = useRef(null);
     const [selectedId, setSelectedId] = useState(undefined as number | undefined);
-    console.log(selectedId);
     return (
         <Box>
             <Table variant="striped" colorScheme="blue">
