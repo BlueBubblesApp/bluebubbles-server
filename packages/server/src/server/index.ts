@@ -2,7 +2,9 @@
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
 import ServerLog from "electron-log";
-import * as process from "process";
+import process from "process";
+import path from 'path';
+import os from 'os';
 import { EventEmitter } from "events";
 import macosVersion from "macos-version";
 
@@ -54,6 +56,9 @@ const osVersion = macosVersion();
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
 ServerLog.transports.console.format = logFormat;
 ServerLog.transports.file.format = logFormat;
+
+// Patch in the original package path so we don't use @bluebubbles/server
+ServerLog.transports.file.resolvePath = () => path.join(os.homedir(), 'Library', 'Logs', 'bluebubbles-server', 'main.log');
 
 /**
  * Create a singleton for the server so that it can be referenced everywhere.
