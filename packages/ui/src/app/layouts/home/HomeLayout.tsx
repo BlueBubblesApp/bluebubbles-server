@@ -73,6 +73,8 @@ export const HomeLayout = (): JSX.Element => {
                 } else {
                     dispatch(setStat({ name: 'best_friend', value: `${e.firstName} ${e?.lastName ?? ''}`.trim() }));
                 }
+            }).then(() => {
+                dispatch(setStat({ name: 'best_friend', value: currentTop }));
             });
         });
         
