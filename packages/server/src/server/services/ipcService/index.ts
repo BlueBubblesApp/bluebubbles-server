@@ -69,7 +69,6 @@ export class IPCService {
         });
 
         ipcMain.handle("get-devices", async (event, args) => {
-            // eslint-disable-next-line no-return-await
             return await Server().repo.devices().find();
         });
 
@@ -208,6 +207,7 @@ export class IPCService {
         });
 
         ipcMain.handle("clear-alerts", async (_, __) => {
+            Server().notificationCount = 0;
             app.setBadgeCount(0);
             await Server().repo.alerts().clear();
         });
