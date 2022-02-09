@@ -37,6 +37,8 @@ if (!gotTheLock) {
 
 process.on("uncaughtException", error => {
     Server().log(`Uncaught Exception: ${error.message}`, "error");
+    if (error?.stack) Server().log(`Uncaught Exception StackTrace: ${error?.stack}`, 'debug');
+    
 });
 
 const handleExit = async () => {
