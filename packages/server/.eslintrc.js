@@ -1,4 +1,4 @@
-{
+module.exports = {
     "env": {
         "es6": true,
         "node": true
@@ -25,7 +25,8 @@
         },
         "ecmaVersion": 2018,
         "sourceType": "module",
-        "project": "./tsconfig.json"
+        "tsconfigRootDir": __dirname,
+        "project": "tsconfig.json"
     },
     "plugins": ["prettier", "@typescript-eslint"],
     "rules": {
@@ -59,4 +60,4 @@
         "@typescript-eslint/no-angle-bracket-type-assertion": 0
 
     }
-}
+};
