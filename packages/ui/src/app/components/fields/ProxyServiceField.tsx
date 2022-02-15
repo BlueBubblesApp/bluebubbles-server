@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     Select,
     Flex,
@@ -17,6 +17,8 @@ import { AiOutlineEdit } from 'react-icons/ai';
 import { BiCopy } from 'react-icons/bi';
 import { setConfig } from '../../slices/ConfigSlice';
 import { copyToClipboard } from '../../utils/GenericUtils';
+import { ConfirmationItems } from '../../utils/ToastUtils';
+import { ConfirmationDialog } from '../modals/ConfirmationDialog';
 
 
 export interface ProxyServiceFieldProps {
@@ -24,13 +26,31 @@ export interface ProxyServiceFieldProps {
     showAddress?: boolean;
 }
 
+const confirmationActions: ConfirmationItems = {
+    confirmation: {
+        message: (
+            'Cloudflare registers brand new domains on the fly to assign to your server. After ' +
+            'switching your proxy service to Cloudflare, it is highly recommended that you toggle your ' + 
+            'device\'s WiFi/Network off and then back on.<br /><br />Note: This is to ensure that new ' +
+            'domains can be found by your device\'s DNS service.'
+        ),
+        func: () => {
+            // Do nothing
+        }
+    }
+};
+
 export const ProxyServiceField = ({ helpText, showAddress = true }: ProxyServiceFieldProps): JSX.Element => {
     const dispatch = useAppDispatch();
     const dnsRef = useRef(null);
+    const alertRef = useRef(null);
     const proxyService: string = (useAppSelector(state => state.config.proxy_service) ?? '').toLowerCase().replace(' ', '-');
     const address: string = useAppSelector(state => state.config.server_address) ?? '';
     const port: number = useAppSelector(state => state.config.socket_port) ?? 1234;
     const [dnsModalOpen, setDnsModalOpen] = useBoolean();
+    const [requiresConfirmation, confirm] = useState((): string | null => {
+        return null;
+    });
     return (
         <FormControl>
             <FormLabel htmlFor='proxy_service'>Proxy Service</FormLabel>
@@ -46,6 +66,8 @@ export const ProxyServiceField = ({ helpText, showAddress = true }: ProxyService
                         onSelectChange(e);
                         if (e.target.value === 'dynamic-dns') {
                             setDnsModalOpen.on();
+                        } else if (e.target.value === 'cloudflare') {
+                            confirm('confirmation');
                         }
                     }}
                 >
@@ -84,6 +106,19 @@ export const ProxyServiceField = ({ helpText, showAddress = true }: ProxyService
                 isOpen={dnsModalOpen}
                 port={port as number}
                 onClose={() => setDnsModalOpen.off()}
+            />
+
+            <ConfirmationDialog
+                title="Notice"
+                modalRef={alertRef}
+                onClose={() => confirm(null)}
+                body={confirmationActions[requiresConfirmation as string]?.message}
+                acceptText="OK"
+                declineText={null}
+                onAccept={() => {
+                    confirmationActions[requiresConfirmation as string].func();
+                }}
+                isOpen={requiresConfirmation !== null}
             />
         </FormControl>
     );
