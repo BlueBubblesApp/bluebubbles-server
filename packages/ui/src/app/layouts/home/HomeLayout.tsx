@@ -49,8 +49,8 @@ export const HomeLayout = (): JSX.Element => {
     const totalPictures: number | null = useAppSelector(state => state.statistics.total_pictures) ?? null;
     const totalVideos: number | null = useAppSelector(state => state.statistics.total_videos) ?? null;
 
-    // Run-once to fetch stats
-    useEffect(() => {
+    const updateStats = () => {
+        console.log('Updating stats...');
         ipcRenderer.invoke('get-message-count').then((messageCount) => {
             dispatch(setStat({ name: 'total_messages', value: messageCount }));
         });
@@ -113,6 +113,11 @@ export const HomeLayout = (): JSX.Element => {
             });
             dispatch(setStat({ name: 'total_videos', value: total }));
         });
+    };
+
+    // Run-once to fetch stats
+    useEffect(() => {
+        setInterval(updateStats, 60000);  // Refresh the stats every 1 minute
     }, []);
 
     return (
