@@ -50,7 +50,6 @@ export const HomeLayout = (): JSX.Element => {
     const totalVideos: number | null = useAppSelector(state => state.statistics.total_videos) ?? null;
 
     const updateStats = () => {
-        console.log('Updating stats...');
         ipcRenderer.invoke('get-message-count').then((messageCount) => {
             dispatch(setStat({ name: 'total_messages', value: messageCount }));
         });
