@@ -116,6 +116,7 @@ export const HomeLayout = (): JSX.Element => {
 
     // Run-once to fetch stats
     useEffect(() => {
+        updateStats();
         setInterval(updateStats, 60000);  // Refresh the stats every 1 minute
     }, []);
 
