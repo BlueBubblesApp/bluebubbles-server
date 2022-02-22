@@ -137,11 +137,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Resolve the promise for sent messages from a client
-            const idx = Server().messageManager.findIndex(entry);
-            if (idx >= 0) {
-                // After the MessageMatchEmit event reaches client, then emmit new-entry to fcm
-                await Server().messageManager.promises[idx].resolve(entry);
-            }
+            await Server().messageManager.resolve(entry);
 
             // Emit it as normal entry
             super.emit("new-entry", entry);
@@ -159,11 +155,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Reject the corresponding promise
-            const idx = Server().messageManager.findIndex(entry);
-            if (idx >= 0) {
-                // After the MessageMatchEmit event reaches client, then emmit message-send-error to fcm
-                await Server().messageManager.promises[idx].reject(entry);
-            }
+            await Server().messageManager.reject(entry);
 
             //Emit it as normal error
             super.emit("message-send-error", entry);
@@ -198,11 +190,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Resolve the promise
-            const idx = Server().messageManager.findIndex(entry);
-            if (idx >= 0) {
-                // After the MessageMatchEmit event reaches client, then emmit updated-entry to fcm
-                await Server().messageManager.promises[idx].resolve(entry);
-            }
+            await Server().messageManager.resolve(entry);
 
             // Emit it as a normal update
             super.emit("updated-entry", entry);
