@@ -173,7 +173,7 @@ export const HomeLayout = (): JSX.Element => {
                                         onClick={() => copyToClipboard(address)}
                                     />
                                 </Tooltip>
-                                <Popover placement='bottom'>
+                                <Popover placement='bottom' isLazy={true}>
                                     <PopoverTrigger>
                                         <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }} >
                                             <Tooltip label='Show QR Code'>
