@@ -404,7 +404,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Stopping HTTP service...");
             await this.httpService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
