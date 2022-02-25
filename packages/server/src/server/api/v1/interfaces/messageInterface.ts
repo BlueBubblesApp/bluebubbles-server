@@ -52,7 +52,7 @@ export class MessageInterface {
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise({chatGuid: chatGuid, text: message, isAttachment: false, sentAt: now, subject: subject, tempGuid: tempGuid});
+        const awaiter = new MessagePromise({chatGuid, text: message, isAttachment: false, sentAt: now, subject, tempGuid});
 
         // Add the promise to the manager
         Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}`);
@@ -204,7 +204,7 @@ export class MessageInterface {
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise({chatGuid: chatGuid, text: messageText, isAttachment: false, sentAt: now, tempGuid: tempGuid});
+        const awaiter = new MessagePromise({chatGuid, text: messageText, isAttachment: false, sentAt: now, tempGuid});
         Server().messageManager.add(awaiter);
 
         // Send the reaction
