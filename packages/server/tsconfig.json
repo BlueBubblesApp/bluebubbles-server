@@ -1,0 +1,16 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "baseUrl": "./src",
+        "paths": {
+            "@server": ["server/index"],
+            "@server/*": ["server/*"],
+        },
+        "outDir": "./dist",
+        "strictNullChecks": false,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true
+    },
+    "include": ["src"],
+    "exclude": ["dist", "node_modules", "*.js"]
+}

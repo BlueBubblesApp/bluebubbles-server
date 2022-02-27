@@ -1,1 +1,0 @@
-export type MultiSelectValue = { label: string; value: string; };
