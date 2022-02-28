@@ -11,6 +11,7 @@ import { QueueService } from "./queueService";
 import { IPCService } from "./ipcService";
 import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
+import { SwiftHelperService } from "./swiftHelperService";
 
 export {
     HttpService,
@@ -25,5 +26,6 @@ export {
     IPCService,
     CertificateService,
     CloudflareService,
-    WebhookService
+    WebhookService,
+    SwiftHelperService
 };

@@ -36,7 +36,8 @@ import {
     IPCService,
     UpdateService,
     CloudflareService,
-    WebhookService
+    WebhookService,
+    SwiftHelperService,
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -112,6 +113,8 @@ class BlueBubblesServer extends EventEmitter {
     proxyServices: Proxy[];
 
     webhookService: WebhookService;
+
+    swiftHelperService: SwiftHelperService;
 
     actionHandler: ActionHandler;
 
@@ -304,6 +307,8 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
+        this.swiftHelperService = new SwiftHelperService();
+
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             try {
@@ -360,6 +365,12 @@ class BlueBubblesServer extends EventEmitter {
             await this.fcm.start();
         } catch (ex: any) {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.swiftHelperService.start();
+        } catch (ex: any) {
+            this.log(`Failed to start SwiftHelper service! ${ex.message}`, "error");
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
