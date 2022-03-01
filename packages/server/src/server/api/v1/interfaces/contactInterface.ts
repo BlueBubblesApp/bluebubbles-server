@@ -22,7 +22,7 @@ export class ContactInterface {
             });
     }
 
-    static findContact(address: string, { preloadedContacts }: { preloadedContacts?: any[] | null }): any | null {
+    static findContact(address: string, { preloadedContacts }: { preloadedContacts?: any[] | null } = {}): any | null {
         const contactList = preloadedContacts ?? contacts.getAllContacts();
         const alphaNumericRegex = /[^a-zA-Z0-9_]/gi;
         const addr = address.replace(alphaNumericRegex, '');

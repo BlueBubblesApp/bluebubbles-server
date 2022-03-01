@@ -9,6 +9,7 @@ import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
+import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 
 export const isMinMonterey = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
@@ -76,7 +77,7 @@ export const safeExecuteAppleScript = async (command: string) => {
 
 export const getContactRecord = async (chat: Chat, member: Handle) => {
     // Get the corresponding
-    const record = await Server().contactsRepo.getContactByAddress(member.id);
+    const record = ContactInterface.findContact(member.id);
 
     // If the record is unknown, we want to format it
     // Otherwise, store either the full name, email, or just first name

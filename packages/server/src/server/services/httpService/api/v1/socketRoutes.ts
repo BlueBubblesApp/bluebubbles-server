@@ -950,31 +950,6 @@ export class SocketRoutes {
         );
 
         /**
-         * Gets a contact (or contacts) for a given list of handles, from the database
-         */
-        socket.on(
-            "get-contacts-from-db",
-            async (params, cb): Promise<void> => {
-                if (!Server().contactsRepo || !Server().contactsRepo.db.isConnected) {
-                    response(cb, "contacts", createServerErrorResponse("Contacts repository is disconnected!"));
-                    return;
-                }
-
-                const handles = params.map((e: any) => (typeof e === "string" ? { address: e } : e));
-                for (let i = 0; i <= handles.length; i += 1) {
-                    if (!handles[i] || !handles[i].address) continue;
-                    const contact = await Server().contactsRepo.getContactByAddress(handles[i].address);
-                    if (contact) {
-                        handles[i].firstName = contact.firstName;
-                        handles[i].lastName = contact.lastName;
-                    }
-                }
-
-                response(cb, "contacts-from-disk", createSuccessResponse(handles));
-            }
-        );
-
-        /**
          * Gets a contacts
          */
         socket.on(

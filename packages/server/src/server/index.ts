@@ -14,7 +14,6 @@ import { FileSystem } from "@server/fileSystem";
 // Database Imports
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
 import { MessageRepository } from "@server/databases/imessage";
-import { ContactRepository } from "@server/databases/contacts";
 import {
     IncomingMessageListener,
     OutgoingMessageListener,
@@ -90,8 +89,6 @@ class BlueBubblesServer extends EventEmitter {
 
     iMessageRepo: MessageRepository;
 
-    contactsRepo: ContactRepository;
-
     httpService: HttpService;
 
     privateApiHelper: BlueBubblesHelperService;
@@ -149,7 +146,6 @@ class BlueBubblesServer extends EventEmitter {
         // Databases
         this.repo = null;
         this.iMessageRepo = null;
-        this.contactsRepo = null;
 
         // Other helpers
         this.eventCache = null;
@@ -279,14 +275,6 @@ class BlueBubblesServer extends EventEmitter {
                     app.quit();
                 }
             });
-        }
-
-        try {
-            this.log("Connecting to Contacts database...");
-            this.contactsRepo = new ContactRepository();
-            await this.contactsRepo.initialize();
-        } catch (ex: any) {
-            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
         }
     }
 
@@ -427,12 +415,6 @@ class BlueBubblesServer extends EventEmitter {
             if (this.caffeinate) this.caffeinate.stop();
         } catch (ex: any) {
             this.log(`Failed to stop Caffeinate service! ${ex?.message ?? ex}`);
-        }
-
-        try {
-            await this.contactsRepo?.db?.close();
-        } catch (ex: any) {
-            this.log(`Failed to close Contacts Database connection! ${ex?.message ?? ex}`);
         }
 
         try {
