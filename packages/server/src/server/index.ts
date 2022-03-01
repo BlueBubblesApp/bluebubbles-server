@@ -49,6 +49,7 @@ import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { fs } from "zx";
 
 const findProcess = require("find-process");
+const contacts = require('node-mac-contacts');
 
 const osVersion = macosVersion();
 
@@ -665,18 +666,22 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Show a warning if the time is off by a reasonable amount (1 minute)
-        const syncString = await this.getTimeSync();
-        if (syncString !== null) {
-            try {
-                const spl = syncString.split('+/-');
-                const left = spl[0].split(' ').slice(0, -1);
-                const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace('+', '').replace('-', '')));
-                if (offset >= 15) {
-                    this.log(`Your macOS time is not synchronized! Offset: ${offset}`, 'warn');
+        try {
+            const syncString = await this.getTimeSync();
+            if (syncString !== null) {
+                try {
+                    const spl = syncString.split('+/-');
+                    const left = spl[0].split(' ').slice(0, -1);
+                    const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace('+', '').replace('-', '')));
+                    if (offset >= 15) {
+                        this.log(`Your macOS time is not synchronized! Offset: ${offset}`, 'warn');
+                    }
+                } catch (ex) {
+                    this.log('Unable to parse time synchronization offset!', 'debug');
                 }
-            } catch (ex) {
-                this.log('Unable to parse time synchronization offset!', 'debug');
             }
+        } catch (ex) {
+            this.log(`Failed to get time sychronization status! Error: ${ex}`, 'debug')
         }
 
         this.setDockIcon();
@@ -687,6 +692,13 @@ class BlueBubblesServer extends EventEmitter {
         } else if (isMinBigSur) {
             this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "debug");
         }
+
+        // Check for contact permissions
+        let contactStatus = contacts.getAuthStatus();
+        if (contactStatus === 'Not Determined') {
+            contactStatus = await contacts.requestAccess();
+        }
+        this.log(`Contacts authorization status: ${contactStatus}`, 'debug');
 
         this.log("Finished post-start checks...");
     }

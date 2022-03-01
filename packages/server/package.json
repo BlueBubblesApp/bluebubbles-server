@@ -139,6 +139,7 @@
         "mime-types": "^2.1.32",
         "ngrok": "^4.3.0",
         "node-forge": "^0.10.0",
+        "node-mac-contacts": "^1.4.0",
         "numeral": "^2.0.6",
         "plist": "^3.0.4",
         "read-chunk": "^3.2.0",
