@@ -1,3 +1,4 @@
+const TIMEOUT = 10*1000;
 
 /**
  * A helper class to handle the responses from the swift helper socket.
@@ -13,12 +14,12 @@
   enqueue(uuid: string, cb: (buf: Buffer) => void) {
       if (!(uuid in this.queue)) {
           this.queue[uuid] = cb;
-          // if the socket requests takes longer than 100ms, we should cancel it
+          // if the socket requests takes longer than the timeout time, we should cancel it
           // by resolving the promise with null and removing it from the queue.
           setTimeout(() => {
               if (this.queue[uuid] != null) this.queue[uuid](null);
               delete this.queue[uuid];
-          }, 100);
+          }, TIMEOUT);
       }
   }
 

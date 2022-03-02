@@ -141,7 +141,7 @@ export class MessageRouter {
     }
 
     static async sendText(ctx: RouterContext, _: Next) {
-        let { tempGuid, message, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
+        let { tempGuid, message, attributedBody, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
 
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
@@ -151,6 +151,7 @@ export class MessageRouter {
             const sentMessage = await MessageInterface.sendMessageSync(
                 chatGuid,
                 message,
+                attributedBody,
                 method,
                 subject,
                 effectId,
