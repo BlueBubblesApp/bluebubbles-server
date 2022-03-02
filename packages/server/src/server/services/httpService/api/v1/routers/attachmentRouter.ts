@@ -6,7 +6,7 @@ import * as mime from "mime-types";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
-import { isNotEmpty } from "@server/helpers/utils";
+import { isNotEmpty, isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { FileStream, Success } from "../responses/success";
@@ -29,7 +29,8 @@ export class AttachmentRouter {
 
     static async download(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
-        const { height, width, quality } = ctx.request.query;
+        const { height, width, quality, original } = ctx.request.query;
+        const useOriginal = isTruthyBool(original as string);
 
         // Fetch the info for the attachment by GUID
         const attachment = await Server().iMessageRepo.getAttachment(guid);
@@ -75,15 +76,19 @@ export class AttachmentRouter {
 
             // Force setting it to a PNG because all resized images are PNGs
             mimeType = "image/png";
-        } else if (attachment.uti === "com.apple.coreaudio-format") {
-            // If it's a CAF audio file, we want to convert it
-            const newPath = await convertAudio(attachment);
-            aPath = newPath ?? aPath;
-        } else if (isNotEmpty(attachment?.mimeType)) {
-            // If the attachment is a HEIC, convert it to a JPEG
-            if (attachment.mimeType.startsWith("image/heic")) {
-                const newPath = await convertImage(attachment);
+        }
+        
+        if (!useOriginal) {
+            if (attachment.uti === "com.apple.coreaudio-format") {
+                // If it's a CAF audio file, we want to convert it
+                const newPath = await convertAudio(attachment);
                 aPath = newPath ?? aPath;
+            } else if (isNotEmpty(attachment?.mimeType)) {
+                // If the attachment is a HEIC, convert it to a JPEG
+                if (attachment.mimeType.startsWith("image/heic")) {
+                    const newPath = await convertImage(attachment);
+                    aPath = newPath ?? aPath;
+                }
             }
         }
 
