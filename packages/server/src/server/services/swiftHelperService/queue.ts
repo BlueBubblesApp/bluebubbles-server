@@ -1,4 +1,4 @@
-const TIMEOUT = 10*1000;
+const TIMEOUT = 1000;
 
 /**
  * A helper class to handle the responses from the swift helper socket.

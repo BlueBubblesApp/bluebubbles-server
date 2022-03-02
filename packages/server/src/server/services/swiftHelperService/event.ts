@@ -16,7 +16,7 @@ export class Event {
     /**
      * The name of the socket event
      */
-    event: string;
+    name: string;
 
     /**
      * A unique identifier for this message, used to resolve the response promise.
@@ -30,12 +30,12 @@ export class Event {
 
     /**
      * Constructs a new SocketMessage.
-     * @param {string} event The name of the socket event
+     * @param {string} name The name of the socket event
      * @param {Buffer} data The message payload
      * @param {string} [uuid] An optional uuid to use for this message. If not provided, a new uuid will be generated.
      */
-    constructor(event: string, data: Buffer, uuid?: string) {
-        this.event = event;
+    constructor(name: string, data: Buffer, uuid?: string) {
+        this.name = name;
         this.data = data;
         this.uuid = uuid ?? generateUuid();
     }
@@ -46,30 +46,32 @@ export class Event {
      * @returns {Event}
      */
     static fromBytes(bytes: Buffer): Event {
-        const eventStart = bytes.indexOf(START_OF_TEXT);
-        const eventEnd = bytes.indexOf(END_OF_TEXT);
-        const event = bytes.subarray(eventStart + 1, eventEnd).toString("ascii");
-        const remain = bytes.subarray(eventEnd + 1);
+        const nameStart = bytes.indexOf(START_OF_TEXT);
+        const nameEnd = bytes.indexOf(END_OF_TEXT);
+        const name = bytes.subarray(nameStart + 1, nameEnd).toString("ascii");
+        const remain = bytes.subarray(nameEnd + 1);
         const uuidStart = remain.indexOf(START_OF_TEXT);
         const uuidEnd = remain.indexOf(END_OF_TEXT);
         const uuid = remain.subarray(uuidStart + 1, uuidEnd).toString("ascii");
         const data = remain.subarray(uuidEnd + 1);
-        return new Event(event, data, uuid);
+        if (nameStart! < 0 || nameEnd! < 0 || uuidStart! < 0 || uuidEnd! < 0)
+            return null;
+        return new Event(name, data, uuid);
     }
 
     /**
      * Converts the SocketMessage to a Buffer for sending over the socket.
-     * Uses the format STX+event+ETX+STX+uuid+ETX+data
+     * Uses the format STX+name+ETX+STX+uuid+ETX+data
      * @returns {Buffer}
      */
     toBytes(): Buffer {
-        const eventBuf = Buffer.from(this.event, "ascii");
+        const nameBuf = Buffer.from(this.name, "ascii");
         const uuidBuf = Buffer.from(this.uuid, "ascii");
-        const buf = Buffer.alloc(eventBuf.length + 2 + uuidBuf.length + 2 + this.data.length);
+        const buf = Buffer.alloc(nameBuf.length + 2 + uuidBuf.length + 2 + this.data.length);
         let loc = 0;
         buf[loc] = START_OF_TEXT;
-        eventBuf.copy(buf, (loc += 1));
-        buf[(loc += eventBuf.length)] = END_OF_TEXT;
+        nameBuf.copy(buf, (loc += 1));
+        buf[(loc += nameBuf.length)] = END_OF_TEXT;
         buf[(loc += 1)] = START_OF_TEXT;
         uuidBuf.copy(buf, (loc += 1));
         buf[(loc += uuidBuf.length)] = END_OF_TEXT;
