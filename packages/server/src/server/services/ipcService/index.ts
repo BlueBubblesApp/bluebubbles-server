@@ -107,6 +107,10 @@ export class IPCService {
             return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events });
         });
 
+        ipcMain.handle("get-contacts", async (event, _) => {
+            return await ContactInterface.getAllContacts();
+        });
+
         ipcMain.handle("get-contact-name", async (event, address) => {
             const res = await ContactInterface.queryContacts([address]);
             return res && res.length > 0 ? res[0] : null;

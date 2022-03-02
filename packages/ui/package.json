@@ -23,6 +23,7 @@
     "react-scripts": "^5.0.0"
   },
   "dependencies": {
+    "@ajna/pagination": "^1.4.13",
     "@chakra-ui/react": "^1.8.1",
     "@emotion/babel-plugin": "^11",
     "@emotion/react": "^11",
