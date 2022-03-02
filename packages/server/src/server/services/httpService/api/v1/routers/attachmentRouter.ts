@@ -43,42 +43,42 @@ export class AttachmentRouter {
         }
 
         // If we want to resize the image, do so here
-        if (mimeType.startsWith("image/") && mimeType !== "image/gif" && (quality || width || height)) {
-            const opts: Partial<Electron.ResizeOptions> = {};
-
-            // Parse opts
-            const parsedWidth = width ? Number.parseInt(width as string, 10) : null;
-            const parsedHeight = height ? Number.parseInt(height as string, 10) : null;
-
-            let newName = attachment.transferName;
-            if (quality) {
-                newName += `.${quality as string}`;
-                opts.quality = quality as string;
-            }
-            if (parsedHeight) {
-                newName += `.${parsedHeight}`;
-                opts.height = parsedHeight;
-            }
-            if (parsedWidth) {
-                newName += `.${parsedWidth}`;
-                opts.width = parsedWidth;
-            }
-
-            // See if we already have a cached attachment
-            if (FileSystem.cachedAttachmentExists(attachment, newName)) {
-                aPath = FileSystem.cachedAttachmentPath(attachment, newName);
-            } else {
-                let image = nativeImage.createFromPath(aPath);
-                image = image.resize(opts);
-                FileSystem.saveCachedAttachment(attachment, newName, image.toPNG());
-                aPath = FileSystem.cachedAttachmentPath(attachment, newName);
-            }
-
-            // Force setting it to a PNG because all resized images are PNGs
-            mimeType = "image/png";
-        }
-        
         if (!useOriginal) {
+            if (mimeType.startsWith("image/") && mimeType !== "image/gif" && (quality || width || height)) {
+                const opts: Partial<Electron.ResizeOptions> = {};
+
+                // Parse opts
+                const parsedWidth = width ? Number.parseInt(width as string, 10) : null;
+                const parsedHeight = height ? Number.parseInt(height as string, 10) : null;
+
+                let newName = attachment.transferName;
+                if (quality) {
+                    newName += `.${quality as string}`;
+                    opts.quality = quality as string;
+                }
+                if (parsedHeight) {
+                    newName += `.${parsedHeight}`;
+                    opts.height = parsedHeight;
+                }
+                if (parsedWidth) {
+                    newName += `.${parsedWidth}`;
+                    opts.width = parsedWidth;
+                }
+
+                // See if we already have a cached attachment
+                if (FileSystem.cachedAttachmentExists(attachment, newName)) {
+                    aPath = FileSystem.cachedAttachmentPath(attachment, newName);
+                } else {
+                    let image = nativeImage.createFromPath(aPath);
+                    image = image.resize(opts);
+                    FileSystem.saveCachedAttachment(attachment, newName, image.toPNG());
+                    aPath = FileSystem.cachedAttachmentPath(attachment, newName);
+                }
+
+                // Force setting it to a PNG because all resized images are PNGs
+                mimeType = "image/png";
+            }
+        
             if (attachment.uti === "com.apple.coreaudio-format") {
                 // If it's a CAF audio file, we want to convert it
                 const newPath = await convertAudio(attachment);
