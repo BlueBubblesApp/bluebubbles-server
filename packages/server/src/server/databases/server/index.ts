@@ -87,10 +87,17 @@ export class ServerRepository extends EventEmitter {
     }
 
     /**
-     * Get the device repo
+     * Get the contacts repo
      */
-     contacts() {
+    contacts() {
         return this.db.getRepository(Contact);
+    }
+
+    /**
+     * Get the contact addresses repo
+     */
+     contactAddresses() {
+        return this.db.getRepository(ContactAddress);
     }
 
     private async loadConfig() {
@@ -165,45 +172,7 @@ export class ServerRepository extends EventEmitter {
 
     public async getContacts(): Promise<Array<Contact>> {
         const repo = this.contacts();
-        return await repo.find({ relations: ["contact_address"] });
-    }
-
-    public async addAddressToContact(contactId: number, address: string, addressType: 'phone' | 'email'): Promise<Contact> {
-        const repo = this.contacts();
-        const item = await repo.findOne(contactId);
-        if (!item) {
-            throw new Error(`Contact with ID "${contactId}" does not exist!`);
-        }
-    }
-
-    public async addContact({
-        firstName,
-        lastName,
-        phoneNumbers = [],
-        emails = []
-    }: {
-        firstName: string,
-        lastName: string,
-        phoneNumbers: string[];
-        emails: string[];
-    }): Promise<Contact> {
-        const repo = this.contacts();
-        const item = await repo.findOne({ firstName, lastName });
-
-        // If the contact exists, don't re-add it, just return it
-        let contact: Contact;
-        if (item) {
-            // TODO: Update webhook
-        } else {
-            contact = repo.create({ firstName, lastName });
-
-            // Add the addresses
-
-
-            await repo.save(contact);
-        }
-        
-        return contact;
+        return await repo.find({ relations: ["addresses"] });
     }
 
     public async addWebhook(url: string, events: Array<{ label: string, value: string }>): Promise<Webhook> {

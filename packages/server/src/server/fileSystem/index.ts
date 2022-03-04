@@ -401,7 +401,6 @@ export class FileSystem {
         const oldPath = FileSystem.getRealPath(attachment.filePath);
         await FileSystem.execShellCommand(
             `/usr/bin/sips --setProperty "format" "${format}" "${oldPath}" --out "${outputPath}"`);
-        console.log(outputPath)
     }
 
     static async isSipDisabled(): Promise<boolean> {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ipcRenderer } from 'electron';
 import {
     Box,
@@ -17,7 +17,12 @@ import {
     CircularProgress,
     Input,
     InputGroup,
-    InputLeftElement
+    InputLeftElement,
+    Menu,
+    MenuButton,
+    Button,
+    MenuList,
+    MenuItem
 } from '@chakra-ui/react';
 import {
     Pagination,
@@ -28,8 +33,11 @@ import {
     PaginationContainer,
     PaginationPageGroup,
 } from '@ajna/pagination';
-import { AiOutlineInfoCircle, AiOutlineSearch} from 'react-icons/ai';
-import { ContactItem, ContactsTable } from 'app/components/tables/ContactsTable';
+import { AiOutlineInfoCircle, AiOutlineSearch } from 'react-icons/ai';
+import { BsChevronDown, BsPersonPlus } from 'react-icons/bs';
+import { ContactAddress, ContactItem, ContactsTable } from 'app/components/tables/ContactsTable';
+import { ContactDialog } from 'app/components/modals/ContactDialog';
+import { addAddressToContact, createContact, deleteContact, deleteContactAddress } from 'app/actions/ContactActions';
 
 const perPage = 25;
 
@@ -46,6 +54,8 @@ export const ContactsLayout = (): JSX.Element => {
     const [search, setSearch] = useState('' as string);
     const [isLoading, setIsLoading] = useBoolean(true);
     const [contacts, setContacts] = useState([] as any[]);
+    const dialogRef = useRef(null);
+    const [dialogOpen, setDialogOpen] = useBoolean();
 
     let filteredContacts = contacts;
     if (search && search.length > 0) {
@@ -64,7 +74,11 @@ export const ContactsLayout = (): JSX.Element => {
 
     useEffect(() => {
         ipcRenderer.invoke('get-contacts').then((contactList) => {
-            setContacts(contactList);
+            setContacts(contactList.map((e: any) => {
+                // Patch the ID as a string
+                e.id = String(e.id);
+                return e;
+            }));
             setIsLoading.off();
         }).catch(() => {
             setIsLoading.off();
@@ -72,7 +86,6 @@ export const ContactsLayout = (): JSX.Element => {
     }, []);
 
     const getEmptyContent = () => {
-
         const wrap = (child: JSX.Element) => {
             return (
                 <section style={{marginTop: 20}}>
@@ -96,8 +109,82 @@ export const ContactsLayout = (): JSX.Element => {
         return filteredContacts.slice((currentPage - 1) * perPage, currentPage * perPage);
     };
 
+    const onCreate = async (contact: ContactItem) => {
+        const newContact = await createContact(
+            contact.firstName,
+            contact.lastName,
+            {
+                emails: contact.emails.map((e: NodeJS.Dict<any>) => e.address),
+                phoneNumbers: contact.phoneNumbers.map((e: NodeJS.Dict<any>) => e.address)
+            }
+        );
+
+        if (newContact) {
+            // Patch the contact using a string ID
+            newContact.id = String(newContact.id);
+
+            // Patch the addresses
+            (newContact as any).phoneNumbers = (newContact as any).addresses.filter((e: any) => e.type === 'phone');
+            (newContact as any).emails = (newContact as any).addresses.filter((e: any) => e.type === 'email');
+
+            setContacts([newContact, ...contacts]);
+        }
+    };
+
+    const onDelete = async (contactId: number) => {
+        await deleteContact(contactId);
+        setContacts(contacts.filter((e: ContactItem) => {
+            return e.id !== String(contactId);
+        }));
+    };
+
+    const onAddAddress = async (contactId: number, address: string) => {
+        const addr = await addAddressToContact(contactId, address, address.includes('@') ? 'email' : 'phone');
+        if (addr) {
+            setContacts(contacts.map((e: ContactItem) => {
+                if (e.id !== String(contactId)) return e;
+                if (address.includes('@')) {
+                    e.emails = [...e.emails, addr];
+                } else {
+                    e.phoneNumbers = [...e.phoneNumbers, addr];
+                }
+
+                return e;
+            }));
+        }
+    };
+
+    const onDeleteAddress = async (contactAddressId: number) => {
+        await deleteContactAddress(contactAddressId);
+        setContacts(contacts.map((e: ContactItem) => {
+            e.emails = e.emails.filter((e: ContactAddress) => e.id !== contactAddressId);
+            e.phoneNumbers = e.phoneNumbers.filter((e: ContactAddress) => e.id !== contactAddressId);
+            return e;
+        }));
+    };
+
     return (
         <Box p={3} borderRadius={10}>
+            <Stack direction='column' p={5}>
+                <Text fontSize='2xl'>Controls</Text>
+                <Divider orientation='horizontal' />
+                <Box>
+                    <Menu>
+                        <MenuButton
+                            as={Button}
+                            rightIcon={<BsChevronDown />}
+                            width="12em"mr={5}
+                        >
+                            Manage
+                        </MenuButton>
+                        <MenuList>
+                            <MenuItem icon={<BsPersonPlus />} onClick={() => setDialogOpen.on()}>
+                                Add Contact
+                            </MenuItem>
+                        </MenuList>
+                    </Menu>
+                </Box>
+            </Stack>
             <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                     <Text fontSize='2xl'>Contacts ({filteredContacts.length})</Text>
@@ -139,7 +226,13 @@ export const ContactsLayout = (): JSX.Element => {
                     {getEmptyContent()}
                 </Flex>
                 {(contacts.length > 0) ? (
-                    <ContactsTable contacts={filterContacts()} />
+                    <ContactsTable
+                        contacts={filterContacts()}
+                        onCreate={onCreate}
+                        onDelete={onDelete}
+                        onAddressAdd={onAddAddress}
+                        onAddressDelete={onDeleteAddress}
+                    />
                 ) : null}
                 <Pagination
                     pagesCount={pagesCount}
@@ -166,6 +259,16 @@ export const ContactsLayout = (): JSX.Element => {
                     </PaginationContainer>
                 </Pagination>
             </Stack>
+
+            <ContactDialog
+                modalRef={dialogRef}
+                isOpen={dialogOpen}
+                onCreate={onCreate}
+                onDelete={onDelete}
+                onAddressAdd={onAddAddress}
+                onAddressDelete={onDeleteAddress}
+                onClose={() => setDialogOpen.off()}
+            />
         </Box>
     );
 };

@@ -1,9 +1,18 @@
+import { Server } from "@server";
+import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
 
 const contacts = require('node-mac-contacts');
 
 export class ContactInterface {
-    private static mapContacts(records: NodeJS.Dict<any>[]): any {
+
+    /**
+     * Maps a contact record (either from the DB or API), and puts it into a standard format
+     * 
+     * @param records The list of contacts to map
+     * @returns A list of contacts in a generic format
+     */
+    private static mapContacts(records: any[], sourceType: string): any {
         return records
             .map((e: NodeJS.Dict<any>) => {
                 return {
@@ -11,17 +20,44 @@ export class ContactInterface {
                     // The "old" way we fetched contacts had a lot more information, but was less reliable.
                     // Technically, if we want to include more information with the phone numbers, we can add them
                     // in without breaking the client. New properties can be added, and the client can suppor them as needed
-                    phoneNumbers: (e?.phoneNumbers ?? []).map((address: string) => { return { address }; }),
-                    emails: (e?.emailAddresses ?? []).map((address: string) => { return { address }; }),
+                    phoneNumbers: (e?.phoneNumbers ?? []).map((address: any) => {
+                        if (typeof(address) === 'string') {
+                            return { address };
+                        } else {
+                            return {
+                                address: address.address,
+                                id: address.id
+                            };
+                        }
+                    }),
+                    emails: (e?.emails ?? []).map((address: any) => {
+                        if (typeof(address) === 'string') {
+                            return { address };
+                        } else {
+                            return {
+                                address: address.address,
+                                id: address.id
+                            };
+                        }
+                    }),
                     firstName: e?.firstName,
                     lastName: e?.lastName,
                     nickname: e?.nickname,
                     birthday: e?.birthday,
-                    avatar: e?.contactImage && e?.contactImage.length > 0 ? base64.bytesToBase64(e?.contactImage) : ''
+                    avatar: e?.contactImage && e?.contactImage.length > 0 ? base64.bytesToBase64(e?.contactImage) : '',
+                    sourceType,
+                    id: e?.identifier ?? e?.id
                 };
             });
     }
 
+    /**
+     * Finds a contact within the known contacts list by address
+     * 
+     * @param address The address you are trying to find a contact entry for
+     * @param preloadedContacts If you already loaded a list of contacts, pass it here
+     * @returns A contact entry dictionary
+     */
     static findContact(address: string, { preloadedContacts }: { preloadedContacts?: any[] | null } = {}): any | null {
         const contactList = preloadedContacts ?? contacts.getAllContacts();
         const alphaNumericRegex = /[^a-zA-Z0-9_]/gi;
@@ -30,8 +66,10 @@ export class ContactInterface {
         // Build a map where the address is the key and contact dict is the value
         const cacheMap: NodeJS.Dict<any> = {};
         for (const c of contactList) {
-            const addresses = [ ...(c?.phoneNumbers ?? []), ...(c?.emailAddresses ?? [])]
-                .map((e) => e.replace(alphaNumericRegex, ''));
+            const addresses = [
+                ...(c?.phoneNumbers ?? []).map((e: NodeJS.Dict<any>) => e.address),
+                ...(c?.emailAddresses ?? []).map((e: NodeJS.Dict<any>) => e.address)
+            ].map((e) => e.replace(alphaNumericRegex, ''));
             for (const contactAddr of addresses) {
                 cacheMap[contactAddr] = c;
             }
@@ -54,14 +92,201 @@ export class ContactInterface {
         return output;
     }
 
-    static getAllContacts(extraProperties: string[] = []): any[] {
-        return ContactInterface.mapContacts(contacts.getAllContacts(extraProperties));
+    /**
+     * Gets all contacts from the AddressBook API
+     * 
+     * @param extraProperties Non-default properties to fetch from the API
+     * @returns A list of contact entries from the API
+     */
+    static getApiContacts(extraProperties: string[] = []): any[] {
+        return ContactInterface.mapContacts(contacts.getAllContacts(extraProperties), 'api');
     }
 
+    /**
+     * Gets all contacts from the local server DB
+     * @returns A list of contact entries from the local DB
+     */
+    static async getDbContacts(): Promise<any[]> {
+        return ContactInterface.mapContacts((await Server().repo.getContacts()).map((e: any) => {
+            e.phoneNumbers = e.addresses.filter((e: any) => e.type === 'phone');
+            e.emails = e.addresses.filter((e: any) => e.type === 'email');
+            return e;
+        }), 'db');
+    }
+
+    /**
+     * Gets all known contacts from the API and local DBs
+     * 
+     * @param extraProperties Non-default properties to fetch from the API
+     * @returns A list of contact entries from both the API and local DB
+     */
+    static async getAllContacts(extraProperties: string[] = []): Promise<any[]> {
+        const apiContacts = ContactInterface.getApiContacts(extraProperties);
+        const dbContacts = await ContactInterface.getDbContacts();
+        return [...dbContacts, ...apiContacts];
+    }
+
+    /**
+     * Removes a contact address from the local database
+     * 
+     * @param addressId The ID for the address to remove
+     */
+     static async deleteContactAddress({
+         contactAddressId,
+         contactAddress
+    }: {
+        contactAddressId?: number;
+        contactAddress?: ContactAddress
+    }): Promise<void> {
+        const contactToDelete = await ContactInterface.findDbContactAddress({ contactAddressId, contactAddress });
+        await Server().repo.contactAddresses().delete(contactToDelete.id);
+    }
+
+    /**
+     * Adds an address to a contact in the local DB
+     * 
+     * @param contactId The ID for the contact to add the address to
+     * @param address The address to add to the contact
+     * @param addressType The type of address to create
+     * @returns A contact object
+     */
+     static async addAddressToContactById(contactId: number, address: string, addressType: 'phone' | 'email'): Promise<ContactAddress> {
+        const contact = await ContactInterface.findDbContact({ contactId });
+        return await ContactInterface.addAddressToContact(contact, address, addressType);
+    }
+
+    /**
+     * Adds an address to a contact in the local DB
+     * 
+     * @param contact The contact object to add the address to
+     * @param address The address to add to the contact
+     * @param addressType The type of address to create
+     * @returns A contact object
+     */
+    static async addAddressToContact(contact: Contact, address: string, addressType: 'phone' | 'email'): Promise<ContactAddress> {
+        // Create & add the address
+        const contactAddress = new ContactAddress();
+        contactAddress.address = address;
+        contactAddress.type = addressType;
+        await Server().repo.contactAddresses().save(contactAddress);
+        contact.addresses.push(contactAddress);
+        await Server().repo.contacts().save(contact);
+        return contactAddress;
+    }
+
+    /**
+     * Creates or updates a contact with addresses
+     *
+     * @param firstName The first name of the contact
+     * @param lastname The last name of the contact
+     * @param phoneNumbers A list of phone numbers to add to the contact
+     * @param emails A list of emails to add to the contact 
+     * @returns The contact object
+     */
+    static async createContact({
+        firstName,
+        lastName,
+        phoneNumbers = [],
+        emails = []
+    }: {
+        firstName: string,
+        lastName: string,
+        phoneNumbers?: string[];
+        emails?: string[];
+    }): Promise<Contact> {
+        const repo = Server().repo.contacts();
+        let contact = await repo.findOne({ firstName, lastName }, { relations: ["addresses"] });
+        if (contact) {
+            throw new Error('Contact already exists!');
+        }
+
+        // If the contact doesn't exists, create it
+        contact = repo.create({ firstName, lastName });
+        await repo.save(contact);
+        contact.addresses = [];
+
+        // Add the phone numbers & emails
+        for (const p of phoneNumbers) {
+            await this.addAddressToContact(contact, p, 'phone');
+        }
+        for (const e of emails) {
+            await this.addAddressToContact(contact, e, 'email');
+        }
+        
+        return contact;
+    }
+
+    /**
+     * Finds a contact in the database by the ID or object.
+     * Throws an error if it doesn't exist.
+     *
+     * @param contactId A number representing the contact ID
+     * @param contact The actual contact object 
+     * @returns A contact object
+     */
+    static async findDbContact({ contactId, contact }: { contactId?: number; contact?: Contact }): Promise<Contact> {
+        if (!contactId && !contact) {
+            throw new Error('A `contactId` or `contact` must be provided to find a Contact!');
+        }
+        
+        const foundContact = contact ?? await Server().repo.contacts().findOne(contactId, { relations: ["addresses"] });
+        if (!foundContact) {
+            throw new Error(`No contact found with the ID: ${contactId}`);
+        }
+
+        return foundContact;
+    }
+
+    /**
+     * Finds a contact address in the database by the ID or object.
+     * Throws an error if it doesn't exist.
+     *
+     * @param contactAddressId A number representing the contact address ID
+     * @param contactAddress The actual contact address object 
+     * @returns A contact object
+     */
+     static async findDbContactAddress({
+         contactAddressId,
+         contactAddress
+    }: {
+        contactAddressId?: number;
+        contactAddress?: ContactAddress
+    }): Promise<ContactAddress> {
+        if (!contactAddressId && !contactAddress) {
+            throw new Error('A `contactAddressId` or `contactAddress` must be provided to find a Contact Address!');
+        }
+        
+        const foundContact = contactAddress ?? await Server().repo.contactAddresses().findOne(
+            contactAddressId, { relations: ["addresses"] });
+        if (!foundContact) {
+            throw new Error(`No contact address found with the ID: ${contactAddressId}`);
+        }
+
+        return foundContact;
+    }
+
+    /**
+     * Deletes a contact from the local DB
+     *
+     * @param contactId A number representing the contact ID
+     * @param contact The actual contact object 
+     */
+    static async deleteContact({ contactId, contact }: { contactId?: number; contact?: Contact }): Promise<void> {
+        const contactToDelete = await ContactInterface.findDbContact({ contactId, contact });
+        await Server().repo.contacts().delete(contactToDelete.id);
+    }
+
+    /**
+     * Query all your contacts for one or more address matches
+     * 
+     * @param addresses A list of addresses to match on
+     * @param extraProperties A list of non-default properties to fetch from the API contacts
+     * @returns A list of contacts matching the addresses
+     */
     static async queryContacts(addresses: string[], extraProperties: string[] = []): Promise<any[]> {
         const data: any[] = [];
         
-        const contactList = contacts.getAllContacts(extraProperties);
+        const contactList = await ContactInterface.getAllContacts(extraProperties);
         for (const i of addresses) {
             const found = ContactInterface.findContact(i, { preloadedContacts: contactList });
             if (found) {
@@ -69,6 +294,6 @@ export class ContactInterface {
             }
         }
 
-        return ContactInterface.mapContacts(data);
+        return data;
     }
 }

@@ -55,9 +55,9 @@ export const convertImage = async (attachment: Attachment): Promise<string> => {
     let failed = false;
     let ext = null;
 
+    Server().log(`Converting attachment, ${theAttachment.transferName}, to an JPG...`);
     if (!fs.existsSync(newPath)) {
         try {
-            Server().log(`Converting attachment, ${theAttachment.transferName}, to an JPG...`);
             if (isNotEmpty(attachment?.mimeType)) {
                 if (attachment.mimeType.startsWith("image/heic")) {
                     await FileSystem.convertToJpg("heic", theAttachment, newPath);
@@ -69,6 +69,8 @@ export const convertImage = async (attachment: Attachment): Promise<string> => {
             Server().log(`Failed to convert image to JPG for attachment, ${theAttachment.transferName}`, "debug");
             Server().log(ex?.message ?? ex, "error");
         }
+    } else {
+        Server().log('Failed to convert attachment! File path did not eixst!', 'debug');
     }
 
     if (!failed && ext) {

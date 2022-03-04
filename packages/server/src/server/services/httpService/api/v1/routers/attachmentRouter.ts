@@ -42,6 +42,8 @@ export class AttachmentRouter {
             mimeType = "application/octet-stream";
         }
 
+        Server().log(`Handling attachment with MIME Type: ${attachment?.mimeType}`);
+
         // If we want to resize the image, do so here
         if (!useOriginal) {
             if (mimeType.startsWith("image/") && mimeType !== "image/gif" && (quality || width || height)) {
@@ -84,6 +86,8 @@ export class AttachmentRouter {
                 const newPath = await convertAudio(attachment);
                 aPath = newPath ?? aPath;
             } else if (isNotEmpty(attachment?.mimeType)) {
+                Server().log('Mime type if valid and not empty', 'debug');
+
                 // If the attachment is a HEIC, convert it to a JPEG
                 if (attachment.mimeType.startsWith("image/heic")) {
                     const newPath = await convertImage(attachment);
@@ -92,6 +96,7 @@ export class AttachmentRouter {
             }
         }
 
+        Server().log(`Sending attachment with path: ${aPath}`);
         return new FileStream(ctx, aPath, mimeType).send();
     }
 

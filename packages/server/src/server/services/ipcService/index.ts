@@ -111,6 +111,27 @@ export class IPCService {
             return await ContactInterface.getAllContacts();
         });
 
+        ipcMain.handle("add-contact", async (event, args) => {
+            return await ContactInterface.createContact({
+                firstName: args.firstName,
+                lastName: args.lastName,
+                emails: args.emails ?? [],
+                phoneNumbers: args.phoneNumbers ?? []
+            });
+        });
+
+        ipcMain.handle("remove-contact", async (event, id) => {
+            return await ContactInterface.deleteContact({ contactId: id });
+        });
+
+        ipcMain.handle("remove-address", async (event, id) => {
+            return await ContactInterface.deleteContactAddress({ contactAddressId: id });
+        });
+
+        ipcMain.handle("add-address", async (event, args) => {
+            return await ContactInterface.addAddressToContactById(args.contactId, args.address, args.type);
+        });
+
         ipcMain.handle("get-contact-name", async (event, address) => {
             const res = await ContactInterface.queryContacts([address]);
             return res && res.length > 0 ? res[0] : null;
