@@ -35,6 +35,7 @@ import {
 } from '@ajna/pagination';
 import { AiOutlineInfoCircle, AiOutlineSearch } from 'react-icons/ai';
 import { BsChevronDown, BsPersonPlus } from 'react-icons/bs';
+import { BiImport } from 'react-icons/bi';
 import { ContactAddress, ContactItem, ContactsTable } from 'app/components/tables/ContactsTable';
 import { ContactDialog } from 'app/components/modals/ContactDialog';
 import { addAddressToContact, createContact, deleteContact, deleteContactAddress } from 'app/actions/ContactActions';
@@ -55,6 +56,7 @@ export const ContactsLayout = (): JSX.Element => {
     const [isLoading, setIsLoading] = useBoolean(true);
     const [contacts, setContacts] = useState([] as any[]);
     const dialogRef = useRef(null);
+    const inputFile = useRef(null);
     const [dialogOpen, setDialogOpen] = useBoolean();
 
     let filteredContacts = contacts;
@@ -163,6 +165,8 @@ export const ContactsLayout = (): JSX.Element => {
         }));
     };
 
+    console.log(filteredContacts);
+
     return (
         <Box p={3} borderRadius={10}>
             <Stack direction='column' p={5}>
@@ -180,6 +184,29 @@ export const ContactsLayout = (): JSX.Element => {
                         <MenuList>
                             <MenuItem icon={<BsPersonPlus />} onClick={() => setDialogOpen.on()}>
                                 Add Contact
+                            </MenuItem>
+                            <MenuItem
+                                icon={<BiImport />}
+                                onClick={() => {
+                                    if (inputFile && inputFile.current) {
+                                        (inputFile.current as HTMLElement).click();
+                                    }
+                                }}
+                            >
+                                Import VCF
+                                <input
+                                    type='file'
+                                    id='file'
+                                    ref={inputFile}
+                                    accept=".vcf"
+                                    style={{display: 'none'}}
+                                    onChange={(e) => {
+                                        const files = e?.target?.files ?? [];
+                                        for (const i of files) {
+                                            ipcRenderer.invoke('import-vcf', i.path);
+                                        }
+                                    }}
+                                />
                             </MenuItem>
                         </MenuList>
                     </Menu>
@@ -217,7 +244,13 @@ export const ContactsLayout = (): JSX.Element => {
                         </InputLeftElement>
                         <Input
                             placeholder='Search Contacts'
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(e) => {
+                                if (currentPage > 1) {
+                                    setCurrentPage(1);
+                                }
+
+                                setSearch(e.target.value);
+                            }}
                             value={search}
                         />
                     </InputGroup>

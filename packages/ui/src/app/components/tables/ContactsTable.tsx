@@ -71,7 +71,7 @@ export const ContactsTable = ({
                             ...(item.emails ?? []).map(e => e.address)
                         ];
                         return (
-                            <Tr key={`${name}-${addresses.join('_')}`}>
+                            <Tr key={`${item.sourceType}-${item.id}-${name}-${addresses.join('_')}`}>
                                 <Td _hover={{ cursor: (item?.sourceType === 'api') ? 'auto' : 'pointer' }} onClick={() => {
                                     if (item?.sourceType === 'api') return;
                                     setSelectedContact(item);

@@ -1,4 +1,6 @@
 import { Server } from "@server";
+import fs from "fs";
+import vcf from "vcf";
 import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
 
@@ -295,5 +297,57 @@ export class ContactInterface {
         }
 
         return data;
+    }
+
+    /**
+     * Imports contacts from a VCF
+     * 
+     * @param filePath File Path to VCF
+     * @returns A list of new contacts added
+     */
+     static async importFromVcf(filePath: string): Promise<any[]> {
+        const content = fs.readFileSync(filePath, { encoding: 'utf-8' }).toString() ?? '';
+        const parsed = vcf.parse(content);
+        const output: Contact[] = [];
+        for (const contact of parsed) {
+            const nameParts = contact.get('n').valueOf().toString()
+                .split(';')
+                .reverse()
+                .filter((e) => e && e.length > 0);
+            if (nameParts.length === 0) continue;
+
+            const params: any = {
+                firstName: nameParts[0],
+                lastName: (nameParts.length > 1) ? nameParts.slice(1).join(' ') : ''
+            };
+    
+            if (contact.get('tel')) {
+                const phonesUnparsed = contact.get('tel').valueOf().toString();
+                if (phonesUnparsed.includes(',') && phonesUnparsed.includes(':')) {
+                    const parsedPhones = phonesUnparsed.split(',').filter((e) => e.includes(':')).map((e) => e.split(':')[1]);
+                    params.phoneNumbers = parsedPhones;
+                } else {
+                    params.phoneNumbers = [phonesUnparsed];
+                }
+            }
+            if (contact.get('email')) {
+                const emailsUnparsed = contact.get('email').valueOf().toString();
+                if (emailsUnparsed.includes(',') && emailsUnparsed.includes(':')) {
+                    const parsedEmails = emailsUnparsed.split(',').filter((e) => e.includes(':')).map((e) => e.split(':')[1]);
+                    params.emails = parsedEmails;
+                } else {
+                    params.emails = [emailsUnparsed];
+                }
+            }
+
+            try {
+                const newContact = await ContactInterface.createContact(params);
+                output.push(newContact);
+            } catch (ex: any) {
+                Server().log(`Error importing contact: ${ex?.message ?? String(ex)}`);
+            }
+        }
+
+        return output;
     }
 }

@@ -132,6 +132,10 @@ export class IPCService {
             return await ContactInterface.addAddressToContactById(args.contactId, args.address, args.type);
         });
 
+        ipcMain.handle("import-vcf", async (event, path) => {
+            return await ContactInterface.importFromVcf(path);
+        });
+
         ipcMain.handle("get-contact-name", async (event, address) => {
             const res = await ContactInterface.queryContacts([address]);
             return res && res.length > 0 ? res[0] : null;
