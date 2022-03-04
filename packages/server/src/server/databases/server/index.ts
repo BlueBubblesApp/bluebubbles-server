@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import { createConnection, Connection } from "typeorm";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { Config, Alert, Device, Queue, Webhook } from "./entity";
+import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
@@ -39,7 +39,7 @@ export class ServerRepository extends EventEmitter {
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
-            entities: [Config, Alert, Device, Queue, Webhook],
+            entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress],
             // We should really use migrations for this.
             // This is me being lazy. Maybe someday...
             synchronize: true
@@ -84,6 +84,13 @@ export class ServerRepository extends EventEmitter {
      */
     webhooks() {
         return this.db.getRepository(Webhook);
+    }
+
+    /**
+     * Get the device repo
+     */
+     contacts() {
+        return this.db.getRepository(Contact);
     }
 
     private async loadConfig() {
@@ -154,6 +161,49 @@ export class ServerRepository extends EventEmitter {
     public async getWebhooks(): Promise<Array<Webhook>> {
         const repo = this.webhooks();
         return await repo.find();
+    }
+
+    public async getContacts(): Promise<Array<Contact>> {
+        const repo = this.contacts();
+        return await repo.find({ relations: ["contact_address"] });
+    }
+
+    public async addAddressToContact(contactId: number, address: string, addressType: 'phone' | 'email'): Promise<Contact> {
+        const repo = this.contacts();
+        const item = await repo.findOne(contactId);
+        if (!item) {
+            throw new Error(`Contact with ID "${contactId}" does not exist!`);
+        }
+    }
+
+    public async addContact({
+        firstName,
+        lastName,
+        phoneNumbers = [],
+        emails = []
+    }: {
+        firstName: string,
+        lastName: string,
+        phoneNumbers: string[];
+        emails: string[];
+    }): Promise<Contact> {
+        const repo = this.contacts();
+        const item = await repo.findOne({ firstName, lastName });
+
+        // If the contact exists, don't re-add it, just return it
+        let contact: Contact;
+        if (item) {
+            // TODO: Update webhook
+        } else {
+            contact = repo.create({ firstName, lastName });
+
+            // Add the addresses
+
+
+            await repo.save(contact);
+        }
+        
+        return contact;
     }
 
     public async addWebhook(url: string, events: Array<{ label: string, value: string }>): Promise<Webhook> {
