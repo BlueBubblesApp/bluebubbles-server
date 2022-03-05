@@ -10,7 +10,7 @@ import { isNotEmpty, isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { FileStream, Success } from "../responses/success";
-import { NotFound } from "../responses/errors";
+import { NotFound, ServerError } from "../responses/errors";
 
 export class AttachmentRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -41,6 +41,9 @@ export class AttachmentRouter {
         if (!mimeType) {
             mimeType = "application/octet-stream";
         }
+
+        Server().log(`Handling attachment download for GUID: ${guid}`);
+        Server().log(`Detected MIME Type: ${mimeType}`);
 
         // If we want to resize the image, do so here
         if (!useOriginal) {
@@ -86,12 +89,15 @@ export class AttachmentRouter {
             } else if (isNotEmpty(attachment?.mimeType)) {
                 // If the attachment is a HEIC, convert it to a JPEG
                 if (attachment.mimeType.startsWith("image/heic")) {
+                    Server().log(`Converting HEIC image to a JPEG image`);
                     const newPath = await convertImage(attachment);
+                    Server().log(`ConvertImage returned path: ${newPath}`);
                     aPath = newPath ?? aPath;
                 }
             }
         }
 
+        Server().log(`Sending attachment with path: ${aPath}`);
         return new FileStream(ctx, aPath, mimeType).send();
     }
 
@@ -117,12 +123,21 @@ export class AttachmentRouter {
         if (!trueHeight || trueHeight <= 0) trueHeight = 320;
         if (!trueWidth || trueWidth <= 0) trueWidth = 480;
 
-        const blurhash = await AttachmentInterface.getBlurhash({
-            filePath: aPath,
-            height: trueHeight,
-            width: trueWidth,
-            quality
-        });
+        let blurhash: string;
+    
+        try {
+            blurhash = await AttachmentInterface.getBlurhash({
+                filePath: aPath,
+                height: trueHeight,
+                width: trueWidth,
+                quality
+            });
+        } catch (ex: any) {
+            return new ServerError({
+                message: 'Failed to get blurhash for attachment!',
+                error: ex?.message ?? String(ex)
+            });
+        }
 
         return new Success(ctx, { data: blurhash }).send();
     }
