@@ -373,6 +373,11 @@ export class BlueBubblesHelperService {
                 } else if (data.event === "stopped-typing") {
                     Server().emitMessage("typing-indicator", { display: false, guid: data.guid }, "normal", false);
                     Server().log(`Stopped typing! ${data.guid}`);
+                } else if (data.event === "message-update") {
+                    for (const value of Server().chatListeners) {
+                        value.checkNewEntriesNow();
+                    }
+                    Server().log(`Updating for new message ${data.guid}`);
                 }
             }
 

@@ -42,6 +42,8 @@ export abstract class ChangeListener extends EventEmitter {
         this.checkForNewEntries();
     }
 
+    private currentTimeout: NodeJS.Timeout;
+
     async checkForNewEntries(): Promise<void> {
         if (this.stopped) return;
 
@@ -73,7 +75,11 @@ export abstract class ChangeListener extends EventEmitter {
         if (processTime >= this.pollFrequency) waitTime = 0;
 
         // Re-run check emssages code
-        setTimeout(() => this.checkForNewEntries(), waitTime);
+        this.currentTimeout = setTimeout(() => this.checkForNewEntries(), waitTime);
+    }
+    public checkNewEntriesNow(){
+        clearTimeout(this.currentTimeout);
+        this.checkForNewEntries();
     }
 
     abstract getEntries(after: Date, before: Date): Promise<void>;
