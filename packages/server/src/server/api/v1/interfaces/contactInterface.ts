@@ -6,6 +6,11 @@ import * as base64 from "byte-base64";
 
 const contacts = require('node-mac-contacts');
 
+type GenericContactParams = {
+    contactId?: number;
+    contact?: Contact
+};
+
 export class ContactInterface {
 
     /**
@@ -14,9 +19,51 @@ export class ContactInterface {
      * @param records The list of contacts to map
      * @returns A list of contacts in a generic format
      */
-    private static mapContacts(records: any[], sourceType: string): any {
+    static mapContacts(records: any[], sourceType: string): any {
         return records
             .map((e: NodeJS.Dict<any>) => {
+                if (Object.keys(e).includes('addresses')) {
+                    e.phoneNumbers = [...(e?.phoneNumbers ?? []), ...(e?.addresses ?? [])
+                        .filter((address: any) => {
+                            if (typeof(address) === 'string') {
+                                return !address.includes('@');
+                            } else if (Object.keys(address).includes('address')) {
+                                return !address.address.includes('@');
+                            }
+                        })
+                        .map((address: any) => {
+                            if (typeof(address) === 'string') {
+                                return { address };
+                            } else {
+                                return {
+                                    address: address.address,
+                                    id: address.id
+                                };
+                            }
+                        }
+                    )];
+
+                    e.emails = [...(e?.emails ?? []), ...(e?.addresses ?? [])
+                        .filter((address: any) => {
+                            if (typeof(address) === 'string') {
+                                return address.includes('@');
+                            } else if (Object.keys(address).includes('address')) {
+                                return address.address.includes('@');
+                            }
+                        })
+                        .map((address: any) => {
+                            if (typeof(address) === 'string') {
+                                return { address };
+                            } else {
+                                return {
+                                    address: address.address,
+                                    id: address.id
+                                };
+                            }
+                        }
+                    )];
+                }
+
                 return {
                     // These maps are for backwards compatibility with the client.
                     // The "old" way we fetched contacts had a lot more information, but was less reliable.
@@ -167,12 +214,26 @@ export class ContactInterface {
      */
     static async addAddressToContact(contact: Contact, address: string, addressType: 'phone' | 'email'): Promise<ContactAddress> {
         // Create & add the address
-        const contactAddress = new ContactAddress();
-        contactAddress.address = address;
-        contactAddress.type = addressType;
-        await Server().repo.contactAddresses().save(contactAddress);
+        let contactAddress = Server().repo.contactAddresses().create({ address, type: addressType });
+        console.log('existing params');
+        console.log({ address, id: contact.id });
+        const existingAddress = await Server().repo.contactAddresses().findOne({ address, contact: { id: contact.id } }, { relations: ['contact'] });
+        console.log('existing');
+        console.log(existingAddress);
+        if (!existingAddress) {
+            contactAddress = await Server().repo.contactAddresses().save(contactAddress);
+        } else {
+            contactAddress = existingAddress;
+        }
+
+        console.log('saved contact address');
+        console.log(contactAddress);
+        
         contact.addresses.push(contactAddress);
         await Server().repo.contacts().save(contact);
+ 
+        console.log('saved contact');
+        console.log(contact);
         return contactAddress;
     }
 
@@ -189,22 +250,25 @@ export class ContactInterface {
         firstName,
         lastName,
         phoneNumbers = [],
-        emails = []
+        emails = [],
+        updateEntry = false
     }: {
         firstName: string,
         lastName: string,
         phoneNumbers?: string[];
         emails?: string[];
+        updateEntry?: boolean;
     }): Promise<Contact> {
         const repo = Server().repo.contacts();
         let contact = await repo.findOne({ firstName, lastName }, { relations: ["addresses"] });
-        if (contact) {
+        if (contact && !updateEntry) {
             throw new Error('Contact already exists!');
+        } else if (!contact) {
+            // If the contact doesn't exists, create it
+            contact = repo.create({ firstName, lastName });
+            await repo.save(contact);
         }
 
-        // If the contact doesn't exists, create it
-        contact = repo.create({ firstName, lastName });
-        await repo.save(contact);
         contact.addresses = [];
 
         // Add the phone numbers & emails
@@ -226,13 +290,17 @@ export class ContactInterface {
      * @param contact The actual contact object 
      * @returns A contact object
      */
-    static async findDbContact({ contactId, contact }: { contactId?: number; contact?: Contact }): Promise<Contact> {
+    static async findDbContact({
+        contactId,
+        contact,
+        throwError = true
+    }: GenericContactParams & { throwError?: boolean }): Promise<Contact | null> {
         if (!contactId && !contact) {
             throw new Error('A `contactId` or `contact` must be provided to find a Contact!');
         }
         
         const foundContact = contact ?? await Server().repo.contacts().findOne(contactId, { relations: ["addresses"] });
-        if (!foundContact) {
+        if (!foundContact && throwError) {
             throw new Error(`No contact found with the ID: ${contactId}`);
         }
 
@@ -273,7 +341,7 @@ export class ContactInterface {
      * @param contactId A number representing the contact ID
      * @param contact The actual contact object 
      */
-    static async deleteContact({ contactId, contact }: { contactId?: number; contact?: Contact }): Promise<void> {
+    static async deleteContact({ contactId, contact }: GenericContactParams): Promise<void> {
         const contactToDelete = await ContactInterface.findDbContact({ contactId, contact });
         await Server().repo.contacts().delete(contactToDelete.id);
     }

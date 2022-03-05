@@ -324,6 +324,11 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: "",
+                        controller: ContactRouter.create
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: "query",
                         controller: ContactRouter.query
                     }
