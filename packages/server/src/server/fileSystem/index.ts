@@ -76,6 +76,8 @@ export class FileSystem {
 
     public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
 
+    public static ffmpegBinary = path.join(FileSystem.resources, "macos", "binaries", "ffmpeg", "ffmpeg");
+
     // Private API directories
     public static usrMySimblPlugins = path.join(userHomeDir(), "Library", "Application Support", "SIMBL", "Plugins");
 
@@ -401,7 +403,11 @@ export class FileSystem {
         const oldPath = FileSystem.getRealPath(attachment.filePath);
         await FileSystem.execShellCommand(
             `/usr/bin/sips --setProperty "format" "${format}" "${oldPath}" --out "${outputPath}"`);
-        console.log(outputPath)
+    }
+
+    static async convertToMp4(attachment: Attachment, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(attachment.filePath);
+        await FileSystem.execShellCommand(`${this.ffmpegBinary} -i "${oldPath}" "${outputPath}"`);
     }
 
     static async isSipDisabled(): Promise<boolean> {

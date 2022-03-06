@@ -5,7 +5,7 @@ import * as mime from "mime-types";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
+import { convertAudio, convertImage, convertVideo } from "@server/databases/imessage/helpers/utils";
 import { isNotEmpty, isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
@@ -86,18 +86,23 @@ export class AttachmentRouter {
                 // If it's a CAF audio file, we want to convert it
                 const newPath = await convertAudio(attachment);
                 aPath = newPath ?? aPath;
-            } else if (isNotEmpty(attachment?.mimeType)) {
+                mimeType = attachment.mimeType ?? mimeType;
+            } else if (attachment.uti === 'public.heic' || mimeType.startsWith("image/heic")) {
                 // If the attachment is a HEIC, convert it to a JPEG
-                if (attachment.mimeType.startsWith("image/heic")) {
-                    Server().log(`Converting HEIC image to a JPEG image`);
-                    const newPath = await convertImage(attachment);
-                    Server().log(`ConvertImage returned path: ${newPath}`);
-                    aPath = newPath ?? aPath;
-                }
+                Server().log(`Converting HEIC image to a JPEG`);
+                const newPath = await convertImage(attachment);
+                aPath = newPath ?? aPath;
+                mimeType = attachment.mimeType ?? mimeType;
+            } else if (attachment.uti === "com.apple.quicktime-movie" || mimeType.startsWith("video/quicktime")) {
+                // If the attachment is a quicktime movie, convert it to an MP4
+                Server().log(`Converting Quicktime Movie to an MP4`);
+                const newPath = await convertVideo(attachment);
+                aPath = newPath ?? aPath;
+                mimeType = attachment.mimeType ?? mimeType;
             }
         }
 
-        Server().log(`Sending attachment with path: ${aPath}`);
+        Server().log(`Sending attachment (${mimeType}) with path: ${aPath}`);
         return new FileStream(ctx, aPath, mimeType).send();
     }
 

@@ -57,7 +57,7 @@ export const convertImage = async (attachment: Attachment): Promise<string> => {
 
     if (!fs.existsSync(newPath)) {
         try {
-            Server().log(`Converting attachment, ${theAttachment.transferName}, to an JPG...`);
+            Server().log(`Converting image attachment, ${theAttachment.transferName}, to an JPG...`);
             if (isNotEmpty(attachment?.mimeType)) {
                 if (attachment.mimeType.startsWith("image/heic")) {
                     await FileSystem.convertToJpg("heic", theAttachment, newPath);
@@ -81,6 +81,45 @@ export const convertImage = async (attachment: Attachment): Promise<string> => {
         return newPath;
     }
 
+    Server().log(`Conversion returned null`);
+    return null;
+};
+
+export const convertVideo = async (attachment: Attachment): Promise<string> => {
+    const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp4`;
+    const theAttachment = attachment;
+
+    // If the path doesn't exist, let's convert the attachment
+    let failed = false;
+    let ext = null;
+
+    if (!fs.existsSync(newPath)) {
+        try {
+            Server().log(`Converting video attachment, ${theAttachment.transferName}, to an MP4...`);
+            if (isNotEmpty(attachment?.mimeType)) {
+                if (attachment.mimeType.startsWith("video/quicktime")) {
+                    await FileSystem.convertToMp4(theAttachment, newPath);
+                    ext = "mov";
+                }
+            }
+        } catch (ex: any) {
+            failed = true;
+            Server().log(`Failed to convert video to MP4 for attachment, ${theAttachment.transferName}`, "debug");
+            Server().log(ex?.message ?? ex, "error");
+        }
+    }
+
+    if (!failed && ext) {
+        // If conversion is successful, we need to modify the attachment a bit
+        theAttachment.mimeType = "video/mp4";
+        theAttachment.filePath = newPath;
+        theAttachment.transferName = basename(newPath).replace(`.${ext}`, ".mp4");
+
+        // Set the fPath to the newly converted path
+        return newPath;
+    }
+
+    Server().log(`Conversion returned null`);
     return null;
 };
 
