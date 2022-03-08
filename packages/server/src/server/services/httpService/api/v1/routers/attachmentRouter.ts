@@ -1,12 +1,11 @@
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { nativeImage } from "electron";
-import * as mime from "mime-types";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage, convertVideo } from "@server/databases/imessage/helpers/utils";
-import { isNotEmpty, isTruthyBool } from "@server/helpers/utils";
+import { isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { FileStream, Success } from "../responses/success";
@@ -37,16 +36,24 @@ export class AttachmentRouter {
         if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
 
         let aPath = FileSystem.getRealPath(attachment.filePath);
-        let mimeType = attachment.mimeType ?? mime.lookup(aPath);
-        if (!mimeType) {
-            mimeType = "application/octet-stream";
-        }
+        let mimeType = attachment.getMimeType();
 
         Server().log(`Handling attachment download for GUID: ${guid}`);
         Server().log(`Detected MIME Type: ${mimeType}`);
 
         // If we want to resize the image, do so here
         if (!useOriginal) {
+            const converters = [convertImage, convertVideo, convertAudio];
+            for (const conversion of converters) {
+                // Try to convert the attachments using available converters
+                const newPath = await conversion(attachment, { originalMimeType: mimeType });
+
+                // If we get back a path, apply the new path and update the mime type
+                aPath = newPath ?? aPath;
+                mimeType = attachment.mimeType ?? mimeType;
+            }
+
+            // Handle resizing the image
             if (mimeType.startsWith("image/") && mimeType !== "image/gif" && (quality || width || height)) {
                 const opts: Partial<Electron.ResizeOptions> = {};
 
@@ -81,25 +88,6 @@ export class AttachmentRouter {
                 // Force setting it to a PNG because all resized images are PNGs
                 mimeType = "image/png";
             }
-        
-            if (attachment.uti === "com.apple.coreaudio-format") {
-                // If it's a CAF audio file, we want to convert it
-                const newPath = await convertAudio(attachment);
-                aPath = newPath ?? aPath;
-                mimeType = attachment.mimeType ?? mimeType;
-            } else if (attachment.uti === 'public.heic' || mimeType.startsWith("image/heic")) {
-                // If the attachment is a HEIC, convert it to a JPEG
-                Server().log(`Converting HEIC image to a JPEG`);
-                const newPath = await convertImage(attachment);
-                aPath = newPath ?? aPath;
-                mimeType = attachment.mimeType ?? mimeType;
-            } else if (attachment.uti === "com.apple.quicktime-movie" || mimeType.startsWith("video/quicktime")) {
-                // If the attachment is a quicktime movie, convert it to an MP4
-                Server().log(`Converting Quicktime Movie to an MP4`);
-                const newPath = await convertVideo(attachment);
-                aPath = newPath ?? aPath;
-                mimeType = attachment.mimeType ?? mimeType;
-            }
         }
 
         Server().log(`Sending attachment (${mimeType}) with path: ${aPath}`);
@@ -115,7 +103,7 @@ export class AttachmentRouter {
         if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
 
         const aPath = FileSystem.getRealPath(attachment.filePath);
-        const mimeType = attachment.mimeType ?? mime.lookup(aPath);
+        const mimeType = attachment.getMimeType();
 
         // Double-check the mime-type to make sure it's a valid attachment for that
         if (!mimeType || !mimeType.startsWith("image")) {

@@ -11,40 +11,41 @@ import { isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
 
+
 export const getCacheName = (message: Message) => {
     const delivered = message.dateDelivered ? message.dateDelivered.getTime() : 0;
     const read = message.dateRead ? message.dateRead.getTime() : 0;
     return `${message.guid}:${delivered}:${read}`;
 };
 
-export const convertAudio = async (attachment: Attachment): Promise<string> => {
+export const convertAudio = async (attachment: Attachment, { originalMimeType = null }: { originalMimeType?: string } = {}): Promise<string> => {
     const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp3`;
-    const theAttachment = attachment;
+    const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
 
-    if (attachment.uti === 'com.apple.coreaudio-format') {
+    if (attachment.uti === 'com.apple.coreaudio-format' || mType == 'audio/x-caf') {
         ext = 'caf'
     }
 
     if (!fs.existsSync(newPath)) {
         try {
-            Server().log(`Converting attachment, ${theAttachment.transferName}, to an MP3...`);
-            if (ext === 'caf') {
-                await FileSystem.convertCafToMp3(theAttachment, newPath);
+            if (isNotEmpty(ext)) {
+                Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
+                await FileSystem.convertCafToMp3(attachment.filePath, newPath);
             }
         } catch (ex: any) {
             failed = true;
-            Server().log(`Failed to convert CAF to MP3 for attachment, ${theAttachment.transferName}`, "debug");
+            Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`, "debug");
             Server().log(ex?.message ?? ex, "error");
         }
     }
 
     if (!failed && ext) {
         // If conversion is successful, we need to modify the attachment a bit
-        theAttachment.mimeType = "audio/mp3";
-        theAttachment.filePath = newPath;
-        theAttachment.transferName = basename(newPath).replace(`.${ext}`, ".mp3");
+        attachment.mimeType = "audio/mp3";
+        attachment.filePath = newPath;
+        attachment.transferName = basename(newPath).replace(`.${ext}`, ".mp3");
 
         // Set the fPath to the newly converted path
         return newPath;
@@ -53,81 +54,80 @@ export const convertAudio = async (attachment: Attachment): Promise<string> => {
     return null;
 };
 
-export const convertImage = async (attachment: Attachment): Promise<string> => {
-    const newPath = `${FileSystem.convertDir}/${attachment.guid}.jpg`;
-    const theAttachment = attachment;
+export const convertImage = async (attachment: Attachment, { originalMimeType = null }: { originalMimeType?: string } = {}): Promise<string> => {
+    const newPath = `${FileSystem.convertDir}/${attachment.guid}.jpeg`;
+    const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
 
-    if (isNotEmpty(attachment?.mimeType)) {
-        if (attachment.mimeType.startsWith("image/heic")) {
-            ext = "heic";
-        }
+    // Only convert certain types
+    if (attachment.uti === 'public.heic' || mType.startsWith('image/heic')) {
+        ext = "heic";
+    } else if (attachment.uti === 'public.heif' || mType.startsWith('image/heif')) {
+        ext = "heif"
+    } else if (attachment.uti === 'public.tiff' || mType.startsWith('image/tiff')) {
+        ext = "tiff";
     }
 
     if (!fs.existsSync(newPath)) {
         try {
-            Server().log(`Converting image attachment, ${theAttachment.transferName}, to an JPG...`);
-            if (ext === 'heic') {
-                await FileSystem.convertToJpg(ext, theAttachment, newPath);
+            if (isNotEmpty(ext)) {
+                Server().log(`Converting image attachment, ${attachment.transferName}, to an JPEG...`);
+                await FileSystem.convertToJpg(attachment.filePath, newPath);
             }
         } catch (ex: any) {
             failed = true;
-            Server().log(`Failed to convert image to JPG for attachment, ${theAttachment.transferName}`, "debug");
+            Server().log(`Failed to convert image to JPEG for attachment, ${attachment.transferName}`, "debug");
             Server().log(ex?.message ?? ex, "error");
         }
     }
 
     if (!failed && ext) {
         // If conversion is successful, we need to modify the attachment a bit
-        theAttachment.mimeType = "image/jpg";
-        theAttachment.filePath = newPath;
-        theAttachment.transferName = basename(newPath).replace(`.${ext}`, ".jpg");
+        attachment.mimeType = "image/jpeg";
+        attachment.filePath = newPath;
+        attachment.transferName = basename(newPath).replace(`.${ext}`, ".jpeg");
 
         // Set the fPath to the newly converted path
         return newPath;
     }
 
-    Server().log(`Conversion returned null`);
     return null;
 };
 
-export const convertVideo = async (attachment: Attachment): Promise<string> => {
+export const convertVideo = async (attachment: Attachment, { originalMimeType = null }: { originalMimeType?: string } = {}): Promise<string> => {
     const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp4`;
-    const theAttachment = attachment;
+    const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
 
-    if (isNotEmpty(attachment?.mimeType)) {
-        if (attachment.uti === "com.apple.quicktime-movie" || attachment.mimeType.startsWith("video/quicktime")) {
-            ext = "mov";
-        }
+    if (attachment.uti === "com.apple.quicktime-movie" || mType.startsWith("video/quicktime")) {
+        ext = "mov";
     }
 
     if (!fs.existsSync(newPath)) {
         try {
-            Server().log(`Converting video attachment, ${theAttachment.transferName}, to an MP4...`);
-            if (ext === 'mov') {
-                await FileSystem.convertToMp4(theAttachment, newPath);
+            if (isNotEmpty(ext)) {
+                Server().log(`Converting video attachment, ${attachment.transferName}, to an MP4...`);
+                await FileSystem.convertToMp4(attachment.filePath, newPath);
             }
         } catch (ex: any) {
             failed = true;
-            Server().log(`Failed to convert video to MP4 for attachment, ${theAttachment.transferName}`, "debug");
+            Server().log(`Failed to convert video to MP4 for attachment, ${attachment.transferName}`, "debug");
             Server().log(ex?.message ?? ex, "error");
         }
     }
 
     if (!failed && ext) {
         // If conversion is successful, we need to modify the attachment a bit
-        theAttachment.mimeType = "video/mp4";
-        theAttachment.filePath = newPath;
-        theAttachment.transferName = basename(newPath).replace(`.${ext}`, ".mp4");
+        attachment.mimeType = "video/mp4";
+        attachment.filePath = newPath;
+        attachment.transferName = basename(newPath).replace(`.${ext}`, ".mp4");
 
         // Set the fPath to the newly converted path
         return newPath;
     }
 
-    Server().log(`Conversion returned null`);
     return null;
 };
 

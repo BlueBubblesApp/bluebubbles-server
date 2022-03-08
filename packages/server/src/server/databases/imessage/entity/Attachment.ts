@@ -10,8 +10,9 @@ import { convertAudio, convertImage, getAttachmentMetadata } from "@server/datab
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
-import { isNotEmpty, isMinSierra } from "@server/helpers/utils";
+import { isNotEmpty, isMinSierra, isEmpty } from "@server/helpers/utils";
 import { conditional } from "conditional-decorator";
+import * as mime from "mime-types";
 
 @Entity("attachment")
 export class Attachment {
@@ -115,6 +116,12 @@ export class Attachment {
         })
     )
     hideAttachment: boolean;
+
+    getMimeType(): string {
+        let mType = this.mimeType ?? mime.lookup(this.filePath);
+        if (!mType || isEmpty(mType as Object)) mType = 'application/octet-stream';
+        return mType;
+    }
 }
 
 export const getAttachmentResponse = async (attachment: Attachment, withData = false): Promise<AttachmentResponse> => {
