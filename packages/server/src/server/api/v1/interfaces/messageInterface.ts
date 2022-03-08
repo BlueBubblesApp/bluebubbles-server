@@ -52,7 +52,14 @@ export class MessageInterface {
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise({chatGuid, text: message, isAttachment: false, sentAt: now, subject, tempGuid});
+        const awaiter = new MessagePromise({
+            chatGuid,
+            text: message,
+            isAttachment: false,
+            sentAt: now,
+            subject,
+            tempGuid
+        });
 
         // Add the promise to the manager
         Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}`);
@@ -107,13 +114,19 @@ export class MessageInterface {
 
         // Since we convert mp3s to cafs we need to correct the name for the awaiter
         let aName = attachmentName;
-        if (aName !== null && aName.endsWith('.mp3')) {
+        if (aName !== null && aName.endsWith(".mp3")) {
             aName = `${aName.substring(0, aName.length - 4)}.caf`;
         }
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise({chatGuid: chatGuid ,text: `->${aName}`, isAttachment: true, sentAt: now, tempGuid: attachmentGuid});
+        const awaiter = new MessagePromise({
+            chatGuid: chatGuid,
+            text: `->${aName}`,
+            isAttachment: true,
+            sentAt: now,
+            tempGuid: attachmentGuid
+        });
 
         // Add the promise to the manager
         Server().messageManager.add(awaiter);
@@ -204,7 +217,7 @@ export class MessageInterface {
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-        const awaiter = new MessagePromise({chatGuid, text: messageText, isAttachment: false, sentAt: now, tempGuid});
+        const awaiter = new MessagePromise({ chatGuid, text: messageText, isAttachment: false, sentAt: now, tempGuid });
         Server().messageManager.add(awaiter);
 
         // Send the reaction
@@ -240,7 +253,6 @@ export class MessageInterface {
         if (!retMessage) {
             throw new Error("Failed to send reaction! Message not found after 5 seconds!");
         }
-
 
         // Return the message
         return retMessage;

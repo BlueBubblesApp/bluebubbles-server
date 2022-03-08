@@ -52,14 +52,14 @@ export class BlueBubblesHelperService {
     }
 
     static async installBundle(force = false): Promise<BundleStatus> {
-        const status: BundleStatus = { success: false, message: 'Unknown status' };
+        const status: BundleStatus = { success: false, message: "Unknown status" };
 
         // Make sure the Private API is enabled
         const pApiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
         if (!force && !pApiEnabled) {
-            status.message = 'Private API feature is not enabled';
+            status.message = "Private API feature is not enabled";
             return status;
-        };
+        }
 
         // eslint-disable-next-line no-nested-ternary
         const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
@@ -68,7 +68,7 @@ export class BlueBubblesHelperService {
 
         // If the local bundle doesn't exist, don't do anything
         if (!fs.existsSync(localPath)) {
-            status.message = 'Unable to locate embedded bundle';
+            status.message = "Unable to locate embedded bundle";
             return status;
         }
 
@@ -130,13 +130,14 @@ export class BlueBubblesHelperService {
 
         // Print a log based on if we wrote the bundle anywhere
         if (writeCount === 0) {
-            status.message = "Attempted to install helper bundle, but neither MySIMBL nor MacForge (MacEnhance) was found!";
+            status.message =
+                "Attempted to install helper bundle, but neither MySIMBL nor MacForge (MacEnhance) was found!";
             Server().log(status.message, "warn");
         } else {
             // Restart iMessage to "apply" the changes
             Server().log("Restarting iMessage to apply Helper updates...");
             await FileSystem.executeAppleScript(restartMessages());
-            
+
             status.success = true;
             status.message = "Successfully installed latest Private API Helper Bundle!";
             Server().log(status.message);
@@ -201,7 +202,7 @@ export class BlueBubblesHelperService {
 
     stop() {
         Server().log(`Stopping Private API Helper...`);
-    
+
         try {
             if (this.helper && !this.helper.destroyed) {
                 this.helper.destroy();
@@ -365,7 +366,7 @@ export class BlueBubblesHelperService {
 
             // Handle events sent from
             if (data.event) {
-                if (data.event === 'ping') {
+                if (data.event === "ping") {
                     Server().log("Private API Helper connected!");
                 } else if (data.event === "started-typing") {
                     Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
@@ -423,7 +424,7 @@ export class BlueBubblesHelperService {
             // If we have a transaction, wait until the transaction is fulfilled to return
             if (transaction) return transaction.promise;
         } catch (ex: any) {
-            Server().log(`${msg} ${ex?.message ?? ex}`, 'debug');
+            Server().log(`${msg} ${ex?.message ?? ex}`, "debug");
         }
 
         return null;

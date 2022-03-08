@@ -11,21 +11,23 @@ import { isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
 
-
 export const getCacheName = (message: Message) => {
     const delivered = message.dateDelivered ? message.dateDelivered.getTime() : 0;
     const read = message.dateRead ? message.dateRead.getTime() : 0;
     return `${message.guid}:${delivered}:${read}`;
 };
 
-export const convertAudio = async (attachment: Attachment, { originalMimeType = null }: { originalMimeType?: string } = {}): Promise<string> => {
+export const convertAudio = async (
+    attachment: Attachment,
+    { originalMimeType = null }: { originalMimeType?: string } = {}
+): Promise<string> => {
     const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp3`;
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
 
-    if (attachment.uti === 'com.apple.coreaudio-format' || mType == 'audio/x-caf') {
-        ext = 'caf'
+    if (attachment.uti === "com.apple.coreaudio-format" || mType == "audio/x-caf") {
+        ext = "caf";
     }
 
     if (!fs.existsSync(newPath)) {
@@ -54,18 +56,21 @@ export const convertAudio = async (attachment: Attachment, { originalMimeType = 
     return null;
 };
 
-export const convertImage = async (attachment: Attachment, { originalMimeType = null }: { originalMimeType?: string } = {}): Promise<string> => {
+export const convertImage = async (
+    attachment: Attachment,
+    { originalMimeType = null }: { originalMimeType?: string } = {}
+): Promise<string> => {
     const newPath = `${FileSystem.convertDir}/${attachment.guid}.jpeg`;
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
 
     // Only convert certain types
-    if (attachment.uti === 'public.heic' || mType.startsWith('image/heic')) {
+    if (attachment.uti === "public.heic" || mType.startsWith("image/heic")) {
         ext = "heic";
-    } else if (attachment.uti === 'public.heif' || mType.startsWith('image/heif')) {
-        ext = "heif"
-    } else if (attachment.uti === 'public.tiff' || mType.startsWith('image/tiff') || mType.endsWith('tif')) {
+    } else if (attachment.uti === "public.heif" || mType.startsWith("image/heif")) {
+        ext = "heif";
+    } else if (attachment.uti === "public.tiff" || mType.startsWith("image/tiff") || mType.endsWith("tif")) {
         ext = "tiff";
     }
 
@@ -95,7 +100,10 @@ export const convertImage = async (attachment: Attachment, { originalMimeType = 
     return null;
 };
 
-export const convertVideo = async (attachment: Attachment, { originalMimeType = null }: { originalMimeType?: string } = {}): Promise<string> => {
+export const convertVideo = async (
+    attachment: Attachment,
+    { originalMimeType = null }: { originalMimeType?: string } = {}
+): Promise<string> => {
     const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp4`;
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
