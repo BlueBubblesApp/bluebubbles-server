@@ -39,11 +39,11 @@ export class OutgoingMessageListener extends ChangeListener {
      */
     async getEntries(after: Date, before: Date): Promise<void> {
         // Second, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
-        let afterOffsetDate = new Date(after.getTime() - 15000);
+        const afterOffsetDate = new Date(after.getTime() - 15000);
         await this.emitOutgoingMessages(afterOffsetDate);
 
         // Third, check for updated messages
-        let afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
+        const afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
         await this.emitUpdatedMessages(afterUpdateOffsetDate);
     }
 
