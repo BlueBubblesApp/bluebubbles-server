@@ -119,7 +119,7 @@ export class Attachment {
 
     getMimeType(): string {
         let mType = this.mimeType ?? mime.lookup(this.filePath);
-        if (!mType || isEmpty(mType as Object)) mType = 'application/octet-stream';
+        if (!mType || isEmpty(mType as any)) mType = "application/octet-stream";
         return mType;
     }
 }
