@@ -1013,9 +1013,6 @@ export class SocketRoutes {
             } catch {
                 return response(cb, "mark-chat-read-error", createServerErrorResponse("Failed to mark chat read!"));
             }
-
-            // Return null so Typescript doesn't yell at us
-            return null;
         });
         /**
          * Tells the server to stop typing in a chat
