@@ -65,7 +65,7 @@ export const convertImage = async (attachment: Attachment, { originalMimeType = 
         ext = "heic";
     } else if (attachment.uti === 'public.heif' || mType.startsWith('image/heif')) {
         ext = "heif"
-    } else if (attachment.uti === 'public.tiff' || mType.startsWith('image/tiff')) {
+    } else if (attachment.uti === 'public.tiff' || mType.startsWith('image/tiff') || mType.endsWith('tif')) {
         ext = "tiff";
     }
 
