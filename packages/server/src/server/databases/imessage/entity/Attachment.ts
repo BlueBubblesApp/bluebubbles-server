@@ -150,9 +150,10 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
             for (const conversion of converters) {
                 // Try to convert the attachments using available converters
                 const newPath = await conversion(attachment, { originalMimeType: mimeType });
-
-                // If we get back a path, apply the new path
-                fPath = newPath ?? fPath;
+                if (newPath) {
+                    fPath = newPath;
+                    break;
+                }
             }
 
             // If the attachment exists, do some things

@@ -47,10 +47,11 @@ export class AttachmentRouter {
             for (const conversion of converters) {
                 // Try to convert the attachments using available converters
                 const newPath = await conversion(attachment, { originalMimeType: mimeType });
-
-                // If we get back a path, apply the new path and update the mime type
-                aPath = newPath ?? aPath;
-                mimeType = attachment.mimeType ?? mimeType;
+                if (newPath) {
+                    aPath = newPath;
+                    mimeType = attachment.mimeType ?? mimeType;
+                    break;
+                }
             }
 
             // Handle resizing the image
