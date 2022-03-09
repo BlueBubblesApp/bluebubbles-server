@@ -38,8 +38,8 @@ export class AttachmentRouter {
         let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
 
-        Server().log(`Handling attachment download for GUID: ${guid}`);
-        Server().log(`Detected MIME Type: ${mimeType}`);
+        Server().log(`Handling attachment download for GUID: ${guid}`, "debug");
+        Server().log(`Detected MIME Type: ${mimeType}`, "debug");
 
         // If we want to resize the image, do so here
         if (!useOriginal) {
@@ -90,7 +90,7 @@ export class AttachmentRouter {
             }
         }
 
-        Server().log(`Sending attachment (${mimeType}) with path: ${aPath}`);
+        Server().log(`Sending attachment (${mimeType}) with path: ${aPath}`, "debug");
         return new FileStream(ctx, aPath, mimeType).send();
     }
 
@@ -117,7 +117,7 @@ export class AttachmentRouter {
         if (!trueWidth || trueWidth <= 0) trueWidth = 480;
 
         let blurhash: string;
-    
+
         try {
             blurhash = await AttachmentInterface.getBlurhash({
                 filePath: aPath,
@@ -127,7 +127,7 @@ export class AttachmentRouter {
             });
         } catch (ex: any) {
             return new ServerError({
-                message: 'Failed to get blurhash for attachment!',
+                message: "Failed to get blurhash for attachment!",
                 error: ex?.message ?? String(ex)
             });
         }
