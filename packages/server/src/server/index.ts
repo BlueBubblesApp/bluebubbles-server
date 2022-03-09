@@ -652,6 +652,18 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Full-disk access permissions are required!", "error");
         }
 
+        // Make sure Messages is running
+        await FileSystem.startMessages();
+        const msgCheckInterval = setInterval(async () => {
+            try {
+                // This won't start it if it's already open
+                await FileSystem.startMessages();
+            } catch (ex: any) {
+                Server().log(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
+                clearInterval(msgCheckInterval);
+            }
+        }, 150000); // Make sure messages is open every 2.5 minutes
+
         this.log("Finished pre-start checks...");
     }
 
