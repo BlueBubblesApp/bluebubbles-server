@@ -5,7 +5,11 @@ import { safeTrim } from "@server/helpers/utils";
 
 export class MacOsInterface {
     static async lock() {
-        await FileSystem.executeAppleScript(lockMacOs());
+        // Give it a second so that anything after can finish doing
+        // whatever it wants to do
+        setTimeout(() => {
+            FileSystem.executeAppleScript(lockMacOs());
+        }, 1000);
     }
 
     static async restartMessagesApp() {

@@ -47,9 +47,9 @@ export class MessageInterface {
 
         Server().log(`Sending message "${message}" to ${chatGuid}`, "debug");
 
-        // Make sure messages is open
-        await FileSystem.startMessages();
-
+        setTimeout(() => {
+            FileSystem.startMessages();
+        }, 0);
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
         const awaiter = new MessagePromise({
@@ -163,10 +163,10 @@ export class MessageInterface {
             tryCount += 1;
 
             // If we've tried 10 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 20) break;
+            if (tryCount >= 40) break;
 
             // Give it a bit to execute
-            await waitMs(500);
+            await waitMs(250);
 
             // Re-fetch the message with the updated information
             retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
