@@ -47,9 +47,6 @@ export class MessageInterface {
 
         Server().log(`Sending message "${message}" to ${chatGuid}`, "debug");
 
-        setTimeout(() => {
-            FileSystem.startMessages();
-        }, 0);
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
         const awaiter = new MessagePromise({

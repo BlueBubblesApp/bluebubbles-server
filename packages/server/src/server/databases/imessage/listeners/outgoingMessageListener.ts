@@ -137,7 +137,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Resolve the promise for sent messages from a client
-            await Server().messageManager.resolve(entry);
+            Server().messageManager.resolve(entry);
 
             // Emit it as normal entry
             super.emit("new-entry", entry);
@@ -155,7 +155,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Reject the corresponding promise
-            await Server().messageManager.reject(entry);
+            Server().messageManager.reject(entry);
 
             //Emit it as normal error
             super.emit("message-send-error", entry);
@@ -190,7 +190,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Resolve the promise
-            await Server().messageManager.resolve(entry);
+            Server().messageManager.resolve(entry);
 
             // Emit it as a normal update
             super.emit("updated-entry", entry);

@@ -330,47 +330,46 @@ export class BlueBubblesHelperService {
                 return;
             }
 
+            // Data can contain multiple events, each split by the demiliter (\n)
             const eventData: string[] = String(eventRaw).split("\n");
-            const event = eventData[eventData.length - 2];
-            if (event == null) {
-                Server().log(`Failed to decode null BlueBubblesHelper data!`);
-                return;
-            }
-
-            Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
-            let data;
-
-            try {
-                data = JSON.parse(event);
-            } catch (e) {
-                Server().log(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
-                return;
-            }
-
-            if (data == null) {
-                Server().log("BlueBubblesHelper sent null data", "warn");
-                return;
-            }
-
-            // Handle events sent from
-            if (data.event) {
-                if (data.event === "ping") {
-                    Server().log("Private API Helper connected!");
-                } else if (data.event === "started-typing") {
-                    Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
-                    Server().log(`Started typing! ${data.guid}`);
-                } else if (data.event === "stopped-typing") {
-                    Server().emitMessage("typing-indicator", { display: false, guid: data.guid }, "normal", false);
-                    Server().log(`Stopped typing! ${data.guid}`);
+            const uniqueEvents = [...new Set(eventData)];
+            for (const event of uniqueEvents) {
+                if (!event || event.trim().length === 0) continue;
+                if (event == null) {
+                    Server().log(`Failed to decode null BlueBubblesHelper data!`);
+                    continue;
                 }
-            }
 
-            // Handle transactions
-            if (data.transactionId) {
-                // Resolve the promise from the transaction manager
-                const idx = this.transactionManager.findIndex(data.transactionId);
-                if (idx >= 0) {
-                    this.transactionManager.promises[idx].resolve(data.identifier, data?.data);
+                Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
+                let data;
+
+                // Handle in a timeout so that we handle each event asyncronously
+                try {
+                    data = JSON.parse(event);
+                } catch (e) {
+                    Server().log(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
+                    return;
+                }
+
+                if (data == null) {
+                    Server().log("BlueBubblesHelper sent null data", "warn");
+                    return;
+                }
+
+                if (data.transactionId) {
+                    // Resolve the promise from the transaction manager
+                    const idx = this.transactionManager.findIndex(data.transactionId);
+                    if (idx >= 0) {
+                        this.transactionManager.promises[idx].resolve(data.identifier, data?.data);
+                    }
+                } else if (data.event) {
+                    if (data.event === "ping") {
+                        Server().log("Private API Helper connected!");
+                    } else if (data.event === "started-typing") {
+                        Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
+                    } else if (data.event === "stopped-typing") {
+                        Server().emitMessage("typing-indicator", { display: false, guid: data.guid }, "normal", false);
+                    }
                 }
             }
         });
@@ -399,7 +398,10 @@ export class BlueBubblesHelperService {
 
                 // Write the request to the socket
                 const res = this.helper.write(`${JSON.stringify(d)}\n`, (err: Error) => {
-                    reject(err);
+                    if (err) {
+                        Server().log(`Socket write error: ${err?.message ?? String(err)}`);
+                        reject(err);
+                    }
                 });
 
                 if (!res) {
@@ -410,7 +412,9 @@ export class BlueBubblesHelperService {
             });
 
             // If we have a transaction, wait until the transaction is fulfilled to return
-            if (transaction) return transaction.promise;
+            if (transaction) {
+                return transaction.promise;
+            }
         } catch (ex: any) {
             Server().log(`${msg} ${ex?.message ?? ex}`, "debug");
         }
