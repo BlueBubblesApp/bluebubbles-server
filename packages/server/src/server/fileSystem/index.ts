@@ -29,7 +29,7 @@ import {
 } from "./types";
 
 // Patch in original user data directory
-app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', 'bluebubbles-server'));
+app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
 
 // Directory modifiers based on the environment
 let subdir = "";
@@ -255,11 +255,11 @@ export class FileSystem {
      */
     static saveFCMClient(contents: any): void {
         const filePath = path.join(FileSystem.fcmDir, "client.json");
-        if ((!contents) && fs.existsSync(filePath)) {
+        if (!contents && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         } else {
             fs.writeFileSync(filePath, JSON.stringify(contents));
-        } 
+        }
     }
 
     /**
@@ -269,11 +269,11 @@ export class FileSystem {
      */
     static saveFCMServer(contents: any): void {
         const filePath = path.join(FileSystem.fcmDir, "server.json");
-        if ((!contents) && fs.existsSync(filePath)) {
+        if (!contents && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         } else {
             fs.writeFileSync(filePath, JSON.stringify(contents));
-        } 
+        }
     }
 
     /**
@@ -381,6 +381,8 @@ export class FileSystem {
 
     static getRealPath(filePath: string) {
         let output = filePath;
+        if (isEmpty(output)) return output;
+
         if (output[0] === "~") {
             output = path.join(process.env.HOME, output.slice(1));
         }
@@ -391,8 +393,9 @@ export class FileSystem {
     static async convertCafToMp3(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
         const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`);
-        if (isNotEmpty(output) && output.includes('Error:')) {
+            `/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`
+        );
+        if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert audio to MP3: ${output}`);
         }
     }
@@ -400,8 +403,9 @@ export class FileSystem {
     static async convertMp3ToCaf(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
         const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`);
-        if (isNotEmpty(output) && output.includes('Error:')) {
+            `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`
+        );
+        if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert audio to CAF: ${output}`);
         }
     }
@@ -409,8 +413,9 @@ export class FileSystem {
     static async convertToJpg(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
         const output = await FileSystem.execShellCommand(
-            `/usr/bin/sips --setProperty "format" "jpeg" "${oldPath}" --out "${outputPath}"`);
-        if (isNotEmpty(output) && output.includes('Error:')) {
+            `/usr/bin/sips --setProperty "format" "jpeg" "${oldPath}" --out "${outputPath}"`
+        );
+        if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert image to JPEG: ${output}`);
         }
     }
@@ -418,20 +423,23 @@ export class FileSystem {
     static async convertToMp4(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
         const output = await FileSystem.execShellCommand(`${this.ffmpegBinary} -i "${oldPath}" "${outputPath}"`);
-        if (isNotEmpty(output) && output.includes('Error:')) {
+        if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert video to MP4: ${output}`);
         }
     }
 
     static async isSipDisabled(): Promise<boolean> {
-        const res = (await FileSystem.execShellCommand(`csrutil status`) ?? '').trim();
-        return !res.endsWith('enabled.');
+        const res = ((await FileSystem.execShellCommand(`csrutil status`)) ?? "").trim();
+        return !res.endsWith("enabled.");
     }
 
     static async hasFullDiskAccess(): Promise<boolean> {
-        const res = (await FileSystem.execShellCommand(
-            `defaults read ~/Library/Preferences/com.apple.universalaccessAuthWarning.plist`) ?? '').trim();
-        return res.includes('BlueBubbles.app" = 1') || res.includes('BlueBubbles" = 1')
+        const res = (
+            (await FileSystem.execShellCommand(
+                `defaults read ~/Library/Preferences/com.apple.universalaccessAuthWarning.plist`
+            )) ?? ""
+        ).trim();
+        return res.includes('BlueBubbles.app" = 1') || res.includes('BlueBubbles" = 1');
     }
 
     static async getFileMetadata(filePath: string): Promise<{ [key: string]: string }> {
