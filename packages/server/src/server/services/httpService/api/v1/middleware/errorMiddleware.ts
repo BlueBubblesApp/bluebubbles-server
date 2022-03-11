@@ -18,8 +18,8 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
         }
 
         Server().log(errStr, "error");
-        if (ex?.check) {
-            Server().log(ex?.stack, 'debug');
+        if (ex?.stack) {
+            Server().log(ex?.stack, "debug");
         }
 
         // Use the custom HTTPError handler

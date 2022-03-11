@@ -1,7 +1,7 @@
 import { onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 
-type ProxyOptions = {
+export type ProxyOptions = {
     name: string;
     autoRefresh?: boolean;
     refreshTimerMs?: number;
@@ -9,7 +9,7 @@ type ProxyOptions = {
 
 const sevenHours = 1000 * 60 * 60 * 7;
 
-abstract class Proxy {
+export abstract class Proxy {
     opts: ProxyOptions;
 
     url: string;
@@ -190,7 +190,3 @@ abstract class Proxy {
         return true;
     }
 }
-
-export { Proxy };
-export type { ProxyOptions };
-

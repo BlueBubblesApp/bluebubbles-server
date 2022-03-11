@@ -26,7 +26,11 @@ const AlertTypeIcon: NodeJS.Dict<IconType> = {
 export const NotificationsTable = ({ notifications }: { notifications: Array<NotificationItem> }): JSX.Element => {
     return (
         <Table variant="striped" colorScheme="blue">
-            <TableCaption>Hopefully nothing terrible is happening...</TableCaption>
+            <TableCaption>
+                Alerts are normal to have. As long as the server recovers,
+                you have nothing to worry about. Alerts are mostly helpful when you
+                are experiencing an issue and want to see if any errors have occured.
+            </TableCaption>
             <Thead>
                 <Tr>
                     <Th>Type</Th>

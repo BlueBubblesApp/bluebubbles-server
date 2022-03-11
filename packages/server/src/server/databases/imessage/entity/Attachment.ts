@@ -6,12 +6,18 @@ import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { convertAudio, convertImage, getAttachmentMetadata } from "@server/databases/imessage/helpers/utils";
+import {
+    convertAudio,
+    convertImage,
+    convertVideo,
+    getAttachmentMetadata
+} from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
-import { isNotEmpty, isMinSierra } from "@server/helpers/utils";
+import { isMinSierra, isEmpty } from "@server/helpers/utils";
 import { conditional } from "conditional-decorator";
+import * as mime from "mime-types";
 
 @Entity("attachment")
 export class Attachment {
@@ -115,6 +121,12 @@ export class Attachment {
         })
     )
     hideAttachment: boolean;
+
+    getMimeType(): string {
+        let mType = this.mimeType ?? mime.lookup(this.filePath);
+        if (!mType || isEmpty(mType as any)) mType = "application/octet-stream";
+        return mType;
+    }
 }
 
 export const getAttachmentResponse = async (attachment: Attachment, withData = false): Promise<AttachmentResponse> => {
@@ -122,25 +134,25 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
     let metadata: Metadata = null;
 
     // Get the fully qualified path
-    const tableData = attachment;
-    let fPath = tableData.filePath;
+    let fPath = FileSystem.getRealPath(attachment.filePath);
+    const mimeType = attachment.getMimeType();
 
     // If the attachment isn't finished downloading, the path will be null
     if (fPath) {
         fPath = FileSystem.getRealPath(fPath);
 
         try {
-            // If the attachment is a caf, let's convert it
-            if (tableData.uti === "com.apple.coreaudio-format") {
-                const newPath = await convertAudio(tableData);
-                fPath = newPath ?? fPath;
-            }
+            Server().log(`Handling attachment response for GUID: ${attachment.guid}`, "debug");
+            Server().log(`Detected MIME Type: ${mimeType}`);
 
-            if (isNotEmpty(tableData?.mimeType)) {
-                // If the attachment is a HEIC, convert it to a JPEG
-                if (tableData.mimeType.startsWith("image/heic")) {
-                    const newPath = await convertImage(tableData);
-                    fPath = newPath ?? fPath;
+            // If we want to resize the image, do so here
+            const converters = [convertImage, convertVideo, convertAudio];
+            for (const conversion of converters) {
+                // Try to convert the attachments using available converters
+                const newPath = await conversion(attachment, { originalMimeType: mimeType });
+                if (newPath) {
+                    fPath = newPath;
+                    break;
                 }
             }
 
@@ -153,7 +165,7 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
                 }
 
                 // Fetch the attachment metadata if there is a mimeType
-                metadata = await getAttachmentMetadata(tableData);
+                metadata = await getAttachmentMetadata(attachment);
 
                 // If there is no data, return null for the data
                 // Otherwise, convert it to a base64 string
@@ -170,20 +182,20 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
     }
 
     return {
-        originalROWID: tableData.ROWID,
-        guid: tableData.guid,
-        messages: tableData.messages ? tableData.messages.map(item => item.guid) : [],
+        originalROWID: attachment.ROWID,
+        guid: attachment.guid,
+        messages: attachment.messages ? attachment.messages.map(item => item.guid) : [],
         data: data as string,
         height: (metadata?.height ?? 0) as number,
         width: (metadata?.width ?? 0) as number,
-        uti: tableData.uti,
-        mimeType: tableData.mimeType,
-        transferState: tableData.transferState,
-        isOutgoing: tableData.isOutgoing,
-        transferName: tableData.transferName,
-        totalBytes: tableData.totalBytes,
-        isSticker: tableData.isSticker,
-        hideAttachment: tableData.hideAttachment,
+        uti: attachment.uti,
+        mimeType: attachment.mimeType,
+        transferState: attachment.transferState,
+        isOutgoing: attachment.isOutgoing,
+        transferName: attachment.transferName,
+        totalBytes: attachment.totalBytes,
+        isSticker: attachment.isSticker,
+        hideAttachment: attachment.hideAttachment,
         metadata
     };
 };

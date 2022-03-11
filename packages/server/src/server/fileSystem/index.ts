@@ -76,6 +76,8 @@ export class FileSystem {
 
     public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
 
+    public static ffmpegBinary = path.join(FileSystem.resources, "macos", "binaries", "ffmpeg", "ffmpeg");
+
     // Private API directories
     public static usrMySimblPlugins = path.join(userHomeDir(), "Library", "Application Support", "SIMBL", "Plugins");
 
@@ -386,22 +388,39 @@ export class FileSystem {
         return output;
     }
 
-    static async convertCafToMp3(attachment: Attachment, outputPath: string): Promise<void> {
-        const oldPath = FileSystem.getRealPath(attachment.filePath);
-        await FileSystem.execShellCommand(`/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`);
+    static async convertCafToMp3(originalPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(originalPath);
+        const output = await FileSystem.execShellCommand(
+            `/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`);
+        if (isNotEmpty(output) && output.includes('Error:')) {
+            throw Error(`Failed to convert audio to MP3: ${output}`);
+        }
     }
 
-    static async convertMp3ToCaf(inputPath: string, outputPath: string): Promise<void> {
-        const oldPath = FileSystem.getRealPath(inputPath);
-        await FileSystem.execShellCommand(
+    static async convertMp3ToCaf(originalPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(originalPath);
+        const output = await FileSystem.execShellCommand(
             `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`);
+        if (isNotEmpty(output) && output.includes('Error:')) {
+            throw Error(`Failed to convert audio to CAF: ${output}`);
+        }
     }
 
-    static async convertToJpg(format: string, attachment: Attachment, outputPath: string): Promise<void> {
-        const oldPath = FileSystem.getRealPath(attachment.filePath);
-        await FileSystem.execShellCommand(
-            `/usr/bin/sips --setProperty "format" "${format}" "${oldPath}" --out "${outputPath}"`);
-        console.log(outputPath)
+    static async convertToJpg(originalPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(originalPath);
+        const output = await FileSystem.execShellCommand(
+            `/usr/bin/sips --setProperty "format" "jpeg" "${oldPath}" --out "${outputPath}"`);
+        if (isNotEmpty(output) && output.includes('Error:')) {
+            throw Error(`Failed to convert image to JPEG: ${output}`);
+        }
+    }
+
+    static async convertToMp4(originalPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(originalPath);
+        const output = await FileSystem.execShellCommand(`${this.ffmpegBinary} -i "${oldPath}" "${outputPath}"`);
+        if (isNotEmpty(output) && output.includes('Error:')) {
+            throw Error(`Failed to convert video to MP4: ${output}`);
+        }
     }
 
     static async isSipDisabled(): Promise<boolean> {
