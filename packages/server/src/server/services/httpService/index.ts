@@ -14,7 +14,7 @@ import * as fs from "fs";
 // Internal libraries
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { fixServerUrl, isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
+import { isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";
 import { CertificateService } from "@server/services/certificateService";
 
@@ -57,10 +57,6 @@ export class HttpService {
             const use_custom_cert = Server().repo.getConfig("use_custom_certificate") as boolean;
             const proxy_service = Server().repo.getConfig("proxy_service") as string;
             if (onlyAlphaNumeric(proxy_service).toLowerCase() === "dynamicdns") {
-                // Force HTTPs for the server URL as well
-                let serverUrl = Server().repo.getConfig("server_address") as string;
-                serverUrl = fixServerUrl(serverUrl);
-
                 if (use_custom_cert) {
                     // Only setup certs if the proxy service is
                     Server().log("Starting Certificate service...");
@@ -181,7 +177,8 @@ export class HttpService {
             // Basic authentication
             if (safeTrim(pass) === safeTrim(cfgPass)) {
                 Server().log(
-                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`);
+                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
+                );
             } else {
                 socket.disconnect();
                 Server().log(`Closing client connection. Authentication failed.`);
@@ -193,7 +190,7 @@ export class HttpService {
              *
              * A console message will be printed, and a socket error will be emitted
              */
-            socket.use(async (_: any, next: Function) => {
+            socket.use(async (_: any, next: (_?: any) => void) => {
                 try {
                     await next();
                 } catch (ex: any) {
