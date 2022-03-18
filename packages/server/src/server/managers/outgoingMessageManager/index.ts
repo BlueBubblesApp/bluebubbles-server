@@ -29,4 +29,14 @@ export class OutgoingMessageManager {
 
         return null;
     }
+
+    async resolve(message: Message) {
+        const idx = this.findIndex(message);
+        if (idx >= 0) await this.promises[idx].resolve(message);
+    }
+
+    async reject(message: Message) {
+        const idx = this.findIndex(message);
+        if (idx >= 0) await this.promises[idx].reject(message);
+    }
 }

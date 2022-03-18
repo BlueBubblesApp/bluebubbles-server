@@ -37,29 +37,17 @@ export class BlueBubblesHelperService {
         this.restartCounter = 0;
         this.transactionManager = new TransactionManager();
         BlueBubblesHelperService.installBundle();
-
-        // Make sure that Messages is always running
-        // We'll check every 15 seconds. No specific reason other than that it seems like a good interval
-        const msgCheckInterval = setInterval(async () => {
-            try {
-                // This won't start it if it's already open
-                await FileSystem.startMessages();
-            } catch (ex: any) {
-                Server().log(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
-                clearInterval(msgCheckInterval);
-            }
-        }, 15000);
     }
 
     static async installBundle(force = false): Promise<BundleStatus> {
-        const status: BundleStatus = { success: false, message: 'Unknown status' };
+        const status: BundleStatus = { success: false, message: "Unknown status" };
 
         // Make sure the Private API is enabled
         const pApiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
         if (!force && !pApiEnabled) {
-            status.message = 'Private API feature is not enabled';
+            status.message = "Private API feature is not enabled";
             return status;
-        };
+        }
 
         // eslint-disable-next-line no-nested-ternary
         const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
@@ -68,7 +56,7 @@ export class BlueBubblesHelperService {
 
         // If the local bundle doesn't exist, don't do anything
         if (!fs.existsSync(localPath)) {
-            status.message = 'Unable to locate embedded bundle';
+            status.message = "Unable to locate embedded bundle";
             return status;
         }
 
@@ -130,13 +118,14 @@ export class BlueBubblesHelperService {
 
         // Print a log based on if we wrote the bundle anywhere
         if (writeCount === 0) {
-            status.message = "Attempted to install helper bundle, but neither MySIMBL nor MacForge (MacEnhance) was found!";
+            status.message =
+                "Attempted to install helper bundle, but neither MySIMBL nor MacForge (MacEnhance) was found!";
             Server().log(status.message, "warn");
         } else {
             // Restart iMessage to "apply" the changes
             Server().log("Restarting iMessage to apply Helper updates...");
             await FileSystem.executeAppleScript(restartMessages());
-            
+
             status.success = true;
             status.message = "Successfully installed latest Private API Helper Bundle!";
             Server().log(status.message);
@@ -201,7 +190,7 @@ export class BlueBubblesHelperService {
 
     stop() {
         Server().log(`Stopping Private API Helper...`);
-    
+
         try {
             if (this.helper && !this.helper.destroyed) {
                 this.helper.destroy();
@@ -341,27 +330,27 @@ export class BlueBubblesHelperService {
                 return;
             }
 
+            // Data can contain multiple events, each split by the demiliter (\n)
             const eventData: string[] = String(eventRaw).split("\n");
-            const event = eventData[eventData.length - 2];
-            if (event == null) {
-                Server().log(`Failed to decode null BlueBubblesHelper data!`);
-                return;
-            }
+            const uniqueEvents = [...new Set(eventData)];
+            for (const event of uniqueEvents) {
+                if (!event || event.trim().length === 0) continue;
+                if (event == null) {
+                    Server().log(`Failed to decode null BlueBubblesHelper data!`);
+                    continue;
+                }
 
-            Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
-            let data;
+                Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
+                let data;
 
-            try {
-                data = JSON.parse(event);
-            } catch (e) {
-                Server().log(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
-                return;
-            }
+                // Handle in a timeout so that we handle each event asyncronously
+                try {
+                    data = JSON.parse(event);
+                } catch (e) {
+                    Server().log(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
+                    return;
+                }
 
-            if (data == null) {
-                Server().log("BlueBubblesHelper sent null data", "warn");
-                return;
-            }
 
             // Handle events sent from
             if (data.event) {
@@ -379,14 +368,26 @@ export class BlueBubblesHelperService {
                     }
                     Server().log(`Updating for new message ${data.guid}`);
                 }
-            }
+                if (data == null) {
+                    Server().log("BlueBubblesHelper sent null data", "warn");
+                    return;
 
-            // Handle transactions
-            if (data.transactionId) {
-                // Resolve the promise from the transaction manager
-                const idx = this.transactionManager.findIndex(data.transactionId);
-                if (idx >= 0) {
-                    this.transactionManager.promises[idx].resolve(data.identifier, data?.data);
+                
+
+                if (data.transactionId) {
+                    // Resolve the promise from the transaction manager
+                    const idx = this.transactionManager.findIndex(data.transactionId);
+                    if (idx >= 0) {
+                        this.transactionManager.promises[idx].resolve(data.identifier, data?.data);
+                    }
+                } else if (data.event) {
+                    if (data.event === "ping") {
+                        Server().log("Private API Helper connected!");
+                    } else if (data.event === "started-typing") {
+                        Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
+                    } else if (data.event === "stopped-typing") {
+                        Server().emitMessage("typing-indicator", { display: false, guid: data.guid }, "normal", false);
+                    }
                 }
             }
         });
@@ -415,7 +416,10 @@ export class BlueBubblesHelperService {
 
                 // Write the request to the socket
                 const res = this.helper.write(`${JSON.stringify(d)}\n`, (err: Error) => {
-                    reject(err);
+                    if (err) {
+                        Server().log(`Socket write error: ${err?.message ?? String(err)}`);
+                        reject(err);
+                    }
                 });
 
                 if (!res) {
@@ -426,9 +430,11 @@ export class BlueBubblesHelperService {
             });
 
             // If we have a transaction, wait until the transaction is fulfilled to return
-            if (transaction) return transaction.promise;
+            if (transaction) {
+                return transaction.promise;
+            }
         } catch (ex: any) {
-            Server().log(`${msg} ${ex?.message ?? ex}`, 'debug');
+            Server().log(`${msg} ${ex?.message ?? ex}`, "debug");
         }
 
         return null;

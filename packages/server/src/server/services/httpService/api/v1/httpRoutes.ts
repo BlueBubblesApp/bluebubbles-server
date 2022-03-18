@@ -17,6 +17,7 @@ import { GeneralRouter } from "./routers/generalRouter";
 import { UiRouter } from "./routers/uiRouter";
 import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
+import { MetricsMiddleware } from "./middleware/metricsMiddleware";
 import { LogMiddleware } from "./middleware/logMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
 import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
@@ -36,7 +37,7 @@ export class HttpRoutes {
     }
 
     private static get unprotected() {
-        return [LogMiddleware];
+        return [MetricsMiddleware, LogMiddleware];
     }
 
     static api: HttpDefinition = {

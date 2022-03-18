@@ -36,24 +36,15 @@ export class UpdateService {
             autoUpdater.autoInstallOnAppQuit = false;
         }
 
-        // Set the feed stuff
-        autoUpdater.setFeedURL({
-            provider: "github",
-            owner: "BlueBubblesApp",
-            repo: "BlueBubbles-Server",
-            vPrefixedTagName: true,
-            host: "github.com",
-            protocol: "https",
-            private: false,
-            releaseType: "release"
-        });
-
         autoUpdater.on("update-downloaded", info => {
+            Server().log("Installing update...");
             autoUpdater.quitAndInstall(false, true);
         });
 
         ipcMain.handle("install-update", async (_, __) => {
+            Server().log("Downloading update...");
             await autoUpdater.downloadUpdate();
+            Server().log("Finished downloading update...");
         });
     }
 

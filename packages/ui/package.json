@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "homepage": "./",
+  "license": "Apache-2.0",
   "scripts": {
     "start": "export BROWSER=none && react-app-rewired start",
     "build": "export NODE_ENV=production && react-app-rewired build"

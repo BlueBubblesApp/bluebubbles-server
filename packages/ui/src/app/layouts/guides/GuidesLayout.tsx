@@ -21,7 +21,7 @@ export const GuidesLayout = (): JSX.Element => {
                 <Spacer />
                 <Wrap spacing='30px' mt={5}>
                     <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
                                 https://bluebubbles.app/install
                             </Text>
@@ -37,7 +37,7 @@ export const GuidesLayout = (): JSX.Element => {
                         </LinkBox>
                     </WrapItem>
                     <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
                                 https://docs.bluebubbles.app
                             </Text>
@@ -53,7 +53,7 @@ export const GuidesLayout = (): JSX.Element => {
                         </LinkBox>
                     </WrapItem>
                     <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
                                 https://bluebubbles.app/faq
                             </Text>
@@ -69,7 +69,7 @@ export const GuidesLayout = (): JSX.Element => {
                         </LinkBox>
                     </WrapItem>
                     <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
                                 https://docs.bluebubbles.app/private-api
                             </Text>
@@ -85,7 +85,7 @@ export const GuidesLayout = (): JSX.Element => {
                         </LinkBox>
                     </WrapItem>
                     <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
                                 https://documenter.getpostman.com
                             </Text>
@@ -101,7 +101,7 @@ export const GuidesLayout = (): JSX.Element => {
                         </LinkBox>
                     </WrapItem>
                     <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
                                 https://bluebubbles.app/web
                             </Text>
@@ -117,7 +117,7 @@ export const GuidesLayout = (): JSX.Element => {
                         </LinkBox>
                     </WrapItem>
                     <WrapItem>
-                        <LinkBox as='article' maxW='sm' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
                                 https://bluebubbles.app/donate
                             </Text>

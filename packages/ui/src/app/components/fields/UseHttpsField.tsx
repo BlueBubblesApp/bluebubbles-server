@@ -15,17 +15,17 @@ export interface UseHttpsFieldProps {
 }
 
 export const UseHttpsField = ({ helpText }: UseHttpsFieldProps): JSX.Element => {
-    const encryption: boolean = (useAppSelector(state => state.config.encrypt_coms) ?? false);
+    const useHttps: boolean = (useAppSelector(state => state.config.use_custom_certificate) ?? false);
 
     return (
         <FormControl>
-            <Checkbox id='encrypt_coms' isChecked={encryption} onChange={onCheckboxToggle}>Encrypt Messages</Checkbox>
+            <Checkbox id='use_custom_certificate' isChecked={useHttps} onChange={onCheckboxToggle}>Use HTTPS</Checkbox>
             <FormHelperText>
                 {helpText ?? (
                     <Text>
                         This will install a self-signed certificate at: <Code>~/Library/Application Support/bluebubbles-server/Certs</Code>
                         <br />
-                        Note: Only use this this option if you have your own certificate! Replace the certificates in the "<Code>Certs</Code>" directory
+                        Note: Only use this this option if you have your own certificate! Replace the certificates in the <Code>Certs</Code> directory
                     </Text>
                 )}
             </FormHelperText>

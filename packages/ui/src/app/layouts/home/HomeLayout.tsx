@@ -49,8 +49,7 @@ export const HomeLayout = (): JSX.Element => {
     const totalPictures: number | null = useAppSelector(state => state.statistics.total_pictures) ?? null;
     const totalVideos: number | null = useAppSelector(state => state.statistics.total_videos) ?? null;
 
-    // Run-once to fetch stats
-    useEffect(() => {
+    const updateStats = () => {
         ipcRenderer.invoke('get-message-count').then((messageCount) => {
             dispatch(setStat({ name: 'total_messages', value: messageCount }));
         });
@@ -73,6 +72,8 @@ export const HomeLayout = (): JSX.Element => {
                 } else {
                     dispatch(setStat({ name: 'best_friend', value: `${e.firstName} ${e?.lastName ?? ''}`.trim() }));
                 }
+            }).catch(() => {
+                dispatch(setStat({ name: 'best_friend', value: currentTop }));
             });
         });
         
@@ -111,6 +112,12 @@ export const HomeLayout = (): JSX.Element => {
             });
             dispatch(setStat({ name: 'total_videos', value: total }));
         });
+    };
+
+    // Run-once to fetch stats
+    useEffect(() => {
+        updateStats();
+        setInterval(updateStats, 60000);  // Refresh the stats every 1 minute
     }, []);
 
     return (
@@ -166,7 +173,7 @@ export const HomeLayout = (): JSX.Element => {
                                         onClick={() => copyToClipboard(address)}
                                     />
                                 </Tooltip>
-                                <Popover placement='bottom'>
+                                <Popover placement='bottom' isLazy={true}>
                                     <PopoverTrigger>
                                         <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }} >
                                             <Tooltip label='Show QR Code'>

@@ -14,7 +14,7 @@ import { FocusableElement } from '@chakra-ui/utils';
 interface ConfirmationDialogProps {
     title?: string;
     body?: string;
-    declineText?: string;
+    declineText?: string | null;
     onDecline?: () => void;
     acceptText?: string;
     onAccept?: () => void;
@@ -64,15 +64,17 @@ export const ConfirmationDialog = ({
                     </AlertDialogBody>
 
                     <AlertDialogFooter>
-                        <Button
-                            ref={modalRef as React.LegacyRef<HTMLButtonElement> | undefined}
-                            onClick={() => {
-                                if (onDecline) onDecline();
-                                onClose();
-                            }}
-                        >
-                            {declineText}
-                        </Button>
+                        {declineText ? (
+                            <Button
+                                ref={modalRef as React.LegacyRef<HTMLButtonElement> | undefined}
+                                onClick={() => {
+                                    if (onDecline) onDecline();
+                                    onClose();
+                                }}
+                            >
+                                {declineText}
+                            </Button>
+                        ): null}
                         <Button
                             ml={3}
                             colorScheme='red'

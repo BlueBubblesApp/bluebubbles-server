@@ -2,7 +2,9 @@
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
 import ServerLog from "electron-log";
-import * as process from "process";
+import process from "process";
+import path from "path";
+import os from "os";
 import { EventEmitter } from "events";
 import macosVersion from "macos-version";
 
@@ -40,7 +42,15 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
 
 import { ActionHandler } from "./api/v1/apple/actions";
-import { insertChatParticipants, isEmpty, isMinBigSur, isMinMojave, isMinMonterey, isMinSierra, isNotEmpty } from "./helpers/utils";
+import {
+    insertChatParticipants,
+    isEmpty,
+    isMinBigSur,
+    isMinMojave,
+    isMinMonterey,
+    isMinSierra,
+    isNotEmpty
+} from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -54,6 +64,10 @@ const osVersion = macosVersion();
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
 ServerLog.transports.console.format = logFormat;
 ServerLog.transports.file.format = logFormat;
+
+// Patch in the original package path so we don't use @bluebubbles/server
+ServerLog.transports.file.resolvePath = () =>
+    path.join(os.homedir(), "Library", "Logs", "bluebubbles-server", "main.log");
 
 /**
  * Create a singleton for the server so that it can be referenced everywhere.
@@ -399,7 +413,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Stopping HTTP service...");
             await this.httpService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
@@ -572,8 +585,8 @@ class BlueBubblesServer extends EventEmitter {
         try {
             return await FileSystem.execShellCommand(`sntp time.apple.com`);
         } catch (ex) {
-            this.log('Failed to sync time with time servers!', 'warn');
-            this.log(ex)
+            this.log("Failed to sync time with time servers!", "warn");
+            this.log(ex);
         }
 
         return null;
@@ -639,6 +652,18 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Full-disk access permissions are required!", "error");
         }
 
+        // Make sure Messages is running
+        await FileSystem.startMessages();
+        const msgCheckInterval = setInterval(async () => {
+            try {
+                // This won't start it if it's already open
+                await FileSystem.startMessages();
+            } catch (ex: any) {
+                Server().log(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
+                clearInterval(msgCheckInterval);
+            }
+        }, 150000); // Make sure messages is open every 2.5 minutes
+
         this.log("Finished pre-start checks...");
     }
 
@@ -664,14 +689,14 @@ class BlueBubblesServer extends EventEmitter {
         const syncString = await this.getTimeSync();
         if (syncString !== null) {
             try {
-                const spl = syncString.split('+/-');
-                const left = spl[0].split(' ').slice(0, -1);
-                const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace('+', '').replace('-', '')));
+                const spl = syncString.split("+/-");
+                const left = spl[0].split(" ").slice(0, -1);
+                const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
                 if (offset >= 15) {
-                    this.log(`Your macOS time is not synchronized! Offset: ${offset}`, 'warn');
+                    this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
                 }
             } catch (ex) {
-                this.log('Unable to parse time synchronization offset!', 'debug');
+                this.log("Unable to parse time synchronization offset!", "debug");
             }
         }
 
@@ -842,22 +867,24 @@ class BlueBubblesServer extends EventEmitter {
         // Check if the MySIMBL/MacForge folder exists
         if (isMinMojave) {
             output.push({
-                name: 'MacForge Plugins Folder',
+                name: "MacForge Plugins Folder",
                 pass: fs.existsSync(FileSystem.libMacForgePlugins),
                 solution: `Manually create this folder: ${FileSystem.libMacForgePlugins}`
             });
         } else {
             output.push({
-                name: 'MySIMBL Plugins Folder',
+                name: "MySIMBL Plugins Folder",
                 pass: fs.existsSync(FileSystem.libMySimblPlugins),
                 solution: `Manually create this folder: ${FileSystem.libMySimblPlugins}`
             });
         }
 
         output.push({
-            name: 'SIP Disabled',
+            name: "SIP Disabled",
             pass: await FileSystem.isSipDisabled(),
-            solution: `Follow our documentation on how to disable SIP: https://docs.bluebubbles.app/private-api/installation`
+            solution:
+                `Follow our documentation on how to disable SIP: ` +
+                `https://docs.bluebubbles.app/private-api/installation`
         });
 
         return output;
@@ -866,17 +893,16 @@ class BlueBubblesServer extends EventEmitter {
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [
             {
-                name: 'Accessibility',
+                name: "Accessibility",
                 pass: systemPreferences.isTrustedAccessibilityClient(false),
-                solution: 'Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles'
+                solution: "Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles"
             },
             {
-                name: 'Full Disk Access',
+                name: "Full Disk Access",
                 pass: this.hasDiskAccess,
-                solution: (
-                    'Open System Preferences > Security > Privacy > Full Disk Access, ' +
-                    'then add BlueBubbles. Lastly, restart BlueBubbles.'
-                )
+                solution:
+                    "Open System Preferences > Security > Privacy > Full Disk Access, " +
+                    "then add BlueBubbles. Lastly, restart BlueBubbles."
             }
         ];
 
@@ -897,20 +923,12 @@ class BlueBubblesServer extends EventEmitter {
             return;
         }
 
-        this.log('Starting chat listeners...');
-        const pollInterval = (this.repo.getConfig('db_poll_interval') as number) ?? 1000;
+        this.log("Starting chat listeners...");
+        const pollInterval = (this.repo.getConfig("db_poll_interval") as number) ?? 1000;
 
         // Create a listener to listen for new/updated messages
-        const incomingMsgListener = new IncomingMessageListener(
-            this.iMessageRepo,
-            this.eventCache,
-            pollInterval
-        );
-        const outgoingMsgListener = new OutgoingMessageListener(
-            this.iMessageRepo,
-            this.eventCache,
-            pollInterval * 1.5
-        );
+        const incomingMsgListener = new IncomingMessageListener(this.iMessageRepo, this.eventCache, pollInterval);
+        const outgoingMsgListener = new OutgoingMessageListener(this.iMessageRepo, this.eventCache, pollInterval * 1.5);
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority
         const groupEventListener = new GroupChangeListener(this.iMessageRepo, pollInterval * 2);

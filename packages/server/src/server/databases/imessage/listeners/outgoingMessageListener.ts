@@ -39,11 +39,11 @@ export class OutgoingMessageListener extends ChangeListener {
      */
     async getEntries(after: Date, before: Date): Promise<void> {
         // Second, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
-        let afterOffsetDate = new Date(after.getTime() - 15000);
+        const afterOffsetDate = new Date(after.getTime() - 15000);
         await this.emitOutgoingMessages(afterOffsetDate);
 
         // Third, check for updated messages
-        let afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
+        const afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
         await this.emitUpdatedMessages(afterUpdateOffsetDate);
     }
 
@@ -137,11 +137,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Resolve the promise for sent messages from a client
-            const idx = Server().messageManager.findIndex(entry);
-            if (idx >= 0) {
-                // After the MessageMatchEmit event reaches client, then emmit new-entry to fcm
-                await Server().messageManager.promises[idx].resolve(entry);
-            }
+            Server().messageManager.resolve(entry);
 
             // Emit it as normal entry
             super.emit("new-entry", entry);
@@ -159,11 +155,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Reject the corresponding promise
-            const idx = Server().messageManager.findIndex(entry);
-            if (idx >= 0) {
-                // After the MessageMatchEmit event reaches client, then emmit message-send-error to fcm
-                await Server().messageManager.promises[idx].reject(entry);
-            }
+            Server().messageManager.reject(entry);
 
             //Emit it as normal error
             super.emit("message-send-error", entry);
@@ -198,11 +190,7 @@ export class OutgoingMessageListener extends ChangeListener {
             this.cache.add(cacheName);
 
             // Resolve the promise
-            const idx = Server().messageManager.findIndex(entry);
-            if (idx >= 0) {
-                // After the MessageMatchEmit event reaches client, then emmit updated-entry to fcm
-                await Server().messageManager.promises[idx].resolve(entry);
-            }
+            Server().messageManager.resolve(entry);
 
             // Emit it as a normal update
             super.emit("updated-entry", entry);

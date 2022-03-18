@@ -35,8 +35,8 @@ export const PollIntervalField = ({ helpText }: PollIntervalFieldProps): JSX.Ele
      */
     const saveInterval = (theNewInterval: number): void => {
         // Validate the interval
-        if (theNewInterval < 200) {
-            setIntervalError('The interval must be at least of 200 ms');
+        if (theNewInterval < 500) {
+            setIntervalError('The interval must be at least 500ms or else database locks can occur');
             return;
         }
 
