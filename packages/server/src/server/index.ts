@@ -14,7 +14,6 @@ import { FileSystem } from "@server/fileSystem";
 // Database Imports
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
 import { MessageRepository } from "@server/databases/imessage";
-import { ContactRepository } from "@server/databases/contacts";
 import {
     IncomingMessageListener,
     OutgoingMessageListener,
@@ -57,6 +56,7 @@ import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { fs } from "zx";
 
 const findProcess = require("find-process");
+const contacts = require("node-mac-contacts");
 
 const osVersion = macosVersion();
 
@@ -97,8 +97,6 @@ class BlueBubblesServer extends EventEmitter {
     repo: ServerRepository;
 
     iMessageRepo: MessageRepository;
-
-    contactsRepo: ContactRepository;
 
     httpService: HttpService;
 
@@ -157,7 +155,6 @@ class BlueBubblesServer extends EventEmitter {
         // Databases
         this.repo = null;
         this.iMessageRepo = null;
-        this.contactsRepo = null;
 
         // Other helpers
         this.eventCache = null;
@@ -287,14 +284,6 @@ class BlueBubblesServer extends EventEmitter {
                     app.quit();
                 }
             });
-        }
-
-        try {
-            this.log("Connecting to Contacts database...");
-            this.contactsRepo = new ContactRepository();
-            await this.contactsRepo.initialize();
-        } catch (ex: any) {
-            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
         }
     }
 
@@ -435,12 +424,6 @@ class BlueBubblesServer extends EventEmitter {
             if (this.caffeinate) this.caffeinate.stop();
         } catch (ex: any) {
             this.log(`Failed to stop Caffeinate service! ${ex?.message ?? ex}`);
-        }
-
-        try {
-            await this.contactsRepo?.db?.close();
-        } catch (ex: any) {
-            this.log(`Failed to close Contacts Database connection! ${ex?.message ?? ex}`);
         }
 
         try {
@@ -686,18 +669,22 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Show a warning if the time is off by a reasonable amount (1 minute)
-        const syncString = await this.getTimeSync();
-        if (syncString !== null) {
-            try {
-                const spl = syncString.split("+/-");
-                const left = spl[0].split(" ").slice(0, -1);
-                const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
-                if (offset >= 15) {
-                    this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
+        try {
+            const syncString = await this.getTimeSync();
+            if (syncString !== null) {
+                try {
+                    const spl = syncString.split("+/-");
+                    const left = spl[0].split(" ").slice(0, -1);
+                    const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
+                    if (offset >= 15) {
+                        this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
+                    }
+                } catch (ex) {
+                    this.log("Unable to parse time synchronization offset!", "debug");
                 }
-            } catch (ex) {
-                this.log("Unable to parse time synchronization offset!", "debug");
             }
+        } catch (ex) {
+            this.log(`Failed to get time sychronization status! Error: ${ex}`, "debug");
         }
 
         this.setDockIcon();
@@ -708,6 +695,13 @@ class BlueBubblesServer extends EventEmitter {
         } else if (isMinBigSur) {
             this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "debug");
         }
+
+        // Check for contact permissions
+        let contactStatus = contacts.getAuthStatus();
+        if (contactStatus === "Not Determined") {
+            contactStatus = await contacts.requestAccess();
+        }
+        this.log(`Contacts authorization status: ${contactStatus}`, "debug");
 
         this.log("Finished post-start checks...");
     }

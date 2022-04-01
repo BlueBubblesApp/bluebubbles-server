@@ -63,7 +63,7 @@ export const convertImage = async (
     const newPath = `${FileSystem.convertDir}/${attachment.guid}.jpeg`;
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
-    let ext = null;
+    let ext: string = null;
 
     // Only convert certain types
     if (attachment.uti === "public.heic" || mType.startsWith("image/heic")) {
@@ -85,6 +85,8 @@ export const convertImage = async (
             Server().log(`Failed to convert image to JPEG for attachment, ${attachment.transferName}`, "debug");
             Server().log(ex?.message ?? ex, "error");
         }
+    } else {
+        Server().log("Failed to convert attachment! File path did not eixst!", "debug");
     }
 
     if (!failed && ext && fs.existsSync(newPath)) {

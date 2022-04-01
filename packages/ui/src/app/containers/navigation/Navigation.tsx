@@ -35,11 +35,13 @@ import {
 import { FiHome, FiSettings, FiMenu, FiBell, FiMonitor, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
 import { FaDiscord } from 'react-icons/fa';
 import { AiOutlineBug, AiOutlineHome, AiOutlineApi } from 'react-icons/ai';
-import { BsChevronDown, BsCheckAll, BsBook } from 'react-icons/bs';
+import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle } from 'react-icons/bs';
 import { BiNotification } from 'react-icons/bi';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
 import { IconType } from 'react-icons';
 import { ReactText } from 'react';
+
+import { ContactsLayout } from 'app/layouts/contacts/ContactsLayout';
 
 import { HomeLayout } from '../../layouts/home/HomeLayout';
 import { DevicesLayout } from '../../layouts/devices/DevicesLayout';
@@ -55,6 +57,7 @@ import './styles.css';
 import { useAppSelector, useAppDispatch } from '../../hooks';
 import { readAll, clear as clearAlerts, NotificationItem } from '../../slices/NotificationsSlice';
 
+
 interface LinkItemProps {
     name: string;
     icon: IconType;
@@ -63,6 +66,7 @@ interface LinkItemProps {
 const LinkItems: Array<LinkItemProps> = [
     { name: 'Home', icon: FiHome, to: '/' },
     { name: 'Devices', icon: FiMonitor, to: '/devices' },
+    { name: 'Contacts', icon: BsPersonCircle, to: '/contacts' },
     { name: 'Debug & Logs', icon: AiOutlineBug, to: '/logs' },
     { name: 'Google FCM', icon: BiNotification, to: '/fcm' },
     { name: 'API & Webhooks', icon: AiOutlineApi, to: '/webhooks' },
@@ -109,11 +113,12 @@ export const Navigation = (): JSX.Element => {
                 <Box ml={{ base: 0, md: 60 }} p="2">
                     <Routes>
                         <Route path="/settings" element={<SettingsLayout />} />
-                        <Route path="/logs"element={<LogsLayout />} />
-                        <Route path="/fcm"element={<FcmLayout />} />
-                        <Route path="/devices"element={<DevicesLayout />} />
-                        <Route path="/webhooks"element={<ApiLayout />} />
-                        <Route path="/guides"element={<GuidesLayout />} />
+                        <Route path="/logs" element={<LogsLayout />} />
+                        <Route path="/contacts" element={<ContactsLayout />} />
+                        <Route path="/fcm" element={<FcmLayout />} />
+                        <Route path="/devices" element={<DevicesLayout />} />
+                        <Route path="/webhooks" element={<ApiLayout />} />
+                        <Route path="/guides" element={<GuidesLayout />} />
                         <Route path="/" element={<HomeLayout />} />
                     </Routes>
                 </Box>

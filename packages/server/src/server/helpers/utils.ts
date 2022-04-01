@@ -9,6 +9,7 @@ import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
+import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 
 export const isMinMonterey = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
@@ -18,7 +19,7 @@ export const isMinHighSierra = macosVersion.isGreaterThanOrEqualTo("10.13");
 export const isMinSierra = macosVersion.isGreaterThanOrEqualTo("10.12");
 
 export const isTruthyBool = (value: string) => {
-    return ['1', true, 'true', 'True'].includes(value);
+    return ["1", true, "true", "True"].includes(value);
 };
 
 export const generateUuid = () => {
@@ -80,7 +81,7 @@ export const safeExecuteAppleScript = async (command: string) => {
 
 export const getContactRecord = async (chat: Chat, member: Handle) => {
     // Get the corresponding
-    const record = await Server().contactsRepo.getContactByAddress(member.id);
+    const record = ContactInterface.findContact(member.id);
 
     // If the record is unknown, we want to format it
     // Otherwise, store either the full name, email, or just first name
@@ -261,7 +262,7 @@ export const fixServerUrl = (value: string) => {
     const use_custom_cert = Server().repo.getConfig("use_custom_certificate") as boolean;
     if (use_custom_cert && newValue.startsWith("http://")) {
         newValue = newValue.replace("http://", "https://");
-    } else if (!use_custom_cert && newValue.startsWith('https://')) {
+    } else if (!use_custom_cert && newValue.startsWith("https://")) {
         newValue = newValue.replace("https://", "http://");
     }
 

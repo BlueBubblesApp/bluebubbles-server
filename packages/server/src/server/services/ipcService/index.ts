@@ -5,7 +5,7 @@ import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alertService";
 import { openLogs } from "@server/api/v1/apple/scripts";
 import { fixServerUrl, onlyAlphaNumeric } from "@server/helpers/utils";
-import { ContactInterface } from '@server/api/v1/interfaces/contactInterface';
+import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { BlueBubblesHelperService } from "../privateApi";
 
 export class IPCService {
@@ -21,11 +21,11 @@ export class IPCService {
 
             // Make sure the Ngrok key is properly formatted
             if (args.ngrok_key) {
-                if (args.ngrok_key.startsWith('./ngrok')) {
-                    args.ngrok_key = args.ngrok_key.replace('./ngrok', '').trim();
+                if (args.ngrok_key.startsWith("./ngrok")) {
+                    args.ngrok_key = args.ngrok_key.replace("./ngrok", "").trim();
                 }
-                if (args.ngrok_key.startsWith('authtoken')) {
-                    args.ngrok_key = args.ngrok_key.replace('authtoken', '').trim();
+                if (args.ngrok_key.startsWith("authtoken")) {
+                    args.ngrok_key = args.ngrok_key.replace("authtoken", "").trim();
                 }
                 args.ngrok_key = args.ngrok_key.trim();
             }
@@ -54,7 +54,7 @@ export class IPCService {
                 await AlertService.markAsRead(i);
                 Server().notificationCount -= 1;
             }
-            
+
             if (Server().notificationCount < 0) Server().notificationCount = 0;
             app.setBadgeCount(Server().notificationCount);
         });
@@ -90,7 +90,7 @@ export class IPCService {
 
         ipcMain.handle("get-webhooks", async (event, args) => {
             const res = await Server().repo.getWebhooks();
-            return res.map((e) => ({ id: e.id, url: e.url, events: e.events, created: e.created }))
+            return res.map(e => ({ id: e.id, url: e.url, events: e.events, created: e.created }));
         });
 
         ipcMain.handle("create-webhook", async (event, payload) => {
@@ -105,6 +105,35 @@ export class IPCService {
 
         ipcMain.handle("update-webhook", async (event, args) => {
             return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events });
+        });
+
+        ipcMain.handle("get-contacts", async (event, _) => {
+            return await ContactInterface.getAllContacts();
+        });
+
+        ipcMain.handle("add-contact", async (event, args) => {
+            return await ContactInterface.createContact({
+                firstName: args.firstName,
+                lastName: args.lastName,
+                emails: args.emails ?? [],
+                phoneNumbers: args.phoneNumbers ?? []
+            });
+        });
+
+        ipcMain.handle("remove-contact", async (event, id) => {
+            return await ContactInterface.deleteContact({ contactId: id });
+        });
+
+        ipcMain.handle("remove-address", async (event, id) => {
+            return await ContactInterface.deleteContactAddress({ contactAddressId: id });
+        });
+
+        ipcMain.handle("add-address", async (event, args) => {
+            return await ContactInterface.addAddressToContactById(args.contactId, args.address, args.type);
+        });
+
+        ipcMain.handle("import-vcf", async (event, path) => {
+            return await ContactInterface.importFromVcf(path);
         });
 
         ipcMain.handle("get-contact-name", async (event, address) => {

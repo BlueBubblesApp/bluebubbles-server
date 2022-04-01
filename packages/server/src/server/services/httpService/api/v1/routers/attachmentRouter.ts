@@ -41,6 +41,8 @@ export class AttachmentRouter {
         Server().log(`Handling attachment download for GUID: ${guid}`, "debug");
         Server().log(`Detected MIME Type: ${mimeType}`, "debug");
 
+        Server().log(`Handling attachment with MIME Type: ${attachment?.mimeType}`);
+
         // If we want to resize the image, do so here
         if (!useOriginal) {
             const converters = [convertImage, convertAudio];
