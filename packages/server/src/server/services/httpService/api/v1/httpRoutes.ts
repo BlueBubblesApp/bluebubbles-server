@@ -19,6 +19,7 @@ import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
 import { MetricsMiddleware } from "./middleware/metricsMiddleware";
 import { LogMiddleware } from "./middleware/logMiddleware";
+import { ErrorMiddleware } from "./middleware/errorMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
 import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
 import { HttpDefinition, HttpMethod, HttpRoute, HttpRouteGroup, KoaMiddleware } from "../../types";
@@ -37,7 +38,7 @@ export class HttpRoutes {
     }
 
     private static get unprotected() {
-        return [MetricsMiddleware, LogMiddleware];
+        return [MetricsMiddleware, ErrorMiddleware, LogMiddleware];
     }
 
     static api: HttpDefinition = {
