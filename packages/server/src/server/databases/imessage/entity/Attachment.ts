@@ -6,12 +6,7 @@ import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
-import {
-    convertAudio,
-    convertImage,
-    convertVideo,
-    getAttachmentMetadata
-} from "@server/databases/imessage/helpers/utils";
+import { convertAudio, convertImage, getAttachmentMetadata } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
@@ -146,7 +141,7 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
             Server().log(`Detected MIME Type: ${mimeType}`);
 
             // If we want to resize the image, do so here
-            const converters = [convertImage, convertVideo, convertAudio];
+            const converters = [convertImage, convertAudio];
             for (const conversion of converters) {
                 // Try to convert the attachments using available converters
                 const newPath = await conversion(attachment, { originalMimeType: mimeType });

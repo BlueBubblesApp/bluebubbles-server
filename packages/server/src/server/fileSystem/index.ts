@@ -76,8 +76,6 @@ export class FileSystem {
 
     public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
 
-    public static ffmpegBinary = path.join(FileSystem.resources, "macos", "binaries", "ffmpeg", "ffmpeg");
-
     // Private API directories
     public static usrMySimblPlugins = path.join(userHomeDir(), "Library", "Application Support", "SIMBL", "Plugins");
 
@@ -417,14 +415,6 @@ export class FileSystem {
         );
         if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert image to JPEG: ${output}`);
-        }
-    }
-
-    static async convertToMp4(originalPath: string, outputPath: string): Promise<void> {
-        const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(`${this.ffmpegBinary} -i "${oldPath}" "${outputPath}"`);
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert video to MP4: ${output}`);
         }
     }
 

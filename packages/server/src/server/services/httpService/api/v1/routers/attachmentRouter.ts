@@ -4,7 +4,7 @@ import { nativeImage } from "electron";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { convertAudio, convertImage, convertVideo } from "@server/databases/imessage/helpers/utils";
+import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
 import { isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
@@ -43,7 +43,7 @@ export class AttachmentRouter {
 
         // If we want to resize the image, do so here
         if (!useOriginal) {
-            const converters = [convertImage, convertVideo, convertAudio];
+            const converters = [convertImage, convertAudio];
             for (const conversion of converters) {
                 // Try to convert the attachments using available converters
                 const newPath = await conversion(attachment, { originalMimeType: mimeType });

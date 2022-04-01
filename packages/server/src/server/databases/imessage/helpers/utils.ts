@@ -43,7 +43,7 @@ export const convertAudio = async (
         }
     }
 
-    if (!failed && ext) {
+    if (!failed && ext && fs.existsSync(newPath)) {
         // If conversion is successful, we need to modify the attachment a bit
         attachment.mimeType = "audio/mp3";
         attachment.filePath = newPath;
@@ -87,50 +87,11 @@ export const convertImage = async (
         }
     }
 
-    if (!failed && ext) {
+    if (!failed && ext && fs.existsSync(newPath)) {
         // If conversion is successful, we need to modify the attachment a bit
         attachment.mimeType = "image/jpeg";
         attachment.filePath = newPath;
         attachment.transferName = basename(newPath).replace(`.${ext}`, ".jpeg");
-
-        // Set the fPath to the newly converted path
-        return newPath;
-    }
-
-    return null;
-};
-
-export const convertVideo = async (
-    attachment: Attachment,
-    { originalMimeType = null }: { originalMimeType?: string } = {}
-): Promise<string> => {
-    const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp4`;
-    const mType = originalMimeType ?? attachment.getMimeType();
-    let failed = false;
-    let ext = null;
-
-    if (attachment.uti === "com.apple.quicktime-movie" || mType.startsWith("video/quicktime")) {
-        ext = "mov";
-    }
-
-    if (!fs.existsSync(newPath)) {
-        try {
-            if (isNotEmpty(ext)) {
-                Server().log(`Converting video attachment, ${attachment.transferName}, to an MP4...`);
-                await FileSystem.convertToMp4(attachment.filePath, newPath);
-            }
-        } catch (ex: any) {
-            failed = true;
-            Server().log(`Failed to convert video to MP4 for attachment, ${attachment.transferName}`, "debug");
-            Server().log(ex?.message ?? ex, "error");
-        }
-    }
-
-    if (!failed && ext) {
-        // If conversion is successful, we need to modify the attachment a bit
-        attachment.mimeType = "video/mp4";
-        attachment.filePath = newPath;
-        attachment.transferName = basename(newPath).replace(`.${ext}`, ".mp4");
 
         // Set the fPath to the newly converted path
         return newPath;
