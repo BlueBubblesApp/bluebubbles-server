@@ -2,12 +2,20 @@ import React, { useEffect, useState } from 'react';
 import {
     Box,
     Divider,
+    Popover,
+    PopoverCloseButton,
+    PopoverContent,
+    PopoverHeader,
+    PopoverBody,
+    PopoverArrow,
+    PopoverTrigger,
     Stack,
     Slider,
     SliderTrack,
     SliderFilledTrack,
     SliderThumb,
     SliderMark,
+    Text,
     Button,
     Flex
 } from '@chakra-ui/react';
@@ -69,6 +77,24 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
         window.scrollTo(0, 0);
     }, []);
 
+    const nextButton = (
+        <Button
+            disabled={!showNext}
+            mt='20px'
+            colorScheme='blue'
+            onClick={() => {
+                if (step === steps.length - 1) {
+                    toggleTutorialCompleted(true);
+                } else {
+                    setStep(step + 1);
+                }
+                
+            }}
+        >
+            {step === steps.length - 1 ? 'Finish' : 'Next'} &gt;
+        </Button>
+    );
+
     return (
         <Box p={3} {...rest}>
             <Box mb='80px'>
@@ -76,7 +102,7 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
                     setCompletedSteps([...completedSteps, step]);
                 }}/>
             </Box>
-            <Box position='fixed' bottom={0} left={0} width='100%' height='80px'>
+            <Box position='fixed' bottom={0} left={0} width='100%' height='80px' bg="gray.800">
                 <Divider />
                 <Flex justifyContent='space-between' alignItems='center' mx={5}>
                     <Button
@@ -112,21 +138,22 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
                             <SliderThumb />
                         </Slider>
                     </Stack>
-                    <Button
-                        disabled={!showNext}
-                        mt='20px'
-                        colorScheme='blue'
-                        onClick={() => {
-                            if (step === steps.length - 1) {
-                                toggleTutorialCompleted(true);
-                            } else {
-                                setStep(step + 1);
-                            }
-                            
-                        }}
-                    >
-                        {step === steps.length - 1 ? 'Finish' : 'Next'} &gt;
-                    </Button>
+                    {/* Step 3 is the connection step */}
+                    {(step === 3) ? (
+                        <Popover autoFocus={false} defaultIsOpen={true}>
+                            <PopoverTrigger>
+                                {nextButton}
+                            </PopoverTrigger>
+                            <PopoverContent>
+                                <PopoverArrow />
+                                <PopoverCloseButton />
+                                <PopoverHeader>Requirements</PopoverHeader>
+                                <PopoverBody>
+                                    <Text>Enter a password and save it (using the floppy disk button) to proceed</Text>
+                                </PopoverBody>
+                            </PopoverContent>
+                        </Popover>
+                    ) : nextButton}
                 </Flex>
             </Box>
         </Box>
