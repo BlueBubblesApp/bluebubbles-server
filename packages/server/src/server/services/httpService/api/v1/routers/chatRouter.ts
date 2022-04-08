@@ -219,9 +219,8 @@ export class ChatRouter {
     }
 
     static async deleteChat(ctx: RouterContext, _: Next): Promise<void> {
-        throw new ServerError({ message: 'API endpoint disabled until further notice!' });
-        // const { guid } = ctx.params;
-        // await ChatInterface.delete({ guid });
-        // return new Success(ctx, { message: `Successfully deleted chat!` }).send();
+        const { guid } = ctx.params;
+        await ChatInterface.delete({ guid });
+        return new Success(ctx, { message: `Successfully deleted chat!` }).send();
     }
 }

@@ -236,7 +236,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.DELETE,
                         path: ":guid",
-                        middleware: [...HttpRoutes.protected],
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: ChatRouter.deleteChat
                     },
                 ]

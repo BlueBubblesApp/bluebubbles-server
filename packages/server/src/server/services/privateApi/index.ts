@@ -274,6 +274,15 @@ export class BlueBubblesHelperService {
         return this.writeData("create-chat", { addresses, message }, request);
     }
 
+    async deleteChat(guid: string): Promise<TransactionResult> {
+        if (isEmpty(guid)) {
+            throw new Error("Failed to delete chat. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.writeData("delete-chat", { guid }, request);
+    }
+
     async sendMessage(
         chatGuid: string,
         message: string,
