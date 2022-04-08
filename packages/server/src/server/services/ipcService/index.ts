@@ -30,6 +30,15 @@ export class IPCService {
                 args.ngrok_key = args.ngrok_key.trim();
             }
 
+            // If we are changing the proxy service to a non-dyn dns service, we need to make sure "use https" is off
+            if (args.proxy_service && args.proxy_service !== 'dynamic-dns') {
+                const httpsStatus = (
+                    args.use_custom_certificate ?? Server().repo.getConfig('use_custom_certificate')) as boolean;
+                if (httpsStatus) {
+                    Server().repo.setConfig('use_custom_certificate', false);
+                }
+            }
+
             for (const item of Object.keys(args)) {
                 if (Server().repo.hasConfig(item) && Server().repo.getConfig(item) !== args[item]) {
                     Server().repo.setConfig(item, args[item]);
