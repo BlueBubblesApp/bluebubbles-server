@@ -588,7 +588,17 @@ export class SocketRoutes {
                 }
 
                 Server().httpService.sendCache.remove(tempGuid);
-                return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
+                if ((sentMessage.error ?? 0) !== 0) {
+                    return response(cb, "message-send-error", createServerErrorResponse(
+                        'Message failed to send!',
+                        ErrorTypes.IMESSAGE_ERROR,
+                        'Message sent with an error. See attached message',
+                        await getMessageResponse(sentMessage))
+                    );
+                } else {
+                    return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
+                }
+                
             } catch (ex: any) {
                 Server().httpService.sendCache.remove(tempGuid);
                 if (ex?.ROWID) {
