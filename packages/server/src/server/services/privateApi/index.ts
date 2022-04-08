@@ -280,7 +280,7 @@ export class BlueBubblesHelperService {
         }
 
         const request = new TransactionPromise(TransactionType.CHAT);
-        return this.writeData("delete-chat", { data: guid }, request);
+        return this.writeData("delete-chat", { chatGuid: guid }, request);
     }
 
     async sendMessage(
