@@ -202,4 +202,40 @@ export class ChatInterface {
 
         return theChat;
     }
+
+    static async delete({ chat, guid }: { chat?: Chat, guid?: string } = {}): Promise<void> {
+        checkPrivateApiStatus();
+        
+        const repo = Server().iMessageRepo.db.getRepository(Chat);
+        if (!chat && isEmpty(guid)) throw new Error('No chat or chat GUID provided!');
+
+        const theChat = chat ?? await repo.findOne({ guid });
+        if (!theChat) return;
+        
+        // Tell the private API to delete the chat
+        await Server().privateApiHelper.deleteChat(theChat.guid);
+
+        let tryCount = 0;
+        let success = false;
+        while (tryCount < 10) {
+            tryCount += 1;
+
+            // See if the chat exists in the DB
+            const chat = await repo.findOne({ guid: theChat.guid });
+
+            // If it doesn't, we're all good and can break out. It's been deleted.
+            // Otherwise, we need to check again after our wait time
+            if (!chat) {
+                success = true;
+                break;
+            }
+
+            // Give it a bit to execute
+            await waitMs(500);
+        }
+
+        if (!success) {
+            throw new Error(`Failed to delete chat! Chat still exists. (GUID: ${theChat.guid})`);
+        }
+    }
 }

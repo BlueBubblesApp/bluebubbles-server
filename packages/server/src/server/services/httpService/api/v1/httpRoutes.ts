@@ -232,7 +232,13 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: ":guid",
                         controller: ChatRouter.find
-                    }
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.deleteChat
+                    },
                 ]
             },
             {
