@@ -217,4 +217,10 @@ export class ChatRouter {
 
         return new FileStream(ctx, FileSystem.getRealPath(iconPath), "image/jfif").send();
     }
+
+    static async deleteChat(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.delete({ guid });
+        return new Success(ctx, { message: `Successfully deleted chat!` }).send();
+    }
 }

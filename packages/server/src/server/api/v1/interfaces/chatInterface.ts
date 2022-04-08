@@ -202,4 +202,13 @@ export class ChatInterface {
 
         return theChat;
     }
+
+    static async delete({ chat, guid }: { chat?: Chat, guid?: string } = {}): Promise<void> {
+        const repo = Server().iMessageRepo.db.getRepository(Chat);
+        if (!chat && isEmpty(guid)) throw new Error('No chat or chat GUID provided!');
+
+        const theChat = chat ?? await repo.findOne({ guid });
+        if (!theChat) return;
+        await repo.remove(theChat);
+    }
 }
