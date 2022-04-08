@@ -10,7 +10,7 @@ import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
 import { FileStream, Success } from "../responses/success";
-import { IMessageError, NotFound } from "../responses/errors";
+import { IMessageError, NotFound, ServerError } from "../responses/errors";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -219,8 +219,9 @@ export class ChatRouter {
     }
 
     static async deleteChat(ctx: RouterContext, _: Next): Promise<void> {
-        const { guid } = ctx.params;
-        await ChatInterface.delete({ guid });
-        return new Success(ctx, { message: `Successfully deleted chat!` }).send();
+        throw new ServerError({ message: 'API endpoint disabled until further notice!' });
+        // const { guid } = ctx.params;
+        // await ChatInterface.delete({ guid });
+        // return new Success(ctx, { message: `Successfully deleted chat!` }).send();
     }
 }
