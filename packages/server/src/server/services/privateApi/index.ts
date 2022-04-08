@@ -7,7 +7,7 @@ import { parse as ParsePlist } from "plist";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
-import { isEmpty, isMinBigSur, isMinMonterey } from "@server/helpers/utils";
+import { isEmpty, isMinBigSur, isMinMonterey, isNotEmpty } from "@server/helpers/utils";
 import { restartMessages } from "@server/api/v1/apple/scripts";
 import {
     TransactionPromise,
@@ -360,7 +360,11 @@ export class BlueBubblesHelperService {
                     // Resolve the promise from the transaction manager
                     const idx = this.transactionManager.findIndex(data.transactionId);
                     if (idx >= 0) {
-                        this.transactionManager.promises[idx].resolve(data.identifier, data?.data);
+                        if (isNotEmpty(data?.error ?? '')) {
+                            this.transactionManager.promises[idx].reject(data.error);
+                        } else {
+                            this.transactionManager.promises[idx].resolve(data.identifier, data?.data);
+                        }
                     }
                 } else if (data.event) {
                     if (data.event === "ping") {
