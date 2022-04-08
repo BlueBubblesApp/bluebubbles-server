@@ -163,7 +163,15 @@ export class MessageRouter {
 
             // Convert to an API response
             const data = await getMessageResponse(sentMessage);
-            return new Success(ctx, { message: "Message sent!", data }).send();
+            if ((data.error ?? 0) !== 0) {
+                throw new IMessageError({
+                    message: 'Message sent with an error. See attached message',
+                    error: 'Message failed to send!',
+                    data
+                });
+            } else {
+                return new Success(ctx, { message: "Message sent!", data }).send();
+            }
         } catch (ex: any) {
             // Remove from cache
             Server().httpService.sendCache.remove(tempGuid);
