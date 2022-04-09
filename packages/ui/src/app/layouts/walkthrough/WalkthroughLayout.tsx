@@ -27,6 +27,7 @@ import { PermissionsWalkthrough } from './permissions/PermissionsWalkthrough';
 import { NotificationsWalkthrough } from './notifications/NotificationsWalkthrough';
 import { useAppSelector } from '../../hooks';
 import { toggleTutorialCompleted } from '../../actions/GeneralActions';
+import { useBackground } from '../../hooks/UseBackground';
 
 type StepItem = {
     component: React.FunctionComponent<any>,
@@ -38,6 +39,7 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
     const [completedSteps, setCompletedSteps] = useState([] as Array<number>);
     const proxyService: string = useAppSelector(state => state.config.proxy_service ?? '');
     const password: string = useAppSelector(state => state.config.password ?? '');
+    const bgColor = useBackground();
     
     // Links walkthrough steps and the values they rely on to be completed
     const steps: Array<StepItem> = [
@@ -102,7 +104,7 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
                     setCompletedSteps([...completedSteps, step]);
                 }}/>
             </Box>
-            <Box position='fixed' bottom={0} left={0} width='100%' height='80px' bg="gray.800">
+            <Box position='fixed' bottom={0} left={0} width='100%' height='80px' bg={bgColor}>
                 <Divider />
                 <Flex justifyContent='space-between' alignItems='center' mx={5}>
                     <Button
@@ -139,7 +141,7 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
                         </Slider>
                     </Stack>
                     {/* Step 3 is the connection step */}
-                    {(step === 3) ? (
+                    {(step === 3 && password.length === 0) ? (
                         <Popover autoFocus={false} defaultIsOpen={true}>
                             <PopoverTrigger>
                                 {nextButton}
