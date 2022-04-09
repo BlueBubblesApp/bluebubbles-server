@@ -170,8 +170,8 @@ export const startChat = (participants: string[], service: string, message: stri
 
         (* Start the new chat with all the recipients *)
         set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}
-        ${messageScpt}
         log thisChat
+        ${messageScpt}
     end tell
 
     try

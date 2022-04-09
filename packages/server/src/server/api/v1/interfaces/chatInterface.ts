@@ -136,31 +136,26 @@ export class ChatInterface {
         method?: 'apple-script' | 'private-api',
         service?: 'iMessage' | 'SMS'
     }): Promise<Chat> {
-        if (method === 'private-api') checkPrivateApiStatus();
+        // if (method === 'private-api') checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
         if (isEmpty(addresses)) {
             throw new Error("No addresses provided!");
         }
 
+        if (method === 'private-api') {
+            Server().log('Private API chat creation is not yet available. Using AppleScript...', 'debug');
+        }
+
         // Sanitize the addresses
         const theAddrs = addresses.map(e => slugifyAddress(e));
-        let chatGuid;
-        if (method === 'private-api') {
-            const result = await Server().privateApiHelper.createChat(theAddrs, message);
-            if (!result?.identifier) {
-                throw new Error("Failed to create chat! Invalid transaction response!");
-            }
-
-            chatGuid = result.identifier;
-        } else {
-            const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, message));
-            if (isNotEmpty(result) && (result.includes(';-;') || result.includes(';+;'))) {
-                chatGuid = result;
-            } else {
-                throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
-            }
+        const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, message));
+        if (isEmpty(result) || (!result.includes(';-;') && !result.includes(';+;'))) {
+            Server().log(`StartChat AppleScript Returned: ${result}`, 'debug');
+            throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
         }
+
+        const chatGuid = result.trim();
 
         // Fetch the chat based on the return data
         let chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
