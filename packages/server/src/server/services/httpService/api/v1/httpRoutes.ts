@@ -175,7 +175,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: "new",
-                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        middleware: [...HttpRoutes.protected],
                         validators: [ChatValidator.validateCreate],
                         controller: ChatRouter.create
                     },
