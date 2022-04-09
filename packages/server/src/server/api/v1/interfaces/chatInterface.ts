@@ -154,7 +154,7 @@ export class ChatInterface {
 
             chatGuid = result.identifier;
         } else {
-            const result = await FileSystem.executeAppleScript(startChat(theAddrs, service));
+            const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, message));
             if (isNotEmpty(result) && (result.includes(';-;') || result.includes(';+;'))) {
                 chatGuid = result;
             } else {

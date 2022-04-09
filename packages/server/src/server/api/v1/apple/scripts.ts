@@ -157,10 +157,11 @@ export const restartMessages = (delaySeconds = 3) => {
 /**
  * The AppleScript used to start a chat with some number of participants
  */
-export const startChat = (participants: string[], service: string) => {
+export const startChat = (participants: string[], service: string, message: string = null) => {
     const formatted = participants.map(buddy => `buddy "${buddy}" of targetService`);
     const buddies = formatted.join(", ");
 
+    const messageScpt = buildMessageScript(message, 'thisChat');
     const useTextChat = !isMinBigSur;
     const qualifier = useTextChat ? " text " : " ";
     const serviceScript = buildServiceScript(service);
@@ -169,6 +170,7 @@ export const startChat = (participants: string[], service: string) => {
 
         (* Start the new chat with all the recipients *)
         set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}
+        ${messageScpt}
         log thisChat
     end tell
 
