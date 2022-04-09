@@ -3,8 +3,8 @@ import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alertService";
-import { openLogs } from "@server/api/v1/apple/scripts";
-import { fixServerUrl, onlyAlphaNumeric } from "@server/helpers/utils";
+import { openLogs, openAppData } from "@server/api/v1/apple/scripts";
+import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { BlueBubblesHelperService } from "../privateApi";
 
@@ -242,6 +242,10 @@ export class IPCService {
 
         ipcMain.handle("open-log-location", (_, __) => {
             FileSystem.executeAppleScript(openLogs());
+        });
+
+        ipcMain.handle("open-app-location", (_, __) => {
+            FileSystem.executeAppleScript(openAppData());
         });
 
         ipcMain.handle("clear-alerts", async (_, __) => {

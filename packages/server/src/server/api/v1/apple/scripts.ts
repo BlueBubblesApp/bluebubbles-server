@@ -788,9 +788,19 @@ export const openSystemPreferences = () => {
     end tell`;
 };
 
+export const openFilePath = (filePath: string) => {
+    filePath = filePath.replace(/ /g, '\\ ');
+    return `do shell script "open ${escapeOsaExp(filePath)}"`;
+};
+
 export const openLogs = () => {
     const logPath = transports.file.getFile().path;
     const pieces = logPath.split("/");
     const parent = pieces.slice(0, pieces.length - 1).join("/");
-    return `do shell script "open ${parent}"`;
+    return openFilePath(parent);
+};
+
+export const openAppData = () => {
+    const parent = FileSystem.baseDir;
+    return openFilePath(parent);
 };

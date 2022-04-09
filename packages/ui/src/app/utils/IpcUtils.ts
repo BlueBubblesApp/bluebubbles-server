@@ -32,6 +32,10 @@ export const openLogLocation = async () => {
     return await ipcRenderer.invoke('open-log-location');
 };
 
+export const openAppLocation = async () => {
+    return await ipcRenderer.invoke('open-app-location');
+};
+
 export const restartViaTerminal = async () => {
     return await ipcRenderer.invoke('restart-via-terminal');
 };
