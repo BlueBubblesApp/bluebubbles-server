@@ -812,16 +812,21 @@ class BlueBubblesServer extends EventEmitter {
         this.httpService.socketServer.emit(type, data);
 
         // Send notification to devices
-        if (sendFcmMessage && FCMService.getApp()) {
-            const devices = await this.repo.devices().find();
-            if (isEmpty(devices)) return;
-
-            const notifData = JSON.stringify(data);
-            await this.fcm.sendNotification(
-                devices.map(device => device.identifier),
-                { type, data: notifData },
-                priority
-            );
+        try {
+            if (sendFcmMessage && FCMService.getApp()) {
+                const devices = await this.repo.devices().find();
+                if (isNotEmpty(devices)) {
+                    const notifData = JSON.stringify(data);
+                    await this.fcm.sendNotification(
+                        devices.map(device => device.identifier),
+                        { type, data: notifData },
+                        priority
+                    );
+                }
+            }
+        } catch (ex: any) {
+            this.log('Failed to send FCM messages!', 'debug');
+            this.log(ex, 'debug');
         }
 
         // Dispatch the webhook
