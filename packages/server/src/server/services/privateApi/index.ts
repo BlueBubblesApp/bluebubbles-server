@@ -145,7 +145,7 @@ export class BlueBubblesHelperService {
             });
 
             this.helper.on("close", () => {
-                Server().log("Private API Helper disconnected!", "error");
+                Server().log("Private API Helper disconnected!", "debug");
                 this.helper = null;
             });
 
