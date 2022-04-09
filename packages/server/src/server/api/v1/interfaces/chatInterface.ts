@@ -4,7 +4,7 @@ import { checkPrivateApiStatus, isEmpty, isMinBigSur, isNotEmpty, slugifyAddress
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
-import { startChat } from "../apple/scripts";
+import { sendMessageFallback, startChat } from "../apple/scripts";
 import { MessageInterface } from "./messageInterface";
 
 export class ChatInterface {
@@ -137,29 +137,39 @@ export class ChatInterface {
         method?: 'apple-script' | 'private-api',
         service?: 'iMessage' | 'SMS'
     }): Promise<Chat> {
-        if (method === 'private-api') checkPrivateApiStatus();
-        if (isMinBigSur) {
-            throw new Error((
-                'Cannot create new chats on Big Sur or newer! Please use the `/api/v1/message/text` endpoint ' +
-                'to send a message directly to an individual. Creating new group chats is not supported.'
-            ));
-        }
+        // Big sur can't use the private api to send
+        if (!isMinBigSur && method === 'private-api') checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
         if (isEmpty(addresses)) {
             throw new Error("No addresses provided!");
         }
 
-        // Sanitize the addresses
-        const theAddrs = addresses.map(e => slugifyAddress(e));
-        const result = await FileSystem.executeAppleScript(
-            startChat(theAddrs, service, method === 'private-api' ? null : message));
-        if (isEmpty(result) || (!result.includes(';-;') && !result.includes(';+;'))) {
-            Server().log(`StartChat AppleScript Returned: ${result}`, 'debug');
-            throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
+        if (isMinBigSur && addresses.length > 1) {
+            throw new Error('Cannot create group chats on macOS Big Sur or newer!');
+        } else if (isMinBigSur && isEmpty(message)) {
+            throw new Error('A message is required when creating chats on macOS Big Sur or newer!');
         }
 
-        const chatGuid = result.trim();
+        // Sanitize the addresses
+        const theAddrs = addresses.map(e => slugifyAddress(e));
+        let chatGuid;
+        if (isMinBigSur) {
+            // If we made it this far and this is Big Sur+, we know there is a message and 1 participant
+            // Since chat creation doesn't work on Big Sur+, we just need to send the message to an
+            // "infered" Chat GUID based on the service and first (only) address
+            chatGuid = `${service};-;${theAddrs[1]}`;
+            await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, message, null));
+        } else {
+            const result = await FileSystem.executeAppleScript(
+                startChat(theAddrs, service, method === 'private-api' ? null : message));
+            if (isEmpty(result) || (!result.includes(';-;') && !result.includes(';+;'))) {
+                Server().log(`StartChat AppleScript Returned: ${result}`, 'debug');
+                throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
+            }
+
+            chatGuid = result.trim();
+        }
 
         // Fetch the chat based on the return data
         let chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
@@ -182,7 +192,8 @@ export class ChatInterface {
             throw new Error("Failed to create new chat! Chat not found after 5 seconds!");
         }
 
-        if (method === 'private-api' && isNotEmpty(message)) {
+        // If we have a message, want to send via the private api, and are not on Big Sur, send the message
+        if (method === 'private-api' && isNotEmpty(message) && !isMinBigSur) {
             await MessageInterface.sendMessageSync(chatGuid, message, "private-api");
         }
 
