@@ -5,6 +5,7 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
 import { startChat } from "../apple/scripts";
+import { MessageInterface } from "./messageInterface";
 
 export class ChatInterface {
     static async get({
@@ -143,13 +144,10 @@ export class ChatInterface {
             throw new Error("No addresses provided!");
         }
 
-        if (method === 'private-api') {
-            Server().log('Private API chat creation is not yet available. Using AppleScript...', 'debug');
-        }
-
         // Sanitize the addresses
         const theAddrs = addresses.map(e => slugifyAddress(e));
-        const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, message));
+        const result = await FileSystem.executeAppleScript(
+            startChat(theAddrs, service, method === 'private-api' ? null : message));
         if (isEmpty(result) || (!result.includes(';-;') && !result.includes(';+;'))) {
             Server().log(`StartChat AppleScript Returned: ${result}`, 'debug');
             throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
@@ -176,6 +174,10 @@ export class ChatInterface {
         // Check if the name changed
         if (isEmpty(chats)) {
             throw new Error("Failed to create new chat! Chat not found after 5 seconds!");
+        }
+
+        if (method === 'private-api' && isNotEmpty(message)) {
+            await MessageInterface.sendMessageSync(chatGuid, message, "private-api");
         }
 
         return chats[0];
