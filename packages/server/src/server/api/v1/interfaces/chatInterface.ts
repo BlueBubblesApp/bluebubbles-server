@@ -1,6 +1,6 @@
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
-import { checkPrivateApiStatus, isEmpty, isNotEmpty, slugifyAddress, waitMs } from "@server/helpers/utils";
+import { checkPrivateApiStatus, isEmpty, isMinBigSur, isNotEmpty, slugifyAddress, waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
@@ -137,7 +137,13 @@ export class ChatInterface {
         method?: 'apple-script' | 'private-api',
         service?: 'iMessage' | 'SMS'
     }): Promise<Chat> {
-        // if (method === 'private-api') checkPrivateApiStatus();
+        if (method === 'private-api') checkPrivateApiStatus();
+        if (isMinBigSur) {
+            throw new Error((
+                'Cannot create new chats on Big Sur or newer! Please use the `/api/v1/message/text` endpoint ' +
+                'to send a message directly to an individual. Creating new group chats is not supported.'
+            ));
+        }
 
         // Make sure we are executing this on a group chat
         if (isEmpty(addresses)) {
