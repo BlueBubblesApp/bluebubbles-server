@@ -161,10 +161,11 @@ export class ChatRouter {
         const { body } = ctx.request;
         const addresses = body?.addresses;
         const message = body?.message;
+        const method = body?.method;
+        const service = body?.service;
 
-        const chat = await ChatInterface.create(addresses, message);
+        const chat = await ChatInterface.create({ addresses, message, method, service });
         if (!chat) throw new IMessageError({ error: "Failed to create chat!" });
-
         return new Success(ctx, { data: await getChatResponse(chat), message: "Successfully created chat!" }).send();
     }
 

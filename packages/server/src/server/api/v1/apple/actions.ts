@@ -559,10 +559,10 @@ export class ActionHandler {
         try {
             try {
                 // First try to send via the AppleScript using the `text chat` qualifier
-                ret = (await FileSystem.executeAppleScript(startChat(buddies, service, true))) as string;
+                ret = (await FileSystem.executeAppleScript(startChat(buddies, service))) as string;
             } catch (ex: any) {
                 // If the above command fails, try with just the `chat` qualifier
-                ret = (await FileSystem.executeAppleScript(startChat(buddies, service, false))) as string;
+                ret = (await FileSystem.executeAppleScript(startChat(buddies, service))) as string;
             }
         } catch (ex: any) {
             // If we failed to create the chat, we can try to "guess" the

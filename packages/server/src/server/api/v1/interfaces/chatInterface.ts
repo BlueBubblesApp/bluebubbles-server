@@ -2,7 +2,9 @@ import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
 import { checkPrivateApiStatus, isEmpty, isNotEmpty, slugifyAddress, waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
+import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
+import { startChat } from "../apple/scripts";
 
 export class ChatInterface {
     static async get({
@@ -123,8 +125,18 @@ export class ChatInterface {
         return theChat;
     }
 
-    static async create(addresses: string[], message: string): Promise<Chat> {
-        checkPrivateApiStatus();
+    static async create({
+        addresses,
+        message = null,
+        method = 'apple-script',
+        service = 'iMessage'
+    }: {
+        addresses: string[],
+        message?: string | null,
+        method?: 'apple-script' | 'private-api',
+        service?: 'iMessage' | 'SMS'
+    }): Promise<Chat> {
+        if (method === 'private-api') checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
         if (isEmpty(addresses)) {
@@ -133,13 +145,25 @@ export class ChatInterface {
 
         // Sanitize the addresses
         const theAddrs = addresses.map(e => slugifyAddress(e));
-        const result = await Server().privateApiHelper.createChat(theAddrs, message);
-        if (!result?.identifier) {
-            throw new Error("Failed to create chat! Invalid transaction response!");
+        let chatGuid;
+        if (method === 'private-api') {
+            const result = await Server().privateApiHelper.createChat(theAddrs, message);
+            if (!result?.identifier) {
+                throw new Error("Failed to create chat! Invalid transaction response!");
+            }
+
+            chatGuid = result.identifier;
+        } else {
+            const result = await FileSystem.executeAppleScript(startChat(theAddrs, service));
+            if (isNotEmpty(result) && (result.includes(';-;') || result.includes(';+;'))) {
+                chatGuid = result;
+            } else {
+                throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
+            }
         }
 
         // Fetch the chat based on the return data
-        let chats = await Server().iMessageRepo.getChats({ chatGuid: result.identifier, withParticipants: true });
+        let chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
         let tryCount = 0;
         while (isEmpty(chats)) {
             tryCount += 1;
@@ -151,7 +175,7 @@ export class ChatInterface {
             await waitMs(500);
 
             // Re-fetch the chat with the updated information
-            chats = await Server().iMessageRepo.getChats({ chatGuid: result.identifier, withParticipants: true });
+            chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
         }
 
         // Check if the name changed
