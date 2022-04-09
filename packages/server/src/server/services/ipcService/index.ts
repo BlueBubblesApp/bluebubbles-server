@@ -236,6 +236,12 @@ export class IPCService {
             await Server().relaunch();
         });
 
+        ipcMain.handle("reset-app", async (_, __) => {
+            await Server().stopAll();
+            FileSystem.removeDirectory(FileSystem.baseDir);
+            await Server().relaunch();
+        });
+
         ipcMain.handle("show-dialog", (_, opts: Electron.MessageBoxOptions) => {
             return dialog.showMessageBox(Server().window, opts);
         });

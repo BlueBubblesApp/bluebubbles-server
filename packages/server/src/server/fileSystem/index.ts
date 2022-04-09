@@ -498,4 +498,8 @@ export class FileSystem {
         const meta = await FileSystem.parseMetadata(imagePath, ImageMetadataKeys);
         return meta as ImageMetadata;
     }
+
+    static removeDirectory(filePath: string) {
+        fs.rmdirSync(filePath, { recursive: true });
+    }
 }
