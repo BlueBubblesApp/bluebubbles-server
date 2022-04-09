@@ -158,7 +158,7 @@ export class ChatInterface {
             // If we made it this far and this is Big Sur+, we know there is a message and 1 participant
             // Since chat creation doesn't work on Big Sur+, we just need to send the message to an
             // "infered" Chat GUID based on the service and first (only) address
-            chatGuid = `${service};-;${theAddrs[1]}`;
+            chatGuid = `${service};-;${theAddrs[0]}`;
             await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, message, null));
         } else {
             const result = await FileSystem.executeAppleScript(
