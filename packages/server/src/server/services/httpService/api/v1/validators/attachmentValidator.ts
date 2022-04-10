@@ -16,7 +16,8 @@ export class AttachmentValidator {
     static downloadRules = {
         height: "numeric|min:1",
         width: "numeric|min:1",
-        quality: "string|in:good,better,best"
+        quality: "string|in:good,better,best",
+        original: "boolean"
     };
 
     static async validateDownload(ctx: RouterContext, next: Next) {

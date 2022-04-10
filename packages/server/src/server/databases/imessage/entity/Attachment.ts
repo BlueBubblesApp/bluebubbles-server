@@ -124,7 +124,17 @@ export class Attachment {
     }
 }
 
-export const getAttachmentResponse = async (attachment: Attachment, withData = false): Promise<AttachmentResponse> => {
+export const getAttachmentResponse = async (
+    attachment: Attachment,
+    {
+        convert = true,
+        loadMetadata = true,
+        getData = false
+    }: {
+        convert?: boolean,
+        loadMetadata?: boolean,
+        getData?: boolean
+    } = {}): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
     let metadata: Metadata = null;
 
@@ -138,16 +148,18 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
 
         try {
             Server().log(`Handling attachment response for GUID: ${attachment.guid}`, "debug");
-            Server().log(`Detected MIME Type: ${mimeType}`);
+            Server().log(`Detected MIME Type: ${mimeType}`, 'debug');
 
             // If we want to resize the image, do so here
-            const converters = [convertImage, convertAudio];
-            for (const conversion of converters) {
-                // Try to convert the attachments using available converters
-                const newPath = await conversion(attachment, { originalMimeType: mimeType });
-                if (newPath) {
-                    fPath = newPath;
-                    break;
+            if (convert) {
+                const converters = [convertImage, convertAudio];
+                for (const conversion of converters) {
+                    // Try to convert the attachments using available converters
+                    const newPath = await conversion(attachment, { originalMimeType: mimeType });
+                    if (newPath) {
+                        fPath = newPath;
+                        break;
+                    }
                 }
             }
 
@@ -155,12 +167,14 @@ export const getAttachmentResponse = async (attachment: Attachment, withData = f
             const exists = fs.existsSync(fPath);
             if (exists) {
                 // If we want data, get the data
-                if (withData) {
+                if (getData) {
                     data = Uint8Array.from(fs.readFileSync(fPath));
                 }
 
                 // Fetch the attachment metadata if there is a mimeType
-                metadata = await getAttachmentMetadata(attachment);
+                if (loadMetadata) {
+                    metadata = await getAttachmentMetadata(attachment);
+                }
 
                 // If there is no data, return null for the data
                 // Otherwise, convert it to a base64 string

@@ -413,7 +413,7 @@ export class SocketRoutes {
             const attachment = await Server().iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
             if (!attachment) return response(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
-            const res = await getAttachmentResponse(attachment, true);
+            const res = await getAttachmentResponse(attachment, { getData: true });
             return response(cb, "attachment", createSuccessResponse(res));
         });
 

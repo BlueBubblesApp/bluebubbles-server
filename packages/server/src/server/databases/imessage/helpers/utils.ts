@@ -42,6 +42,8 @@ export const convertAudio = async (
             Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`, "debug");
             Server().log(ex?.message ?? ex, "error");
         }
+    } else {
+        Server().log("Attachment has already been converted! Skipping...", "debug");
     }
 
     if (!failed && ext && fs.existsSync(newPath)) {
@@ -88,7 +90,7 @@ export const convertImage = async (
             Server().log(ex?.message ?? ex, "error");
         }
     } else {
-        Server().log("Failed to convert attachment! File path did not eixst!", "debug");
+        Server().log("Attachment has already been converted! Skipping...", "debug");
     }
 
     if (!failed && ext && fs.existsSync(newPath)) {

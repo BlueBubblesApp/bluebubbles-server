@@ -68,12 +68,17 @@ export class MessageRouter {
     }
 
     static async query(ctx: RouterContext, _: Next) {
-        let { chatGuid, with: withQuery, offset, limit, where, sort, after, before } = ctx?.request?.body;
+        let {
+            chatGuid, with: withQuery, offset, limit, where,
+            sort, after, before, convertAttachments
+        } = ctx?.request?.body;
 
         // Pull out the filters
         withQuery = withQuery.filter((e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
         const withChats = withQuery.includes("chat") || withQuery.includes("chats");
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
+        const withAttachmentMetadata = withQuery.includes(
+            "attachment.metadata") || withQuery.includes("attachments.metadata");
         const withHandle = withQuery.includes("handle");
         const withChatParticipants =
             withQuery.includes("chat.participants") || withQuery.includes("chats.participants");
@@ -131,7 +136,10 @@ export class MessageRouter {
                 }
             }
 
-            const msgRes = await getMessageResponse(msg);
+            const msgRes = await getMessageResponse(msg, {
+                convertAttachments,
+                loadAttachmentMetadata: withAttachmentMetadata
+            });
             data.push(msgRes);
         }
 
