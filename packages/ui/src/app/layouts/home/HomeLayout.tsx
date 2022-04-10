@@ -203,6 +203,8 @@ export const HomeLayout = (): JSX.Element => {
                                                     Your QR Code should remain <strong>private</strong> as it contains sensitive information!
                                                 </Text>
                                                 <Box border="5px solid" borderColor='white' mt={4} height='266px' width='266px' borderRadius='lg' mb={3}>
+                                                    {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                                                    {/* @ts-ignore: ts2876 */}
                                                     {(qrCode) ? <QRCode value={qrCode as string} /> : null}
                                                 </Box>
                                             </Flex>
