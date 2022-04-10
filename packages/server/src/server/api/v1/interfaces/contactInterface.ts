@@ -3,6 +3,7 @@ import fs from "fs";
 import vcf from "vcf";
 import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
+import { isNotEmpty } from "@server/helpers/utils";
 
 const contacts = require("node-mac-contacts");
 
@@ -66,6 +67,7 @@ export class ContactInterface {
                 ];
             }
 
+            const avatar = e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail;
             return {
                 // These maps are for backwards compatibility with the client.
                 // The "old" way we fetched contacts had a lot more information, but was less reliable.
@@ -95,7 +97,7 @@ export class ContactInterface {
                 lastName: e?.lastName,
                 nickname: e?.nickname,
                 birthday: e?.birthday,
-                avatar: e?.contactImage && e?.contactImage.length > 0 ? base64.bytesToBase64(e?.contactImage) : "",
+                avatar: isNotEmpty(avatar) ? base64.bytesToBase64(e?.contactImage) : "",
                 sourceType,
                 id: e?.identifier ?? e?.id
             };
@@ -228,27 +230,17 @@ export class ContactInterface {
     ): Promise<ContactAddress> {
         // Create & add the address
         let contactAddress = Server().repo.contactAddresses().create({ address, type: addressType });
-        console.log("existing params");
-        console.log({ address, id: contact.id });
         const existingAddress = await Server()
             .repo.contactAddresses()
             .findOne({ address, contact: { id: contact.id } }, { relations: ["contact"] });
-        console.log("existing");
-        console.log(existingAddress);
         if (!existingAddress) {
             contactAddress = await Server().repo.contactAddresses().save(contactAddress);
         } else {
             contactAddress = existingAddress;
         }
 
-        console.log("saved contact address");
-        console.log(contactAddress);
-
         contact.addresses.push(contactAddress);
         await Server().repo.contacts().save(contact);
-
-        console.log("saved contact");
-        console.log(contact);
         return contactAddress;
     }
 
@@ -266,6 +258,7 @@ export class ContactInterface {
         lastName,
         phoneNumbers = [],
         emails = [],
+        avatar = null,
         updateEntry = false
     }: {
         firstName: string;
@@ -273,6 +266,7 @@ export class ContactInterface {
         phoneNumbers?: string[];
         emails?: string[];
         updateEntry?: boolean;
+        avatar?: Buffer
     }): Promise<Contact> {
         const repo = Server().repo.contacts();
         let contact = await repo.findOne({ firstName, lastName }, { relations: ["addresses"] });
@@ -280,7 +274,7 @@ export class ContactInterface {
             throw new Error("Contact already exists!");
         } else if (!contact) {
             // If the contact doesn't exists, create it
-            contact = repo.create({ firstName, lastName });
+            contact = repo.create({ firstName, lastName, avatar });
             await repo.save(contact);
         }
 
@@ -292,6 +286,11 @@ export class ContactInterface {
         }
         for (const e of emails) {
             await this.addAddressToContact(contact, e, "email");
+        }
+
+        if (isNotEmpty(avatar)) {
+            contact.avatar = avatar;
+            await repo.save(contact);
         }
 
         return contact;

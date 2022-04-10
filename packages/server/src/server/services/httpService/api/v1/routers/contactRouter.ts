@@ -53,8 +53,6 @@ export class ContactRouter {
 
         const contacts: Contact[] = [];
         const errors: any[] = [];
-        console.log(body);
-        console.log("trying...");
         for (const item of body) {
             if (!ContactRouter.isAddressObject(item)) {
                 errors.push({
@@ -66,13 +64,13 @@ export class ContactRouter {
             }
 
             try {
-                console.log("creating...");
                 contacts.push(
                     await ContactInterface.createContact({
                         firstName: item.firstName,
                         lastName: item?.lastName ?? "",
                         phoneNumbers: item?.phoneNumbers ?? [],
                         emails: item?.emails ?? [],
+                        avatar: item?.avatar ?? null,
                         updateEntry: true
                     })
                 );

@@ -1,3 +1,4 @@
+import { Base64Transformer } from "@server/databases/transformers/Base64Transformer";
 import {
     Entity,
     PrimaryGeneratedColumn,
@@ -24,6 +25,9 @@ export class Contact {
 
     @OneToMany(() => ContactAddress, contactAddress => contactAddress.contact)
     addresses: ContactAddress[];
+
+    @Column("text", { name: "avatar", transformer: Base64Transformer, nullable: true })
+    avatar: Buffer;
 
     @CreateDateColumn()
     created: Date;
