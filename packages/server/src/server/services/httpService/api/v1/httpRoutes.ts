@@ -199,6 +199,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: ":guid/read",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: ChatRouter.markRead
                     },
                     {
