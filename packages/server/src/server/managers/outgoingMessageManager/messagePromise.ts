@@ -89,6 +89,17 @@ export class MessagePromise {
         }
     }
 
+    async emitMessageError(sentMessage: Message) {
+        // If we have a sent message and we have a tempGuid, we need to emit the message match event
+        if (sentMessage) {
+            if (this.tempGuid) {
+                Server().httpService.sendCache.remove(this.tempGuid);
+            }
+            
+            await Server().emitMessageError(sentMessage, this.tempGuid);
+        }
+    }
+
     isSame(message: Message) {
         // We can only set one attachment at a time, so we will check that one
         // Images will have an invisible character as the text (of length 1)

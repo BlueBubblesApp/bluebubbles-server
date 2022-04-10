@@ -860,6 +860,21 @@ class BlueBubblesServer extends EventEmitter {
         await this.emitMessage("new-message", resp);
     }
 
+    async emitMessageError(message: Message, tempGuid: string = null) {
+        this.log(`Failed to send message: [${message.contentString()}] (Temp GUID: ${tempGuid ?? 'N/A'})`);
+
+        /**
+         * ERROR CODES:
+         * 4: Message Timeout
+         */
+        const data = await getMessageResponse(message);
+        if (isNotEmpty(tempGuid)) {
+            data.tempGuid = tempGuid;
+        }
+
+        await this.emitMessage("message-send-error", data);
+    }
+
     async checkPrivateApiRequirements(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [];
 
@@ -974,13 +989,7 @@ class BlueBubblesServer extends EventEmitter {
          * Message listener for messages that have errored out
          */
         outgoingMsgListener.on("message-send-error", async (item: Message) => {
-            this.log(`Failed to send message: [${item.contentString()}]`);
-
-            /**
-             * ERROR CODES:
-             * 4: Message Timeout
-             */
-            await this.emitMessage("message-send-error", await getMessageResponse(item));
+            await this.emitMessageError(item);
         });
 
         /**

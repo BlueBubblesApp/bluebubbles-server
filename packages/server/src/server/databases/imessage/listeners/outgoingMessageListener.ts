@@ -154,11 +154,14 @@ export class OutgoingMessageListener extends ChangeListener {
             // Add to cache
             this.cache.add(cacheName);
 
-            // Reject the corresponding promise
-            Server().messageManager.reject(entry);
+            // Reject the corresponding promise.
+            // This will emit a message send error
+            const success = Server().messageManager.reject(entry);
 
-            //Emit it as normal error
-            super.emit("message-send-error", entry);
+            // Emit it as normal error
+            if (!success) {
+                super.emit("message-send-error", entry);
+            }
         }
     }
 

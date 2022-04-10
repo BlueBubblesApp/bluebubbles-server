@@ -172,6 +172,12 @@ export class MessageRouter {
 
             // Convert to an API response
             const data = await getMessageResponse(sentMessage);
+
+            // Inject the TempGUID back into the response
+            if (isNotEmpty(tempGuid)) {
+                data.tempGuid = tempGuid;
+            }
+
             if ((data.error ?? 0) !== 0) {
                 throw new IMessageError({
                     message: 'Message sent with an error. See attached message',
