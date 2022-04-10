@@ -76,9 +76,12 @@ export class MessagePromise {
         await this.emitMessageMatch(value);
     }
 
-    reject(reason?: any) {
+    async reject(reason?: any, message: Message = null) {
         this.isResolved = true;
         this.rejectPromise(reason);
+        if (message) {
+            await this.emitMessageError(message);
+        }
     }
 
     async emitMessageMatch(sentMessage: Message) {

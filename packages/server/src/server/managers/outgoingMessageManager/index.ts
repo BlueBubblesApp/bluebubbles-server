@@ -40,10 +40,10 @@ export class OutgoingMessageManager {
         return false;
     }
 
-    async reject(message: Message): Promise<boolean> {
+    async reject(reason: any, message: Message): Promise<boolean> {
         const idx = this.findIndex(message);
         if (idx >= 0) {
-            await this.promises[idx].reject(message);
+            await this.promises[idx].reject(reason, message);
             return true;
         }
 
