@@ -74,7 +74,8 @@ export class MessageRouter {
         } = ctx?.request?.body;
 
         // Pull out the filters
-        withQuery = withQuery.filter((e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
+        withQuery = (withQuery ?? []).filter(
+            (e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
         const withChats = withQuery.includes("chat") || withQuery.includes("chats");
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withAttachmentMetadata = withQuery.includes(
