@@ -57,16 +57,21 @@ export const HomeLayout = (): JSX.Element => {
 
         ipcRenderer.invoke('get-individual-message-counts').then((dmCounts) => {
             let currentTopCount = 0;
-            let currentTop = 'N/A';
+            let currentTop: string | null = null;
             let isGroup = false;
             dmCounts.forEach((item: any) => {
-                if (item.message_count > currentTopCount) {
+                if (!currentTop || item.message_count > currentTopCount) {
                     const guid = item.chat_guid.replace('iMessage', '').replace(';+;', '').replace(';-;', '');
                     currentTopCount = item.message_count;
                     isGroup = (item.group_name ?? '').length > 0;
                     currentTop = isGroup ? item.group_name : guid;
                 }
             });
+
+            // If we don't get a top 
+            if (!currentTop) {
+                return dispatch(setStat({ name: 'best_friend', value: 'Unknown' }));
+            }
 
             if (!isGroup) {
                 ipcRenderer.invoke('get-contact-name', currentTop).then(e => {
@@ -78,7 +83,7 @@ export const HomeLayout = (): JSX.Element => {
                 }).catch(() => {
                     dispatch(setStat({ name: 'best_friend', value: currentTop }));
                 });
-            } else if (currentTop.length === 0) {
+            } else if ((currentTop as string).length === 0) {
                 dispatch(setStat({ name: 'best_friend', value: 'Unnamed Group' }));
             }
         });
