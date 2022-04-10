@@ -19,7 +19,7 @@ export class ContactInterface {
      * @param records The list of contacts to map
      * @returns A list of contacts in a generic format
      */
-    static mapContacts(records: any[], sourceType: string): any {
+    static mapContacts(records: any[], sourceType: string, { ignoreAvatars = false } = {}): any {
         return records.map((e: NodeJS.Dict<any>) => {
             if (Object.keys(e).includes("addresses")) {
                 e.phoneNumbers = [
@@ -67,7 +67,7 @@ export class ContactInterface {
                 ];
             }
 
-            const avatar = e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail;
+            const avatar = ignoreAvatars ? null : e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail;
             return {
                 // These maps are for backwards compatibility with the client.
                 // The "old" way we fetched contacts had a lot more information, but was less reliable.
@@ -97,7 +97,7 @@ export class ContactInterface {
                 lastName: e?.lastName,
                 nickname: e?.nickname,
                 birthday: e?.birthday,
-                avatar: isNotEmpty(avatar) ? base64.bytesToBase64(e?.contactImage) : "",
+                avatar: isNotEmpty(avatar) ? base64.bytesToBase64(avatar) : "",
                 sourceType,
                 id: e?.identifier ?? e?.id
             };
