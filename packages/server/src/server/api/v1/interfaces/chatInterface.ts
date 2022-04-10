@@ -6,6 +6,7 @@ import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
 import { sendMessageFallback, startChat } from "../apple/scripts";
 import { MessageInterface } from "./messageInterface";
+import { ActionHandler } from "../apple/actions";
 
 export class ChatInterface {
     static async get({
@@ -154,15 +155,15 @@ export class ChatInterface {
         // Sanitize the addresses
         const theAddrs = addresses.map(e => slugifyAddress(e));
         let chatGuid;
+        let sentMessage;
         if (isMinBigSur) {
             // If we made it this far and this is Big Sur+, we know there is a message and 1 participant
             // Since chat creation doesn't work on Big Sur+, we just need to send the message to an
             // "infered" Chat GUID based on the service and first (only) address
             chatGuid = `${service};-;${theAddrs[0]}`;
-            await FileSystem.executeAppleScript(sendMessageFallback(chatGuid, message, null));
+            sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, "apple-script");
         } else {
-            const result = await FileSystem.executeAppleScript(
-                startChat(theAddrs, service, method === 'private-api' ? null : message));
+            const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
             if (isEmpty(result) || (!result.includes(';-;') && !result.includes(';+;'))) {
                 Server().log(`StartChat AppleScript Returned: ${result}`, 'debug');
                 throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
@@ -193,11 +194,13 @@ export class ChatInterface {
         }
 
         // If we have a message, want to send via the private api, and are not on Big Sur, send the message
-        if (method === 'private-api' && isNotEmpty(message) && !isMinBigSur) {
-            await MessageInterface.sendMessageSync(chatGuid, message, "private-api");
+        if (isNotEmpty(message) && !isMinBigSur) {
+            sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, method);
         }
 
-        return chats[0];
+        const chat = chats[0];
+        chat.messages = [sentMessage];
+        return chat;
     }
 
     static async toggleParticipant(chat: Chat, address: string, action: "add" | "remove"): Promise<Chat> {
