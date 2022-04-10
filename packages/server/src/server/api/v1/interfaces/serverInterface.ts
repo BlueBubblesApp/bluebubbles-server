@@ -65,12 +65,12 @@ export class ServerInterface {
 
         // Helper for adding counts to the results
         const addToResults = (result: any[], identifier: string) => {
-            const totals: any = {};
-            for (const cat of items) {
-                totals[`${cat}s`] = 0;
-            }
-
             for (const i of result) {
+                const totals: any = {};
+                for (const cat of items) {
+                    totals[`${cat}s`] = results[i.chat_guid]?.totals[`${cat}s`] ?? 0;
+                }
+
                 if (!Object.keys(results).includes(i.chat_guid)) {
                     results[i.chat_guid] = {
                         chatGuid: i.chat_guid,
