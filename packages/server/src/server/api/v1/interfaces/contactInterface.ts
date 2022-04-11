@@ -152,6 +152,15 @@ export class ContactInterface {
      * @returns A list of contact entries from the API
      */
     static getApiContacts(extraProperties: string[] = []): any[] {
+        // Compensate for if `avatar` is passed instead of contactImage
+        if (extraProperties.includes('avatar')) {
+            if (!extraProperties.includes('contactImage') && !extraProperties.includes('contactThumbnailImage')) {
+                extraProperties.push('contactImage');
+            }
+
+            extraProperties = extraProperties.filter((e) => e !== 'avatar');
+        }
+
         return ContactInterface.mapContacts(contacts.getAllContacts(extraProperties), "api");
     }
 
@@ -159,9 +168,9 @@ export class ContactInterface {
      * Gets all contacts from the local server DB
      * @returns A list of contact entries from the local DB
      */
-    static async getDbContacts(): Promise<any[]> {
+    static async getDbContacts(withAvatars = false): Promise<any[]> {
         return ContactInterface.mapContacts(
-            (await Server().repo.getContacts()).map((e: any) => {
+            (await Server().repo.getContacts(withAvatars)).map((e: any) => {
                 e.phoneNumbers = e.addresses.filter((e: any) => e.type === "phone");
                 e.emails = e.addresses.filter((e: any) => e.type === "email");
                 return e;
@@ -177,8 +186,12 @@ export class ContactInterface {
      * @returns A list of contact entries from both the API and local DB
      */
     static async getAllContacts(extraProperties: string[] = []): Promise<any[]> {
+        const withAvatars = (
+            extraProperties.includes('contactImage') || extraProperties.includes('contactThumbnailImage') ||
+            extraProperties.includes('avatar')
+        );
         const apiContacts = ContactInterface.getApiContacts(extraProperties);
-        const dbContacts = await ContactInterface.getDbContacts();
+        const dbContacts = await ContactInterface.getDbContacts(withAvatars);
         return [...dbContacts, ...apiContacts];
     }
 

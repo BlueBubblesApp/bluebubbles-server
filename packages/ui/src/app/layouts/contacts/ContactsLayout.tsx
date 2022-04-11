@@ -165,8 +165,6 @@ export const ContactsLayout = (): JSX.Element => {
         }));
     };
 
-    console.log(filteredContacts);
-
     return (
         <Box p={3} borderRadius={10}>
             <Stack direction='column' p={5}>

@@ -170,9 +170,14 @@ export class ServerRepository extends EventEmitter {
         return await repo.find();
     }
 
-    public async getContacts(): Promise<Array<Contact>> {
+    public async getContacts(withAvatars = false): Promise<Array<Contact>> {
         const repo = this.contacts();
-        return await repo.find({ relations: ["addresses"] });
+        const fields: (keyof Contact)[] = ['firstName', 'lastName'];
+        if (withAvatars) {
+            fields.push('avatar')
+        }
+
+        return await repo.find({ select: fields, relations: ["addresses"] });
     }
 
     public async addWebhook(url: string, events: Array<{ label: string; value: string }>): Promise<Webhook> {
