@@ -131,12 +131,14 @@ export class ChatInterface {
         addresses,
         message = null,
         method = 'apple-script',
-        service = 'iMessage'
+        service = 'iMessage',
+        tempGuid
     }: {
         addresses: string[],
         message?: string | null,
         method?: 'apple-script' | 'private-api',
-        service?: 'iMessage' | 'SMS'
+        service?: 'iMessage' | 'SMS',
+        tempGuid?: string
     }): Promise<Chat> {
         // Big sur can't use the private api to send
         if (!isMinBigSur && method === 'private-api') checkPrivateApiStatus();
@@ -161,7 +163,8 @@ export class ChatInterface {
             // Since chat creation doesn't work on Big Sur+, we just need to send the message to an
             // "infered" Chat GUID based on the service and first (only) address
             chatGuid = `${service};-;${theAddrs[0]}`;
-            sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, "apple-script");
+            sentMessage = await MessageInterface.sendMessageSync(
+                chatGuid, message, "apple-script", null, null, null, tempGuid);
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
             if (isEmpty(result) || (!result.includes(';-;') && !result.includes(';+;'))) {
@@ -195,7 +198,7 @@ export class ChatInterface {
 
         // If we have a message, want to send via the private api, and are not on Big Sur, send the message
         if (isNotEmpty(message) && !isMinBigSur) {
-            sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, method);
+            sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, method, null, null, null, tempGuid);
         }
 
         const chat = chats[0];

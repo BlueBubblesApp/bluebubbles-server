@@ -43,7 +43,8 @@ export class ChatValidator {
         addresses: "required|array",
         message: "string",
         method: "string|in:apple-script,private-api",
-        service: "string|in:iMessage,SMS"
+        service: "string|in:iMessage,SMS",
+        tempGuid: "string"
     };
 
     static async validateCreate(ctx: RouterContext, next: Next) {

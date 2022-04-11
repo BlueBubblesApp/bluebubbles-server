@@ -58,7 +58,7 @@ export class ChatRouter {
             .map(e => safeTrim(e));
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
-        const { sort, before, after, offset, limit } = ctx?.request.query;
+        const { sort, before, after, offset, limit } = (ctx?.request.query ?? {});
 
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
@@ -163,10 +163,22 @@ export class ChatRouter {
         const message = body?.message;
         const method = body?.method;
         const service = body?.service;
+        const tempGuid = body?.tempGuid;
 
-        const chat = await ChatInterface.create({ addresses, message, method, service });
+        const chat = await ChatInterface.create({ addresses, message, method, service, tempGuid });
         if (!chat) throw new IMessageError({ error: "Failed to create chat!" });
-        return new Success(ctx, { data: await getChatResponse(chat), message: "Successfully created chat!" }).send();
+
+        // Convert the data to an API response
+        const data = await getChatResponse(chat);
+
+        // Inject the tempGuid back into the messages (if available)
+        if (isNotEmpty(tempGuid)) {
+            for (const i of (data.messages ?? [])) {
+                i.tempGuid = tempGuid;
+            }
+        }
+        
+        return new Success(ctx, { data, message: "Successfully created chat!" }).send();
     }
 
     static async addParticipant(ctx: RouterContext, next: Next): Promise<void> {

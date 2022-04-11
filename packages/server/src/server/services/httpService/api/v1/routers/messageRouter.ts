@@ -71,7 +71,7 @@ export class MessageRouter {
         let {
             chatGuid, with: withQuery, offset, limit, where,
             sort, after, before, convertAttachments
-        } = ctx?.request?.body;
+        } = (ctx?.request?.body ?? {});
 
         // Pull out the filters
         withQuery = (withQuery ?? []).filter(
@@ -150,7 +150,10 @@ export class MessageRouter {
     }
 
     static async sendText(ctx: RouterContext, _: Next) {
-        let { tempGuid, message, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
+        let {
+            tempGuid, message, method, chatGuid, effectId,
+            subject, selectedMessageGuid
+        } = (ctx?.request?.body ?? {});
 
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
@@ -205,7 +208,7 @@ export class MessageRouter {
 
     static async sendAttachment(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const { tempGuid, chatGuid, name } = ctx.request?.body;
+        const { tempGuid, chatGuid, name } = (ctx.request?.body ?? {});
         const attachment = files?.attachment as File;
 
         // Add to send cache
@@ -243,7 +246,7 @@ export class MessageRouter {
     }
 
     static async react(ctx: RouterContext, _: Next) {
-        const { chatGuid, selectedMessageGuid, reaction } = ctx?.request?.body;
+        const { chatGuid, selectedMessageGuid, reaction } = (ctx?.request?.body ?? {});
 
         // Fetch the message we are reacting to
         const message = await Server().iMessageRepo.getMessage(selectedMessageGuid, false, true);
