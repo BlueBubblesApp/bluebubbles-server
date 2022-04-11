@@ -169,14 +169,7 @@ export class ContactInterface {
      * @returns A list of contact entries from the local DB
      */
     static async getDbContacts(withAvatars = false): Promise<any[]> {
-        return ContactInterface.mapContacts(
-            (await Server().repo.getContacts(withAvatars)).map((e: any) => {
-                e.phoneNumbers = e.addresses.filter((e: any) => e.type === "phone");
-                e.emails = e.addresses.filter((e: any) => e.type === "email");
-                return e;
-            }),
-            "db"
-        );
+        return ContactInterface.mapContacts(await Server().repo.getContacts(withAvatars), "db");
     }
 
     /**
