@@ -259,12 +259,12 @@ export const fixServerUrl = (value: string) => {
     }
 
     // Force HTTPS if enabled, and vice versa when not enabled
-    const use_custom_cert = Server().repo.getConfig("use_custom_certificate") as boolean;
-    if (use_custom_cert && newValue.startsWith("http://")) {
-        newValue = newValue.replace("http://", "https://");
-    } else if (!use_custom_cert && newValue.startsWith("https://")) {
-        newValue = newValue.replace("https://", "http://");
-    }
+    // const use_custom_cert = Server().repo.getConfig("use_custom_certificate") as boolean;
+    // if (use_custom_cert && newValue.startsWith("http://")) {
+    //     newValue = newValue.replace("http://", "https://");
+    // } else if (!use_custom_cert && newValue.startsWith("https://")) {
+    //     newValue = newValue.replace("https://", "http://");
+    // }
 
     // Auto add scheme
     if (!newValue.startsWith("http")) {
