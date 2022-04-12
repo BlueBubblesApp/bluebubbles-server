@@ -58,7 +58,7 @@ export class ChatRouter {
             .map(e => safeTrim(e));
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
-        const { sort, before, after, offset, limit } = (ctx?.request.query ?? {});
+        const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
@@ -173,11 +173,11 @@ export class ChatRouter {
 
         // Inject the tempGuid back into the messages (if available)
         if (isNotEmpty(tempGuid)) {
-            for (const i of (data.messages ?? [])) {
+            for (const i of data.messages ?? []) {
                 i.tempGuid = tempGuid;
             }
         }
-        
+
         return new Success(ctx, { data, message: "Successfully created chat!" }).send();
     }
 
@@ -188,10 +188,12 @@ export class ChatRouter {
     static async markRead(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
         await Server().privateApiHelper.markChatRead(guid);
-        await Server().emitMessage('chat-read-status-changed', {
+        await Server().emitMessage("chat-read-status-changed", {
             chatGuid: guid,
             read: true
         });
+
+        return new Success(ctx, { message: "Successfully marked chat as read!" }).send();
     }
 
     static async removeParticipant(ctx: RouterContext, next: Next): Promise<void> {
@@ -223,9 +225,9 @@ export class ChatRouter {
         const iconPath = await Server().iMessageRepo.getGroupIconPath(chat.guid);
         if (!iconPath) {
             throw new NotFound({
-                message: 'The requested resource was not found',
-                error: 'Unable to find icon for the selected chat'
-            })
+                message: "The requested resource was not found",
+                error: "Unable to find icon for the selected chat"
+            });
         }
 
         return new FileStream(ctx, FileSystem.getRealPath(iconPath), "image/jfif").send();
