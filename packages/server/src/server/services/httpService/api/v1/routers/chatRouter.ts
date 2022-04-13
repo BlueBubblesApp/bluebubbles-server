@@ -10,7 +10,7 @@ import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
 import { FileStream, Success } from "../responses/success";
-import { IMessageError, NotFound, ServerError } from "../responses/errors";
+import { IMessageError, NotFound } from "../responses/errors";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -134,6 +134,10 @@ export class ChatRouter {
         const updated = [];
         const errors: string[] = [];
         if (displayName) {
+            if (chat.participants.length <= 1) {
+                throw new IMessageError({ message: "Cannot rename a non-group chat!", error: "Chat is not a group" });
+            }
+
             try {
                 chat = await ChatInterface.setDisplayName(chat, displayName);
                 updated.push("displayName");

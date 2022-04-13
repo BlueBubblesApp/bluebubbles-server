@@ -22,14 +22,13 @@ import { ValidRemoveTapback } from "../../../types";
 import {
     safeExecuteAppleScript,
     generateChatNameList,
-    getiMessageNumberFormat,
+    getiMessageAddressFormat,
     toBoolean,
     slugifyAddress,
     isNotEmpty,
     isEmpty,
     safeTrim,
-    isMinMonterey,
-    isMinBigSur
+    isMinMonterey
 } from "../../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
 
@@ -43,13 +42,13 @@ export class ActionHandler {
         let messageScript;
 
         let theAttachment = attachment;
-        if (theAttachment !== null && theAttachment.endsWith('.mp3')) {
+        if (theAttachment !== null && theAttachment.endsWith(".mp3")) {
             try {
                 const newPath = `${theAttachment.substring(0, theAttachment.length - 4)}.caf`;
                 await FileSystem.convertMp3ToCaf(theAttachment, newPath);
                 theAttachment = newPath;
             } catch (ex) {
-                Server().log('Failed to convert MP3 to CAF!', 'warn');
+                Server().log("Failed to convert MP3 to CAF!", "warn");
             }
         }
 
@@ -60,25 +59,20 @@ export class ActionHandler {
         //  3: If we still have an error, throw the error
         let error;
         try {
-            // Build the message script
-            if (isMinBigSur) {
-                messageScript = sendMessageFallback(chatGuid, message ?? "", isMinMonterey ? null : theAttachment);
-                if (isMinMonterey) {
-                    // If it's monterey, we can't send attachments normally. We need to use accessibility
-                    // Make the first script send the image using accessibility. Then the second script sends
-                    // just the message
-                    if (isNotEmpty(theAttachment)) {
-                        // Fetch participants of the chat and get handles (addresses)
-                        const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-                        if (isNotEmpty(chats) && isNotEmpty(chats[0]?.participants)) {
-                            const participants = chats[0].participants.map(i => i.id);
-                            messageScript = sendAttachmentAccessibility(theAttachment, participants);
-                            await FileSystem.executeAppleScript(messageScript);
-                        }
+            messageScript = buildSendMessageScript(chatGuid, message ?? "", isMinMonterey ? null : theAttachment);
+            if (isMinMonterey) {
+                // If it's monterey, we can't send attachments normally. We need to use accessibility
+                // Make the first script send the image using accessibility. Then the second script sends
+                // just the message
+                if (isNotEmpty(theAttachment)) {
+                    // Fetch participants of the chat and get handles (addresses)
+                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+                    if (isNotEmpty(chats) && isNotEmpty(chats[0]?.participants)) {
+                        const participants = chats[0].participants.map(i => i.id);
+                        messageScript = sendAttachmentAccessibility(theAttachment, participants);
+                        await FileSystem.executeAppleScript(messageScript);
                     }
                 }
-            } else {
-                messageScript = buildSendMessageScript(chatGuid, message ?? "", theAttachment);
             }
 
             // Try to send the message
@@ -168,7 +162,13 @@ export class ActionHandler {
         // Create the awaiter
         let messageAwaiter = null;
         if (isNotEmpty(message)) {
-            messageAwaiter = new MessagePromise({chatGuid, text: message, isAttachment: false, sentAt: now,  tempGuid});
+            messageAwaiter = new MessagePromise({
+                chatGuid,
+                text: message,
+                isAttachment: false,
+                sentAt: now,
+                tempGuid
+            });
             Server().log(`Adding await for chat: "${chatGuid}"; text: ${messageAwaiter.text}`);
             Server().messageManager.add(messageAwaiter);
         }
@@ -176,14 +176,20 @@ export class ActionHandler {
         // Since we convert mp3s to cafs, we need to modify the attachment name here too
         // This is mainly just for the awaiter
         let aName = attachmentName;
-        if (aName !== null && aName.endsWith('.mp3')) {
+        if (aName !== null && aName.endsWith(".mp3")) {
             aName = `${aName.substring(0, aName.length - 4)}.caf`;
         }
 
         // Create the awaiter
         let attachmentAwaiter = null;
         if (attachment && isNotEmpty(aName)) {
-            attachmentAwaiter = new MessagePromise({chatGuid, text: `->${aName}`, isAttachment: true, sentAt: now, tempGuid: attachmentGuid});
+            attachmentAwaiter = new MessagePromise({
+                chatGuid,
+                text: `->${aName}`,
+                isAttachment: true,
+                sentAt: now,
+                tempGuid: attachmentGuid
+            });
             Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${aName}`);
             Server().messageManager.add(attachmentAwaiter);
         }
@@ -195,7 +201,6 @@ export class ActionHandler {
         // Wait for the attachment first
         if (attachmentAwaiter) {
             await attachmentAwaiter.promise;
-
         }
 
         // Next, wait for the message
@@ -311,7 +316,7 @@ export class ActionHandler {
         const names = await generateChatNameList(chatGuid);
         let address = participant;
         if (!address.includes("@")) {
-            address = getiMessageNumberFormat(address);
+            address = getiMessageAddressFormat(address, false, true);
         }
 
         /**

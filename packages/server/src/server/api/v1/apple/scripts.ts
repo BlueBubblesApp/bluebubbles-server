@@ -3,7 +3,7 @@ import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
-import { escapeOsaExp, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
@@ -106,6 +106,14 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
     // If it's not a GUID, throw an error
     if (!chatGuid.includes(";")) throw new Error(`Invalid GUID! Can't send message to: ${chatGuid}`);
 
+    // If the chat is to an individual, we need to make sure the number is formatted correctly
+    if (chatGuid.includes(";-;")) {
+        const strSplit = chatGuid.split(";-;");
+        const service = strSplit[0];
+        const addr = strSplit[1];
+        chatGuid = `${service};-;${getiMessageAddressFormat(addr)}`;
+    }
+
     // Return the script
     return `tell application "Messages"
         set targetChat to a reference to chat id "${chatGuid}"
@@ -161,7 +169,7 @@ export const startChat = (participants: string[], service: string, message: stri
     const formatted = participants.map(buddy => `buddy "${buddy}" of targetService`);
     const buddies = formatted.join(", ");
 
-    const messageScpt = buildMessageScript(message, 'thisChat');
+    const messageScpt = buildMessageScript(message, "thisChat");
     const useTextChat = !isMinBigSur;
     const qualifier = useTextChat ? " text " : " ";
     const serviceScript = buildServiceScript(service);
@@ -792,7 +800,7 @@ export const openSystemPreferences = () => {
 };
 
 export const openFilePath = (filePath: string) => {
-    filePath = filePath.replace(/ /g, '\\ ');
+    filePath = filePath.replace(/ /g, "\\ ");
     return `do shell script "open ${escapeOsaExp(filePath)}"`;
 };
 

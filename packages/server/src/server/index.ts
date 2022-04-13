@@ -142,6 +142,8 @@ class BlueBubblesServer extends EventEmitter {
 
     lastConnection: number;
 
+    region: string | null;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -180,6 +182,8 @@ class BlueBubblesServer extends EventEmitter {
         this.notificationCount = 0;
         this.isRestarting = false;
         this.isStopping = false;
+
+        this.region = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -597,11 +601,20 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to restart via terminal!\n${ex}`);
         }
 
+        // Get the current region
+        this.region = await FileSystem.getRegion();
+
         // Log some server metadata
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
         this.log(`Server Metadata -> Time Synchronization: ${await this.getTimeSync()}`, "debug");
+        this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
+
+        if (!this.region) {
+            this.log("No region detected, defaulting to US...", "debug");
+            this.region = "US";
+        }
 
         // If the user is on el capitan, we need to force cloudflare
         const proxyService = this.repo.getConfig("proxy_service") as string;
@@ -825,8 +838,8 @@ class BlueBubblesServer extends EventEmitter {
                 }
             }
         } catch (ex: any) {
-            this.log('Failed to send FCM messages!', 'debug');
-            this.log(ex, 'debug');
+            this.log("Failed to send FCM messages!", "debug");
+            this.log(ex, "debug");
         }
 
         // Dispatch the webhook
@@ -861,7 +874,7 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async emitMessageError(message: Message, tempGuid: string = null) {
-        this.log(`Failed to send message: [${message.contentString()}] (Temp GUID: ${tempGuid ?? 'N/A'})`);
+        this.log(`Failed to send message: [${message.contentString()}] (Temp GUID: ${tempGuid ?? "N/A"})`);
 
         /**
          * ERROR CODES:

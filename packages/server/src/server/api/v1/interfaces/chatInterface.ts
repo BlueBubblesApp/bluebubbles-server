@@ -4,9 +4,8 @@ import { checkPrivateApiStatus, isEmpty, isMinBigSur, isNotEmpty, slugifyAddress
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
-import { sendMessageFallback, startChat } from "../apple/scripts";
+import { startChat } from "../apple/scripts";
 import { MessageInterface } from "./messageInterface";
-import { ActionHandler } from "../apple/actions";
 
 export class ChatInterface {
     static async get({
@@ -48,12 +47,10 @@ export class ChatInterface {
             // Insert the cached participants from the original request
             if (Object.keys(chatCache).includes(chat.guid)) {
                 chatRes.participants = await Promise.all(
-                    chatCache[chat.guid].map(
-                        async (e): Promise<HandleResponse> => {
-                            const test = await getHandleResponse(e);
-                            return test;
-                        }
-                    )
+                    chatCache[chat.guid].map(async (e): Promise<HandleResponse> => {
+                        const test = await getHandleResponse(e);
+                        return test;
+                    })
                 );
             }
 
@@ -130,18 +127,18 @@ export class ChatInterface {
     static async create({
         addresses,
         message = null,
-        method = 'apple-script',
-        service = 'iMessage',
+        method = "apple-script",
+        service = "iMessage",
         tempGuid
     }: {
-        addresses: string[],
-        message?: string | null,
-        method?: 'apple-script' | 'private-api',
-        service?: 'iMessage' | 'SMS',
-        tempGuid?: string
+        addresses: string[];
+        message?: string | null;
+        method?: "apple-script" | "private-api";
+        service?: "iMessage" | "SMS";
+        tempGuid?: string;
     }): Promise<Chat> {
         // Big sur can't use the private api to send
-        if (!isMinBigSur && method === 'private-api') checkPrivateApiStatus();
+        if (!isMinBigSur && method === "private-api") checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
         if (isEmpty(addresses)) {
@@ -149,9 +146,9 @@ export class ChatInterface {
         }
 
         if (isMinBigSur && addresses.length > 1) {
-            throw new Error('Cannot create group chats on macOS Big Sur or newer!');
+            throw new Error("Cannot create group chats on macOS Big Sur or newer!");
         } else if (isMinBigSur && isEmpty(message)) {
-            throw new Error('A message is required when creating chats on macOS Big Sur or newer!');
+            throw new Error("A message is required when creating chats on macOS Big Sur or newer!");
         }
 
         // Sanitize the addresses
@@ -164,11 +161,18 @@ export class ChatInterface {
             // "infered" Chat GUID based on the service and first (only) address
             chatGuid = `${service};-;${theAddrs[0]}`;
             sentMessage = await MessageInterface.sendMessageSync(
-                chatGuid, message, "apple-script", null, null, null, tempGuid);
+                chatGuid,
+                message,
+                "apple-script",
+                null,
+                null,
+                null,
+                tempGuid
+            );
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
-            if (isEmpty(result) || (!result.includes(';-;') && !result.includes(';+;'))) {
-                Server().log(`StartChat AppleScript Returned: ${result}`, 'debug');
+            if (isEmpty(result) || (!result.includes(";-;") && !result.includes(";+;"))) {
+                Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
                 throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
             }
 
@@ -247,15 +251,15 @@ export class ChatInterface {
         return theChat;
     }
 
-    static async delete({ chat, guid }: { chat?: Chat, guid?: string } = {}): Promise<void> {
+    static async delete({ chat, guid }: { chat?: Chat; guid?: string } = {}): Promise<void> {
         checkPrivateApiStatus();
-        
-        const repo = Server().iMessageRepo.db.getRepository(Chat);
-        if (!chat && isEmpty(guid)) throw new Error('No chat or chat GUID provided!');
 
-        const theChat = chat ?? await repo.findOne({ guid });
+        const repo = Server().iMessageRepo.db.getRepository(Chat);
+        if (!chat && isEmpty(guid)) throw new Error("No chat or chat GUID provided!");
+
+        const theChat = chat ?? (await repo.findOne({ guid }));
         if (!theChat) return;
-        
+
         // Tell the private API to delete the chat
         await Server().privateApiHelper.deleteChat(theChat.guid);
 

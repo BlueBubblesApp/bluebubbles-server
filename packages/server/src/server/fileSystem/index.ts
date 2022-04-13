@@ -502,4 +502,24 @@ export class FileSystem {
     static removeDirectory(filePath: string) {
         fs.rmdirSync(filePath, { recursive: true });
     }
+
+    static async getRegion(): Promise<string | null> {
+        let region = null;
+
+        try {
+            // Try to get the language (i.e. en_US)
+            const output = await FileSystem.execShellCommand(
+                `defaults read -g AppleLanguages | sed '/"/!d;s/["[:space:]]//g;s/-/_/'`
+            );
+
+            // If we get a result back, pull the region out of it
+            if (isNotEmpty(output) && output.includes("_")) {
+                region = output.split("_")[1].trim();
+            }
+        } catch (ex) {
+            // Don't do anything if it fails, we'll just default to US
+        }
+
+        return region;
+    }
 }
