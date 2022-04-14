@@ -18,9 +18,9 @@ class SocketManager {
             do {
                 try self.sock = Socket.create(family: Socket.ProtocolFamily.unix, proto: Socket.SocketProtocol.unix)
                 try self.sock?.connect(to: sock)
-                Logger.debug("connected to socket")
+                Logger.log("connected to socket")
                 event()
-                Logger.debug("socket disconnected")
+                Logger.log("socket disconnected")
             } catch let error {
                 guard let socketError = error as? Socket.Error else {
                     Logger.error("unexpected error...\n \(error)")

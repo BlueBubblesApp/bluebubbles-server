@@ -66,11 +66,11 @@ import { Queue } from "./queue";
         });
         this.child.stderr.setEncoding("utf8");
         this.child.stderr.on("data", data => {
-            Server().log(`Swift Helper error: ${data}`);
+            Server().log(`Swift Helper error: ${data}`, "error");
         });
         // if the child process exits, we should restart it
         this.child.on("close", code => {
-            Server().log("Swift Helper process exited: " + code);
+            Server().log("Swift Helper process exited: " + code, "error");
             this.runSwiftHelper();
         });
     }
@@ -117,8 +117,7 @@ import { Queue } from "./queue";
                 try {
                     return JSON.parse(buf.toString());
                 } catch (e) {
-                    console.log("UH OHHH");
-                    console.log(buf.toString());
+                    Server().log("server returned invalid json: "+buf.toString(), "error");
                     Server().log(e);
                 }
             }
