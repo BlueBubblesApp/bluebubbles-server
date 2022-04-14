@@ -18,9 +18,9 @@ class SocketManager {
             do {
                 try self.sock = Socket.create(family: Socket.ProtocolFamily.unix, proto: Socket.SocketProtocol.unix)
                 try self.sock?.connect(to: sock)
-                Logger.info("connected to socket")
+                Logger.debug("connected to socket")
                 event()
-                Logger.info("socket disconnected")
+                Logger.debug("socket disconnected")
             } catch let error {
                 guard let socketError = error as? Socket.Error else {
                     Logger.error("unexpected error...\n \(error)")
@@ -28,7 +28,7 @@ class SocketManager {
                 }
                 Logger.error("error reported:\n \(socketError.description)")
             }
-            Logger.info("attempting reconnect in 5 seconds")
+            Logger.debug("attempting reconnect in 5 seconds")
             sleep(5)
         }
     }

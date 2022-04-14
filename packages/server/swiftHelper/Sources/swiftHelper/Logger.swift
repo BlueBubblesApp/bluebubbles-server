@@ -10,15 +10,16 @@ import Foundation
 class Logger {
     // the main log function that sends a log to parent process as an Event.
     // this should be used instead of print, which should never be used.
-    static func log(_ msg: String, level: LogLevel = .info) {
-        print(level.rawValue+":"+msg)
+    static func log(_ msg: String, level: LogLevel = .log) {
+        // format logLevel:message:ETX
+        print(level.rawValue+":"+msg, terminator: "\u{3}")
     }
     // convinience functions for log levels
     static func debug(_ msg: String) {
         log(msg, level: .debug)
     }
-    static func info(_ msg: String) {
-        log(msg, level: .info)
+    static func log(_ msg: String) {
+        log(msg, level: .log)
     }
     static func warn(_ msg: String) {
         log(msg, level: .warn)
@@ -30,7 +31,7 @@ class Logger {
 
 enum LogLevel: String {
     case debug
-    case info
+    case log
     case warn
     case error
 }

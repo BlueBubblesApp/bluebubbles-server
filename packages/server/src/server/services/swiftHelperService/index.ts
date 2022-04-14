@@ -46,15 +46,22 @@ import { Queue } from "./queue";
         this.child.stdout.setEncoding("utf8");
         // we should listen to stdout data
         // so we can forward to the bb logger
-        this.child.stdout.on("data", data => {
-            let si = data.indexOf(":");
-            let level = data.substring(0, si);
-            if (["log", "error", "warn", "debug"].indexOf(level) >= 0) {
-                let content = data.substring(si+1);
-                Server().log(`Swift Helper: ${content}`, level);
-            } else {
-                // log as error, should be using Logger in swiftHelper, not print
-                Server().log(`Swift Helper: ${data}`, "error");
+        this.child.stdout.on("data", (data: string) => {
+            // multiple lines can be returned if written in quick succession
+            // therefore we should pass the ascii ETX (\u0003)
+            // at the end of each log and split by the ETX character
+            const lines = data.split("\u0003");
+            lines.pop();
+            for (const line of lines) {
+                let splitIndex = line.indexOf(":");
+                let level = line.substring(0, splitIndex);
+                if (["log", "error", "warn", "debug"].indexOf(level) >= 0) {
+                    let content = line.substring(splitIndex+1);
+                    Server().log(`Swift Helper: ${content}`, level as any);
+                } else {
+                    // log as error, should be using Logger in swiftHelper, not print
+                    Server().log(`Swift Helper: ${line}`, "error");
+                }
             }
         });
         this.child.stderr.setEncoding("utf8");
@@ -110,6 +117,8 @@ import { Queue } from "./queue";
                 try {
                     return JSON.parse(buf.toString());
                 } catch (e) {
+                    console.log("UH OHHH");
+                    console.log(buf.toString());
                     Server().log(e);
                 }
             }
