@@ -1,12 +1,12 @@
 {
     "name": "bluebubbles-server",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "private": true,
     "workspaces": ["packages/*"],
     "scripts": {
         "start": "concurrently \"cd ./packages/ui && npm run start\" \"cd ./packages/server && npm run start\"",
-        "build-ui": "cd ./packages/ui && npm run build && mkdir -p ../server/dist/ && cp -R ./build/* ../server/dist/* && cd ../../",
+        "build-ui": "cd ./packages/ui && npm run build && mkdir -p ../server/dist/ && cp -R ./build/** ../server/dist/ && cd ../../",
         "build-server": "cd ./packages/server && npm run dist && cd ../../",
         "build": "npm run build-ui && npm run build-server && rm -rf ./dist && mkdir -p ./dist && cp -R ./packages/server/release/* ./dist/ && rm -rf ./packages/server/release/ && rm -rf ./packages/ui/build/"
     },

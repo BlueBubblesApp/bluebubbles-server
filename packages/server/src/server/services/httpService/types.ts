@@ -1,7 +1,7 @@
 import type { Next } from "koa";
 import type { RouterContext } from "koa-router";
 
-export type KoaMiddleware = (ctx: RouterContext<any, {}>, _: Next) => Promise<any>;
+export type KoaMiddleware = (ctx: RouterContext<any, any>, _: Next) => Promise<any>;
 
 export enum HttpMethod {
     GET = "GET",

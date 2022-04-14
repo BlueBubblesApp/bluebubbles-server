@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import { createConnection, Connection } from "typeorm";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { Config, Alert, Device, Queue, Webhook } from "./entity";
+import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
@@ -39,7 +39,7 @@ export class ServerRepository extends EventEmitter {
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
-            entities: [Config, Alert, Device, Queue, Webhook],
+            entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress],
             // We should really use migrations for this.
             // This is me being lazy. Maybe someday...
             synchronize: true
@@ -84,6 +84,20 @@ export class ServerRepository extends EventEmitter {
      */
     webhooks() {
         return this.db.getRepository(Webhook);
+    }
+
+    /**
+     * Get the contacts repo
+     */
+    contacts() {
+        return this.db.getRepository(Contact);
+    }
+
+    /**
+     * Get the contact addresses repo
+     */
+    contactAddresses() {
+        return this.db.getRepository(ContactAddress);
     }
 
     private async loadConfig() {
@@ -156,7 +170,17 @@ export class ServerRepository extends EventEmitter {
         return await repo.find();
     }
 
-    public async addWebhook(url: string, events: Array<{ label: string, value: string }>): Promise<Webhook> {
+    public async getContacts(withAvatars = false): Promise<Array<Contact>> {
+        const repo = this.contacts();
+        const fields: (keyof Contact)[] = ["firstName", "lastName", "displayName"];
+        if (withAvatars) {
+            fields.push("avatar");
+        }
+
+        return await repo.find({ select: fields, relations: ["addresses"] });
+    }
+
+    public async addWebhook(url: string, events: Array<{ label: string; value: string }>): Promise<Webhook> {
         const repo = this.webhooks();
         const item = await repo.findOne({ url });
 
@@ -171,10 +195,14 @@ export class ServerRepository extends EventEmitter {
         id,
         url = null,
         events = null
-    }: { id: number, url: string, events: Array<{ label: string, value: string }> }): Promise<Webhook> {
+    }: {
+        id: number;
+        url: string;
+        events: Array<{ label: string; value: string }>;
+    }): Promise<Webhook> {
         const repo = this.webhooks();
         const item = await repo.findOne({ id });
-        if (!item) throw new Error('Failed to update webhook! Existing webhook does not exist!');
+        if (!item) throw new Error("Failed to update webhook! Existing webhook does not exist!");
 
         if (url) item.url = url;
         if (events) item.events = JSON.stringify(events.map(e => e.value));
@@ -183,9 +211,9 @@ export class ServerRepository extends EventEmitter {
         return item;
     }
 
-    public async deleteWebhook({ url = null, id = null }: { url: string | null, id: number | null }): Promise<void> {
+    public async deleteWebhook({ url = null, id = null }: { url: string | null; id: number | null }): Promise<void> {
         const repo = this.webhooks();
-        const item = (url) ? await repo.findOne({ url }) : await repo.findOne({ id });
+        const item = url ? await repo.findOne({ url }) : await repo.findOne({ id });
         if (!item) return;
         await repo.delete(item.id);
     }

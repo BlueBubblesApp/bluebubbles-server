@@ -3,9 +3,9 @@ import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { AlertService } from "@server/services/alertService";
-import { openLogs } from "@server/api/v1/apple/scripts";
-import { fixServerUrl, onlyAlphaNumeric } from "@server/helpers/utils";
-import { ContactInterface } from '@server/api/v1/interfaces/contactInterface';
+import { openLogs, openAppData } from "@server/api/v1/apple/scripts";
+import { fixServerUrl } from "@server/helpers/utils";
+import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { BlueBubblesHelperService } from "../privateApi";
 
 export class IPCService {
@@ -21,13 +21,22 @@ export class IPCService {
 
             // Make sure the Ngrok key is properly formatted
             if (args.ngrok_key) {
-                if (args.ngrok_key.startsWith('./ngrok')) {
-                    args.ngrok_key = args.ngrok_key.replace('./ngrok', '').trim();
+                if (args.ngrok_key.startsWith("./ngrok")) {
+                    args.ngrok_key = args.ngrok_key.replace("./ngrok", "").trim();
                 }
-                if (args.ngrok_key.startsWith('authtoken')) {
-                    args.ngrok_key = args.ngrok_key.replace('authtoken', '').trim();
+                if (args.ngrok_key.startsWith("authtoken")) {
+                    args.ngrok_key = args.ngrok_key.replace("authtoken", "").trim();
                 }
                 args.ngrok_key = args.ngrok_key.trim();
+            }
+
+            // If we are changing the proxy service to a non-dyn dns service, we need to make sure "use https" is off
+            if (args.proxy_service && args.proxy_service !== "dynamic-dns") {
+                const httpsStatus = (args.use_custom_certificate ??
+                    Server().repo.getConfig("use_custom_certificate")) as boolean;
+                if (httpsStatus) {
+                    Server().repo.setConfig("use_custom_certificate", false);
+                }
             }
 
             for (const item of Object.keys(args)) {
@@ -54,7 +63,7 @@ export class IPCService {
                 await AlertService.markAsRead(i);
                 Server().notificationCount -= 1;
             }
-            
+
             if (Server().notificationCount < 0) Server().notificationCount = 0;
             app.setBadgeCount(Server().notificationCount);
         });
@@ -90,7 +99,7 @@ export class IPCService {
 
         ipcMain.handle("get-webhooks", async (event, args) => {
             const res = await Server().repo.getWebhooks();
-            return res.map((e) => ({ id: e.id, url: e.url, events: e.events, created: e.created }))
+            return res.map(e => ({ id: e.id, url: e.url, events: e.events, created: e.created }));
         });
 
         ipcMain.handle("create-webhook", async (event, payload) => {
@@ -105,6 +114,48 @@ export class IPCService {
 
         ipcMain.handle("update-webhook", async (event, args) => {
             return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events });
+        });
+
+        ipcMain.handle("get-contacts", async (event, _) => {
+            return await ContactInterface.getAllContacts();
+        });
+
+        ipcMain.handle("add-contact", async (event, args) => {
+            return await ContactInterface.createContact({
+                firstName: args.firstName,
+                lastName: args.lastName,
+                displayName: args.displayname,
+                emails: args.emails ?? [],
+                phoneNumbers: args.phoneNumbers ?? []
+            });
+        });
+
+        ipcMain.handle("update-contact", async (event, args) => {
+            return await ContactInterface.createContact({
+                id: args.contactId ?? args.id,
+                firstName: args.firstName,
+                lastName: args.lastName,
+                displayName: args.displayName,
+                emails: args.emails ?? [],
+                phoneNumbers: args.phoneNumbers ?? [],
+                updateEntry: true
+            });
+        });
+
+        ipcMain.handle("remove-contact", async (event, id) => {
+            return await ContactInterface.deleteContact({ contactId: id });
+        });
+
+        ipcMain.handle("remove-address", async (event, id) => {
+            return await ContactInterface.deleteContactAddress({ contactAddressId: id });
+        });
+
+        ipcMain.handle("add-address", async (event, args) => {
+            return await ContactInterface.addAddressToContactById(args.contactId, args.address, args.type);
+        });
+
+        ipcMain.handle("import-vcf", async (event, path) => {
+            return await ContactInterface.importFromVcf(path);
         });
 
         ipcMain.handle("get-contact-name", async (event, address) => {
@@ -198,12 +249,22 @@ export class IPCService {
             await Server().relaunch();
         });
 
+        ipcMain.handle("reset-app", async (_, __) => {
+            await Server().stopAll();
+            FileSystem.removeDirectory(FileSystem.baseDir);
+            await Server().relaunch();
+        });
+
         ipcMain.handle("show-dialog", (_, opts: Electron.MessageBoxOptions) => {
             return dialog.showMessageBox(Server().window, opts);
         });
 
         ipcMain.handle("open-log-location", (_, __) => {
             FileSystem.executeAppleScript(openLogs());
+        });
+
+        ipcMain.handle("open-app-location", (_, __) => {
+            FileSystem.executeAppleScript(openAppData());
         });
 
         ipcMain.handle("clear-alerts", async (_, __) => {

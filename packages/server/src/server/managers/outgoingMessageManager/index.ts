@@ -30,13 +30,23 @@ export class OutgoingMessageManager {
         return null;
     }
 
-    async resolve(message: Message) {
+    async resolve(message: Message): Promise<boolean> {
         const idx = this.findIndex(message);
-        if (idx >= 0) await this.promises[idx].resolve(message);
+        if (idx >= 0) {
+            await this.promises[idx].resolve(message);
+            return true;
+        }
+
+        return false;
     }
 
-    async reject(message: Message) {
+    async reject(reason: any, message: Message): Promise<boolean> {
         const idx = this.findIndex(message);
-        if (idx >= 0) await this.promises[idx].reject(message);
+        if (idx >= 0) {
+            await this.promises[idx].reject(reason, message);
+            return true;
+        }
+
+        return false;
     }
 }

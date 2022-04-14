@@ -6,7 +6,7 @@ import {
     Spacer,
     Button
 } from '@chakra-ui/react';
-import { toggleTutorialCompleted } from '../../../actions/GeneralActions';
+import { toggleTutorialCompleted, resetApp } from '../../../actions/GeneralActions';
 import { ConfirmationDialog } from '../../../components/modals/ConfirmationDialog';
 import { ConfirmationItems } from '../../../utils/ToastUtils';
 
@@ -20,6 +20,14 @@ const confirmationActions: ConfirmationItems = {
         func: () => {
             toggleTutorialCompleted(false);
         }
+    },
+    resetApp: {
+        message: (
+            'Are you sure you want to reset the app?<br /><br />' +
+            'This will remove all your configurations & settings. It ' +
+            'will also restart the app when complete.'
+        ),
+        func: resetApp
     }
 };
 
@@ -38,6 +46,12 @@ export const ResetSettings = (): JSX.Element => {
                 onClick={() => confirm('resetTutorial')}
             >
                 Reset Tutorial
+            </Button>
+            <Button
+                colorScheme={'red'}
+                onClick={() => confirm('resetApp')}
+            >
+                Reset App
             </Button>
 
             <ConfirmationDialog

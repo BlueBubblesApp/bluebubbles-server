@@ -17,7 +17,9 @@ import { GeneralRouter } from "./routers/generalRouter";
 import { UiRouter } from "./routers/uiRouter";
 import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
+import { MetricsMiddleware } from "./middleware/metricsMiddleware";
 import { LogMiddleware } from "./middleware/logMiddleware";
+import { ErrorMiddleware } from "./middleware/errorMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
 import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
 import { HttpDefinition, HttpMethod, HttpRoute, HttpRouteGroup, KoaMiddleware } from "../../types";
@@ -36,7 +38,7 @@ export class HttpRoutes {
     }
 
     private static get unprotected() {
-        return [LogMiddleware];
+        return [MetricsMiddleware, ErrorMiddleware, LogMiddleware];
     }
 
     static api: HttpDefinition = {
@@ -173,7 +175,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: "new",
-                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        middleware: [...HttpRoutes.protected],
                         validators: [ChatValidator.validateCreate],
                         controller: ChatRouter.create
                     },
@@ -197,6 +199,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: ":guid/read",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: ChatRouter.markRead
                     },
                     {
@@ -230,7 +233,13 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: ":guid",
                         controller: ChatRouter.find
-                    }
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.deleteChat
+                    },
                 ]
             },
             {
@@ -321,6 +330,11 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: "",
                         controller: ContactRouter.get
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "",
+                        controller: ContactRouter.create
                     },
                     {
                         method: HttpMethod.POST,

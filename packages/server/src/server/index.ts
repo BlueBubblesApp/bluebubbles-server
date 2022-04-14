@@ -3,8 +3,8 @@
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
 import ServerLog from "electron-log";
 import process from "process";
-import path from 'path';
-import os from 'os';
+import path from "path";
+import os from "os";
 import { EventEmitter } from "events";
 import macosVersion from "macos-version";
 
@@ -14,7 +14,6 @@ import { FileSystem } from "@server/fileSystem";
 // Database Imports
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
 import { MessageRepository } from "@server/databases/imessage";
-import { ContactRepository } from "@server/databases/contacts";
 import {
     IncomingMessageListener,
     OutgoingMessageListener,
@@ -43,13 +42,22 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
 
 import { ActionHandler } from "./api/v1/apple/actions";
-import { insertChatParticipants, isEmpty, isMinBigSur, isMinMojave, isMinMonterey, isMinSierra, isNotEmpty } from "./helpers/utils";
+import {
+    insertChatParticipants,
+    isEmpty,
+    isMinBigSur,
+    isMinMojave,
+    isMinMonterey,
+    isMinSierra,
+    isNotEmpty
+} from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { fs } from "zx";
 
 const findProcess = require("find-process");
+const contacts = require("node-mac-contacts");
 
 const osVersion = macosVersion();
 
@@ -59,7 +67,8 @@ ServerLog.transports.console.format = logFormat;
 ServerLog.transports.file.format = logFormat;
 
 // Patch in the original package path so we don't use @bluebubbles/server
-ServerLog.transports.file.resolvePath = () => path.join(os.homedir(), 'Library', 'Logs', 'bluebubbles-server', 'main.log');
+ServerLog.transports.file.resolvePath = () =>
+    path.join(os.homedir(), "Library", "Logs", "bluebubbles-server", "main.log");
 
 /**
  * Create a singleton for the server so that it can be referenced everywhere.
@@ -89,8 +98,6 @@ class BlueBubblesServer extends EventEmitter {
     repo: ServerRepository;
 
     iMessageRepo: MessageRepository;
-
-    contactsRepo: ContactRepository;
 
     httpService: HttpService;
 
@@ -138,6 +145,8 @@ class BlueBubblesServer extends EventEmitter {
 
     lastConnection: number;
 
+    region: string | null;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -151,7 +160,6 @@ class BlueBubblesServer extends EventEmitter {
         // Databases
         this.repo = null;
         this.iMessageRepo = null;
-        this.contactsRepo = null;
 
         // Other helpers
         this.eventCache = null;
@@ -177,6 +185,8 @@ class BlueBubblesServer extends EventEmitter {
         this.notificationCount = 0;
         this.isRestarting = false;
         this.isStopping = false;
+
+        this.region = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -281,14 +291,6 @@ class BlueBubblesServer extends EventEmitter {
                     app.quit();
                 }
             });
-        }
-
-        try {
-            this.log("Connecting to Contacts database...");
-            this.contactsRepo = new ContactRepository();
-            await this.contactsRepo.initialize();
-        } catch (ex: any) {
-            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
         }
     }
 
@@ -440,12 +442,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            await this.contactsRepo?.db?.close();
-        } catch (ex: any) {
-            this.log(`Failed to close Contacts Database connection! ${ex?.message ?? ex}`);
-        }
-
-        try {
             await this.iMessageRepo?.db?.close();
         } catch (ex: any) {
             this.log(`Failed to close iMessage Database connection! ${ex?.message ?? ex}`);
@@ -587,8 +583,8 @@ class BlueBubblesServer extends EventEmitter {
         try {
             return await FileSystem.execShellCommand(`sntp time.apple.com`);
         } catch (ex) {
-            this.log('Failed to sync time with time servers!', 'warn');
-            this.log(ex)
+            this.log("Failed to sync time with time servers!", "warn");
+            this.log(ex);
         }
 
         return null;
@@ -616,11 +612,20 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to restart via terminal!\n${ex}`);
         }
 
+        // Get the current region
+        this.region = await FileSystem.getRegion();
+
         // Log some server metadata
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
         this.log(`Server Metadata -> Time Synchronization: ${await this.getTimeSync()}`, "debug");
+        this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
+
+        if (!this.region) {
+            this.log("No region detected, defaulting to US...", "debug");
+            this.region = "US";
+        }
 
         // If the user is on el capitan, we need to force cloudflare
         const proxyService = this.repo.getConfig("proxy_service") as string;
@@ -654,6 +659,18 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Full-disk access permissions are required!", "error");
         }
 
+        // Make sure Messages is running
+        await FileSystem.startMessages();
+        const msgCheckInterval = setInterval(async () => {
+            try {
+                // This won't start it if it's already open
+                await FileSystem.startMessages();
+            } catch (ex: any) {
+                Server().log(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
+                clearInterval(msgCheckInterval);
+            }
+        }, 150000); // Make sure messages is open every 2.5 minutes
+
         this.log("Finished pre-start checks...");
     }
 
@@ -676,18 +693,22 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Show a warning if the time is off by a reasonable amount (1 minute)
-        const syncString = await this.getTimeSync();
-        if (syncString !== null) {
-            try {
-                const spl = syncString.split('+/-');
-                const left = spl[0].split(' ').slice(0, -1);
-                const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace('+', '').replace('-', '')));
-                if (offset >= 15) {
-                    this.log(`Your macOS time is not synchronized! Offset: ${offset}`, 'warn');
+        try {
+            const syncString = await this.getTimeSync();
+            if (syncString !== null) {
+                try {
+                    const spl = syncString.split("+/-");
+                    const left = spl[0].split(" ").slice(0, -1);
+                    const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
+                    if (offset >= 15) {
+                        this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
+                    }
+                } catch (ex) {
+                    this.log("Unable to parse time synchronization offset!", "debug");
                 }
-            } catch (ex) {
-                this.log('Unable to parse time synchronization offset!', 'debug');
             }
+        } catch (ex) {
+            this.log(`Failed to get time sychronization status! Error: ${ex}`, "debug");
         }
 
         this.setDockIcon();
@@ -698,6 +719,13 @@ class BlueBubblesServer extends EventEmitter {
         } else if (isMinBigSur) {
             this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "debug");
         }
+
+        // Check for contact permissions
+        let contactStatus = contacts.getAuthStatus();
+        if (contactStatus === "Not Determined") {
+            contactStatus = await contacts.requestAccess();
+        }
+        this.log(`Contacts authorization status: ${contactStatus}`, "debug");
 
         this.log("Finished post-start checks...");
     }
@@ -808,16 +836,21 @@ class BlueBubblesServer extends EventEmitter {
         this.httpService.socketServer.emit(type, data);
 
         // Send notification to devices
-        if (sendFcmMessage && FCMService.getApp()) {
-            const devices = await this.repo.devices().find();
-            if (isEmpty(devices)) return;
-
-            const notifData = JSON.stringify(data);
-            await this.fcm.sendNotification(
-                devices.map(device => device.identifier),
-                { type, data: notifData },
-                priority
-            );
+        try {
+            if (sendFcmMessage && FCMService.getApp()) {
+                const devices = await this.repo.devices().find();
+                if (isNotEmpty(devices)) {
+                    const notifData = JSON.stringify(data);
+                    await this.fcm.sendNotification(
+                        devices.map(device => device.identifier),
+                        { type, data: notifData },
+                        priority
+                    );
+                }
+            }
+        } catch (ex: any) {
+            this.log("Failed to send FCM messages!", "debug");
+            this.log(ex, "debug");
         }
 
         // Dispatch the webhook
@@ -851,28 +884,45 @@ class BlueBubblesServer extends EventEmitter {
         await this.emitMessage("new-message", resp);
     }
 
+    async emitMessageError(message: Message, tempGuid: string = null) {
+        this.log(`Failed to send message: [${message.contentString()}] (Temp GUID: ${tempGuid ?? "N/A"})`);
+
+        /**
+         * ERROR CODES:
+         * 4: Message Timeout
+         */
+        const data = await getMessageResponse(message);
+        if (isNotEmpty(tempGuid)) {
+            data.tempGuid = tempGuid;
+        }
+
+        await this.emitMessage("message-send-error", data);
+    }
+
     async checkPrivateApiRequirements(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [];
 
         // Check if the MySIMBL/MacForge folder exists
         if (isMinMojave) {
             output.push({
-                name: 'MacForge Plugins Folder',
+                name: "MacForge Plugins Folder",
                 pass: fs.existsSync(FileSystem.libMacForgePlugins),
                 solution: `Manually create this folder: ${FileSystem.libMacForgePlugins}`
             });
         } else {
             output.push({
-                name: 'MySIMBL Plugins Folder',
+                name: "MySIMBL Plugins Folder",
                 pass: fs.existsSync(FileSystem.libMySimblPlugins),
                 solution: `Manually create this folder: ${FileSystem.libMySimblPlugins}`
             });
         }
 
         output.push({
-            name: 'SIP Disabled',
+            name: "SIP Disabled",
             pass: await FileSystem.isSipDisabled(),
-            solution: `Follow our documentation on how to disable SIP: https://docs.bluebubbles.app/private-api/installation`
+            solution:
+                `Follow our documentation on how to disable SIP: ` +
+                `https://docs.bluebubbles.app/private-api/installation`
         });
 
         return output;
@@ -881,17 +931,16 @@ class BlueBubblesServer extends EventEmitter {
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [
             {
-                name: 'Accessibility',
+                name: "Accessibility",
                 pass: systemPreferences.isTrustedAccessibilityClient(false),
-                solution: 'Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles'
+                solution: "Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles"
             },
             {
-                name: 'Full Disk Access',
+                name: "Full Disk Access",
                 pass: this.hasDiskAccess,
-                solution: (
-                    'Open System Preferences > Security > Privacy > Full Disk Access, ' +
-                    'then add BlueBubbles. Lastly, restart BlueBubbles.'
-                )
+                solution:
+                    "Open System Preferences > Security > Privacy > Full Disk Access, " +
+                    "then add BlueBubbles. Lastly, restart BlueBubbles."
             }
         ];
 
@@ -912,20 +961,12 @@ class BlueBubblesServer extends EventEmitter {
             return;
         }
 
-        this.log('Starting chat listeners...');
-        const pollInterval = (this.repo.getConfig('db_poll_interval') as number) ?? 1000;
+        this.log("Starting chat listeners...");
+        const pollInterval = (this.repo.getConfig("db_poll_interval") as number) ?? 1000;
 
         // Create a listener to listen for new/updated messages
-        const incomingMsgListener = new IncomingMessageListener(
-            this.iMessageRepo,
-            this.eventCache,
-            pollInterval
-        );
-        const outgoingMsgListener = new OutgoingMessageListener(
-            this.iMessageRepo,
-            this.eventCache,
-            pollInterval * 1.5
-        );
+        const incomingMsgListener = new IncomingMessageListener(this.iMessageRepo, this.eventCache, pollInterval);
+        const outgoingMsgListener = new OutgoingMessageListener(this.iMessageRepo, this.eventCache, pollInterval * 1.5);
 
         // No real rhyme or reason to multiply this by 2. It's just not as much a priority
         const groupEventListener = new GroupChangeListener(this.iMessageRepo, pollInterval * 2);
@@ -972,13 +1013,7 @@ class BlueBubblesServer extends EventEmitter {
          * Message listener for messages that have errored out
          */
         outgoingMsgListener.on("message-send-error", async (item: Message) => {
-            this.log(`Failed to send message: [${item.contentString()}]`);
-
-            /**
-             * ERROR CODES:
-             * 4: Message Timeout
-             */
-            await this.emitMessage("message-send-error", await getMessageResponse(item));
+            await this.emitMessageError(item);
         });
 
         /**

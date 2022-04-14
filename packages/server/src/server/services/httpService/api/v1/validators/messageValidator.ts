@@ -41,7 +41,11 @@ export class MessageValidator {
     }
 
     static queryBodyRules = {
-        with: "array|in:chat,chats,attachment,attachments,handle,chat.participants,chats.participants",
+        with: (
+            "array|in:chat,chats,attachment,attachments,handle,chat.participants," +
+            "chats.participants,attachment.metadata,attachments.metadata"
+        ),
+        convertAttachments: "boolean",
         where: "array",
         "where.*.statement": "required|string",
         "where.*.args": "present",

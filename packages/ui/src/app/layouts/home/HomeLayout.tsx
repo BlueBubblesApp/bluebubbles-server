@@ -57,24 +57,35 @@ export const HomeLayout = (): JSX.Element => {
 
         ipcRenderer.invoke('get-individual-message-counts').then((dmCounts) => {
             let currentTopCount = 0;
-            let currentTop = 'N/A';
+            let currentTop: string | null = null;
+            let isGroup = false;
             dmCounts.forEach((item: any) => {
-                if (item.message_count > currentTopCount) {
+                if (!currentTop || item.message_count > currentTopCount) {
                     const guid = item.chat_guid.replace('iMessage', '').replace(';+;', '').replace(';-;', '');
                     currentTopCount = item.message_count;
-                    currentTop = item.group_name.length > 0 ? item.group_name : guid;
+                    isGroup = (item.group_name ?? '').length > 0;
+                    currentTop = isGroup ? item.group_name : guid;
                 }
             });
 
-            ipcRenderer.invoke('get-contact-name', currentTop).then(e => {
-                if (!e && !e.firstName) {
+            // If we don't get a top 
+            if (!currentTop) {
+                return dispatch(setStat({ name: 'best_friend', value: 'Unknown' }));
+            }
+
+            if (!isGroup) {
+                ipcRenderer.invoke('get-contact-name', currentTop).then(e => {
+                    if (!e && !e.firstName) {
+                        dispatch(setStat({ name: 'best_friend', value: currentTop }));
+                    } else {
+                        dispatch(setStat({ name: 'best_friend', value: `${e.firstName} ${e?.lastName ?? ''}`.trim() }));
+                    }
+                }).catch(() => {
                     dispatch(setStat({ name: 'best_friend', value: currentTop }));
-                } else {
-                    dispatch(setStat({ name: 'best_friend', value: `${e.firstName} ${e?.lastName ?? ''}`.trim() }));
-                }
-            }).catch(() => {
-                dispatch(setStat({ name: 'best_friend', value: currentTop }));
-            });
+                });
+            } else if ((currentTop as string).length === 0) {
+                dispatch(setStat({ name: 'best_friend', value: 'Unnamed Group' }));
+            }
         });
         
         ipcRenderer.invoke('get-group-message-counts').then((groupCounts) => {
@@ -197,6 +208,8 @@ export const HomeLayout = (): JSX.Element => {
                                                     Your QR Code should remain <strong>private</strong> as it contains sensitive information!
                                                 </Text>
                                                 <Box border="5px solid" borderColor='white' mt={4} height='266px' width='266px' borderRadius='lg' mb={3}>
+                                                    {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                                                    {/* @ts-ignore: ts2876 */}
                                                     {(qrCode) ? <QRCode value={qrCode as string} /> : null}
                                                 </Box>
                                             </Flex>

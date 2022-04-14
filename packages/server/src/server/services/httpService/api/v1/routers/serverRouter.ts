@@ -16,12 +16,19 @@ export class ServerRouter {
     }
 
     static async restartServices(ctx: RouterContext, _: Next) {
-        Server().hotRestart();
+        // Give it a second so that we can return to the client
+        setTimeout(() => {
+            Server().hotRestart();
+        }, 1000);
+
         return new Success(ctx, { message: "Successfully kicked off services restart!" }).send();
     }
 
     static async restartAll(ctx: RouterContext, _: Next) {
-        Server().relaunch();
+        // Give it a second so that we can return to the client
+        setTimeout(() => {
+            Server().relaunch();
+        }, 1000);
         return new Success(ctx, { message: "Successfully kicked off re-launch process!" }).send();
     }
 

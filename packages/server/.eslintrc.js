@@ -10,7 +10,6 @@ module.exports = {
         "node_modules"
     ],
     "extends": [
-        "airbnb",
         "eslint:recommended",
         "plugin:import/recommended",
         "plugin:import/typescript",
@@ -34,6 +33,7 @@ module.exports = {
         "no-await-in-loop": "off",
         "no-console": 0,
         "no-continue": "off",
+        "no-unreachable": "warn",
         "global-require": 0,
         "max-len": ["error", { "code": 120 }],
         "import/prefer-default-export": 0,

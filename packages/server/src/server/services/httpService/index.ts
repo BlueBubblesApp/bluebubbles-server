@@ -181,7 +181,8 @@ export class HttpService {
             // Basic authentication
             if (safeTrim(pass) === safeTrim(cfgPass)) {
                 Server().log(
-                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`);
+                    `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
+                );
             } else {
                 socket.disconnect();
                 Server().log(`Closing client connection. Authentication failed.`);
@@ -193,7 +194,7 @@ export class HttpService {
              *
              * A console message will be printed, and a socket error will be emitted
              */
-            socket.use(async (_: any, next: Function) => {
+            socket.use(async (_: any, next: (error?: Error) => void) => {
                 try {
                     await next();
                 } catch (ex: any) {
