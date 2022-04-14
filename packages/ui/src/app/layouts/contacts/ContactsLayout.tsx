@@ -38,7 +38,7 @@ import { BsChevronDown, BsPersonPlus } from 'react-icons/bs';
 import { BiImport } from 'react-icons/bi';
 import { ContactAddress, ContactItem, ContactsTable } from 'app/components/tables/ContactsTable';
 import { ContactDialog } from 'app/components/modals/ContactDialog';
-import { addAddressToContact, createContact, deleteContact, deleteContactAddress } from 'app/actions/ContactActions';
+import { addAddressToContact, createContact, deleteContact, deleteContactAddress, updateContact } from 'app/actions/ContactActions';
 
 const perPage = 25;
 
@@ -47,7 +47,7 @@ const buildIdentifier = (contact: ContactItem) => {
         contact.firstName ?? '', contact.lastName ?? '',
         (contact.phoneNumbers ?? []).map((e) => e.address.replaceAll(/[^a-zA-Z0-9_]/gi, '')).join('|'),
         (contact.emails ?? []).map((e) => e.address.replaceAll(/[^a-zA-Z0-9_]/gi, '')).join('|'),
-        contact.nickname ?? ''
+        contact.displayName ?? ''
     ].join(' ').toLowerCase();
 };
 
@@ -133,15 +133,47 @@ export const ContactsLayout = (): JSX.Element => {
         }
     };
 
-    const onDelete = async (contactId: number) => {
-        await deleteContact(contactId);
+    const onUpdate = async (contact: NodeJS.Dict<any>) => {
+        const cId = typeof(contact.id) === 'string' ? Number.parseInt(contact.id) : contact.id as number;
+        const newContact = await updateContact(
+            cId,
+            {
+                firstName: contact.firstName,
+                lastName: contact.lastName,
+                displayName: contact.displayName,
+                emails: contact.emails.map((e: NodeJS.Dict<any>) => e.address),
+                phoneNumbers: contact.phoneNumbers.map((e: NodeJS.Dict<any>) => e.address)
+            }
+        );
+
+        const copiedContacts = [...contacts];
+        let updated = false;
+        for (let i = 0; i < copiedContacts.length; i++) {
+            if (copiedContacts[i].id === String(cId)) {
+                copiedContacts[i].firstName = newContact.firstName;
+                copiedContacts[i].lastName = newContact.lastName;
+                copiedContacts[i].displayName = newContact.displayName;
+                copiedContacts[i].emails = newContact.emails;
+                copiedContacts[i].phoneNumbers = newContact.phoneNumbers;
+                updated = true;
+            }
+        }
+
+        if (updated) {
+            setContacts(copiedContacts);
+        }
+    };
+
+    const onDelete = async (contactId: number | string) => {
+        await deleteContact(typeof(contactId) === 'string' ? Number.parseInt(contactId as string) : contactId);
         setContacts(contacts.filter((e: ContactItem) => {
             return e.id !== String(contactId);
         }));
     };
 
-    const onAddAddress = async (contactId: number, address: string) => {
-        const addr = await addAddressToContact(contactId, address, address.includes('@') ? 'email' : 'phone');
+    const onAddAddress = async (contactId: number | string, address: string) => {
+        const cId = typeof(contactId) === 'string' ? Number.parseInt(contactId as string) : contactId;
+        const addr = await addAddressToContact(cId, address, address.includes('@') ? 'email' : 'phone');
         if (addr) {
             setContacts(contacts.map((e: ContactItem) => {
                 if (e.id !== String(contactId)) return e;
@@ -226,9 +258,9 @@ export const ContactsLayout = (): JSX.Element => {
                             <PopoverBody>
                                 <Text>
                                     Here are the contacts on your macOS device that BlueBubbles knows about,
-                                    and will serve to any clients that want to know about them. These are loaded
-                                    directly from this Mac's Address Book. This list will not contains contacts exported
-                                    from your Android device (yet).
+                                    and will serve to any clients that want to know about them. These include
+                                    contacts from this Mac's Address Book, as well as contacts from uploads/imports
+                                    or manual entry.
                                 </Text>
                             </PopoverBody>
                         </PopoverContent>
@@ -261,6 +293,7 @@ export const ContactsLayout = (): JSX.Element => {
                         contacts={filterContacts()}
                         onCreate={onCreate}
                         onDelete={onDelete}
+                        onUpdate={onUpdate}
                         onAddressAdd={onAddAddress}
                         onAddressDelete={onDeleteAddress}
                     />
@@ -277,15 +310,19 @@ export const ContactsLayout = (): JSX.Element => {
                         pt={2}
                     >
                         <PaginationPrevious>Previous</PaginationPrevious>
+                        <Box ml={1}></Box>
                         <PaginationPageGroup flexWrap="wrap" justifyContent="center">
                             {pages.map((page: number) => (
                                 <PaginationPage 
                                     key={`pagination_page_${page}`} 
                                     page={page}
                                     my={1}
+                                    px={3}
+                                    fontSize={14}
                                 />
                             ))}
                         </PaginationPageGroup>
+                        <Box ml={1}></Box>
                         <PaginationNext>Next</PaginationNext>
                     </PaginationContainer>
                 </Pagination>

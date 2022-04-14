@@ -172,9 +172,9 @@ export class ServerRepository extends EventEmitter {
 
     public async getContacts(withAvatars = false): Promise<Array<Contact>> {
         const repo = this.contacts();
-        const fields: (keyof Contact)[] = ['firstName', 'lastName'];
+        const fields: (keyof Contact)[] = ["firstName", "lastName", "displayName"];
         if (withAvatars) {
-            fields.push('avatar')
+            fields.push("avatar");
         }
 
         return await repo.find({ select: fields, relations: ["addresses"] });

@@ -23,6 +23,9 @@ export class Contact {
     @Column("text", { name: "last_name", nullable: false })
     lastName: string;
 
+    @Column("text", { name: "display_name", nullable: true, default: null })
+    displayName: string;
+
     @OneToMany(() => ContactAddress, contactAddress => contactAddress.contact)
     addresses: ContactAddress[];
 

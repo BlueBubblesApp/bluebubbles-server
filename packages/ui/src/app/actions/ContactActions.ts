@@ -18,6 +18,15 @@ export const deleteContactAddress = async (contacAddresstId: number): Promise<vo
     });
 };
 
+export const updateContact = async (contactId: number, updatedFields: NodeJS.Dict<any>): Promise<ContactItem> => {
+    const result: ContactItem = await ipcRenderer.invoke('update-contact', { contactId, ...updatedFields });
+    showSuccessToast({
+        id: 'contacts',
+        description: 'Successfully updated Contact!'
+    });
+    return result;
+};
+
 export const createContact = async (
     firstName: string,
     lastName: string,

@@ -31,11 +31,11 @@ export class IPCService {
             }
 
             // If we are changing the proxy service to a non-dyn dns service, we need to make sure "use https" is off
-            if (args.proxy_service && args.proxy_service !== 'dynamic-dns') {
-                const httpsStatus = (
-                    args.use_custom_certificate ?? Server().repo.getConfig('use_custom_certificate')) as boolean;
+            if (args.proxy_service && args.proxy_service !== "dynamic-dns") {
+                const httpsStatus = (args.use_custom_certificate ??
+                    Server().repo.getConfig("use_custom_certificate")) as boolean;
                 if (httpsStatus) {
-                    Server().repo.setConfig('use_custom_certificate', false);
+                    Server().repo.setConfig("use_custom_certificate", false);
                 }
             }
 
@@ -124,8 +124,21 @@ export class IPCService {
             return await ContactInterface.createContact({
                 firstName: args.firstName,
                 lastName: args.lastName,
+                displayName: args.displayname,
                 emails: args.emails ?? [],
                 phoneNumbers: args.phoneNumbers ?? []
+            });
+        });
+
+        ipcMain.handle("update-contact", async (event, args) => {
+            return await ContactInterface.createContact({
+                id: args.contactId ?? args.id,
+                firstName: args.firstName,
+                lastName: args.lastName,
+                displayName: args.displayName,
+                emails: args.emails ?? [],
+                phoneNumbers: args.phoneNumbers ?? [],
+                updateEntry: true
             });
         });
 

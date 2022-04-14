@@ -9,7 +9,8 @@ import {
     Badge,
     useBoolean,
     Icon,
-    Box
+    Box,
+    Tooltip
 } from '@chakra-ui/react';
 import { AiOutlineEdit } from 'react-icons/ai';
 import { MdOutlineEditOff } from 'react-icons/md';
@@ -26,7 +27,7 @@ export interface ContactItem {
     emails: ContactAddress[];
     firstName: string;
     lastName: string;
-    nickname: string;
+    displayName: string;
     birthday: string;
     avatar: string;
     id: string;
@@ -38,13 +39,15 @@ export const ContactsTable = ({
     contacts,
     onCreate,
     onDelete,
+    onUpdate,
     onAddressAdd,
     onAddressDelete
 }: {
     contacts: Array<ContactItem>,
     onCreate?: (contact: ContactItem) => void,
-    onDelete?: (contactId: number) => void,
-    onAddressAdd?: (contactId: number, address: string) => void;
+    onDelete?: (contactId: number | string) => void,
+    onUpdate?: (contact: Partial<ContactItem>) => void,
+    onAddressAdd?: (contactId: number | string, address: string) => void;
     onAddressDelete?: (contactAddressId: number) => void;
 }): JSX.Element => {
     const dialogRef = useRef(null);
@@ -57,14 +60,14 @@ export const ContactsTable = ({
                 <Thead>
                     <Tr>
                         <Th>Edit</Th>
-                        <Th>Name</Th>
+                        <Th>Display Name</Th>
                         <Th isNumeric>Addresses</Th>
                     </Tr>
                 </Thead>
                 <Tbody>
                     {contacts.map(item => {
-                        const name = (item.nickname && item.nickname.length > 0)
-                            ? item.nickname
+                        const name = (item.displayName && item.displayName.length > 0)
+                            ? item.displayName
                             : [item?.firstName, item?.lastName].filter((e) => e && e.length > 0).join(' ');
                         const addresses = [
                             ...(item.phoneNumbers ?? []).map(e => e.address),
@@ -78,9 +81,17 @@ export const ContactsTable = ({
                                     setDialogOpen.on();
                                 }}>
                                     {(item?.sourceType === 'api') ? (
-                                        <Icon as={MdOutlineEditOff} />
+                                        <Tooltip label="Not Editable" hasArrow aria-label='not editable tooltip'>
+                                            <span>
+                                                <Icon as={MdOutlineEditOff} />
+                                            </span>
+                                        </Tooltip>
                                     ): (
-                                        <Icon as={AiOutlineEdit} />
+                                        <Tooltip label="Click to Edit" hasArrow aria-label='editable tooltip'>
+                                            <span>
+                                                <Icon as={AiOutlineEdit} />
+                                            </span>
+                                        </Tooltip>
                                     )}
                                 </Td>
                                 <Td>{name}</Td>
@@ -99,6 +110,7 @@ export const ContactsTable = ({
                 existingContact={selectedContact}
                 onDelete={onDelete}
                 onCreate={onCreate}
+                onUpdate={onUpdate}
                 onAddressAdd={onAddressAdd}
                 onAddressDelete={onAddressDelete}
                 onClose={() => {

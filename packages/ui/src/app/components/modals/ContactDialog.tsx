@@ -17,7 +17,8 @@ import {
     TagLabel,
     TagCloseButton,
     HStack,
-    IconButton
+    IconButton,
+    useBoolean
 } from '@chakra-ui/react';
 import { FocusableElement } from '@chakra-ui/utils';
 import { ContactAddress, ContactItem } from '../tables/ContactsTable';
@@ -27,20 +28,22 @@ import { AiOutlinePlus } from 'react-icons/ai';
 
 interface ContactDialogProps {
     onCancel?: () => void;
-    onDelete?: (contactId: number) => void;
+    onDelete?: (contactId: number | string) => void;
     onCreate?: (contact: ContactItem) => void;
-    onAddressAdd?: (contactId: number, address: string) => void;
+    onUpdate?: (contact: Partial<ContactItem>) => void;
+    onAddressAdd?: (contactId: number | string, address: string) => void;
     onAddressDelete?: (contactAddressId: number) => void;
     onClose: () => void;
     isOpen: boolean;
     modalRef: React.RefObject<FocusableElement> | undefined;
-    existingContact?: NodeJS.Dict<any>;
+    existingContact?: ContactItem;
 }
 
 export const ContactDialog = ({
     onCancel,
     onDelete,
     onCreate,
+    onUpdate,
     onClose,
     onAddressAdd,
     onAddressDelete,
@@ -50,7 +53,9 @@ export const ContactDialog = ({
 }: ContactDialogProps): JSX.Element => {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
+    const [displayName, setDisplayName] = useState('');
     const [currentAddress, setCurrentAddress] = useState('');
+    const [hasEdited, setHasEdited] = useBoolean(false);
     const [phones, setPhones] = useState([] as ContactAddress[]);
     const [emails, setEmails] = useState([] as ContactAddress[]);
     const [firstNameError, setFirstNameError] = useState('');
@@ -60,6 +65,7 @@ export const ContactDialog = ({
         if (!existingContact) return;
         if (existingContact.firstName) setFirstName(existingContact.firstName);
         if (existingContact.lastName) setLastName(existingContact.lastName);
+        if (existingContact.displayName) setDisplayName(existingContact.displayName);
         if (existingContact.phoneNumbers) setPhones(existingContact.phoneNumbers);
         if (existingContact.emails) setEmails(existingContact.emails);
     }, [existingContact]);
@@ -102,7 +108,9 @@ export const ContactDialog = ({
         setEmails([]);
         setFirstName('');
         setLastName('');
+        setDisplayName('');
         setCurrentAddress('');
+        setHasEdited.off();
 
         if (onClose) onClose();
     };
@@ -131,6 +139,9 @@ export const ContactDialog = ({
                                 onChange={(e) => {
                                     setFirstNameError('');
                                     setFirstName(e.target.value);
+                                    if (!hasEdited) {
+                                        setDisplayName(`${e.target.value} ${lastName}`.trim());
+                                    }
                                 }}
                             />
                             {isNameValid ? (
@@ -146,6 +157,22 @@ export const ContactDialog = ({
                                 placeholder='Apple'
                                 onChange={(e) => {
                                     setLastName(e.target.value);
+                                    if (!hasEdited) {
+                                        setDisplayName(`${firstName} ${e.target.value}`.trim());
+                                    }
+                                }}
+                            />
+                        </FormControl>
+                        <FormControl mt={5}>
+                            <FormLabel htmlFor='lastName'>Display Name</FormLabel>
+                            <Input
+                                id='displayName'
+                                type='text'
+                                value={displayName}
+                                placeholder='Tim Apple'
+                                onChange={(e) => {
+                                    setHasEdited.on();
+                                    setDisplayName(e.target.value);
                                 }}
                             />
                         </FormControl>
@@ -200,6 +227,14 @@ export const ContactDialog = ({
                             ref={modalRef as React.LegacyRef<HTMLButtonElement> | undefined}
                             onClick={() => {
                                 if (!existingContact && onCancel) onCancel();
+                                if (existingContact && onUpdate) {
+                                    existingContact.firstName = firstName;
+                                    existingContact.lastName = lastName;
+                                    existingContact.displayName = displayName;
+                                    existingContact.phoneNumbers = phones;
+                                    existingContact.emails = emails;
+                                    onUpdate(existingContact);
+                                }
                                 _onClose();
                             }}
                         >
@@ -238,7 +273,7 @@ export const ContactDialog = ({
                                             lastName,
                                             phoneNumbers: phones,
                                             emails: emails,
-                                            nickname: '',
+                                            displayName,
                                             birthday: '',
                                             avatar: '',
                                             id: '',

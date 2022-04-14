@@ -95,7 +95,7 @@ export class ContactInterface {
                 }),
                 firstName: e?.firstName,
                 lastName: e?.lastName,
-                nickname: e?.nickname,
+                displayName: e?.displayName ?? e.nickname,
                 birthday: e?.birthday,
                 avatar: isNotEmpty(avatar) ? base64.bytesToBase64(avatar) : "",
                 sourceType,
@@ -153,12 +153,12 @@ export class ContactInterface {
      */
     static getApiContacts(extraProperties: string[] = []): any[] {
         // Compensate for if `avatar` is passed instead of contactImage
-        if (extraProperties.includes('avatar')) {
-            if (!extraProperties.includes('contactImage') && !extraProperties.includes('contactThumbnailImage')) {
-                extraProperties.push('contactImage');
+        if (extraProperties.includes("avatar")) {
+            if (!extraProperties.includes("contactImage") && !extraProperties.includes("contactThumbnailImage")) {
+                extraProperties.push("contactImage");
             }
 
-            extraProperties = extraProperties.filter((e) => e !== 'avatar');
+            extraProperties = extraProperties.filter(e => e !== "avatar");
         }
 
         return ContactInterface.mapContacts(contacts.getAllContacts(extraProperties), "api");
@@ -179,10 +179,10 @@ export class ContactInterface {
      * @returns A list of contact entries from both the API and local DB
      */
     static async getAllContacts(extraProperties: string[] = []): Promise<any[]> {
-        const withAvatars = (
-            extraProperties.includes('contactImage') || extraProperties.includes('contactThumbnailImage') ||
-            extraProperties.includes('avatar')
-        );
+        const withAvatars =
+            extraProperties.includes("contactImage") ||
+            extraProperties.includes("contactThumbnailImage") ||
+            extraProperties.includes("avatar");
         const apiContacts = ContactInterface.getApiContacts(extraProperties);
         const dbContacts = await ContactInterface.getDbContacts(withAvatars);
         return [...dbContacts, ...apiContacts];
@@ -255,33 +255,46 @@ export class ContactInterface {
      *
      * @param firstName The first name of the contact
      * @param lastname The last name of the contact
+     * @param displayName The name to show for the contact
      * @param phoneNumbers A list of phone numbers to add to the contact
      * @param emails A list of emails to add to the contact
      * @returns The contact object
      */
     static async createContact({
+        id,
         firstName,
         lastName,
+        displayName = null,
         phoneNumbers = [],
         emails = [],
         avatar = null,
         updateEntry = false
     }: {
+        id?: number;
         firstName: string;
         lastName: string;
+        displayName?: string | null;
         phoneNumbers?: string[];
         emails?: string[];
         updateEntry?: boolean;
-        avatar?: Buffer
+        avatar?: Buffer;
     }): Promise<Contact> {
         const repo = Server().repo.contacts();
-        let contact = await repo.findOne({ firstName, lastName }, { relations: ["addresses"] });
+        let contact = null;
+        if (id) {
+            contact = await repo.findOne(id, { relations: ["addresses"] });
+        } else {
+            contact = await repo.findOne({ firstName, lastName }, { relations: ["addresses"] });
+        }
+
+        let isNew = false;
         if (contact && !updateEntry) {
             throw new Error("Contact already exists!");
         } else if (!contact) {
             // If the contact doesn't exists, create it
-            contact = repo.create({ firstName, lastName, avatar });
+            contact = repo.create({ firstName, lastName, avatar, displayName });
             await repo.save(contact);
+            isNew = true;
         }
 
         contact.addresses = [];
@@ -294,8 +307,32 @@ export class ContactInterface {
             await this.addAddressToContact(contact, e, "email");
         }
 
+        // If it was newly saved, we don't need to update any fields
+        if (isNew) return contact;
+
+        // For existing items, update their fields
+        let updated = false;
+        if (isNotEmpty(firstName) && firstName !== contact.firstName) {
+            contact.firstName = firstName;
+            updated = true;
+        }
+
+        if (isNotEmpty(firstName) && firstName !== contact.firstName) {
+            contact.firstName = firstName;
+            updated = true;
+        }
+
         if (isNotEmpty(avatar)) {
             contact.avatar = avatar;
+            updated = true;
+        }
+
+        if (isNotEmpty(displayName) && displayName !== contact.displayName) {
+            contact.displayName = displayName;
+            updated = true;
+        }
+
+        if (updated) {
             await repo.save(contact);
         }
 
