@@ -163,8 +163,8 @@ export class MessageRouter {
             const sentMessage = await MessageInterface.sendMessageSync(
                 chatGuid,
                 message,
-                attributedBody,
                 method,
+                attributedBody,
                 subject,
                 effectId,
                 selectedMessageGuid,
