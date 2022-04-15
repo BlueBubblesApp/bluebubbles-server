@@ -46,7 +46,6 @@ class SocketManager {
                     Logger.warn("error decoding")
                     continue
                 }
-                Logger.debug("Recieved socket message: "+msg.name+":"+msg.uuid)
                 try sock?.write(from: msg.handleMessage()!.toBytes())
             } catch let error {
                 guard let socketError = error as? Socket.Error else {

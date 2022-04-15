@@ -8,6 +8,10 @@ const START_OF_TEXT = 0x02;
  * Represents the ASCII end of text (ETX) character.
  */
 const END_OF_TEXT = 0x03;
+/**
+ * Represents the ASCII end of transmission (EOT) character.
+ */
+const END_OF_TRANSMISSION = 0x04;
 
 /**
  * A class that facilitates sending events over the swift helper socket.
@@ -61,13 +65,13 @@ export class Event {
 
     /**
      * Converts the SocketMessage to a Buffer for sending over the socket.
-     * Uses the format STX+name+ETX+STX+uuid+ETX+data
+     * Uses the format STX+name+ETX+STX+uuid+ETX+data+EOT
      * @returns {Buffer}
      */
     toBytes(): Buffer {
         const nameBuf = Buffer.from(this.name, "ascii");
         const uuidBuf = Buffer.from(this.uuid, "ascii");
-        const buf = Buffer.alloc(nameBuf.length + 2 + uuidBuf.length + 2 + this.data.length);
+        const buf = Buffer.alloc(nameBuf.length + 2 + uuidBuf.length + 2 + this.data.length + 1);
         let loc = 0;
         buf[loc] = START_OF_TEXT;
         nameBuf.copy(buf, (loc += 1));
@@ -76,6 +80,7 @@ export class Event {
         uuidBuf.copy(buf, (loc += 1));
         buf[(loc += uuidBuf.length)] = END_OF_TEXT;
         this.data.copy(buf, (loc += 1));
+        buf[buf.length-1] = END_OF_TRANSMISSION;
         return buf;
     }
 }

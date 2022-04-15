@@ -22,8 +22,11 @@ func deserializeAttributedBody(data: Data) -> Data {
             // now we need to check if the type is actually serializible
             // ie trying to serialize NSData will screw stuff up
             // I'm pretty sure we can parse this data if we want later,
-            // but it doesn't seem important and is usually just related
-            // to the date/timestamp of a tapback
+            // but it doesn't seem high priority and is usually just related
+            // to a message including a date, which could be implemented without
+            // the extra data from the attributedBody field.
+            // because we're effectively removing the attribute value here, this can
+            // lead to multiple keys over adjacent ranges that have the same value
             if (!(attr.value is NSData)) {
                 runAttributes[attr.key] = attr.value
             }

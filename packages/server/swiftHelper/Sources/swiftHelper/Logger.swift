@@ -11,8 +11,8 @@ class Logger {
     // the main log function that sends a log to parent process as an Event.
     // this should be used instead of print, which should never be used.
     static func log(_ msg: String, level: LogLevel = .log) {
-        // format logLevel:message:ETX
-        print(level.rawValue+":"+msg, terminator: "\u{3}")
+        // format logLevel:message:EOT
+        print(level.rawValue+":"+msg, terminator: "\u{4}")
     }
     // convinience functions for log levels
     static func debug(_ msg: String) {

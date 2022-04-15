@@ -1,5 +1,3 @@
-const TIMEOUT = 1000;
-
 /**
  * A helper class to handle the responses from the swift helper socket.
  */
@@ -10,8 +8,9 @@ const TIMEOUT = 1000;
    * Adds a callback to the queue to be called when the response is received.
    * @param {string} uuid The uuid of the SocketMessage
    * @param {(buf: Buffer) => void} cb The promise to resolve when the message is received.
+   * @param {number} timeout The timeout in milliseconds to wait for the response.
    */
-  enqueue(uuid: string, cb: (buf: Buffer) => void) {
+  enqueue(uuid: string, cb: (buf: Buffer) => void, timeout: number) {
       if (!(uuid in this.queue)) {
           this.queue[uuid] = cb;
           // if the socket requests takes longer than the timeout time, we should cancel it
@@ -19,7 +18,7 @@ const TIMEOUT = 1000;
           setTimeout(() => {
               if (this.queue[uuid] != null) this.queue[uuid](null);
               delete this.queue[uuid];
-          }, TIMEOUT);
+          }, timeout);
       }
   }
 

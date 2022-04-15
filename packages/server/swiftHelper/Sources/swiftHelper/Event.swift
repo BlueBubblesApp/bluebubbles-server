@@ -9,6 +9,7 @@ import Foundation
 
 let START_OF_TEXT: UInt8 = 0x02
 let END_OF_TEXT: UInt8 = 0x03
+let END_OF_TRANSMISSION: UInt8 = 0x04
 
 class Event {
     let name: String
@@ -34,7 +35,7 @@ class Event {
         guard let uuidEnd = remain.firstIndex(of: END_OF_TEXT) else {return nil}
         let uuidData = remain.subdata(in: uuidStart+1 ..< uuidEnd)
         guard let uuid = String(data: uuidData, encoding: .ascii) else {return nil}
-        let data = remain.subdata(in: uuidEnd+1 ..< remain.count)
+        let data = remain.subdata(in: uuidEnd+1 ..< remain.count-1)
         return Event(event: event, uuid: uuid, data: data)
     }
     func toBytes() -> Data {
@@ -44,6 +45,7 @@ class Event {
         data.append(uuid.data(using: .ascii)!)
         data.append(Data([END_OF_TEXT]))
         data.append(self.data)
+        data.append(Data([END_OF_TRANSMISSION]))
         return data
     }
     func handleMessage() -> Event? {

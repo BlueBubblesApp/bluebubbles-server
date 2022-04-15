@@ -32,8 +32,20 @@ import { Queue } from "./queue";
                 Server().log("Swift Helper disconnected");
             });
             client.on("data", data => {
-                const msg = Event.fromBytes(data);
-                this.queue.call(msg.uuid, msg.data);
+                data.indexOf("\u0004")
+                // split data by the EOT character
+                const events = [];
+                let lastI = 0;
+                for (let i = 0; i < data.length; i++) {
+                    if (data[i] === 0x04) {
+                        events.push(data.slice(lastI, i));
+                        lastI = i + 1;
+                    }
+                }
+                events.forEach(event => {
+                    const msg = Event.fromBytes(event);
+                    this.queue.call(msg.uuid, msg.data);
+                });
             });
             this.helper = client;
         });
@@ -48,9 +60,9 @@ import { Queue } from "./queue";
         // so we can forward to the bb logger
         this.child.stdout.on("data", (data: string) => {
             // multiple lines can be returned if written in quick succession
-            // therefore we should pass the ascii ETX (\u0003)
-            // at the end of each log and split by the ETX character
-            const lines = data.split("\u0003");
+            // therefore we should pass the ascii EOT (\u0004)
+            // at the end of each log and split by the EOT character
+            const lines = data.split("\u0004");
             lines.pop();
             for (const line of lines) {
                 let splitIndex = line.indexOf(":");
@@ -92,12 +104,13 @@ import { Queue } from "./queue";
     /**
      * Sends a Event to the Swift Helper process and listens for the response.
      * @param {Event} msg The Event to send.
+     * @param {number} timeout The timeout in milliseconds, defaults to 1000.
      * @returns {Promise<Buffer | null>} A promise that resolves to the response message.
      */
-    private async sendSocketEvent(msg: Event): Promise<Buffer | null> {
+    private async sendSocketEvent(msg: Event, timeout=1000): Promise<Buffer | null> {
         return new Promise(resolve => {
             this.helper.write(msg.toBytes());
-            this.queue.enqueue(msg.uuid, resolve);
+            this.queue.enqueue(msg.uuid, resolve, timeout);
         });
     }
 
@@ -110,7 +123,7 @@ import { Queue } from "./queue";
         // if the blob is null or our helper isn't connected, we should return null
         if (blob != null && this.helper != null) {
             const msg = new Event("deserializeAttributedBody", Buffer.from(blob));
-            const buf = await this.sendSocketEvent(msg);
+            const buf = await this.sendSocketEvent(msg, 250);
             // in case the helper process returns something weird,
             // catch any exceptions that would come from deserializing it and return null
             if (buf != null) {
