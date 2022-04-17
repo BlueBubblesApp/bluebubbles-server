@@ -522,4 +522,24 @@ export class FileSystem {
 
         return region;
     }
+
+    static async getIcloudAccount(): Promise<string> {
+        let account = null;
+
+        try {
+            // Try to get the language (i.e. en_US)
+            const output = await FileSystem.execShellCommand(
+                `/usr/libexec/PlistBuddy -c "print :Accounts:0:AccountID" ~/Library/Preferences/MobileMeAccounts.plist`
+            );
+
+            // If we get a result back, pull the region out of it
+            if (isNotEmpty(output) && output.includes("@")) {
+                account = output.trim();
+            }
+        } catch (ex) {
+            // Don't do anything if it fails, we'll just default to US
+        }
+
+        return account;
+    }
 }

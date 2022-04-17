@@ -76,15 +76,8 @@ export class SocketRoutes {
         /**
          * Return information about the server
          */
-        socket.on("get-server-metadata", (_, cb): void => {
-            const meta: ServerMetadataResponse = {
-                os_version: osVersion,
-                server_version: app.getVersion(),
-                private_api: Server().repo.getConfig("enable_private_api") as boolean,
-                proxy_service: Server().repo.getConfig("proxy_service") as string,
-                helper_connected: !!Server().privateApiHelper?.helper
-            };
-
+        socket.on("get-server-metadata", async (_, cb): Promise<void> => {
+            const meta: ServerMetadataResponse = await GeneralInterface.getServerMetadata();
             return response(cb, "server-metadata", createSuccessResponse(meta, "Successfully fetched metadata"));
         });
 
@@ -589,16 +582,19 @@ export class SocketRoutes {
 
                 Server().httpService.sendCache.remove(tempGuid);
                 if ((sentMessage.error ?? 0) !== 0) {
-                    return response(cb, "message-send-error", createServerErrorResponse(
-                        'Message failed to send!',
-                        ErrorTypes.IMESSAGE_ERROR,
-                        'Message sent with an error. See attached message',
-                        await getMessageResponse(sentMessage))
+                    return response(
+                        cb,
+                        "message-send-error",
+                        createServerErrorResponse(
+                            "Message failed to send!",
+                            ErrorTypes.IMESSAGE_ERROR,
+                            "Message sent with an error. See attached message",
+                            await getMessageResponse(sentMessage)
+                        )
                     );
                 } else {
                     return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
                 }
-                
             } catch (ex: any) {
                 Server().httpService.sendCache.remove(tempGuid);
                 if (ex?.ROWID) {
