@@ -724,7 +724,7 @@ class BlueBubblesServer extends EventEmitter {
         let contactStatus = "Unknown";
         try {
             // If denied, this will not re-request the permission
-            contactStatus = contacts.getAuthStatus();
+            contactStatus = await contacts.requestAccess();
         } catch (ex) {
             this.log(`Failed to request contacts auth access! Error: ${ex}`, "debug");
         }
