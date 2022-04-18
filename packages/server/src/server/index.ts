@@ -721,12 +721,15 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Check for contact permissions
-        let contactStatus = contacts.getAuthStatus();
-        if (contactStatus === "Not Determined") {
-            contactStatus = await contacts.requestAccess();
+        let contactStatus = "Unknown";
+        try {
+            // If denied, this will not re-request the permission
+            contactStatus = contacts.getAuthStatus();
+        } catch (ex) {
+            this.log(`Failed to request contacts auth access! Error: ${ex}`, "debug");
         }
-        this.log(`Contacts authorization status: ${contactStatus}`, "debug");
 
+        this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         this.log("Finished post-start checks...");
     }
 

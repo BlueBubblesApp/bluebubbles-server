@@ -1,0 +1,6 @@
+owner: BlueBubblesApp
+repo: bluebubbles-server
+provider: github
+private: false
+releaseType: draft
+updaterCacheDirName: '@bluebubblesserver-updater'

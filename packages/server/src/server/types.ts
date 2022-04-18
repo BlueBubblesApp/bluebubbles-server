@@ -6,6 +6,7 @@ export type ServerMetadataResponse = {
     private_api: boolean;
     helper_connected: boolean;
     proxy_service: string;
+    detected_icloud: string;
 };
 
 /**

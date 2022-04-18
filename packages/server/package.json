@@ -76,6 +76,10 @@
             "hardenedRuntime": true,
             "entitlements": "./scripts/entitlements.mac.plist",
             "entitlementsInherit": "./scripts/entitlements.mac.plist",
+            "extendInfo": {
+                "NSContactsUsageDescription": "This app needs access to your Contacts",
+                "NSAppleEventsUsageDescription": "This app needs access to run AppleScripts"
+            },
             "gatekeeperAssess": false,
             "minimumSystemVersion": "10.11.6"
         },

@@ -1,5 +1,7 @@
 node_modules/
-dist/
+!dist/
+dist/*
+!dist/dev-app-update.yml
 release/
 .vscode
 .DS_Store
