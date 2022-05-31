@@ -4,20 +4,20 @@ import { FileSystem } from "@server/fileSystem";
 import { isMinBigSur } from "@server/helpers/utils";
 
 
-
 export class FacetimeService {
 
     disableFacetimeListener = false;
 
     incomingCallListener: NodeJS.Timeout;
 
-    static gettingCallPrev = false;
-    static gettingCall = false;
-    static notificationSent = false;
-
 
     start() {
         Server().log('Initializing Facetime Service');
+
+        let gettingCall = false;
+        let gettingCallPrev = false;
+        let notificationSent = false;
+        
         if (this.disableFacetimeListener) return;
 
         // Service loop
@@ -27,39 +27,35 @@ export class FacetimeService {
             // Check for call applescript
             let facetimeCallIncoming;
             if (isMinBigSur) {
+                // eslint-disable-next-line max-len
                 facetimeCallIncoming  = await (await FileSystem.executeAppleScript(checkForIncomingFacetime11())).replace('\n', ''); // If on macos 11 and up
             } else {
+                // eslint-disable-next-line max-len
                 facetimeCallIncoming  = await (await FileSystem.executeAppleScript(checkForIncomingFacetime10())).replace('\n', ''); // If on macos 10 and below
             }
             
-
-
-
             // Update the gettingCall variable if you're getting a call
             if (facetimeCallIncoming !== '')
-                FacetimeService.gettingCall = true;
+                gettingCall = true;
             else
-                FacetimeService.gettingCall = false;
+                gettingCall = false;
             
-
-
             // If you're getting a call, send a notification to the device
-            if (FacetimeService.gettingCall && !FacetimeService.notificationSent) {
+            if (gettingCall && !notificationSent) {
                 Server().log(`Incoming facetime call from ${facetimeCallIncoming}`);
-                FacetimeService.notificationSent = true;
+                notificationSent = true;
                 const jsonData = JSON.stringify({
                     "caller": facetimeCallIncoming,
-                    "timestamp": Math.floor(+new Date() / 1000),
+                    "timestamp": new Date().getTime(),
                 })
                 Server().emitMessage("incoming-facetime", jsonData);
             }
 
-
             // Clear the notification sent variable
-            if (!FacetimeService.gettingCall && FacetimeService.notificationSent && FacetimeService.gettingCallPrev)
-                FacetimeService.notificationSent = false;
+            if (!gettingCall && notificationSent && gettingCallPrev)
+                notificationSent = false;
 
-            FacetimeService.gettingCallPrev = FacetimeService.gettingCall;
+            gettingCallPrev = gettingCall;
 
             setTimeout(serviceLoop, 1000);
         };
