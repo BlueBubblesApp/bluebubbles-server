@@ -6,3 +6,5 @@ release/
 .DS_Store
 **/*.log
 .env
+.yarn
+.yarnrc*

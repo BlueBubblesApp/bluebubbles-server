@@ -259,7 +259,7 @@ export class ChatInterface {
         const repo = Server().iMessageRepo.db.getRepository(Chat);
         if (!chat && isEmpty(guid)) throw new Error("No chat or chat GUID provided!");
 
-        const theChat = chat ?? (await repo.findOne({ guid }));
+        const theChat = chat ?? (await repo.findOneBy({ guid }));
         if (!theChat) return;
 
         // Tell the private API to delete the chat
@@ -271,7 +271,7 @@ export class ChatInterface {
             tryCount += 1;
 
             // See if the chat exists in the DB
-            const chat = await repo.findOne({ guid: theChat.guid });
+            const chat = await repo.findOneBy({ guid: theChat.guid });
 
             // If it doesn't, we're all good and can break out. It's been deleted.
             // Otherwise, we need to check again after our wait time

@@ -133,7 +133,7 @@ export class ServerRepository extends EventEmitter {
     async setConfig(name: string, value: Date | string | boolean | number): Promise<void> {
         const orig = { ...this.config };
         const saniVal = ServerRepository.convertToDbValue(value);
-        const item = await this.configs().findOne({ name });
+        const item = await this.configs().findOneBy({ name });
 
         // Either change or create the new Config object
         if (item) {
@@ -172,7 +172,7 @@ export class ServerRepository extends EventEmitter {
 
     public async getContacts(withAvatars = false): Promise<Array<Contact>> {
         const repo = this.contacts();
-        const fields: (keyof Contact)[] = ["firstName", "lastName", "displayName"];
+        const fields: (keyof Contact)[] = ["firstName", "lastName", "displayName", "id"];
         if (withAvatars) {
             fields.push("avatar");
         }
@@ -182,7 +182,7 @@ export class ServerRepository extends EventEmitter {
 
     public async addWebhook(url: string, events: Array<{ label: string; value: string }>): Promise<Webhook> {
         const repo = this.webhooks();
-        const item = await repo.findOne({ url });
+        const item = await repo.findOneBy({ url });
 
         // If the webhook exists, don't re-add it, just return it
         if (item) return item;
@@ -201,7 +201,7 @@ export class ServerRepository extends EventEmitter {
         events: Array<{ label: string; value: string }>;
     }): Promise<Webhook> {
         const repo = this.webhooks();
-        const item = await repo.findOne({ id });
+        const item = await repo.findOneBy({ id });
         if (!item) throw new Error("Failed to update webhook! Existing webhook does not exist!");
 
         if (url) item.url = url;
@@ -213,7 +213,7 @@ export class ServerRepository extends EventEmitter {
 
     public async deleteWebhook({ url = null, id = null }: { url: string | null; id: number | null }): Promise<void> {
         const repo = this.webhooks();
-        const item = url ? await repo.findOne({ url }) : await repo.findOne({ id });
+        const item = url ? await repo.findOneBy({ url }) : await repo.findOneBy({ id });
         if (!item) return;
         await repo.delete(item.id);
     }

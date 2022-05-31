@@ -54,9 +54,9 @@ import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { fs } from "zx";
+import { getContactPermissionStatus } from "./utils/PermissionUtils";
 
 const findProcess = require("find-process");
-const contacts = require("node-mac-contacts");
 
 const osVersion = macosVersion();
 
@@ -710,14 +710,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Check for contact permissions
-        let contactStatus = "Unknown";
-        try {
-            // If denied, this will not re-request the permission
-            contactStatus = await contacts.requestAccess();
-        } catch (ex) {
-            this.log(`Failed to request contacts auth access! Error: ${ex}`, "debug");
-        }
-
+        const contactStatus = await getContactPermissionStatus();
         this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         this.log("Finished post-start checks...");
     }

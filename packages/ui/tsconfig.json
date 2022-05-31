@@ -1,9 +1,17 @@
 {
-    "extends": "../../tsconfig.base.json",
-    "compilerOptions": {
-        "baseUrl": "./src",
-        "jsx": "react-jsx"
-    },
-    "include": ["src"],
-    "exclude": ["dist", "node_modules", "*.js"]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "./src",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "*.js"
+  ]
 }

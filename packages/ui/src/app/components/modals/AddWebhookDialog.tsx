@@ -25,7 +25,7 @@ import { convertMultiSelectValues } from '../../utils/GenericUtils';
 interface AddWebhookDialogProps {
     onCancel?: () => void;
     isOpen: boolean;
-    modalRef: React.RefObject<FocusableElement> | undefined;
+    modalRef: React.RefObject<FocusableElement>;
     onClose: () => void;
     existingId?: number;
 }

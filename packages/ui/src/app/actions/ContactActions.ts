@@ -11,11 +11,20 @@ export const deleteContact = async (contactId: number): Promise<void> => {
 };
 
 export const deleteContactAddress = async (contacAddresstId: number): Promise<void> => {
-    await ipcRenderer.invoke('remove-address', contacAddresstId);
-    showSuccessToast({
-        id: 'contacts',
-        description: 'Successfully deleted Address!'
-    });
+    try {
+        await ipcRenderer.invoke('remove-address', contacAddresstId);
+        showSuccessToast({
+            id: 'contacts',
+            description: 'Successfully deleted Address!'
+        });
+    } catch (ex: any) {
+        let msg = ex?.message ?? String(ex);
+        msg = msg.split('Error: ')[1];
+        showErrorToast({
+            id: 'contacts',
+            description: `Failed to delete Contact! Error: ${msg}`
+        });
+    }
 };
 
 export const updateContact = async (contactId: number, updatedFields: NodeJS.Dict<any>): Promise<ContactItem> => {
@@ -82,4 +91,22 @@ export const addAddressToContact = async (contactId: number, address: string, ad
     }
 
     return null;
+};
+
+export const deleteLocalContacts = async (): Promise<void> => {
+    try {
+        await ipcRenderer.invoke('delete-contacts');
+
+        showSuccessToast({
+            id: 'contacts',
+            description: 'Successfully deleted all local Contacts!'
+        });
+    } catch (ex: any) {
+        let msg = ex?.message ?? String(ex);
+        msg = msg.split('Error: ')[1];
+        showErrorToast({
+            id: 'contacts',
+            description: `Failed to delete all local Contacts! Error: ${msg}`
+        });
+    }
 };

@@ -19,7 +19,7 @@ interface ConfirmationDialogProps {
     acceptText?: string;
     onAccept?: () => void;
     isOpen: boolean;
-    modalRef: React.RefObject<FocusableElement> | undefined;
+    modalRef: React.RefObject<FocusableElement>;
     onClose: () => void;
 }
 

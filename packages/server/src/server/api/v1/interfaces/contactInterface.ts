@@ -238,7 +238,7 @@ export class ContactInterface {
         let contactAddress = Server().repo.contactAddresses().create({ address, type: addressType });
         const existingAddress = await Server()
             .repo.contactAddresses()
-            .findOne({ address, contact: { id: contact.id } }, { relations: ["contact"] });
+            .findOne({ where: { address, contact: { id: contact.id }}, relations: { contact: true } });
         if (!existingAddress) {
             contactAddress = await Server().repo.contactAddresses().save(contactAddress);
         } else {
@@ -282,9 +282,9 @@ export class ContactInterface {
         const repo = Server().repo.contacts();
         let contact = null;
         if (id) {
-            contact = await repo.findOne(id, { relations: ["addresses"] });
+            contact = await repo.findOne({ where: { id }, relations: { addresses: true } });
         } else {
-            contact = await repo.findOne({ firstName, lastName }, { relations: ["addresses"] });
+            contact = await repo.findOne({ where: { firstName, lastName }, relations: { addresses: true } });
         }
 
         let isNew = false;
@@ -360,7 +360,7 @@ export class ContactInterface {
             contact ??
             (await Server()
                 .repo.contacts()
-                .findOne(contactId, { relations: ["addresses"] }));
+                .findOne({ where: { id: contactId }, relations: { addresses: true } }));
         if (!foundContact && throwError) {
             throw new Error(`No contact found with the ID: ${contactId}`);
         }
@@ -391,7 +391,7 @@ export class ContactInterface {
             contactAddress ??
             (await Server()
                 .repo.contactAddresses()
-                .findOne(contactAddressId, { relations: ["addresses"] }));
+                .findOne({ where: { id: contactAddressId }, relations: { contact: true } }));
         if (!foundContact) {
             throw new Error(`No contact address found with the ID: ${contactAddressId}`);
         }
@@ -490,5 +490,13 @@ export class ContactInterface {
         }
 
         return output;
+    }
+    
+    /**
+     * Deletes all contacts from the "local" database
+     */
+     static async deleteAllContacts(): Promise<void> {
+        const repo = Server().repo.contacts();
+        await repo.clear();
     }
 }
