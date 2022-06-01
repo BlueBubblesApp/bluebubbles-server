@@ -72,6 +72,14 @@ export const DevicesLayout = (): JSX.Element => {
     
     useEffect(() => {
         refreshDevices(false);
+
+        // Refresh devices every 60 seconds
+        const refresher = setInterval(() => {
+            refreshDevices(false);
+        }, 60000);
+
+        // Return a function to clear the interval on unmount
+        return () => clearInterval(refresher);
     }, []);
 
     return (

@@ -7,7 +7,7 @@ import { openLogs, openAppData } from "@server/api/v1/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { BlueBubblesHelperService } from "../privateApi";
-import { getContactPermissionStatus } from "@server/utils/PermissionUtils";
+import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
 
 export class IPCService {
     /**
@@ -119,6 +119,10 @@ export class IPCService {
 
         ipcMain.handle("contact-permission-status", async (event, _) => {
             return await getContactPermissionStatus();
+        });
+
+        ipcMain.handle("request-contact-permission", async (event, _) => {
+            return await requestContactPermission();
         });
 
         ipcMain.handle("get-contacts", async (event, _) => {

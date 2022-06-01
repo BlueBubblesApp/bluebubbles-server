@@ -54,7 +54,7 @@ import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { fs } from "zx";
-import { getContactPermissionStatus } from "./utils/PermissionUtils";
+import { requestContactPermission } from "./utils/PermissionUtils";
 
 const findProcess = require("find-process");
 
@@ -710,7 +710,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Check for contact permissions
-        const contactStatus = await getContactPermissionStatus();
+        const contactStatus = await requestContactPermission();
         this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         this.log("Finished post-start checks...");
     }

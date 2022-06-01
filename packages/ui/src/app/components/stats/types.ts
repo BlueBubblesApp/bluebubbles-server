@@ -1,0 +1,1 @@
+export type StatValue = string | number | null;

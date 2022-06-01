@@ -102,6 +102,15 @@ export const ContactsLayout = (): JSX.Element => {
         });
     };
 
+    const requestContactPermission = async (): Promise<void> => {
+        setPermission(null);
+        ipcRenderer.invoke('request-contact-permission').then((status: string) => {
+            setPermission(status);
+        }).catch(() => {
+            setPermission('Unknown');
+        });
+    };
+
     useEffect(() => {
         ipcRenderer.invoke('get-contacts').then((contactList: any[]) => {
             setContacts(contactList.map((e: any) => {
@@ -152,8 +161,9 @@ export const ContactsLayout = (): JSX.Element => {
         );
 
         if (newContact) {
-            // Patch the contact using a string ID
+            // Patch the contact using a string ID & source type
             newContact.id = String(newContact.id);
+            newContact.sourceType = 'db';
 
             // Patch the addresses
             (newContact as any).phoneNumbers = (newContact as any).addresses.filter((e: any) => e.type === 'phone');
@@ -226,17 +236,7 @@ export const ContactsLayout = (): JSX.Element => {
     const clearLocalContacts = async () => {
         // Delete the contacts, then filter out the DB items
         await deleteLocalContacts();
-
-        console.log('BEFORE');
-        console.log(contacts.length);
-        const test = contacts.filter(e => e.sourceType !== 'db');
-        console.log('AFTER');
-        console.log(test.length);
-
-        setContacts(contacts.filter(e => {
-            console.log(e.sourceType);
-            return true;
-        }));
+        setContacts(contacts.filter(e => e.sourceType !== 'db'));
     };
 
     const confirmationActions: ConfirmationItems = {
@@ -310,7 +310,7 @@ export const ContactsLayout = (): JSX.Element => {
                                 Refresh Permission Status
                             </MenuItem>
                             {(permission !== null && permission !== 'Authorized') ? (
-                                <MenuItem icon={<BsUnlockFill />} onClick={() => refreshPermissionStatus()}>
+                                <MenuItem icon={<BsUnlockFill />} onClick={() => requestContactPermission()}>
                                     Request Permission
                                 </MenuItem>
                             ) : null}
