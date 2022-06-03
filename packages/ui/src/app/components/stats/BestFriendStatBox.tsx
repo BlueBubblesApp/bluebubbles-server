@@ -1,7 +1,10 @@
-import { getContactName } from 'app/utils/IpcUtils';
 import React from 'react';
+
+import { getContactName } from 'app/utils/IpcUtils';
 import { UpdatableStatBox } from './index';
 import { StatValue } from './types';
+
+const contactNameCache: NodeJS.Dict<string> = {};
 
 export const BestFriendStatBox = (
     {
@@ -34,8 +37,15 @@ export const BestFriendStatBox = (
         // If this is an individual, get their contact info
         if (!isGroup) {
             try {
-                const contact = await getContactName(currentTop);
-                if (contact?.firstName) return `${contact.firstName} ${contact?.lastName ?? ''}`.trim();
+                if (Object.keys(contactNameCache).includes(currentTop)) {
+                    return contactNameCache[currentTop] as string;
+                } else {
+                    const contact = await getContactName(currentTop);
+                    if (contact?.firstName) {
+                        contactNameCache[currentTop] = `${contact.firstName} ${contact?.lastName ?? ''}`.trim();
+                        return contactNameCache[currentTop] as string;
+                    }
+                }
             } catch {
                 // Don't do anything if we fail. The fallback will be applied
             }
