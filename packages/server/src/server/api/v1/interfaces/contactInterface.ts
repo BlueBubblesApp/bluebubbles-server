@@ -4,8 +4,11 @@ import vcf from "vcf";
 import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
 import { isNotEmpty } from "@server/helpers/utils";
+import { ApiContactsCache } from "../caches/apiContactsCache";
 
 const contacts = require("node-mac-contacts");
+
+const contactsCache = new ApiContactsCache();
 
 type GenericContactParams = {
     contactId?: number;
@@ -13,14 +16,34 @@ type GenericContactParams = {
 };
 
 export class ContactInterface {
+    
+    static apiExtraProperties: string[] = [
+        'jobTitle', 'departmentName', 'organizationName', 'middleName', 'note',
+        'contactImage', 'contactThumbnailImage', 'instantMessageAddresses', 'socialProfiles'
+    ]
+
     /**
      * Maps a contact record (either from the DB or API), and puts it into a standard format
      *
      * @param records The list of contacts to map
      * @returns A list of contacts in a generic format
      */
-    static mapContacts(records: any[], sourceType: string, { ignoreAvatars = false } = {}): any {
+    static mapContacts(
+        records: any[],
+        sourceType: string,
+        {
+            extraProps = []
+        }: {
+            extraProps?: string[]
+        } = {}): any {
         return records.map((e: NodeJS.Dict<any>) => {
+            // Only include extra properties that are asked for.
+            for (const prop of ContactInterface.apiExtraProperties) {
+                if (!extraProps.includes(prop) && Object.keys(e).includes(prop)) {
+                    delete e[prop];
+                }
+            }
+
             if (Object.keys(e).includes("addresses")) {
                 e.phoneNumbers = [
                     ...(e?.phoneNumbers ?? []),
@@ -67,7 +90,10 @@ export class ContactInterface {
                 ];
             }
 
-            const avatar = ignoreAvatars ? null : e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail;
+            const useAvatar = extraProps.includes('avatar') ||
+                extraProps.includes('contactImage') ||
+                extraProps.includes('contactImageThumbnail');
+            const avatar = useAvatar ? e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail : null;
             return {
                 // These maps are for backwards compatibility with the client.
                 // The "old" way we fetched contacts had a lot more information, but was less reliable.
@@ -148,20 +174,20 @@ export class ContactInterface {
     /**
      * Gets all contacts from the AddressBook API
      *
-     * @param extraProperties Non-default properties to fetch from the API
+     * @param extraProps Non-default properties to fetch from the API
      * @returns A list of contact entries from the API
      */
-    static getApiContacts(extraProperties: string[] = []): any[] {
+    static getApiContacts(extraProps: string[] = []): any[] {
         // Compensate for if `avatar` is passed instead of contactImage
-        if (extraProperties.includes("avatar")) {
-            if (!extraProperties.includes("contactImage") && !extraProperties.includes("contactThumbnailImage")) {
-                extraProperties.push("contactImage");
+        if (extraProps.includes("avatar")) {
+            if (!extraProps.includes("contactImage") && !extraProps.includes("contactThumbnailImage")) {
+                extraProps.push("contactImage");
             }
 
-            extraProperties = extraProperties.filter(e => e !== "avatar");
+            extraProps = extraProps.filter(e => e !== "avatar");
         }
 
-        return ContactInterface.mapContacts(contacts.getAllContacts(extraProperties), "api");
+        return ContactInterface.mapContacts(contactsCache.getApiContacts(), "api", { extraProps });
     }
 
     /**
@@ -498,5 +524,9 @@ export class ContactInterface {
      static async deleteAllContacts(): Promise<void> {
         const repo = Server().repo.contacts();
         await repo.clear();
+    }
+
+    static refreshApiContacts() {
+        contactsCache.loadApiContacts(true);
     }
 }

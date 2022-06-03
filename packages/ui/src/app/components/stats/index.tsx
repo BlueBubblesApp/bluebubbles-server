@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { ipcRenderer } from 'electron';
 import {
     Spacer,
     Box,
     Badge,
     Text,
-    SkeletonText,
+    SkeletonText
 } from '@chakra-ui/react';
 import { formatNumber } from 'app/utils/NumberUtils';
 import { useAppDispatch, useAppSelector } from '../../hooks';
@@ -17,6 +17,8 @@ import { DailyMessagesStatBox } from './DailyMessagesStatBox';
 import { TotalPicturesStatBox } from './TotalPicturesStatBox';
 import { TotalVideosStatBox } from './TotalVideosStatBox';
 import { StatValue } from './types';
+import { useTimeout } from 'app/hooks/UseTimeout';
+import { useInterval } from 'app/hooks/UseInterval';
 
 
 const updateCache: { [key: string]: number } = {};
@@ -36,8 +38,8 @@ const shouldUpdate = (statName: string, updateInterval: number) => {
     const lastCheck = updateCache[statName];
 
     // If we haven't checked within the update interval, we should check.
-    // Include a 100ms tolerance
-    if ((new Date().getTime()) - lastCheck >= updateInterval - 100) return true;
+    // Include a 500ms tolerance
+    if ((new Date().getTime()) - lastCheck >= updateInterval - 500) return true;
 
     return false;
 };
@@ -105,21 +107,11 @@ export const UpdatableStatBox = (
         });
     };
 
-    /**
-     * Called after the first component render, and anytime the
-     * dependencies change (never in this case)
-     */
-    useEffect(() => {
-        // Call the function to update the stat, applying the delay
-        setTimeout(updateStat, delay);
+    useTimeout(updateStat, delay);
 
-        if (autoUpdate) {
-            const refresher = setInterval(updateStat, updateInterval);
-
-            // Return a function to clear the interval on unmount
-            return () => clearInterval(refresher);
-        }
-    }, []);
+    if (autoUpdate) {
+        useInterval(updateStat, updateInterval);
+    }
 
     return <StatBox title={title} text={stat} color={color} />;
 };

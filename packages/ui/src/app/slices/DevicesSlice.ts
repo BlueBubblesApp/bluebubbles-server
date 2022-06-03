@@ -38,6 +38,7 @@ export const DevicesSlice = createSlice({
             }
         },
         add: (state, action: PayloadAction<DeviceItem>) => {
+            if (deviceExists(state, action.payload)) return;
             state.devices.push(action.payload);
         },
         clear: (state) => {

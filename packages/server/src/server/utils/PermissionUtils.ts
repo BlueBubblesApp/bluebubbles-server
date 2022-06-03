@@ -21,9 +21,9 @@ export const requestContactPermission = async (): Promise<string> => {
     let contactStatus = getContactPermissionStatus();
 
     try {
-        // Only request access if the permission is "Not Determined".
+        // Only request access if the permission is "Not Determined" or "Unknown".
         // If the permission is denied, then it was explicitly denied and we shouldn't request it.
-        if (contactStatus === 'Not Determined') {
+        if (contactStatus === 'Not Determined' || contactStatus === 'Unknown') {
             contactStatus = await contacts.requestAccess();
 
             // Check the new status

@@ -97,7 +97,11 @@ export const reinstallHelperBundle = async () => {
 };
 
 export const getContactName = async (value: string): Promise<ContactItem> => {
+    return await syncInvokeIpc('get-contact-name', value);
+};
+
+export const syncInvokeIpc = async (event: string, data: any = null): Promise<any> => {
     return new Promise((resolve, reject) => {
-        ipcRenderer.invoke('get-contact-name', value).then(resolve).catch(reject);
+        ipcRenderer.invoke(event, data).then(resolve).catch(reject);
     });
 };

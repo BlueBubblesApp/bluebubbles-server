@@ -41,7 +41,7 @@ import { ContactAddress, ContactItem, ContactsTable } from 'app/components/table
 import { ContactDialog } from 'app/components/modals/ContactDialog';
 import { addAddressToContact, createContact, deleteContact, deleteContactAddress, deleteLocalContacts, updateContact } from 'app/actions/ContactActions';
 import { FiTrash } from 'react-icons/fi';
-import { ConfirmationItems } from 'app/utils/ToastUtils';
+import { ConfirmationItems, showSuccessToast } from 'app/utils/ToastUtils';
 import { ConfirmationDialog } from 'app/components/modals/ConfirmationDialog';
 import { waitMs } from 'app/utils/GenericUtils';
 
@@ -111,7 +111,7 @@ export const ContactsLayout = (): JSX.Element => {
         });
     };
 
-    useEffect(() => {
+    const loadContacts = (showToast = false) => {
         ipcRenderer.invoke('get-contacts').then((contactList: any[]) => {
             setContacts(contactList.map((e: any) => {
                 // Patch the ID as a string
@@ -123,6 +123,16 @@ export const ContactsLayout = (): JSX.Element => {
             setIsLoading.off();
         });
 
+        if (showToast) {
+            showSuccessToast({
+                id: 'contacts',
+                description: 'Successfully refreshed Contacts!'
+            });
+        }
+    };
+
+    useEffect(() => {
+        loadContacts();
         refreshPermissionStatus();
     }, []);
 
@@ -267,6 +277,9 @@ export const ContactsLayout = (): JSX.Element => {
                             <MenuItem icon={<BsPersonPlus />} onClick={() => setDialogOpen.on()}>
                                 Add Contact
                             </MenuItem>
+                            <MenuItem icon={<BiRefresh />} onClick={() => loadContacts(true)}>
+                                Refresh Contacts
+                            </MenuItem>
                             <MenuItem
                                 icon={<BiImport />}
                                 onClick={() => {
@@ -390,7 +403,7 @@ export const ContactsLayout = (): JSX.Element => {
                         w="full"
                         pt={2}
                     >
-                        <PaginationPrevious>Previous</PaginationPrevious>
+                        <PaginationPrevious minWidth={'75px'}>Previous</PaginationPrevious>
                         <Box ml={1}></Box>
                         <PaginationPageGroup flexWrap="wrap" justifyContent="center">
                             {pages.map((page: number) => (
@@ -404,7 +417,7 @@ export const ContactsLayout = (): JSX.Element => {
                             ))}
                         </PaginationPageGroup>
                         <Box ml={1}></Box>
-                        <PaginationNext>Next</PaginationNext>
+                        <PaginationNext minWidth={'50px'}>Next</PaginationNext>
                     </PaginationContainer>
                 </Pagination>
             </Stack>

@@ -12,6 +12,7 @@ export const StatsSlice = createSlice({
     initialState,
     reducers: {
         setStat: (state, action: PayloadAction<StatItem>) => {
+            if (state[action.payload.name] === action.payload.value) return;
             state[action.payload.name] = action.payload.value;
         }
     }

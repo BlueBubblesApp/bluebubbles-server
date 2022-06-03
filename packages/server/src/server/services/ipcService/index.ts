@@ -214,6 +214,10 @@ export class IPCService {
             return count;
         });
 
+        ipcMain.handle("refresh-api-contacts", async (_, __) => {
+            ContactInterface.refreshApiContacts();
+        });
+
         ipcMain.handle("check-permissions", async (_, __) => {
             return await Server().checkPermissions();
         });

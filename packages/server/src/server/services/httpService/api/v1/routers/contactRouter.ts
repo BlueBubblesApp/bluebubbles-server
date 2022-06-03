@@ -83,7 +83,7 @@ export class ContactRouter {
             }
         }
 
-        const output: any = { data: ContactInterface.mapContacts(contacts, "db", { ignoreAvatars: true }) };
+        const output: any = { data: ContactInterface.mapContacts(contacts, "db") };
         if (isNotEmpty(errors)) {
             output.metadata = {};
             output.metadata.errors = errors;
