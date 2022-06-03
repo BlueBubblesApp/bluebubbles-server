@@ -23,7 +23,7 @@ interface ErrorDialogProps {
     errors: Array<ErrorItem>;
     closeButtonText?: string;
     isOpen: boolean;
-    modalRef: React.RefObject<FocusableElement> | undefined;
+    modalRef: React.RefObject<FocusableElement>;
     onClose: () => void
 }
 

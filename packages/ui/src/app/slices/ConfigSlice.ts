@@ -18,6 +18,7 @@ export const ConfigSlice = createSlice({
                 ipcRenderer.invoke('set-config', { [action.payload.name]: action.payload.value });
             }
 
+            if (state[action.payload.name] === action.payload.value) return;
             state[action.payload.name] = action.payload.value;
         },
         setConfigBulk: (state, action: PayloadAction<Array<ConfigItem>>) => {
@@ -28,6 +29,7 @@ export const ConfigSlice = createSlice({
                     ipcRenderer.invoke('set-config', { [i.name]: i.value });
                 }
 
+                if (state[i.name] === i.value) continue;
                 state[i.name] = i.value;
             }
         }

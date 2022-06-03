@@ -11,7 +11,7 @@ export class FcmRouter {
     }
 
     static async registerDevice(ctx: RouterContext, _: Next) {
-        const { name, identifier } = ctx.request?.body;
+        const { name, identifier } = (ctx.request?.body ?? {});
         await GeneralInterface.addFcmDevice(name, identifier);
         return new Success(ctx, { message: "Successfully added device!" }).send();
     }

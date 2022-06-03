@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Box,
     Divider,
@@ -20,14 +20,17 @@ import {
 } from '@chakra-ui/react';
 import { BsChevronDown } from 'react-icons/bs';
 import { FiTrash } from 'react-icons/fi';
+import { BiRefresh } from 'react-icons/bi';
+import { store } from '../../store';
 import { DevicesTable } from '../../components/tables/DevicesTable';
-import { ConfirmationItems } from '../../utils/ToastUtils';
+import { ConfirmationItems, showSuccessToast } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 import { hasKey } from '../../utils/GenericUtils';
 import { useAppSelector, useAppDispatch } from '../../hooks';
-import { clear } from '../../slices/DevicesSlice';
+import { clear, DeviceItem, addAll as addAllDevices } from '../../slices/DevicesSlice';
 import { AnyAction } from '@reduxjs/toolkit';
 import { AiOutlineInfoCircle } from 'react-icons/ai';
+import { getDevices } from '../../utils/IpcUtils';
 
 
 const confirmationActions: ConfirmationItems = {
@@ -42,6 +45,23 @@ const confirmationActions: ConfirmationItems = {
     }
 };
 
+const refreshDevices = (showToast = true) => {
+    getDevices().then(devices => {
+        if (!devices) return;
+    
+        const items: Array<DeviceItem> = [];
+        for (const item of devices) {
+            items.push({ id: item.identifier, name: item.name, lastActive: item.last_active });
+        }
+    
+        store.dispatch(addAllDevices(items));
+    });
+
+    if (showToast) {
+        showSuccessToast({ id: 'devices', description: 'Successfully refreshed devices!' });
+    }
+};
+
 export const DevicesLayout = (): JSX.Element => {
     const [requiresConfirmation, confirm] = useState((): string | null => {
         return null;
@@ -49,6 +69,18 @@ export const DevicesLayout = (): JSX.Element => {
     const alertRef = useRef(null);
     const devices = useAppSelector(state => state.deviceStore.devices);
     const dispatch = useAppDispatch();
+    
+    useEffect(() => {
+        refreshDevices(false);
+
+        // Refresh devices every 60 seconds
+        const refresher = setInterval(() => {
+            refreshDevices(false);
+        }, 60000);
+
+        // Return a function to clear the interval on unmount
+        return () => clearInterval(refresher);
+    }, []);
 
     return (
         <Box p={3} borderRadius={10}>
@@ -65,6 +97,9 @@ export const DevicesLayout = (): JSX.Element => {
                             Manage
                         </MenuButton>
                         <MenuList>
+                            <MenuItem icon={<BiRefresh />} onClick={() => refreshDevices()}>
+                                Refresh Devices
+                            </MenuItem>
                             <MenuItem icon={<FiTrash />} onClick={() => confirm('clearDevices')}>
                                 Clear Devices
                             </MenuItem>

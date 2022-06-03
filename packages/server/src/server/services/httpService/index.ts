@@ -190,7 +190,7 @@ export class HttpService {
              *
              * A console message will be printed, and a socket error will be emitted
              */
-            socket.use(async (_: any, next: (_?: any) => void) => {
+            socket.use(async (_: any, next: (error?: Error) => void) => {
                 try {
                     await next();
                 } catch (ex: any) {

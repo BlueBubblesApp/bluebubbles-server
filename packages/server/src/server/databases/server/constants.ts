@@ -1,5 +1,5 @@
 export const DEFAULT_SOCKET_PORT = 1234;
-export const DEFAULT_DB_ITEMS: { [key: string]: Function } = {
+export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     tutorial_is_done: () => 0,
     socket_port: () => DEFAULT_SOCKET_PORT,
     server_address: () => "",

@@ -76,9 +76,12 @@ export class MessagePromise {
         await this.emitMessageMatch(value);
     }
 
-    reject(reason?: any) {
+    async reject(reason?: any, message: Message = null) {
         this.isResolved = true;
         this.rejectPromise(reason);
+        if (message) {
+            await this.emitMessageError(message);
+        }
     }
 
     async emitMessageMatch(sentMessage: Message) {
@@ -86,6 +89,17 @@ export class MessagePromise {
         if (sentMessage && isNotEmpty(this.tempGuid)) {
             Server().httpService.sendCache.remove(this.tempGuid);
             await Server().emitMessageMatch(sentMessage, this.tempGuid);
+        }
+    }
+
+    async emitMessageError(sentMessage: Message) {
+        // If we have a sent message and we have a tempGuid, we need to emit the message match event
+        if (sentMessage) {
+            if (this.tempGuid) {
+                Server().httpService.sendCache.remove(this.tempGuid);
+            }
+            
+            await Server().emitMessageError(sentMessage, this.tempGuid);
         }
     }
 

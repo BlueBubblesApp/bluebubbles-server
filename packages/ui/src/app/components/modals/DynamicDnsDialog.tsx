@@ -12,7 +12,8 @@ import {
     Input,
     FormControl,
     FormErrorMessage,
-    FormLabel
+    FormLabel,
+    Text
 } from '@chakra-ui/react';
 import { FocusableElement } from '@chakra-ui/utils';
 
@@ -21,7 +22,7 @@ interface DynamicDnsDialogProps {
     onCancel?: () => void;
     onConfirm?: (address: string) => void;
     isOpen: boolean;
-    modalRef: React.RefObject<FocusableElement> | undefined;
+    modalRef: React.RefObject<FocusableElement>;
     onClose: () => void;
     port?: number
 }
@@ -51,13 +52,14 @@ export const DynamicDnsDialog = ({
                     </AlertDialogHeader>
 
                     <AlertDialogBody>
-                        Enter your Dynamic DNS URL, including the schema and port. Here are some examples:
-                        <br />
+                        <Text>Enter your Dynamic DNS URL, including the schema and port. Here are some examples:</Text>
                         <br />
                         <UnorderedList>
                             <ListItem>http://thequickbrownfox.ddns.net:{port}</ListItem>
-                            <ListItem>https://bluebubbles.no-ip.org:{port}</ListItem>
+                            <ListItem>http://bluebubbles.no-ip.org:{port}</ListItem>
                         </UnorderedList>
+                        <br />
+                        <Text>If you plan to use your own custom certificate, please remember to use <strong>"https://"</strong> as your URL scheme</Text>
                         <br />
                         <FormControl isInvalid={isInvalid}>
                             <FormLabel htmlFor='address'>Dynamic DNS</FormLabel>

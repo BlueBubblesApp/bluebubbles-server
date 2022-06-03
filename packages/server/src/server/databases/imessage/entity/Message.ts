@@ -504,11 +504,25 @@ export class Message {
     threadOriginatorPart: string;
 }
 
-export const getMessageResponse = async (tableData: Message): Promise<MessageResponse> => {
+export const getMessageResponse = async (
+    tableData: Message,
+    {
+        convertAttachments = true,
+        loadAttachmentMetadata = true,
+        getAttachmentData = false
+    }: {
+        convertAttachments?: boolean,
+        loadAttachmentMetadata?: boolean,
+        getAttachmentData?: boolean
+    } = {}): Promise<MessageResponse> => {
     // Load attachments
     const attachments = [];
     for (const attachment of tableData?.attachments ?? []) {
-        const resData = await getAttachmentResponse(attachment, false);
+        const resData = await getAttachmentResponse(attachment, {
+            convert: convertAttachments,
+            getData: getAttachmentData,
+            loadMetadata: loadAttachmentMetadata
+        });
         attachments.push(resData);
     }
 

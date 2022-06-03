@@ -17,7 +17,7 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
             errStr = `${errStr} (has data: true)`;
         }
 
-        Server().log(errStr, "error");
+        Server().log(errStr, "debug");
         if (ex?.stack) {
             Server().log(ex?.stack, "debug");
         }
