@@ -195,7 +195,8 @@ export class ContactInterface {
      * @returns A list of contact entries from the local DB
      */
     static async getDbContacts(withAvatars = false): Promise<any[]> {
-        return ContactInterface.mapContacts(await Server().repo.getContacts(withAvatars), "db");
+        const extraProps = withAvatars ? ["avatar"] : [];
+        return ContactInterface.mapContacts(await Server().repo.getContacts(withAvatars), "db", { extraProps });
     }
 
     /**
