@@ -1,5 +1,5 @@
 /* eslint-disable no-param-reassign */
-import { createConnection, Connection } from "typeorm";
+import { DataSource } from "typeorm";
 
 import { DBMessageParams, ChatParams, HandleParams } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
@@ -14,7 +14,7 @@ import { isEmpty } from "@firebase/util";
  * A repository class to facilitate pulling information from the iMessage database
  */
 export class MessageRepository {
-    db: Connection = null;
+    db: DataSource = null;
 
     constructor() {
         this.db = null;
@@ -24,13 +24,14 @@ export class MessageRepository {
      * Creates a connection to the iMessage database
      */
     async initialize() {
-        this.db = await createConnection({
+        this.db = new DataSource({
             name: "iMessage",
             type: "better-sqlite3",
             database: `${process.env.HOME}/Library/Messages/chat.db`,
             entities: [Chat, Handle, Message, Attachment]
         });
 
+        this.db = await this.db.initialize();
         return this.db;
     }
 

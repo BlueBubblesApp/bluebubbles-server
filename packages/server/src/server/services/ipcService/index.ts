@@ -135,9 +135,9 @@ export class IPCService {
 
         ipcMain.handle("add-contact", async (event, args) => {
             return await ContactInterface.createContact({
-                firstName: args.firstName,
-                lastName: args.lastName,
-                displayName: args.displayname,
+                firstName: args?.firstName ?? '',
+                lastName: args?.lastName ?? '',
+                displayName: args?.displayName ?? '',
                 emails: args.emails ?? [],
                 phoneNumbers: args.phoneNumbers ?? []
             });
@@ -146,9 +146,9 @@ export class IPCService {
         ipcMain.handle("update-contact", async (event, args) => {
             return await ContactInterface.createContact({
                 id: args.contactId ?? args.id,
-                firstName: args.firstName,
-                lastName: args.lastName,
-                displayName: args.displayName,
+                firstName: args?.firstName ?? '',
+                lastName: args.lastName ?? '',
+                displayName: args?.displayName ?? '',
                 emails: args.emails ?? [],
                 phoneNumbers: args.phoneNumbers ?? [],
                 updateEntry: true

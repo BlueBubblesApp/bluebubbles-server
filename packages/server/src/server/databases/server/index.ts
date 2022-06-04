@@ -1,16 +1,17 @@
 import { app } from "electron";
 import { EventEmitter } from "events";
-import { createConnection, Connection } from "typeorm";
+import { DataSource } from "typeorm";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
+import { ContactDisplayName1654360736751 } from "./migrations/1654360736751-ContactDisplayName";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
 
 export class ServerRepository extends EventEmitter {
-    db: Connection = null;
+    db: DataSource = null;
 
     config: ServerConfig;
 
@@ -21,12 +22,12 @@ export class ServerRepository extends EventEmitter {
         this.config = {};
     }
 
-    async initialize(): Promise<Connection> {
+    async initialize(): Promise<DataSource> {
         const isDev = process.env.NODE_ENV !== "production";
 
         // If the DB is set, but not connected, try to connect
         if (this.db) {
-            if (!this.db.isConnected) await this.db.connect();
+            if (!this.db.isInitialized) await this.db.initialize();
             return this.db;
         }
 
@@ -35,15 +36,16 @@ export class ServerRepository extends EventEmitter {
             dbPath = `${app.getPath("userData")}/bluebubbles-server/config.db`;
         }
 
-        this.db = await createConnection({
+        this.db = new DataSource({
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
             entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress],
-            // We should really use migrations for this.
-            // This is me being lazy. Maybe someday...
-            synchronize: true
+            migrations: [ContactDisplayName1654360736751],
+            synchronize: isDev
         });
+
+        this.db = await this.db.initialize();
 
         // Load default config items
         await this.loadConfig();

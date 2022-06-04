@@ -3,8 +3,9 @@ import fs from "fs";
 import vcf from "vcf";
 import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
-import { deduplicateObjectArray, isNotEmpty } from "@server/helpers/utils";
+import { deduplicateObjectArray, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { ApiContactsCache } from "../caches/apiContactsCache";
+import type { FindOptionsWhere } from "typeorm";
 
 const contacts = require("node-mac-contacts");
 
@@ -255,18 +256,18 @@ export class ContactInterface {
      */
     static async createContact({
         id,
-        firstName,
-        lastName,
-        displayName = null,
+        firstName = '',
+        lastName = '',
+        displayName = '',
         phoneNumbers = [],
         emails = [],
         avatar = null,
         updateEntry = false
     }: {
         id?: number;
-        firstName: string;
-        lastName: string;
-        displayName?: string | null;
+        firstName?: string;
+        lastName?: string;
+        displayName?: string;
         phoneNumbers?: string[];
         emails?: string[];
         updateEntry?: boolean;
@@ -274,16 +275,44 @@ export class ContactInterface {
     }): Promise<Contact> {
         const repo = Server().repo.contacts();
         let contact = null;
-        if (id) {
-            contact = await repo.findOne({ where: { id }, relations: { addresses: true } });
-        } else {
-            contact = await repo.findOne({ where: { firstName, lastName }, relations: { addresses: true } });
+
+        // Throw an error if we don't have enough information to update an entry
+        if (updateEntry && isEmpty(id) && isEmpty(firstName) && isEmpty(lastName) && isEmpty(displayName)) {
+            throw new Error((
+                'To update an existing contact, you must provide one of the following: ' +
+                'id, firstName, lastName, displayName'
+            ));
         }
 
+        // Throw an error if we don't have enough information to create a new entry
+        if (!updateEntry && isEmpty(firstName) && isEmpty(displayName)) {
+            throw new Error('To create a new contact, please provide a firstName/lastName or displayName');
+        }
+
+        let existingContacts: Contact[] = [];
+        if (id) {
+            existingContacts = await repo.find({ where: { id }, relations: { addresses: true } });
+        } else if (firstName || lastName || displayName) {
+            const where: FindOptionsWhere<Contact> = {};
+            if (firstName) where.firstName = firstName;
+            if (lastName) where.lastName = lastName;
+            if (displayName) where.displayName = displayName;
+            existingContacts = await repo.find({ where, relations: { addresses: true } });
+        }
+
+        if (updateEntry && existingContacts.length > 1) {
+            throw new Error((
+                'Failed to update Contact! Criteria returned multiple Contacts. ' + 
+                'Please add additional criteria, i.e.: firstName, lastName, displayName'
+            ));
+        } if (!updateEntry && isNotEmpty(existingContacts)) {
+            throw new Error('Failed to create new Contact! Existing contact with similar info already exists!');
+        }
+
+        contact = isEmpty(existingContacts) ? null : existingContacts[0];
+
         let isNew = false;
-        if (contact && !updateEntry) {
-            throw new Error("Contact already exists!");
-        } else if (!contact) {
+        if (!contact) {
             // If the contact doesn't exists, create it
             contact = repo.create({ firstName, lastName, avatar, displayName });
             await repo.save(contact);
@@ -305,22 +334,22 @@ export class ContactInterface {
 
         // For existing items, update their fields
         let updated = false;
-        if (isNotEmpty(firstName) && firstName !== contact.firstName) {
+        if (firstName !== null && firstName !== contact.firstName) {
             contact.firstName = firstName;
             updated = true;
         }
 
-        if (isNotEmpty(firstName) && firstName !== contact.firstName) {
-            contact.firstName = firstName;
+        if (lastName !== null && lastName !== contact.lastName) {
+            contact.lastName = lastName;
             updated = true;
         }
 
-        if (isNotEmpty(avatar)) {
+        if (avatar !== null) {
             contact.avatar = avatar;
             updated = true;
         }
 
-        if (isNotEmpty(displayName) && displayName !== contact.displayName) {
+        if (displayName !== null && displayName !== contact.displayName) {
             contact.displayName = displayName;
             updated = true;
         }
