@@ -1,4 +1,5 @@
 /* eslint-disable max-len */
+import * as fs from "fs";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
@@ -68,9 +69,15 @@ export class ActionHandler {
                     // Fetch participants of the chat and get handles (addresses)
                     const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
                     if (isNotEmpty(chats) && isNotEmpty(chats[0]?.participants)) {
-                        const participants = chats[0].participants.map(i => i.id);
-                        messageScript = sendAttachmentAccessibility(theAttachment, participants);
-                        await FileSystem.executeAppleScript(messageScript);
+                        // If we have a group name, use that as the address to enter
+                        let participants = [];
+                        if ((chats[0]?.participants ?? []).length > 1 && isNotEmpty(chats[0].displayName)) {
+                            participants = [chats[0].displayName];
+                        } else {
+                            participants = chats[0].participants.map(i => i.id);
+                        }
+
+                        await FileSystem.executeAppleScript(sendAttachmentAccessibility(theAttachment, participants));
                     }
                 }
             }

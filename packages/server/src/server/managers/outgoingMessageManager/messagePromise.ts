@@ -1,7 +1,8 @@
 import { Server } from "@server";
+import { imageExtensions } from "@server/api/v1/apple/constants";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { isMinMonterey, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
 
 export class MessagePromise {
     promise: Promise<Message>;
@@ -108,9 +109,6 @@ export class MessagePromise {
         // Images will have an invisible character as the text (of length 1)
         // So if it's an attachment, and doesn't meet the criteria, return false
         const matchTxt = `${message.subject ?? ""}${message.text ?? ""}`;
-        if (this.isAttachment && ((message.attachments ?? []).length > 1 || matchTxt.length > 1)) {
-            return false;
-        }
 
         // If we have chats, we need to make sure this promise is for that chat
         // We use endsWith to support when the chatGuid is just an address
@@ -120,12 +118,23 @@ export class MessagePromise {
 
         // If this is an attachment, we need to match it slightly differently
         if (this.isAttachment) {
-            if ((message.attachments ?? []).length > 1 || matchTxt.length > 1) {
-                return false;
+            if ((message.attachments ?? []).length > 1 || matchTxt.length > 1) return false;
+
+            // If the transfer names match, congratz we have a match.
+            let isMatch = message.attachments[0].transferName.endsWith(this.text.split("->")[1]);
+            const ext = this.text.split('.').slice(-1)[0];
+
+            // If this is Monterey, some clip-boarded images are automatically converted to TIFF.
+            // If we don't have a match, and it's an image, check if this could be a TIFF.
+            // This is an assumption, it may not be 100% correct.
+            if (!isMatch && isMinMonterey && imageExtensions.includes(ext)) {
+                const name = message.attachments[0].transferName;
+                if (name.startsWith('IMG') && name.endsWith('.tiff')) {
+                    isMatch = true;
+                }
             }
 
-            // If the transfer names match, congratz we have a match
-            return message.attachments[0].transferName.endsWith(this.text.split("->")[1]);
+            return isMatch;
         }
 
         return this.text === onlyAlphaNumeric(message.text) && this.sentAt < message.dateCreated.getTime();

@@ -1,9 +1,11 @@
 /* eslint-disable max-len */
+import { clipboard, nativeImage } from "electron";
 import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
 import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { imageExtensions } from "./constants";
 
 const osVersion = macosVersion();
 
@@ -192,29 +194,45 @@ export const startChat = (participants: string[], service: string, message: stri
  */
 export const sendAttachmentAccessibility = (attachmentPath: string, participants: string[]) => {
     const recipientCommands = [];
+    // Key code 125 == down arrow
     for (const i of participants) {
         recipientCommands.push(`
-            delay 1
+            delay 2
             keystroke "${i}"
             delay 1
+            key code 125
+            delay 1
             keystroke return`);
+    }
+
+    // Copy the image to the clipboard.
+    // Don't do this via AppleScript because it won't work right.
+    // All other file types should just use the normal POSIX method
+    let scriptCopy = `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"`;
+    let scriptClip = `set the clipboard to theFile`;
+    const ext = attachmentPath.split('.').slice(-1)[0].toLowerCase();
+    if (imageExtensions.includes(ext)) {
+        scriptCopy = null;
+        scriptClip = null;
+        clipboard.writeImage(nativeImage.createFromPath(attachmentPath));
     }
 
     // Caffeinate is so we don't let the computer sleep while this is running
     return `try
             do shell script "caffeinate -u -t 2"
-            delay 2.0
+            delay 1
         end try
         
-        tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
+        ${scriptCopy ?? ''}
         tell application "System Events" to tell application process "Messages"
             set frontmost to true
             keystroke "n" using {command down}
+            delay 0.5
             ${recipientCommands.join("\n")}
             delay 1
-            keystroke tab
+            keystroke return
             delay 0.5
-            set the clipboard to theFile
+            ${scriptClip ?? ''}
             keystroke "v" using {command down}
             delay 3.0
             keystroke return
