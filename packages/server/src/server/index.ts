@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
+import fs from "fs";
 import ServerLog from "electron-log";
 import process from "process";
 import path from "path";
@@ -53,7 +54,6 @@ import {
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
-import { fs } from "zx";
 import { requestContactPermission } from "./utils/PermissionUtils";
 
 const findProcess = require("find-process");

@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
-import { clipboard, nativeImage } from "electron";
+import fs from "fs";
+import { clipboard } from "electron";
 import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
@@ -205,19 +206,12 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
             keystroke return`);
     }
 
-    // Copy the image to the clipboard.
-    // Don't do this via AppleScript because it won't work right.
-    // All other file types should just use the normal POSIX method
-    let scriptCopy = `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"`;
-    let scriptClip = `set the clipboard to theFile`;
-    const ext = attachmentPath.split('.').slice(-1)[0].toLowerCase();
-    if (imageExtensions.includes(ext)) {
-        scriptCopy = null;
-        scriptClip = null;
-        clipboard.writeImage(nativeImage.createFromPath(attachmentPath));
-    }
+    // The AppleScript copy _only_ works on Monterey
+    const scriptCopy = `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"`;
+    const scriptClip = `set the clipboard to theFile`;
 
     // Caffeinate is so we don't let the computer sleep while this is running
+    // The CMD + A & Delete will clear any existing text or attachments
     return `try
             do shell script "caffeinate -u -t 2"
             delay 1
@@ -232,7 +226,12 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
             delay 1
             keystroke return
             delay 0.5
+            keystroke "a" using {command down}
+            delay 0.5
+            key code 51
+            delay 0.5
             ${scriptClip ?? ''}
+            delay 0.5
             keystroke "v" using {command down}
             delay 3.0
             keystroke return
