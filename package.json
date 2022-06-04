@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "private": true,
     "workspaces": [
@@ -20,7 +20,7 @@
     },
     "homepage": "https://www.bluebubbles.app",
     "devEngines": {
-        "node": ">=18.x",
+        "node": "17.x",
         "npm": ">=7.x",
         "yarn": ">=1.x"
     },
