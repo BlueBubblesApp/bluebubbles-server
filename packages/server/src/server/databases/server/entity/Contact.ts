@@ -12,18 +12,18 @@ import {
 import { ContactAddress } from "./ContactAddress";
 
 @Entity({ name: "contact" })
-@Unique(["firstName", "lastName", "displayName"])
+@Unique(["firstName", "lastName"])
 export class Contact {
     @PrimaryGeneratedColumn({ name: "id" })
     id: number;
 
-    @Column("text", { name: "first_name", nullable: false, default: '' })
+    @Column("text", { name: "first_name", nullable: false })
     firstName: string;
 
-    @Column("text", { name: "last_name", nullable: false, default: '' })
+    @Column("text", { name: "last_name", nullable: false })
     lastName: string;
 
-    @Column("text", { name: "display_name", nullable: false, default: '' })
+    @Column("text", { name: "display_name", nullable: true, default: null })
     displayName: string;
 
     @OneToMany(() => ContactAddress, contactAddress => contactAddress.contact)

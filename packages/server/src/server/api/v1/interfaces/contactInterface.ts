@@ -316,10 +316,10 @@ export class ContactInterface {
             // If the contact doesn't exists, create it
             contact = repo.create({ firstName, lastName, avatar, displayName });
             await repo.save(contact);
-            isNew = true;
-        }
 
-        contact.addresses = [];
+            isNew = true;
+            contact.addresses = [];
+        }
 
         // Add the phone numbers & emails
         for (const p of phoneNumbers) {
