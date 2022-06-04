@@ -39,6 +39,15 @@ export const concatUint8Arrays = (a: Uint8Array, b: Uint8Array): Uint8Array => {
     return newArr;
 };
 
+export const deduplicateObjectArray = (items: any[], key: string): any[] => {
+    const seen = new Set();
+    return items.filter(el => {
+        const duplicate = seen.has(el[key]);
+        seen.add(el[key]);
+        return !duplicate;
+    });
+}
+
 export const getiMessageAddressFormat = (address: string, preSlugged = false, pretty = false): string => {
     const phoneUtil = PhoneNumberUtil.getInstance();
 

@@ -3,7 +3,7 @@ import fs from "fs";
 import vcf from "vcf";
 import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
-import { isNotEmpty } from "@server/helpers/utils";
+import { deduplicateObjectArray, isNotEmpty } from "@server/helpers/utils";
 import { ApiContactsCache } from "../caches/apiContactsCache";
 
 const contacts = require("node-mac-contacts");
@@ -21,6 +21,40 @@ export class ContactInterface {
         'jobTitle', 'departmentName', 'organizationName', 'middleName', 'note',
         'contactImage', 'contactThumbnailImage', 'instantMessageAddresses', 'socialProfiles'
     ]
+
+    private static extractEmails = (contact: any) => {
+        // Normalize all the email records
+        const emails = [...(contact?.emails ?? []), ...(contact?.emailAddresses ?? []), ...(contact?.addresses ?? [])]
+            // Make sure all the emails are in the same format { address: xxxxxxx }
+            .map((e) => {
+                const address = (typeof(e) === 'string') ? e : (
+                    e?.address ?? e?.value ?? e?.email ?? null);
+                return { address, id: e?.id ?? e?.identifier ?? null };
+            })
+            // Make sure that each address has a value and is actually an email
+            .filter((e) => {
+                return isNotEmpty(e.address) && e.address.includes('@')
+            });
+
+        return deduplicateObjectArray(emails, 'address');
+    };
+
+    private static extractPhoneNumbers = (contact: any) => {
+        // Normalize all the email records
+        const phones = [...(contact?.phones ?? []), ...(contact?.phoneNumbers ?? []), ...(contact?.addresses ?? [])]
+            // Make sure all the numbers are in the same format { address: xxxxxxx }
+            .map((e) => {
+                const address = (typeof(e) === 'string') ? e : (
+                    e?.address ?? e?.value ?? e?.phone ?? e?.number ?? null);
+                return { address, id: e?.id ?? e?.identifier ?? null };
+            })
+            // Make sure that each address has a value and is actually an email
+            .filter((e) => {
+                return isNotEmpty(e.address) && !e.address.includes('@')
+            });
+
+        return deduplicateObjectArray(phones, 'address');
+    };
 
     /**
      * Maps a contact record (either from the DB or API), and puts it into a standard format
@@ -44,81 +78,13 @@ export class ContactInterface {
                 }
             }
 
-            if (Object.keys(e).includes("addresses")) {
-                e.phoneNumbers = [
-                    ...(e?.phoneNumbers ?? []),
-                    ...(e?.addresses ?? [])
-                        .filter((address: any) => {
-                            if (typeof address === "string") {
-                                return !address.includes("@");
-                            } else if (Object.keys(address).includes("address")) {
-                                return !address.address.includes("@");
-                            }
-                        })
-                        .map((address: any) => {
-                            if (typeof address === "string") {
-                                return { address };
-                            } else {
-                                return {
-                                    address: address.address,
-                                    id: address.id
-                                };
-                            }
-                        })
-                ];
-
-                e.emails = [
-                    ...(e?.emails ?? []),
-                    ...(e?.addresses ?? [])
-                        .filter((address: any) => {
-                            if (typeof address === "string") {
-                                return address.includes("@");
-                            } else if (Object.keys(address).includes("address")) {
-                                return address.address.includes("@");
-                            }
-                        })
-                        .map((address: any) => {
-                            if (typeof address === "string") {
-                                return { address };
-                            } else {
-                                return {
-                                    address: address.address,
-                                    id: address.id
-                                };
-                            }
-                        })
-                ];
-            }
-
             const useAvatar = extraProps.includes('avatar') ||
                 extraProps.includes('contactImage') ||
                 extraProps.includes('contactImageThumbnail');
             const avatar = useAvatar ? e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail : null;
             return {
-                // These maps are for backwards compatibility with the client.
-                // The "old" way we fetched contacts had a lot more information, but was less reliable.
-                // Technically, if we want to include more information with the phone numbers, we can add them
-                // in without breaking the client. New properties can be added, and the client can suppor them as needed
-                phoneNumbers: (e?.phoneNumbers ?? []).map((address: any) => {
-                    if (typeof address === "string") {
-                        return { address };
-                    } else {
-                        return {
-                            address: address.address,
-                            id: address.id
-                        };
-                    }
-                }),
-                emails: (e?.emails ?? []).map((address: any) => {
-                    if (typeof address === "string") {
-                        return { address };
-                    } else {
-                        return {
-                            address: address.address,
-                            id: address.id
-                        };
-                    }
-                }),
+                phoneNumbers: ContactInterface.extractPhoneNumbers(e),
+                emails: ContactInterface.extractEmails(e),
                 firstName: e?.firstName,
                 lastName: e?.lastName,
                 displayName: e?.displayName ?? e.nickname,
