@@ -121,20 +121,7 @@ export class MessagePromise {
             if ((message.attachments ?? []).length > 1 || matchTxt.length > 1) return false;
 
             // If the transfer names match, congratz we have a match.
-            let isMatch = message.attachments[0].transferName.endsWith(this.text.split("->")[1]);
-            const ext = this.text.split('.').slice(-1)[0];
-
-            // If this is Monterey, some clip-boarded images are automatically converted to TIFF.
-            // If we don't have a match, and it's an image, check if this could be a TIFF.
-            // This is an assumption, it may not be 100% correct.
-            if (!isMatch && isMinMonterey && imageExtensions.includes(ext)) {
-                const name = message.attachments[0].transferName;
-                if (name.startsWith('IMG') && name.endsWith('.tiff')) {
-                    isMatch = true;
-                }
-            }
-
-            return isMatch;
+            return message.attachments[0].transferName.endsWith(this.text.split("->")[1]);
         }
 
         return this.text === onlyAlphaNumeric(message.text) && this.sentAt < message.dateCreated.getTime();
