@@ -43,9 +43,11 @@ export class ContactTables1654432080899 implements MigrationInterface {
         await queryRunner.query(`PRAGMA foreign_keys=off;`);
 
         // 1: Rename the original table
+        Server().log(`Migration[${this.name}]   -> Renaming old table`, 'debug');
         await queryRunner.query(`ALTER TABLE "contact" RENAME TO "contact_old";`);
 
         // 2: Update the original table's entries so that any of the NOT NULL fields are never null
+        Server().log(`Migration[${this.name}]   -> Ensuring no fields are NULL`, 'debug');
         await queryRunner.query(`UPDATE "contact_old" SET "first_name" = '' WHERE "first_name" IS NULL;`);
         await queryRunner.query(`UPDATE "contact_old" SET "last_name" = '' WHERE "last_name" IS NULL;`);
         await queryRunner.query(`UPDATE "contact_old" SET "display_name" = '' WHERE "display_name" IS NULL;`);
@@ -53,12 +55,15 @@ export class ContactTables1654432080899 implements MigrationInterface {
         await queryRunner.query(`UPDATE "contact_old" SET "updated" = datetime('now') WHERE "updated" IS NULL;`);
 
         // 3: Recreate the original table
+        Server().log(`Migration[${this.name}]   -> Recreating contact table`, 'debug');
         await queryRunner.query(this.createContactTable);
 
         // 4: Insert all the data back into the original table with the updated contstraints
+        Server().log(`Migration[${this.name}]   -> Transfering data to new table`, 'debug');
         await queryRunner.query(`INSERT INTO "contact" SELECT * FROM "contact_old";`);
 
         // 5: Drop original, renamed table
+        Server().log(`Migration[${this.name}]   -> Removing original (renamed) table`, 'debug');
         await queryRunner.query(`DROP TABLE "contact_old";`);
         await queryRunner.query(`PRAGMA foreign_keys=on;`);
 
