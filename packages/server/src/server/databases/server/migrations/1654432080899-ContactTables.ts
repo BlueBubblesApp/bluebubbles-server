@@ -1,19 +1,19 @@
 import { Server } from "@server";
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class ContactTables1654393552948 implements MigrationInterface {
+export class ContactTables1654432080899 implements MigrationInterface {
 
-    name = 'ContactTables1654393552948'
+    name = 'ContactTables1654432080899'
 
     createContactTable = `
         CREATE TABLE IF NOT EXISTS "contact" (
             "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
             "first_name" text NOT NULL DEFAULT '',
             "last_name" text NOT NULL DEFAULT '',
+            "display_name" text NOT NULL DEFAULT '',
             "avatar" text,
             "created" datetime NOT NULL DEFAULT (datetime('now')),
             "updated" datetime NOT NULL DEFAULT (datetime('now')),
-            "display_name" text NOT NULL DEFAULT '',
             CONSTRAINT "UQ_329d7cf43bb68fb3c888df2f02f" UNIQUE ("first_name", "last_name", "display_name")
         );
     `;
@@ -39,17 +39,26 @@ export class ContactTables1654393552948 implements MigrationInterface {
 
         // Now we need to make sure that all other versions also have a display_name unique constraint.
         // Since sqlite doesn't support updating a table's unique constraints, we have to do some magic.
-        // 1: Rename the original table
-        // 2: Update the original table's entries so that display_name is never null (which it won't be later)
-        // 3: Recreate the original table
-        // 4: Insert all the data back into the original table with the updated contstraints
-        // 5: Drop original, renamed table
         Server().log(`Migration[${this.name}] Migrating Contact table constraints...`, 'debug');
         await queryRunner.query(`PRAGMA foreign_keys=off;`);
+
+        // 1: Rename the original table
         await queryRunner.query(`ALTER TABLE "contact" RENAME TO "contact_old";`);
+
+        // 2: Update the original table's entries so that any of the NOT NULL fields are never null
+        await queryRunner.query(`UPDATE "contact_old" SET "first_name" = '' WHERE "first_name" IS NULL;`);
+        await queryRunner.query(`UPDATE "contact_old" SET "last_name" = '' WHERE "last_name" IS NULL;`);
         await queryRunner.query(`UPDATE "contact_old" SET "display_name" = '' WHERE "display_name" IS NULL;`);
+        await queryRunner.query(`UPDATE "contact_old" SET "created" = datetime('now) WHERE "created" IS NULL;`);
+        await queryRunner.query(`UPDATE "contact_old" SET "updated" = datetime('now) WHERE "updated" IS NULL;`);
+
+        // 3: Recreate the original table
         await queryRunner.query(this.createContactTable);
+
+        // 4: Insert all the data back into the original table with the updated contstraints
         await queryRunner.query(`INSERT INTO "contact" SELECT * FROM "contact_old";`);
+
+        // 5: Drop original, renamed table
         await queryRunner.query(`DROP TABLE "contact_old";`);
         await queryRunner.query(`PRAGMA foreign_keys=on;`);
 

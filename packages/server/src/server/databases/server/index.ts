@@ -5,7 +5,7 @@ import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
-import { ContactTables1654393552948 } from "./migrations/1654393552948-ContactTables";
+import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
@@ -41,7 +41,7 @@ export class ServerRepository extends EventEmitter {
             type: "better-sqlite3",
             database: dbPath,
             entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress],
-            migrations: [ContactTables1654393552948],
+            migrations: [ContactTables1654432080899],
             migrationsRun: true,
             migrationsTableName: 'migrations',
             synchronize: isDev
