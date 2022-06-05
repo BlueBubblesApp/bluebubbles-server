@@ -49,8 +49,8 @@ export class ContactTables1654432080899 implements MigrationInterface {
         await queryRunner.query(`UPDATE "contact_old" SET "first_name" = '' WHERE "first_name" IS NULL;`);
         await queryRunner.query(`UPDATE "contact_old" SET "last_name" = '' WHERE "last_name" IS NULL;`);
         await queryRunner.query(`UPDATE "contact_old" SET "display_name" = '' WHERE "display_name" IS NULL;`);
-        await queryRunner.query(`UPDATE "contact_old" SET "created" = datetime('now) WHERE "created" IS NULL;`);
-        await queryRunner.query(`UPDATE "contact_old" SET "updated" = datetime('now) WHERE "updated" IS NULL;`);
+        await queryRunner.query(`UPDATE "contact_old" SET "created" = datetime('now') WHERE "created" IS NULL;`);
+        await queryRunner.query(`UPDATE "contact_old" SET "updated" = datetime('now') WHERE "updated" IS NULL;`);
 
         // 3: Recreate the original table
         await queryRunner.query(this.createContactTable);
