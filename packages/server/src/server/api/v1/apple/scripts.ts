@@ -1,9 +1,12 @@
 /* eslint-disable max-len */
+import fs from "fs";
+import { clipboard } from "electron";
 import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
 import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { imageExtensions } from "./constants";
 
 const osVersion = macosVersion();
 
@@ -192,29 +195,43 @@ export const startChat = (participants: string[], service: string, message: stri
  */
 export const sendAttachmentAccessibility = (attachmentPath: string, participants: string[]) => {
     const recipientCommands = [];
+    // Key code 125 == down arrow
     for (const i of participants) {
         recipientCommands.push(`
-            delay 1
+            delay 2
             keystroke "${i}"
+            delay 1
+            key code 125
             delay 1
             keystroke return`);
     }
 
+    // The AppleScript copy _only_ works on Monterey
+    const scriptCopy = `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"`;
+    const scriptClip = `set the clipboard to theFile`;
+
     // Caffeinate is so we don't let the computer sleep while this is running
+    // The CMD + A & Delete will clear any existing text or attachments
     return `try
             do shell script "caffeinate -u -t 2"
-            delay 2.0
+            delay 1
         end try
         
-        tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
+        ${scriptCopy ?? ''}
         tell application "System Events" to tell application process "Messages"
             set frontmost to true
             keystroke "n" using {command down}
+            delay 0.5
             ${recipientCommands.join("\n")}
             delay 1
-            keystroke tab
+            keystroke return
             delay 0.5
-            set the clipboard to theFile
+            keystroke "a" using {command down}
+            delay 0.5
+            key code 51
+            delay 0.5
+            ${scriptClip ?? ''}
+            delay 0.5
             keystroke "v" using {command down}
             delay 3.0
             keystroke return

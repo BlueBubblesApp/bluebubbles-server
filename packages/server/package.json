@@ -1,6 +1,6 @@
 {
     "name": "@bluebubbles/server",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "main": "./dist/main.js",
     "license": "Apache-2.0",
     "author": {
@@ -76,8 +76,8 @@
             "entitlements": "./scripts/entitlements.mac.plist",
             "entitlementsInherit": "./scripts/entitlements.mac.plist",
             "extendInfo": {
-                "NSContactsUsageDescription": "This app needs access to your Contacts",
-                "NSAppleEventsUsageDescription": "This app needs access to run AppleScripts"
+                "NSContactsUsageDescription": "BlueBubbles needs access to your Contacts",
+                "NSAppleEventsUsageDescription": "BlueBubbles needs access to run AppleScripts"
             },
             "gatekeeperAssess": false,
             "minimumSystemVersion": "10.11.6"
@@ -116,7 +116,7 @@
         "@typescript-eslint/parser": "^5.18.0",
         "babel-loader": "^8.1.0",
         "css-loader": "^3.5.2",
-        "electron": "18.3.1",
+        "electron": "17.4.5",
         "electron-builder": "^22.9.1",
         "electron-notarize": "^1.0.0",
         "eslint": "^8.13.0",
