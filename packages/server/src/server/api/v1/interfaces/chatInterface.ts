@@ -10,16 +10,17 @@ import { MessageInterface } from "./messageInterface";
 export class ChatInterface {
     static async get({
         guid = null,
-        withArchived = false,
+        withArchived = true,
         withLastMessage = false,
         offset = 0,
         limit = null,
         sort = "lastmessage"
-    }: any): Promise<ChatResponse[]> {
+    }: any = {}): Promise<ChatResponse[]> {
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
             withParticipants: false,
             withLastMessage,
+            withArchived,
             offset,
             limit
         });

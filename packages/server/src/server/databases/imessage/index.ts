@@ -44,7 +44,7 @@ export class MessageRepository {
     async getChats({
         chatGuid = null,
         withParticipants = true,
-        withArchived = false,
+        withArchived = true,
         withLastMessage = false,
         offset = 0,
         limit = null
