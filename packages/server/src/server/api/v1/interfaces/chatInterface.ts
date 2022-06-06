@@ -10,7 +10,6 @@ import { MessageInterface } from "./messageInterface";
 export class ChatInterface {
     static async get({
         guid = null,
-        withParticipants = true,
         withArchived = false,
         withLastMessage = false,
         offset = 0,
@@ -19,7 +18,7 @@ export class ChatInterface {
     }: any): Promise<ChatResponse[]> {
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
-            withParticipants,
+            withParticipants: false,
             withLastMessage,
             offset,
             limit
@@ -41,7 +40,6 @@ export class ChatInterface {
 
         const results = [];
         for (const chat of chats ?? []) {
-            if (chat.guid.startsWith("urn:")) continue;
             const chatRes = await getChatResponse(chat);
 
             // Insert the cached participants from the original request
