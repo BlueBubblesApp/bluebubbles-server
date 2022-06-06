@@ -45,6 +45,7 @@ export const userHomeDir = () => {
     return process?.env?.HOME ?? process?.env?.HOMEPATH ?? process?.env?.USERPROFILE;
 };
 
+
 /**
  * The class used to handle all communications to the App's "filesystem".
  * The filesystem is the directory dedicated to the app-specific files
@@ -90,6 +91,8 @@ export class FileSystem {
     );
 
     public static libMacForgePlugins = `/${path.join("Library", "Application Support", "MacEnhance", "Plugins")}`;
+
+    public static findMyDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.findmy.fmipcore");
 
     /**
      * Sets up all required directories and then, writes the scripts

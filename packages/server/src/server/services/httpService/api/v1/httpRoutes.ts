@@ -21,6 +21,7 @@ import { MetricsMiddleware } from "./middleware/metricsMiddleware";
 import { LogMiddleware } from "./middleware/logMiddleware";
 import { ErrorMiddleware } from "./middleware/errorMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
+import { iCloudRouter } from "./routers/icloudRouter";
 import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
 import { HttpDefinition, HttpMethod, HttpRoute, HttpRouteGroup, KoaMiddleware } from "../../types";
 import { SettingsValidator } from "./validators/settingsValidator";
@@ -69,6 +70,23 @@ export class HttpRoutes {
                         method: HttpMethod.POST,
                         path: "imessage/restart",
                         controller: MacOsRouter.restartMessagesApp
+                    }
+                ]
+            },
+            {
+                name: "iCloud",
+                middleware: HttpRoutes.protected,
+                prefix: "icloud",
+                routes: [
+                    {
+                        method: HttpMethod.GET,
+                        path: "findmy/devices",
+                        controller: iCloudRouter.devices
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "findmy/devices/refresh",
+                        controller: iCloudRouter.refresh
                     }
                 ]
             },
