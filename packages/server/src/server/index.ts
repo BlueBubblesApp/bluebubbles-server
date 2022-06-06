@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
+import fs from "fs";
 import ServerLog from "electron-log";
 import process from "process";
 import path from "path";
@@ -14,7 +15,6 @@ import { FileSystem } from "@server/fileSystem";
 // Database Imports
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
 import { MessageRepository } from "@server/databases/imessage";
-import { ContactRepository } from "@server/databases/contacts";
 import {
     IncomingMessageListener,
     OutgoingMessageListener,
@@ -55,7 +55,7 @@ import {
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
-import { fs } from "zx";
+import { requestContactPermission } from "./utils/PermissionUtils";
 
 const findProcess = require("find-process");
 
@@ -100,8 +100,6 @@ class BlueBubblesServer extends EventEmitter {
     repo: ServerRepository;
 
     iMessageRepo: MessageRepository;
-
-    contactsRepo: ContactRepository;
 
     httpService: HttpService;
 
@@ -149,6 +147,8 @@ class BlueBubblesServer extends EventEmitter {
 
     lastConnection: number;
 
+    region: string | null;
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -162,7 +162,6 @@ class BlueBubblesServer extends EventEmitter {
         // Databases
         this.repo = null;
         this.iMessageRepo = null;
-        this.contactsRepo = null;
 
         // Other helpers
         this.eventCache = null;
@@ -189,6 +188,8 @@ class BlueBubblesServer extends EventEmitter {
         this.notificationCount = 0;
         this.isRestarting = false;
         this.isStopping = false;
+
+        this.region = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -293,14 +294,6 @@ class BlueBubblesServer extends EventEmitter {
                     app.quit();
                 }
             });
-        }
-
-        try {
-            this.log("Connecting to Contacts database...");
-            this.contactsRepo = new ContactRepository();
-            await this.contactsRepo.initialize();
-        } catch (ex: any) {
-            this.log(`Failed to connect to Contacts database! Please enable Full Disk Access!`, "error");
         }
     }
 
@@ -456,12 +449,6 @@ class BlueBubblesServer extends EventEmitter {
             if (this.caffeinate) this.caffeinate.stop();
         } catch (ex: any) {
             this.log(`Failed to stop Caffeinate service! ${ex?.message ?? ex}`);
-        }
-
-        try {
-            await this.contactsRepo?.db?.close();
-        } catch (ex: any) {
-            this.log(`Failed to close Contacts Database connection! ${ex?.message ?? ex}`);
         }
 
         try {
@@ -635,11 +622,20 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to restart via terminal!\n${ex}`);
         }
 
+        // Get the current region
+        this.region = await FileSystem.getRegion();
+
         // Log some server metadata
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
         this.log(`Server Metadata -> Time Synchronization: ${await this.getTimeSync()}`, "debug");
+        this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
+
+        if (!this.region) {
+            this.log("No region detected, defaulting to US...", "debug");
+            this.region = "US";
+        }
 
         // If the user is on el capitan, we need to force cloudflare
         const proxyService = this.repo.getConfig("proxy_service") as string;
@@ -707,18 +703,22 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Show a warning if the time is off by a reasonable amount (1 minute)
-        const syncString = await this.getTimeSync();
-        if (syncString !== null) {
-            try {
-                const spl = syncString.split("+/-");
-                const left = spl[0].split(" ").slice(0, -1);
-                const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
-                if (offset >= 15) {
-                    this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
+        try {
+            const syncString = await this.getTimeSync();
+            if (syncString !== null) {
+                try {
+                    const spl = syncString.split("+/-");
+                    const left = spl[0].split(" ").slice(0, -1);
+                    const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
+                    if (offset >= 15) {
+                        this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
+                    }
+                } catch (ex) {
+                    this.log("Unable to parse time synchronization offset!", "debug");
                 }
-            } catch (ex) {
-                this.log("Unable to parse time synchronization offset!", "debug");
             }
+        } catch (ex) {
+            this.log(`Failed to get time sychronization status! Error: ${ex}`, "debug");
         }
 
         this.setDockIcon();
@@ -730,6 +730,9 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "debug");
         }
 
+        // Check for contact permissions
+        const contactStatus = await requestContactPermission();
+        this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         this.log("Finished post-start checks...");
     }
 
@@ -839,16 +842,21 @@ class BlueBubblesServer extends EventEmitter {
         this.httpService.socketServer.emit(type, data);
 
         // Send notification to devices
-        if (sendFcmMessage && FCMService.getApp()) {
-            const devices = await this.repo.devices().find();
-            if (isEmpty(devices)) return;
-
-            const notifData = JSON.stringify(data);
-            await this.fcm.sendNotification(
-                devices.map(device => device.identifier),
-                { type, data: notifData },
-                priority
-            );
+        try {
+            if (sendFcmMessage && FCMService.getApp()) {
+                const devices = await this.repo.devices().find();
+                if (isNotEmpty(devices)) {
+                    const notifData = JSON.stringify(data);
+                    await this.fcm.sendNotification(
+                        devices.map(device => device.identifier),
+                        { type, data: notifData },
+                        priority
+                    );
+                }
+            }
+        } catch (ex: any) {
+            this.log("Failed to send FCM messages!", "debug");
+            this.log(ex, "debug");
         }
 
         // Dispatch the webhook
@@ -880,6 +888,21 @@ class BlueBubblesServer extends EventEmitter {
 
         // We are emitting this as a new message, the only difference being the included tempGuid
         await this.emitMessage("new-message", resp);
+    }
+
+    async emitMessageError(message: Message, tempGuid: string = null) {
+        this.log(`Failed to send message: [${message.contentString()}] (Temp GUID: ${tempGuid ?? "N/A"})`);
+
+        /**
+         * ERROR CODES:
+         * 4: Message Timeout
+         */
+        const data = await getMessageResponse(message);
+        if (isNotEmpty(tempGuid)) {
+            data.tempGuid = tempGuid;
+        }
+
+        await this.emitMessage("message-send-error", data);
     }
 
     async checkPrivateApiRequirements(): Promise<Array<NodeJS.Dict<any>>> {
@@ -996,13 +1019,7 @@ class BlueBubblesServer extends EventEmitter {
          * Message listener for messages that have errored out
          */
         outgoingMsgListener.on("message-send-error", async (item: Message) => {
-            this.log(`Failed to send message: [${item.contentString()}]`);
-
-            /**
-             * ERROR CODES:
-             * 4: Message Timeout
-             */
-            await this.emitMessage("message-send-error", await getMessageResponse(item));
+            await this.emitMessageError(item);
         });
 
         /**

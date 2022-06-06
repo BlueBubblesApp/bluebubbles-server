@@ -19,7 +19,7 @@ export const UseHttpsField = ({ helpText }: UseHttpsFieldProps): JSX.Element => 
 
     return (
         <FormControl>
-            <Checkbox id='use_custom_certificate' isChecked={useHttps} onChange={onCheckboxToggle}>Use HTTPS</Checkbox>
+            <Checkbox id='use_custom_certificate' isChecked={useHttps} onChange={onCheckboxToggle}>Use Custom Certificate</Checkbox>
             <FormHelperText>
                 {helpText ?? (
                     <Text>

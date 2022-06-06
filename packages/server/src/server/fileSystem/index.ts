@@ -76,8 +76,6 @@ export class FileSystem {
 
     public static contactsFile = `${FileSystem.contactsDir}/contacts.vcf`;
 
-    public static ffmpegBinary = path.join(FileSystem.resources, "macos", "binaries", "ffmpeg", "ffmpeg");
-
     // Private API directories
     public static usrMySimblPlugins = path.join(userHomeDir(), "Library", "Application Support", "SIMBL", "Plugins");
 
@@ -420,14 +418,6 @@ export class FileSystem {
         }
     }
 
-    static async convertToMp4(originalPath: string, outputPath: string): Promise<void> {
-        const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(`${this.ffmpegBinary} -i "${oldPath}" "${outputPath}"`);
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert video to MP4: ${output}`);
-        }
-    }
-
     static async isSipDisabled(): Promise<boolean> {
         const res = ((await FileSystem.execShellCommand(`csrutil status`)) ?? "").trim();
         return !res.endsWith("enabled.");
@@ -507,5 +497,49 @@ export class FileSystem {
     static async getImageMetadata(imagePath: string): Promise<ImageMetadata> {
         const meta = await FileSystem.parseMetadata(imagePath, ImageMetadataKeys);
         return meta as ImageMetadata;
+    }
+
+    static removeDirectory(filePath: string) {
+        fs.rmdirSync(filePath, { recursive: true });
+    }
+
+    static async getRegion(): Promise<string | null> {
+        let region = null;
+
+        try {
+            // Try to get the language (i.e. en_US)
+            const output = await FileSystem.execShellCommand(
+                `defaults read -g AppleLanguages | sed '/"/!d;s/["[:space:]]//g;s/-/_/'`
+            );
+
+            // If we get a result back, pull the region out of it
+            if (isNotEmpty(output) && output.includes("_")) {
+                region = output.split("_")[1].trim();
+            }
+        } catch (ex) {
+            // Don't do anything if it fails, we'll just default to US
+        }
+
+        return region;
+    }
+
+    static async getIcloudAccount(): Promise<string> {
+        let account = null;
+
+        try {
+            // Try to get the language (i.e. en_US)
+            const output = await FileSystem.execShellCommand(
+                `/usr/libexec/PlistBuddy -c "print :Accounts:0:AccountID" ~/Library/Preferences/MobileMeAccounts.plist`
+            );
+
+            // If we get a result back, pull the region out of it
+            if (isNotEmpty(output) && output.includes("@")) {
+                account = output.trim();
+            }
+        } catch (ex) {
+            // Don't do anything if it fails, we'll just default to US
+        }
+
+        return account;
     }
 }

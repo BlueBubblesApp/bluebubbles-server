@@ -18,6 +18,7 @@ import {
 import { BsChevronDown, BsBootstrapReboot, BsTerminal } from 'react-icons/bs';
 import { VscDebugRestart } from 'react-icons/vsc';
 import { AiOutlineClear, AiOutlineInfoCircle } from 'react-icons/ai';
+import { GoFileSubmodule } from 'react-icons/go';
 import { FiExternalLink } from 'react-icons/fi';
 import { LogsTable } from '../../components/tables/LogsTable';
 import { ConfirmationItems } from '../../utils/ToastUtils';
@@ -27,7 +28,13 @@ import { hasKey } from '../../utils/GenericUtils';
 import { useAppSelector , useAppDispatch} from '../../hooks';
 import { AnyAction } from '@reduxjs/toolkit';
 import { clear as clearLogs, setDebug } from '../../slices/LogsSlice';
-import { openLogLocation, restartViaTerminal, restartServices, fullRestart } from '../../utils/IpcUtils';
+import {
+    openLogLocation,
+    openAppLocation,
+    restartViaTerminal,
+    restartServices,
+    fullRestart
+} from '../../utils/IpcUtils';
 
 
 const confirmationActions: ConfirmationItems = {
@@ -132,6 +139,9 @@ export const LogsLayout = (): JSX.Element => {
                                 </MenuItem>
                                 <MenuItem icon={<FiExternalLink />} onClick={() => openLogLocation()}>
                                     Open Log Location
+                                </MenuItem>
+                                <MenuItem icon={<GoFileSubmodule />} onClick={() => openAppLocation()}>
+                                    Open App Location
                                 </MenuItem>
                                 <MenuItem icon={<AiOutlineClear />} onClick={() => clearLogs()}>
                                     Clear Logs

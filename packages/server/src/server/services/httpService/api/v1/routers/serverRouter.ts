@@ -8,7 +8,7 @@ import { Success } from "../responses/success";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
-        return new Success(ctx, { data: GeneralInterface.getServerMetadata() }).send();
+        return new Success(ctx, { data: await GeneralInterface.getServerMetadata() }).send();
     }
 
     static async checkForUpdate(ctx: RouterContext, _: Next) {

@@ -76,15 +76,8 @@ export class SocketRoutes {
         /**
          * Return information about the server
          */
-        socket.on("get-server-metadata", (_, cb): void => {
-            const meta: ServerMetadataResponse = {
-                os_version: osVersion,
-                server_version: app.getVersion(),
-                private_api: Server().repo.getConfig("enable_private_api") as boolean,
-                proxy_service: Server().repo.getConfig("proxy_service") as string,
-                helper_connected: !!Server().privateApiHelper?.helper
-            };
-
+        socket.on("get-server-metadata", async (_, cb): Promise<void> => {
+            const meta: ServerMetadataResponse = await GeneralInterface.getServerMetadata();
             return response(cb, "server-metadata", createSuccessResponse(meta, "Successfully fetched metadata"));
         });
 
@@ -413,7 +406,7 @@ export class SocketRoutes {
             const attachment = await Server().iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
             if (!attachment) return response(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
-            const res = await getAttachmentResponse(attachment, true);
+            const res = await getAttachmentResponse(attachment, { getData: true });
             return response(cb, "attachment", createSuccessResponse(res));
         });
 
@@ -588,7 +581,20 @@ export class SocketRoutes {
                 }
 
                 Server().httpService.sendCache.remove(tempGuid);
-                return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
+                if ((sentMessage.error ?? 0) !== 0) {
+                    return response(
+                        cb,
+                        "message-send-error",
+                        createServerErrorResponse(
+                            "Message failed to send!",
+                            ErrorTypes.IMESSAGE_ERROR,
+                            "Message sent with an error. See attached message",
+                            await getMessageResponse(sentMessage)
+                        )
+                    );
+                } else {
+                    return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
+                }
             } catch (ex: any) {
                 Server().httpService.sendCache.remove(tempGuid);
                 if (ex?.ROWID) {
@@ -889,28 +895,6 @@ export class SocketRoutes {
                 "send-tapback-error",
                 createServerErrorResponse("iMessage Private API Helper is not connected!")
             );
-        });
-
-        /**
-         * Gets a contact (or contacts) for a given list of handles, from the database
-         */
-        socket.on("get-contacts-from-db", async (params, cb): Promise<void> => {
-            if (!Server().contactsRepo || !Server().contactsRepo.db.isConnected) {
-                response(cb, "contacts", createServerErrorResponse("Contacts repository is disconnected!"));
-                return;
-            }
-
-            const handles = params.map((e: any) => (typeof e === "string" ? { address: e } : e));
-            for (let i = 0; i <= handles.length; i += 1) {
-                if (!handles[i] || !handles[i].address) continue;
-                const contact = await Server().contactsRepo.getContactByAddress(handles[i].address);
-                if (contact) {
-                    handles[i].firstName = contact.firstName;
-                    handles[i].lastName = contact.lastName;
-                }
-            }
-
-            response(cb, "contacts-from-disk", createSuccessResponse(handles));
         });
 
         /**

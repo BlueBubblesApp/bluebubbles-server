@@ -31,7 +31,7 @@ export class AlertService {
 
     static async markAsRead(id: number): Promise<Alert> {
         // Find the corresponding alert
-        const alert = await Server().repo.alerts().findOne(id);
+        const alert = await Server().repo.alerts().findOneBy({ id });
         if (!alert) throw new Error(`Alert [id: ${id}] does not exist!`);
 
         // Modify and save the alert
@@ -41,7 +41,7 @@ export class AlertService {
 
     static async delete(id: number): Promise<void> {
         // Find the corresponding alert
-        const alert = await Server().repo.alerts().findOne(id);
+        const alert = await Server().repo.alerts().findOneBy({ id });
         if (!alert) return;
 
         await Server().repo.alerts().remove(alert);

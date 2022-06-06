@@ -41,7 +41,10 @@ export class ChatValidator {
 
     static createRules = {
         addresses: "required|array",
-        message: "string"
+        message: "string",
+        method: "string|in:apple-script,private-api",
+        service: "string|in:iMessage,SMS",
+        tempGuid: "string"
     };
 
     static async validateCreate(ctx: RouterContext, next: Next) {

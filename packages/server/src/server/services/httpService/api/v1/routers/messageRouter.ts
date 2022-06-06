@@ -68,12 +68,18 @@ export class MessageRouter {
     }
 
     static async query(ctx: RouterContext, _: Next) {
-        let { chatGuid, with: withQuery, offset, limit, where, sort, after, before } = ctx?.request?.body;
+        let {
+            chatGuid, with: withQuery, offset, limit, where,
+            sort, after, before, convertAttachments
+        } = (ctx?.request?.body ?? {});
 
         // Pull out the filters
-        withQuery = withQuery.filter((e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
+        withQuery = (withQuery ?? []).filter(
+            (e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
         const withChats = withQuery.includes("chat") || withQuery.includes("chats");
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
+        const withAttachmentMetadata = withQuery.includes(
+            "attachment.metadata") || withQuery.includes("attachments.metadata");
         const withHandle = withQuery.includes("handle");
         const withChatParticipants =
             withQuery.includes("chat.participants") || withQuery.includes("chats.participants");
@@ -131,7 +137,10 @@ export class MessageRouter {
                 }
             }
 
-            const msgRes = await getMessageResponse(msg);
+            const msgRes = await getMessageResponse(msg, {
+                convertAttachments,
+                loadAttachmentMetadata: withAttachmentMetadata
+            });
             data.push(msgRes);
         }
 
@@ -141,7 +150,10 @@ export class MessageRouter {
     }
 
     static async sendText(ctx: RouterContext, _: Next) {
-        let { tempGuid, message, method, chatGuid, effectId, subject, selectedMessageGuid } = ctx?.request?.body;
+        let {
+            tempGuid, message, method, chatGuid, effectId,
+            subject, selectedMessageGuid
+        } = (ctx?.request?.body ?? {});
 
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
@@ -163,7 +175,21 @@ export class MessageRouter {
 
             // Convert to an API response
             const data = await getMessageResponse(sentMessage);
-            return new Success(ctx, { message: "Message sent!", data }).send();
+
+            // Inject the TempGUID back into the response
+            if (isNotEmpty(tempGuid)) {
+                data.tempGuid = tempGuid;
+            }
+
+            if ((data.error ?? 0) !== 0) {
+                throw new IMessageError({
+                    message: 'Message sent with an error. See attached message',
+                    error: 'Message failed to send!',
+                    data
+                });
+            } else {
+                return new Success(ctx, { message: "Message sent!", data }).send();
+            }
         } catch (ex: any) {
             // Remove from cache
             Server().httpService.sendCache.remove(tempGuid);
@@ -182,7 +208,7 @@ export class MessageRouter {
 
     static async sendAttachment(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const { tempGuid, chatGuid, name } = ctx.request?.body;
+        const { tempGuid, chatGuid, name } = (ctx.request?.body ?? {});
         const attachment = files?.attachment as File;
 
         // Add to send cache
@@ -220,7 +246,7 @@ export class MessageRouter {
     }
 
     static async react(ctx: RouterContext, _: Next) {
-        const { chatGuid, selectedMessageGuid, reaction } = ctx?.request?.body;
+        const { chatGuid, selectedMessageGuid, reaction } = (ctx?.request?.body ?? {});
 
         // Fetch the message we are reacting to
         const message = await Server().iMessageRepo.getMessage(selectedMessageGuid, false, true);

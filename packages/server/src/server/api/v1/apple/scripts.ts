@@ -1,9 +1,12 @@
 /* eslint-disable max-len */
+import fs from "fs";
+import { clipboard } from "electron";
 import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
-import { escapeOsaExp, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { imageExtensions } from "./constants";
 
 const osVersion = macosVersion();
 
@@ -106,6 +109,14 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
     // If it's not a GUID, throw an error
     if (!chatGuid.includes(";")) throw new Error(`Invalid GUID! Can't send message to: ${chatGuid}`);
 
+    // If the chat is to an individual, we need to make sure the number is formatted correctly
+    if (chatGuid.includes(";-;")) {
+        const strSplit = chatGuid.split(";-;");
+        const service = strSplit[0];
+        const addr = strSplit[1];
+        chatGuid = `${service};-;${getiMessageAddressFormat(addr)}`;
+    }
+
     // Return the script
     return `tell application "Messages"
         set targetChat to a reference to chat id "${chatGuid}"
@@ -157,10 +168,12 @@ export const restartMessages = (delaySeconds = 3) => {
 /**
  * The AppleScript used to start a chat with some number of participants
  */
-export const startChat = (participants: string[], service: string, useTextChat: boolean) => {
+export const startChat = (participants: string[], service: string, message: string = null) => {
     const formatted = participants.map(buddy => `buddy "${buddy}" of targetService`);
     const buddies = formatted.join(", ");
 
+    const messageScpt = buildMessageScript(message, "thisChat");
+    const useTextChat = !isMinBigSur;
     const qualifier = useTextChat ? " text " : " ";
     const serviceScript = buildServiceScript(service);
     return `tell application "Messages"
@@ -169,6 +182,7 @@ export const startChat = (participants: string[], service: string, useTextChat: 
         (* Start the new chat with all the recipients *)
         set thisChat to make new${qualifier}chat with properties {participants: {${buddies}}}
         log thisChat
+        ${messageScpt}
     end tell
 
     try
@@ -181,29 +195,43 @@ export const startChat = (participants: string[], service: string, useTextChat: 
  */
 export const sendAttachmentAccessibility = (attachmentPath: string, participants: string[]) => {
     const recipientCommands = [];
+    // Key code 125 == down arrow
     for (const i of participants) {
         recipientCommands.push(`
-            delay 1
+            delay 2
             keystroke "${i}"
+            delay 1
+            key code 125
             delay 1
             keystroke return`);
     }
 
+    // The AppleScript copy _only_ works on Monterey
+    const scriptCopy = `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"`;
+    const scriptClip = `set the clipboard to theFile`;
+
     // Caffeinate is so we don't let the computer sleep while this is running
+    // The CMD + A & Delete will clear any existing text or attachments
     return `try
             do shell script "caffeinate -u -t 2"
-            delay 2.0
+            delay 1
         end try
         
-        tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
+        ${scriptCopy ?? ''}
         tell application "System Events" to tell application process "Messages"
             set frontmost to true
             keystroke "n" using {command down}
+            delay 0.5
             ${recipientCommands.join("\n")}
             delay 1
-            keystroke tab
+            keystroke return
             delay 0.5
-            set the clipboard to theFile
+            keystroke "a" using {command down}
+            delay 0.5
+            key code 51
+            delay 0.5
+            ${scriptClip ?? ''}
+            delay 0.5
             keystroke "v" using {command down}
             delay 3.0
             keystroke return
@@ -818,14 +846,21 @@ export const checkForIncomingFacetime10 = () => {
             end if
         end tell
     end tell`
-}
+};
 
-
-
+export const openFilePath = (filePath: string) => {
+    filePath = filePath.replace(/ /g, "\\ ");
+    return `do shell script "open ${escapeOsaExp(filePath)}"`;
+};
 
 export const openLogs = () => {
     const logPath = transports.file.getFile().path;
     const pieces = logPath.split("/");
     const parent = pieces.slice(0, pieces.length - 1).join("/");
-    return `do shell script "open ${parent}"`;
+    return openFilePath(parent);
+};
+
+export const openAppData = () => {
+    const parent = FileSystem.baseDir;
+    return openFilePath(parent);
 };

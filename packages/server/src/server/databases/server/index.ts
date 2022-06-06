@@ -1,16 +1,17 @@
 import { app } from "electron";
 import { EventEmitter } from "events";
-import { createConnection, Connection } from "typeorm";
+import { DataSource } from "typeorm";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { Config, Alert, Device, Queue, Webhook } from "./entity";
+import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
+import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
 
 export class ServerRepository extends EventEmitter {
-    db: Connection = null;
+    db: DataSource = null;
 
     config: ServerConfig;
 
@@ -21,12 +22,12 @@ export class ServerRepository extends EventEmitter {
         this.config = {};
     }
 
-    async initialize(): Promise<Connection> {
+    async initialize(): Promise<DataSource> {
         const isDev = process.env.NODE_ENV !== "production";
 
         // If the DB is set, but not connected, try to connect
         if (this.db) {
-            if (!this.db.isConnected) await this.db.connect();
+            if (!this.db.isInitialized) await this.db.initialize();
             return this.db;
         }
 
@@ -35,15 +36,18 @@ export class ServerRepository extends EventEmitter {
             dbPath = `${app.getPath("userData")}/bluebubbles-server/config.db`;
         }
 
-        this.db = await createConnection({
+        this.db = new DataSource({
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
-            entities: [Config, Alert, Device, Queue, Webhook],
-            // We should really use migrations for this.
-            // This is me being lazy. Maybe someday...
-            synchronize: true
+            entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress],
+            migrations: [ContactTables1654432080899],
+            migrationsRun: true,
+            migrationsTableName: 'migrations',
+            synchronize: isDev
         });
+
+        this.db = await this.db.initialize();
 
         // Load default config items
         await this.loadConfig();
@@ -86,6 +90,20 @@ export class ServerRepository extends EventEmitter {
         return this.db.getRepository(Webhook);
     }
 
+    /**
+     * Get the contacts repo
+     */
+    contacts() {
+        return this.db.getRepository(Contact);
+    }
+
+    /**
+     * Get the contact addresses repo
+     */
+    contactAddresses() {
+        return this.db.getRepository(ContactAddress);
+    }
+
     private async loadConfig() {
         const items: Config[] = await this.configs().find();
         for (const i of items) this.config[i.name] = ServerRepository.convertFromDbValue(i.value);
@@ -119,7 +137,7 @@ export class ServerRepository extends EventEmitter {
     async setConfig(name: string, value: Date | string | boolean | number): Promise<void> {
         const orig = { ...this.config };
         const saniVal = ServerRepository.convertToDbValue(value);
-        const item = await this.configs().findOne({ name });
+        const item = await this.configs().findOneBy({ name });
 
         // Either change or create the new Config object
         if (item) {
@@ -156,9 +174,19 @@ export class ServerRepository extends EventEmitter {
         return await repo.find();
     }
 
-    public async addWebhook(url: string, events: Array<{ label: string, value: string }>): Promise<Webhook> {
+    public async getContacts(withAvatars = false): Promise<Array<Contact>> {
+        const repo = this.contacts();
+        const fields: (keyof Contact)[] = ["firstName", "lastName", "displayName", "id"];
+        if (withAvatars) {
+            fields.push("avatar");
+        }
+
+        return await repo.find({ select: fields, relations: ["addresses"] });
+    }
+
+    public async addWebhook(url: string, events: Array<{ label: string; value: string }>): Promise<Webhook> {
         const repo = this.webhooks();
-        const item = await repo.findOne({ url });
+        const item = await repo.findOneBy({ url });
 
         // If the webhook exists, don't re-add it, just return it
         if (item) return item;
@@ -171,10 +199,14 @@ export class ServerRepository extends EventEmitter {
         id,
         url = null,
         events = null
-    }: { id: number, url: string, events: Array<{ label: string, value: string }> }): Promise<Webhook> {
+    }: {
+        id: number;
+        url: string;
+        events: Array<{ label: string; value: string }>;
+    }): Promise<Webhook> {
         const repo = this.webhooks();
-        const item = await repo.findOne({ id });
-        if (!item) throw new Error('Failed to update webhook! Existing webhook does not exist!');
+        const item = await repo.findOneBy({ id });
+        if (!item) throw new Error("Failed to update webhook! Existing webhook does not exist!");
 
         if (url) item.url = url;
         if (events) item.events = JSON.stringify(events.map(e => e.value));
@@ -183,9 +215,9 @@ export class ServerRepository extends EventEmitter {
         return item;
     }
 
-    public async deleteWebhook({ url = null, id = null }: { url: string | null, id: number | null }): Promise<void> {
+    public async deleteWebhook({ url = null, id = null }: { url: string | null; id: number | null }): Promise<void> {
         const repo = this.webhooks();
-        const item = (url) ? await repo.findOne({ url }) : await repo.findOne({ id });
+        const item = url ? await repo.findOneBy({ url }) : await repo.findOneBy({ id });
         if (!item) return;
         await repo.delete(item.id);
     }
