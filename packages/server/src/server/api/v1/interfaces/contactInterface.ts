@@ -460,6 +460,8 @@ export class ContactInterface {
      * @returns A list of new contacts added
      */
     static async importFromVcf(filePath: string): Promise<any[]> {
+        Server().log(`Importing VCF from path: ${filePath}`, 'debug');
+
         const content = fs.readFileSync(filePath, { encoding: "utf-8" }).toString() ?? "";
         const parsed = vcf.parse(content);
         const output: Contact[] = [];

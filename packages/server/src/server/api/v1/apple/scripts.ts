@@ -1,12 +1,9 @@
 /* eslint-disable max-len */
-import fs from "fs";
-import { clipboard } from "electron";
 import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
 import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
-import { imageExtensions } from "./constants";
 
 const osVersion = macosVersion();
 
@@ -88,7 +85,46 @@ export const hideMessages = () => {
  * The AppleScript used to send a message with or without an attachment
  */
 export const startMessages = () => {
-    return `set appName to "Messages"
+    return startApp('Messages');
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const startFindMyFrields = () => {
+    return startApp('FindMy');
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const hideApp = (appName: string) => {
+    return `tell application "System Events" to tell application process "${appName}"
+        set visible to false
+    end tell`;
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const showApp = (appName: string) => {
+    return `tell application "System Events" to tell application process "${appName}"
+        set frontmost to true
+    end tell`;
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+ export const hideFindMyFriends = () => {
+    return hideApp('FindMy');
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+ export const startApp = (appName: string) => {
+    return `set appName to "${appName}"
         if application appName is running then
             return 0
         else

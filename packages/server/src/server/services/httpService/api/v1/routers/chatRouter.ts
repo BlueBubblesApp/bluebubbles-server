@@ -6,7 +6,7 @@ import { FileSystem } from "@server/fileSystem";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
-import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, isTruthyBool, safeTrim } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
 import { FileStream, Success } from "../responses/success";
@@ -14,7 +14,13 @@ import { IMessageError, NotFound } from "../responses/errors";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
-        const chats = await Server().iMessageRepo.getChats();
+        const { includeArchived } = ctx?.request.query ?? {};
+
+        // We want to include the archived by default
+        const withArchived = includeArchived ? isTruthyBool(includeArchived as string) : true;
+
+        // Get all the chats so we can parse through them for the breakdown
+        const chats = await Server().iMessageRepo.getChats({ withArchived });
         const serviceCounts: { [key: string]: number } = {};
         for (const chat of chats) {
             if (!Object.keys(serviceCounts).includes(chat.serviceName)) {
@@ -29,7 +35,7 @@ export class ChatRouter {
     }
 
     static async find(ctx: RouterContext, _: Next) {
-        const withQuery = ((ctx.request.query.with ?? "") as string)
+        const withQuery = ((ctx?.request.query.with ?? "") as string)
             .toLowerCase()
             .split(",")
             .map(e => safeTrim(e));
@@ -38,7 +44,8 @@ export class ChatRouter {
 
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
-            withParticipants
+            withParticipants,
+            withArchived: true
         });
 
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
@@ -62,7 +69,8 @@ export class ChatRouter {
 
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
-            withParticipants: false
+            withParticipants: false,
+            withArchived: true
         });
 
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
@@ -95,7 +103,6 @@ export class ChatRouter {
         const withQuery = (body?.with ?? [])
             .filter((e: any) => typeof e === "string")
             .map((e: string) => safeTrim(e.toLowerCase()));
-        const withParticipants = withQuery.includes("participants");
         const withLastMessage = withQuery.includes("lastmessage");
         const withArchived = withQuery.includes("archived");
         const guid = body?.guid;
@@ -104,7 +111,6 @@ export class ChatRouter {
         // Fetch the chats
         const results = await ChatInterface.get({
             guid,
-            withParticipants,
             withLastMessage,
             withArchived,
             offset: offset ? Number.parseInt(offset, 10) : 0,
