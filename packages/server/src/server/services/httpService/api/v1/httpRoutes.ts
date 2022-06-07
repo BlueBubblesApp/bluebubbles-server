@@ -21,6 +21,7 @@ import { MetricsMiddleware } from "./middleware/metricsMiddleware";
 import { LogMiddleware } from "./middleware/logMiddleware";
 import { ErrorMiddleware } from "./middleware/errorMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
+import { iCloudRouter } from "./routers/icloudRouter";
 import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
 import { HttpDefinition, HttpMethod, HttpRoute, HttpRouteGroup, KoaMiddleware } from "../../types";
 import { SettingsValidator } from "./validators/settingsValidator";
@@ -29,6 +30,7 @@ import { HandleValidator } from "./validators/handleValidator";
 import { FcmValidator } from "./validators/fcmValidator";
 import { AttachmentValidator } from "./validators/attachmentValidator";
 import { ChatValidator } from "./validators/chatValidator";
+import { AlertsValidator } from "./validators/alertsValidator";
 
 export class HttpRoutes {
     static version = 1;
@@ -73,6 +75,33 @@ export class HttpRoutes {
                 ]
             },
             {
+                name: "iCloud",
+                middleware: HttpRoutes.protected,
+                prefix: "icloud",
+                routes: [
+                    {
+                        method: HttpMethod.GET,
+                        path: "findmy/devices",
+                        controller: iCloudRouter.devices
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "findmy/devices/refresh",
+                        controller: iCloudRouter.refreshDevices
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "findmy/friends",
+                        controller: iCloudRouter.friends
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "findmy/friends/refresh",
+                        controller: iCloudRouter.refreshFriends
+                    }
+                ]
+            },
+            {
                 name: "Server",
                 middleware: HttpRoutes.protected,
                 prefix: "server",
@@ -101,6 +130,17 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: "update/check",
                         controller: ServerRouter.checkForUpdate
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "alert",
+                        controller: ServerRouter.getAlerts
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "alert/read",
+                        controller: ServerRouter.markAsRead,
+                        validators: [AlertsValidator.validateRead]
                     },
                     {
                         method: HttpMethod.GET,

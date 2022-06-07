@@ -295,11 +295,13 @@ export const ContactsLayout = (): JSX.Element => {
                                     ref={inputFile}
                                     accept=".vcf"
                                     style={{display: 'none'}}
-                                    onChange={(e) => {
+                                    onChange={async (e) => {
                                         const files = e?.target?.files ?? [];
                                         for (const i of files) {
-                                            ipcRenderer.invoke('import-vcf', i.webkitRelativePath);
+                                            await ipcRenderer.invoke('import-vcf', i.path);
                                         }
+
+                                        loadContacts();
                                     }}
                                 />
                             </MenuItem>

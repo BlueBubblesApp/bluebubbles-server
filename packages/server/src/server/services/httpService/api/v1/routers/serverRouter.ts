@@ -5,6 +5,9 @@ import { Server } from "@server";
 import { ServerInterface } from "@server/api/v1/interfaces/serverInterface";
 import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { Success } from "../responses/success";
+import { AlertsInterface } from "@server/api/v1/interfaces/alertsInterface";
+import { isEmpty } from "@server/helpers/utils";
+import { BadRequest } from "../responses/errors";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
@@ -77,5 +80,15 @@ export class ServerRouter {
         }
 
         return new Success(ctx, { data: await await ServerInterface.getMediaTotalsByChat(params) }).send();
+    }
+
+    static async getAlerts(ctx: RouterContext, _: Next) {
+        return new Success(ctx, { data: await AlertsInterface.find() }).send();
+    }
+
+    static async markAsRead(ctx: RouterContext, _: Next) {
+        const { ids } = ctx?.request?.body ?? {};
+        if (isEmpty(ids)) throw new BadRequest({ message: 'No alert IDs provided!' });
+        return new Success(ctx, { data: await AlertsInterface.markAsRead(ids) }).send();
     }
 }

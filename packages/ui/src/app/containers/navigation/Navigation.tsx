@@ -140,7 +140,7 @@ export const Navigation = (): JSX.Element => {
                             </MenuButton>
                             <MenuList>
                                 <MenuItem icon={<FiTrash />} onClick={() => {
-                                    dispatch(clearAlerts());
+                                    dispatch(clearAlerts({ showToast: true }));
                                 }}>
                                     Clear Alerts
                                 </MenuItem>
