@@ -5,6 +5,10 @@ export class ContactTables1654432080899 implements MigrationInterface {
 
     name = 'ContactTables1654432080899'
 
+    contactColumnOrder = 'id, first_name, last_name, display_name, avatar, created, updated';
+
+    contactAddressColumnOrder = 'id, address, type, created, updated';
+
     createContactTable = `
         CREATE TABLE IF NOT EXISTS "contact" (
             "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -62,8 +66,11 @@ export class ContactTables1654432080899 implements MigrationInterface {
 
         // 4: Insert all the data back into the original table with the updated contstraints
         Server().log(`Migration[${this.name}]   -> Transfering data to new tables`, 'debug');
-        await queryRunner.query(`INSERT INTO "contact" SELECT * FROM "contact_old";`);
-        await queryRunner.query(`INSERT INTO "contact_address" SELECT * FROM "contact_address_old";`);
+        await queryRunner.query(
+            `INSERT INTO "contact" (${this.contactColumnOrder}) SELECT ${this.contactColumnOrder} FROM "contact_old";`);
+        await queryRunner.query(
+            `INSERT INTO "contact_address" (${this.contactAddressColumnOrder}) SELECT ${
+                this.contactAddressColumnOrder} FROM "contact_address_old";`);
 
         // 5: Drop original, renamed table
         Server().log(`Migration[${this.name}]   -> Removing original (renamed) tables`, 'debug');
