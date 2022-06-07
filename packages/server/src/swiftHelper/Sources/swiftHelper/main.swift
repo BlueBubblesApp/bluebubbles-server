@@ -9,9 +9,9 @@ import Foundation
 // required to get io to work properly.
 setbuf(__stdoutp, nil)
 if CommandLine.arguments.count > 1 {
-    Logger.debug("starting socket on " + CommandLine.arguments[1])
+    Logger.debug("Starting socket on " + CommandLine.arguments[1])
     SocketManager.shared.connect(sock: CommandLine.arguments[1])
-    Logger.debug("socket closed");
+    Logger.debug("Socket closed");
 } else {
-    Logger.error("no sock file provided")
+    Logger.error("No sock file provided")
 }

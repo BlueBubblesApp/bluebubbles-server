@@ -18,17 +18,19 @@ class SocketManager {
             do {
                 try self.sock = Socket.create(family: Socket.ProtocolFamily.unix, proto: Socket.SocketProtocol.unix)
                 try self.sock?.connect(to: sock)
-                Logger.log("connected to socket")
+                Logger.log("Connected to socket")
                 event()
-                Logger.log("socket disconnected")
+                Logger.log("Socket disconnected")
             } catch let error {
                 guard let socketError = error as? Socket.Error else {
-                    Logger.error("unexpected error...\n \(error)")
+                    Logger.error("Unexpected error...\n \(error)")
                     return
                 }
-                Logger.error("error reported:\n \(socketError.description)")
+
+                Logger.error("Error reported:\n \(socketError.description)")
             }
-            Logger.debug("attempting reconnect in 5 seconds")
+
+            Logger.debug("Attempting reconnect in 5 seconds")
             sleep(5)
         }
     }
@@ -43,7 +45,7 @@ class SocketManager {
                     break
                 }
                 guard let msg = Event.fromBytes(bytes: readData, bytesRead: bytesRead!) else {
-                    Logger.warn("error decoding")
+                    Logger.warn("Error decoding event")
                     continue
                 }
                 try sock?.write(from: msg.handleMessage()!.toBytes())
