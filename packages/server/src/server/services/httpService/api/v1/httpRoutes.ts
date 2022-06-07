@@ -30,6 +30,7 @@ import { HandleValidator } from "./validators/handleValidator";
 import { FcmValidator } from "./validators/fcmValidator";
 import { AttachmentValidator } from "./validators/attachmentValidator";
 import { ChatValidator } from "./validators/chatValidator";
+import { AlertsValidator } from "./validators/alertsValidator";
 
 export class HttpRoutes {
     static version = 1;
@@ -86,7 +87,17 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: "findmy/devices/refresh",
-                        controller: iCloudRouter.refresh
+                        controller: iCloudRouter.refreshDevices
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "findmy/friends",
+                        controller: iCloudRouter.friends
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "findmy/friends/refresh",
+                        controller: iCloudRouter.refreshFriends
                     }
                 ]
             },
@@ -119,6 +130,17 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: "update/check",
                         controller: ServerRouter.checkForUpdate
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "alert",
+                        controller: ServerRouter.getAlerts
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "alert/read",
+                        controller: ServerRouter.markAsRead,
+                        validators: [AlertsValidator.validateRead]
                     },
                     {
                         method: HttpMethod.GET,

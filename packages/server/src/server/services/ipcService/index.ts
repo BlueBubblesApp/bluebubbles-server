@@ -2,7 +2,7 @@ import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { AlertService } from "@server/services/alertService";
+import { AlertsInterface } from "@server/api/v1/interfaces/alertsInterface";
 import { openLogs, openAppData } from "@server/api/v1/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
@@ -55,18 +55,12 @@ export class IPCService {
         });
 
         ipcMain.handle("get-alerts", async (_, __) => {
-            const alerts = await AlertService.find();
+            const alerts = await AlertsInterface.find();
             return alerts;
         });
 
         ipcMain.handle("mark-alerts-as-read", async (_, args) => {
-            for (const i of args) {
-                await AlertService.markAsRead(i);
-                Server().notificationCount -= 1;
-            }
-
-            if (Server().notificationCount < 0) Server().notificationCount = 0;
-            app.setBadgeCount(Server().notificationCount);
+            await AlertsInterface.markAsRead(args);
         });
 
         ipcMain.handle("set-fcm-server", async (_, args) => {

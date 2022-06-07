@@ -1,12 +1,14 @@
 import { ipcRenderer } from 'electron';
 import { showSuccessToast } from '../utils/ToastUtils';
 
-export const clearAlerts = async (): Promise<void> => {
+export const clearAlerts = async (showToast = true): Promise<void> => {
     await ipcRenderer.invoke('clear-alerts');
-    showSuccessToast({
-        id: 'alerts',
-        description: 'Successfully cleared Alerts!'
-    });
+    if (showToast) {
+        showSuccessToast({
+            id: 'alerts',
+            description: 'Successfully cleared Alerts!'
+        });
+    }
 };
 
 
