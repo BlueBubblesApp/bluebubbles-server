@@ -286,6 +286,7 @@ export class BlueBubblesHelperService {
     async sendMessage(
         chatGuid: string,
         message: string,
+        attributedBody: Record<string, any> = null,
         subject: string = null,
         effectId: string = null,
         selectedMessageGuid: string = null
@@ -295,7 +296,14 @@ export class BlueBubblesHelperService {
         }
 
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.writeData("send-message", { chatGuid, subject, message, effectId, selectedMessageGuid }, request);
+        return this.writeData("send-message", {
+            chatGuid,
+            subject,
+            message,
+            attributedBody,
+            effectId,
+            selectedMessageGuid
+        }, request);
     }
 
     async addParticipant(chatGuid: string, address: string) {

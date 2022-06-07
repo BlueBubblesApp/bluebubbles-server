@@ -22,6 +22,7 @@ export type MessageResponse = {
     tempGuid?: string;
     guid: string;
     text: string;
+    attributedBody?: Record<string, any>;
     handle?: HandleResponse | null;
     handleId: number;
     otherHandle: number;

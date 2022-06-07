@@ -9,8 +9,9 @@
     },
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "scripts": {
-        "build": "export NODE_ENV=production && webpack --config ./scripts/webpack.main.prod.config.js",
-        "start": "export NODE_ENV=development && webpack --config ./scripts/webpack.main.config.js && electron ./dist/main.js",
+        "build-swift": "cd swiftHelper && swift build -c release && cp .build/release/swiftHelper ../appResources/swiftHelper && cd ..",
+        "build": "export NODE_ENV=production && npm run build-swift && webpack --config ./scripts/webpack.main.prod.config.js",
+        "start": "export NODE_ENV=development && npm run build-swift && webpack --config ./scripts/webpack.main.config.js && electron ./dist/main.js",
         "lint": "eslint --ext=jsx,js,tsx,ts src",
         "dist": "npm run build && electron-builder build --mac --publish never",
         "postinstall": "electron-builder install-app-deps"

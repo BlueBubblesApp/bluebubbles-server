@@ -38,6 +38,7 @@ export class MessageInterface {
         chatGuid: string,
         message: string,
         method: "apple-script" | "private-api",
+        attributedBody?: Record<string, any> | null,
         subject?: string,
         effectId?: string,
         selectedMessageGuid?: string,
@@ -72,6 +73,7 @@ export class MessageInterface {
             sentMessage = await MessageInterface.sendMessagePrivateApi(
                 chatGuid,
                 message,
+                attributedBody,
                 subject,
                 effectId,
                 selectedMessageGuid
@@ -136,6 +138,7 @@ export class MessageInterface {
     static async sendMessagePrivateApi(
         chatGuid: string,
         message: string,
+        attributedBody?: Record<string, any> | null,
         subject?: string | null,
         effectId?: string | null,
         selectedMessageGuid?: string | null
@@ -144,6 +147,7 @@ export class MessageInterface {
         const result = await Server().privateApiHelper.sendMessage(
             chatGuid,
             message,
+            attributedBody ?? null,
             subject ?? null,
             effectId ?? null,
             selectedMessageGuid ?? null
