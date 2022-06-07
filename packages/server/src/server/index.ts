@@ -432,6 +432,12 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
         }
 
+        try {
+            this.swiftHelperService?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Swift Helper service! ${ex?.message ?? ex}`, "error");
+        }
+
         this.log("Finished stopping services...");
     }
 
@@ -1076,7 +1082,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Restarting the server...");
 
         // Disconnect & reconnect to the iMessage DB
-        if (this.iMessageRepo.db.isConnected) {
+        if (this.iMessageRepo.db.isInitialized) {
             this.log("Reconnecting to iMessage database...");
             await this.iMessageRepo.db.close();
             await this.iMessageRepo.db.connect();

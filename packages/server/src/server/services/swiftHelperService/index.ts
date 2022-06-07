@@ -31,6 +31,7 @@ import { Queue } from "./queue";
                 this.helper = null;
                 Server().log("Swift Helper disconnected");
             });
+
             client.on("data", data => {
                 data.indexOf("\u0004")
                 // split data by the EOT character
@@ -42,20 +43,23 @@ import { Queue } from "./queue";
                         lastI = i + 1;
                     }
                 }
+
                 events.forEach(event => {
                     const msg = Event.fromBytes(event);
                     this.queue.call(msg.uuid, msg.data);
                 });
             });
+
             this.helper = client;
         });
+
         this.server.listen(this.sockPath);
     }
 
     private runSwiftHelper() {
-        Server().log("Starting Swift Helper");
         this.child = spawn(this.helperPath, [this.sockPath]);
         this.child.stdout.setEncoding("utf8");
+
         // we should listen to stdout data
         // so we can forward to the bb logger
         this.child.stdout.on("data", (data: string) => {
@@ -64,22 +68,25 @@ import { Queue } from "./queue";
             // at the end of each log and split by the EOT character
             const lines = data.split("\u0004");
             lines.pop();
+
             for (const line of lines) {
-                let splitIndex = line.indexOf(":");
-                let level = line.substring(0, splitIndex);
+                const splitIndex = line.indexOf(":");
+                const level = line.substring(0, splitIndex);
                 if (["log", "error", "warn", "debug"].indexOf(level) >= 0) {
-                    let content = line.substring(splitIndex+1);
-                    Server().log(`Swift Helper: ${content}`, level as any);
+                    const content = line.substring(splitIndex+1);
+                    Server().log(`[Swift Helper] ${content}`, level as any);
                 } else {
                     // log as error, should be using Logger in swiftHelper, not print
-                    Server().log(`Swift Helper: ${line}`, "error");
+                    Server().log(`[Swift Helper] ${line}`, "error");
                 }
             }
         });
+
         this.child.stderr.setEncoding("utf8");
         this.child.stderr.on("data", data => {
-            Server().log(`Swift Helper error: ${data}`, "error");
+            Server().log(`[Swift Helper] Error: ${data}`, "error");
         });
+
         // if the child process exits, we should restart it
         this.child.on("close", code => {
             Server().log("Swift Helper process exited: " + code, "error");
@@ -91,14 +98,43 @@ import { Queue } from "./queue";
      * Initializes the Swift Helper service.
      */
     start() {
+        Server().log("Starting Swift Helper...");
+
         this.helperPath = `${FileSystem.resources}/swiftHelper`;
-        this.sockPath = `${app.getPath("userData")}/swift-helper.sock`;
+        this.sockPath = `${FileSystem.baseDir}/swift-helper.sock`;
+
         // Configure & start the socket server
-        Server().log("Starting Swift Helper...", "debug");
         this.startServer();
+
         // we should set a 100 ms timeout to give time for the
         // socket server to start before connecting with the helper
         setTimeout(this.runSwiftHelper.bind(this), 100);
+    }
+
+    stop() {
+        Server().log('Stopping Swift Helper...');
+
+        if (this.child?.stdout) this.child.stdout.removeAllListeners();
+        if (this.child?.stderr) this.child.stderr.removeAllListeners();
+        if (this.child) {
+            this.child.removeAllListeners();
+            this.child.kill();
+        }
+
+        if (this.helper) {
+            this.helper.destroy();
+            this.helper = null;
+        }
+
+        if (this.server) {
+            this.server.close();
+            this.server = null;
+        }
+    }
+
+    restart() {
+        this.stop();
+        this.start();
     }
 
     /**
