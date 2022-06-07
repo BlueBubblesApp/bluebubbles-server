@@ -852,38 +852,6 @@ export const openSystemPreferences = () => {
     end tell`;
 };
 
-export const checkForIncomingFacetime11 = () => {
-    return `tell application "System Events"
-
-        if not (exists group 1 of UI element 1 of scroll area 1 of window 1 of application process "NotificationCenter") then
-            return ""
-        end if
-
-        set notificationGroup to group 1 of UI element 1 of scroll area 1 of window 1 of application process "NotificationCenter"
-        
-        if (exists static text 1 of notificationGroup) and (value of static text 1 of notificationGroup = "FaceTime") then
-            set callerName to value of static text 2 of notificationGroup
-            return callerName
-        else
-            return ""
-        end if
-    end tell`
-};
-
-export const checkForIncomingFacetime10 = () => {
-    return `tell application "System Events"
-        tell application process "NotificationCenter"
-            if not (exists static text 2 of window 1) then
-                return ""
-            else if (value of static text 1 of window 1 = "FaceTime") then
-                return value of static text 2 of window 1
-            else
-                return ""
-            end if
-        end tell
-    end tell`
-};
-
 export const openFilePath = (filePath: string) => {
     filePath = filePath.replace(/ /g, "\\ ");
     return `do shell script "open ${escapeOsaExp(filePath)}"`;

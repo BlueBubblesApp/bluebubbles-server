@@ -50,9 +50,5 @@ export const webhookEventOptions = [
     {
         label: 'Websocket Hello World',
         value: 'hello-world'
-    },
-    {
-        label: 'Incoming Facetime Call',
-        value: 'incoming-facetime'
     }
 ];

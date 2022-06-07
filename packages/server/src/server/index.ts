@@ -36,8 +36,7 @@ import {
     IPCService,
     UpdateService,
     CloudflareService,
-    WebhookService,
-    FacetimeService
+    WebhookService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -61,8 +60,6 @@ import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
 const findProcess = require("find-process");
 
 const osVersion = macosVersion();
-
-const facetimeServiceEnabled = true;
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -109,8 +106,6 @@ class BlueBubblesServer extends EventEmitter {
     privateApiHelper: BlueBubblesHelperService;
 
     fcm: FCMService;
-
-    facetime: FacetimeService;
 
     networkChecker: NetworkService;
 
@@ -174,7 +169,6 @@ class BlueBubblesServer extends EventEmitter {
         this.httpService = null;
         this.privateApiHelper = null;
         this.fcm = null;
-        this.facetime = null;
         this.caffeinate = null;
         this.networkChecker = null;
         this.queue = null;
@@ -332,18 +326,12 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
-        if(facetimeServiceEnabled) {
-            this.facetime = new FacetimeService();
-        }
-
         try {
             this.log("Initializing proxy services...");
             this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
         } catch (ex: any) {
             this.log(`Failed to initialize proxy services! ${ex.message}`, "error");
         }
-
-        
 
         try {
             this.log("Initializing Message Manager...");
@@ -357,15 +345,6 @@ class BlueBubblesServer extends EventEmitter {
             this.webhookService = new WebhookService();
         } catch (ex: any) {
             this.log(`Failed to start Webhook service! ${ex.message}`, "error");
-        }
-
-        try {
-            this.log("Starting Facetime service...");
-            if (this.facetime == null)
-                this.facetime = new FacetimeService();
-            this.facetime.start();
-        } catch (ex: any) {
-            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
         }
     }
 
