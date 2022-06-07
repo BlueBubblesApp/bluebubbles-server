@@ -119,6 +119,22 @@ export const GuidesLayout = (): JSX.Element => {
                     <WrapItem>
                         <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
                             <Text color='gray'>
+                                https://github.com/sponsors/BlueBubblesApp
+                            </Text>
+                            <Heading size='md' my={2}>
+                                <LinkOverlay href='https://github.com/sponsors/BlueBubblesApp' target='_blank'>
+                                    Sponsor Us
+                                </LinkOverlay>
+                            </Heading>
+                            <Text>
+                                Sponsor us by contributing a recurring donation to us, through GitHub. A monthly donation
+                                is just another way to help support the developers and help maintain the project!
+                            </Text>
+                        </LinkBox>
+                    </WrapItem>
+                    <WrapItem>
+                        <LinkBox as='article' maxW='xs' px='5' pb={5} pt={2} borderWidth='1px' rounded='xl'>
+                            <Text color='gray'>
                                 https://bluebubbles.app/donate
                             </Text>
                             <Heading size='md' my={2}>

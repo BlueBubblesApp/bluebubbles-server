@@ -23,7 +23,7 @@ export class GeneralInterface {
 
     static async addFcmDevice(name: string, identifier: string): Promise<void> {
         // If the device ID exists, update the identifier
-        const device = await Server().repo.devices().findOne({ name });
+        const device = await Server().repo.devices().findOneBy({ name });
         if (device) {
             device.identifier = identifier;
             device.last_active = new Date().getTime();

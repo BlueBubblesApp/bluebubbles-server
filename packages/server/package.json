@@ -1,6 +1,6 @@
 {
     "name": "@bluebubbles/server",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "main": "./dist/main.js",
     "license": "Apache-2.0",
     "author": {
@@ -77,8 +77,8 @@
             "entitlements": "./scripts/entitlements.mac.plist",
             "entitlementsInherit": "./scripts/entitlements.mac.plist",
             "extendInfo": {
-                "NSContactsUsageDescription": "This app needs access to your Contacts",
-                "NSAppleEventsUsageDescription": "This app needs access to run AppleScripts"
+                "NSContactsUsageDescription": "BlueBubbles needs access to your Contacts",
+                "NSAppleEventsUsageDescription": "BlueBubbles needs access to run AppleScripts"
             },
             "gatekeeperAssess": false,
             "minimumSystemVersion": "10.11.6"
@@ -95,8 +95,9 @@
         "@babel/plugin-proposal-private-property-in-object": "^7.16.7",
         "@babel/preset-env": "^7.12.11",
         "@babel/preset-typescript": "^7.12.7",
-        "@types/better-sqlite3": "^7.4.2",
+        "@types/better-sqlite3": "^7.5.0",
         "@types/crypto-js": "^4.0.1",
+        "@types/electron": "^1.6.10",
         "@types/google-libphonenumber": "^7.4.18",
         "@types/history": "^4.7.5",
         "@types/koa": "^2.13.4",
@@ -116,7 +117,7 @@
         "@typescript-eslint/parser": "^5.18.0",
         "babel-loader": "^8.1.0",
         "css-loader": "^3.5.2",
-        "electron": "16.2.2",
+        "electron": "17.4.5",
         "electron-builder": "^22.9.1",
         "electron-notarize": "^1.0.0",
         "eslint": "^8.13.0",
@@ -128,7 +129,7 @@
         "husky": "^4.2.5",
         "lint-staged": "^10.1.5",
         "prettier": "^2.6.2",
-        "typescript": "^4.6.3",
+        "typescript": "^4.7.2",
         "webpack": "^5.68.0",
         "webpack-cli": "^4.9.2",
         "webpack-merge": "^5.8.0",
@@ -141,13 +142,13 @@
         "@firebase/util": "^1.5.1",
         "@peculiar/x509": "^1.6.1",
         "axios": "^0.25.0",
-        "better-sqlite3": "^7.4.5",
+        "better-sqlite3": "^7.5.3",
         "blurhash": "^1.1.3",
         "byte-base64": "^1.1.0",
         "compare-versions": "^3.6.0",
         "conditional-decorator": "^0.1.7",
         "crypto-js": "^4.0.0",
-        "electron-log": "^4.2.4",
+        "electron-log": "^4.4.7",
         "electron-updater": "^4.3.5",
         "find-process": "^1.4.4",
         "firebase-admin": "^10.0.2",
@@ -171,7 +172,7 @@
         "reflect-metadata": "^0.1.13",
         "slugify": "^1.6.0",
         "socket.io": "3.1.2",
-        "typeorm": "^0.2.41",
+        "typeorm": "^0.3.6",
         "validatorjs": "^3.22.1",
         "vcf": "^2.1.1",
         "zx": "^4.3.0"

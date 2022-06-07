@@ -10,17 +10,17 @@ import { MessageInterface } from "./messageInterface";
 export class ChatInterface {
     static async get({
         guid = null,
-        withParticipants = true,
-        withArchived = false,
+        withArchived = true,
         withLastMessage = false,
         offset = 0,
         limit = null,
         sort = "lastmessage"
-    }: any): Promise<ChatResponse[]> {
+    }: any = {}): Promise<ChatResponse[]> {
         const chats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
-            withParticipants,
+            withParticipants: false,
             withLastMessage,
+            withArchived,
             offset,
             limit
         });
@@ -32,7 +32,9 @@ export class ChatInterface {
         const tmpChats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
             withParticipants: true,
-            withArchived
+            withArchived,
+            offset,
+            limit
         });
 
         for (const chat of tmpChats) {
@@ -41,7 +43,6 @@ export class ChatInterface {
 
         const results = [];
         for (const chat of chats ?? []) {
-            if (chat.guid.startsWith("urn:")) continue;
             const chatRes = await getChatResponse(chat);
 
             // Insert the cached participants from the original request
@@ -171,12 +172,12 @@ export class ChatInterface {
             );
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
+            Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
             if (isEmpty(result) || (!result.includes(";-;") && !result.includes(";+;"))) {
-                Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
                 throw new Error("Failed to create chat! AppleScript did not return a Chat GUID!");
             }
 
-            chatGuid = result.trim();
+            chatGuid = result.trim().split(" ").slice(-1)[0];
         }
 
         // Fetch the chat based on the return data
@@ -202,7 +203,9 @@ export class ChatInterface {
 
         // If we have a message, want to send via the private api, and are not on Big Sur, send the message
         if (isNotEmpty(message) && !isMinBigSur) {
+            Server().log(`Sending message...`, "debug");
             sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, method, null, null, null, tempGuid);
+            Server().log(`Message sent!`, "debug");
         }
 
         const chat = chats[0];
@@ -257,7 +260,7 @@ export class ChatInterface {
         const repo = Server().iMessageRepo.db.getRepository(Chat);
         if (!chat && isEmpty(guid)) throw new Error("No chat or chat GUID provided!");
 
-        const theChat = chat ?? (await repo.findOne({ guid }));
+        const theChat = chat ?? (await repo.findOneBy({ guid }));
         if (!theChat) return;
 
         // Tell the private API to delete the chat
@@ -269,7 +272,7 @@ export class ChatInterface {
             tryCount += 1;
 
             // See if the chat exists in the DB
-            const chat = await repo.findOne({ guid: theChat.guid });
+            const chat = await repo.findOneBy({ guid: theChat.guid });
 
             // If it doesn't, we're all good and can break out. It's been deleted.
             // Otherwise, we need to check again after our wait time

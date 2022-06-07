@@ -85,7 +85,46 @@ export const hideMessages = () => {
  * The AppleScript used to send a message with or without an attachment
  */
 export const startMessages = () => {
-    return `set appName to "Messages"
+    return startApp('Messages');
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const startFindMyFrields = () => {
+    return startApp('FindMy');
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const hideApp = (appName: string) => {
+    return `tell application "System Events" to tell application process "${appName}"
+        set visible to false
+    end tell`;
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const showApp = (appName: string) => {
+    return `tell application "System Events" to tell application process "${appName}"
+        set frontmost to true
+    end tell`;
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+ export const hideFindMyFriends = () => {
+    return hideApp('FindMy');
+};
+
+/**
+ * The AppleScript used to send a message with or without an attachment
+ */
+ export const startApp = (appName: string) => {
+    return `set appName to "${appName}"
         if application appName is running then
             return 0
         else
@@ -192,29 +231,43 @@ export const startChat = (participants: string[], service: string, message: stri
  */
 export const sendAttachmentAccessibility = (attachmentPath: string, participants: string[]) => {
     const recipientCommands = [];
+    // Key code 125 == down arrow
     for (const i of participants) {
         recipientCommands.push(`
-            delay 1
+            delay 2
             keystroke "${i}"
+            delay 1
+            key code 125
             delay 1
             keystroke return`);
     }
 
+    // The AppleScript copy _only_ works on Monterey
+    const scriptCopy = `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"`;
+    const scriptClip = `set the clipboard to theFile`;
+
     // Caffeinate is so we don't let the computer sleep while this is running
+    // The CMD + A & Delete will clear any existing text or attachments
     return `try
             do shell script "caffeinate -u -t 2"
-            delay 2.0
+            delay 1
         end try
         
-        tell application "System Events" to set theFile to POSIX file "${attachmentPath}"
+        ${scriptCopy ?? ''}
         tell application "System Events" to tell application process "Messages"
             set frontmost to true
             keystroke "n" using {command down}
+            delay 0.5
             ${recipientCommands.join("\n")}
             delay 1
-            keystroke tab
+            keystroke return
             delay 0.5
-            set the clipboard to theFile
+            keystroke "a" using {command down}
+            delay 0.5
+            key code 51
+            delay 0.5
+            ${scriptClip ?? ''}
+            delay 0.5
             keystroke "v" using {command down}
             delay 3.0
             keystroke return

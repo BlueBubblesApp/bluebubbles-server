@@ -20,6 +20,7 @@ import {
     InputLeftElement,
     Menu,
     MenuButton,
+    MenuDivider,
     Button,
     MenuList,
     MenuItem
@@ -34,11 +35,15 @@ import {
     PaginationPageGroup,
 } from '@ajna/pagination';
 import { AiOutlineInfoCircle, AiOutlineSearch } from 'react-icons/ai';
-import { BsChevronDown, BsPersonPlus } from 'react-icons/bs';
-import { BiImport } from 'react-icons/bi';
+import { BsChevronDown, BsPersonPlus, BsUnlockFill } from 'react-icons/bs';
+import { BiImport, BiRefresh } from 'react-icons/bi';
 import { ContactAddress, ContactItem, ContactsTable } from 'app/components/tables/ContactsTable';
 import { ContactDialog } from 'app/components/modals/ContactDialog';
-import { addAddressToContact, createContact, deleteContact, deleteContactAddress, updateContact } from 'app/actions/ContactActions';
+import { addAddressToContact, createContact, deleteContact, deleteContactAddress, deleteLocalContacts, updateContact } from 'app/actions/ContactActions';
+import { FiTrash } from 'react-icons/fi';
+import { ConfirmationItems, showSuccessToast } from 'app/utils/ToastUtils';
+import { ConfirmationDialog } from 'app/components/modals/ConfirmationDialog';
+import { waitMs } from 'app/utils/GenericUtils';
 
 const perPage = 25;
 
@@ -51,13 +56,26 @@ const buildIdentifier = (contact: ContactItem) => {
     ].join(' ').toLowerCase();
 };
 
+const getPermissionColor = (status: string | null): string => {
+    if (!status) return 'yellow';
+    if (status === 'Authorized') return 'green';
+    return 'red';
+};
+
 export const ContactsLayout = (): JSX.Element => {
     const [search, setSearch] = useState('' as string);
     const [isLoading, setIsLoading] = useBoolean(true);
     const [contacts, setContacts] = useState([] as any[]);
+    const [permission, setPermission] = useState((): string | null => {
+        return null;
+    });
     const dialogRef = useRef(null);
     const inputFile = useRef(null);
     const [dialogOpen, setDialogOpen] = useBoolean();
+    const alertRef = useRef(null);
+    const [requiresConfirmation, confirm] = useState((): string | null => {
+        return null;
+    });
 
     let filteredContacts = contacts;
     if (search && search.length > 0) {
@@ -74,8 +92,27 @@ export const ContactsLayout = (): JSX.Element => {
         initialState: { currentPage: 1 },
     });
 
-    useEffect(() => {
-        ipcRenderer.invoke('get-contacts').then((contactList) => {
+    const refreshPermissionStatus = async (): Promise<void> => {
+        setPermission(null);
+        await waitMs(500);
+        ipcRenderer.invoke('contact-permission-status').then((status: string) => {
+            setPermission(status);
+        }).catch(() => {
+            setPermission('Unknown');
+        });
+    };
+
+    const requestContactPermission = async (): Promise<void> => {
+        setPermission(null);
+        ipcRenderer.invoke('request-contact-permission').then((status: string) => {
+            setPermission(status);
+        }).catch(() => {
+            setPermission('Unknown');
+        });
+    };
+
+    const loadContacts = (showToast = false) => {
+        ipcRenderer.invoke('get-contacts').then((contactList: any[]) => {
             setContacts(contactList.map((e: any) => {
                 // Patch the ID as a string
                 e.id = String(e.id);
@@ -85,6 +122,18 @@ export const ContactsLayout = (): JSX.Element => {
         }).catch(() => {
             setIsLoading.off();
         });
+
+        if (showToast) {
+            showSuccessToast({
+                id: 'contacts',
+                description: 'Successfully refreshed Contacts!'
+            });
+        }
+    };
+
+    useEffect(() => {
+        loadContacts();
+        refreshPermissionStatus();
     }, []);
 
     const getEmptyContent = () => {
@@ -122,8 +171,9 @@ export const ContactsLayout = (): JSX.Element => {
         );
 
         if (newContact) {
-            // Patch the contact using a string ID
+            // Patch the contact using a string ID & source type
             newContact.id = String(newContact.id);
+            newContact.sourceType = 'db';
 
             // Patch the addresses
             (newContact as any).phoneNumbers = (newContact as any).addresses.filter((e: any) => e.type === 'phone');
@@ -140,9 +190,7 @@ export const ContactsLayout = (): JSX.Element => {
             {
                 firstName: contact.firstName,
                 lastName: contact.lastName,
-                displayName: contact.displayName,
-                emails: contact.emails.map((e: NodeJS.Dict<any>) => e.address),
-                phoneNumbers: contact.phoneNumbers.map((e: NodeJS.Dict<any>) => e.address)
+                displayName: contact.displayName
             }
         );
 
@@ -153,8 +201,6 @@ export const ContactsLayout = (): JSX.Element => {
                 copiedContacts[i].firstName = newContact.firstName;
                 copiedContacts[i].lastName = newContact.lastName;
                 copiedContacts[i].displayName = newContact.displayName;
-                copiedContacts[i].emails = newContact.emails;
-                copiedContacts[i].phoneNumbers = newContact.phoneNumbers;
                 updated = true;
             }
         }
@@ -197,6 +243,22 @@ export const ContactsLayout = (): JSX.Element => {
         }));
     };
 
+    const clearLocalContacts = async () => {
+        // Delete the contacts, then filter out the DB items
+        await deleteLocalContacts();
+        setContacts(contacts.filter(e => e.sourceType !== 'db'));
+    };
+
+    const confirmationActions: ConfirmationItems = {
+        clearLocalContacts: {
+            message: (
+                'Are you sure you want to clear/delete all local Contacts?<br /><br />' +
+                'This will remove any Contacts added manually, via the API, or via the import process'
+            ),
+            func: clearLocalContacts
+        }
+    };
+
     return (
         <Box p={3} borderRadius={10}>
             <Stack direction='column' p={5}>
@@ -215,6 +277,9 @@ export const ContactsLayout = (): JSX.Element => {
                             <MenuItem icon={<BsPersonPlus />} onClick={() => setDialogOpen.on()}>
                                 Add Contact
                             </MenuItem>
+                            <MenuItem icon={<BiRefresh />} onClick={() => loadContacts(true)}>
+                                Refresh Contacts
+                            </MenuItem>
                             <MenuItem
                                 icon={<BiImport />}
                                 onClick={() => {
@@ -230,16 +295,47 @@ export const ContactsLayout = (): JSX.Element => {
                                     ref={inputFile}
                                     accept=".vcf"
                                     style={{display: 'none'}}
-                                    onChange={(e) => {
+                                    onChange={async (e) => {
                                         const files = e?.target?.files ?? [];
                                         for (const i of files) {
-                                            ipcRenderer.invoke('import-vcf', i.path);
+                                            await ipcRenderer.invoke('import-vcf', i.path);
                                         }
+
+                                        loadContacts();
                                     }}
                                 />
                             </MenuItem>
+                            <MenuDivider />
+                            <MenuItem icon={<FiTrash />} onClick={() => confirm('clearLocalContacts')}>
+                                Clear Local Contacts
+                            </MenuItem>
                         </MenuList>
                     </Menu>
+                    <Menu>
+                        <MenuButton
+                            as={Button}
+                            rightIcon={<BsChevronDown />}
+                            width="12em"
+                            mr={5}
+                        >
+                            Permissions
+                        </MenuButton>
+                        <MenuList>
+                            <MenuItem icon={<BiRefresh />} onClick={() => refreshPermissionStatus()}>
+                                Refresh Permission Status
+                            </MenuItem>
+                            {(permission !== null && permission !== 'Authorized') ? (
+                                <MenuItem icon={<BsUnlockFill />} onClick={() => requestContactPermission()}>
+                                    Request Permission
+                                </MenuItem>
+                            ) : null}
+                        </MenuList>
+                    </Menu>
+                    <Text as="span" verticalAlign="middle">
+                        Status: <Text as="span" color={getPermissionColor(permission)}>
+                            {permission ? permission : 'Checking...'}
+                        </Text>
+                    </Text>
                 </Box>
             </Stack>
             <Stack direction='column' p={5}>
@@ -309,7 +405,7 @@ export const ContactsLayout = (): JSX.Element => {
                         w="full"
                         pt={2}
                     >
-                        <PaginationPrevious>Previous</PaginationPrevious>
+                        <PaginationPrevious minWidth={'75px'}>Previous</PaginationPrevious>
                         <Box ml={1}></Box>
                         <PaginationPageGroup flexWrap="wrap" justifyContent="center">
                             {pages.map((page: number) => (
@@ -323,7 +419,7 @@ export const ContactsLayout = (): JSX.Element => {
                             ))}
                         </PaginationPageGroup>
                         <Box ml={1}></Box>
-                        <PaginationNext>Next</PaginationNext>
+                        <PaginationNext minWidth={'50px'}>Next</PaginationNext>
                     </PaginationContainer>
                 </Pagination>
             </Stack>
@@ -336,6 +432,16 @@ export const ContactsLayout = (): JSX.Element => {
                 onAddressAdd={onAddAddress}
                 onAddressDelete={onDeleteAddress}
                 onClose={() => setDialogOpen.off()}
+            />
+
+            <ConfirmationDialog
+                modalRef={alertRef}
+                onClose={() => confirm(null)}
+                body={confirmationActions[requiresConfirmation as string]?.message}
+                onAccept={() => {
+                    confirmationActions[requiresConfirmation as string].func();
+                }}
+                isOpen={requiresConfirmation !== null}
             />
         </Box>
     );

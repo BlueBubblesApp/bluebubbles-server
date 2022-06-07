@@ -9,6 +9,11 @@ export interface NotificationItem {
     read?: boolean;
 }
 
+export interface NotificationClearParams {
+    showToast?: boolean;
+    delete?: boolean;
+}
+
 interface NotificationState {
     max: number;
     notifications: Array<NotificationItem>;
@@ -52,8 +57,11 @@ export const NotificationsSlice = createSlice({
         prune: (state) => {
             state.notifications = state.notifications.slice(0, state.max);
         },
-        clear: (state) => {
-            clearAlerts();
+        clear: (state, action: PayloadAction<NotificationClearParams>) => {
+            if (action.payload.delete ?? true) {
+                clearAlerts(action.payload.showToast ?? true);
+            }
+            
             state.notifications = [];
         },
         readAll: (state) => {
@@ -65,7 +73,7 @@ export const NotificationsSlice = createSlice({
                     alertIds.push(i.id);
                 }
             }
-
+    
             markAlertsAsRead(alertIds);
             state.notifications = notifications;
         }

@@ -8,3 +8,5 @@ release/
 .env
 .build
 .swiftpm
+.yarn
+.yarnrc*

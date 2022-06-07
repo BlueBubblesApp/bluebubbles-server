@@ -2,6 +2,12 @@ import { webhookEventOptions } from '../constants';
 import { MultiSelectValue } from '../types';
 import { showSuccessToast } from './ToastUtils';
 
+
+export const waitMs = async (ms: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return new Promise((resolve, _) => setTimeout(resolve, ms));
+};
+
 export const testJson = (value: string): NodeJS.Dict<any> | null => {
     try {
         return JSON.parse(value);

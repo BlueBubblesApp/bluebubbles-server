@@ -35,7 +35,7 @@ interface ContactDialogProps {
     onAddressDelete?: (contactAddressId: number) => void;
     onClose: () => void;
     isOpen: boolean;
-    modalRef: React.RefObject<FocusableElement> | undefined;
+    modalRef: React.RefObject<FocusableElement>;
     existingContact?: ContactItem;
 }
 
@@ -231,8 +231,6 @@ export const ContactDialog = ({
                                     existingContact.firstName = firstName;
                                     existingContact.lastName = lastName;
                                     existingContact.displayName = displayName;
-                                    existingContact.phoneNumbers = phones;
-                                    existingContact.emails = emails;
                                     onUpdate(existingContact);
                                 }
                                 _onClose();

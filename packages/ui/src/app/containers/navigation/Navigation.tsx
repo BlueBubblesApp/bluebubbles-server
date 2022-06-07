@@ -34,7 +34,7 @@ import {
 } from '@chakra-ui/react';
 import { FiHome, FiSettings, FiMenu, FiBell, FiMonitor, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
 import { FaDiscord } from 'react-icons/fa';
-import { AiOutlineBug, AiOutlineHome, AiOutlineApi } from 'react-icons/ai';
+import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart } from 'react-icons/ai';
 import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle } from 'react-icons/bs';
 import { BiNotification } from 'react-icons/bi';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
@@ -140,7 +140,7 @@ export const Navigation = (): JSX.Element => {
                             </MenuButton>
                             <MenuList>
                                 <MenuItem icon={<FiTrash />} onClick={() => {
-                                    dispatch(clearAlerts());
+                                    dispatch(clearAlerts({ showToast: true }));
                                 }}>
                                     Clear Alerts
                                 </MenuItem>
@@ -264,6 +264,11 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
                 <Tooltip label="BlueBubbles Web" aria-label="website-tip">
                     <Link href="https://bluebubbles.app/web" style={{ textDecoration: 'none' }} target="_blank">
                         <IconButton size="lg" variant="ghost" aria-label="bluebubbles web" icon={<FiMessageCircle />} />
+                    </Link>
+                </Tooltip>
+                <Tooltip label="Sponsor Us" aria-label="sponsor-tip">
+                    <Link href="https://github.com/sponsors/BlueBubblesApp" style={{ textDecoration: 'none' }} target="_blank">
+                        <IconButton size="lg" variant="ghost" aria-label="donate" icon={<AiOutlineHeart />} />
                     </Link>
                 </Tooltip>
                 <Tooltip label="Support Us" aria-label="donate-tip">

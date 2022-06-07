@@ -12,7 +12,7 @@ import { addAll as addAllDevices } from './app/slices/DevicesSlice';
 import { DeviceItem } from './app/slices/DevicesSlice';
 import { add as addLog } from './app/slices/LogsSlice';
 import { addAll as addAllWebhooks } from './app/slices/WebhooksSlice';
-import { add as addAlert, addAll as addAllAlerts, NotificationItem } from './app/slices/NotificationsSlice';
+import { add as addAlert, addAll as addAllAlerts, NotificationItem, clear as clearAlerts } from './app/slices/NotificationsSlice';
 import { ipcRenderer } from 'electron';
 import { getRandomInt } from './app/utils/GenericUtils';
 
@@ -64,22 +64,30 @@ getDevices().then(devices => {
 });
 
 // Load the alerts from the server
-getAlerts().then(alerts => {
-    if (!alerts) return;
+const loadAlerts = (replace = false) => {
+    getAlerts().then(alerts => {
+        if (!alerts) return;
+    
+        const items: Array<NotificationItem> = [];
+        for (const item of alerts) {
+            items.push({
+                id: item?.id,
+                message: item.value,
+                type: item.type,
+                timestamp: item?.created ?? new Date(),
+                read: item?.isRead ?? false
+            });
+        }
+    
+        if (replace) {
+            store.dispatch(clearAlerts({ showToast: false, delete: false }));
+        }
 
-    const items: Array<NotificationItem> = [];
-    for (const item of alerts) {
-        items.push({
-            id: item?.id,
-            message: item.value,
-            type: item.type,
-            timestamp: item?.created ?? new Date(),
-            read: item?.isRead ?? false
-        });
-    }
+        store.dispatch(addAllAlerts(items));
+    });
+};
 
-    store.dispatch(addAllAlerts(items));
-});
+loadAlerts();
 
 // Load private API requirements
 getPrivateApiRequirements().then(requirements => {
@@ -129,6 +137,11 @@ ipcRenderer.on('new-alert', (_: any, alert: any) => {
         timestamp: alert?.created ?? new Date(),
         read: alert?.isRead ?? false
     }));
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ipcRenderer.on('refresh-alerts', (_: any, __: any) => {
+    loadAlerts(true);
 });
 
 ReactDOM.render(

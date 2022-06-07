@@ -12,9 +12,7 @@ export class ContactRouter {
             data &&
             typeof data === "object" &&
             !Array.isArray(data) &&
-            Object.keys(data).includes("firstName") &&
-            ((Object.keys(data).includes("phoneNumbers") && data.phoneNumbers && Array.isArray(data.phoneNumbers)) ||
-                (Object.keys(data).includes("emails") && data.emails && Array.isArray(data.emails)))
+            (Object.keys(data).includes("firstName") || Object.keys(data).includes("displayName"))
         );
     }
 
@@ -66,8 +64,9 @@ export class ContactRouter {
             try {
                 contacts.push(
                     await ContactInterface.createContact({
-                        firstName: item.firstName,
-                        lastName: item?.lastName ?? "",
+                        firstName: item.firstName ?? '',
+                        lastName: item?.lastName ?? '',
+                        displayName: item?.displayName ?? '',
                         phoneNumbers: item?.phoneNumbers ?? [],
                         emails: item?.emails ?? [],
                         avatar: item?.avatar ?? null,
@@ -83,7 +82,7 @@ export class ContactRouter {
             }
         }
 
-        const output: any = { data: ContactInterface.mapContacts(contacts, "db", { ignoreAvatars: true }) };
+        const output: any = { data: ContactInterface.mapContacts(contacts, "db") };
         if (isNotEmpty(errors)) {
             output.metadata = {};
             output.metadata.errors = errors;

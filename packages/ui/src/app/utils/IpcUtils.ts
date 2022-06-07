@@ -1,3 +1,4 @@
+import { ContactItem } from 'app/components/tables/ContactsTable';
 import { ipcRenderer } from 'electron';
 import { MultiSelectValue } from '../types';
 import { showErrorToast, showSuccessToast } from './ToastUtils';
@@ -93,4 +94,14 @@ export const reinstallHelperBundle = async () => {
             description: res.message
         });
     }
+};
+
+export const getContactName = async (value: string): Promise<ContactItem> => {
+    return await syncInvokeIpc('get-contact-name', value);
+};
+
+export const syncInvokeIpc = async (event: string, data: any = null): Promise<any> => {
+    return new Promise((resolve, reject) => {
+        ipcRenderer.invoke(event, data).then(resolve).catch(reject);
+    });
 };

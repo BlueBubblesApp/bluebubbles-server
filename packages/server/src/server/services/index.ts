@@ -1,6 +1,5 @@
 import { HttpService } from "./httpService";
 import { FCMService } from "./fcmService";
-import { AlertService } from "./alertService";
 import { CaffeinateService } from "./caffeinateService";
 import { UpdateService } from "./updateService";
 import { NgrokService } from "./proxyServices/ngrokService";
@@ -12,11 +11,11 @@ import { IPCService } from "./ipcService";
 import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
 import { SwiftHelperService } from "./swiftHelperService";
+import { FindMyService } from "./findMyService";
 
 export {
     HttpService,
     FCMService,
-    AlertService,
     CaffeinateService,
     UpdateService,
     NgrokService,
@@ -27,5 +26,6 @@ export {
     CertificateService,
     CloudflareService,
     WebhookService,
-    SwiftHelperService
+    SwiftHelperService,
+    FindMyService
 };

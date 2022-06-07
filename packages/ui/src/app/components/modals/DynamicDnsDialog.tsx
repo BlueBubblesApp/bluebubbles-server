@@ -22,7 +22,7 @@ interface DynamicDnsDialogProps {
     onCancel?: () => void;
     onConfirm?: (address: string) => void;
     isOpen: boolean;
-    modalRef: React.RefObject<FocusableElement> | undefined;
+    modalRef: React.RefObject<FocusableElement>;
     onClose: () => void;
     port?: number
 }
