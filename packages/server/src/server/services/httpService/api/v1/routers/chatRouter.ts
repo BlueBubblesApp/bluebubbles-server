@@ -104,7 +104,6 @@ export class ChatRouter {
             .filter((e: any) => typeof e === "string")
             .map((e: string) => safeTrim(e.toLowerCase()));
         const withLastMessage = withQuery.includes("lastmessage");
-        const withArchived = withQuery.includes("archived");
         const guid = body?.guid;
         const { sort, offset, limit } = body;
 
@@ -112,7 +111,6 @@ export class ChatRouter {
         const results = await ChatInterface.get({
             guid,
             withLastMessage,
-            withArchived,
             offset: offset ? Number.parseInt(offset, 10) : 0,
             limit: limit ? Number.parseInt(limit, 10) : 1000,
             sort

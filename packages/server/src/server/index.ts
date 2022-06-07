@@ -15,6 +15,7 @@ import { FileSystem } from "@server/fileSystem";
 // Database Imports
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
 import { MessageRepository } from "@server/databases/imessage";
+import { FindMyRepository } from "@server/databases/findmy";
 import {
     IncomingMessageListener,
     OutgoingMessageListener,
@@ -27,7 +28,6 @@ import { ChangeListener } from "@server/databases/imessage/listeners/changeListe
 import {
     HttpService,
     FCMService,
-    AlertService,
     CaffeinateService,
     NgrokService,
     LocalTunnelService,
@@ -55,6 +55,7 @@ import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
+import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
 
 const findProcess = require("find-process");
 
@@ -98,13 +99,13 @@ class BlueBubblesServer extends EventEmitter {
 
     iMessageRepo: MessageRepository;
 
+    findMyRepo: FindMyRepository;
+
     httpService: HttpService;
 
     privateApiHelper: BlueBubblesHelperService;
 
     fcm: FCMService;
-
-    alerter: AlertService;
 
     networkChecker: NetworkService;
 
@@ -157,6 +158,7 @@ class BlueBubblesServer extends EventEmitter {
         // Databases
         this.repo = null;
         this.iMessageRepo = null;
+        this.findMyRepo = null;
 
         // Other helpers
         this.eventCache = null;
@@ -205,7 +207,7 @@ class BlueBubblesServer extends EventEmitter {
         switch (type) {
             case "error":
                 ServerLog.error(message);
-                AlertService.create("error", message);
+                AlertsInterface.create("error", message);
                 this.notificationCount += 1;
                 break;
             case "debug":
@@ -213,7 +215,7 @@ class BlueBubblesServer extends EventEmitter {
                 break;
             case "warn":
                 ServerLog.warn(message);
-                AlertService.create("warn", message);
+                AlertsInterface.create("warn", message);
                 this.notificationCount += 1;
                 break;
             case "log":
@@ -222,13 +224,18 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         if (["error", "warn"].includes(type)) {
-            app.setBadgeCount(this.notificationCount);
+            this.setNotificationCount(this.notificationCount);
         }
 
         this.emitToUI("new-log", {
             message,
             type: type ?? "log"
         });
+    }
+
+    setNotificationCount(count: number) {
+        this.notificationCount = count;
+        app.setBadgeCount(this.notificationCount);
     }
 
     async initServer(): Promise<void> {
@@ -289,6 +296,9 @@ class BlueBubblesServer extends EventEmitter {
                 }
             });
         }
+
+        this.log("Initializing FindMy Repository...");
+        this.findMyRepo = new FindMyRepository();
     }
 
     async initServices(): Promise<void> {
@@ -495,7 +505,7 @@ class BlueBubblesServer extends EventEmitter {
         // Load notification count
         try {
             this.log("Initializing alert service...");
-            const alerts = (await AlertService.find()).filter(item => !item.isRead);
+            const alerts = (await AlertsInterface.find()).filter(item => !item.isRead);
             this.notificationCount = alerts.length;
         } catch (ex: any) {
             this.log("Failed to get initial notification count. Skipping.", "warn");
@@ -939,7 +949,7 @@ class BlueBubblesServer extends EventEmitter {
      */
     private startChatListeners() {
         if (!this.iMessageRepo?.db) {
-            AlertService.create(
+            AlertsInterface.create(
                 "info",
                 "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled"
             );

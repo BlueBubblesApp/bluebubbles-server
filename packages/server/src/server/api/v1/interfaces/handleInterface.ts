@@ -20,10 +20,7 @@ export class HandleInterface {
         // As long as there are results, we should fetch chats and match them
         const handleChatMap: { [key: string]: ChatResponse[] } = {};
         if (handles && withChats) {
-            const chats = await ChatInterface.get({
-                withParticipants: true,
-                withLastMessage: false
-            });
+            const chats = await ChatInterface.get();
 
             // Store chats (by address) in a cache for easy accessing
             for (const i of chats) {

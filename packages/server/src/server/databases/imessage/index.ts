@@ -44,7 +44,7 @@ export class MessageRepository {
     async getChats({
         chatGuid = null,
         withParticipants = true,
-        withArchived = false,
+        withArchived = true,
         withLastMessage = false,
         offset = 0,
         limit = null
@@ -52,11 +52,13 @@ export class MessageRepository {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
-        if (withParticipants) query.innerJoinAndSelect("chat.participants", "handle");
+        if (withParticipants) {
+            query.leftJoinAndSelect("chat.participants", "handle");
+        }
 
         // Add inner join with messages if we want the last message too
         if (withLastMessage) {
-            query.innerJoinAndSelect("chat.messages", "message");
+            query.leftJoinAndSelect("chat.messages", "message");
         }
 
         if (!withArchived) query.andWhere("chat.is_archived == 0");

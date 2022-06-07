@@ -94,6 +94,8 @@ export class FileSystem {
 
     public static findMyDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.findmy.fmipcore");
 
+    public static findMyFriendsDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.icloud.fmfd");
+
     /**
      * Sets up all required directories and then, writes the scripts
      * to the scripts directory

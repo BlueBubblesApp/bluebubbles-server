@@ -1,14 +1,15 @@
 import { Server } from "@server";
 import { Alert } from "@server/databases/server/entity/Alert";
+import { isEmpty } from "@server/helpers/utils";
 
-import { AlertTypes } from "./types";
+import { AlertTypes } from "../types/alertTypes";
 
 /**
- * This services manages alerts to the server dashboard
+ * An interface to interact with server alerts
  */
-export class AlertService {
-    static async find(): Promise<Alert[]> {
-        const query = Server().repo.alerts().createQueryBuilder("alert").orderBy("created", "DESC").limit(10);
+export class AlertsInterface {
+    static async find(limit = 10): Promise<Alert[]> {
+        const query = Server().repo.alerts().createQueryBuilder("alert").orderBy("created", "DESC").limit(limit);
         return query.getMany();
     }
 
@@ -29,14 +30,19 @@ export class AlertService {
         return saved;
     }
 
-    static async markAsRead(id: number): Promise<Alert> {
+    static async markAsRead(ids: number[]): Promise<void> {
+        if (isEmpty(ids)) return;
+    
         // Find the corresponding alert
-        const alert = await Server().repo.alerts().findOneBy({ id });
-        if (!alert) throw new Error(`Alert [id: ${id}] does not exist!`);
+        const query = Server().repo.alerts().createQueryBuilder()
+            .update()
+            .set({ isRead: true })
+            .where("alert.id IN (:...ids)", { ids });
+        await query.execute();
 
-        // Modify and save the alert
-        alert.isRead = true;
-        return Server().repo.alerts().manager.save(alert);
+        const alerts = (await AlertsInterface.find(100)).filter(e => !e.isRead);
+        Server().setNotificationCount(alerts.length);
+        Server().emitToUI("refresh-alerts", null);
     }
 
     static async delete(id: number): Promise<void> {
