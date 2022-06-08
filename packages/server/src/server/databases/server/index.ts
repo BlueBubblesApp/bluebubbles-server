@@ -1,3 +1,4 @@
+import fs from "fs";
 import { app } from "electron";
 import { EventEmitter } from "events";
 import { DataSource } from "typeorm";
@@ -36,15 +37,16 @@ export class ServerRepository extends EventEmitter {
             dbPath = `${app.getPath("userData")}/bluebubbles-server/config.db`;
         }
 
+        const shouldSync = !fs.existsSync(dbPath) || isDev;
         this.db = new DataSource({
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
             entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress],
             migrations: [ContactTables1654432080899],
-            migrationsRun: true,
+            migrationsRun: !shouldSync,
             migrationsTableName: 'migrations',
-            synchronize: isDev
+            synchronize: shouldSync
         });
 
         this.db = await this.db.initialize();
