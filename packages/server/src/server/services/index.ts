@@ -11,6 +11,7 @@ import { IPCService } from "./ipcService";
 import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
 import { FindMyService } from "./findMyService";
+import { FacetimeService } from "./facetimeService";
 
 export {
     HttpService,
@@ -25,5 +26,6 @@ export {
     CertificateService,
     CloudflareService,
     WebhookService,
-    FindMyService
+    FindMyService,
+    FacetimeService
 };
