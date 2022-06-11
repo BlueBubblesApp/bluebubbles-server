@@ -1067,8 +1067,8 @@ class BlueBubblesServer extends EventEmitter {
         // Disconnect & reconnect to the iMessage DB
         if (this.iMessageRepo.db.isConnected) {
             this.log("Reconnecting to iMessage database...");
-            await this.iMessageRepo.db.close();
-            await this.iMessageRepo.db.connect();
+            await this.iMessageRepo.db.destroy();
+            await this.iMessageRepo.db.initialize();
         }
 
         await this.stopServices();

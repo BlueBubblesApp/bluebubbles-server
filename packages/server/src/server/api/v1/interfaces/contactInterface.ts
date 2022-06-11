@@ -71,7 +71,10 @@ export class ContactInterface {
         }: {
             extraProps?: string[]
         } = {}): any {
-        return records.map((e: NodeJS.Dict<any>) => {
+        return records.map((contact: NodeJS.Dict<any>) => {
+            // We have to make a copy so that when we "delete", we aren't deleting from the master copy.
+            const e = { ...contact };
+            
             // Only include extra properties that are asked for.
             for (const prop of ContactInterface.apiExtraProperties) {
                 if (!extraProps.includes(prop) && Object.keys(e).includes(prop)) {
