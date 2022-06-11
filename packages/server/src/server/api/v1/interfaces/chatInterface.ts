@@ -32,9 +32,7 @@ export class ChatInterface {
         const tmpChats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
             withParticipants: true,
-            withArchived,
-            offset,
-            limit
+            withArchived
         });
 
         for (const chat of tmpChats) {
