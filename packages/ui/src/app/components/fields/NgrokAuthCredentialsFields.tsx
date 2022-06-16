@@ -10,13 +10,15 @@ import {
     Box,
     Link,
     Text,
+    Checkbox,
     Stack,
     HStack,
-    VStack
+    Spacer,
 } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { showSuccessToast } from '../../utils/ToastUtils';
 import { setConfig } from '../../slices/ConfigSlice';
+import { onCheckboxToggle } from '../../actions/ConfigActions';
 import { AiFillEye, AiFillEyeInvisible, AiOutlineSave } from 'react-icons/ai';
 import { baseTheme } from '../../../theme';
 
@@ -29,12 +31,16 @@ export const NgrokAuthUserField = ({ helpText }: NgrokAuthUserFieldProps): JSX.E
     const dispatch = useAppDispatch();
     const ngrokUser: string = (useAppSelector(state => state.config.ngrok_user) ?? '');
     const ngrokPassword: string = (useAppSelector(state => state.config.ngrok_password) ?? '');
+    const ngrokAuthEnabled: boolean = (useAppSelector(state => state.config.ngrok_auth_enabled) ?? false);
+
     const [showNgrokPassword, setShowNgrokPassword] = useBoolean();
+
     const [newNgrokPassword, setNewNgrokPassword] = useState(ngrokPassword);
-    const [ngrokPasswordError, setNgrokPasswordError] = useState('');
     const [newNgrokUser, setNewNgrokUser] = useState(ngrokUser);
-    const [ngrokUserError, setNgrokUserError] = useState('');
-    const hasNgrokUserError: boolean = (ngrokUserError ?? '').length > 0;
+    
+    const [ngrokCredentialsError, setNgrokCredentialsError] = useState('');
+    
+    const hasNgrokCredentialsError: boolean = (ngrokCredentialsError ?? '').length > 0;
 
     useEffect(() => { setNewNgrokUser(ngrokUser); }, [ngrokUser]);
 
@@ -47,28 +53,25 @@ export const NgrokAuthUserField = ({ helpText }: NgrokAuthUserFieldProps): JSX.E
         theNewNgrokUser = theNewNgrokUser.trim();
         theNewNgrokPassword = theNewNgrokPassword.trim();
 
+        let completeErrorMsg = '';
         // Validate the user
-        if (theNewNgrokUser === ngrokUser) {
-            setNgrokUserError('You have not changed the username since your last save!');
-            return;
-        } else if (theNewNgrokUser.includes(' ')) {
-            setNgrokUserError('Invalid Ngrok Auth User! Please check that you have copied it correctly.');
-            return;
+        if (theNewNgrokUser.length < 1) {
+            completeErrorMsg = completeErrorMsg + 'Invalid Ngrok Auth User! Please check that you have copied it correctly. ';
         }
 
         // Validate the password
-        if (theNewNgrokPassword === ngrokPassword) {
-            setNgrokUserError('You have not changed the password since your last save!');
-            return;
-        } else if (theNewNgrokPassword.includes(' ')) {
-            setNgrokUserError('Invalid Ngrok Auth Password! Please check that you have copied it correctly.');
-            return;
+        if (theNewNgrokPassword.length < 8) {
+            completeErrorMsg = completeErrorMsg + 'Invalid Ngrok Auth Password! Must be at least 8 characters.';
         }
 
+        if (completeErrorMsg != '') {
+            setNgrokCredentialsError(completeErrorMsg);
+            return;
+        }
+        
+        setNgrokCredentialsError('');
         dispatch(setConfig({ name: 'ngrok_user', value: theNewNgrokUser }));
         dispatch(setConfig({ name: 'ngrok_password', value: theNewNgrokPassword }));
-        setNgrokUserError('');
-        setNgrokPasswordError('');
         showSuccessToast({
             id: 'settings',
             duration: 4000,
@@ -77,26 +80,31 @@ export const NgrokAuthUserField = ({ helpText }: NgrokAuthUserFieldProps): JSX.E
     };
 
     return (
-        <FormControl isInvalid={hasNgrokUserError}>
+        <FormControl isInvalid={hasNgrokCredentialsError}>
             <FormLabel htmlFor='ngrok_user'>Ngrok Authentication (Very Optional)</FormLabel>
             <HStack>
+                <Checkbox id='ngrok_auth_enabled' isChecked={ngrokAuthEnabled} onChange={onCheckboxToggle}>
+                    Enable Auth
+                </Checkbox>
                 <Input
                     id='ngrok_user'
+                    placeholder='username'
                     type='text'
                     maxWidth="20em"
                     value={newNgrokUser}
                     onChange={(e) => {
-                        if (hasNgrokUserError) setNgrokUserError('');
+                        if (hasNgrokCredentialsError) setNgrokCredentialsError('');
                         setNewNgrokUser(e.target.value);
                     }}
                 />
                 <Input
                     id='ngrok_password'
+                    placeholder='password'
                     type={showNgrokPassword ? 'text' : 'password'}
                     maxWidth="20em"
                     value={newNgrokPassword}
                     onChange={(e) => {
-                        if (hasNgrokUserError) setNgrokPasswordError('');
+                        if (hasNgrokCredentialsError) setNgrokCredentialsError('');
                         setNewNgrokPassword(e.target.value);
                     }}
                 />
@@ -115,7 +123,7 @@ export const NgrokAuthUserField = ({ helpText }: NgrokAuthUserFieldProps): JSX.E
                     onClick={() => saveNgrokUserAndPassword(newNgrokUser, newNgrokPassword)}
                 />
             </HStack>
-            {!hasNgrokUserError ? (
+            {!hasNgrokCredentialsError ? (
                 <FormHelperText>
                     {helpText ?? (
                         <Text>
@@ -125,7 +133,10 @@ export const NgrokAuthUserField = ({ helpText }: NgrokAuthUserFieldProps): JSX.E
                     )}
                 </FormHelperText>
             ) : (
-                <FormErrorMessage>{ngrokUserError}</FormErrorMessage>
+                <Stack>
+                    <FormErrorMessage>{ngrokCredentialsError}</FormErrorMessage>
+                </Stack>
+                
             )}
         </FormControl>
         
