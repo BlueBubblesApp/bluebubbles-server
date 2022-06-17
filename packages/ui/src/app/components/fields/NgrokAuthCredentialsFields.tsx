@@ -29,7 +29,6 @@ export const NgrokAuthCredentialsFields = ({ helpText }: NgrokAuthCredentialsFie
     const dispatch = useAppDispatch();
     const ngrokUser: string = (useAppSelector(state => state.config.ngrok_user) ?? '');
     const ngrokPassword: string = (useAppSelector(state => state.config.ngrok_password) ?? '');
-    // const ngrokAuthEnabled: boolean = (useAppSelector(state => state.config.ngrok_auth_enabled) ?? false);
 
     const [showNgrokPassword, setShowNgrokPassword] = useBoolean();
     const [newNgrokPassword, setNewNgrokPassword] = useState(ngrokPassword);
@@ -42,7 +41,7 @@ export const NgrokAuthCredentialsFields = ({ helpText }: NgrokAuthCredentialsFie
 
 
     /**
-     * A handler & validator for saving a new Ngrok auth token.
+     * A handler and validator to enable Ngrok Tunnel Authentication
      *
      * @param theNewNgrokUser - The ngrok username
      * @param theNewNgrokPassword - The ngrok password
@@ -50,21 +49,21 @@ export const NgrokAuthCredentialsFields = ({ helpText }: NgrokAuthCredentialsFie
     const enableNgrokBasicAuth = (theNewNgrokUser: string, theNewNgrokPassword: string): void => {
         theNewNgrokUser = theNewNgrokUser.trim();
         theNewNgrokPassword = theNewNgrokPassword.trim();
-
         let errorMsg = '';
         // Validate the user and pass
         if (theNewNgrokUser.length < 4){
             errorMsg = 'Username must be at least 4 characters long.';
         }
-
         if (theNewNgrokPassword.length < 8){
             errorMsg = errorMsg + ' Password must be at least 8 characters long.';
         }
+        // if errorMsg is not empty, user or pass is invalid so abort
         if (errorMsg.length > 0) {
             setNgrokCredentialsError(errorMsg);
             return;
         }
         
+        // if execution reaches this block, user and pass are valid so set config values properly
         setNgrokCredentialsError('');        
         dispatch(setConfig({ name: 'ngrok_auth_enabled', value: true }));
         dispatch(setConfig({ name: 'ngrok_user', value: theNewNgrokUser }));
@@ -72,7 +71,7 @@ export const NgrokAuthCredentialsFields = ({ helpText }: NgrokAuthCredentialsFie
         showSuccessToast({
             id: 'settings',
             duration: 4000,
-            description: 'Successfully ENABLED Ngrok Authentication!'
+            description: 'Successfully ENABLED Ngrok Authentication! Restarting proxy services...'
         });
     };
 
@@ -86,7 +85,7 @@ export const NgrokAuthCredentialsFields = ({ helpText }: NgrokAuthCredentialsFie
         showSuccessToast({
             id: 'settings',
             duration: 4000,
-            description: 'Successfully DISABLED Ngrok Authentication'
+            description: 'Successfully DISABLED Ngrok Authentication. Restarting proxy services...'
         });
     };
 
@@ -155,10 +154,7 @@ export const NgrokAuthCredentialsFields = ({ helpText }: NgrokAuthCredentialsFie
                         )}
                     </FormHelperText>
                 ) : (
-                    <Stack>
-                        <FormErrorMessage>{ngrokCredentialsError}</FormErrorMessage>
-                    </Stack>
-                    
+                    <FormErrorMessage>{ngrokCredentialsError}</FormErrorMessage>
                 )}
             </FormControl>
         </div>
