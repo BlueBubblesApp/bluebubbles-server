@@ -786,6 +786,11 @@ class BlueBubblesServer extends EventEmitter {
             await this.restartProxyServices();
         }
 
+        // If the ngrok region is different, restart the ngrok process
+        if (prevConfig.ngrok_auth_enabled !== nextConfig.ngrok_auth_enabled && !proxiesRestarted) {
+            await this.restartProxyServices();
+        }
+
         // Install the bundle if the Private API is turned on
         if (!prevConfig.enable_private_api && nextConfig.enable_private_api) {
             if (Server().privateApiHelper === null) {

@@ -23,7 +23,7 @@ import {  AiOutlineInfoCircle } from 'react-icons/ai';
 import { useAppSelector } from '../../../hooks';
 import { NgrokRegionField } from '../../../components/fields/NgrokRegionField';
 import { NgrokAuthTokenField } from '../../../components/fields/NgrokAuthTokenField';
-import { NgrokAuthUserField } from '../../../components/fields/NgrokAuthCredentialsFields';
+import { NgrokAuthCredentialsFields } from '../../../components/fields/NgrokAuthCredentialsFields';
 import { ProxyServiceField } from '../../../components/fields/ProxyServiceField';
 import { ServerPasswordField } from '../../../components/fields/ServerPasswordField';
 import { LocalPortField } from '../../../components/fields/LocalPortField';
@@ -65,7 +65,7 @@ export const ConnectionSettings = (): JSX.Element => {
             <Spacer />
             {(proxyService === 'ngrok') ? (<NgrokAuthTokenField />) : null}
             <Spacer />
-            {(proxyService === 'ngrok' && ngrokToken != '') ? (<NgrokAuthUserField />) : null}
+            {(proxyService === 'ngrok' && ngrokToken != '') ? (<NgrokAuthCredentialsFields />) : null}
             <Spacer />
             <Divider orientation='horizontal' />
             <ServerPasswordField />
