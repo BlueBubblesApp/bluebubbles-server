@@ -90,73 +90,71 @@ export const NgrokAuthCredentialsFields = ({ helpText }: NgrokAuthCredentialsFie
     };
 
     return (
-        <div>
-            <FormControl isInvalid={ngrokCredentialsError != '' ?? true}>
-                <FormLabel htmlFor='ngrok_user'>Ngrok Authentication (Very Optional)</FormLabel>
-                <HStack>
-                    <Box>
-                        <Button
-                            onClick={() => disableNgrokBasicAuth()}
-                        >    
-                            Disable
-                        </Button>
-                    </Box>
-                    <Box>
-                        <Input
-                            id='ngrok_user'
-                            placeholder='username'
-                            type='text'
-                            maxWidth="20em"
-                            value={newNgrokUser}
-                            onChange={(e) => {
-                                if (ngrokCredentialsError == '') setNgrokCredentialsError('');
-                                setNewNgrokUser(e.target.value);
-                            }}
-                        />
-                    </Box>
-                    <Box>
-                        <Input
-                            id='ngrok_password'
-                            placeholder='password'
-                            type={showNgrokPassword ? 'text' : 'password'}
-                            maxWidth="20em"
-                            value={newNgrokPassword}
-                            onChange={(e) => {
-                                if (ngrokCredentialsError == '') setNgrokCredentialsError('');
-                                setNewNgrokPassword(e.target.value);
-                            }}
-                        />
-                    </Box> 
-                    <Box>   
-                        <IconButton
-                            ml={3}
-                            verticalAlign='top'
-                            aria-label='View Ngrok password'
-                            icon={showNgrokPassword ? <AiFillEye /> : <AiFillEyeInvisible />}
-                            onClick={() => setShowNgrokPassword.toggle()}
-                        />
-                        <IconButton
-                            ml={3}
-                            verticalAlign='top'
-                            aria-label='Save Ngrok password'
-                            icon={<AiOutlineSave />}
-                            onClick={() => enableNgrokBasicAuth(newNgrokUser, newNgrokPassword)}
-                        />
-                    </Box>    
-                </HStack>
-                { ngrokCredentialsError == '' ? (
-                    <FormHelperText>
-                        {helpText ?? (
-                            <Text>
-                                This an optional additional security measure to protect your ngrok tunnel/server. This will require authentication
-                                to the tunnel before a client is able to connect to your bluebubbles sever.
-                            </Text>
-                        )}
-                    </FormHelperText>
-                ) : (
-                    <FormErrorMessage>{ngrokCredentialsError}</FormErrorMessage>
-                )}
-            </FormControl>
-        </div>
+        <FormControl isInvalid={ngrokCredentialsError != '' ?? true}>
+            <FormLabel htmlFor='ngrok_user'>Ngrok Authentication (Very Optional)</FormLabel>
+            <HStack>
+                <Box>
+                    <Button
+                        onClick={() => disableNgrokBasicAuth()}
+                    >    
+                        Disable
+                    </Button>
+                </Box>
+                <Box>
+                    <Input
+                        id='ngrok_user'
+                        placeholder='username'
+                        type='text'
+                        maxWidth="20em"
+                        value={newNgrokUser}
+                        onChange={(e) => {
+                            if (ngrokCredentialsError == '') setNgrokCredentialsError('');
+                            setNewNgrokUser(e.target.value);
+                        }}
+                    />
+                </Box>
+                <Box>
+                    <Input
+                        id='ngrok_password'
+                        placeholder='password'
+                        type={showNgrokPassword ? 'text' : 'password'}
+                        maxWidth="20em"
+                        value={newNgrokPassword}
+                        onChange={(e) => {
+                            if (ngrokCredentialsError == '') setNgrokCredentialsError('');
+                            setNewNgrokPassword(e.target.value);
+                        }}
+                    />
+                </Box> 
+                <Box>   
+                    <IconButton
+                        ml={3}
+                        verticalAlign='top'
+                        aria-label='View Ngrok password'
+                        icon={showNgrokPassword ? <AiFillEye /> : <AiFillEyeInvisible />}
+                        onClick={() => setShowNgrokPassword.toggle()}
+                    />
+                    <IconButton
+                        ml={3}
+                        verticalAlign='top'
+                        aria-label='Save Ngrok password'
+                        icon={<AiOutlineSave />}
+                        onClick={() => enableNgrokBasicAuth(newNgrokUser, newNgrokPassword)}
+                    />
+                </Box>    
+            </HStack>
+            { ngrokCredentialsError == '' ? (
+                <FormHelperText>
+                    {helpText ?? (
+                        <Text>
+                            This an optional additional security measure to protect your ngrok tunnel/server. This will require authentication
+                            to the tunnel before a client is able to connect to your bluebubbles sever.
+                        </Text>
+                    )}
+                </FormHelperText>
+            ) : (
+                <FormErrorMessage>{ngrokCredentialsError}</FormErrorMessage>
+            )}
+        </FormControl>
     );
 };
