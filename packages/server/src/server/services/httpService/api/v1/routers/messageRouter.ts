@@ -98,7 +98,8 @@ export class MessageRouter {
                 });
         }
 
-        const opts: DBMessageParams = {
+        // Fetch the info for the message by GUID
+        const messages = await Server().iMessageRepo.getMessages({
             chatGuid,
             withChats,
             withAttachments,
@@ -107,14 +108,9 @@ export class MessageRouter {
             limit,
             sort,
             before,
-            after
-        };
-
-        // Since we have a default value for `where`, we have to set it conditionally
-        if (isNotEmpty(where)) opts.where = where;
-
-        // Fetch the info for the message by GUID
-        const messages = await Server().iMessageRepo.getMessages(opts);
+            after,
+            where: where ?? []
+        });
 
         // Handle fetching the chat participants with the messages (if requested)
         const chatCache: { [key: string]: Handle[] } = {};
@@ -145,7 +141,7 @@ export class MessageRouter {
         }
 
         // Build metadata to return
-        const metadata = { offset, limit };
+        const metadata = { offset, limit, total: data.length };
         return new Success(ctx, { data, message: "Successfully fetched messages!", metadata }).send();
     }
 

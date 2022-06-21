@@ -212,12 +212,7 @@ export class MessageRepository {
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
-        where = [
-            {
-                statement: "message.text IS NOT NULL",
-                args: null
-            }
-        ]
+        where = []
     }: DBMessageParams) {
         // Sanitize some params
         if (after && typeof after === "number") after = new Date(after);
@@ -393,9 +388,6 @@ export class MessageRepository {
                 )
                 .andWhere("chat.guid = :guid", { guid: chatGuid });
         }
-
-        // Add default WHERE clauses
-        query.andWhere("message.text IS NOT NULL").andWhere("associated_message_type == 0");
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 

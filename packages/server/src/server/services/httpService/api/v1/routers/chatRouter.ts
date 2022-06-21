@@ -118,7 +118,7 @@ export class ChatRouter {
 
         // Build metadata to return
         const metadata = {
-            total: await Server().iMessageRepo.getChatCount(),
+            total: results.length,
             offset,
             limit
         };
