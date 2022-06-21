@@ -9,6 +9,8 @@ export class ApiContactsCache {
 
     contacts: any[] | null = null;
 
+    recentlyUpdated = false;
+
     getApiContacts() {
         // If we aren't authorized, return an empty array without setting this.contacts.
         // This way, if a permission is changed from Denied -> Authorized, we can still
@@ -34,8 +36,18 @@ export class ApiContactsCache {
 
             // When a contact changes, reload and cache the contacts
             contacts.listener.on('contact-changed', () => {
+                // If we recently updated (within 3 seconds), don't refresh
+                if (this.recentlyUpdated) return;
+                this.recentlyUpdated = true;
+
+                // Refresh the contacts on new data
                 Server().log('API Contacts change detected! Refreshing API Contacts...');
                 this.loadContacts();
+
+                // After 3 seconds, reset the recently updated flag
+                setTimeout(() => {
+                    this.recentlyUpdated = false;
+                }, 3000);
             });
         }
     }
