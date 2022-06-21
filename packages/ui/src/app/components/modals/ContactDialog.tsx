@@ -7,6 +7,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     Button,
+    Box,
     Input,
     FormControl,
     FormErrorMessage,
@@ -18,12 +19,14 @@ import {
     TagCloseButton,
     HStack,
     IconButton,
-    useBoolean
+    useBoolean,
+    Stack
 } from '@chakra-ui/react';
 import { FocusableElement } from '@chakra-ui/utils';
 import { ContactAddress, ContactItem } from '../tables/ContactsTable';
 import { showErrorToast } from 'app/utils/ToastUtils';
 import { AiOutlinePlus } from 'react-icons/ai';
+import { ImageFromData } from '../ImageFromData';
 
 
 interface ContactDialogProps {
@@ -115,6 +118,47 @@ export const ContactDialog = ({
         if (onClose) onClose();
     };
 
+    const firstLastField = () => {
+        return (
+            <>
+                <FormControl isInvalid={isNameValid} mt={5}>
+                    <FormLabel htmlFor='firstName'>First Name</FormLabel>
+                    <Input
+                        id='firstName'
+                        type='text'
+                        value={firstName}
+                        placeholder='Tim'
+                        onChange={(e) => {
+                            setFirstNameError('');
+                            setFirstName(e.target.value);
+                            if (!hasEdited) {
+                                setDisplayName(`${e.target.value} ${lastName}`.trim());
+                            }
+                        }}
+                    />
+                    {isNameValid ? (
+                        <FormErrorMessage>{firstNameError}</FormErrorMessage>
+                    ) : null}
+                </FormControl>
+                <FormControl mt={5}>
+                    <FormLabel htmlFor='lastName'>Last Name</FormLabel>
+                    <Input
+                        id='lastName'
+                        type='text'
+                        value={lastName}
+                        placeholder='Apple'
+                        onChange={(e) => {
+                            setLastName(e.target.value);
+                            if (!hasEdited) {
+                                setDisplayName(`${firstName} ${e.target.value}`.trim());
+                            }
+                        }}
+                    />
+                </FormControl>
+            </>
+        );
+    };
+
     return (
         <AlertDialog
             isOpen={isOpen}
@@ -129,40 +173,20 @@ export const ContactDialog = ({
 
                     <AlertDialogBody>
                         <Text>Add a custom contact to the server's database</Text>
-                        <FormControl isInvalid={isNameValid} mt={5}>
-                            <FormLabel htmlFor='firstName'>First Name</FormLabel>
-                            <Input
-                                id='firstName'
-                                type='text'
-                                value={firstName}
-                                placeholder='Tim'
-                                onChange={(e) => {
-                                    setFirstNameError('');
-                                    setFirstName(e.target.value);
-                                    if (!hasEdited) {
-                                        setDisplayName(`${e.target.value} ${lastName}`.trim());
-                                    }
-                                }}
-                            />
-                            {isNameValid ? (
-                                <FormErrorMessage>{firstNameError}</FormErrorMessage>
-                            ) : null}
-                        </FormControl>
-                        <FormControl mt={5}>
-                            <FormLabel htmlFor='lastName'>Last Name</FormLabel>
-                            <Input
-                                id='lastName'
-                                type='text'
-                                value={lastName}
-                                placeholder='Apple'
-                                onChange={(e) => {
-                                    setLastName(e.target.value);
-                                    if (!hasEdited) {
-                                        setDisplayName(`${firstName} ${e.target.value}`.trim());
-                                    }
-                                }}
-                            />
-                        </FormControl>
+                        {(existingContact?.avatar && existingContact.avatar.length > 0) ? (
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Box mt={5}>
+                                    <ImageFromData data={existingContact.avatar} height={150} width={150} style={{ borderRadius: 150 }} />
+                                </Box>
+                                <Box>
+                                    {firstLastField()}
+                                </Box>
+                            </Stack>
+                        ) : (
+                            <Box>
+                                {firstLastField()}
+                            </Box>  
+                        )}
                         <FormControl mt={5}>
                             <FormLabel htmlFor='lastName'>Display Name</FormLabel>
                             <Input

@@ -15,6 +15,7 @@ import {
 import { AiOutlineEdit } from 'react-icons/ai';
 import { MdOutlineEditOff } from 'react-icons/md';
 import { ContactDialog } from '../modals/ContactDialog';
+import { ImageFromData } from '../ImageFromData';
 
 
 export interface ContactAddress {
@@ -60,6 +61,7 @@ export const ContactsTable = ({
                 <Thead>
                     <Tr>
                         <Th>Edit</Th>
+                        <Th>Avatar</Th>
                         <Th>Display Name</Th>
                         <Th isNumeric>Addresses</Th>
                     </Tr>
@@ -93,6 +95,15 @@ export const ContactsTable = ({
                                             </span>
                                         </Tooltip>
                                     )}
+                                </Td>
+                                <Td>
+                                    <Box ml={3}>
+                                        {(item?.avatar && item.avatar.length > 0) ? (
+                                            <ImageFromData data={item.avatar} height={24} width={24} style={{ borderRadius: 24 }} />
+                                        ) : (
+                                            <Badge>N/A</Badge>
+                                        )}
+                                    </Box>
                                 </Td>
                                 <Td>{name}</Td>
                                 <Td isNumeric>{addresses.map((addr) => (

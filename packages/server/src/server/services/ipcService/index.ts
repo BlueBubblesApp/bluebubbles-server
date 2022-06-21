@@ -119,8 +119,8 @@ export class IPCService {
             return await requestContactPermission();
         });
 
-        ipcMain.handle("get-contacts", async (event, _) => {
-            return await ContactInterface.getAllContacts();
+        ipcMain.handle("get-contacts", async (event, extraProperties) => {
+            return await ContactInterface.getAllContacts(extraProperties ?? []);
         });
 
         ipcMain.handle("delete-contacts", async (event, _) => {
