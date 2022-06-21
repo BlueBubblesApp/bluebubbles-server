@@ -13,8 +13,8 @@
         "build": "export NODE_ENV=production && npm run build-swift && webpack --config ./scripts/webpack.main.prod.config.js",
         "start": "export NODE_ENV=development && npm run build-swift && webpack --config ./scripts/webpack.main.config.js && electron ./dist/main.js",
         "lint": "eslint --ext=jsx,js,tsx,ts src",
-        "dist": "npm run build && electron-builder build --mac --publish never",
-        "postinstall": "electron-builder install-app-deps"
+        "dist": "electron-rebuild -f -o better-sqlite3 && npm run build && electron-builder build --mac --publish never --config ./scripts/electron-builder-config.js",
+        "postinstall": "electron-rebuild install-app-deps"
     },
     "husky": {
         "hooks": {
@@ -29,64 +29,6 @@
             "prettier --config ./.prettierrc --ignore-path ./.prettierignore --write",
             "eslint --ext=jsx,js,ts,tsx --fix src"
         ]
-    },
-    "build": {
-        "productName": "BlueBubbles",
-        "appId": "com.BlueBubbles.BlueBubbles-Server",
-        "directories": {
-            "output": "release",
-            "buildResources": "appResources"
-        },
-        "files": [
-            "dist/",
-            "node_modules/",
-            "appResources/",
-            "package.json"
-        ],
-        "asar": true,
-        "asarUnpack": [
-            "**/node_modules/ngrok/bin/**"
-        ],
-        "extraResources": [
-            "**/appResources/**"
-        ],
-        "mac": {
-            "category": "public.app-category.social-networking",
-            "publish": [
-                {
-                    "provider": "github",
-                    "repo": "bluebubbles-server",
-                    "owner": "BlueBubblesApp",
-                    "private": false,
-                    "channel": "latest",
-                    "releaseType": "release"
-                }
-            ],
-            "target": [
-                {
-                    "target": "dmg"
-                },
-                {
-                    "target": "zip"
-                }
-            ],
-            "type": "distribution",
-            "icon": "../../icons/regular/icon-512.png",
-            "darkModeSupport": true,
-            "hardenedRuntime": true,
-            "entitlements": "./scripts/entitlements.mac.plist",
-            "entitlementsInherit": "./scripts/entitlements.mac.plist",
-            "extendInfo": {
-                "NSContactsUsageDescription": "BlueBubbles needs access to your Contacts",
-                "NSAppleEventsUsageDescription": "BlueBubbles needs access to run AppleScripts"
-            },
-            "gatekeeperAssess": false,
-            "minimumSystemVersion": "10.11.6"
-        },
-        "dmg": {
-            "sign": false
-        },
-        "afterSign": "./scripts/notarize.js"
     },
     "devDependencies": {
         "@babel/core": "^7.16.12",
