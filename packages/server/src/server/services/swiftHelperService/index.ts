@@ -5,6 +5,7 @@ import { ChildProcess, spawn } from "child_process";
 import { FileSystem } from "@server/fileSystem";
 import { Event } from "./event";
 import { Queue } from "./queue";
+import { isNotEmpty } from "@server/helpers/utils";
 
 /**
  * A class that handles the communication with the swift helper process.
@@ -155,7 +156,7 @@ import { Queue } from "./queue";
      */
     async deserializeAttributedBody(blob: Blob | null): Promise<Record<string, any>> {
         // if the blob is null or our helper isn't connected, we should return null
-        if (blob != null && this.helper != null) {
+        if (isNotEmpty(blob) && this.helper && this.helper.writable) {
             try {
                 const msg = new Event("deserializeAttributedBody", Buffer.from(blob));
                 const buf = await this.sendSocketEvent(msg, 250);
