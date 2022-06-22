@@ -7,6 +7,16 @@
 
 import Foundation
 
+
+func isScalar(value: Any, allowSequences: Bool) -> Bool {
+    if (allowSequences) {
+        return value is NSString || value is NSNumber || value is NSNull || value is NSArray || value is NSDictionary
+    } else {
+        return value is NSString || value is NSNumber || value is NSNull
+    }
+}
+
+
 func deserializeAttributedBody(data: Data) -> Data {
     let typedStreamUnarchiver = NSUnarchiver(forReadingWith:data)
     let attrStr = typedStreamUnarchiver!.decodeObject() as! NSAttributedString?
@@ -27,7 +37,25 @@ func deserializeAttributedBody(data: Data) -> Data {
             // the extra data from the attributedBody field.
             // because we're effectively removing the attribute value here, this can
             // lead to multiple keys over adjacent ranges that have the same value
-            if (!(attr.value is NSData)) {
+            var shouldAdd = isScalar(value: attr.value, allowSequences: true)
+            if (shouldAdd && attr.value is NSArray) {
+                for subItem in (attr.value as! NSArray) {
+                    if (!isScalar(value: subItem, allowSequences: false)) {
+                        shouldAdd = false
+                        break
+                    }
+                }
+                runAttributes[attr.key] = attr.value
+            } else if (shouldAdd && attr.value is NSArray) {
+                for (_, subItem) in (attr.value as! NSDictionary).enumerated() {
+                    if (!isScalar(value: subItem.value, allowSequences: false)) {
+                        shouldAdd = false
+                        break
+                    }
+                }
+            }
+
+            if (shouldAdd) {
                 runAttributes[attr.key] = attr.value
             }
         }
