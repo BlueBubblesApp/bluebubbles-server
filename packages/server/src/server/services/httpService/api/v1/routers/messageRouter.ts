@@ -7,7 +7,7 @@ import { Server } from "@server";
 import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
 import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
-import { DBMessageParams } from "@server/databases/imessage/types";
+import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
@@ -156,7 +156,7 @@ export class MessageRouter {
 
         try {
             // Send the message
-            const sentMessage = await MessageInterface.sendMessageSync(
+            const sentMessage = await MessageInterface.sendMessageSync({
                 chatGuid,
                 message,
                 method,
@@ -165,7 +165,7 @@ export class MessageRouter {
                 effectId,
                 selectedMessageGuid,
                 tempGuid
-            );
+            });
 
             // Remove from cache
             Server().httpService.sendCache.remove(tempGuid);
@@ -197,6 +197,12 @@ export class MessageRouter {
                     data: await getMessageResponse(ex),
                     error: "Failed to send message! See attached message error code."
                 });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Message Send Error",
+                    data: await getMessageResponse(ex.msg),
+                    error: "Failed to send message! See attached message error code."
+                });
             } else {
                 throw new IMessageError({ message: "Message Send Error", error: ex?.message ?? ex.toString() });
             }
@@ -213,12 +219,12 @@ export class MessageRouter {
 
         // Send the attachment
         try {
-            const sentMessage: Message = await MessageInterface.sendAttachmentSync(
+            const sentMessage: Message = await MessageInterface.sendAttachmentSync({
                 chatGuid,
-                attachment.path,
-                name,
-                tempGuid
-            );
+                attachmentPath: attachment.path,
+                attachmentName: name,
+                attachmentGuid: tempGuid
+            });
 
             // Remove from cache
             Server().httpService.sendCache.remove(tempGuid);
@@ -251,7 +257,7 @@ export class MessageRouter {
 
         // Send the reaction
         try {
-            const sentMessage = await MessageInterface.sendReaction(chatGuid, message, reaction);
+            const sentMessage = await MessageInterface.sendReaction({ chatGuid, message, reaction });
             return new Success(ctx, { message: "Reaction sent!", data: await getMessageResponse(sentMessage) }).send();
         } catch (ex: any) {
             if (ex instanceof Message) {

@@ -43,6 +43,7 @@ export class OutgoingMessageManager {
     async reject(reason: any, message: Message): Promise<boolean> {
         const idx = this.findIndex(message);
         if (idx >= 0) {
+            console.log("TEST: 3");
             await this.promises[idx].reject(reason, message);
             return true;
         }

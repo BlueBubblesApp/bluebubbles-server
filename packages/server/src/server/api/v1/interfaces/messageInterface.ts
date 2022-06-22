@@ -7,6 +7,12 @@ import { checkPrivateApiStatus, isNotEmpty, waitMs } from "@server/helpers/utils
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ActionHandler } from "@server/api/v1/apple/actions";
+import type {
+    SendMessageParams,
+    SendAttachmentParams,
+    SendMessagePrivateApiParams,
+    SendReactionParams
+} from "@server/api/v1/types";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -34,16 +40,16 @@ export class MessageInterface {
      *
      * @returns The command line response
      */
-    static async sendMessageSync(
-        chatGuid: string,
-        message: string,
-        method: "apple-script" | "private-api",
-        attributedBody?: Record<string, any> | null,
-        subject?: string,
-        effectId?: string,
-        selectedMessageGuid?: string,
-        tempGuid?: string
-    ): Promise<Message> {
+    static async sendMessageSync({
+        chatGuid,
+        message,
+        method = "apple-script",
+        attributedBody = null,
+        subject = null,
+        effectId = null,
+        selectedMessageGuid = null,
+        tempGuid = null
+    }: SendMessageParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
         Server().log(`Sending message "${message}" to ${chatGuid}`, "debug");
@@ -60,7 +66,7 @@ export class MessageInterface {
         });
 
         // Add the promise to the manager
-        Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}`);
+        Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}; tempGuid: ${tempGuid ?? 'N/A'}`);
         Server().messageManager.add(awaiter);
 
         // Try to send the iMessage
@@ -70,14 +76,14 @@ export class MessageInterface {
             await ActionHandler.sendMessageHandler(chatGuid, message ?? "", null);
             sentMessage = await awaiter.promise;
         } else if (method === "private-api") {
-            sentMessage = await MessageInterface.sendMessagePrivateApi(
+            sentMessage = await MessageInterface.sendMessagePrivateApi({
                 chatGuid,
                 message,
                 attributedBody,
                 subject,
                 effectId,
                 selectedMessageGuid
-            );
+            });
         } else {
             throw new Error(`Invalid send method: ${method}`);
         }
@@ -95,12 +101,12 @@ export class MessageInterface {
      *
      * @returns The command line response
      */
-    static async sendAttachmentSync(
-        chatGuid: string,
-        attachmentPath: string,
-        attachmentName?: string,
-        attachmentGuid?: string
-    ): Promise<Message> {
+    static async sendAttachmentSync({
+        chatGuid,
+        attachmentPath,
+        attachmentName = null,
+        attachmentGuid = null
+    }: SendAttachmentParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
         // Copy the attachment to a more permanent storage
@@ -135,14 +141,14 @@ export class MessageInterface {
         return await awaiter.promise;
     }
 
-    static async sendMessagePrivateApi(
-        chatGuid: string,
-        message: string,
-        attributedBody?: Record<string, any> | null,
-        subject?: string | null,
-        effectId?: string | null,
-        selectedMessageGuid?: string | null
-    ) {
+    static async sendMessagePrivateApi({
+        chatGuid,
+        message,
+        attributedBody = null,
+        subject = null,
+        effectId = null,
+        selectedMessageGuid = null
+    }: SendMessagePrivateApiParams) {
         checkPrivateApiStatus();
         const result = await Server().privateApiHelper.sendMessage(
             chatGuid,
@@ -181,12 +187,12 @@ export class MessageInterface {
         return retMessage;
     }
 
-    static async sendReaction(
-        chatGuid: string,
-        message: Message,
-        reaction: ValidTapback | ValidRemoveTapback,
-        tempGuid?: string | null
-    ): Promise<Message> {
+    static async sendReaction({
+        chatGuid,
+        message,
+        reaction,
+        tempGuid = null
+    }: SendReactionParams): Promise<Message> {
         checkPrivateApiStatus();
 
         // Rebuild the selected message text to make it what the reaction text

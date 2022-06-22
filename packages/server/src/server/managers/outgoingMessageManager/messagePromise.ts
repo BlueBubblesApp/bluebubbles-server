@@ -1,15 +1,30 @@
 import { Server } from "@server";
-import { imageExtensions } from "@server/api/v1/apple/constants";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { isMinMonterey, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+
+export class MessagePromiseRejection extends Error {
+    error: string;
+
+    msg: Message | null;
+
+    tempGuid: string | null;
+
+    constructor(error: string, message?: Message, tempGuid?: string) {
+        super(error);
+        this.name = this.constructor.name;
+        this.msg = message;
+        this.tempGuid = tempGuid;
+        Error.captureStackTrace(this, this.constructor);
+    }
+}
 
 export class MessagePromise {
     promise: Promise<Message>;
 
     private resolvePromise: (value: Message | PromiseLike<Message>) => void;
 
-    private rejectPromise: (reason?: any) => void;
+    private rejectPromise: (reason?: MessagePromiseRejection) => void;
 
     text: string;
 
@@ -77,9 +92,9 @@ export class MessagePromise {
         await this.emitMessageMatch(value);
     }
 
-    async reject(reason?: any, message: Message = null) {
+    async reject(reason?: string, message: Message = null) {
         this.isResolved = true;
-        this.rejectPromise(reason);
+        this.rejectPromise(new MessagePromiseRejection(reason, message, this.tempGuid));
         if (message) {
             await this.emitMessageError(message);
         }

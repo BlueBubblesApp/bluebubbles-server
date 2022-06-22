@@ -555,30 +555,25 @@ export class SocketRoutes {
                 if (params?.attachment && params?.attachmentName && params?.attachmentGuid) {
                     // Save the attachment data
                     const b = base64.base64ToBytes(params.attachment);
-                    // eslint-disable-next-line no-param-reassign
                     const newPath = FileSystem.saveAttachment(params.attachmentName, b);
 
                     // Send the attachment first
-                    sentMessage = await MessageInterface.sendAttachmentSync(
+                    sentMessage = await MessageInterface.sendAttachmentSync({
                         chatGuid,
-                        newPath,
-                        params?.attachmentName,
-                        params?.attachmentGuid
-                    );
+                        attachmentPath: newPath,
+                        attachmentName: params?.attachmentName,
+                        attachmentGuid: params?.attachmentGuid
+                    });
                 }
 
                 // If we have a message, send it second
                 if (isNotEmpty(message)) {
-                    sentMessage = await MessageInterface.sendMessageSync(
+                    sentMessage = await MessageInterface.sendMessageSync({
                         chatGuid,
                         message,
-                        "apple-script",
-                        null,
-                        null,
-                        null,
-                        null,
+                        method: "apple-script",
                         tempGuid
-                    );
+                    });
                 }
 
                 Server().httpService.sendCache.remove(tempGuid);
@@ -874,12 +869,12 @@ export class SocketRoutes {
             // If the helper is online, use it to send the tapback
             if (Server().privateApiHelper?.helper) {
                 try {
-                    const sentMessage = await MessageInterface.sendReaction(
-                        params.chatGuid,
+                    const sentMessage = await MessageInterface.sendReaction({
+                        chatGuid: params.chatGuid,
                         message,
-                        params.tapback,
+                        reaction: params.tapback,
                         tempGuid
-                    );
+                    });
 
                     return response(
                         cb,
