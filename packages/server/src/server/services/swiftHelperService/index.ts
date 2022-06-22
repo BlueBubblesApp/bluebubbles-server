@@ -2,7 +2,6 @@ import { Server } from "@server/index";
 import * as net from "net";
 import * as fs from "fs-extra";
 import { ChildProcess, spawn } from "child_process";
-import { app } from "electron";
 import { FileSystem } from "@server/fileSystem";
 import { Event } from "./event";
 import { Queue } from "./queue";

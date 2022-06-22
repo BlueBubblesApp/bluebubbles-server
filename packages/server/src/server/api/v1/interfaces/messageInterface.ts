@@ -1,7 +1,6 @@
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
-import { ValidRemoveTapback, ValidTapback } from "@server/types";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { checkPrivateApiStatus, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
