@@ -200,7 +200,7 @@ export class MessageRouter {
             } else if (ex instanceof MessagePromiseRejection) {
                 throw new IMessageError({
                     message: "Message Send Error",
-                    data: await getMessageResponse(ex.msg),
+                    data: (ex?.msg) ? await getMessageResponse(ex.msg) : null,
                     error: "Failed to send message! See attached message error code."
                 });
             } else {
@@ -242,6 +242,12 @@ export class MessageRouter {
                     data: await getMessageResponse(ex),
                     error: "Failed to send attachment! See attached message error code."
                 });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Attachment Send Error",
+                    data: (ex?.msg) ? await getMessageResponse(ex.msg) : null,
+                    error: "Failed to send attachment! See attached message error code."
+                });
             } else {
                 throw new IMessageError({ message: "Attachment Send Error", error: ex?.message ?? ex.toString() });
             }
@@ -264,6 +270,12 @@ export class MessageRouter {
                 throw new IMessageError({
                     message: "Reaction Send Error",
                     data: await getMessageResponse(ex),
+                    error: "Failed to send reaction! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Reaction Send Error",
+                    data: (ex?.msg) ? await getMessageResponse(ex.msg) : null,
                     error: "Failed to send reaction! See attached message error code."
                 });
             } else {
