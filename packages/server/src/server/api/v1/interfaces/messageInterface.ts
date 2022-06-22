@@ -126,13 +126,15 @@ export class MessageInterface {
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
         const awaiter = new MessagePromise({
             chatGuid: chatGuid,
-            text: `->${aName}`,
+            text: aName,
             isAttachment: true,
             sentAt: now,
             tempGuid: attachmentGuid
         });
 
         // Add the promise to the manager
+        Server().log(
+            `Adding await for chat: "${chatGuid}"; attachment: ${aName}; tempGuid: ${attachmentGuid ?? 'N/A'}`);
         Server().messageManager.add(awaiter);
 
         // Send the message
