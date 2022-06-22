@@ -72,23 +72,22 @@ import { Queue } from "./queue";
                 const splitIndex = line.indexOf(":");
                 const level = line.substring(0, splitIndex);
                 if (["log", "error", "warn", "debug"].indexOf(level) >= 0) {
-                    const content = line.substring(splitIndex+1);
+                    const content = line.substring(splitIndex + 1);
                     Server().log(`[Swift Helper] ${content}`, level as any);
                 } else {
-                    // log as error, should be using Logger in swiftHelper, not print
-                    Server().log(`[Swift Helper] ${line}`, "error");
+                    Server().log(`[Swift Helper] ${line}`, "debug");
                 }
             }
         });
 
         this.child.stderr.setEncoding("utf8");
         this.child.stderr.on("data", data => {
-            Server().log(`[Swift Helper] Error: ${data}`, "error");
+            Server().log(`[Swift Helper] Error: ${data}`, "debug");
         });
 
         // if the child process exits, we should restart it
         this.child.on("close", code => {
-            Server().log("Swift Helper process exited: " + code, "error");
+            Server().log(`Swift Helper process exited: ${code}`, "debug");
             this.runSwiftHelper();
         });
     }
