@@ -41,12 +41,12 @@ export class QueueService {
                 case "send-attachment":
                     // Send the attachment first
                     try {
-                        await MessageInterface.sendAttachmentSync(
-                            item.data.chatGuid,
-                            item.data.attachmentPath,
-                            item.data.attachmentName,
-                            item.data.attachmentGuid
-                        );
+                        await MessageInterface.sendAttachmentSync({
+                            chatGuid: item.data.chatGuid,
+                            attachmentPath: item.data.attachmentPath,
+                            attachmentName: item.data.attachmentName,
+                            attachmentGuid: item.data.attachmentGuid
+                        });
                         Server().httpService.sendCache.remove(item?.data?.attachmentGuid);
                     } catch (ex: any) {
                         // Re-throw the error after removing from cache
@@ -57,16 +57,12 @@ export class QueueService {
                     // Then send the message (if required)
                     if (isNotEmpty(item.data.message)) {
                         try {
-                            await MessageInterface.sendMessageSync(
-                                item.data.chatGuid,
-                                item.data.message,
-                                "apple-script",
-                                null,
-                                null,
-                                null,
-                                null,
-                                item.data.tempGuid
-                            );
+                            await MessageInterface.sendMessageSync({
+                                chatGuid: item.data.chatGuid,
+                                message: item.data.message,
+                                method: "apple-script",
+                                tempGuid: item.data.tempGuid
+                            });
                         } finally {
                             // Remove from cache
                             Server().httpService.sendCache.remove(item?.data?.tempGuid);

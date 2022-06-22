@@ -158,19 +158,24 @@ import { Queue } from "./queue";
     async deserializeAttributedBody(blob: Blob | null): Promise<Record<string, any>> {
         // if the blob is null or our helper isn't connected, we should return null
         if (blob != null && this.helper != null) {
-            const msg = new Event("deserializeAttributedBody", Buffer.from(blob));
-            const buf = await this.sendSocketEvent(msg, 250);
-            // in case the helper process returns something weird,
-            // catch any exceptions that would come from deserializing it and return null
-            if (buf != null) {
-                try {
-                    return JSON.parse(buf.toString());
-                } catch (e) {
-                    Server().log("server returned invalid json: "+buf.toString(), "error");
-                    Server().log(e);
+            try {
+                const msg = new Event("deserializeAttributedBody", Buffer.from(blob));
+                const buf = await this.sendSocketEvent(msg, 250);
+                // in case the helper process returns something weird,
+                // catch any exceptions that would come from deserializing it and return null
+                if (buf != null) {
+                    try {
+                        return JSON.parse(buf.toString());
+                    } catch (e) {
+                        Server().log("SwiftHelper returned invalid json: " + buf.toString(), "debug");
+                        Server().log(e);
+                    }
                 }
+            } catch (ex: any) {
+                Server().log(`Failed to deserialize Attributed Body! Error: ${ex?.message ?? String(ex)}`, 'debug');
             }
         }
+
         return null;
     }
 }
