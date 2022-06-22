@@ -36,6 +36,10 @@ if (!gotTheLock) {
 }
 
 process.on("uncaughtException", error => {
+    // These are typically errors from the Swift Helper
+    if (error?.message === 'write EPIPE') return;
+
+    // Print the exception
     Server().log(`Uncaught Exception: ${error.message}`, "error");
     if (error?.stack) Server().log(`Uncaught Exception StackTrace: ${error?.stack}`, 'debug');
     
