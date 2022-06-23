@@ -46,7 +46,7 @@ func deserializeAttributedBody(data: Data) -> Data {
                     }
                 }
                 runAttributes[attr.key] = attr.value
-            } else if (shouldAdd && attr.value is NSArray) {
+            } else if (shouldAdd && attr.value is NSDictionary) {
                 for (_, subItem) in (attr.value as! NSDictionary).enumerated() {
                     if (!isScalar(value: subItem.value, allowSequences: false)) {
                         shouldAdd = false
