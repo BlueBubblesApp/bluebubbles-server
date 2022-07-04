@@ -117,6 +117,16 @@ export class Attachment {
     )
     hideAttachment: boolean;
 
+    @conditional(
+        isMinSierra,
+        Column({
+            type: "text",
+            unique: true,
+            name: "original_guid"
+        })
+    )
+    originalGuid: string;
+
     getMimeType(): string {
         let mType = this.mimeType ?? mime.lookup(this.filePath);
         if (!mType || isEmpty(mType as any)) mType = "application/octet-stream";
@@ -131,10 +141,11 @@ export const getAttachmentResponse = async (
         loadMetadata = true,
         getData = false
     }: {
-        convert?: boolean,
-        loadMetadata?: boolean,
-        getData?: boolean
-    } = {}): Promise<AttachmentResponse> => {
+        convert?: boolean;
+        loadMetadata?: boolean;
+        getData?: boolean;
+    } = {}
+): Promise<AttachmentResponse> => {
     let data: Uint8Array | string = null;
     let metadata: Metadata = null;
 
@@ -147,8 +158,13 @@ export const getAttachmentResponse = async (
         fPath = FileSystem.getRealPath(fPath);
 
         try {
-            Server().log(`Handling attachment response for GUID: ${attachment.guid}`, "debug");
-            Server().log(`Detected MIME Type: ${mimeType}`, 'debug');
+            Server().log(
+                `Handling attachment response for GUID: ${attachment.guid} (Original: ${
+                    attachment.originalGuid ?? "N/A"
+                })`,
+                "debug"
+            );
+            Server().log(`Detected MIME Type: ${mimeType}`, "debug");
 
             // If we want to resize the image, do so here
             if (convert) {
@@ -205,6 +221,7 @@ export const getAttachmentResponse = async (
         totalBytes: attachment.totalBytes,
         isSticker: attachment.isSticker,
         hideAttachment: attachment.hideAttachment,
+        originalGuid: attachment.originalGuid,
         metadata
     };
 };

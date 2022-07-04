@@ -22,7 +22,7 @@ export const convertAudio = async (
     { originalMimeType = null }: { originalMimeType?: string } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const newPath = `${FileSystem.convertDir}/${attachment.guid}.mp3`;
+    const newPath = `${FileSystem.convertDir}/${attachment.originalGuid ?? attachment.guid}.mp3`;
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
@@ -64,7 +64,7 @@ export const convertImage = async (
     { originalMimeType = null }: { originalMimeType?: string } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const newPath = `${FileSystem.convertDir}/${attachment.guid}.jpeg`;
+    const newPath = `${FileSystem.convertDir}/${attachment.originalGuid ?? attachment.guid}.jpeg`;
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext: string = null;

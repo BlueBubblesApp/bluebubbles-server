@@ -100,6 +100,7 @@ export type AttachmentResponse = {
     transferName: string;
     isSticker: boolean;
     hideAttachment: boolean;
+    originalGuid: string;
     metadata: { [key: string]: string | boolean | number };
 };
 

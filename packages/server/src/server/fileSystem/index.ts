@@ -45,7 +45,6 @@ export const userHomeDir = () => {
     return process?.env?.HOME ?? process?.env?.HOMEPATH ?? process?.env?.USERPROFILE;
 };
 
-
 /**
  * The class used to handle all communications to the App's "filesystem".
  * The filesystem is the directory dedicated to the app-specific files
@@ -120,7 +119,7 @@ export class FileSystem {
     }
 
     static cachedAttachmentPath(attachment: Attachment, name: string) {
-        return path.join(FileSystem.attachmentCacheDir, attachment.guid, name);
+        return path.join(FileSystem.attachmentCacheDir, attachment.originalGuid ?? attachment.guid, name);
     }
 
     static cachedAttachmentExists(attachment: Attachment, name: string) {
@@ -129,7 +128,7 @@ export class FileSystem {
     }
 
     static saveCachedAttachment(attachment: Attachment, name: string, data: Buffer) {
-        const basePath = path.join(FileSystem.attachmentCacheDir, attachment.guid);
+        const basePath = path.join(FileSystem.attachmentCacheDir, attachment.originalGuid ?? attachment.guid);
         if (!fs.existsSync(basePath)) {
             fs.mkdirSync(basePath, { recursive: true });
         }
