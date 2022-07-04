@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
 import { conditional } from "conditional-decorator";
 
+import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
@@ -516,10 +517,11 @@ export const getMessageResponse = async (
         loadAttachmentMetadata = true,
         getAttachmentData = false
     }: {
-        convertAttachments?: boolean,
-        loadAttachmentMetadata?: boolean,
-        getAttachmentData?: boolean
-    } = {}): Promise<MessageResponse> => {
+        convertAttachments?: boolean;
+        loadAttachmentMetadata?: boolean;
+        getAttachmentData?: boolean;
+    } = {}
+): Promise<MessageResponse> => {
     // Load attachments
     const attachments = [];
     for (const attachment of tableData?.attachments ?? []) {
@@ -535,6 +537,13 @@ export const getMessageResponse = async (
     for (const chat of tableData?.chats ?? []) {
         const chatRes = await getChatResponse(chat);
         chats.push(chatRes);
+    }
+
+    let attributedBody = null;
+    try {
+        attributedBody = await tableData.attributedBody;
+    } catch (ex: any) {
+        Server().log(`Failed to decode attributed body! Error: ${String(ex)}`, "debug");
     }
 
     return {
