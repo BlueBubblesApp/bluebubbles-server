@@ -58,10 +58,8 @@ export class OutgoingMessageListener extends ChangeListener {
         // 1: Check for new messages
         const newMessages = await this.repo.getMessages({
             after,
-            withChats: false,
-            withAttachments: false,
-            withHandle: false,
-            where: [ ...baseQuery ]
+            withChats: true,
+            where: [...baseQuery]
         });
 
         // 2: Divide the new messages into sent/unsent buckets
@@ -131,12 +129,16 @@ export class OutgoingMessageListener extends ChangeListener {
             // This will emit a message send error
             const success = Server().messageManager.reject("message-send-error", entry);
             Server().log(
-                `Errored Msg -> ${cacheName} -> ${(entry.text ?? '').substring(0, 25)} -> ${success}`, 'debug');
+                `Errored Msg -> ${cacheName} -> ${(entry.text ?? "").substring(0, 25)} -> ${success}`,
+                "debug"
+            );
 
             // Emit it as normal error
             if (!success) {
                 Server().log(
-                    `Message Manager Match Failed -> Promises: ${Server().messageManager.promises.length}`, 'debug');
+                    `Message Manager Match Failed -> Promises: ${Server().messageManager.promises.length}`,
+                    "debug"
+                );
                 super.emit("message-send-error", entry);
             }
         }

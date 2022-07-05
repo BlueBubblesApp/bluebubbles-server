@@ -1,7 +1,7 @@
 import { Server } from "@server";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { getFilenameWithoutExtension, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
 
 export class MessagePromiseRejection extends Error {
     error: string;
@@ -45,7 +45,6 @@ export class MessagePromise {
     private tempGuid?: string | null;
 
     constructor({ chatGuid, text, isAttachment, sentAt, subject, tempGuid }: MessagePromiseConstructorParameters) {
-
         // Used to temporarily update the guid
         this.tempGuid = tempGuid;
 
@@ -62,8 +61,8 @@ export class MessagePromise {
         });
 
         this.chatGuid = chatGuid;
-        this.text = onlyAlphaNumeric(text ?? '');
-        this.subject = onlyAlphaNumeric(subject ?? '');
+        this.text = isAttachment ? getFilenameWithoutExtension(text) : onlyAlphaNumeric(text ?? "");
+        this.subject = onlyAlphaNumeric(subject ?? "");
         this.isAttachment = isAttachment;
 
         // Subtract 10 seconds to account for any "delay" in the sending process (somehow)
@@ -112,7 +111,7 @@ export class MessagePromise {
             if (this.tempGuid) {
                 Server().httpService.sendCache.remove(this.tempGuid);
             }
-            
+
             await Server().emitMessageError(sentMessage, this.tempGuid);
         }
     }
@@ -132,9 +131,11 @@ export class MessagePromise {
             // Iterate over the attachments and check if any of the transfer names match the one we are awaiting on
             for (const a of message.attachments) {
                 // If the transfer names match, congratz we have a match.
-                if (a.transferName.endsWith(this.text)) return true;
+                // We don't need to get the filename from the text because we've already
+                // done that in the constructor.
+                if (getFilenameWithoutExtension(a.transferName) === this.text) return true;
             }
-            
+
             // If we have no attachment matches, they're not the same
             return false;
         }

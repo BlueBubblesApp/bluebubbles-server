@@ -24,6 +24,10 @@ export const isTruthyBool = (value: string) => {
     return ["1", true, "true", "True"].includes(value);
 };
 
+export const getFilenameWithoutExtension = (filename: string) => {
+    return filename.split(".").slice(0, -1).join(".");
+};
+
 export const generateUuid = () => {
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
         const r = (Math.random() * 16) | 0;
@@ -46,7 +50,7 @@ export const deduplicateObjectArray = (items: any[], key: string): any[] => {
         seen.add(el[key]);
         return !duplicate;
     });
-}
+};
 
 export const getiMessageAddressFormat = (address: string, preSlugged = false, pretty = false): string => {
     const phoneUtil = PhoneNumberUtil.getInstance();
