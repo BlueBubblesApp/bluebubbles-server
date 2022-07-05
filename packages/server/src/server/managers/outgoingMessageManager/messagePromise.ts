@@ -148,6 +148,7 @@ export class MessagePromise {
         return this.text === onlyAlphaNumeric(message.text) && this.sentAt <= message.dateCreated.getTime();
     }
 }
+
 interface MessagePromiseConstructorParameters {
     chatGuid: string;
     text: string;
