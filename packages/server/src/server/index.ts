@@ -21,7 +21,7 @@ import {
     OutgoingMessageListener,
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
-import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { Message } from "@server/databases/imessage/entity/Message";
 import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
 
 // Service Imports
@@ -36,8 +36,7 @@ import {
     IPCService,
     UpdateService,
     CloudflareService,
-    WebhookService,
-    SwiftHelperService,
+    WebhookService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -57,6 +56,7 @@ import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
+import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
 
 const findProcess = require("find-process");
 
@@ -121,8 +121,6 @@ class BlueBubblesServer extends EventEmitter {
     proxyServices: Proxy[];
 
     webhookService: WebhookService;
-
-    swiftHelperService: SwiftHelperService;
 
     actionHandler: ActionHandler;
 
@@ -319,8 +317,6 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
-        this.swiftHelperService = new SwiftHelperService();
-
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             try {
@@ -379,12 +375,6 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
 
-        try {
-            this.swiftHelperService.start();
-        } catch (ex: any) {
-            this.log(`Failed to start SwiftHelper service! ${ex.message}`, "error");
-        }
-
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             this.log("Starting Private API Helper listener...");
@@ -430,12 +420,6 @@ class BlueBubblesServer extends EventEmitter {
             await this.httpService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
-        }
-
-        try {
-            this.swiftHelperService?.stop();
-        } catch (ex: any) {
-            this.log(`Failed to stop Swift Helper service! ${ex?.message ?? ex}`, "error");
         }
 
         this.log("Finished stopping services...");
@@ -889,7 +873,8 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Message match found for text, [${newMessage.contentString()}]`);
 
         // Convert to a response JSON
-        const resp = await getMessageResponse(newMessage);
+        // Since we sent the message, we don't need to include the participants
+        const resp = await MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false });
         resp.tempGuid = tempGuid;
 
         // We are emitting this as a new message, the only difference being the included tempGuid
@@ -903,7 +888,8 @@ class BlueBubblesServer extends EventEmitter {
          * ERROR CODES:
          * 4: Message Timeout
          */
-        const data = await getMessageResponse(message);
+        // Since this is a message send error, we don't need to include the participants
+        const data = await MessageSerializer.serialize({ message, loadChatParticipants: false });
         if (isNotEmpty(tempGuid)) {
             data.tempGuid = tempGuid;
         }
@@ -996,7 +982,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New Message from You, ${newMessage.contentString()}`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(newMessage));
+            await this.emitMessage("new-message", await MessageSerializer.serialize({ message: newMessage }));
         });
 
         /**
@@ -1018,7 +1004,11 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("updated-message", await getMessageResponse(newMessage));
+            // Since this is a message update, we do not need to include the participants
+            await this.emitMessage(
+                "updated-message",
+                MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false })
+            );
         });
 
         /**
@@ -1037,30 +1027,34 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(newMessage), "high");
+            await this.emitMessage("new-message", await MessageSerializer.serialize({ message: newMessage }), "high");
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
             this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
-            await this.emitMessage("group-name-change", await getMessageResponse(item));
+            // Group name changes don't require the participants to be loaded
+            await this.emitMessage(
+                "group-name-change",
+                await MessageSerializer.serialize({ message: item, loadChatParticipants: false })
+            );
         });
 
         groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-removed", await getMessageResponse(item));
+            await this.emitMessage("participant-removed", await MessageSerializer.serialize({ message: item }));
         });
 
         groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-added", await getMessageResponse(item));
+            await this.emitMessage("participant-added", await MessageSerializer.serialize({ message: item }));
         });
 
         groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-left", await getMessageResponse(item));
+            await this.emitMessage("participant-left", await MessageSerializer.serialize({ message: item }));
         });
 
         outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
