@@ -68,6 +68,11 @@ export class ChatRouter {
             .map(e => safeTrim(e));
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
+        const withAttributedBody =
+            withQuery.includes("message.attributedbody") ||
+            withQuery.includes("message.attributed-body") ||
+            withQuery.includes("messages.attributedbody") ||
+            withQuery.includes("messages.attributed-body");
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
         const chats = await Server().iMessageRepo.getChats({
@@ -93,7 +98,8 @@ export class ChatRouter {
         const messages = await Server().iMessageRepo.getMessages(opts);
         const results = await MessageSerializer.serializeList({
             messages,
-            loadChatParticipants: false
+            loadChatParticipants: false,
+            parseAttributedBody: withAttributedBody
         });
 
         return new Success(ctx, { data: results }).send();

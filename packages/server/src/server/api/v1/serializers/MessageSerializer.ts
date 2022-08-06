@@ -39,7 +39,10 @@ export class MessageSerializer {
         loadChatParticipants = true
     }: MessageSerializerParams): Promise<MessageResponse[]> {
         // Bulk serialize the attributed bodies
-        const attributedMessages: NodeJS.Dict<any> = await ObjCHelperService.bulkDeserializeAttributedBody(messages);
+        let attributedMessages: NodeJS.Dict<any> = [];
+        if (parseAttributedBody) {
+            attributedMessages = await ObjCHelperService.bulkDeserializeAttributedBody(messages);
+        }
 
         // Convert the messages to their serialized versions
         const messageResponses: MessageResponse[] = [];
@@ -55,9 +58,11 @@ export class MessageSerializer {
         }
 
         // Link the decoded attributed bodies to the original messages
-        for (const item of attributedMessages.data) {
-            const matchIndex = messageResponses.findIndex(m => m.guid === item.id);
-            messageResponses[matchIndex].attributedBody = item.body;
+        if (parseAttributedBody) {
+            for (const item of attributedMessages?.data ?? []) {
+                const matchIndex = messageResponses.findIndex(m => m.guid === item.id);
+                messageResponses[matchIndex].attributedBody = item.body;
+            }
         }
 
         // Handle fetching the chat participants with the messages (if requested)
@@ -126,7 +131,7 @@ export class MessageSerializer {
             originalROWID: message.ROWID,
             guid: message.guid,
             text: message.text,
-            attributedBody: message.attributedBody,
+            attributedBody: null, //message.attributedBody,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
