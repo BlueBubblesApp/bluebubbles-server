@@ -37,7 +37,7 @@ import {
     UpdateService,
     CloudflareService,
     WebhookService,
-    SwiftHelperService,
+    SwiftHelperService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -238,7 +238,10 @@ class BlueBubblesServer extends EventEmitter {
 
     setNotificationCount(count: number) {
         this.notificationCount = count;
-        app.setBadgeCount(this.notificationCount);
+
+        if (this.repo.getConfig("dock_badge")) {
+            app.setBadgeCount(this.notificationCount);
+        }
     }
 
     async initServer(): Promise<void> {
@@ -819,6 +822,15 @@ class BlueBubblesServer extends EventEmitter {
         // If the dock style changes
         if (prevConfig.hide_dock_icon !== nextConfig.hide_dock_icon) {
             this.setDockIcon();
+        }
+
+        // If the badge config changes
+        if (prevConfig.dock_badge !== nextConfig.dock_badge) {
+            if (nextConfig.dock_badge) {
+                app.setBadgeCount(this.notificationCount);
+            } else {
+                app.setBadgeCount(0);
+            }
         }
 
         // If auto-start changes
