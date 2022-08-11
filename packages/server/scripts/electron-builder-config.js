@@ -35,10 +35,11 @@ module.exports = {
         ],
         "target": [
             {
-                "target": "dmg"
-            },
-            {
-                "target": "zip"
+                "target": "default",
+                "arch": [
+                    'x64',
+                    // 'arm64'
+                ]
             }
         ],
         "type": "distribution",
