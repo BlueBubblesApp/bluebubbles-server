@@ -638,7 +638,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
-        this.log(`Server Metadata -> Time Synchronization: ${await this.getTimeSync()}`, "debug");
+        this.log(`Server Metadata -> Time Synchronization: ${((await this.getTimeSync()) ?? "").trim()}`, "debug");
         this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
 
         if (!this.region) {
