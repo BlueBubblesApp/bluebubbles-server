@@ -7,8 +7,7 @@ export class CloudflareService extends Proxy {
     constructor() {
         super({
             name: "Cloudflare",
-            refreshTimerMs: 86400000, // 24 hours
-            autoRefresh: true
+            autoRefresh: false
         });
     }
 
@@ -39,10 +38,9 @@ export class CloudflareService extends Proxy {
             }, 5000);
         });
 
-        // Change the update timer for when the update frequency changes
-        this.manager.on("new-frequency", async freq => {
-            // Subtract 5 minutes just to be safe that we restart it before the timeout period
-            this.opts.refreshTimerMs = freq - 1000 * 60 * 5;
+        // When we get a new URL, set the URL and update
+        this.manager.on("needs-restart", async _ => {
+            this.restart();
         });
 
         this.url = await this.manager.start();
