@@ -60,7 +60,7 @@ export const NgrokAuthTokenField = ({ helpText }: NgrokAuthTokenFieldProps): JSX
 
     return (
         <FormControl isInvalid={hasNgrokTokenError}>
-            <FormLabel htmlFor='ngrok_key'>Ngrok Auth Token (Optional)</FormLabel>
+            <FormLabel htmlFor='ngrok_key'>Ngrok Auth Token (Highly Recommended)</FormLabel>
             <Input
                 id='password'
                 type={showNgrokToken ? 'text' : 'password'}
@@ -90,8 +90,9 @@ export const NgrokAuthTokenField = ({ helpText }: NgrokAuthTokenFieldProps): JSX
                     {helpText ?? (
                         <Text>
                             Using an Auth Token will allow you to use the benefits of the upgraded Ngrok
-                            service. This can improve connection stability and reliability. If you do not have
-                            an Ngrok Account, sign up for free here:&nbsp;
+                            service. This can improve connection stability and reliability. <b>It is highly
+                            recommended that you setup an auth token, especially if you are having connection
+                            issues.</b> If you do not have an Ngrok Account, sign up for free here:&nbsp;
                             <Box as='span' color={baseTheme.colors.brand.primary}>
                                 <Link href='https://dashboard.ngrok.com/get-started/your-authtoken' target='_blank'>ngrok.com</Link>
                             </Box>
