@@ -105,3 +105,11 @@ export const syncInvokeIpc = async (event: string, data: any = null): Promise<an
         ipcRenderer.invoke(event, data).then(resolve).catch(reject);
     });
 };
+
+export const openFullDiskPrefs = async () => {
+    return await ipcRenderer.invoke('open-fulldisk-preferences');
+};
+
+export const openAccessibilityPrefs = async () => {
+    return await ipcRenderer.invoke('open-accessibility-preferences');
+};

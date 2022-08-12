@@ -19,9 +19,10 @@ import {
 import { BiRefresh } from 'react-icons/bi';
 import { useAppSelector } from '../hooks';
 import { AiOutlineInfoCircle } from 'react-icons/ai';
-import { checkPermissions } from '../utils/IpcUtils';
+import { checkPermissions, openAccessibilityPrefs, openFullDiskPrefs } from '../utils/IpcUtils';
 import { store } from '../store';
 import { setConfig } from '../slices/ConfigSlice';
+import { BsGear } from 'react-icons/bs';
 
 
 type RequirementsItem = {
@@ -39,6 +40,7 @@ const spin = keyframes`
 export const PermissionRequirements = (): JSX.Element => {
     const permissions: Array<RequirementsItem> = (useAppSelector(state => state.config.permissions) ?? []);
     const [showProgress, setShowProgress] = useBoolean();
+    const [showAccessibilityProgress, setShowAccessibilityProgress] = useBoolean();
 
     const refreshRequirements = () => {
         setShowProgress.on();
@@ -54,7 +56,7 @@ export const PermissionRequirements = (): JSX.Element => {
     };
 
     return (
-        <Box border='1px solid' borderColor={useColorModeValue('gray.200', 'gray.700')} borderRadius='xl' p={3} width='325px'>
+        <Box border='1px solid' borderColor={useColorModeValue('gray.200', 'gray.700')} borderRadius='xl' p={3} width='375px'>
             <Stack direction='row' align='center'>
                 <Text fontSize='lg' fontWeight='bold'>macOS Permissions</Text>
                 <Box
@@ -72,24 +74,44 @@ export const PermissionRequirements = (): JSX.Element => {
                             <Text fontSize='md'><strong>{e.name}</strong>:&nbsp;
                                 <Box as='span' color={e.pass ? 'green' : 'red'}>{e.pass ? 'Pass' : 'Fail'}</Box>
                             </Text>
-                            {(e.pass) ? (
-                                <Popover trigger='hover'>
-                                    <PopoverTrigger>
-                                        <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
-                                            <AiOutlineInfoCircle />
-                                        </Box>
-                                    </PopoverTrigger>
-                                    <PopoverContent>
-                                        <PopoverArrow />
-                                        <PopoverCloseButton />
-                                        <PopoverHeader>How to Fix</PopoverHeader>
-                                        <PopoverBody>
-                                            <Text>
-                                                {e.solution}
-                                            </Text>
-                                        </PopoverBody>
-                                    </PopoverContent>
-                                </Popover>
+                            {(!e.pass) ? (
+                                <>
+                                    <Popover trigger='hover'>
+                                        <PopoverTrigger>
+                                            <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
+                                                <AiOutlineInfoCircle />
+                                            </Box>
+                                        </PopoverTrigger>
+                                        <PopoverContent>
+                                            <PopoverArrow />
+                                            <PopoverCloseButton />
+                                            <PopoverHeader>How to Fix</PopoverHeader>
+                                            <PopoverBody>
+                                                <Text>
+                                                    {e.solution}
+                                                </Text>
+                                            </PopoverBody>
+                                        </PopoverContent>
+                                    </Popover>
+                                    <Box
+                                        _hover={{ cursor: 'pointer' }}
+                                        animation={showAccessibilityProgress ? `${spin} infinite 1s linear` : undefined}
+                                        onClick={() => {
+                                            setShowAccessibilityProgress.on();
+                                            setTimeout(() => {
+                                                setShowAccessibilityProgress.off();
+                                            }, 1000);
+
+                                            if (e.name === 'Accessibility') {
+                                                openAccessibilityPrefs();
+                                            } else if (e.name === 'Full Disk Access') {
+                                                openFullDiskPrefs();
+                                            }
+                                        }}
+                                    >
+                                        <BsGear />
+                                    </Box>
+                                </>
                             ): null}
                         </Stack>
                     </ListItem>
