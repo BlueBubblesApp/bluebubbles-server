@@ -176,6 +176,43 @@ export const FcmLayout = (): JSX.Element => {
                 </Flex>
             </Stack>
             <Stack direction='column' p={5}>
+                <Text fontSize='2xl'>Firebase Links</Text>
+                <Divider orientation='horizontal' />
+                <Spacer />
+                <Stack direction='row' mt={3}>
+                    <Button
+                        size='xs'
+                    >
+                        <Link
+                            href="https://console.firebase.google.com/u/0/project/_/database"
+                            target="_blank"
+                        >
+                            Enable Realtime Database
+                        </Link>
+                    </Button>
+                    <Button
+                        size='xs'
+                    >
+                        <Link
+                            href="https://console.firebase.google.com/u/0/project/_/settings/general"
+                            target="_blank"
+                        >
+                            Google Services Download
+                        </Link>
+                    </Button>
+                    <Button
+                        size='xs'
+                    >
+                        <Link
+                            href="https://console.firebase.google.com/u/0/project/_/settings/serviceaccounts/adminsdk"
+                            target="_blank"
+                        >
+                            Admin SDK Download
+                        </Link>
+                    </Button>
+                </Stack>
+            </Stack>
+            <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                     <Text fontSize='2xl'>Configuration</Text>
                     <Popover trigger='hover'>
