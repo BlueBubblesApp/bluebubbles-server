@@ -20,6 +20,8 @@ export const isMinMojave = macosVersion.isGreaterThanOrEqualTo("10.14");
 export const isMinHighSierra = macosVersion.isGreaterThanOrEqualTo("10.13");
 export const isMinSierra = macosVersion.isGreaterThanOrEqualTo("10.12");
 
+export const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
+
 export const isTruthyBool = (value: string) => {
     return ["1", true, "true", "True"].includes(value);
 };
