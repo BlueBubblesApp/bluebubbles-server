@@ -113,3 +113,7 @@ export const openFullDiskPrefs = async () => {
 export const openAccessibilityPrefs = async () => {
     return await ipcRenderer.invoke('open-accessibility-preferences');
 };
+
+export const getPrivateApiStatus = async () => {
+    return await ipcRenderer.invoke('get-private-api-status');
+};

@@ -81,6 +81,14 @@ export class IPCService {
             return await Server().checkPrivateApiRequirements();
         });
 
+        ipcMain.handle("get-private-api-status", async (_, __) => {
+            return {
+                enabled: Server().repo.getConfig("enable_private_api") as boolean,
+                connected: !!Server().privateApiHelper?.helper,
+                port: BlueBubblesHelperService.port
+            };
+        });
+
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {
             return await BlueBubblesHelperService.installBundle(true);
         });

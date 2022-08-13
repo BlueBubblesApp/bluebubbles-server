@@ -14,6 +14,7 @@ import { PrivateApiRequirements } from '../PrivateApiRequirements';
 import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../modals/ConfirmationDialog';
 import { reinstallHelperBundle } from '../../utils/IpcUtils';
+import { PrivateApiStatus } from '../PrivateApiStatus';
 
 export interface PrivateApiFieldProps {
     helpText?: string;
@@ -38,8 +39,10 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
 
     return (
         <Box mt={1}>
-            <PrivateApiRequirements />
-
+            <Stack direction='row'>
+                <PrivateApiRequirements />
+                <PrivateApiStatus />
+            </Stack>
             <FormControl mt={5}>
                 <Stack direction='row'>
                     <Checkbox

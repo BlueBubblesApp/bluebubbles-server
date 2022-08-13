@@ -18,6 +18,7 @@ import { TransactionManager } from "@server/managers/transactionManager";
 
 import * as net from "net";
 import { ValidRemoveTapback } from "../../types";
+import { MAX_PORT, MIN_PORT } from "./constants";
 
 type BundleStatus = {
     success: boolean;
@@ -33,12 +34,8 @@ export class BlueBubblesHelperService {
 
     transactionManager: TransactionManager;
 
-    minPort = 45670;
-
-    maxPort = 65535;
-
-    get port(): number {
-        return clamp(this.minPort + os.userInfo().uid - 501, this.minPort, this.maxPort);
+    static get port(): number {
+        return clamp(MIN_PORT + os.userInfo().uid - 501, MIN_PORT, MAX_PORT);
     }
 
     constructor() {
@@ -188,10 +185,9 @@ export class BlueBubblesHelperService {
         // we'll base this off the users uid (a unique id for each user, starting from 501)
         // we'll subtract 501 to get an id starting at 0, incremented for each user
         // then we add this to the base port to get a unique port for the socket
-        const port = this.port;
-        Server().log(`Starting Socket server on port ${port}`);
+        Server().log(`Starting Socket server on port ${BlueBubblesHelperService.port}`);
         // Listen and reset the restart counter
-        this.server.listen(port, "localhost", 511, () => {
+        this.server.listen(BlueBubblesHelperService.port, "localhost", 511, () => {
             this.restartCounter = 0;
         });
     }
