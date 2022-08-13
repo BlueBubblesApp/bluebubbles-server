@@ -15,7 +15,7 @@ interface LogsState {
 }
 
 const initialState: LogsState = {
-    max: 25,
+    max: 100,
     logs: [],
     debug: false
 };
