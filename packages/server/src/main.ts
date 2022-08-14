@@ -21,7 +21,7 @@ Server(win);
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
     console.error("BlueBubbles is already running! Quiting...");
-    app.quit();
+    app.exit(0);
 } else {
     app.on("second-instance", (_, __, ___) => {
         if (win) {
@@ -55,7 +55,7 @@ const handleExit = async (quit = false) => {
         await Server().stopServices();
     }
     
-    if (quit) app.quit();
+    if (quit) app.exit(0);
     isHandlingExit = false;
 };
 

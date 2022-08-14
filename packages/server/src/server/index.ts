@@ -300,7 +300,7 @@ class BlueBubblesServer extends EventEmitter {
                     this.relaunch();
                 } else if (returnValue.response === 1) {
                     FileSystem.executeAppleScript(openSystemPreferences());
-                    app.quit();
+                    app.exit(0);
                 }
             });
         }
