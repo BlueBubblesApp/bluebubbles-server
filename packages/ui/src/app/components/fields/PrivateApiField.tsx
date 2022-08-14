@@ -6,7 +6,8 @@ import {
     Text,
     Box,
     Stack,
-    Button
+    Button,
+    Link
 } from '@chakra-ui/react';
 import { useAppSelector } from '../../hooks';
 import { onCheckboxToggle } from '../../actions/ConfigActions';
@@ -58,12 +59,18 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
                     >
                         Re-install Helper
                     </Button>
+                    <Button size='xs'>
+                        <Link target="_blank" href="https://docs.bluebubbles.app/private-api/">
+                            Private API Setup Docs
+                        </Link>
+                    </Button>
                 </Stack>
                 <FormHelperText>
                     {helpText ?? (
                         <Text>
                             If you have set up the Private API features (via MacForge or MySIMBL),
-                            enable this option to allow the server to communicate with the iMessage Private API.
+                            enable this option to allow the server to communicate with the iMessage Private API. If you
+                            have not done the Private API setup, use the button above to read the documentation.
                         </Text>
                     )}
                 </FormHelperText>
