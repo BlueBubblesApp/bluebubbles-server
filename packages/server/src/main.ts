@@ -46,7 +46,9 @@ process.on("uncaughtException", error => {
     
 });
 
-const handleExit = async (quit = false) => {
+const handleExit = async (event: any = null) => {
+    if (event) event.preventDefault();
+    console.trace('handleExit');
     if (isHandlingExit) return;
     isHandlingExit = true;
 
@@ -55,8 +57,7 @@ const handleExit = async (quit = false) => {
         await Server().stopServices();
     }
     
-    if (quit) app.exit(0);
-    isHandlingExit = false;
+    app.exit(0);
 };
 
 const buildTray = () => {
@@ -114,7 +115,7 @@ const buildTray = () => {
             label: "Close",
             type: "normal",
             click: async () => {
-                await handleExit(true);
+                await handleExit();
             }
         }
     ]);
@@ -211,12 +212,9 @@ app.on("window-all-closed", () => {
 });
 
 /**
- * I'm not totally sure this will work because of the way electron is... but, I'm going to try.
  * Basically, we want to gracefully exist whenever there is a Ctrl + C or other exit command
  */
-app.on("before-quit", () => handleExit());
-app.on("will-quit", () => handleExit());
-process.on("SIGINT", () => handleExit());
+app.on("before-quit", (event) => handleExit(event));
 
 /**
  * All code below this point has to do with the command-line functionality.
