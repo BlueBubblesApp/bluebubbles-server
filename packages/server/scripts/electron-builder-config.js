@@ -50,7 +50,8 @@ module.exports = {
         "entitlementsInherit": "./scripts/entitlements.mac.plist",
         "extendInfo": {
             "NSContactsUsageDescription": "BlueBubbles needs access to your Contacts",
-            "NSAppleEventsUsageDescription": "BlueBubbles needs access to run AppleScripts"
+            "NSAppleEventsUsageDescription": "BlueBubbles needs access to run AppleScripts",
+            "NSSystemAdministrationUsageDescription": "BlueBubbles needs access to manage your system",
         },
         "gatekeeperAssess": false,
         "minimumSystemVersion": "10.11.6"
