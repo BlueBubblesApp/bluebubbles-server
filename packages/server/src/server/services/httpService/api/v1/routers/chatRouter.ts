@@ -4,13 +4,13 @@ import { Next } from "koa";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { isEmpty, isNotEmpty, isTruthyBool, safeTrim } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
 import { FileStream, Success } from "../responses/success";
 import { IMessageError, NotFound } from "../responses/errors";
+import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -52,7 +52,10 @@ export class ChatRouter {
 
         const res = await getChatResponse(chats[0]);
         if (withLastMessage) {
-            res.lastMessage = await getMessageResponse(await Server().iMessageRepo.getChatLastMessage(ctx.params.guid));
+            res.lastMessage = await MessageSerializer.serialize({
+                message: await Server().iMessageRepo.getChatLastMessage(ctx.params.guid),
+                loadChatParticipants: false
+            });
         }
 
         return new Success(ctx, { data: res }).send();
@@ -65,6 +68,11 @@ export class ChatRouter {
             .map(e => safeTrim(e));
         const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
         const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
+        const withAttributedBody =
+            withQuery.includes("message.attributedbody") ||
+            withQuery.includes("message.attributed-body") ||
+            withQuery.includes("messages.attributedbody") ||
+            withQuery.includes("messages.attributed-body");
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
         const chats = await Server().iMessageRepo.getChats({
@@ -88,10 +96,11 @@ export class ChatRouter {
 
         // Fetch the info for the message by GUID
         const messages = await Server().iMessageRepo.getMessages(opts);
-        const results = [];
-        for (const msg of messages ?? []) {
-            results.push(await getMessageResponse(msg));
-        }
+        const results = await MessageSerializer.serializeList({
+            messages,
+            loadChatParticipants: false,
+            parseAttributedBody: withAttributedBody
+        });
 
         return new Success(ctx, { data: results }).send();
     }

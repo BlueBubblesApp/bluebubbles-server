@@ -11,6 +11,7 @@ import { IPCService } from "./ipcService";
 import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
 import { SwiftHelperService } from "./swiftHelperService";
+import { ObjCHelperService } from "./objCHelperService";
 import { FindMyService } from "./findMyService";
 
 export {
@@ -27,5 +28,6 @@ export {
     CloudflareService,
     WebhookService,
     SwiftHelperService,
+    ObjCHelperService,
     FindMyService
 };

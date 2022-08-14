@@ -22,7 +22,7 @@ export type MessageResponse = {
     tempGuid?: string;
     guid: string;
     text: string;
-    attributedBody?: Record<string, any>;
+    attributedBody?: NodeJS.Dict<any>;
     handle?: HandleResponse | null;
     handleId: number;
     otherHandle: number;

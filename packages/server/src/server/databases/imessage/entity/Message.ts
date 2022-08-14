@@ -11,7 +11,6 @@ import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinSierra, sanitizeStr } from "@server/helpers/utils";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
-import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
 
 @Entity("message")
 export class Message {
@@ -105,10 +104,9 @@ export class Message {
 
     @Column({
         type: "blob",
-        nullable: true,
-        transformer: AttributedBodyTransformer
+        nullable: true
     })
-    attributedBody: Promise<Record<string, any>>;
+    attributedBody: Blob;
 
     @Column({ type: "integer", nullable: true, default: 0 })
     version: number;
@@ -509,85 +507,3 @@ export class Message {
     )
     threadOriginatorPart: string;
 }
-
-export const getMessageResponse = async (
-    tableData: Message,
-    {
-        convertAttachments = true,
-        loadAttachmentMetadata = true,
-        getAttachmentData = false
-    }: {
-        convertAttachments?: boolean;
-        loadAttachmentMetadata?: boolean;
-        getAttachmentData?: boolean;
-    } = {}
-): Promise<MessageResponse> => {
-    // Load attachments
-    const attachments = [];
-    for (const attachment of tableData?.attachments ?? []) {
-        const resData = await getAttachmentResponse(attachment, {
-            convert: convertAttachments,
-            getData: getAttachmentData,
-            loadMetadata: loadAttachmentMetadata
-        });
-        attachments.push(resData);
-    }
-
-    const chats = [];
-    for (const chat of tableData?.chats ?? []) {
-        const chatRes = await getChatResponse(chat);
-        chats.push(chatRes);
-    }
-
-    let attributedBody = null;
-    try {
-        attributedBody = await tableData.attributedBody;
-    } catch (ex: any) {
-        Server().log(`Failed to decode attributed body! Error: ${String(ex)}`, "debug");
-    }
-
-    return {
-        originalROWID: tableData.ROWID,
-        guid: tableData.guid,
-        text: tableData.text,
-        attributedBody: await tableData.attributedBody,
-        handle: tableData.handle ? await getHandleResponse(tableData.handle) : null,
-        handleId: tableData.handleId,
-        otherHandle: tableData.otherHandle,
-        chats,
-        attachments,
-        subject: tableData.subject,
-        country: tableData.country,
-        error: tableData.error,
-        dateCreated: tableData.dateCreated ? tableData.dateCreated.getTime() : null,
-        dateRead: tableData.dateRead ? tableData.dateRead.getTime() : null,
-        dateDelivered: tableData.dateDelivered ? tableData.dateDelivered.getTime() : null,
-        isFromMe: tableData.isFromMe,
-        isDelayed: tableData.isDelayed,
-        isAutoReply: tableData.isAutoReply,
-        isSystemMessage: tableData.isSystemMessage,
-        isServiceMessage: tableData.isServiceMessage,
-        isForward: tableData.isForward,
-        isArchived: tableData.isArchived,
-        cacheRoomnames: tableData.cacheRoomnames,
-        isAudioMessage: tableData.isAudioMessage,
-        hasDdResults: tableData.hasDdResults,
-        datePlayed: tableData.datePlayed ? tableData.datePlayed.getTime() : null,
-        itemType: tableData.itemType,
-        groupTitle: tableData.groupTitle,
-        groupActionType: tableData.groupActionType,
-        isExpired: tableData.isExpirable,
-        balloonBundleId: tableData.balloonBundleId,
-        associatedMessageGuid: tableData.associatedMessageGuid,
-        associatedMessageType: tableData.associatedMessageType,
-        expressiveSendStyleId: tableData.expressiveSendStyleId,
-        timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
-            ? tableData.timeExpressiveSendStyleId.getTime()
-            : null,
-        replyToGuid: tableData.replyToGuid,
-        isCorrupt: tableData.isCorrupt,
-        isSpam: tableData.isSpam,
-        threadOriginatorGuid: tableData.threadOriginatorGuid,
-        threadOriginatorPart: tableData.threadOriginatorPart
-    };
-};
