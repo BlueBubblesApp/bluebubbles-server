@@ -62,7 +62,6 @@
         "electron": "19.0.10",
         "electron-builder": "^23.3.3",
         "electron-notarize": "^1.0.0",
-        "electron-rebuild": "^3.2.7",
         "eslint": "^8.13.0",
         "eslint-config-prettier": "^8.5.0",
         "eslint-plugin-import": "^2.26.0",
