@@ -53,12 +53,11 @@ export class ChatValidator {
     }
 
     static toggleParticipantRules = {
-        address: "required|string",
-        message: "string"
+        address: "required|string"
     };
 
     static async validateToggleParticipant(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx?.request?.body, ChatValidator.createRules);
+        ValidateInput(ctx?.request?.body, ChatValidator.toggleParticipantRules);
         await next();
     }
 }

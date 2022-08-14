@@ -8,6 +8,7 @@ import path from "path";
 import os from "os";
 import { EventEmitter } from "events";
 import macosVersion from "macos-version";
+import { getAuthStatus } from "node-mac-permissions";
 
 // Configuration/Filesytem Imports
 import { FileSystem } from "@server/fileSystem";
@@ -128,10 +129,6 @@ class BlueBubblesServer extends EventEmitter {
 
     eventCache: EventCache;
 
-    hasDiskAccess: boolean;
-
-    hasAccessibilityAccess: boolean;
-
     hasSetup: boolean;
 
     hasStarted: boolean;
@@ -145,6 +142,15 @@ class BlueBubblesServer extends EventEmitter {
     lastConnection: number;
 
     region: string | null;
+
+    get hasDiskAccess(): boolean {
+        const status = getAuthStatus("full-disk-access");
+        return status === "authorized";
+    }
+
+    get hasAccessibilityAccess(): boolean {
+        return systemPreferences.isTrustedAccessibilityClient(false) === true;
+    }
 
     /**
      * Constructor to just initialize everything to null pretty much
@@ -178,8 +184,6 @@ class BlueBubblesServer extends EventEmitter {
         this.messageManager = null;
         this.webhookService = null;
 
-        this.hasDiskAccess = true;
-        this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
         this.notificationCount = 0;
@@ -236,7 +240,10 @@ class BlueBubblesServer extends EventEmitter {
 
     setNotificationCount(count: number) {
         this.notificationCount = count;
-        app.setBadgeCount(this.notificationCount);
+
+        if (this.repo.getConfig("dock_badge")) {
+            app.setBadgeCount(this.notificationCount);
+        }
     }
 
     async initServer(): Promise<void> {
@@ -619,7 +626,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
-        this.log(`Server Metadata -> Time Synchronization: ${await this.getTimeSync()}`, "debug");
+        this.log(`Server Metadata -> Time Synchronization: ${((await this.getTimeSync()) ?? "").trim()}`, "debug");
         this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
 
         if (!this.region) {
@@ -644,8 +651,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Checking Permissions...");
 
         // Log if we dont have accessibility access
-        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
-            this.hasAccessibilityAccess = true;
+        if (this.hasAccessibilityAccess) {
             this.log("Accessibility permissions are enabled");
         } else {
             this.log("Accessibility permissions are required for certain actions!", "debug");
@@ -653,7 +659,6 @@ class BlueBubblesServer extends EventEmitter {
 
         // Log if we dont have accessibility access
         if (this.iMessageRepo?.db) {
-            this.hasDiskAccess = true;
             this.log("Full-disk access permissions are enabled");
         } else {
             this.log("Full-disk access permissions are required!", "error");
@@ -803,6 +808,15 @@ class BlueBubblesServer extends EventEmitter {
         // If the dock style changes
         if (prevConfig.hide_dock_icon !== nextConfig.hide_dock_icon) {
             this.setDockIcon();
+        }
+
+        // If the badge config changes
+        if (prevConfig.dock_badge !== nextConfig.dock_badge) {
+            if (nextConfig.dock_badge) {
+                app.setBadgeCount(this.notificationCount);
+            } else {
+                app.setBadgeCount(0);
+            }
         }
 
         // If auto-start changes

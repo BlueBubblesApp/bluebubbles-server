@@ -33,8 +33,11 @@ export const PermissionsWalkthrough = (): JSX.Element => {
                 </Text>
                 <Box my={3} />
                 <PermissionRequirements />
-                <Text fontSize='lg' my={5}>Quick Guide</Text>
-                <Text fontSize='md' mt={5}>Open System Preferences, then the following:</Text>
+                <Text fontSize='lg' my={5}><b>Quick Guide</b></Text>
+                <Text fontSize='md' mt={5}>
+                    Use the gear icon next to a permission failure above to open System Preferences,
+                    then add/enable BlueBubbles:
+                </Text>
                 <Image src={SystemPreferencesImage} borderRadius='lg' my={2} />
                 <Image src={FullDiskImage} borderRadius='lg' my={2} />
                 

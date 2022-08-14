@@ -217,7 +217,7 @@ export class ChatRouter {
         await ChatRouter.toggleParticipant(ctx, next, "remove");
     }
 
-    static async toggleParticipant(ctx: RouterContext, _: Next, action: "add" | "remove"): Promise<void> {
+    private static async toggleParticipant(ctx: RouterContext, _: Next, action: "add" | "remove"): Promise<void> {
         const { body } = ctx.request;
         const { guid } = ctx.params;
         const address = body?.address;

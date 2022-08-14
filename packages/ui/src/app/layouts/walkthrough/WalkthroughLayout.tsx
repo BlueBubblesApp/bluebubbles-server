@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Box,
     Divider,
@@ -17,7 +17,8 @@ import {
     SliderMark,
     Text,
     Button,
-    Flex
+    Flex,
+    useBoolean
 } from '@chakra-ui/react';
 import { IntroWalkthrough } from './intro/IntroWalkthrough';
 import { ConnectionWalkthrough } from './connection/ConnectionWalkthrough';
@@ -28,6 +29,7 @@ import { NotificationsWalkthrough } from './notifications/NotificationsWalkthrou
 import { useAppSelector } from '../../hooks';
 import { toggleTutorialCompleted } from '../../actions/GeneralActions';
 import { useBackground } from '../../hooks/UseBackground';
+import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 
 type StepItem = {
     component: React.FunctionComponent<any>,
@@ -35,9 +37,12 @@ type StepItem = {
 };
 
 export const WalkthroughLayout = ({...rest}): JSX.Element => {
+    const alertRef = useRef(null);
+    const [openNgrokAlert, setOpenNgrokAlert] = useBoolean(false);
     const [step, setStep] = useState(0);
     const [completedSteps, setCompletedSteps] = useState([] as Array<number>);
     const proxyService: string = useAppSelector(state => state.config.proxy_service ?? '');
+    const ngrokToken: string = useAppSelector(state => state.config.ngrok_key ?? '');
     const password: string = useAppSelector(state => state.config.password ?? '');
     const bgColor = useBackground();
     
@@ -87,6 +92,8 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
             onClick={() => {
                 if (step === steps.length - 1) {
                     toggleTutorialCompleted(true);
+                } else if (step === 3 && proxyService === 'ngrok' && ngrokToken.length === 0) {
+                    setOpenNgrokAlert.on();
                 } else {
                     setStep(step + 1);
                 }
@@ -158,6 +165,19 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
                     ) : nextButton}
                 </Flex>
             </Box>
+
+            <ConfirmationDialog
+                modalRef={alertRef}
+                title='Configure an Ngrok Auth Token'
+                body='Are you sure you do not want to configure an Ngrok Auth Token? Not doing so may cause connection issues!'
+                declineText="No, I'll configure it"
+                acceptText="Yes, I'm sure"
+                onAccept={() => {
+                    setStep(step + 1);
+                }}
+                isOpen={openNgrokAlert}
+                onClose={() => { setOpenNgrokAlert.off(); }}
+            />
         </Box>
     );
 };

@@ -11,11 +11,11 @@ export class CloudflareManager extends EventEmitter {
     // Use a default (empty) config file so we don't interfere with the default CF install (if any)
     cfgPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflared-config.yml");
 
+    pidPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare.pid");
+
     proc: ProcessPromise<ProcessOutput>;
 
     currentProxyUrl: string;
-
-    updateFrequencyMs = 86400000; // Default update frequency (24 hrs)
 
     private proxyUrlRegex = /INF \|\s{1,}(https:\/\/[^\s]+)\s{1,}\|/m;
 
@@ -34,7 +34,8 @@ export class CloudflareManager extends EventEmitter {
     private async connectHandler(): Promise<string> {
         return new Promise((resolve, reject) => {
             const port = Server().repo.getConfig("socket_port") as string;
-            this.proc = $`${this.daemonPath} tunnel --url localhost:${port} --config ${this.cfgPath}`;
+            // eslint-disable-next-line max-len
+            this.proc = $`${this.daemonPath} tunnel --url localhost:${port} --config ${this.cfgPath} --pidfile ${this.pidPath}`;
 
             // If there is an error with the command, throw the error
             this.proc.catch(reason => {
@@ -69,25 +70,43 @@ export class CloudflareManager extends EventEmitter {
         this.emit("new-url", this.currentProxyUrl);
     }
 
-    setUpdateFrequency(value: string) {
-        if (isEmpty(value)) return;
-
-        try {
-            this.updateFrequencyMs = Number.parseInt(value.trim(), 10);
-            this.emit("new-frequency", this.updateFrequencyMs);
-        } catch (ex) {
-            // Don't do anything (probably a parsing issue)
+    async handleData(chunk: any) {
+        const data: string = chunk.toString();
+        if (data.includes("connect: bad file descriptor")) {
+            Server().log("Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date", "debug");
+            return;
         }
+
+        this.detectNewUrl(data);
+        this.detectMaxConnectionRetries(data);
     }
 
-    handleData(chunk: any) {
-        const data: string = chunk.toString();
+    private detectNewUrl(data: string) {
         const urlMatches = data.match(this.proxyUrlRegex);
         if (isNotEmpty(urlMatches)) this.setProxyUrl(urlMatches[1]);
-        if (data.startsWith("Autoupdate frequency is set autoupdateFreq=")) {
-            this.setUpdateFrequency(data.split("=")[1]);
-        } else if (data.includes("connect: bad file descriptor")) {
-            Server().log("Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date", "warn");
+    }
+
+    private detectMaxConnectionRetries(data: string) {
+        if (data.includes("Retrying connection in up to ")) {
+            try {
+                const splitData = data.split("Retrying connection in up to ")[1];
+                const secSplit = splitData.split(" ")[0].replace("s", "").trim();
+
+                // Cloudflare will retry every 1, 2, 4, 8, and 16 seconds (when retry count if 5, by default)
+                const retrySec = Number.parseInt(secSplit, 10);
+                if (!isNaN(retrySec)) {
+                    Server().log(`Detected Cloudflare retry in ${retrySec} seconds...`, "debug");
+                    if (retrySec >= 16) {
+                        Server().log(
+                            "Cloudflare reached its max connection retries. Restarting proxy service...",
+                            "debug"
+                        );
+                        this.emit("needs-restart", true);
+                    }
+                }
+            } catch (ex) {
+                // Don't do anything
+            }
         }
     }
 
