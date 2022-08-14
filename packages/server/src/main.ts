@@ -12,6 +12,7 @@ app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', '
 
 let win: BrowserWindow;
 let tray: Tray;
+let isHandlingExit = false;
 
 // Instantiate the server
 Server(win);
@@ -45,10 +46,17 @@ process.on("uncaughtException", error => {
     
 });
 
-const handleExit = async () => {
-    if (!Server() || Server().isStopping) return;
-    await Server().stopServices();
-    app.quit();
+const handleExit = async (quit = false) => {
+    if (isHandlingExit) return;
+    isHandlingExit = true;
+
+    // Safely close the services
+    if (Server() && !Server().isStopping) {
+        await Server().stopServices();
+    }
+    
+    if (quit) app.quit();
+    isHandlingExit = false;
 };
 
 const buildTray = () => {
@@ -106,7 +114,7 @@ const buildTray = () => {
             label: "Close",
             type: "normal",
             click: async () => {
-                await handleExit();
+                await handleExit(true);
             }
         }
     ]);
