@@ -79,6 +79,7 @@
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
+        "@firebase/app-types": "^0.7.0",
         "@firebase/util": "^1.6.3",
         "@peculiar/x509": "^1.6.1",
         "axios": "^0.25.0",
