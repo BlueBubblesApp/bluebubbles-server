@@ -7,4 +7,3 @@ release/
 .DS_Store
 **/*.log
 .env
-appResources/swiftHelper
