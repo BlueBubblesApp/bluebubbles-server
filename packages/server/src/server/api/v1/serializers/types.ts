@@ -11,6 +11,8 @@ export interface MessageSerializerSingleParams {
     attachmentConfig?: AttachmentConfigParams;
     parseAttributedBody?: boolean;
     loadChatParticipants?: boolean;
+    enforceMaxSize?: boolean;
+    maxSizeBytes?: number;
 }
 
 export interface MessageSerializerParams {
@@ -18,4 +20,6 @@ export interface MessageSerializerParams {
     attachmentConfig?: AttachmentConfigParams;
     parseAttributedBody?: boolean;
     loadChatParticipants?: boolean;
+    enforceMaxSize?: boolean;
+    maxSizeBytes?: number;
 }

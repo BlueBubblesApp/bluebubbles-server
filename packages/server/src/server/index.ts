@@ -996,7 +996,10 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New Message from You, ${newMessage.contentString()}`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await MessageSerializer.serialize({ message: newMessage }));
+            await this.emitMessage("new-message", await MessageSerializer.serialize({
+                message: newMessage,
+                enforceMaxSize: true
+            }));
         });
 
         /**
@@ -1041,7 +1044,10 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await MessageSerializer.serialize({ message: newMessage }), "high");
+            await this.emitMessage("new-message", await MessageSerializer.serialize({
+                message: newMessage,
+                enforceMaxSize: true
+            }), "high");
         });
 
         groupEventListener.on("name-change", async (item: Message) => {

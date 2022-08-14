@@ -16,14 +16,20 @@ export class MessageSerializer {
             loadMetadata: true
         },
         parseAttributedBody = true,
-        loadChatParticipants = true
+        loadChatParticipants = true,
+        enforceMaxSize = false,
+        // Max payload size is 4000 bytes
+        // https://firebase.google.com/docs/cloud-messaging/concept-options#notifications_and_data_messages
+        maxSizeBytes = 4000
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
         return (
             await MessageSerializer.serializeList({
                 messages: [message],
                 attachmentConfig,
                 parseAttributedBody,
-                loadChatParticipants
+                loadChatParticipants,
+                enforceMaxSize,
+                maxSizeBytes
             })
         )[0];
     }
@@ -36,7 +42,9 @@ export class MessageSerializer {
             loadMetadata: true
         },
         parseAttributedBody = true,
-        loadChatParticipants = true
+        loadChatParticipants = true,
+        enforceMaxSize = false,
+        maxSizeBytes = 4000
     }: MessageSerializerParams): Promise<MessageResponse[]> {
         // Bulk serialize the attributed bodies
         let attributedMessages: NodeJS.Dict<any> = [];
@@ -94,6 +102,21 @@ export class MessageSerializer {
                         }
                     } else {
                         messageResponses[i].chats[k].participants = chatCache[messages[i].chats[k].guid];
+                    }
+                }
+            }
+        }
+
+        if (enforceMaxSize) {
+            const strData = JSON.stringify(messageResponses);
+            const len = Buffer.byteLength(strData, "utf8");
+
+            // If we've reached out max size, we need to clear the participants
+            if (len > maxSizeBytes) {
+                for (let i = 0; i < messageResponses.length; i++) {
+                    for (let c = 0; c < (messageResponses[i]?.chats ?? []).length; c++) {
+                        if (isEmpty(messageResponses[i].chats[c].participants)) continue;
+                        messageResponses[i].chats[c].participants = [];
                     }
                 }
             }
