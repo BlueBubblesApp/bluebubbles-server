@@ -2,9 +2,10 @@ import { Server } from "@server";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, sanitizeStr } from "@server/helpers/utils";
 import { ObjCHelperService } from "@server/services";
 import { HandleResponse, MessageResponse } from "@server/types";
+import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 import type { MessageSerializerParams, MessageSerializerSingleParams } from "./types";
 
 export class MessageSerializer {
@@ -119,6 +120,16 @@ export class MessageSerializer {
                         messageResponses[i].chats[c].participants = [];
                     }
                 }
+            }
+        }
+
+        // For Ventura, we need to check for the text message within the attributed body, so we can use it as the text.
+        // It will be null/empty on Ventura.
+        for (let i = 0; i < messageResponses.length; i++) {
+            const msgText = sanitizeStr(messageResponses[i].text ?? '');
+            const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
+            if (isEmpty(msgText) && isNotEmpty(bodyText)) {
+                messageResponses[i].text = sanitizeStr(bodyText);
             }
         }
 
