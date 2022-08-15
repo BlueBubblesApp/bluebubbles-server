@@ -38,13 +38,9 @@ export class AttachmentRouter {
         let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
 
-        Server().log(
-            `Handling attachment download for GUID: ${attachment.guid} (Original: ${attachment.originalGuid ?? "N/A"})`,
-            "debug"
-        );
-        Server().log(`Detected MIME Type: ${mimeType}`, "debug");
-
-        Server().log(`Handling attachment with MIME Type: ${attachment?.mimeType}`);
+        const g = attachment.guid;
+        const og = attachment.originalGuid ?? 'N/A';
+        Server().log(`Attachment download request (MIME: ${mimeType}; GUID: ${g}; Original GUID: ${og})`, "debug");
 
         // If we want to resize the image, do so here
         if (!useOriginal) {

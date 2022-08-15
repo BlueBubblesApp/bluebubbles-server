@@ -14,7 +14,7 @@ export class HandleValidator {
 
     static queryBodyRules = {
         address: "string",
-        with: "array|in:chat,chats,chat.participants,chats.participants",
+        with: "array",
         offset: "numeric|min:0",
         limit: "numeric|min:1|max:1000"
     };

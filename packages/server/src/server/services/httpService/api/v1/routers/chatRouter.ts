@@ -5,19 +5,22 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { DBMessageParams } from "@server/databases/imessage/types";
-import { isEmpty, isNotEmpty, isTruthyBool, safeTrim } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, isTruthyBool } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
+import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { arrayHasOne } from "@server/utils/CollectionUtils";
 
 import { FileStream, Success } from "../responses/success";
 import { IMessageError, NotFound } from "../responses/errors";
-import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { parseWithQuery } from "../utils";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
         const { includeArchived } = ctx?.request.query ?? {};
 
         // We want to include the archived by default
-        const withArchived = includeArchived ? isTruthyBool(includeArchived as string) : true;
+        // Using != instead of !== because we want to treat null and undefined as equal
+        const withArchived = (includeArchived != null) ? isTruthyBool(includeArchived as string) : true;
 
         // Get all the chats so we can parse through them for the breakdown
         const chats = await Server().iMessageRepo.getChats({ withArchived });
@@ -35,10 +38,7 @@ export class ChatRouter {
     }
 
     static async find(ctx: RouterContext, _: Next) {
-        const withQuery = ((ctx?.request.query.with ?? "") as string)
-            .toLowerCase()
-            .split(",")
-            .map(e => safeTrim(e));
+        const withQuery = parseWithQuery(ctx?.request?.query?.with);
         const withParticipants = withQuery.includes("participants");
         const withLastMessage = withQuery.includes("lastmessage");
 
@@ -62,17 +62,13 @@ export class ChatRouter {
     }
 
     static async getMessages(ctx: RouterContext, _: Next) {
-        const withQuery = ((ctx.request.query.with ?? "") as string)
-            .toLowerCase()
-            .split(",")
-            .map(e => safeTrim(e));
-        const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
-        const withHandle = withQuery.includes("handle") || withQuery.includes("handles");
-        const withAttributedBody =
-            withQuery.includes("message.attributedbody") ||
-            withQuery.includes("message.attributed-body") ||
-            withQuery.includes("messages.attributedbody") ||
-            withQuery.includes("messages.attributed-body");
+        const withQuery = parseWithQuery(ctx?.request?.query?.with);
+        const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
+        const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
+        const withAttributedBody = arrayHasOne(withQuery, [
+            "message.attributedbody", "message.attributed-body",
+            "messages.attributedody", "messages.attributed-body"
+        ]);
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
         const chats = await Server().iMessageRepo.getChats({
@@ -109,10 +105,9 @@ export class ChatRouter {
         const { body } = ctx.request;
 
         // Pull out the filters
-        const withQuery = (body?.with ?? [])
-            .filter((e: any) => typeof e === "string")
-            .map((e: string) => safeTrim(e.toLowerCase()));
-        const withLastMessage = withQuery.includes("lastmessage");
+        const withQuery = parseWithQuery(body?.with);
+            
+        const withLastMessage = arrayHasOne(withQuery, ["lastmessage", "last-message"]);
         const guid = body?.guid;
         const { sort, offset, limit } = body;
 

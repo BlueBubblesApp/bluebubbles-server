@@ -4,13 +4,16 @@ import { Next } from "koa";
 import type { File } from "formidable";
 
 import { Server } from "@server";
-import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
+import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { arrayHasOne } from "@server/utils/CollectionUtils";
 import { Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
-import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { parseWithQuery } from "../utils";
+
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
@@ -42,13 +45,10 @@ export class MessageRouter {
 
     static async find(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
-        const withQuery = ((ctx.request.query.with ?? "") as string)
-            .toLowerCase()
-            .split(",")
-            .map(e => safeTrim(e));
-        const withChats = withQuery.includes("chats") || withQuery.includes("chat");
-        const withParticipants = withQuery.includes("chats.participants") || withQuery.includes("chat.participants");
-        const withAttachments = withQuery.includes("attachments") || withQuery.includes("attachment");
+        const withQuery = parseWithQuery(ctx.request.query.with);
+        const withChats = arrayHasOne(withQuery, ["chats", "chat"]);
+        const withParticipants = arrayHasOne(withQuery, ["chats.participants", "chat.participants"]);
+        const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
 
         // Fetch the info for the message by GUID
         const message = await Server().iMessageRepo.getMessage(guid, withChats, withAttachments);
@@ -86,17 +86,13 @@ export class MessageRouter {
         } = ctx?.request?.body ?? {};
 
         // Pull out the filters
-        withQuery = (withQuery ?? [])
-            .filter((e: any) => typeof e === "string")
-            .map((e: string) => safeTrim(e.toLowerCase()));
-        const withChats = withQuery.includes("chat") || withQuery.includes("chats");
-        const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
-        const withAttachmentMetadata =
-            withQuery.includes("attachment.metadata") || withQuery.includes("attachments.metadata");
-        const withHandle = withQuery.includes("handle");
-        const withChatParticipants =
-            withQuery.includes("chat.participants") || withQuery.includes("chats.participants");
-        const withAttributedBody = withQuery.includes("attributedbody") || withQuery.includes("attributed-body");
+        withQuery = parseWithQuery(withQuery);
+        const withChats = arrayHasOne(withQuery, ["chat", "chats"]);
+        const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
+        const withAttachmentMetadata = arrayHasOne(withQuery, ["attachment.metadata", "attachments.metadata"]);
+        const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
+        const withChatParticipants = arrayHasOne(withQuery, ["chat.participants", "chats.participants"]);
+        const withAttributedBody = arrayHasOne(withQuery, ["attributedbody", "attributed-body"]);
 
         // We don't need to worry about it not being a number because
         // the validator checks for that. It also checks for min values.
