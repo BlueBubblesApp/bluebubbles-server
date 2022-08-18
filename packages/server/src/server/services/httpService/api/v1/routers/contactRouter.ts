@@ -26,7 +26,7 @@ export class ContactRouter {
     static async query(ctx: RouterContext, _: Next) {
         const { body } = ctx.request;
         const addresses = body?.addresses ?? [];
-        const extraProps = body?.extraProperties ?? [];
+        const extraProps = parseWithQuery(body?.extraProperties ?? []);
 
         let res = [];
         if (isEmpty(addresses) || !Array.isArray(addresses)) {

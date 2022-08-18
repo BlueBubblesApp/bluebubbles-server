@@ -176,9 +176,10 @@ export class ContactInterface {
      * @returns A list of contact entries from both the API and local DB
      */
     static async getAllContacts(extraProperties: string[] = []): Promise<any[]> {
+        extraProperties = extraProperties.map(e => e.toLowerCase());
         const withAvatars =
-            extraProperties.includes("contactImage") ||
-            extraProperties.includes("contactThumbnailImage") ||
+            extraProperties.includes("contactimage") ||
+            extraProperties.includes("contactthumbnailimage") ||
             extraProperties.includes("avatar");
         const apiContacts = ContactInterface.getApiContacts(extraProperties);
         const dbContacts = await ContactInterface.getDbContacts(withAvatars);
