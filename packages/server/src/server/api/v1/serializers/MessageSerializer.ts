@@ -69,8 +69,11 @@ export class MessageSerializer {
         // Link the decoded attributed bodies to the original messages
         if (parseAttributedBody) {
             for (const item of attributedMessages?.data ?? []) {
+                if (isEmpty(item?.id) || isEmpty(item?.body)) continue;
                 const matchIndex = messageResponses.findIndex(m => m.guid === item.id);
-                messageResponses[matchIndex].attributedBody = item.body;
+
+                // Make sure the response is a list so we can support multiple attribute bodies later
+                messageResponses[matchIndex].attributedBody = !Array.isArray(item.body) ? [item.body] : item.body;
             }
         }
 
