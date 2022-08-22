@@ -246,12 +246,11 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
     const scriptCopy = `tell application "System Events" to set theFile to POSIX file "${attachmentPath}"`;
     const scriptClip = `set the clipboard to theFile`;
 
-    // Caffeinate is so we don't let the computer sleep while this is running
     // The CMD + A & Delete will clear any existing text or attachments
-    return `try
-            do shell script "caffeinate -u -t 2"
-            delay 1
-        end try
+    return `if (running of screen saver preferences) then
+            stop current screen saver
+            delay 2
+        end if
         
         ${scriptCopy ?? ''}
         tell application "System Events" to tell application process "Messages"
