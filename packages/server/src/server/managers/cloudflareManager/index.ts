@@ -17,6 +17,8 @@ export class CloudflareManager extends EventEmitter {
 
     currentProxyUrl: string;
 
+    isRestarting = false;
+
     private proxyUrlRegex = /INF \|\s{1,}(https:\/\/[^\s]+)\s{1,}\|/m;
 
     async start(): Promise<string> {
@@ -49,7 +51,14 @@ export class CloudflareManager extends EventEmitter {
             this.proc.stderr.on("error", chunk => this.handleError(chunk));
 
             this.on("new-url", url => resolve(url));
-            this.on("error", err => reject(err));
+            this.on("error", err => {
+                // Ignore certain errors
+                if (typeof err === "string") {
+                    if (err.includes('Thank you for trying Cloudflare Tunnel.')) return;
+                }
+
+                reject(err)
+            });
 
             setTimeout(() => {
                 reject(new Error("Failed to connect to Cloudflare after 30 seconds..."));
@@ -87,16 +96,20 @@ export class CloudflareManager extends EventEmitter {
     }
 
     private detectMaxConnectionRetries(data: string) {
+        if (this.isRestarting) return;
         if (data.includes("Retrying connection in up to ")) {
             try {
                 const splitData = data.split("Retrying connection in up to ")[1];
                 const secSplit = splitData.split(" ")[0].replace("s", "").trim();
 
-                // Cloudflare will retry every 1, 2, 4, 8, and 16 seconds (when retry count if 5, by default)
+                // Cloudflare will retry every 1, 2, 4, 8, and 16 seconds (when retry count is 5, by default)
+                // The retry count is set to 6, so it goes: 1, 2, 4, 8, 16, 32
                 const retrySec = Number.parseInt(secSplit, 10);
                 if (!isNaN(retrySec)) {
                     Server().log(`Detected Cloudflare retry in ${retrySec} seconds...`, "debug");
-                    if (retrySec >= 16) {
+                    if (retrySec >= 32) {
+                        this.isRestarting = true;
+
                         Server().log(
                             "Cloudflare reached its max connection retries. Restarting proxy service...",
                             "debug"

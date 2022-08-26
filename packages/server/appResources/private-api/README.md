@@ -4,6 +4,6 @@ The `macosXbundle.md5` files within this directory contain a single string that 
 
 `find -s /path/to/private/api/folder/BlueBubblesHelper.bundle -type f -exec md5 {} \; | md5`
 
-**GitHub Release Reference**: https://github.com/BlueBubblesApp/BlueBubbles-Server-Helper/releases/tag/0.0.4
+**GitHub Release Reference**: https://github.com/BlueBubblesApp/BlueBubbles-Server-Helper/releases/tag/0.0.6
 
 You can also check the current versions of these bundles by opening the `version.txt` file.

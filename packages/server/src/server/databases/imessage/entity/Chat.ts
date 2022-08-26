@@ -88,27 +88,12 @@ export class Chat {
 }
 
 export const getChatResponse = async (tableData: Chat): Promise<ChatResponse> => {
-    const messages = [];
-    for (const msg of tableData?.messages ?? []) {
-        if (!msg) continue;
-
-        // Since the chat will be the top level object, we don't need to load the participants
-        const msgRes = await MessageSerializer.serialize({ message: msg, loadChatParticipants: false });
-        messages.push(msgRes);
-    }
-
-    const participants = [];
-    for (const handle of tableData?.participants ?? []) {
-        if (!handle) continue;
-        const handleRes = await getHandleResponse(handle);
-        participants.push(handleRes);
-    }
-
     return {
         originalROWID: tableData.ROWID,
         guid: tableData.guid,
-        participants,
-        messages,
+        participants: await Promise.all((tableData?.participants ?? []).map(handle => getHandleResponse(handle))),
+        messages: await Promise.all((tableData?.messages ?? []).map(
+            msg => MessageSerializer.serialize({ message: msg, loadChatParticipants: false }))),
         style: tableData.style,
         chatIdentifier: tableData.chatIdentifier,
         isArchived: tableData.isArchived,
