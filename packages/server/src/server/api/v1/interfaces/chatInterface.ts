@@ -220,6 +220,7 @@ export class ChatInterface {
             throw new Error("Chat is not a group chat!");
         }
 
+        Server().log(`Toggling Participant [Action: ${action}]: ${address}...`, "debug");
         await Server().privateApiHelper.toggleParticipant(theChat.guid, address, action);
 
         let tryCount = 0;
