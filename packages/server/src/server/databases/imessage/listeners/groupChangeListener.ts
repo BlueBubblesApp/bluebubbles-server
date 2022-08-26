@@ -23,6 +23,7 @@ export class GroupChangeListener extends ChangeListener {
             after: offsetDate,
             before,
             withChats: true,
+            withHandle: true,
             where: [
                 {
                     statement: "message.text IS NULL",

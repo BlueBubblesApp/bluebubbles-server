@@ -147,33 +147,20 @@ export class MessageSerializer {
             loadMetadata: true
         }
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
-        // Load attachments
-        const attachments = [];
-        for (const attachment of message?.attachments ?? []) {
-            const resData = await getAttachmentResponse(attachment, {
-                convert: attachmentConfig.convert,
-                getData: attachmentConfig.getData,
-                loadMetadata: attachmentConfig.loadMetadata
-            });
-            attachments.push(resData);
-        }
-
-        const chats = [];
-        for (const chat of message?.chats ?? []) {
-            const chatRes = await getChatResponse(chat);
-            chats.push(chatRes);
-        }
-
         return {
             originalROWID: message.ROWID,
             guid: message.guid,
             text: message.text,
-            attributedBody: null, //message.attributedBody,
+            attributedBody: null,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
-            chats,
-            attachments,
+            chats: await Promise.all((message.chats ?? []).map(chat => getChatResponse(chat))),
+            attachments: await Promise.all((message.attachments ?? []).map(a => getAttachmentResponse(a, {
+                convert: attachmentConfig.convert,
+                getData: attachmentConfig.getData,
+                loadMetadata: attachmentConfig.loadMetadata
+            }))),
             subject: message.subject,
             country: message.country,
             error: message.error,

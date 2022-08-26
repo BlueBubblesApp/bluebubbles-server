@@ -226,7 +226,7 @@ export class ChatInterface {
         while (newCount === prevCount) {
             tryCount += 1;
 
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            // If we've tried 20 times and there is no change, break out (~10 seconds)
             if (tryCount >= 20) break;
 
             // Give it a bit to execute
@@ -243,7 +243,7 @@ export class ChatInterface {
 
         // Check if the name changed
         if (newCount === prevCount) {
-            throw new Error("Failed to set new display name! Operation took longer than 5 seconds!");
+            throw new Error(`Failed to ${action} participant to chat! Operation took longer than 5 seconds!`);
         }
 
         return theChat;
