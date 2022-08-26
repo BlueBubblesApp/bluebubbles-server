@@ -8,6 +8,7 @@ import path from "path";
 import os from "os";
 import { EventEmitter } from "events";
 import macosVersion from "macos-version";
+import { getAuthStatus } from "node-mac-permissions";
 
 // Configuration/Filesytem Imports
 import { FileSystem } from "@server/fileSystem";
@@ -21,7 +22,7 @@ import {
     OutgoingMessageListener,
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
-import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { Message } from "@server/databases/imessage/entity/Message";
 import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
 
 // Service Imports
@@ -56,6 +57,7 @@ import { BlueBubblesHelperService } from "./services/privateApi";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
+import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
 
 const findProcess = require("find-process");
 
@@ -127,10 +129,6 @@ class BlueBubblesServer extends EventEmitter {
 
     eventCache: EventCache;
 
-    hasDiskAccess: boolean;
-
-    hasAccessibilityAccess: boolean;
-
     hasSetup: boolean;
 
     hasStarted: boolean;
@@ -144,6 +142,15 @@ class BlueBubblesServer extends EventEmitter {
     lastConnection: number;
 
     region: string | null;
+
+    get hasDiskAccess(): boolean {
+        const status = getAuthStatus("full-disk-access");
+        return status === "authorized";
+    }
+
+    get hasAccessibilityAccess(): boolean {
+        return systemPreferences.isTrustedAccessibilityClient(false) === true;
+    }
 
     /**
      * Constructor to just initialize everything to null pretty much
@@ -177,8 +184,6 @@ class BlueBubblesServer extends EventEmitter {
         this.messageManager = null;
         this.webhookService = null;
 
-        this.hasDiskAccess = true;
-        this.hasAccessibilityAccess = false;
         this.hasSetup = false;
         this.hasStarted = false;
         this.notificationCount = 0;
@@ -235,7 +240,10 @@ class BlueBubblesServer extends EventEmitter {
 
     setNotificationCount(count: number) {
         this.notificationCount = count;
-        app.setBadgeCount(this.notificationCount);
+
+        if (this.repo.getConfig("dock_badge")) {
+            app.setBadgeCount(this.notificationCount);
+        }
     }
 
     async initServer(): Promise<void> {
@@ -618,7 +626,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
-        this.log(`Server Metadata -> Time Synchronization: ${await this.getTimeSync()}`, "debug");
+        this.log(`Server Metadata -> Time Synchronization: ${((await this.getTimeSync()) ?? "").trim()}`, "debug");
         this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
 
         if (!this.region) {
@@ -643,8 +651,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Checking Permissions...");
 
         // Log if we dont have accessibility access
-        if (systemPreferences.isTrustedAccessibilityClient(false) === true) {
-            this.hasAccessibilityAccess = true;
+        if (this.hasAccessibilityAccess) {
             this.log("Accessibility permissions are enabled");
         } else {
             this.log("Accessibility permissions are required for certain actions!", "debug");
@@ -652,7 +659,6 @@ class BlueBubblesServer extends EventEmitter {
 
         // Log if we dont have accessibility access
         if (this.iMessageRepo?.db) {
-            this.hasDiskAccess = true;
             this.log("Full-disk access permissions are enabled");
         } else {
             this.log("Full-disk access permissions are required!", "error");
@@ -804,6 +810,15 @@ class BlueBubblesServer extends EventEmitter {
             this.setDockIcon();
         }
 
+        // If the badge config changes
+        if (prevConfig.dock_badge !== nextConfig.dock_badge) {
+            if (nextConfig.dock_badge) {
+                app.setBadgeCount(this.notificationCount);
+            } else {
+                app.setBadgeCount(0);
+            }
+        }
+
         // If auto-start changes
         if (prevConfig.auto_start !== nextConfig.auto_start) {
             app.setLoginItemSettings({ openAtLogin: nextConfig.auto_start as boolean, openAsHidden: true });
@@ -872,7 +887,8 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Message match found for text, [${newMessage.contentString()}]`);
 
         // Convert to a response JSON
-        const resp = await getMessageResponse(newMessage);
+        // Since we sent the message, we don't need to include the participants
+        const resp = await MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false });
         resp.tempGuid = tempGuid;
 
         // We are emitting this as a new message, the only difference being the included tempGuid
@@ -886,7 +902,8 @@ class BlueBubblesServer extends EventEmitter {
          * ERROR CODES:
          * 4: Message Timeout
          */
-        const data = await getMessageResponse(message);
+        // Since this is a message send error, we don't need to include the participants
+        const data = await MessageSerializer.serialize({ message, loadChatParticipants: false });
         if (isNotEmpty(tempGuid)) {
             data.tempGuid = tempGuid;
         }
@@ -979,7 +996,10 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New Message from You, ${newMessage.contentString()}`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(newMessage));
+            await this.emitMessage("new-message", await MessageSerializer.serialize({
+                message: newMessage,
+                enforceMaxSize: true
+            }));
         });
 
         /**
@@ -1001,7 +1021,11 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("updated-message", await getMessageResponse(newMessage));
+            // Since this is a message update, we do not need to include the participants
+            await this.emitMessage(
+                "updated-message",
+                MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false })
+            );
         });
 
         /**
@@ -1020,30 +1044,37 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await getMessageResponse(newMessage), "high");
+            await this.emitMessage("new-message", await MessageSerializer.serialize({
+                message: newMessage,
+                enforceMaxSize: true
+            }), "high");
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
             this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
-            await this.emitMessage("group-name-change", await getMessageResponse(item));
+            // Group name changes don't require the participants to be loaded
+            await this.emitMessage(
+                "group-name-change",
+                await MessageSerializer.serialize({ message: item, loadChatParticipants: false })
+            );
         });
 
         groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-removed", await getMessageResponse(item));
+            await this.emitMessage("participant-removed", await MessageSerializer.serialize({ message: item }));
         });
 
         groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-added", await getMessageResponse(item));
+            await this.emitMessage("participant-added", await MessageSerializer.serialize({ message: item }));
         });
 
         groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-left", await getMessageResponse(item));
+            await this.emitMessage("participant-left", await MessageSerializer.serialize({ message: item }));
         });
 
         outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
@@ -1065,7 +1096,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Restarting the server...");
 
         // Disconnect & reconnect to the iMessage DB
-        if (this.iMessageRepo.db.isConnected) {
+        if (this.iMessageRepo.db.isInitialized) {
             this.log("Reconnecting to iMessage database...");
             await this.iMessageRepo.db.destroy();
             await this.iMessageRepo.db.initialize();

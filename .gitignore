@@ -6,5 +6,7 @@ release/
 .DS_Store
 **/*.log
 .env
+.build
+.swiftpm
 .yarn
 .yarnrc*

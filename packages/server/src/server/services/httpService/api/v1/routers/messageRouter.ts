@@ -4,13 +4,16 @@ import { Next } from "koa";
 import type { File } from "formidable";
 
 import { Server } from "@server";
-import { isEmpty, isNotEmpty, safeTrim } from "@server/helpers/utils";
-import { getMessageResponse, Message } from "@server/databases/imessage/entity/Message";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
-import { DBMessageParams } from "@server/databases/imessage/types";
-import { Handle } from "@server/databases/imessage/entity/Handle";
+import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
+import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { arrayHasOne } from "@server/utils/CollectionUtils";
 import { Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
+import { parseWithQuery } from "../utils";
+
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
@@ -31,19 +34,21 @@ export class MessageRouter {
         const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
         const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
         const total = await Server().iMessageRepo.getMessageCount(
-            afterDate, beforeDate, false, chatGuid as string, true);
+            afterDate,
+            beforeDate,
+            false,
+            chatGuid as string,
+            true
+        );
         return new Success(ctx, { data: { total } }).send();
     }
 
     static async find(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
-        const withQuery = ((ctx.request.query.with ?? "") as string)
-            .toLowerCase()
-            .split(",")
-            .map(e => safeTrim(e));
-        const withChats = withQuery.includes("chats") || withQuery.includes("chat");
-        const withParticipants = withQuery.includes("chats.participants") || withQuery.includes("chat.participants");
-        const withAttachments = withQuery.includes("attachments") || withQuery.includes("attachment");
+        const withQuery = parseWithQuery(ctx.request.query.with);
+        const withChats = arrayHasOne(withQuery, ["chats", "chat"]);
+        const withParticipants = arrayHasOne(withQuery, ["chats.participants", "chat.participants"]);
+        const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
 
         // Fetch the info for the message by GUID
         const message = await Server().iMessageRepo.getMessage(guid, withChats, withAttachments);
@@ -64,25 +69,30 @@ export class MessageRouter {
             }
         }
 
-        return new Success(ctx, { data: await getMessageResponse(message) }).send();
+        return new Success(ctx, { data: await MessageSerializer.serialize({ message }) }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
         let {
-            chatGuid, with: withQuery, offset, limit, where,
-            sort, after, before, convertAttachments
-        } = (ctx?.request?.body ?? {});
+            chatGuid,
+            with: withQuery,
+            offset,
+            limit,
+            where,
+            sort,
+            after,
+            before,
+            convertAttachments
+        } = ctx?.request?.body ?? {};
 
         // Pull out the filters
-        withQuery = (withQuery ?? []).filter(
-            (e: any) => typeof e === "string").map((e: string) => safeTrim(e.toLowerCase()));
-        const withChats = withQuery.includes("chat") || withQuery.includes("chats");
-        const withAttachments = withQuery.includes("attachment") || withQuery.includes("attachments");
-        const withAttachmentMetadata = withQuery.includes(
-            "attachment.metadata") || withQuery.includes("attachments.metadata");
-        const withHandle = withQuery.includes("handle");
-        const withChatParticipants =
-            withQuery.includes("chat.participants") || withQuery.includes("chats.participants");
+        withQuery = parseWithQuery(withQuery);
+        const withChats = arrayHasOne(withQuery, ["chat", "chats"]);
+        const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
+        const withAttachmentMetadata = arrayHasOne(withQuery, ["attachment.metadata", "attachments.metadata"]);
+        const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
+        const withChatParticipants = arrayHasOne(withQuery, ["chat.participants", "chats.participants"]);
+        const withAttributedBody = arrayHasOne(withQuery, ["attributedbody", "attributed-body"]);
 
         // We don't need to worry about it not being a number because
         // the validator checks for that. It also checks for min values.
@@ -98,83 +108,61 @@ export class MessageRouter {
                 });
         }
 
-        const opts: DBMessageParams = {
+        // Fetch the info for the message by GUID
+        const messages = await Server().iMessageRepo.getMessages({
             chatGuid,
-            withChats,
+            withChats: withChats || withChatParticipants,
             withAttachments,
             withHandle,
             offset,
             limit,
             sort,
             before,
-            after
-        };
+            after,
+            where: where ?? []
+        });
 
-        // Since we have a default value for `where`, we have to set it conditionally
-        if (isNotEmpty(where)) opts.where = where;
-
-        // Fetch the info for the message by GUID
-        const messages = await Server().iMessageRepo.getMessages(opts);
-
-        // Handle fetching the chat participants with the messages (if requested)
-        const chatCache: { [key: string]: Handle[] } = {};
-        if (withChats && withChatParticipants) {
-            const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-            for (const i of chats) {
-                chatCache[i.guid] = i.participants;
-            }
-        }
-
-        // Do you want the blurhash? Default to false
-        const data = [];
-        for (const msg of messages) {
-            // Insert in the participants from the cache
-            if (withChatParticipants) {
-                for (const chat of msg.chats) {
-                    if (Object.keys(chatCache).includes(chat.guid)) {
-                        chat.participants = chatCache[chat.guid];
-                    }
-                }
-            }
-
-            const msgRes = await getMessageResponse(msg, {
-                convertAttachments,
-                loadAttachmentMetadata: withAttachmentMetadata
-            });
-            data.push(msgRes);
-        }
+        const data = await MessageSerializer.serializeList({
+            messages,
+            attachmentConfig: {
+                loadMetadata: withAttachmentMetadata,
+                convert: convertAttachments
+            },
+            parseAttributedBody: withAttributedBody,
+            loadChatParticipants: withChatParticipants
+        });
 
         // Build metadata to return
-        const metadata = { offset, limit };
+        const metadata = { offset, limit, total: data.length };
         return new Success(ctx, { data, message: "Successfully fetched messages!", metadata }).send();
     }
 
     static async sendText(ctx: RouterContext, _: Next) {
-        let {
-            tempGuid, message, method, chatGuid, effectId,
-            subject, selectedMessageGuid
-        } = (ctx?.request?.body ?? {});
+        let { tempGuid, message, attributedBody, method, chatGuid, effectId, subject, selectedMessageGuid } =
+            ctx?.request?.body ?? {};
 
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
 
         try {
             // Send the message
-            const sentMessage = await MessageInterface.sendMessageSync(
+            const sentMessage = await MessageInterface.sendMessageSync({
                 chatGuid,
                 message,
                 method,
+                attributedBody,
                 subject,
                 effectId,
                 selectedMessageGuid,
                 tempGuid
-            );
+            });
 
             // Remove from cache
             Server().httpService.sendCache.remove(tempGuid);
 
             // Convert to an API response
-            const data = await getMessageResponse(sentMessage);
+            // No need to load the participants since we sent the message
+            const data = await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false });
 
             // Inject the TempGUID back into the response
             if (isNotEmpty(tempGuid)) {
@@ -183,8 +171,8 @@ export class MessageRouter {
 
             if ((data.error ?? 0) !== 0) {
                 throw new IMessageError({
-                    message: 'Message sent with an error. See attached message',
-                    error: 'Message failed to send!',
+                    message: "Message sent with an error. See attached message",
+                    error: "Message failed to send!",
                     data
                 });
             } else {
@@ -197,7 +185,17 @@ export class MessageRouter {
             if (ex instanceof Message) {
                 throw new IMessageError({
                     message: "Message Send Error",
-                    data: await getMessageResponse(ex),
+                    // No need to load the participants since we sent the message
+                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    error: "Failed to send message! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Message Send Error",
+                    // No need to load the participants since we sent the message
+                    data: ex?.msg
+                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        : null,
                     error: "Failed to send message! See attached message error code."
                 });
             } else {
@@ -208,7 +206,7 @@ export class MessageRouter {
 
     static async sendAttachment(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const { tempGuid, chatGuid, name } = (ctx.request?.body ?? {});
+        const { tempGuid, chatGuid, name } = ctx.request?.body ?? {};
         const attachment = files?.attachment as File;
 
         // Add to send cache
@@ -216,18 +214,19 @@ export class MessageRouter {
 
         // Send the attachment
         try {
-            const sentMessage: Message = await MessageInterface.sendAttachmentSync(
+            const sentMessage: Message = await MessageInterface.sendAttachmentSync({
                 chatGuid,
-                attachment.path,
-                name,
-                tempGuid
-            );
+                attachmentPath: attachment.path,
+                attachmentName: name,
+                attachmentGuid: tempGuid
+            });
 
             // Remove from cache
             Server().httpService.sendCache.remove(tempGuid);
 
             // Convert to an API response
-            const data = await getMessageResponse(sentMessage);
+            // No need to load the participants since we sent the message
+            const data = await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false });
             return new Success(ctx, { message: "Attachment sent!", data }).send();
         } catch (ex: any) {
             // Remove from cache
@@ -236,7 +235,17 @@ export class MessageRouter {
             if (ex instanceof Message) {
                 throw new IMessageError({
                     message: "Attachment Send Error",
-                    data: await getMessageResponse(ex),
+                    // No need to load the participants since we sent the message
+                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    error: "Failed to send attachment! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Attachment Send Error",
+                    // No need to load the participants since we sent the message
+                    data: ex?.msg
+                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        : null,
                     error: "Failed to send attachment! See attached message error code."
                 });
             } else {
@@ -246,7 +255,7 @@ export class MessageRouter {
     }
 
     static async react(ctx: RouterContext, _: Next) {
-        const { chatGuid, selectedMessageGuid, reaction } = (ctx?.request?.body ?? {});
+        const { chatGuid, selectedMessageGuid, reaction } = ctx?.request?.body ?? {};
 
         // Fetch the message we are reacting to
         const message = await Server().iMessageRepo.getMessage(selectedMessageGuid, false, true);
@@ -254,13 +263,27 @@ export class MessageRouter {
 
         // Send the reaction
         try {
-            const sentMessage = await MessageInterface.sendReaction(chatGuid, message, reaction);
-            return new Success(ctx, { message: "Reaction sent!", data: await getMessageResponse(sentMessage) }).send();
+            const sentMessage = await MessageInterface.sendReaction({ chatGuid, message, reaction });
+            return new Success(ctx, {
+                message: "Reaction sent!",
+                // No need to load the participants since we sent the message
+                data: await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false })
+            }).send();
         } catch (ex: any) {
             if (ex instanceof Message) {
                 throw new IMessageError({
                     message: "Reaction Send Error",
-                    data: await getMessageResponse(ex),
+                    // No need to load the participants since we sent the message
+                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    error: "Failed to send reaction! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Reaction Send Error",
+                    // No need to load the participants since we sent the message
+                    data: ex?.msg
+                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        : null,
                     error: "Failed to send reaction! See attached message error code."
                 });
             } else {

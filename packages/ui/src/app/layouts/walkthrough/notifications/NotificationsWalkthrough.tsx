@@ -7,7 +7,9 @@ import {
     AlertIcon,
     Link,
     SimpleGrid,
-    useBoolean
+    useBoolean,
+    Stack,
+    Button
 } from '@chakra-ui/react';
 import { DropZone } from '../../../components/DropZone';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
@@ -132,20 +134,53 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                         color='brand.primary'
                         target='_blank'>https://bluebubbles.app/install</Link>
                 </Text>
-                <Text fontSize='3xl' mt={5}>Firebase Configurations</Text>
-                
+                <Text fontSize='3xl' mt={3}>Firebase Links</Text>
+                <Stack direction='row' mt={3}>
+                    <Button
+                        size='xs'
+                    >
+                        <Link
+                            href="https://console.firebase.google.com/u/0/project/_/database"
+                            target="_blank"
+                        >
+                            Enable Realtime Database
+                        </Link>
+                    </Button>
+                    <Button
+                        size='xs'
+                    >
+                        <Link
+                            href="https://console.firebase.google.com/u/0/project/_/settings/general"
+                            target="_blank"
+                        >
+                            Google Services JSON Download
+                        </Link>
+                    </Button>
+                    <Button
+                        size='xs'
+                    >
+                        <Link
+                            href="https://console.firebase.google.com/u/0/project/_/settings/serviceaccounts/adminsdk"
+                            target="_blank"
+                        >
+                            Admin SDK JSON Download
+                        </Link>
+                    </Button>
+                </Stack>
+
+                <Text fontSize='3xl' mt={3}>Firebase Configurations</Text>
                 <SimpleGrid columns={2} spacing={5} mt={5}>
                     <DropZone
-                        text="Drag n' Drop google-services.json"
-                        loadedText="google-services.json Successfully Loaded!"
-                        isDragging={isDragging}
-                        isLoaded={serverLoaded}
-                    />
-                    <DropZone
-                        text="Drag n' Drop *-firebase-adminsdk-*.json"
-                        loadedText="*-firebase-adminsdk-*.json Successfully Loaded!"
+                        text="Drag n' Drop Google Services JSON"
+                        loadedText="Google Services JSON Successfully Loaded!"
                         isDragging={isDragging}
                         isLoaded={clientLoaded}
+                    />
+                    <DropZone
+                        text="Drag n' Drop Admin SDK JSON"
+                        loadedText="Admin SDK JSON Successfully Loaded!"
+                        isDragging={isDragging}
+                        isLoaded={serverLoaded}
                     />
                 </SimpleGrid>
             </Box>

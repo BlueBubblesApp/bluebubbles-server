@@ -192,7 +192,7 @@ export class ActionHandler {
         if (attachment && isNotEmpty(aName)) {
             attachmentAwaiter = new MessagePromise({
                 chatGuid,
-                text: `->${aName}`,
+                text: aName,
                 isAttachment: true,
                 sentAt: now,
                 tempGuid: attachmentGuid

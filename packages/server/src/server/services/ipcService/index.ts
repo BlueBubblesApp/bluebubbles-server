@@ -1,4 +1,5 @@
-import { app, dialog, ipcMain, nativeTheme, systemPreferences } from "electron";
+import { app, dialog, ipcMain, systemPreferences } from "electron";
+import { askForAccessibilityAccess, askForFullDiskAccess } from "node-mac-permissions";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
@@ -80,6 +81,14 @@ export class IPCService {
             return await Server().checkPrivateApiRequirements();
         });
 
+        ipcMain.handle("get-private-api-status", async (_, __) => {
+            return {
+                enabled: Server().repo.getConfig("enable_private_api") as boolean,
+                connected: !!Server().privateApiHelper?.helper,
+                port: BlueBubblesHelperService.port
+            };
+        });
+
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {
             return await BlueBubblesHelperService.installBundle(true);
         });
@@ -119,8 +128,8 @@ export class IPCService {
             return await requestContactPermission();
         });
 
-        ipcMain.handle("get-contacts", async (event, _) => {
-            return await ContactInterface.getAllContacts();
+        ipcMain.handle("get-contacts", async (event, extraProperties) => {
+            return await ContactInterface.getAllContacts(extraProperties ?? []);
         });
 
         ipcMain.handle("delete-contacts", async (event, _) => {
@@ -129,9 +138,9 @@ export class IPCService {
 
         ipcMain.handle("add-contact", async (event, args) => {
             return await ContactInterface.createContact({
-                firstName: args?.firstName ?? '',
-                lastName: args?.lastName ?? '',
-                displayName: args?.displayName ?? '',
+                firstName: args?.firstName ?? "",
+                lastName: args?.lastName ?? "",
+                displayName: args?.displayName ?? "",
                 emails: args.emails ?? [],
                 phoneNumbers: args.phoneNumbers ?? []
             });
@@ -140,9 +149,9 @@ export class IPCService {
         ipcMain.handle("update-contact", async (event, args) => {
             return await ContactInterface.createContact({
                 id: args.contactId ?? args.id,
-                firstName: args?.firstName ?? '',
-                lastName: args.lastName ?? '',
-                displayName: args?.displayName ?? '',
+                firstName: args?.firstName ?? "",
+                lastName: args.lastName ?? "",
+                displayName: args?.displayName ?? "",
                 emails: args.emails ?? [],
                 phoneNumbers: args.phoneNumbers ?? [],
                 updateEntry: true
@@ -282,6 +291,14 @@ export class IPCService {
             Server().notificationCount = 0;
             app.setBadgeCount(0);
             await Server().repo.alerts().clear();
+        });
+
+        ipcMain.handle("open-fulldisk-preferences", async (_, __) => {
+            askForFullDiskAccess();
+        });
+
+        ipcMain.handle("open-accessibility-preferences", async (_, __) => {
+            askForAccessibilityAccess();
         });
     }
 }

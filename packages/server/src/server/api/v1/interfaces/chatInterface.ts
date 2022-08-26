@@ -159,15 +159,12 @@ export class ChatInterface {
             // Since chat creation doesn't work on Big Sur+, we just need to send the message to an
             // "infered" Chat GUID based on the service and first (only) address
             chatGuid = `${service};-;${theAddrs[0]}`;
-            sentMessage = await MessageInterface.sendMessageSync(
+            sentMessage = await MessageInterface.sendMessageSync({
                 chatGuid,
                 message,
-                "apple-script",
-                null,
-                null,
-                null,
+                method: "apple-script",
                 tempGuid
-            );
+        });
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
             Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
@@ -202,7 +199,7 @@ export class ChatInterface {
         // If we have a message, want to send via the private api, and are not on Big Sur, send the message
         if (isNotEmpty(message) && !isMinBigSur) {
             Server().log(`Sending message...`, "debug");
-            sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, method, null, null, null, tempGuid);
+            sentMessage = await MessageInterface.sendMessageSync({ chatGuid, message, method, tempGuid });
             Server().log(`Message sent!`, "debug");
         }
 

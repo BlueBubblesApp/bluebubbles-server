@@ -20,7 +20,12 @@ export class FindMyService {
         if (!FindMyService.cacheFileExists(guid)) return null;
         const cPath = path.join(FileSystem.findMyFriendsDir, "fsCachedData", guid);
         const data = fs.readFileSync(cPath, { encoding: 'utf-8' });
-        return JSON.parse(data);
+
+        try {
+            return JSON.parse(data);
+        } catch {
+            throw new Error('Failed to read FindMy cache file! It is not in the correct format!');
+        }
     }
 
     static async getFriends(): Promise<NodeJS.Dict<any> | null> {
@@ -53,8 +58,8 @@ export class FindMyService {
 
         try {
             return JSON.parse(data);
-        } catch (_) {
-            return null;
+        } catch {
+            throw new Error('Failed to read FindMy cache file! It is not in the correct format!');
         }
     }
 

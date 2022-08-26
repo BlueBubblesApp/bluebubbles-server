@@ -1,8 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, JoinColumn, JoinTable, ManyToMany } from "typeorm";
 
-import { Message, getMessageResponse } from "@server/databases/imessage/entity/Message";
+import { Message } from "@server/databases/imessage/entity/Message";
 import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { HandleResponse } from "@server/types";
+import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
 
 @Entity("handle")
 export class Handle {
@@ -37,7 +38,8 @@ export class Handle {
 export const getHandleResponse = async (tableData: Handle): Promise<HandleResponse> => {
     const messages = [];
     for (const msg of tableData?.messages ?? []) {
-        const msgRes = await getMessageResponse(msg);
+        // Since participants is the top level objet, we don't need to load them in
+        const msgRes = await MessageSerializer.serialize({ message: msg, loadChatParticipants: false });
         messages.push(msgRes);
     }
 

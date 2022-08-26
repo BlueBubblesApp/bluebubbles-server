@@ -5,6 +5,7 @@ import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { Success } from "../responses/success";
 import { Contact } from "@server/databases/server/entity";
+import { parseWithQuery } from "../utils";
 
 export class ContactRouter {
     private static isAddressObject(data: any): boolean {
@@ -17,10 +18,7 @@ export class ContactRouter {
     }
 
     static async get(ctx: RouterContext, _: Next) {
-        const extraProps = ((ctx.request.query?.extraProperties as string) ?? "")
-            .split(",")
-            .map(e => e.trim())
-            .filter(e => e && e.length > 0);
+        const extraProps = parseWithQuery(ctx.request.query?.extraProperties as string)
         const contacts = await ContactInterface.getAllContacts(extraProps);
         return new Success(ctx, { data: contacts }).send();
     }
@@ -28,7 +26,7 @@ export class ContactRouter {
     static async query(ctx: RouterContext, _: Next) {
         const { body } = ctx.request;
         const addresses = body?.addresses ?? [];
-        const extraProps = body?.extraProperties ?? [];
+        const extraProps = parseWithQuery(body?.extraProperties ?? []);
 
         let res = [];
         if (isEmpty(addresses) || !Array.isArray(addresses)) {

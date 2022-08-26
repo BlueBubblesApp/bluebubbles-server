@@ -41,10 +41,7 @@ export class MessageValidator {
     }
 
     static queryBodyRules = {
-        with: (
-            "array|in:chat,chats,attachment,attachments,handle,chat.participants," +
-            "chats.participants,attachment.metadata,attachments.metadata"
-        ),
+        with: "array",
         convertAttachments: "boolean",
         where: "array",
         "where.*.statement": "required|string",
@@ -82,9 +79,9 @@ export class MessageValidator {
         // Default the method to AppleScript
         saniMethod = saniMethod ?? "apple-script";
 
-        // If we have an effectId or subject, let's imply we want to use
-        // the Private API
-        if (effectId || subject || selectedMessageGuid) {
+        // If we have an effectId, subject, reply, or attributedBody
+        // let's imply we want to use the Private API
+        if (effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
             saniMethod = "private-api";
         }
 

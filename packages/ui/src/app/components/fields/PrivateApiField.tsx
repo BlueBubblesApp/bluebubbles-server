@@ -6,7 +6,8 @@ import {
     Text,
     Box,
     Stack,
-    Button
+    Button,
+    Link
 } from '@chakra-ui/react';
 import { useAppSelector } from '../../hooks';
 import { onCheckboxToggle } from '../../actions/ConfigActions';
@@ -14,6 +15,7 @@ import { PrivateApiRequirements } from '../PrivateApiRequirements';
 import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../modals/ConfirmationDialog';
 import { reinstallHelperBundle } from '../../utils/IpcUtils';
+import { PrivateApiStatus } from '../PrivateApiStatus';
 
 export interface PrivateApiFieldProps {
     helpText?: string;
@@ -38,8 +40,10 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
 
     return (
         <Box mt={1}>
-            <PrivateApiRequirements />
-
+            <Stack direction='row'>
+                <PrivateApiRequirements />
+                <PrivateApiStatus />
+            </Stack>
             <FormControl mt={5}>
                 <Stack direction='row'>
                     <Checkbox
@@ -55,12 +59,18 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
                     >
                         Re-install Helper
                     </Button>
+                    <Button size='xs'>
+                        <Link target="_blank" href="https://docs.bluebubbles.app/private-api/">
+                            Private API Setup Docs
+                        </Link>
+                    </Button>
                 </Stack>
                 <FormHelperText>
                     {helpText ?? (
                         <Text>
                             If you have set up the Private API features (via MacForge or MySIMBL),
-                            enable this option to allow the server to communicate with the iMessage Private API.
+                            enable this option to allow the server to communicate with the iMessage Private API. If you
+                            have not done the Private API setup, use the button above to read the documentation.
                         </Text>
                     )}
                 </FormHelperText>
