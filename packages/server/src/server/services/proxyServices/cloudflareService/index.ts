@@ -40,7 +40,13 @@ export class CloudflareService extends Proxy {
 
         // When we get a new URL, set the URL and update
         this.manager.on("needs-restart", async _ => {
-            this.restart();
+            try {
+                await this.restart();
+            } catch (ex) {
+                // Don't do anything
+            } finally {
+                this.manager.isRestarting = false;
+            }
         });
 
         this.url = await this.manager.start();

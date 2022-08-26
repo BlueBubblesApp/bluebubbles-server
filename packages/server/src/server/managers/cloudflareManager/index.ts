@@ -17,6 +17,8 @@ export class CloudflareManager extends EventEmitter {
 
     currentProxyUrl: string;
 
+    isRestarting = false;
+
     private proxyUrlRegex = /INF \|\s{1,}(https:\/\/[^\s]+)\s{1,}\|/m;
 
     async start(): Promise<string> {
@@ -87,6 +89,7 @@ export class CloudflareManager extends EventEmitter {
     }
 
     private detectMaxConnectionRetries(data: string) {
+        if (this.isRestarting) return;
         if (data.includes("Retrying connection in up to ")) {
             try {
                 const splitData = data.split("Retrying connection in up to ")[1];
@@ -97,6 +100,8 @@ export class CloudflareManager extends EventEmitter {
                 if (!isNaN(retrySec)) {
                     Server().log(`Detected Cloudflare retry in ${retrySec} seconds...`, "debug");
                     if (retrySec >= 16) {
+                        this.isRestarting = true;
+
                         Server().log(
                             "Cloudflare reached its max connection retries. Restarting proxy service...",
                             "debug"
