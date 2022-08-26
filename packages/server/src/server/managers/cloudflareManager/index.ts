@@ -102,11 +102,12 @@ export class CloudflareManager extends EventEmitter {
                 const splitData = data.split("Retrying connection in up to ")[1];
                 const secSplit = splitData.split(" ")[0].replace("s", "").trim();
 
-                // Cloudflare will retry every 1, 2, 4, 8, and 16 seconds (when retry count if 5, by default)
+                // Cloudflare will retry every 1, 2, 4, 8, and 16 seconds (when retry count is 5, by default)
+                // The retry count is set to 6, so it goes: 1, 2, 4, 8, 16, 32
                 const retrySec = Number.parseInt(secSplit, 10);
                 if (!isNaN(retrySec)) {
                     Server().log(`Detected Cloudflare retry in ${retrySec} seconds...`, "debug");
-                    if (retrySec >= 16) {
+                    if (retrySec >= 32) {
                         this.isRestarting = true;
 
                         Server().log(
