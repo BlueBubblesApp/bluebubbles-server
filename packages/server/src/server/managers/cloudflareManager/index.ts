@@ -51,7 +51,14 @@ export class CloudflareManager extends EventEmitter {
             this.proc.stderr.on("error", chunk => this.handleError(chunk));
 
             this.on("new-url", url => resolve(url));
-            this.on("error", err => reject(err));
+            this.on("error", err => {
+                // Ignore certain errors
+                if (typeof err === "string") {
+                    if (err.includes('Thank you for trying Cloudflare Tunnel.')) return;
+                }
+
+                reject(err)
+            });
 
             setTimeout(() => {
                 reject(new Error("Failed to connect to Cloudflare after 30 seconds..."));
