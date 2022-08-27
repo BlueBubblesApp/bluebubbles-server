@@ -10,7 +10,7 @@ import { convertAudio, convertImage, getAttachmentMetadata } from "@server/datab
 import { AttachmentResponse } from "@server/types";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
-import { isMinSierra, isEmpty } from "@server/helpers/utils";
+import { isMinSierra, isMinHighSierra, isEmpty } from "@server/helpers/utils";
 import { conditional } from "conditional-decorator";
 import * as mime from "mime-types";
 
@@ -118,7 +118,7 @@ export class Attachment {
     hideAttachment: boolean;
 
     @conditional(
-        isMinSierra,
+        isMinHighSierra,
         Column({
             type: "text",
             unique: true,
