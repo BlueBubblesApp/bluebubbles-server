@@ -247,10 +247,10 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
     const scriptClip = `set the clipboard to theFile`;
 
     // The CMD + A & Delete will clear any existing text or attachments
-    return `if (running of screen saver preferences) then
-            stop current screen saver
+    return `try
+            do shell script "caffeinate -u -t 1"
             delay 2
-        end if
+        end try
         
         ${scriptCopy ?? ''}
         tell application "System Events" to tell application process "Messages"
