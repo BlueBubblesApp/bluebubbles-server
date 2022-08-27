@@ -7,7 +7,7 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
-import { isMinSierra, isNotEmpty } from "@server/helpers/utils";
+import { isMinHighSierra, isNotEmpty } from "@server/helpers/utils";
 import { isEmpty } from "@firebase/util";
 
 /**
@@ -125,7 +125,7 @@ export class MessageRepository {
         }
 
         // El Capitan does not have an original_guid column.
-        if (isMinSierra) {
+        if (isMinHighSierra) {
             query.where("attachment.original_guid LIKE :guid", { guid: `%${attachmentGuid}` });
             query.orWhere("attachment.guid LIKE :guid", { guid: `%${attachmentGuid}` });
         } else {
