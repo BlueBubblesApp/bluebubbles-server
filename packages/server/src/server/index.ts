@@ -144,8 +144,24 @@ class BlueBubblesServer extends EventEmitter {
     region: string | null;
 
     get hasDiskAccess(): boolean {
-        const status = getAuthStatus("full-disk-access");
-        return status === "authorized";
+        // As long as we've tried to initialize the DB, we know if we do/do not have access.
+        const dbInit: boolean | null = this.iMessageRepo?.db?.isInitialized;
+        if (dbInit != null) return dbInit;
+
+        // If we've never initialized the DB, and just want to detect if we have access,
+        // we can check the permissions using node-mac-permissions. However, default to true,
+        // if the macOS version is under Mojave.
+        let status = true;
+        if (isMinMojave) {
+            const authStatus = getAuthStatus("full-disk-access");
+            if (authStatus === 'authorized') {
+                status = true;
+            } else {
+                this.log(`FullDiskAccess Permission Status: ${authStatus}`, 'debug');
+            }
+        }
+
+        return status;
     }
 
     get hasAccessibilityAccess(): boolean {
@@ -658,7 +674,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Log if we dont have accessibility access
-        if (this.iMessageRepo?.db) {
+        if (this.hasDiskAccess) {
             this.log("Full-disk access permissions are enabled");
         } else {
             this.log("Full-disk access permissions are required!", "error");
@@ -965,7 +981,7 @@ class BlueBubblesServer extends EventEmitter {
      * we will emit a message to the socket, as well as the FCM server
      */
     private startChatListeners() {
-        if (!this.iMessageRepo?.db) {
+        if (!this.hasDiskAccess) {
             AlertsInterface.create(
                 "info",
                 "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled"
