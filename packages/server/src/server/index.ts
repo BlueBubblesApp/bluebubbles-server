@@ -972,7 +972,7 @@ class BlueBubblesServer extends EventEmitter {
      * we will emit a message to the socket, as well as the FCM server
      */
     private startChatListeners() {
-        if (!this.iMessageRepo?.db) {
+        if (!this.hasDiskAccess) {
             AlertsInterface.create(
                 "info",
                 "Restart the app once 'Full Disk Access' and 'Accessibility' permissions are enabled"
