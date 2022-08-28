@@ -144,12 +144,21 @@ class BlueBubblesServer extends EventEmitter {
     region: string | null;
 
     get hasDiskAccess(): boolean {
-        // The default value is whether or not our DB is connected.
-        // If it's null, we still default to true because on macOS < 10.14,
-        // there are no FullDiskAccess options.
-        let status = this.iMessageRepo?.db?.isInitialized ?? true;
+        // As long as we've tried to initialize the DB, we know if we do/do not have access.
+        const dbInit: boolean | null = this.iMessageRepo?.db?.isInitialized;
+        if (dbInit != null) return dbInit;
+
+        // If we've never initialized the DB, and just want to detect if we have access,
+        // we can check the permissions using node-mac-permissions. However, default to true,
+        // if the macOS version is under Mojave.
+        let status = true;
         if (isMinMojave) {
-            status = (getAuthStatus("full-disk-access") === "authorized");
+            const authStatus = getAuthStatus("full-disk-access");
+            if (authStatus === 'authorized') {
+                status = true;
+            } else {
+                this.log(`FullDiskAccess Permission Status: ${authStatus}`, 'debug');
+            }
         }
 
         return status;
