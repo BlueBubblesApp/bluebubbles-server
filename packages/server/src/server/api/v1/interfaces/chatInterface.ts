@@ -203,7 +203,10 @@ export class ChatInterface {
         }
 
         const chat = chats[0];
-        chat.messages = [sentMessage];
+        if (sentMessage) {
+            chat.messages = [sentMessage];
+        }
+
         return chat;
     }
 
