@@ -127,9 +127,8 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Reject the corresponding promise.
             // This will emit a message send error
-            const success = Server().messageManager.reject("message-send-error", entry);
-            Server().log(
-                `Errored Msg -> ${cacheName} -> ${(entry.text ?? "").substring(0, 25)} -> ${success}`,
+            const success = await Server().messageManager.reject("message-send-error", entry);
+            Server().log(`Errored Msg -> ${cacheName} -> ${entry.contentString()} -> ${success} (Code: ${entry.error})`,
                 "debug"
             );
 
