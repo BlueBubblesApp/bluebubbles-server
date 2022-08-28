@@ -144,8 +144,15 @@ class BlueBubblesServer extends EventEmitter {
     region: string | null;
 
     get hasDiskAccess(): boolean {
-        const status = getAuthStatus("full-disk-access");
-        return status === "authorized";
+        // The default value is whether or not our DB is connected.
+        // If it's null, we still default to true because on macOS < 10.14,
+        // there are no FullDiskAccess options.
+        let status = this.iMessageRepo?.db?.isInitialized ?? true;
+        if (isMinMojave) {
+            status = (getAuthStatus("full-disk-access") === "authorized");
+        }
+
+        return status;
     }
 
     get hasAccessibilityAccess(): boolean {
@@ -658,7 +665,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Log if we dont have accessibility access
-        if (this.iMessageRepo?.db) {
+        if (this.hasDiskAccess) {
             this.log("Full-disk access permissions are enabled");
         } else {
             this.log("Full-disk access permissions are required!", "error");
