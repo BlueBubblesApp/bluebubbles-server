@@ -9,9 +9,8 @@
     },
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "scripts": {
-        "build-objc": "cd ./src/objcHelper && clang -mmacosx-version-min=10.11 -framework Foundation bluebubbles_objc_helper.m -o ../../appResources/bluebubblesObjcHelper && cd ../../",
-        "build": "export NODE_ENV=production && npm run build-objc && webpack --config ./scripts/webpack.main.prod.config.js",
-        "start": "export NODE_ENV=development && npm run build-objc && webpack --config ./scripts/webpack.main.config.js && electron ./dist/main.js",
+        "build": "export NODE_ENV=production && webpack --config ./scripts/webpack.main.prod.config.js",
+        "start": "export NODE_ENV=development && webpack --config ./scripts/webpack.main.config.js && electron ./dist/main.js",
         "lint": "eslint --ext=jsx,js,tsx,ts src",
         "dist": "electron-rebuild -f -o better-sqlite3 && npm run build && electron-builder build --mac --publish never --config ./scripts/electron-builder-config.js",
         "postinstall": "electron-rebuild install-app-deps"
@@ -107,6 +106,7 @@
         "node-forge": "^1.3.1",
         "node-mac-contacts": "^1.6.0",
         "node-mac-permissions": "^2.2.1",
+        "node-typedstream": "^1.1.1",
         "numeral": "^2.0.6",
         "plist": "^3.0.6",
         "read-chunk": "^3.2.0",

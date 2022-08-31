@@ -11,6 +11,8 @@ import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinSierra, sanitizeStr } from "@server/helpers/utils";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
+import {NSAttributedString} from "node-typedstream";
+import {AttributedBodyTransformer} from "@server/databases/transformers/AttributedBodyTransformer";
 
 @Entity("message")
 export class Message {
@@ -104,9 +106,10 @@ export class Message {
 
     @Column({
         type: "blob",
-        nullable: true
+        nullable: true,
+        transformer: AttributedBodyTransformer,
     })
-    attributedBody: Blob;
+    attributedBody: NSAttributedString | null;
 
     @Column({ type: "integer", nullable: true, default: 0 })
     version: number;
