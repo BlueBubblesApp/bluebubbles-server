@@ -12,7 +12,8 @@ import {
     parseMetadataString,
     isNotEmpty,
     isEmpty,
-    safeTrim
+    safeTrim,
+    isMinMonterey
 } from "@server/helpers/utils";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
@@ -53,6 +54,9 @@ export class FileSystem {
     public static baseDir = path.join(app.getPath("userData"), subdir);
 
     public static attachmentsDir = path.join(FileSystem.baseDir, "Attachments");
+
+    public static messagesAttachmentsDir = path.join(
+        userHomeDir(), "Library", "Messages", "Attachments", "BlueBubbles");
 
     public static attachmentCacheDir = path.join(FileSystem.baseDir, "Attachments", "Cached");
 
@@ -155,10 +159,16 @@ export class FileSystem {
      * @param buffer The attachment bytes (buffer)
      */
     static copyAttachment(originalPath: string, name: string): string {
-        const newPath = path.join(FileSystem.attachmentsDir, name);
+        let newPath = path.join(FileSystem.attachmentsDir, name);
+        if (isMinMonterey) {
+            if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) fs.mkdirSync(FileSystem.messagesAttachmentsDir);
+            newPath = path.join(FileSystem.messagesAttachmentsDir, name);
+        }
+
         if (newPath !== originalPath) {
             fs.copyFileSync(originalPath, newPath);
         }
+
         return newPath;
     }
 

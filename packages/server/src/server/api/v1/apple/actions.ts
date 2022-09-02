@@ -60,27 +60,27 @@ export class ActionHandler {
         //  3: If we still have an error, throw the error
         let error;
         try {
-            messageScript = buildSendMessageScript(chatGuid, message ?? "", isMinMonterey ? null : theAttachment);
-            if (isMinMonterey) {
-                // If it's monterey, we can't send attachments normally. We need to use accessibility
-                // Make the first script send the image using accessibility. Then the second script sends
-                // just the message
-                if (isNotEmpty(theAttachment)) {
-                    // Fetch participants of the chat and get handles (addresses)
-                    const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-                    if (isNotEmpty(chats) && isNotEmpty(chats[0]?.participants)) {
-                        // If we have a group name, use that as the address to enter
-                        let participants = [];
-                        if ((chats[0]?.participants ?? []).length > 1 && isNotEmpty(chats[0].displayName)) {
-                            participants = [chats[0].displayName];
-                        } else {
-                            participants = chats[0].participants.map(i => i.id);
-                        }
+            messageScript = buildSendMessageScript(chatGuid, message ?? "", theAttachment);
+            // if (isMinMonterey) {
+            //     // If it's monterey, we can't send attachments normally. We need to use accessibility
+            //     // Make the first script send the image using accessibility. Then the second script sends
+            //     // just the message
+            //     if (isNotEmpty(theAttachment)) {
+            //         // Fetch participants of the chat and get handles (addresses)
+            //         const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+            //         if (isNotEmpty(chats) && isNotEmpty(chats[0]?.participants)) {
+            //             // If we have a group name, use that as the address to enter
+            //             let participants = [];
+            //             if ((chats[0]?.participants ?? []).length > 1 && isNotEmpty(chats[0].displayName)) {
+            //                 participants = [chats[0].displayName];
+            //             } else {
+            //                 participants = chats[0].participants.map(i => i.id);
+            //             }
 
-                        await FileSystem.executeAppleScript(sendAttachmentAccessibility(theAttachment, participants));
-                    }
-                }
-            }
+            //             await FileSystem.executeAppleScript(sendAttachmentAccessibility(theAttachment, participants));
+            //         }
+            //     }
+            // }
 
             // Try to send the message
             await FileSystem.executeAppleScript(messageScript);
