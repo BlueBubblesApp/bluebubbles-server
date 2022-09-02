@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text, Divider } from '@chakra-ui/react';
+import { Box, Text, Divider, Stack } from '@chakra-ui/react';
 import { ConnectionSettings } from './connection/ConnectionSettings';
 import { FeatureSettings } from './features/FeatureSettings';
 import { UpdateSettings } from './update/UpdateSettings';
@@ -7,6 +7,7 @@ import { ResetSettings } from './reset/ResetSettings';
 import { ThemeSettings } from './theme/ThemeSettings';
 import { DatabaseSettings } from './database/DatabaseSettings';
 import { PermissionRequirements } from '../../components/PermissionRequirements';
+import { AttachmentCacheBox } from 'app/components/AttachmentCacheBox';
 
 
 export const SettingsLayout = (): JSX.Element => {
@@ -18,11 +19,19 @@ export const SettingsLayout = (): JSX.Element => {
                 <DatabaseSettings />
                 <UpdateSettings />
                 <ThemeSettings />
-                <Box p={5}>
-                    <Text fontSize='2xl'>Permission Status</Text>
-                    <Divider orientation='horizontal' my={3}/>
-                    <PermissionRequirements />
-                </Box>
+                <Stack direction='row' align='flex-start' flexWrap={'wrap'}>
+                    <Box py={5}>
+                        <Text fontSize='2xl'>Permission Status</Text>
+                        <Divider orientation='horizontal' my={3}/>
+                        <PermissionRequirements />
+                    </Box>
+                    <Box py={5}>
+                        <Text fontSize='2xl'>Attachment Management</Text>
+                        <Divider orientation='horizontal' my={3}/>
+                        <AttachmentCacheBox />
+                    </Box>
+                </Stack>
+                
                 <ResetSettings />
             </Box>
         </section>
