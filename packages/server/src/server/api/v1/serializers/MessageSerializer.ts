@@ -71,6 +71,7 @@ export class MessageSerializer {
             for (const item of attributedMessages?.data ?? []) {
                 if (isEmpty(item?.id) || isEmpty(item?.body)) continue;
                 const matchIndex = messageResponses.findIndex(m => m.guid === item.id);
+                if (matchIndex === -1) continue;
 
                 // Make sure the response is a list so we can support multiple attribute bodies later
                 messageResponses[matchIndex].attributedBody = !Array.isArray(item.body) ? [item.body] : item.body;
