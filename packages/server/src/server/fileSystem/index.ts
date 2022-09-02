@@ -147,6 +147,7 @@ export class FileSystem {
      * @param buffer The attachment bytes (buffer)
      */
     static saveAttachment(name: string, buffer: Uint8Array): string {
+        if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
         const newPath = path.join(FileSystem.attachmentsDir, name);
         fs.writeFileSync(newPath, buffer);
         return newPath;
@@ -163,6 +164,8 @@ export class FileSystem {
         if (isMinMonterey) {
             if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) fs.mkdirSync(FileSystem.messagesAttachmentsDir);
             newPath = path.join(FileSystem.messagesAttachmentsDir, name);
+        } else {
+            if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
         }
 
         if (newPath !== originalPath) {
@@ -171,6 +174,70 @@ export class FileSystem {
 
         return newPath;
     }
+
+    static async cachedAttachmentCount() {
+        let count = 0;
+        const files = [
+            FileSystem.attachmentsDir, FileSystem.attachmentCacheDir,
+            FileSystem.messagesAttachmentsDir
+        ];
+
+        for (const file of files) {
+            if (fs.existsSync(file)) {
+                count += (await FileSystem.getFiles(file)).length;
+            }
+        }
+
+        return count;
+    }
+
+    static clearAttachmentCaches() {
+        const files = [
+            FileSystem.attachmentsDir, FileSystem.attachmentCacheDir,
+            FileSystem.messagesAttachmentsDir
+        ];
+
+        for (const file of files) {
+            if (fs.existsSync(file)) {
+                fs.rmdirSync(file, { recursive: true });
+            }
+
+            fs.mkdirSync(file);
+        }
+    }
+
+    static async getCachedAttachmentsSize(): Promise<number> {
+        let size = 0;
+        const files = [
+            FileSystem.attachmentsDir, FileSystem.attachmentCacheDir,
+            FileSystem.messagesAttachmentsDir
+        ];
+
+        for (const file of files) {
+            if (fs.existsSync(file)) {
+                size += await FileSystem.getDirectorySize(file);
+            }
+        }
+
+        return size;
+    }
+
+    static async getDirectorySize(directory: string) {
+        const files = await fs.promises.readdir( directory );
+        const stats = files.map( file => fs.promises.stat( path.join( directory, file ) ) );
+        return ( await Promise.all( stats ) ).reduce( ( accumulator, { size } ) => accumulator + size, 0 );
+    }
+
+    static async getFiles(dir: string): Promise<string[]> {
+        const dirents = await fs.promises.readdir(dir, { withFileTypes: true });
+        const files = await Promise.all(dirents.map((dirent) => {
+            const res = path.resolve(dir, dirent.name);
+            return dirent.isDirectory() ? FileSystem.getFiles(res) : res;
+        }));
+
+        return Array.prototype.concat(...files);
+    }
+      
 
     /**
      * Saves an attachment by chunk

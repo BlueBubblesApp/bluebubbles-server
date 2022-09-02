@@ -117,3 +117,11 @@ export const openAccessibilityPrefs = async () => {
 export const getPrivateApiStatus = async () => {
     return await ipcRenderer.invoke('get-private-api-status');
 };
+
+export const getAttachmentCacheInfo = async () => {
+    return await ipcRenderer.invoke('get-attachment-cache-info');
+};
+
+export const clearAttachmentCache = async () => {
+    return await ipcRenderer.invoke('clear-attachment-caches');
+};

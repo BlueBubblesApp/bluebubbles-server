@@ -39,7 +39,7 @@ export const ResetSettings = (): JSX.Element => {
     });
     return (
         <Stack direction='column' p={5}>
-            <Text fontSize='2xl'>Reset Settings</Text>
+            <Text fontSize='2xl'>Danger Zone</Text>
             <Divider orientation='horizontal' />
             <Spacer />
             <Button

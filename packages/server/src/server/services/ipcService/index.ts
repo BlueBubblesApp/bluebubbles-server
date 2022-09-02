@@ -300,5 +300,15 @@ export class IPCService {
         ipcMain.handle("open-accessibility-preferences", async (_, __) => {
             askForAccessibilityAccess();
         });
+
+        ipcMain.handle("get-attachment-cache-info", async (_, __) => {
+            const count = await FileSystem.cachedAttachmentCount();
+            const size = await FileSystem.getCachedAttachmentsSize();
+            return { count, size };
+        });
+
+        ipcMain.handle("clear-attachment-caches", async (_, __) => {
+            FileSystem.clearAttachmentCaches();
+        });
     }
 }
