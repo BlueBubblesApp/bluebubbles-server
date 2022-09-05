@@ -7,6 +7,8 @@ import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
 
+app.commandLine.appendSwitch('in-process-gpu');
+
 // Patch in original user data directory
 app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', 'bluebubbles-server'));
 
@@ -37,9 +39,6 @@ if (!gotTheLock) {
 }
 
 process.on("uncaughtException", error => {
-    // These are typically errors from the Swift Helper
-    if (error?.message === 'write EPIPE') return;
-
     // Print the exception
     Server().log(`Uncaught Exception: ${error.message}`, "error");
     if (error?.stack) Server().log(`Uncaught Exception StackTrace: ${error?.stack}`, 'debug');
