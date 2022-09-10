@@ -4,9 +4,11 @@ import { Next } from "koa";
 import { Server } from "@server";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { HandleInterface } from "@server/api/v1/interfaces/handleInterface";
-import { isEmpty, safeTrim } from "@server/helpers/utils";
+import { isEmpty } from "@server/helpers/utils";
+import { arrayHasOne } from "@server/utils/CollectionUtils";
 import { Success } from "../responses/success";
 import { NotFound } from "../responses/errors";
+import { parseWithQuery } from "../utils";
 
 export class HandleRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -25,12 +27,9 @@ export class HandleRouter {
         const { body } = ctx.request;
 
         // Pull out the filters
-        const withQuery = (body?.with ?? [])
-            .filter((e: any) => typeof e === "string")
-            .map((e: string) => safeTrim(e.toLowerCase()));
-        const withChats = withQuery.includes("chat") || withQuery.includes("chats");
-        const withChatParticipants =
-            withQuery.includes("chat.participants") || withQuery.includes("chats.participants");
+        const withQuery = parseWithQuery(body?.with);
+        const withChats = arrayHasOne(withQuery, ['chat', 'chats']);
+        const withChatParticipants = arrayHasOne(withQuery, ["chat.participants", "chats.participants"]);
         const address = body?.address;
 
         // Pull the pagination params and make sure they are correct

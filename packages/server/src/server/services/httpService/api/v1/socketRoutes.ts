@@ -22,7 +22,6 @@ import { ErrorTypes, ResponseFormat, ResponseJson } from "@server/services/httpS
 // Entities
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
-import { getMessageResponse } from "@server/databases/imessage/entity/Message";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { ActionHandler } from "@server/api/v1/apple/actions";
@@ -38,6 +37,7 @@ import {
     createBadRequestResponse,
     createNoDataResponse
 } from "./responses";
+import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
@@ -325,12 +325,10 @@ export class SocketRoutes {
             if (params?.where) dbParams.where = params.where;
 
             const messages = await Server().iMessageRepo.getMessages(dbParams);
-            const results = [];
-            for (const msg of messages) {
-                const msgRes = await getMessageResponse(msg);
-                results.push(msgRes);
-            }
-
+            const results = await MessageSerializer.serializeList({
+                messages,
+                loadChatParticipants: params?.withChatParticipants ?? params?.withChats ?? false
+            });
             return response(cb, "chat-messages", createSuccessResponse(results));
         });
 
@@ -367,31 +365,10 @@ export class SocketRoutes {
 
             // Get the messages
             const messages = await Server().iMessageRepo.getMessages(dbParams);
-
-            // Handle fetching the chat participants with the messages (if requested)
-            const withChatParticipants = params?.withChatParticipants ?? false;
-            const chatCache: { [key: string]: Handle[] } = {};
-            if (withChatParticipants) {
-                const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-                for (const i of chats) {
-                    chatCache[i.guid] = i.participants;
-                }
-            }
-
-            const results = [];
-            for (const msg of messages) {
-                // Insert in the participants from the cache
-                if (withChatParticipants) {
-                    for (const chat of msg.chats) {
-                        if (Object.keys(chatCache).includes(chat.guid)) {
-                            chat.participants = chatCache[chat.guid];
-                        }
-                    }
-                }
-
-                const msgRes = await getMessageResponse(msg);
-                results.push(msgRes);
-            }
+            const results = await MessageSerializer.serializeList({
+                messages,
+                loadChatParticipants: params?.withChatParticipants ?? params?.withChats ?? false
+            });
 
             return response(cb, "messages", createSuccessResponse(results));
         });
@@ -474,7 +451,7 @@ export class SocketRoutes {
             });
             if (isEmpty(messages)) return response(cb, "last-chat-message", createNoDataResponse());
 
-            const result = await getMessageResponse(messages[0]);
+            const result = await MessageSerializer.serialize({ message: messages[0], loadChatParticipants: false });
             return response(cb, "last-chat-message", createSuccessResponse(result));
         });
 
@@ -555,29 +532,25 @@ export class SocketRoutes {
                 if (params?.attachment && params?.attachmentName && params?.attachmentGuid) {
                     // Save the attachment data
                     const b = base64.base64ToBytes(params.attachment);
-                    // eslint-disable-next-line no-param-reassign
                     const newPath = FileSystem.saveAttachment(params.attachmentName, b);
 
                     // Send the attachment first
-                    sentMessage = await MessageInterface.sendAttachmentSync(
+                    sentMessage = await MessageInterface.sendAttachmentSync({
                         chatGuid,
-                        newPath,
-                        params?.attachmentName,
-                        params?.attachmentGuid
-                    );
+                        attachmentPath: newPath,
+                        attachmentName: params?.attachmentName,
+                        attachmentGuid: params?.attachmentGuid
+                    });
                 }
 
                 // If we have a message, send it second
                 if (isNotEmpty(message)) {
-                    sentMessage = await MessageInterface.sendMessageSync(
+                    sentMessage = await MessageInterface.sendMessageSync({
                         chatGuid,
                         message,
-                        "apple-script",
-                        null,
-                        null,
-                        null,
+                        method: "apple-script",
                         tempGuid
-                    );
+                    });
                 }
 
                 Server().httpService.sendCache.remove(tempGuid);
@@ -589,11 +562,19 @@ export class SocketRoutes {
                             "Message failed to send!",
                             ErrorTypes.IMESSAGE_ERROR,
                             "Message sent with an error. See attached message",
-                            await getMessageResponse(sentMessage)
+                            // No need to load the participants since we sent the message
+                            await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false })
                         )
                     );
                 } else {
-                    return response(cb, "message-sent", createSuccessResponse(await getMessageResponse(sentMessage)));
+                    // No need to load the participants since we sent the message
+                    return response(
+                        cb,
+                        "message-sent",
+                        createSuccessResponse(
+                            await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false })
+                        )
+                    );
                 }
             } catch (ex: any) {
                 Server().httpService.sendCache.remove(tempGuid);
@@ -873,17 +854,21 @@ export class SocketRoutes {
             // If the helper is online, use it to send the tapback
             if (Server().privateApiHelper?.helper) {
                 try {
-                    const sentMessage = await MessageInterface.sendReaction(
-                        params.chatGuid,
+                    const sentMessage = await MessageInterface.sendReaction({
+                        chatGuid: params.chatGuid,
                         message,
-                        params.tapback,
+                        reaction: params.tapback,
                         tempGuid
-                    );
+                    });
 
                     return response(
                         cb,
                         "tapback-sent",
-                        createSuccessResponse(await getMessageResponse(sentMessage), "Successfully sent reaction!")
+                        // No need to load the participants since we sent the message
+                        createSuccessResponse(
+                            await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false }),
+                            "Successfully sent reaction!"
+                        )
                     );
                 } catch (ex: any) {
                     return response(cb, "send-tapback-error", createServerErrorResponse(ex?.message ?? ex));

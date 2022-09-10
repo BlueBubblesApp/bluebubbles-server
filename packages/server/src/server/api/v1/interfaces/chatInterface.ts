@@ -32,9 +32,7 @@ export class ChatInterface {
         const tmpChats = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
             withParticipants: true,
-            withArchived,
-            offset,
-            limit
+            withArchived
         });
 
         for (const chat of tmpChats) {
@@ -161,15 +159,12 @@ export class ChatInterface {
             // Since chat creation doesn't work on Big Sur+, we just need to send the message to an
             // "infered" Chat GUID based on the service and first (only) address
             chatGuid = `${service};-;${theAddrs[0]}`;
-            sentMessage = await MessageInterface.sendMessageSync(
+            sentMessage = await MessageInterface.sendMessageSync({
                 chatGuid,
                 message,
-                "apple-script",
-                null,
-                null,
-                null,
+                method: "apple-script",
                 tempGuid
-            );
+            });
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
             Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
@@ -181,6 +176,7 @@ export class ChatInterface {
         }
 
         // Fetch the chat based on the return data
+        Server().log(`Verifying Chat creation for GUID: ${chatGuid}`, "debug");
         let chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
         let tryCount = 0;
         while (isEmpty(chats)) {
@@ -203,13 +199,14 @@ export class ChatInterface {
 
         // If we have a message, want to send via the private api, and are not on Big Sur, send the message
         if (isNotEmpty(message) && !isMinBigSur) {
-            Server().log(`Sending message...`, "debug");
-            sentMessage = await MessageInterface.sendMessageSync(chatGuid, message, method, null, null, null, tempGuid);
-            Server().log(`Message sent!`, "debug");
+            sentMessage = await MessageInterface.sendMessageSync({ chatGuid, message, method, tempGuid });
         }
 
         const chat = chats[0];
-        chat.messages = [sentMessage];
+        if (sentMessage) {
+            chat.messages = [sentMessage];
+        }
+
         return chat;
     }
 
@@ -225,13 +222,14 @@ export class ChatInterface {
             throw new Error("Chat is not a group chat!");
         }
 
+        Server().log(`Toggling Participant [Action: ${action}]: ${address}...`, "debug");
         await Server().privateApiHelper.toggleParticipant(theChat.guid, address, action);
 
         let tryCount = 0;
         while (newCount === prevCount) {
             tryCount += 1;
 
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            // If we've tried 20 times and there is no change, break out (~10 seconds)
             if (tryCount >= 20) break;
 
             // Give it a bit to execute
@@ -248,7 +246,7 @@ export class ChatInterface {
 
         // Check if the name changed
         if (newCount === prevCount) {
-            throw new Error("Failed to set new display name! Operation took longer than 5 seconds!");
+            throw new Error(`Failed to ${action} participant to chat! Operation took longer than 5 seconds!`);
         }
 
         return theChat;

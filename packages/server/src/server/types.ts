@@ -22,6 +22,7 @@ export type MessageResponse = {
     tempGuid?: string;
     guid: string;
     text: string;
+    attributedBody?: NodeJS.Dict<any>[];
     handle?: HandleResponse | null;
     handleId: number;
     otherHandle: number;
@@ -99,6 +100,7 @@ export type AttachmentResponse = {
     transferName: string;
     isSticker: boolean;
     hideAttachment: boolean;
+    originalGuid: string;
     metadata: { [key: string]: string | boolean | number };
 };
 

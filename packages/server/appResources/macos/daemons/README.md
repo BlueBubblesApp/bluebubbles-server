@@ -8,4 +8,4 @@ The `.md5` files within this directory contain a single string that is correlate
 
 This is the official cloudflare daemon, downloaded from: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz
 
-The dummy `cloufldared-config.yml` file is for the daemon to use as to not interfere with the default system configuration
+The dummy `cloudflared-config.yml` file is for the daemon to use as to not interfere with the default system configuration

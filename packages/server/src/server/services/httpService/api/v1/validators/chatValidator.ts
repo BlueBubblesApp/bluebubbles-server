@@ -19,7 +19,7 @@ export class ChatValidator {
     }
 
     static queryRules = {
-        with: "array|in:participants,lastMessage,lastmessage,archived",
+        with: "array",
         sort: "string|in:lastmessage",
         offset: "numeric|min:0",
         limit: "numeric|min:1|max:1000"
@@ -53,12 +53,11 @@ export class ChatValidator {
     }
 
     static toggleParticipantRules = {
-        address: "required|string",
-        message: "string"
+        address: "required|string"
     };
 
     static async validateToggleParticipant(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx?.request?.body, ChatValidator.createRules);
+        ValidateInput(ctx?.request?.body, ChatValidator.toggleParticipantRules);
         await next();
     }
 }

@@ -61,7 +61,7 @@ export class BadRequest extends HTTPError {
 export class NotFound extends HTTPError {
     constructor(response?: ResponseParams) {
         super({
-            status: 400,
+            status: 404,
             message: response?.message ?? "The requested resource was not found",
             error: {
                 type: ErrorTypes.DATABSE_ERROR,

@@ -1,17 +1,34 @@
 import { Server } from "@server";
-import { imageExtensions } from "@server/api/v1/apple/constants";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { isMinMonterey, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { getFilenameWithoutExtension, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+
+export class MessagePromiseRejection extends Error {
+    error: string;
+
+    msg: Message | null;
+
+    tempGuid: string | null;
+
+    constructor(error: string, message?: Message, tempGuid?: string) {
+        super(error);
+        this.name = this.constructor.name;
+        this.msg = message;
+        this.tempGuid = tempGuid;
+        Error.captureStackTrace(this, this.constructor);
+    }
+}
 
 export class MessagePromise {
     promise: Promise<Message>;
 
     private resolvePromise: (value: Message | PromiseLike<Message>) => void;
 
-    private rejectPromise: (reason?: any) => void;
+    private rejectPromise: (reason?: MessagePromiseRejection) => void;
 
     text: string;
+
+    subject: string;
 
     chatGuid: string;
 
@@ -28,7 +45,6 @@ export class MessagePromise {
     private tempGuid?: string | null;
 
     constructor({ chatGuid, text, isAttachment, sentAt, subject, tempGuid }: MessagePromiseConstructorParameters) {
-
         // Used to temporarily update the guid
         this.tempGuid = tempGuid;
 
@@ -45,16 +61,12 @@ export class MessagePromise {
         });
 
         this.chatGuid = chatGuid;
-        this.text = `${subject ?? ""}${text ?? ""}`;
+        this.text = isAttachment ? getFilenameWithoutExtension(text) : onlyAlphaNumeric(text ?? "");
+        this.subject = onlyAlphaNumeric(subject ?? "");
         this.isAttachment = isAttachment;
 
         // Subtract 10 seconds to account for any "delay" in the sending process (somehow)
         this.sentAt = typeof sentAt === "number" ? sentAt : sentAt.getTime();
-
-        // If this is an attachment, we don't need to compare the message text
-        if (!this.isAttachment) {
-            this.text = onlyAlphaNumeric(this.text);
-        }
 
         // Create a timeout for how long until we "error-out".
         // Timeouts should change based on if it's an attachment or message
@@ -77,9 +89,9 @@ export class MessagePromise {
         await this.emitMessageMatch(value);
     }
 
-    async reject(reason?: any, message: Message = null) {
+    async reject(reason?: string, message: Message = null) {
         this.isResolved = true;
-        this.rejectPromise(reason);
+        this.rejectPromise(new MessagePromiseRejection(reason, message, this.tempGuid));
         if (message) {
             await this.emitMessageError(message);
         }
@@ -99,17 +111,12 @@ export class MessagePromise {
             if (this.tempGuid) {
                 Server().httpService.sendCache.remove(this.tempGuid);
             }
-            
+
             await Server().emitMessageError(sentMessage, this.tempGuid);
         }
     }
 
     isSame(message: Message) {
-        // We can only set one attachment at a time, so we will check that one
-        // Images will have an invisible character as the text (of length 1)
-        // So if it's an attachment, and doesn't meet the criteria, return false
-        const matchTxt = `${message.subject ?? ""}${message.text ?? ""}`;
-
         // If we have chats, we need to make sure this promise is for that chat
         // We use endsWith to support when the chatGuid is just an address
         if (isNotEmpty(message.chats) && !message.chats.some((c: Chat) => c.guid.endsWith(this.chatGuid))) {
@@ -118,15 +125,30 @@ export class MessagePromise {
 
         // If this is an attachment, we need to match it slightly differently
         if (this.isAttachment) {
-            if ((message.attachments ?? []).length > 1 || matchTxt.length > 1) return false;
+            // If this was supposed to be an attachment, but there are no attachments, there's no match
+            if ((message.attachments ?? []).length === 0) return false;
 
-            // If the transfer names match, congratz we have a match.
-            return message.attachments[0].transferName.endsWith(this.text.split("->")[1]);
+            // Iterate over the attachments and check if any of the transfer names match the one we are awaiting on
+            for (const a of message.attachments) {
+                // If the transfer names match, congratz we have a match.
+                // We don't need to get the filename from the text because we've already
+                // done that in the constructor.
+                if (getFilenameWithoutExtension(a.transferName) === this.text) return true;
+            }
+
+            // If we have no attachment matches, they're not the same
+            return false;
         }
 
-        return this.text === onlyAlphaNumeric(message.text) && this.sentAt < message.dateCreated.getTime();
+        // Check if the subject matches
+        const cmpSubject = isNotEmpty(this.subject) && isNotEmpty(message.subject);
+        if (cmpSubject && this.subject !== onlyAlphaNumeric(message.subject)) return false;
+
+        // Check if the text matches
+        return this.text === onlyAlphaNumeric(message.text) && this.sentAt <= message.dateCreated.getTime();
     }
 }
+
 interface MessagePromiseConstructorParameters {
     chatGuid: string;
     text: string;

@@ -67,7 +67,7 @@ export abstract class Proxy {
      */
     async start(): Promise<void> {
         if (!this.canStart()) {
-            Server().log(`${this.opts.name} proxy is diabled. Not restarting.`);
+            Server().log(`${this.opts.name} proxy is disabled. Not restarting.`);
             return;
         }
 

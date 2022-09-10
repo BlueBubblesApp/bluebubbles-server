@@ -71,7 +71,10 @@ export class ContactInterface {
         }: {
             extraProps?: string[]
         } = {}): any {
-        return records.map((e: NodeJS.Dict<any>) => {
+        return records.map((contact: NodeJS.Dict<any>) => {
+            // We have to make a copy so that when we "delete", we aren't deleting from the master copy.
+            const e = { ...contact };
+            
             // Only include extra properties that are asked for.
             for (const prop of ContactInterface.apiExtraProperties) {
                 if (!extraProps.includes(prop) && Object.keys(e).includes(prop)) {
@@ -173,9 +176,10 @@ export class ContactInterface {
      * @returns A list of contact entries from both the API and local DB
      */
     static async getAllContacts(extraProperties: string[] = []): Promise<any[]> {
+        extraProperties = extraProperties.map(e => e.toLowerCase());
         const withAvatars =
-            extraProperties.includes("contactImage") ||
-            extraProperties.includes("contactThumbnailImage") ||
+            extraProperties.includes("contactimage") ||
+            extraProperties.includes("contactthumbnailimage") ||
             extraProperties.includes("avatar");
         const apiContacts = ContactInterface.getApiContacts(extraProperties);
         const dbContacts = await ContactInterface.getDbContacts(withAvatars);

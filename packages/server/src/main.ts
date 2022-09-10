@@ -7,11 +7,14 @@ import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
 
+app.commandLine.appendSwitch('in-process-gpu');
+
 // Patch in original user data directory
 app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', 'bluebubbles-server'));
 
 let win: BrowserWindow;
 let tray: Tray;
+let isHandlingExit = false;
 
 // Instantiate the server
 Server(win);
@@ -20,7 +23,7 @@ Server(win);
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
     console.error("BlueBubbles is already running! Quiting...");
-    app.quit();
+    app.exit(0);
 } else {
     app.on("second-instance", (_, __, ___) => {
         if (win) {
@@ -36,15 +39,24 @@ if (!gotTheLock) {
 }
 
 process.on("uncaughtException", error => {
+    // Print the exception
     Server().log(`Uncaught Exception: ${error.message}`, "error");
     if (error?.stack) Server().log(`Uncaught Exception StackTrace: ${error?.stack}`, 'debug');
     
 });
 
-const handleExit = async () => {
-    if (!Server() || Server().isStopping) return;
-    await Server().stopServices();
-    app.quit();
+const handleExit = async (event: any = null) => {
+    if (event) event.preventDefault();
+    console.trace('handleExit');
+    if (isHandlingExit) return;
+    isHandlingExit = true;
+
+    // Safely close the services
+    if (Server() && !Server().isStopping) {
+        await Server().stopServices();
+    }
+    
+    app.exit(0);
 };
 
 const buildTray = () => {
@@ -199,12 +211,9 @@ app.on("window-all-closed", () => {
 });
 
 /**
- * I'm not totally sure this will work because of the way electron is... but, I'm going to try.
  * Basically, we want to gracefully exist whenever there is a Ctrl + C or other exit command
  */
-app.on("before-quit", () => handleExit());
-app.on("will-quit", () => handleExit());
-process.on("SIGINT", () => handleExit());
+app.on("before-quit", (event) => handleExit(event));
 
 /**
  * All code below this point has to do with the command-line functionality.

@@ -7,7 +7,7 @@ import { parse as ParsePlist } from "plist";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
-import { isEmpty, isMinBigSur, isMinMonterey, isNotEmpty } from "@server/helpers/utils";
+import { clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty } from "@server/helpers/utils";
 import { restartMessages } from "@server/api/v1/apple/scripts";
 import {
     TransactionPromise,
@@ -18,6 +18,7 @@ import { TransactionManager } from "@server/managers/transactionManager";
 
 import * as net from "net";
 import { ValidRemoveTapback } from "../../types";
+import { MAX_PORT, MIN_PORT } from "./constants";
 
 type BundleStatus = {
     success: boolean;
@@ -32,6 +33,10 @@ export class BlueBubblesHelperService {
     restartCounter: number;
 
     transactionManager: TransactionManager;
+
+    static get port(): number {
+        return clamp(MIN_PORT + os.userInfo().uid - 501, MIN_PORT, MAX_PORT);
+    }
 
     constructor() {
         this.restartCounter = 0;
@@ -180,10 +185,9 @@ export class BlueBubblesHelperService {
         // we'll base this off the users uid (a unique id for each user, starting from 501)
         // we'll subtract 501 to get an id starting at 0, incremented for each user
         // then we add this to the base port to get a unique port for the socket
-        const port = 45670 + os.userInfo().uid - 501;
-        Server().log(`Starting Socket server on port ${port}`);
+        Server().log(`Starting Socket server on port ${BlueBubblesHelperService.port}`);
         // Listen and reset the restart counter
-        this.server.listen(port, "localhost", 511, () => {
+        this.server.listen(BlueBubblesHelperService.port, "localhost", 511, () => {
             this.restartCounter = 0;
         });
     }
@@ -286,6 +290,7 @@ export class BlueBubblesHelperService {
     async sendMessage(
         chatGuid: string,
         message: string,
+        attributedBody: Record<string, any> = null,
         subject: string = null,
         effectId: string = null,
         selectedMessageGuid: string = null
@@ -295,7 +300,18 @@ export class BlueBubblesHelperService {
         }
 
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.writeData("send-message", { chatGuid, subject, message, effectId, selectedMessageGuid }, request);
+        return this.writeData(
+            "send-message",
+            {
+                chatGuid,
+                subject,
+                message,
+                attributedBody,
+                effectId,
+                selectedMessageGuid
+            },
+            request
+        );
     }
 
     async addParticipant(chatGuid: string, address: string) {
@@ -369,7 +385,7 @@ export class BlueBubblesHelperService {
                     // Resolve the promise from the transaction manager
                     const idx = this.transactionManager.findIndex(data.transactionId);
                     if (idx >= 0) {
-                        if (isNotEmpty(data?.error ?? '')) {
+                        if (isNotEmpty(data?.error ?? "")) {
                             this.transactionManager.promises[idx].reject(data.error);
                         } else {
                             this.transactionManager.promises[idx].resolve(data.identifier, data?.data);

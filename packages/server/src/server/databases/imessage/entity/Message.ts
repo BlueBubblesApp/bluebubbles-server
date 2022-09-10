@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
 import { conditional } from "conditional-decorator";
 
+import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
@@ -101,7 +102,10 @@ export class Message {
     @Column({ type: "text", nullable: true })
     country: string;
 
-    @Column({ type: "blob", nullable: true })
+    @Column({
+        type: "blob",
+        nullable: true
+    })
     attributedBody: Blob;
 
     @Column({ type: "integer", nullable: true, default: 0 })
@@ -503,76 +507,3 @@ export class Message {
     )
     threadOriginatorPart: string;
 }
-
-export const getMessageResponse = async (
-    tableData: Message,
-    {
-        convertAttachments = true,
-        loadAttachmentMetadata = true,
-        getAttachmentData = false
-    }: {
-        convertAttachments?: boolean,
-        loadAttachmentMetadata?: boolean,
-        getAttachmentData?: boolean
-    } = {}): Promise<MessageResponse> => {
-    // Load attachments
-    const attachments = [];
-    for (const attachment of tableData?.attachments ?? []) {
-        const resData = await getAttachmentResponse(attachment, {
-            convert: convertAttachments,
-            getData: getAttachmentData,
-            loadMetadata: loadAttachmentMetadata
-        });
-        attachments.push(resData);
-    }
-
-    const chats = [];
-    for (const chat of tableData?.chats ?? []) {
-        const chatRes = await getChatResponse(chat);
-        chats.push(chatRes);
-    }
-
-    return {
-        originalROWID: tableData.ROWID,
-        guid: tableData.guid,
-        text: tableData.text,
-        handle: tableData.handle ? await getHandleResponse(tableData.handle) : null,
-        handleId: tableData.handleId,
-        otherHandle: tableData.otherHandle,
-        chats,
-        attachments,
-        subject: tableData.subject,
-        country: tableData.country,
-        error: tableData.error,
-        dateCreated: tableData.dateCreated ? tableData.dateCreated.getTime() : null,
-        dateRead: tableData.dateRead ? tableData.dateRead.getTime() : null,
-        dateDelivered: tableData.dateDelivered ? tableData.dateDelivered.getTime() : null,
-        isFromMe: tableData.isFromMe,
-        isDelayed: tableData.isDelayed,
-        isAutoReply: tableData.isAutoReply,
-        isSystemMessage: tableData.isSystemMessage,
-        isServiceMessage: tableData.isServiceMessage,
-        isForward: tableData.isForward,
-        isArchived: tableData.isArchived,
-        cacheRoomnames: tableData.cacheRoomnames,
-        isAudioMessage: tableData.isAudioMessage,
-        hasDdResults: tableData.hasDdResults,
-        datePlayed: tableData.datePlayed ? tableData.datePlayed.getTime() : null,
-        itemType: tableData.itemType,
-        groupTitle: tableData.groupTitle,
-        groupActionType: tableData.groupActionType,
-        isExpired: tableData.isExpirable,
-        balloonBundleId: tableData.balloonBundleId,
-        associatedMessageGuid: tableData.associatedMessageGuid,
-        associatedMessageType: tableData.associatedMessageType,
-        expressiveSendStyleId: tableData.expressiveSendStyleId,
-        timeExpressiveSendStyleId: tableData.timeExpressiveSendStyleId
-            ? tableData.timeExpressiveSendStyleId.getTime()
-            : null,
-        replyToGuid: tableData.replyToGuid,
-        isCorrupt: tableData.isCorrupt,
-        isSpam: tableData.isSpam,
-        threadOriginatorGuid: tableData.threadOriginatorGuid,
-        threadOriginatorPart: tableData.threadOriginatorPart
-    };
-};

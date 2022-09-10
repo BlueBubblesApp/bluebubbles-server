@@ -55,79 +55,51 @@ export class OutgoingMessageListener extends ChangeListener {
             }
         ];
 
-        // First, check for unsent messages
-        const newUnsent = await this.repo.getMessages({
+        // 1: Check for new messages
+        const newMessages = await this.repo.getMessages({
             after,
-            withChats: false,
-            withAttachments: false,
-            withHandle: false,
-            where: [
-                ...baseQuery,
-                {
-                    statement: "message.is_sent = :isSent",
-                    args: { isSent: 0 }
-                }
-            ]
+            withChats: true,
+            where: [...baseQuery]
         });
 
+        // 2: Divide the new messages into sent/unsent buckets
+        const newUnsent = newMessages.filter(e => !e.isSent);
+        const newSent = newMessages.filter(e => e.isSent);
         if (isNotEmpty(newUnsent)) {
             Server().log(`Detected ${newUnsent.length} unsent outgoing message(s)`, "debug");
         }
 
-        // Second, check for sent messages
-        const newSent = await this.repo.getMessages({
-            after,
-            withChats: true,
-            where: [
-                ...baseQuery,
-                {
-                    statement: "message.is_sent = :isSent",
-                    args: { isSent: 1 }
-                }
-            ]
-        });
-
-        // Make sure none of the "sent" ones include the unsent ones
-        const unsent = [];
-        for (const us of newUnsent) {
-            let found = false;
-            for (const s of newSent) {
-                if (us.ROWID === s.ROWID) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                unsent.push(us.ROWID);
-            }
+        // 3: Gather IDs of all unsent messages (from now & previously)
+        const unsentIds: number[] = newUnsent.map(e => e.ROWID);
+        for (const i of this.notSent) {
+            if (!unsentIds.includes(i)) unsentIds.push(i);
         }
 
-        // Third, check for anything that hasn't been sent
-        const lookbackSent = await this.repo.getMessages({
+        // 4: Find all unsent messages
+        const lookbackMessages = await this.repo.getMessages({
             withChats: true,
             where: [
                 ...baseQuery,
                 {
-                    statement: `message.ROWID in (${this.notSent.join(", ")})`,
+                    statement: `message.ROWID in (${unsentIds.join(", ")})`,
                     args: null
                 }
             ]
         });
-
-        if (isNotEmpty(lookbackSent)) {
-            Server().log(`Detected ${lookbackSent.length} sent (previously unsent) message(s)`, "debug");
+        if (isNotEmpty(lookbackMessages)) {
+            Server().log(`Detected ${lookbackMessages.length} sent (previously unsent) message(s)`, "debug");
         }
 
-        // Fourth, add the new unsent items to the list
-        const sentOrErrored = lookbackSent.filter(item => item.isSent || item.error > 0).map(item => item.ROWID);
-        this.notSent = this.notSent.filter(item => !sentOrErrored.includes(item)); // Filter down not sent
-        for (const i of unsent) // Add newly unsent to
-            if (!this.notSent.includes(i)) this.notSent.push(i);
+        // 5: Gather all the lookback messages and put them into buckets for the different outcomes
+        const lookbackSent = lookbackMessages.filter(item => item.isSent && (item?.error ?? 0) === 0);
+        const lookbackErrored = lookbackMessages.filter(item => (item?.error ?? 0) > 0);
+        const lookbackUnsent = lookbackMessages.filter(item => !item.isSent && (item?.error ?? 0) === 0);
 
-        // Emit the sent messages
-        const entries = [...newSent, ...lookbackSent.filter(item => item.isSent)];
-        for (const entry of entries) {
+        // Update the global list containing messages that are still unsent
+        this.notSent = lookbackUnsent.map(e => e.ROWID);
+
+        // 6: Emit all the messages that were successfully sent
+        for (const entry of [...newSent, ...lookbackSent]) {
             const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
@@ -143,9 +115,8 @@ export class OutgoingMessageListener extends ChangeListener {
             super.emit("new-entry", entry);
         }
 
-        // Emit the errored messages
-        const errored = lookbackSent.filter(item => item.error > 0);
-        for (const entry of errored) {
+        // 6: Emit all the messages that failed sent
+        for (const entry of lookbackErrored) {
             const cacheName = getCacheName(entry);
 
             // Skip over any that we've finished
@@ -156,10 +127,17 @@ export class OutgoingMessageListener extends ChangeListener {
 
             // Reject the corresponding promise.
             // This will emit a message send error
-            const success = Server().messageManager.reject("message-send-error", entry);
+            const success = await Server().messageManager.reject("message-send-error", entry);
+            Server().log(`Errored Msg -> ${cacheName} -> ${entry.contentString()} -> ${success} (Code: ${entry.error})`,
+                "debug"
+            );
 
             // Emit it as normal error
             if (!success) {
+                Server().log(
+                    `Message Manager Match Failed -> Promises: ${Server().messageManager.promises.length}`,
+                    "debug"
+                );
                 super.emit("message-send-error", entry);
             }
         }

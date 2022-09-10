@@ -7,7 +7,7 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
-import { isNotEmpty } from "@server/helpers/utils";
+import { isMinHighSierra, isNotEmpty } from "@server/helpers/utils";
 import { isEmpty } from "@firebase/util";
 
 /**
@@ -117,28 +117,20 @@ export class MessageRepository {
 
         if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
 
-        // Format the attachment GUID if it has weird additional characters
-        let actualGuid = attachmentGuid;
-
-        // If the attachment GUID starts with "at_", strip it out basically
-        // It can be `at_0`, at_1`, etc. So we need to get the 3rd index, `at_0_GUID`
-        if (actualGuid.includes("at_")) {
-            // eslint-disable-next-line prefer-destructuring
-            actualGuid = actualGuid.split("_")[2];
+        // Attachment GUIDs may start with a prefix such as p:/ or `at_x_`. For lookups,
+        // all we need is the actual GUID, which is the last 36 digits.
+        // Original GUIDs can also be prefixed with at_x_ or p:/.
+        if (attachmentGuid.length >= 36) {
+            attachmentGuid = attachmentGuid.substring(attachmentGuid.length - 36);
         }
 
-        // Sometimes attachments have a `/` or `:` in it. If so, we want to get the actual GUID from it
-        // `i.e. p:/GUID`
-        if (actualGuid.includes("/")) {
-            // eslint-disable-next-line prefer-destructuring
-            actualGuid = actualGuid.split("/")[1];
+        // El Capitan does not have an original_guid column.
+        if (isMinHighSierra) {
+            query.where("attachment.original_guid LIKE :guid", { guid: `%${attachmentGuid}` });
+            query.orWhere("attachment.guid LIKE :guid", { guid: `%${attachmentGuid}` });
+        } else {
+            query.where("attachment.guid LIKE :guid", { guid: `%${attachmentGuid}` });
         }
-        if (actualGuid.includes(":")) {
-            // eslint-disable-next-line prefer-destructuring
-            actualGuid = actualGuid.split(":")[1];
-        }
-
-        query.andWhere("attachment.guid LIKE :guid", { guid: `%${actualGuid}` });
 
         const attachment = await query.getOne();
         return attachment;
@@ -212,12 +204,7 @@ export class MessageRepository {
         withAttachments = true,
         withHandle = true,
         sort = "DESC",
-        where = [
-            {
-                statement: "message.text IS NOT NULL",
-                args: null
-            }
-        ]
+        where = []
     }: DBMessageParams) {
         // Sanitize some params
         if (after && typeof after === "number") after = new Date(after);
@@ -393,9 +380,6 @@ export class MessageRepository {
                 )
                 .andWhere("chat.guid = :guid", { guid: chatGuid });
         }
-
-        // Add default WHERE clauses
-        query.andWhere("message.text IS NOT NULL").andWhere("associated_message_type == 0");
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 

@@ -138,58 +138,52 @@ export class FCMService {
         devices: string[],
         data: any,
         priority: "normal" | "high" = "normal"
-    ): Promise<admin.messaging.MessagingDevicesResponse[]> {
+    ): Promise<admin.messaging.BatchResponse> {
         try {
             if (!(await this.start())) return null;
 
             // Build out the notification message
-            const msg: admin.messaging.DataMessagePayload = { data };
-            const options: admin.messaging.MessagingOptions = { priority };
-
-            const responses: admin.messaging.MessagingDevicesResponse[] = [];
-            Server().log(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`, "debug");
-            for (const device of devices) {
-                const res = await FCMService.getApp().messaging().sendToDevice(device, msg, options);
-                if (res.failureCount > 0) {
-                    Server().log(
-                        `Failed to send notification to device "${device}" ${res.failureCount} times!`,
-                        "debug"
-                    );
+            const payload: admin.messaging.MulticastMessage = {
+                data,
+                tokens: devices,
+                android: {
+                    priority,
+                    ttl: 60 * 60 * 24 // 24 hr expiration
                 }
+            };
 
-                // Read over the errors and log the errors
-                for (const i of res.results) {
-                    if (i.error) {
-                        if (i.error.code === "messaging/payload-size-limit-exceeded") {
+            Server().log(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`, "debug");
+            const response = await FCMService.getApp().messaging().sendMulticast(payload);
+            if (response.failureCount > 0) {
+                response.responses.forEach(resp => {
+                    if (!resp.success && resp.error) {
+                        const code = resp.error?.code;
+                        const msg = resp.error?.message;
+                        if (code === "messaging/payload-size-limit-exceeded") {
                             // Manually handle the size limit error
                             Server().log(
                                 "Could not send Firebase Notification due to payload exceeding size limits!",
                                 "warn"
                             );
                             Server().log(`Failed notification Payload: ${JSON.stringify(data)}`, "debug");
-                        } else if (i.error.code !== "messaging/registration-token-not-registered") {
+                        } else if (code !== "messaging/registration-token-not-registered") {
                             // Ignore token not registered errors
-                            Server().log(
-                                `Firebase returned the following error (Code: ${i.error.code}): ${i.error.message}`,
-                                "error"
-                            );
+                            Server().log(`Firebase returned the following error (Code: ${code}): ${msg}`, "error");
 
-                            if (i.error?.stack) {
-                                Server().log(`Firebase Stacktrace: ${i.error.stack}`, "debug");
+                            if (resp.error?.stack) {
+                                Server().log(`Firebase Stacktrace: ${resp.error.stack}`, "debug");
                             }
                         }
                     }
-                }
-
-                responses.push(res);
+                });
             }
 
-            return responses;
+            return response;
         } catch (ex: any) {
             Server().log(`Failed to send notification! ${ex.message}`);
         }
 
-        return [];
+        return { responses: [], successCount: 0, failureCount: 0 };
     }
 
     static async stop() {
