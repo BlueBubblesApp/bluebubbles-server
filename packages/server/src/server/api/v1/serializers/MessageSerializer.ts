@@ -3,9 +3,7 @@ import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachm
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { isEmpty, isNotEmpty, sanitizeStr } from "@server/helpers/utils";
-import { ObjCHelperService } from "@server/services";
 import { HandleResponse, MessageResponse } from "@server/types";
-import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 import type { MessageSerializerParams, MessageSerializerSingleParams } from "./types";
 
 export class MessageSerializer {
@@ -16,7 +14,6 @@ export class MessageSerializer {
             getData: false,
             loadMetadata: true
         },
-        parseAttributedBody = true,
         loadChatParticipants = true,
         enforceMaxSize = false,
         // Max payload size is 4000 bytes
@@ -27,7 +24,6 @@ export class MessageSerializer {
             await MessageSerializer.serializeList({
                 messages: [message],
                 attachmentConfig,
-                parseAttributedBody,
                 loadChatParticipants,
                 enforceMaxSize,
                 maxSizeBytes
@@ -42,17 +38,10 @@ export class MessageSerializer {
             getData: false,
             loadMetadata: true
         },
-        parseAttributedBody = true,
         loadChatParticipants = true,
         enforceMaxSize = false,
         maxSizeBytes = 4000
     }: MessageSerializerParams): Promise<MessageResponse[]> {
-        // Bulk serialize the attributed bodies
-        let attributedMessages: NodeJS.Dict<any> = [];
-        if (parseAttributedBody) {
-            attributedMessages = await ObjCHelperService.bulkDeserializeAttributedBody(messages);
-        }
-
         // Convert the messages to their serialized versions
         const messageResponses: MessageResponse[] = [];
         for (const message of messages) {
@@ -60,22 +49,9 @@ export class MessageSerializer {
                 await MessageSerializer.convert({
                     message: message,
                     attachmentConfig,
-                    parseAttributedBody,
                     loadChatParticipants
                 })
             );
-        }
-
-        // Link the decoded attributed bodies to the original messages
-        if (parseAttributedBody) {
-            for (const item of attributedMessages?.data ?? []) {
-                if (isEmpty(item?.id) || isEmpty(item?.body)) continue;
-                const matchIndex = messageResponses.findIndex(m => m.guid === item.id);
-                if (matchIndex === -1) continue;
-
-                // Make sure the response is a list so we can support multiple attribute bodies later
-                messageResponses[matchIndex].attributedBody = !Array.isArray(item.body) ? [item.body] : item.body;
-            }
         }
 
         // Handle fetching the chat participants with the messages (if requested)
@@ -131,7 +107,7 @@ export class MessageSerializer {
         // It will be null/empty on Ventura.
         for (let i = 0; i < messageResponses.length; i++) {
             const msgText = sanitizeStr(messageResponses[i].text ?? '');
-            const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
+            const bodyText = messageResponses[i].attributedBody?.value;
             if (isEmpty(msgText) && isNotEmpty(bodyText)) {
                 messageResponses[i].text = sanitizeStr(bodyText);
             }
@@ -152,7 +128,7 @@ export class MessageSerializer {
             originalROWID: message.ROWID,
             guid: message.guid,
             text: message.text,
-            attributedBody: null,
+            attributedBody: message.attributedBody,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
