@@ -10123,10 +10123,10 @@ node-releases@^2.0.3:
   resolved "https://registry.npmjs.org/node-releases/-/node-releases-2.0.5.tgz"
   integrity sha512-U9h1NLROZTq9uE1SNffn6WuPDg8icmi3ns4rEl/oTfIle4iLjTliCzgTsbaIFMq/Xn078/lfY/BL0GWZ+psK4Q==
 
-node-typedstream@^1.1.1:
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/node-typedstream/-/node-typedstream-1.1.1.tgz#cc09ccc02c0778c7564ad3c18de0d1d52a1fe315"
-  integrity sha512-xJkMV8pOZJ/cEPznl8wCxUCSG2yblyQZwwcOtr+Bxcc4whHdgY1bWsIQQaCvFYmCeRPleCuGliSn8CySJB9r4A==
+node-typedstream@^1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/node-typedstream/-/node-typedstream-1.2.1.tgz#4552aa97ba2ca3163899dc880c95d10687f12349"
+  integrity sha512-/Nk1kcPFPvAq4L7qkEky5jHphDmfzMbKB8n4prnqo4+dd/gRCRMJQNeBTsek2hUv77b1ECIyyc37TshAhy2tvw==
 
 nopt@^5.0.0:
   version "5.0.0"

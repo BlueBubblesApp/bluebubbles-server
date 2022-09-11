@@ -4,6 +4,7 @@ import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { isEmpty, isNotEmpty, sanitizeStr } from "@server/helpers/utils";
 import { HandleResponse, MessageResponse } from "@server/types";
+import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 import type { MessageSerializerParams, MessageSerializerSingleParams } from "./types";
 
 export class MessageSerializer {
@@ -107,7 +108,7 @@ export class MessageSerializer {
         // It will be null/empty on Ventura.
         for (let i = 0; i < messageResponses.length; i++) {
             const msgText = sanitizeStr(messageResponses[i].text ?? '');
-            const bodyText = messageResponses[i].attributedBody?.value;
+            const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
             if (isEmpty(msgText) && isNotEmpty(bodyText)) {
                 messageResponses[i].text = sanitizeStr(bodyText);
             }
