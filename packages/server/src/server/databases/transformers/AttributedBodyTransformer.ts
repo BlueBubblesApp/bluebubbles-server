@@ -1,15 +1,15 @@
 import { ValueTransformer } from "typeorm";
 import { NSAttributedString, Unarchiver } from "node-typedstream";
-import {Server} from "@server";
+import { Server } from "@server";
 import { isEmpty } from "@server/helpers/utils";
 
 export const AttributedBodyTransformer: ValueTransformer = {
     from: dbValue => {
         try {
-            const attributedBody = Unarchiver.open(dbValue).decodeAll();
+            const attributedBody = Unarchiver.open(dbValue, Unarchiver.BinaryDecoding.decodable).decodeAll();
             if (isEmpty(attributedBody)) return null;
 
-            const attributedBodies = attributedBody[0].values.filter((e) => {
+            const attributedBodies = attributedBody[0].values.filter(e => {
                 return e && e instanceof NSAttributedString;
             });
 
