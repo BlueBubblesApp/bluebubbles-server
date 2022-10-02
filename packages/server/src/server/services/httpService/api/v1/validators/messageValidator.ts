@@ -136,11 +136,32 @@ export class MessageValidator {
     static sendReactionRules = {
         chatGuid: "required|string",
         selectedMessageGuid: "required|string",
-        reaction: `required|string|in:${MessageInterface.possibleReactions.join(",")}`
+        reaction: `required|string|in:${MessageInterface.possibleReactions.join(",")}`,
+        partIndex: "numeric:min:0"
     };
 
     static async validateReaction(ctx: RouterContext, next: Next) {
         ValidateInput(ctx.request?.body, MessageValidator.sendReactionRules);
+        await next();
+    }
+
+    static editParamRules = {
+        editedMessage: "required|string",
+        backwardsCompatibilityMessage: "required|string",
+        partIndex: "numeric|min:0"
+    };
+
+    static async validateEdit(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx.params, MessageValidator.editParamRules);
+        await next();
+    }
+
+    static unsendParamRules = {
+        partIndex: "numeric|min:0"
+    };
+
+    static async validateUnsend(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx.params, MessageValidator.unsendParamRules);
         await next();
     }
 }

@@ -256,17 +256,40 @@ export class BlueBubblesHelperService {
         await this.writeData("mark-chat-read", { chatGuid });
     }
 
+    async markChatUnead(chatGuid: string) {
+        if (!this.helper || !this.server) {
+            Server().log("Failed to mark chat as unread, BlueBubblesHelper is not running!", "error");
+            return;
+        }
+        if (!chatGuid) {
+            Server().log("Failed to mark chat as unread, no chatGuid specified!", "error");
+            return;
+        }
+
+        await this.writeData("mark-chat-unread", { chatGuid });
+    }
+
     async sendReaction(
         chatGuid: string,
         selectedMessageGuid: string,
-        reactionType: ValidTapback | ValidRemoveTapback
+        reactionType: ValidTapback | ValidRemoveTapback,
+        partIndex?: number
     ): Promise<TransactionResult> {
         if (!chatGuid || !selectedMessageGuid || !reactionType) {
             throw new Error("Failed to send reaction. Invalid params!");
         }
 
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.writeData("send-reaction", { chatGuid, selectedMessageGuid, reactionType }, request);
+        return this.writeData(
+            "send-reaction",
+            {
+                chatGuid,
+                selectedMessageGuid,
+                reactionType,
+                partIndex: partIndex ?? 0
+            },
+            request
+        );
     }
 
     async createChat(addresses: string[], message: string | null): Promise<TransactionResult> {
@@ -285,6 +308,65 @@ export class BlueBubblesHelperService {
 
         const request = new TransactionPromise(TransactionType.CHAT);
         return this.writeData("delete-chat", { chatGuid: guid }, request);
+    }
+
+    async editMessage({
+        chatGuid,
+        messageGuid,
+        editedMessage,
+        backwardsCompatMessage,
+        partIndex
+    }: {
+        chatGuid: string;
+        messageGuid: string;
+        editedMessage: string;
+        backwardsCompatMessage: string;
+        partIndex: number;
+    }): Promise<TransactionResult> {
+        if (isEmpty(chatGuid)) throw new Error("Failed to edit message. Chat GUID not provided!");
+        if (isEmpty(messageGuid)) throw new Error("Failed to edit message. Message GUID not provided!");
+        if (isEmpty(editedMessage)) throw new Error("Failed to edit message. Edited Message not provided!");
+        if (isEmpty(backwardsCompatMessage))
+            throw new Error("Failed to edit message. Backwards Compatibility Message not provided!");
+        if (partIndex == null) throw new Error("Failed to edit message. Part Index not provided!");
+
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.writeData(
+            "edit-message",
+            {
+                chatGuid,
+                messageGuid,
+                editedMessage,
+                backwardsCompatibilityMessage: backwardsCompatMessage,
+                partIndex
+            },
+            request
+        );
+    }
+
+    async unsendMessage({
+        chatGuid,
+        messageGuid,
+        partIndex
+    }: {
+        chatGuid: string;
+        messageGuid: string;
+        partIndex: number;
+    }): Promise<TransactionResult> {
+        if (isEmpty(chatGuid)) throw new Error("Failed to edit message. Chat GUID not provided!");
+        if (isEmpty(messageGuid)) throw new Error("Failed to edit message. Message GUID not provided!");
+        if (partIndex == null) throw new Error("Failed to edit message. Part Index not provided!");
+
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.writeData(
+            "unsend-message",
+            {
+                chatGuid,
+                messageGuid,
+                partIndex
+            },
+            request
+        );
     }
 
     async sendMessage(

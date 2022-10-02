@@ -10,7 +10,9 @@ import type {
     SendMessageParams,
     SendAttachmentParams,
     SendMessagePrivateApiParams,
-    SendReactionParams
+    SendReactionParams,
+    UnsendMessageParams,
+    EditMessageParams
 } from "@server/api/v1/types";
 
 export class MessageInterface {
@@ -65,7 +67,7 @@ export class MessageInterface {
         });
 
         // Add the promise to the manager
-        Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}; tempGuid: ${tempGuid ?? 'N/A'}`);
+        Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}; tempGuid: ${tempGuid ?? "N/A"}`);
         Server().messageManager.add(awaiter);
 
         // Try to send the iMessage
@@ -134,7 +136,8 @@ export class MessageInterface {
 
         // Add the promise to the manager
         Server().log(
-            `Adding await for chat: "${chatGuid}"; attachment: ${aName}; tempGuid: ${attachmentGuid ?? 'N/A'}`);
+            `Adding await for chat: "${chatGuid}"; attachment: ${aName}; tempGuid: ${attachmentGuid ?? "N/A"}`
+        );
         Server().messageManager.add(awaiter);
 
         // Send the message
@@ -188,11 +191,80 @@ export class MessageInterface {
         return retMessage;
     }
 
+    static async unsendMessage({ chatGuid, messageGuid, partIndex = 0 }: UnsendMessageParams) {
+        checkPrivateApiStatus();
+        await Server().privateApiHelper.unsendMessage({ chatGuid, messageGuid, partIndex: partIndex ?? 0 });
+
+        // Fetch the chat based on the return data
+        let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        let tryCount = 0;
+        while (!retMessage) {
+            tryCount += 1;
+
+            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            if (tryCount >= 40) break;
+
+            // Give it a bit to execute
+            await waitMs(250);
+
+            // Re-fetch the message with the updated information
+            retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        }
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error("Failed to unsend message! Message not found after 5 seconds!");
+        }
+
+        return retMessage;
+    }
+
+    static async editMessage({
+        chatGuid,
+        messageGuid,
+        editedMessage,
+        backwardsCompatMessage,
+        partIndex = 0
+    }: EditMessageParams) {
+        checkPrivateApiStatus();
+        await Server().privateApiHelper.editMessage({
+            chatGuid,
+            messageGuid,
+            editedMessage,
+            backwardsCompatMessage,
+            partIndex: partIndex ?? 0
+        });
+
+        // Fetch the chat based on the return data
+        let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        let tryCount = 0;
+        while (!retMessage) {
+            tryCount += 1;
+
+            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            if (tryCount >= 40) break;
+
+            // Give it a bit to execute
+            await waitMs(250);
+
+            // Re-fetch the message with the updated information
+            retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        }
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error("Failed to edit message! Message not found after 5 seconds!");
+        }
+
+        return retMessage;
+    }
+
     static async sendReaction({
         chatGuid,
         message,
         reaction,
-        tempGuid = null
+        tempGuid = null,
+        partIndex = 0
     }: SendReactionParams): Promise<Message> {
         checkPrivateApiStatus();
 
@@ -229,7 +301,7 @@ export class MessageInterface {
         Server().messageManager.add(awaiter);
 
         // Send the reaction
-        const result = await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);
+        const result = await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction, partIndex ?? 0);
         if (!result?.identifier) {
             throw new Error("Failed to send reaction! No message GUID returned.");
         } else {

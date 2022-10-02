@@ -14,7 +14,6 @@ import { Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
 import { parseWithQuery } from "../utils";
 
-
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
         const total = await Server().iMessageRepo.getMessageCount(null, null, true);
@@ -255,7 +254,7 @@ export class MessageRouter {
     }
 
     static async react(ctx: RouterContext, _: Next) {
-        const { chatGuid, selectedMessageGuid, reaction } = ctx?.request?.body ?? {};
+        const { chatGuid, selectedMessageGuid, reaction, partIndex } = ctx?.request?.body ?? {};
 
         // Fetch the message we are reacting to
         const message = await Server().iMessageRepo.getMessage(selectedMessageGuid, false, true);
@@ -263,7 +262,7 @@ export class MessageRouter {
 
         // Send the reaction
         try {
-            const sentMessage = await MessageInterface.sendReaction({ chatGuid, message, reaction });
+            const sentMessage = await MessageInterface.sendReaction({ chatGuid, message, reaction, partIndex });
             return new Success(ctx, {
                 message: "Reaction sent!",
                 // No need to load the participants since we sent the message
@@ -288,6 +287,97 @@ export class MessageRouter {
                 });
             } else {
                 throw new IMessageError({ message: "Reaction Send Error", error: ex?.message ?? ex.toString() });
+            }
+        }
+    }
+
+    static async unsendMessage(ctx: RouterContext, _: Next) {
+        const { guid: messageGuid } = ctx?.params ?? {};
+        const { partIndex } = ctx?.request?.body ?? {};
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(messageGuid, true, true);
+        if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+
+        if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
+        const chatGuid = message.chats[0].guid;
+
+        // Unsend the message
+        try {
+            const unsentMessage = await MessageInterface.unsendMessage({ chatGuid, messageGuid, partIndex });
+            return new Success(ctx, {
+                message: "Message unsent!",
+                // No need to load the participants since we sent the message
+                data: await MessageSerializer.serialize({ message: unsentMessage, loadChatParticipants: false })
+            }).send();
+        } catch (ex: any) {
+            if (ex instanceof Message) {
+                throw new IMessageError({
+                    message: "Unsend Message Error",
+                    // No need to load the participants since we sent the message
+                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    error: "Failed to unsend message! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Unsend Message Error",
+                    // No need to load the participants since we sent the message
+                    data: ex?.msg
+                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        : null,
+                    error: "Failed to unsend message! See attached message error code."
+                });
+            } else {
+                throw new IMessageError({ message: "Unsend Message Error", error: ex?.message ?? ex.toString() });
+            }
+        }
+    }
+
+    static async editMessage(ctx: RouterContext, _: Next) {
+        const { guid: messageGuid } = ctx?.params ?? {};
+        const { editedMessage, backwardsCompatibilityMessage, partIndex } = ctx?.request?.body ?? {};
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(messageGuid, false, true);
+        if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+
+        if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
+        const chatGuid = message.chats[0].guid;
+
+        // Edit the message
+        try {
+            const changedMessage = await MessageInterface.editMessage({
+                chatGuid,
+                messageGuid,
+                editedMessage,
+                backwardsCompatMessage: backwardsCompatibilityMessage,
+                partIndex
+            });
+
+            return new Success(ctx, {
+                message: "Message edited!",
+                // No need to load the participants since we sent the message
+                data: await MessageSerializer.serialize({ message: changedMessage, loadChatParticipants: false })
+            }).send();
+        } catch (ex: any) {
+            if (ex instanceof Message) {
+                throw new IMessageError({
+                    message: "Message Edit Error",
+                    // No need to load the participants since we sent the message
+                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    error: "Failed to edit message! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Message Edit Error",
+                    // No need to load the participants since we sent the message
+                    data: ex?.msg
+                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        : null,
+                    error: "Failed to edit message! See attached message error code."
+                });
+            } else {
+                throw new IMessageError({ message: "Message Edit Error", error: ex?.message ?? ex.toString() });
             }
         }
     }
