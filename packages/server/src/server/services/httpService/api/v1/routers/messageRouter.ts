@@ -292,7 +292,7 @@ export class MessageRouter {
     }
 
     static async unsendMessage(ctx: RouterContext, _: Next) {
-        const { guid: messageGuid } = ctx?.params ?? {};
+        const { guid: messageGuid } = ctx.params ?? {};
         const { partIndex } = ctx?.request?.body ?? {};
 
         // Fetch the message we are reacting to
@@ -334,7 +334,7 @@ export class MessageRouter {
     }
 
     static async editMessage(ctx: RouterContext, _: Next) {
-        const { guid: messageGuid } = ctx?.params ?? {};
+        const { guid: messageGuid } = ctx.params ?? {};
         const { editedMessage, backwardsCompatibilityMessage, partIndex } = ctx?.request?.body ?? {};
 
         // Fetch the message we are reacting to
