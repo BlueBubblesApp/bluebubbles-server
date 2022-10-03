@@ -59,6 +59,9 @@ export type MessageResponse = {
     isSpam?: boolean;
     threadOriginatorGuid?: string | null;
     threadOriginatorPart?: string | null;
+    dateRetracted?: number | null;
+    dateEdited?: number | null;
+    partCount?: number | null;
 };
 
 export type HandleResponse = {

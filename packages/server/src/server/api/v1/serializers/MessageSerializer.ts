@@ -130,7 +130,7 @@ export class MessageSerializer {
         // For Ventura, we need to check for the text message within the attributed body, so we can use it as the text.
         // It will be null/empty on Ventura.
         for (let i = 0; i < messageResponses.length; i++) {
-            const msgText = sanitizeStr(messageResponses[i].text ?? '');
+            const msgText = sanitizeStr(messageResponses[i].text ?? "");
             const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
             if (isEmpty(msgText) && isNotEmpty(bodyText)) {
                 messageResponses[i].text = sanitizeStr(bodyText);
@@ -157,11 +157,15 @@ export class MessageSerializer {
             handleId: message.handleId,
             otherHandle: message.otherHandle,
             chats: await Promise.all((message.chats ?? []).map(chat => getChatResponse(chat))),
-            attachments: await Promise.all((message.attachments ?? []).map(a => getAttachmentResponse(a, {
-                convert: attachmentConfig.convert,
-                getData: attachmentConfig.getData,
-                loadMetadata: attachmentConfig.loadMetadata
-            }))),
+            attachments: await Promise.all(
+                (message.attachments ?? []).map(a =>
+                    getAttachmentResponse(a, {
+                        convert: attachmentConfig.convert,
+                        getData: attachmentConfig.getData,
+                        loadMetadata: attachmentConfig.loadMetadata
+                    })
+                )
+            ),
             subject: message.subject,
             country: message.country,
             error: message.error,
@@ -194,7 +198,10 @@ export class MessageSerializer {
             isCorrupt: message.isCorrupt,
             isSpam: message.isSpam,
             threadOriginatorGuid: message.threadOriginatorGuid,
-            threadOriginatorPart: message.threadOriginatorPart
+            threadOriginatorPart: message.threadOriginatorPart,
+            dateEdited: message.dateEdited ? message.dateEdited.getTime() : null,
+            dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : null,
+            partCount: message.partCount
         };
     }
 }

@@ -1,15 +1,20 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
 import { conditional } from "conditional-decorator";
 
-import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { DateTransformer } from "@server/databases/transformers/DateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
-import { MessageResponse } from "@server/types";
-import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinSierra, sanitizeStr } from "@server/helpers/utils";
+import { Handle } from "@server/databases/imessage/entity/Handle";
+import { Chat } from "@server/databases/imessage/entity/Chat";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import {
+    isMinBigSur,
+    isMinCatalina,
+    isMinHighSierra,
+    isMinSierra,
+    isMinVentura,
+    sanitizeStr
+} from "@server/helpers/utils";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 
 @Entity("message")
@@ -506,4 +511,36 @@ export class Message {
         })
     )
     threadOriginatorPart: string;
+
+    @conditional(
+        isMinVentura,
+        Column({
+            name: "date_retracted",
+            type: "date",
+            transformer: DateTransformer,
+            default: 0
+        })
+    )
+    dateRetracted: Date;
+
+    @conditional(
+        isMinVentura,
+        Column({
+            name: "date_edited",
+            type: "date",
+            transformer: DateTransformer,
+            default: 0
+        })
+    )
+    dateEdited: Date;
+
+    @conditional(
+        isMinVentura,
+        Column({
+            name: "part_count",
+            type: "integer",
+            default: null
+        })
+    )
+    partCount: number;
 }
