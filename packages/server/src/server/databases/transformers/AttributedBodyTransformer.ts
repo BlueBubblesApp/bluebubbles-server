@@ -9,7 +9,7 @@ export const AttributedBodyTransformer: ValueTransformer = {
             const attributedBody = Unarchiver.open(dbValue, Unarchiver.BinaryDecoding.decodable).decodeAll();
             if (isEmpty(attributedBody)) return null;
 
-            const attributedBodies = attributedBody[0].values.filter(e => {
+            const attributedBodies = attributedBody[0].values.filter((e: any) => {
                 return e && e instanceof NSAttributedString;
             });
 
