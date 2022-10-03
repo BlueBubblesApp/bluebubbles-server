@@ -1,4 +1,5 @@
 import { ServerConfig } from "./databases/server";
+import {NSAttributedString} from "node-typedstream";
 
 export type ServerMetadataResponse = {
     os_version: string;
@@ -22,7 +23,7 @@ export type MessageResponse = {
     tempGuid?: string;
     guid: string;
     text: string;
-    attributedBody?: NodeJS.Dict<any>[];
+    attributedBody?: NSAttributedString;
     handle?: HandleResponse | null;
     handleId: number;
     otherHandle: number;
