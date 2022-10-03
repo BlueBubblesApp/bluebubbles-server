@@ -92,6 +92,7 @@ export class MessageRouter {
         const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
         const withChatParticipants = arrayHasOne(withQuery, ["chat.participants", "chats.participants"]);
         const withAttributedBody = arrayHasOne(withQuery, ["attributedbody", "attributed-body"]);
+        const withMessageSummaryInfo = arrayHasOne(withQuery, ["messageSummaryInfo", "message-summary-info"]);
 
         // We don't need to worry about it not being a number because
         // the validator checks for that. It also checks for min values.
@@ -128,6 +129,7 @@ export class MessageRouter {
                 convert: convertAttachments
             },
             parseAttributedBody: withAttributedBody,
+            parseMessageSummary: withMessageSummaryInfo,
             loadChatParticipants: withChatParticipants
         });
 

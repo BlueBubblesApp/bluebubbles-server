@@ -16,8 +16,8 @@ import {
     sanitizeStr
 } from "@server/helpers/utils";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
-import {NSAttributedString} from "node-typedstream";
-import {AttributedBodyTransformer} from "@server/databases/transformers/AttributedBodyTransformer";
+import { NSAttributedString } from "node-typedstream";
+import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
 
 @Entity("message")
 export class Message {
@@ -112,7 +112,7 @@ export class Message {
     @Column({
         type: "blob",
         nullable: true,
-        transformer: AttributedBodyTransformer,
+        transformer: AttributedBodyTransformer
     })
     attributedBody: NSAttributedString | null;
 
@@ -460,8 +460,16 @@ export class Message {
     )
     timeExpressiveSendStyleId: Date;
 
-    @conditional(isMinHighSierra, Column({ name: "message_summary_info", type: "blob", nullable: true }))
-    messageSummaryInfo: Blob;
+    @conditional(
+        isMinHighSierra,
+        Column({
+            name: "message_summary_info",
+            type: "blob",
+            nullable: true,
+            transformer: AttributedBodyTransformer
+        })
+    )
+    messageSummaryInfo: NSAttributedString | null;
 
     @conditional(
         isMinCatalina,

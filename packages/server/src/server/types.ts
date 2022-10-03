@@ -1,5 +1,5 @@
 import { ServerConfig } from "./databases/server";
-import {NSAttributedString} from "node-typedstream";
+import { NSAttributedString } from "node-typedstream";
 
 export type ServerMetadataResponse = {
     os_version: string;
@@ -24,6 +24,7 @@ export type MessageResponse = {
     guid: string;
     text: string;
     attributedBody?: NSAttributedString;
+    messageSummaryInfo?: NSAttributedString;
     handle?: HandleResponse | null;
     handleId: number;
     otherHandle: number;

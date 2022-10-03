@@ -71,6 +71,12 @@ export class ChatRouter {
             "messages.attributedody",
             "messages.attributed-body"
         ]);
+        const withMessageSummaryInfo = arrayHasOne(withQuery, [
+            "message.messageSummaryInfo",
+            "message.message-summary-info",
+            "messages.messageSummaryInfo",
+            "messages.message-summary-info"
+        ]);
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
         const chats = await Server().iMessageRepo.getChats({
@@ -97,7 +103,8 @@ export class ChatRouter {
         const results = await MessageSerializer.serializeList({
             messages,
             loadChatParticipants: false,
-            parseAttributedBody: withAttributedBody
+            parseAttributedBody: withAttributedBody,
+            parseMessageSummary: withMessageSummaryInfo
         });
 
         return new Success(ctx, { data: results }).send();

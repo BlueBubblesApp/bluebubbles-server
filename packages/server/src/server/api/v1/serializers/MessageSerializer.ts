@@ -15,6 +15,8 @@ export class MessageSerializer {
             getData: false,
             loadMetadata: true
         },
+        parseAttributedBody = false,
+        parseMessageSummary = false,
         loadChatParticipants = true,
         enforceMaxSize = false,
         // Max payload size is 4000 bytes
@@ -25,6 +27,8 @@ export class MessageSerializer {
             await MessageSerializer.serializeList({
                 messages: [message],
                 attachmentConfig,
+                parseAttributedBody,
+                parseMessageSummary,
                 loadChatParticipants,
                 enforceMaxSize,
                 maxSizeBytes
@@ -39,6 +43,8 @@ export class MessageSerializer {
             getData: false,
             loadMetadata: true
         },
+        parseAttributedBody = false,
+        parseMessageSummary = false,
         loadChatParticipants = true,
         enforceMaxSize = false,
         maxSizeBytes = 4000
@@ -50,6 +56,8 @@ export class MessageSerializer {
                 await MessageSerializer.convert({
                     message: message,
                     attachmentConfig,
+                    parseAttributedBody,
+                    parseMessageSummary,
                     loadChatParticipants
                 })
             );
@@ -119,6 +127,8 @@ export class MessageSerializer {
 
     private static async convert({
         message,
+        parseAttributedBody = false,
+        parseMessageSummary = false,
         attachmentConfig = {
             convert: true,
             getData: false,
@@ -129,7 +139,8 @@ export class MessageSerializer {
             originalROWID: message.ROWID,
             guid: message.guid,
             text: message.text,
-            attributedBody: message.attributedBody,
+            attributedBody: parseAttributedBody ? message.attributedBody : null,
+            messageSummaryInfo: parseMessageSummary ? message.messageSummaryInfo : null,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
