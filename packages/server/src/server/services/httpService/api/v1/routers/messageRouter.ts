@@ -139,7 +139,7 @@ export class MessageRouter {
     }
 
     static async sendText(ctx: RouterContext, _: Next) {
-        let { tempGuid, message, attributedBody, method, chatGuid, effectId, subject, selectedMessageGuid } =
+        let { tempGuid, message, attributedBody, method, chatGuid, effectId, subject, selectedMessageGuid, partIndex } =
             ctx?.request?.body ?? {};
 
         // Add to send cache
@@ -155,7 +155,8 @@ export class MessageRouter {
                 subject,
                 effectId,
                 selectedMessageGuid,
-                tempGuid
+                tempGuid,
+                partIndex
             });
 
             // Remove from cache
