@@ -48,6 +48,8 @@ export class MessageRouter {
         const withChats = arrayHasOne(withQuery, ["chats", "chat"]);
         const withParticipants = arrayHasOne(withQuery, ["chats.participants", "chat.participants"]);
         const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
+        const withAttributedBody = arrayHasOne(withQuery, ["attributedBody", "attributed-body"]);
+        const withMessageSummaryInfo = arrayHasOne(withQuery, ["messageSummaryInfo", "message-summary-info"]);
 
         // Fetch the info for the message by GUID
         const message = await Server().iMessageRepo.getMessage(guid, withChats, withAttachments);
@@ -68,7 +70,13 @@ export class MessageRouter {
             }
         }
 
-        return new Success(ctx, { data: await MessageSerializer.serialize({ message }) }).send();
+        return new Success(ctx, {
+            data: await MessageSerializer.serialize({
+                message,
+                parseAttributedBody: withAttributedBody,
+                parseMessageSummary: withMessageSummaryInfo
+            })
+        }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
@@ -164,7 +172,12 @@ export class MessageRouter {
 
             // Convert to an API response
             // No need to load the participants since we sent the message
-            const data = await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false });
+            const data = await MessageSerializer.serialize({
+                message: sentMessage,
+                loadChatParticipants: false,
+                parseAttributedBody: true,
+                parseMessageSummary: true
+            });
 
             // Inject the TempGUID back into the response
             if (isNotEmpty(tempGuid)) {
@@ -228,7 +241,12 @@ export class MessageRouter {
 
             // Convert to an API response
             // No need to load the participants since we sent the message
-            const data = await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false });
+            const data = await MessageSerializer.serialize({
+                message: sentMessage,
+                loadChatParticipants: false,
+                parseAttributedBody: true,
+                parseMessageSummary: true
+            });
             return new Success(ctx, { message: "Attachment sent!", data }).send();
         } catch (ex: any) {
             // Remove from cache
@@ -269,7 +287,12 @@ export class MessageRouter {
             return new Success(ctx, {
                 message: "Reaction sent!",
                 // No need to load the participants since we sent the message
-                data: await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false })
+                data: await MessageSerializer.serialize({
+                    message: sentMessage,
+                    loadChatParticipants: false,
+                    parseAttributedBody: true,
+                    parseMessageSummary: true
+                })
             }).send();
         } catch (ex: any) {
             if (ex instanceof Message) {
@@ -311,7 +334,12 @@ export class MessageRouter {
             return new Success(ctx, {
                 message: "Message unsent!",
                 // No need to load the participants since we sent the message
-                data: await MessageSerializer.serialize({ message: unsentMessage, loadChatParticipants: false })
+                data: await MessageSerializer.serialize({
+                    message: unsentMessage,
+                    loadChatParticipants: false,
+                    parseAttributedBody: true,
+                    parseMessageSummary: true
+                })
             }).send();
         } catch (ex: any) {
             if (ex instanceof Message) {
@@ -360,7 +388,12 @@ export class MessageRouter {
             return new Success(ctx, {
                 message: "Message edited!",
                 // No need to load the participants since we sent the message
-                data: await MessageSerializer.serialize({ message: changedMessage, loadChatParticipants: false })
+                data: await MessageSerializer.serialize({
+                    message: changedMessage,
+                    loadChatParticipants: false,
+                    parseAttributedBody: true,
+                    parseMessageSummary: true
+                })
             }).send();
         } catch (ex: any) {
             if (ex instanceof Message) {
