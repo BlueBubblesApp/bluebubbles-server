@@ -137,7 +137,7 @@ export class MessageValidator {
         chatGuid: "required|string",
         selectedMessageGuid: "required|string",
         reaction: `required|string|in:${MessageInterface.possibleReactions.join(",")}`,
-        partIndex: "numeric:min:0"
+        partIndex: "numeric|min:0"
     };
 
     static async validateReaction(ctx: RouterContext, next: Next) {
