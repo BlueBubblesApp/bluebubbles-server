@@ -152,7 +152,7 @@ export class MessageValidator {
     };
 
     static async validateEdit(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx.params, MessageValidator.editParamRules);
+        ValidateInput(ctx.request?.body, MessageValidator.editParamRules);
         await next();
     }
 
@@ -161,7 +161,7 @@ export class MessageValidator {
     };
 
     static async validateUnsend(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx.params, MessageValidator.unsendParamRules);
+        ValidateInput(ctx.request?.body, MessageValidator.unsendParamRules);
         await next();
     }
 }
