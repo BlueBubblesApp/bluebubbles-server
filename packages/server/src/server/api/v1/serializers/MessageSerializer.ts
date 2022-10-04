@@ -56,8 +56,6 @@ export class MessageSerializer {
                 await MessageSerializer.convert({
                     message: message,
                     attachmentConfig,
-                    parseAttributedBody,
-                    parseMessageSummary,
                     loadChatParticipants
                 })
             );
@@ -107,6 +105,16 @@ export class MessageSerializer {
             }
         }
 
+        // The parse options are enforced _after_ the convert function is called.
+        // This is so that we can properly extract the text from the attributed body
+        // for those on macOS Ventura. Otherwise, set it to null to not clutter the payload.
+        if (!parseAttributedBody || !parseMessageSummary) {
+            for (let i = 0; i < messageResponses.length; i++) {
+                if (!parseAttributedBody) messageResponses[i].attributedBody = null;
+                if (!parseMessageSummary) messageResponses[i].messageSummaryInfo = null;
+            }
+        }
+
         if (enforceMaxSize) {
             const strData = JSON.stringify(messageResponses);
             const len = Buffer.byteLength(strData, "utf8");
@@ -127,8 +135,6 @@ export class MessageSerializer {
 
     private static async convert({
         message,
-        parseAttributedBody = false,
-        parseMessageSummary = false,
         attachmentConfig = {
             convert: true,
             getData: false,
@@ -139,8 +145,8 @@ export class MessageSerializer {
             originalROWID: message.ROWID,
             guid: message.guid,
             text: message.text,
-            attributedBody: parseAttributedBody ? message.attributedBody : null,
-            messageSummaryInfo: parseMessageSummary ? message.messageSummaryInfo : null,
+            attributedBody: message.attributedBody,
+            messageSummaryInfo: message.messageSummaryInfo,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
