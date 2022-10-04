@@ -66,7 +66,8 @@ export class MessageValidator {
         method: "string|in:apple-script,private-api",
         effectId: "string",
         subject: "string",
-        selectedMessageGuid: "string"
+        selectedMessageGuid: "string",
+        partIndex: "numeric|min:0"
     };
 
     static async validateText(ctx: RouterContext, next: Next) {

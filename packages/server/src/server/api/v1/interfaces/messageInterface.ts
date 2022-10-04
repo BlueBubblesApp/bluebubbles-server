@@ -49,7 +49,8 @@ export class MessageInterface {
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
-        tempGuid = null
+        tempGuid = null,
+        partIndex = 0
     }: SendMessageParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -83,7 +84,8 @@ export class MessageInterface {
                 attributedBody,
                 subject,
                 effectId,
-                selectedMessageGuid
+                selectedMessageGuid,
+                partIndex
             });
         } else {
             throw new Error(`Invalid send method: ${method}`);
@@ -151,7 +153,8 @@ export class MessageInterface {
         attributedBody = null,
         subject = null,
         effectId = null,
-        selectedMessageGuid = null
+        selectedMessageGuid = null,
+        partIndex = 0
     }: SendMessagePrivateApiParams) {
         checkPrivateApiStatus();
         const result = await Server().privateApiHelper.sendMessage(
@@ -160,7 +163,8 @@ export class MessageInterface {
             attributedBody ?? null,
             subject ?? null,
             effectId ?? null,
-            selectedMessageGuid ?? null
+            selectedMessageGuid ?? null,
+            partIndex ?? 0
         );
 
         if (!result?.identifier) {

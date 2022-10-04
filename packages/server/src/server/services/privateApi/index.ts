@@ -375,7 +375,8 @@ export class BlueBubblesHelperService {
         attributedBody: Record<string, any> = null,
         subject: string = null,
         effectId: string = null,
-        selectedMessageGuid: string = null
+        selectedMessageGuid: string = null,
+        partIndex = 0
     ): Promise<TransactionResult> {
         if (!chatGuid || !message) {
             throw new Error("Failed to send message. Invalid params!");
@@ -390,7 +391,8 @@ export class BlueBubblesHelperService {
                 message,
                 attributedBody,
                 effectId,
-                selectedMessageGuid
+                selectedMessageGuid,
+                partIndex
             },
             request
         );

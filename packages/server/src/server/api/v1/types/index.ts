@@ -10,6 +10,7 @@ export type SendMessageParams = {
     effectId?: string;
     selectedMessageGuid?: string;
     tempGuid?: string;
+    partIndex?: number;
 };
 
 export type SendMessagePrivateApiParams = {
@@ -19,6 +20,7 @@ export type SendMessagePrivateApiParams = {
     subject?: string;
     effectId?: string;
     selectedMessageGuid?: string;
+    partIndex?: number;
 };
 
 export type UnsendMessageParams = {
