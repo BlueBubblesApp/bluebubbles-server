@@ -97,6 +97,16 @@ export class MessageSerializer {
             }
         }
 
+        // For Ventura, we need to check for the text message within the attributed body, so we can use it as the text.
+        // It will be null/empty on Ventura.
+        for (let i = 0; i < messageResponses.length; i++) {
+            const msgText = sanitizeStr(messageResponses[i].text ?? "");
+            const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
+            if (isEmpty(msgText) && isNotEmpty(bodyText)) {
+                messageResponses[i].text = sanitizeStr(bodyText);
+            }
+        }
+
         if (enforceMaxSize) {
             const strData = JSON.stringify(messageResponses);
             const len = Buffer.byteLength(strData, "utf8");
@@ -109,16 +119,6 @@ export class MessageSerializer {
                         messageResponses[i].chats[c].participants = [];
                     }
                 }
-            }
-        }
-
-        // For Ventura, we need to check for the text message within the attributed body, so we can use it as the text.
-        // It will be null/empty on Ventura.
-        for (let i = 0; i < messageResponses.length; i++) {
-            const msgText = sanitizeStr(messageResponses[i].text ?? "");
-            const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
-            if (isEmpty(msgText) && isNotEmpty(bodyText)) {
-                messageResponses[i].text = sanitizeStr(bodyText);
             }
         }
 
@@ -140,7 +140,12 @@ export class MessageSerializer {
             guid: message.guid,
             text: message.text,
             attributedBody: parseAttributedBody ? message.attributedBody : null,
-            messageSummaryInfo: parseMessageSummary ? message.messageSummaryInfo : null,
+            // Extract the first element
+            messageSummaryInfo: parseMessageSummary
+                ? (message.messageSummaryInfo ?? []).length > 0
+                    ? message.messageSummaryInfo[0]
+                    : null
+                : null,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,

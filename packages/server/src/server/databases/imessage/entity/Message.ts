@@ -114,7 +114,7 @@ export class Message {
         nullable: true,
         transformer: AttributedBodyTransformer
     })
-    attributedBody: NSAttributedString | null;
+    attributedBody: NSAttributedString[] | null;
 
     @Column({ type: "integer", nullable: true, default: 0 })
     version: number;
@@ -469,7 +469,7 @@ export class Message {
             transformer: AttributedBodyTransformer
         })
     )
-    messageSummaryInfo: NSAttributedString | null;
+    messageSummaryInfo: NodeJS.Dict<any>[] | null;
 
     @conditional(
         isMinCatalina,

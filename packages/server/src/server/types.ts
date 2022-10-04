@@ -23,8 +23,8 @@ export type MessageResponse = {
     tempGuid?: string;
     guid: string;
     text: string;
-    attributedBody?: NSAttributedString;
-    messageSummaryInfo?: NSAttributedString;
+    attributedBody?: NSAttributedString[];
+    messageSummaryInfo?: NodeJS.Dict<any>;
     handle?: HandleResponse | null;
     handleId: number;
     otherHandle: number;
