@@ -1,4 +1,3 @@
-import { ServerConfig } from "./databases/server";
 import { NSAttributedString } from "node-typedstream";
 
 export type ServerMetadataResponse = {
