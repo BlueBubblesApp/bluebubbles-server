@@ -95,16 +95,6 @@ export class MessageSerializer {
             }
         }
 
-        // For Ventura, we need to check for the text message within the attributed body, so we can use it as the text.
-        // It will be null/empty on Ventura.
-        for (let i = 0; i < messageResponses.length; i++) {
-            const msgText = sanitizeStr(messageResponses[i].text ?? "");
-            const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
-            if (isEmpty(msgText) && isNotEmpty(bodyText)) {
-                messageResponses[i].text = sanitizeStr(bodyText);
-            }
-        }
-
         // The parse options are enforced _after_ the convert function is called.
         // This is so that we can properly extract the text from the attributed body
         // for those on macOS Ventura. Otherwise, set it to null to not clutter the payload.
@@ -144,7 +134,7 @@ export class MessageSerializer {
         return {
             originalROWID: message.ROWID,
             guid: message.guid,
-            text: message.text,
+            text: message.universalText(true),
             attributedBody: message.attributedBody,
             messageSummaryInfo: message.messageSummaryInfo,
             handle: message.handle ? await getHandleResponse(message.handle) : null,

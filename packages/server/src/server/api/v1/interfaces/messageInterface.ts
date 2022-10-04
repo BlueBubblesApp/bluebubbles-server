@@ -279,10 +279,11 @@ export class MessageInterface {
             : reactionTextMap[reaction as string];
 
         // If the message text is just the invisible char, we know it's probably just an attachment
-        const isOnlyMedia = message.text.length === 1 && message.text === invisibleMediaChar;
+        const text = message.universalText(false) ?? "";
+        const isOnlyMedia = text.length === 1 && text === invisibleMediaChar;
 
         // Default the message to the other message surrounded by greek quotes
-        let msg = `“${message.text}”`;
+        let msg = `“${text}”`;
 
         // If it's a media-only message and we have at least 1 attachment,
         // set the message according to the first attachment's MIME type

@@ -8,6 +8,7 @@ import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import {
+    isEmpty,
     isMinBigSur,
     isMinCatalina,
     isMinHighSierra,
@@ -15,14 +16,24 @@ import {
     isMinVentura,
     sanitizeStr
 } from "@server/helpers/utils";
-import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { NSAttributedString } from "node-typedstream";
 import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
+import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 
 @Entity("message")
 export class Message {
+    universalText(sanitize = false): string | null {
+        let text = this.text;
+        const attributedText = AttributedBodyUtils.extractText(this.attributedBody);
+        if (isEmpty(text) && !isEmpty(attributedText)) {
+            text = attributedText;
+        }
+
+        return sanitize ? sanitizeStr(text) : text;
+    }
+
     contentString(maxText = 15): string {
-        let text = sanitizeStr((this.text ?? "").replace(invisibleMediaChar, ""));
+        let text = this.universalText(true) ?? "";
         const textLen = text.length;
         const attachments = this.attachments ?? [];
         const attachmentsLen = attachments.length;

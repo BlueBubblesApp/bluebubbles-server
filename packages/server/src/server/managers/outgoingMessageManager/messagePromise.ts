@@ -146,11 +146,7 @@ export class MessagePromise {
         if (cmpSubject && this.subject !== onlyAlphaNumeric(message.subject)) return false;
 
         // Compare the original text to the message's text or attributed body (if available)
-        let messageText = message.text;
-        const extractedText = AttributedBodyUtils.extractText(message.attributedBody);
-        if (isEmpty(message.text) && isNotEmpty(extractedText)) {
-            messageText = onlyAlphaNumeric(extractedText);
-        }
+        const messageText = onlyAlphaNumeric(message.universalText(true));
 
         // Check if the text matches
         return this.text === messageText && this.sentAt <= message.dateCreated.getTime();
