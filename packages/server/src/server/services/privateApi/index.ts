@@ -256,7 +256,7 @@ export class BlueBubblesHelperService {
         await this.writeData("mark-chat-read", { chatGuid });
     }
 
-    async markChatUnead(chatGuid: string) {
+    async markChatUnread(chatGuid: string) {
         if (!this.helper || !this.server) {
             Server().log("Failed to mark chat as unread, BlueBubblesHelper is not running!", "error");
             return;

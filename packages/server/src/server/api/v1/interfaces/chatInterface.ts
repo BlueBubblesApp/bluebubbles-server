@@ -297,7 +297,7 @@ export class ChatInterface {
     }
 
     static async markUnread(chatGuid: string): Promise<void> {
-        await Server().privateApiHelper.markChatRead(chatGuid);
+        await Server().privateApiHelper.markChatUnread(chatGuid);
         await Server().emitMessage("chat-read-status-changed", {
             chatGuid,
             read: false
