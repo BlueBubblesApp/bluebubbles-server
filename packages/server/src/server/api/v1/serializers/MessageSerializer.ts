@@ -140,12 +140,7 @@ export class MessageSerializer {
             guid: message.guid,
             text: message.text,
             attributedBody: parseAttributedBody ? message.attributedBody : null,
-            // Extract the first element
-            messageSummaryInfo: parseMessageSummary
-                ? (message.messageSummaryInfo ?? []).length > 0
-                    ? message.messageSummaryInfo[0]
-                    : null
-                : null,
+            messageSummaryInfo: parseMessageSummary ? message.messageSummaryInfo : null,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
