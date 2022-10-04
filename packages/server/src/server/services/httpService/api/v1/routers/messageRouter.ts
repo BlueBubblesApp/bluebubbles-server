@@ -369,7 +369,7 @@ export class MessageRouter {
         const { editedMessage, backwardsCompatibilityMessage, partIndex } = ctx?.request?.body ?? {};
 
         // Fetch the message we are reacting to
-        const message = await Server().iMessageRepo.getMessage(messageGuid, false, true);
+        const message = await Server().iMessageRepo.getMessage(messageGuid, true, true);
         if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
 
         if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
