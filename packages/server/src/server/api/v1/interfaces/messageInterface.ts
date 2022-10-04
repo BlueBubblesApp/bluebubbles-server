@@ -197,12 +197,14 @@ export class MessageInterface {
 
     static async unsendMessage({ chatGuid, messageGuid, partIndex = 0 }: UnsendMessageParams) {
         checkPrivateApiStatus();
+        const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
+        const currentEditDate = msg?.dateEdited ?? 0;
         await Server().privateApiHelper.unsendMessage({ chatGuid, messageGuid, partIndex: partIndex ?? 0 });
 
         // Fetch the chat based on the return data
         let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
         let tryCount = 0;
-        while (!retMessage) {
+        while (!retMessage || retMessage.dateEdited <= currentEditDate) {
             tryCount += 1;
 
             // If we've tried 10 times and there is no change, break out (~10 seconds)
@@ -231,6 +233,8 @@ export class MessageInterface {
         partIndex = 0
     }: EditMessageParams) {
         checkPrivateApiStatus();
+        const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
+        const currentEditDate = msg?.dateEdited ?? 0;
         await Server().privateApiHelper.editMessage({
             chatGuid,
             messageGuid,
@@ -242,7 +246,7 @@ export class MessageInterface {
         // Fetch the chat based on the return data
         let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
         let tryCount = 0;
-        while (!retMessage) {
+        while (!retMessage || retMessage.dateEdited <= currentEditDate) {
             tryCount += 1;
 
             // If we've tried 10 times and there is no change, break out (~10 seconds)
