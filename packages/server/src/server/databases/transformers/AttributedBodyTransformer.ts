@@ -5,6 +5,8 @@ import { isEmpty } from "@server/helpers/utils";
 
 export const AttributedBodyTransformer: ValueTransformer = {
     from: dbValue => {
+        if (isEmpty(dbValue)) return null;
+
         try {
             const attributedBody = Unarchiver.open(dbValue, Unarchiver.BinaryDecoding.decodable).decodeAll();
             if (isEmpty(attributedBody)) return null;
