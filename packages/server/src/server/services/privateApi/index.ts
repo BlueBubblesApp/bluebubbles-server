@@ -80,6 +80,16 @@ export class BlueBubblesHelperService {
         // For each of the paths, write the bundle to them (assuming the paths exist & the bundle is newer)
         let writeCount = 0;
         for (const pluginPath of opts) {
+            // If the MacForge/MySIMBL path exists, but the plugin path doesn't, create it.
+            if (fs.existsSync(path.dirname(pluginPath)) && !fs.existsSync(pluginPath)) {
+                Server().log("Plugins path does not exist, creating it...", "debug");
+                try {
+                    fs.mkdirSync(pluginPath, { recursive: true });
+                } catch (ex: any) {
+                    Server().log(`Failed to create Plugins path: ${ex?.message ?? String(ex)}`, "debug");
+                }
+            }
+
             if (!fs.existsSync(pluginPath)) continue;
 
             const remotePath = path.join(pluginPath, "BlueBubblesHelper.bundle");
