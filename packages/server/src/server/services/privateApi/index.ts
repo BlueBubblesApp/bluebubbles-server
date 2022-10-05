@@ -80,6 +80,16 @@ export class BlueBubblesHelperService {
         // For each of the paths, write the bundle to them (assuming the paths exist & the bundle is newer)
         let writeCount = 0;
         for (const pluginPath of opts) {
+            // If the MacForge/MySIMBL path exists, but the plugin path doesn't, create it.
+            if (fs.existsSync(path.dirname(pluginPath)) && !fs.existsSync(pluginPath)) {
+                Server().log("Plugins path does not exist, creating it...", "debug");
+                try {
+                    fs.mkdirSync(pluginPath, { recursive: true });
+                } catch (ex: any) {
+                    Server().log(`Failed to create Plugins path: ${ex?.message ?? String(ex)}`, "debug");
+                }
+            }
+
             if (!fs.existsSync(pluginPath)) continue;
 
             const remotePath = path.join(pluginPath, "BlueBubblesHelper.bundle");
@@ -256,17 +266,40 @@ export class BlueBubblesHelperService {
         await this.writeData("mark-chat-read", { chatGuid });
     }
 
+    async markChatUnread(chatGuid: string) {
+        if (!this.helper || !this.server) {
+            Server().log("Failed to mark chat as unread, BlueBubblesHelper is not running!", "error");
+            return;
+        }
+        if (!chatGuid) {
+            Server().log("Failed to mark chat as unread, no chatGuid specified!", "error");
+            return;
+        }
+
+        await this.writeData("mark-chat-unread", { chatGuid });
+    }
+
     async sendReaction(
         chatGuid: string,
         selectedMessageGuid: string,
-        reactionType: ValidTapback | ValidRemoveTapback
+        reactionType: ValidTapback | ValidRemoveTapback,
+        partIndex?: number
     ): Promise<TransactionResult> {
         if (!chatGuid || !selectedMessageGuid || !reactionType) {
             throw new Error("Failed to send reaction. Invalid params!");
         }
 
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.writeData("send-reaction", { chatGuid, selectedMessageGuid, reactionType }, request);
+        return this.writeData(
+            "send-reaction",
+            {
+                chatGuid,
+                selectedMessageGuid,
+                reactionType,
+                partIndex: partIndex ?? 0
+            },
+            request
+        );
     }
 
     async createChat(addresses: string[], message: string | null): Promise<TransactionResult> {
@@ -287,13 +320,73 @@ export class BlueBubblesHelperService {
         return this.writeData("delete-chat", { chatGuid: guid }, request);
     }
 
+    async editMessage({
+        chatGuid,
+        messageGuid,
+        editedMessage,
+        backwardsCompatMessage,
+        partIndex
+    }: {
+        chatGuid: string;
+        messageGuid: string;
+        editedMessage: string;
+        backwardsCompatMessage: string;
+        partIndex: number;
+    }): Promise<TransactionResult> {
+        if (isEmpty(chatGuid)) throw new Error("Failed to edit message. Chat GUID not provided!");
+        if (isEmpty(messageGuid)) throw new Error("Failed to edit message. Message GUID not provided!");
+        if (isEmpty(editedMessage)) throw new Error("Failed to edit message. Edited Message not provided!");
+        if (isEmpty(backwardsCompatMessage))
+            throw new Error("Failed to edit message. Backwards Compatibility Message not provided!");
+        if (partIndex == null) throw new Error("Failed to edit message. Part Index not provided!");
+
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.writeData(
+            "edit-message",
+            {
+                chatGuid,
+                messageGuid,
+                editedMessage,
+                backwardsCompatibilityMessage: backwardsCompatMessage,
+                partIndex
+            },
+            request
+        );
+    }
+
+    async unsendMessage({
+        chatGuid,
+        messageGuid,
+        partIndex
+    }: {
+        chatGuid: string;
+        messageGuid: string;
+        partIndex: number;
+    }): Promise<TransactionResult> {
+        if (isEmpty(chatGuid)) throw new Error("Failed to edit message. Chat GUID not provided!");
+        if (isEmpty(messageGuid)) throw new Error("Failed to edit message. Message GUID not provided!");
+        if (partIndex == null) throw new Error("Failed to edit message. Part Index not provided!");
+
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.writeData(
+            "unsend-message",
+            {
+                chatGuid,
+                messageGuid,
+                partIndex
+            },
+            request
+        );
+    }
+
     async sendMessage(
         chatGuid: string,
         message: string,
         attributedBody: Record<string, any> = null,
         subject: string = null,
         effectId: string = null,
-        selectedMessageGuid: string = null
+        selectedMessageGuid: string = null,
+        partIndex = 0
     ): Promise<TransactionResult> {
         if (!chatGuid || !message) {
             throw new Error("Failed to send message. Invalid params!");
@@ -308,7 +401,8 @@ export class BlueBubblesHelperService {
                 message,
                 attributedBody,
                 effectId,
-                selectedMessageGuid
+                selectedMessageGuid,
+                partIndex
             },
             request
         );

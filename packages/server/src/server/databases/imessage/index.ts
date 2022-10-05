@@ -7,7 +7,7 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
-import { isMinHighSierra, isNotEmpty } from "@server/helpers/utils";
+import { isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 import { isEmpty } from "@firebase/util";
 
 /**
@@ -344,6 +344,16 @@ export class MessageRepository {
             });
         if (before)
             query.andWhere("message.date_read < :before", {
+                before: convertDateTo2001Time(before as Date)
+            });
+
+        // Add date_edited constraints
+        if (after && isMinVentura)
+            query.orWhere("message.date_edited >= :after", {
+                after: convertDateTo2001Time(after as Date)
+            });
+        if (before && isMinVentura)
+            query.andWhere("message.date_edited < :before", {
                 before: convertDateTo2001Time(before as Date)
             });
 

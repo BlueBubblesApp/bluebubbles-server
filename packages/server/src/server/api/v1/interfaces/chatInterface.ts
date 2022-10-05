@@ -287,4 +287,20 @@ export class ChatInterface {
             throw new Error(`Failed to delete chat! Chat still exists. (GUID: ${theChat.guid})`);
         }
     }
+
+    static async markRead(chatGuid: string): Promise<void> {
+        await Server().privateApiHelper.markChatRead(chatGuid);
+        await Server().emitMessage("chat-read-status-changed", {
+            chatGuid,
+            read: true
+        });
+    }
+
+    static async markUnread(chatGuid: string): Promise<void> {
+        await Server().privateApiHelper.markChatUnread(chatGuid);
+        await Server().emitMessage("chat-read-status-changed", {
+            chatGuid,
+            read: false
+        });
+    }
 }

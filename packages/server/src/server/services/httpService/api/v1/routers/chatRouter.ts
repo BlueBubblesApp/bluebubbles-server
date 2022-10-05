@@ -20,7 +20,7 @@ export class ChatRouter {
 
         // We want to include the archived by default
         // Using != instead of !== because we want to treat null and undefined as equal
-        const withArchived = (includeArchived != null) ? isTruthyBool(includeArchived as string) : true;
+        const withArchived = includeArchived != null ? isTruthyBool(includeArchived as string) : true;
 
         // Get all the chats so we can parse through them for the breakdown
         const chats = await Server().iMessageRepo.getChats({ withArchived });
@@ -66,8 +66,16 @@ export class ChatRouter {
         const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
         const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
         const withAttributedBody = arrayHasOne(withQuery, [
-            "message.attributedbody", "message.attributed-body",
-            "messages.attributedody", "messages.attributed-body"
+            "message.attributedbody",
+            "message.attributed-body",
+            "messages.attributedody",
+            "messages.attributed-body"
+        ]);
+        const withMessageSummaryInfo = arrayHasOne(withQuery, [
+            "message.messageSummaryInfo",
+            "message.message-summary-info",
+            "messages.messageSummaryInfo",
+            "messages.message-summary-info"
         ]);
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
@@ -95,7 +103,8 @@ export class ChatRouter {
         const results = await MessageSerializer.serializeList({
             messages,
             loadChatParticipants: false,
-            parseAttributedBody: withAttributedBody
+            parseAttributedBody: withAttributedBody,
+            parseMessageSummary: withMessageSummaryInfo
         });
 
         return new Success(ctx, { data: results }).send();
@@ -106,7 +115,7 @@ export class ChatRouter {
 
         // Pull out the filters
         const withQuery = parseWithQuery(body?.with);
-            
+
         const withLastMessage = arrayHasOne(withQuery, ["lastmessage", "last-message"]);
         const guid = body?.guid;
         const { sort, offset, limit } = body;
@@ -199,13 +208,14 @@ export class ChatRouter {
 
     static async markRead(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
-        await Server().privateApiHelper.markChatRead(guid);
-        await Server().emitMessage("chat-read-status-changed", {
-            chatGuid: guid,
-            read: true
-        });
-
+        await ChatInterface.markRead(guid);
         return new Success(ctx, { message: "Successfully marked chat as read!" }).send();
+    }
+
+    static async markUnread(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.markUnread(guid);
+        return new Success(ctx, { message: "Successfully marked chat as unread!" }).send();
     }
 
     static async removeParticipant(ctx: RouterContext, next: Next): Promise<void> {

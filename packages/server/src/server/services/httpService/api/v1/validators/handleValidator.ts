@@ -8,7 +8,7 @@ export class HandleValidator {
     };
 
     static async validateFind(ctx: RouterContext, next: Next) {
-        ValidateInput(ctx?.params, HandleValidator.findRules);
+        ValidateInput(ctx.params, HandleValidator.findRules);
         await next();
     }
 

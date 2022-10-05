@@ -1,7 +1,8 @@
 import { Server } from "@server";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { getFilenameWithoutExtension, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { getFilenameWithoutExtension, isEmpty, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 
 export class MessagePromiseRejection extends Error {
     error: string;
@@ -144,8 +145,11 @@ export class MessagePromise {
         const cmpSubject = isNotEmpty(this.subject) && isNotEmpty(message.subject);
         if (cmpSubject && this.subject !== onlyAlphaNumeric(message.subject)) return false;
 
+        // Compare the original text to the message's text or attributed body (if available)
+        const messageText = onlyAlphaNumeric(message.universalText(true));
+
         // Check if the text matches
-        return this.text === onlyAlphaNumeric(message.text) && this.sentAt <= message.dateCreated.getTime();
+        return this.text === messageText && this.sentAt <= message.dateCreated.getTime();
     }
 }
 

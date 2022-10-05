@@ -10,7 +10,9 @@ import type {
     SendMessageParams,
     SendAttachmentParams,
     SendMessagePrivateApiParams,
-    SendReactionParams
+    SendReactionParams,
+    UnsendMessageParams,
+    EditMessageParams
 } from "@server/api/v1/types";
 
 export class MessageInterface {
@@ -47,7 +49,8 @@ export class MessageInterface {
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
-        tempGuid = null
+        tempGuid = null,
+        partIndex = 0
     }: SendMessageParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -65,7 +68,7 @@ export class MessageInterface {
         });
 
         // Add the promise to the manager
-        Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}; tempGuid: ${tempGuid ?? 'N/A'}`);
+        Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}; tempGuid: ${tempGuid ?? "N/A"}`);
         Server().messageManager.add(awaiter);
 
         // Try to send the iMessage
@@ -81,7 +84,8 @@ export class MessageInterface {
                 attributedBody,
                 subject,
                 effectId,
-                selectedMessageGuid
+                selectedMessageGuid,
+                partIndex
             });
         } else {
             throw new Error(`Invalid send method: ${method}`);
@@ -134,7 +138,8 @@ export class MessageInterface {
 
         // Add the promise to the manager
         Server().log(
-            `Adding await for chat: "${chatGuid}"; attachment: ${aName}; tempGuid: ${attachmentGuid ?? 'N/A'}`);
+            `Adding await for chat: "${chatGuid}"; attachment: ${aName}; tempGuid: ${attachmentGuid ?? "N/A"}`
+        );
         Server().messageManager.add(awaiter);
 
         // Send the message
@@ -148,7 +153,8 @@ export class MessageInterface {
         attributedBody = null,
         subject = null,
         effectId = null,
-        selectedMessageGuid = null
+        selectedMessageGuid = null,
+        partIndex = 0
     }: SendMessagePrivateApiParams) {
         checkPrivateApiStatus();
         const result = await Server().privateApiHelper.sendMessage(
@@ -157,7 +163,8 @@ export class MessageInterface {
             attributedBody ?? null,
             subject ?? null,
             effectId ?? null,
-            selectedMessageGuid ?? null
+            selectedMessageGuid ?? null,
+            partIndex ?? 0
         );
 
         if (!result?.identifier) {
@@ -188,11 +195,84 @@ export class MessageInterface {
         return retMessage;
     }
 
+    static async unsendMessage({ chatGuid, messageGuid, partIndex = 0 }: UnsendMessageParams) {
+        checkPrivateApiStatus();
+        const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
+        const currentEditDate = msg?.dateEdited ?? 0;
+        await Server().privateApiHelper.unsendMessage({ chatGuid, messageGuid, partIndex: partIndex ?? 0 });
+
+        // Fetch the chat based on the return data
+        let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        let tryCount = 0;
+        while (!retMessage || retMessage.dateEdited <= currentEditDate) {
+            tryCount += 1;
+
+            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            if (tryCount >= 40) break;
+
+            // Give it a bit to execute
+            await waitMs(250);
+
+            // Re-fetch the message with the updated information
+            retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        }
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error("Failed to unsend message! Message not found after 5 seconds!");
+        }
+
+        return retMessage;
+    }
+
+    static async editMessage({
+        chatGuid,
+        messageGuid,
+        editedMessage,
+        backwardsCompatMessage,
+        partIndex = 0
+    }: EditMessageParams) {
+        checkPrivateApiStatus();
+        const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
+        const currentEditDate = msg?.dateEdited ?? 0;
+        await Server().privateApiHelper.editMessage({
+            chatGuid,
+            messageGuid,
+            editedMessage,
+            backwardsCompatMessage,
+            partIndex: partIndex ?? 0
+        });
+
+        // Fetch the chat based on the return data
+        let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        let tryCount = 0;
+        while (!retMessage || retMessage.dateEdited <= currentEditDate) {
+            tryCount += 1;
+
+            // If we've tried 10 times and there is no change, break out (~10 seconds)
+            if (tryCount >= 40) break;
+
+            // Give it a bit to execute
+            await waitMs(250);
+
+            // Re-fetch the message with the updated information
+            retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        }
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error("Failed to edit message! Message not found after 5 seconds!");
+        }
+
+        return retMessage;
+    }
+
     static async sendReaction({
         chatGuid,
         message,
         reaction,
-        tempGuid = null
+        tempGuid = null,
+        partIndex = 0
     }: SendReactionParams): Promise<Message> {
         checkPrivateApiStatus();
 
@@ -203,10 +283,11 @@ export class MessageInterface {
             : reactionTextMap[reaction as string];
 
         // If the message text is just the invisible char, we know it's probably just an attachment
-        const isOnlyMedia = message.text.length === 1 && message.text === invisibleMediaChar;
+        const text = message.universalText(false) ?? "";
+        const isOnlyMedia = text.length === 1 && text === invisibleMediaChar;
 
         // Default the message to the other message surrounded by greek quotes
-        let msg = `“${message.text}”`;
+        let msg = `“${text}”`;
 
         // If it's a media-only message and we have at least 1 attachment,
         // set the message according to the first attachment's MIME type
@@ -229,7 +310,7 @@ export class MessageInterface {
         Server().messageManager.add(awaiter);
 
         // Send the reaction
-        const result = await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction);
+        const result = await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction, partIndex ?? 0);
         if (!result?.identifier) {
             throw new Error("Failed to send reaction! No message GUID returned.");
         } else {

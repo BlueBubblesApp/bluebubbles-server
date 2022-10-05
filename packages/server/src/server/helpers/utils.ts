@@ -13,6 +13,7 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 
+export const isMinVentura = macosVersion.isGreaterThanOrEqualTo("13.0");
 export const isMinMonterey = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
 export const isMinCatalina = macosVersion.isGreaterThanOrEqualTo("10.15");

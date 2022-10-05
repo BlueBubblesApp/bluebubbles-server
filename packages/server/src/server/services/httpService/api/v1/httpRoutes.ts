@@ -244,6 +244,12 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/unread",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.markUnread
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/participant/add",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
@@ -279,7 +285,7 @@ export class HttpRoutes {
                         path: ":guid",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: ChatRouter.deleteChat
-                    },
+                    }
                 ]
             },
             {
@@ -334,6 +340,18 @@ export class HttpRoutes {
                         path: ":guid",
                         validators: [MessageValidator.validateFind],
                         controller: MessageRouter.find
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/edit",
+                        validators: [MessageValidator.validateEdit],
+                        controller: MessageRouter.editMessage
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/unsend",
+                        validators: [MessageValidator.validateUnsend],
+                        controller: MessageRouter.unsendMessage
                     }
                 ]
             },
