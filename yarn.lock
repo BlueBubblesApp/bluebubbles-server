@@ -10135,10 +10135,10 @@ node-releases@^2.0.3:
   resolved "https://registry.npmjs.org/node-releases/-/node-releases-2.0.5.tgz"
   integrity sha512-U9h1NLROZTq9uE1SNffn6WuPDg8icmi3ns4rEl/oTfIle4iLjTliCzgTsbaIFMq/Xn078/lfY/BL0GWZ+psK4Q==
 
-node-typedstream@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/node-typedstream/-/node-typedstream-1.3.0.tgz#f1eeff3873fb6d5a8309b6a9d4f64a6a5d590852"
-  integrity sha512-ZU8f1noZqgFrYVAvNkg8BzV6RybC6ek5+ABrNDNdFDmoMK8aiKJlleXsQAqTau07mDi5ehZPFo6E88hyUF6R5A==
+node-typedstream@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/node-typedstream/-/node-typedstream-1.4.0.tgz#71507219dc40a8c367d1ceb79fcc8b3122e1f180"
+  integrity sha512-JxpesnVGw9xvnUp1RLMQmunXvH5E91Mrz9QPnzYOy+RzKpf4QNMzD4NWp2w2M4d1G4vpTKc9Cku5xdUVN553uw==
   dependencies:
     bplist-parser "^0.3.2"
 
