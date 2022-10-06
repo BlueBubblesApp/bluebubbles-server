@@ -37,7 +37,8 @@ import {
     IPCService,
     UpdateService,
     CloudflareService,
-    WebhookService
+    WebhookService,
+    ScheduledMessagesService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -115,6 +116,8 @@ class BlueBubblesServer extends EventEmitter {
 
     updater: UpdateService;
 
+    scheduledMessages: ScheduledMessagesService;
+
     messageManager: OutgoingMessageManager;
 
     queue: QueueService;
@@ -154,10 +157,10 @@ class BlueBubblesServer extends EventEmitter {
         let status = true;
         if (isMinMojave) {
             const authStatus = getAuthStatus("full-disk-access");
-            if (authStatus === 'authorized') {
+            if (authStatus === "authorized") {
                 status = true;
             } else {
-                this.log(`FullDiskAccess Permission Status: ${authStatus}`, 'debug');
+                this.log(`FullDiskAccess Permission Status: ${authStatus}`, "debug");
             }
         }
 
@@ -199,6 +202,7 @@ class BlueBubblesServer extends EventEmitter {
         this.updater = null;
         this.messageManager = null;
         this.webhookService = null;
+        this.scheduledMessages = null;
 
         this.hasSetup = false;
         this.hasStarted = false;
@@ -370,6 +374,13 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.log(`Failed to start Webhook service! ${ex.message}`, "error");
         }
+
+        try {
+            this.log("Initializing Scheduled Messages Service...");
+            this.scheduledMessages = new ScheduledMessagesService();
+        } catch (ex: any) {
+            this.log(`Failed to start Webhook service! ${ex.message}`, "error");
+        }
     }
 
     /**
@@ -396,6 +407,13 @@ class BlueBubblesServer extends EventEmitter {
             await this.fcm.start();
         } catch (ex: any) {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Starting Scheduled Messages service...");
+            await this.scheduledMessages.start();
+        } catch (ex: any) {
+            this.log(`Failed to start Scheduled Messages service! ${ex.message}`, "error");
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
@@ -445,6 +463,12 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
         }
 
+        try {
+            this.scheduledMessages?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Scheduled Messages service! ${ex?.message ?? ex}`, "error");
+        }
+
         this.log("Finished stopping services...");
     }
 
@@ -465,14 +489,14 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            await this.iMessageRepo?.db?.close();
+            await this.iMessageRepo?.db?.destroy();
         } catch (ex: any) {
             this.log(`Failed to close iMessage Database connection! ${ex?.message ?? ex}`);
         }
 
         try {
-            if (this.repo?.db?.isConnected) {
-                await this.repo?.db?.close();
+            if (this.repo?.db?.isInitialized) {
+                await this.repo?.db?.destroy();
             }
         } catch (ex: any) {
             this.log(`Failed to close Server Database connection! ${ex?.message ?? ex}`);
@@ -1012,10 +1036,13 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New Message from You, ${newMessage.contentString()}`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await MessageSerializer.serialize({
-                message: newMessage,
-                enforceMaxSize: true
-            }));
+            await this.emitMessage(
+                "new-message",
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    enforceMaxSize: true
+                })
+            );
         });
 
         /**
@@ -1060,10 +1087,14 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
             // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await MessageSerializer.serialize({
-                message: newMessage,
-                enforceMaxSize: true
-            }), "high");
+            await this.emitMessage(
+                "new-message",
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    enforceMaxSize: true
+                }),
+                "high"
+            );
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
