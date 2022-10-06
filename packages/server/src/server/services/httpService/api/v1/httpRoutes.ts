@@ -31,6 +31,8 @@ import { FcmValidator } from "./validators/fcmValidator";
 import { AttachmentValidator } from "./validators/attachmentValidator";
 import { ChatValidator } from "./validators/chatValidator";
 import { AlertsValidator } from "./validators/alertsValidator";
+import { ScheduledMessageValidator } from "./validators/scheduledMessageValidator";
+import { ScheduledMessageRouter } from "./routers/scheduledMessageRouter";
 
 export class HttpRoutes {
     static version = 1;
@@ -334,6 +336,27 @@ export class HttpRoutes {
                         path: "query",
                         validators: [MessageValidator.validateQuery],
                         controller: MessageRouter.query
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "schedule",
+                        controller: ScheduledMessageRouter.getScheduledMessages
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "schedule",
+                        validators: [ScheduledMessageValidator.validateScheduledMessage],
+                        controller: ScheduledMessageRouter.createScheduledMessage
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "schedule/:id",
+                        controller: ScheduledMessageRouter.getById
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: "schedule/:id",
+                        controller: ScheduledMessageRouter.deleteById
                     },
                     {
                         method: HttpMethod.GET,
