@@ -1,9 +1,14 @@
-import { DateTransformer } from "@server/databases/transformers/DateTransformer";
+import { EpochDateTransformer } from "@server/databases/transformers/EpochDateTransformer";
 import { JsonTransformer } from "@server/databases/transformers/JsonTransformer";
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm";
 
 @Entity({ name: "scheduled_message" })
 export class ScheduledMessage {
+    toString() {
+        // eslint-disable-next-line max-len
+        return `ScheduledMessage(id=${this.id}, type=${this.type}, scheduledFor=${this.scheduledFor}, message=${this.payload.message})`;
+    }
+
     @PrimaryGeneratedColumn({ name: "id" })
     id: number;
 
@@ -16,7 +21,7 @@ export class ScheduledMessage {
     payload: NodeJS.Dict<any>;
 
     // The timestamp to send the message at
-    @Column("date", { name: "scheduled_for", nullable: true, transformer: DateTransformer })
+    @Column("date", { name: "scheduled_for", nullable: true, transformer: EpochDateTransformer })
     scheduledFor: Date;
 
     // JSON String containing metadata around the schedule
@@ -32,7 +37,7 @@ export class ScheduledMessage {
     error: string;
 
     // The timestamp the message was sent at
-    @Column("date", { name: "sent_at", nullable: true, transformer: DateTransformer })
+    @Column("date", { name: "sent_at", nullable: true, transformer: EpochDateTransformer })
     sentAt: Date;
 
     @CreateDateColumn()

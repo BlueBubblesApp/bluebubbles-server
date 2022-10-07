@@ -1,8 +1,8 @@
-import * as process from "process";
 import { Server } from "@server";
 import { ScheduledMessage } from "@server/databases/server/entity";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { SendMessageParams } from "@server/api/v1/types";
+import { FindOneOptions } from "typeorm";
 
 export enum ScheduledMessageStatus {
     PENDING = "pending",
@@ -47,6 +47,8 @@ export class ScheduledMessagesService {
     }
 
     async createScheduledMessage(scheduledMessage: ScheduledMessage): Promise<ScheduledMessage> {
+        Server().log(`Creating new scheduled message: ${scheduledMessage.toString()}`);
+
         const repo = Server().repo.scheduledMessages();
         const newScheduledMessage = repo.create(scheduledMessage);
         await repo.save(newScheduledMessage);
@@ -56,9 +58,13 @@ export class ScheduledMessagesService {
 
     async deleteScheduledMessage(id: number): Promise<void> {
         const repo = Server().repo.scheduledMessages();
-        const scheduledMessage = await repo.findBy({ id });
+        const findOptions: FindOneOptions<ScheduledMessage> = { where: { id } } as FindOneOptions<ScheduledMessage>;
+        const scheduledMessage = await repo.findOne(findOptions);
         if (scheduledMessage) {
+            Server().log(`Deleting scheduled message: ${scheduledMessage.toString()}`);
             await repo.remove(scheduledMessage);
+        } else {
+            throw new Error("Scheduled message not found");
         }
 
         if (Object.keys(this.timers).includes(String(id))) {
@@ -68,14 +74,20 @@ export class ScheduledMessagesService {
     }
 
     async scheduleMessage(scheduledMessage: ScheduledMessage): Promise<void> {
+        if (scheduledMessage.status !== ScheduledMessageStatus.PENDING) return;
+
         const now = new Date();
         const diff = scheduledMessage.scheduledFor.getTime() - now.getTime();
 
         // If the schedule has passed, do not schedule it.
         if (diff <= 0) {
+            Server().log(`Expiring: ${scheduledMessage.toString()}`);
+            Server().log(`Scheduled message was ${diff} ms late`, "debug");
             await this.handleExpiredMessag(scheduledMessage);
         } else {
+            Server().log(`Scheduling: ${scheduledMessage.toString()}`);
             this.timers[String(scheduledMessage.id)] = setTimeout(() => {
+                Server().log(`Sending: ${scheduledMessage.toString()}`);
                 this.sendScheduledMessage(scheduledMessage);
             }, diff);
         }

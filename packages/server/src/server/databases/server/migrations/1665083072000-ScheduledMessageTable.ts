@@ -9,11 +9,11 @@ export class ScheduledMessageTable1665083072000 implements MigrationInterface {
             "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
             "type" text NOT NULL,
             "payload" text NOT NULL,
-            "scheduled_for" datetime,
+            "scheduled_for" datetime DEFAULT NULL,
             "schedule" text NOT NULL,
             "status" text NOT NULL DEFAULT 'pending',
             "error" text DEFAULT NULL,
-            "sent_at" datetime,
+            "sent_at" datetime DEFAULT NULL,
             "created" datetime NOT NULL DEFAULT (datetime('now'))
         );
     `;
