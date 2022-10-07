@@ -1,7 +1,7 @@
 import { Server } from "@server";
 import { ScheduledMessage } from "@server/databases/server/entity";
-import { isNotEmpty } from "@server/helpers/utils";
 import { ScheduledMessageScheduleType, ScheduledMessageType } from "@server/services/scheduledMessagesService";
+import { FindOneOptions } from "typeorm";
 import { SendMessageParams } from "../types";
 
 export class ScheduledMessagesInterface {
@@ -34,7 +34,7 @@ export class ScheduledMessagesInterface {
 
     static async getScheduledMessage(id: number): Promise<ScheduledMessage> {
         const repo = Server().repo.scheduledMessages();
-        const res = await repo.findBy({ id });
-        return isNotEmpty(res) ? res[0] : null;
+        const findOpts: FindOneOptions<ScheduledMessage> = { where: { id } } as FindOneOptions<ScheduledMessage>;
+        return await repo.findOne(findOpts);
     }
 }
