@@ -4,7 +4,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "t
 
 import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/databases/transformers/DateTransformer";
+import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { convertAudio, convertImage, getAttachmentMetadata } from "@server/databases/imessage/helpers/utils";
 import { AttachmentResponse } from "@server/types";
@@ -34,7 +34,7 @@ export class Attachment {
         type: "integer",
         name: "created_date",
         default: 0,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     createdDate: Date;
 
@@ -42,7 +42,7 @@ export class Attachment {
         type: "integer",
         name: "start_date",
         default: 0,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     startDate: Date;
 

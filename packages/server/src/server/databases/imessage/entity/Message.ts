@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColum
 import { conditional } from "conditional-decorator";
 
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/databases/transformers/DateTransformer";
+import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
@@ -153,7 +153,7 @@ export class Message {
         name: "date",
         type: "date",
         nullable: true,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     dateCreated: Date;
 
@@ -161,7 +161,7 @@ export class Message {
         name: "date_read",
         type: "date",
         nullable: true,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     dateRead: Date;
 
@@ -169,7 +169,7 @@ export class Message {
         name: "date_delivered",
         type: "date",
         nullable: true,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     dateDelivered: Date;
 
@@ -347,7 +347,7 @@ export class Message {
     @Column({
         name: "date_played",
         type: "integer",
-        transformer: DateTransformer,
+        transformer: AppleDateTransformer,
         default: 0
     })
     datePlayed: Date;
@@ -465,7 +465,7 @@ export class Message {
         Column({
             name: "time_expressive_send_played",
             type: "integer",
-            transformer: DateTransformer,
+            transformer: AppleDateTransformer,
             default: 0
         })
     )
@@ -539,7 +539,7 @@ export class Message {
         Column({
             name: "date_retracted",
             type: "date",
-            transformer: DateTransformer,
+            transformer: AppleDateTransformer,
             default: 0
         })
     )
@@ -550,7 +550,7 @@ export class Message {
         Column({
             name: "date_edited",
             type: "date",
-            transformer: DateTransformer,
+            transformer: AppleDateTransformer,
             default: 0
         })
     )
