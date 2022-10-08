@@ -34,6 +34,11 @@ export enum ScheduledMessageScheduleRecurringType {
 export class ScheduledMessagesService {
     private timers: Record<string, NodeJS.Timeout> = {};
 
+    async saveScheduledMessage(scheduledMessage: ScheduledMessage) {
+        Server().emitToUI("scheduled-message-update", scheduledMessage);
+        await Server().repo.scheduledMessages().save(scheduledMessage);
+    }
+
     async loadAndSchedule() {
         const schedules = await this.getScheduledMessages();
         for (const schedule of schedules) {
@@ -51,7 +56,7 @@ export class ScheduledMessagesService {
 
         const repo = Server().repo.scheduledMessages();
         const newScheduledMessage = repo.create(scheduledMessage);
-        await repo.save(newScheduledMessage);
+        await this.saveScheduledMessage(newScheduledMessage);
         await this.scheduleMessage(newScheduledMessage);
         return newScheduledMessage;
     }
@@ -73,7 +78,29 @@ export class ScheduledMessagesService {
         }
     }
 
+    async deleteScheduledMessages(): Promise<void> {
+        const repo = Server().repo.scheduledMessages();
+        const scheduledMessages = await repo.find();
+        const ids = scheduledMessages.map(scheduledMessage => scheduledMessage.id);
+        await repo.clear();
+
+        for (const id of ids) {
+            if (Object.keys(this.timers).includes(String(id))) {
+                clearTimeout(this.timers[String(id)]);
+                delete this.timers[String(id)];
+            }
+        }
+    }
+
     async scheduleMessage(scheduledMessage: ScheduledMessage): Promise<void> {
+        // If it's in progress, mark it as failed
+        if (scheduledMessage.status === ScheduledMessageStatus.IN_PROGRESS) {
+            scheduledMessage.status = ScheduledMessageStatus.ERROR;
+            scheduledMessage.error = "Server was restarted while the scheduled message was in progress.";
+            await this.saveScheduledMessage(scheduledMessage);
+            return;
+        }
+
         if (scheduledMessage.status !== ScheduledMessageStatus.PENDING) return;
 
         const now = new Date();
@@ -83,27 +110,25 @@ export class ScheduledMessagesService {
         if (diff <= 0) {
             Server().log(`Expiring: ${scheduledMessage.toString()}`);
             Server().log(`Scheduled message was ${diff} ms late`, "debug");
-            await this.handleExpiredMessag(scheduledMessage);
+            await this.handleExpiredMessage(scheduledMessage);
         } else {
-            Server().log(`Scheduling: ${scheduledMessage.toString()}`);
+            Server().log(`Scheduling (in ${diff} ms): ${scheduledMessage.toString()}`);
             this.timers[String(scheduledMessage.id)] = setTimeout(() => {
-                Server().log(`Sending: ${scheduledMessage.toString()}`);
                 this.sendScheduledMessage(scheduledMessage);
             }, diff);
         }
     }
 
-    async handleExpiredMessag(scheduledMessage: ScheduledMessage): Promise<void> {
+    async handleExpiredMessage(scheduledMessage: ScheduledMessage): Promise<void> {
         // Set the status to error, and remove the schedule for it
         scheduledMessage.status = ScheduledMessageStatus.ERROR;
         scheduledMessage.error = "Message expired before it could be sent. Or the server was not online at the time.";
-        scheduledMessage.scheduledFor = null;
 
         // Reschedule the message
         await this.tryReschedule(scheduledMessage);
 
         // Save the message
-        await Server().repo.scheduledMessages().save(scheduledMessage);
+        await this.saveScheduledMessage(scheduledMessage);
     }
 
     async tryReschedule(scheduledMessage: ScheduledMessage): Promise<void> {
@@ -152,9 +177,11 @@ export class ScheduledMessagesService {
     }
 
     async sendScheduledMessage(scheduledMessage: ScheduledMessage): Promise<void> {
+        Server().log(`Sending: ${scheduledMessage.toString()}`);
+
         // Set the status to in-progress
         scheduledMessage.status = ScheduledMessageStatus.IN_PROGRESS;
-        Server().repo.scheduledMessages().save(scheduledMessage);
+        this.saveScheduledMessage(scheduledMessage);
 
         // Send the message
         try {
@@ -163,22 +190,21 @@ export class ScheduledMessagesService {
             }
 
             scheduledMessage.sentAt = new Date();
-        } catch (ex) {
+        } catch (ex: any) {
+            Server().log(`Failed to send scheduled message: ${ex?.message ?? String(ex)}`);
             scheduledMessage.status = ScheduledMessageStatus.ERROR;
             scheduledMessage.error = String(ex);
         } finally {
             if (scheduledMessage.status !== ScheduledMessageStatus.ERROR) {
                 scheduledMessage.status = ScheduledMessageStatus.COMPLETE;
             }
-
-            scheduledMessage.scheduledFor = null;
         }
 
         // Reschedule the message
         await this.tryReschedule(scheduledMessage);
 
         // Save the message
-        await Server().repo.scheduledMessages().save(scheduledMessage);
+        await this.saveScheduledMessage(scheduledMessage);
     }
 
     start() {

@@ -6,7 +6,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeor
 export class ScheduledMessage {
     toString() {
         // eslint-disable-next-line max-len
-        return `ScheduledMessage(id=${this.id}, type=${this.type}, scheduledFor=${this.scheduledFor}, message=${this.payload.message})`;
+        return `ScheduledMessage(id=${this.id}, type=${this.type}, status=${this.status}, scheduledFor=${this.scheduledFor}, message=${this.payload.message})`;
     }
 
     @PrimaryGeneratedColumn({ name: "id" })
@@ -21,7 +21,7 @@ export class ScheduledMessage {
     payload: NodeJS.Dict<any>;
 
     // The timestamp to send the message at
-    @Column("date", { name: "scheduled_for", nullable: true, transformer: EpochDateTransformer })
+    @Column("date", { name: "scheduled_for", nullable: false, transformer: EpochDateTransformer })
     scheduledFor: Date;
 
     // JSON String containing metadata around the schedule

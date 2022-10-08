@@ -32,6 +32,10 @@ export class ScheduledMessagesInterface {
         return await Server().scheduledMessages.deleteScheduledMessage(id);
     }
 
+    static async deleteScheduledMessages(): Promise<void> {
+        return await Server().scheduledMessages.deleteScheduledMessages();
+    }
+
     static async getScheduledMessage(id: number): Promise<ScheduledMessage> {
         const repo = Server().repo.scheduledMessages();
         const findOpts: FindOneOptions<ScheduledMessage> = { where: { id } } as FindOneOptions<ScheduledMessage>;

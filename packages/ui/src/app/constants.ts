@@ -52,3 +52,18 @@ export const webhookEventOptions = [
         value: 'hello-world'
     }
 ];
+
+export const scheduledMessageTypeOptions = [
+    {
+        label: 'Send Message',
+        value: 'send-message'
+    }
+];
+
+export const intervalTypeToLabel: Record<string, string> = {
+    'hourly': 'Hour(s)',
+    'daily': 'Day(s)',
+    'weekly': 'Week(s)',
+    'monthly': 'Month(s)',
+    'yearly': 'Year(s)'
+};
