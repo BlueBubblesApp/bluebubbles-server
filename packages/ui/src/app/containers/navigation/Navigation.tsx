@@ -171,6 +171,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
         <Box
             borderRight="1px"
             borderRightColor={useColorModeValue('gray.200', 'gray.700')}
+            minW='16em'
             w={{ base: 'full', md: 60 }}
             pos="fixed"
             h="full"
@@ -183,7 +184,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
             </Flex>
             {LinkItems.map(link => (
                 <RouterLink key={link.name} to={link.to}>
-                    <NavItem icon={link.icon} to={link.to} minW='14em'>{link.name}</NavItem>
+                    <NavItem icon={link.icon} to={link.to}>{link.name}</NavItem>
                 </RouterLink>
             ))}
         </Box>
@@ -237,7 +238,7 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
 
     return (
         <Flex
-            ml={{ base: 0, md: 60 }}
+            ml={{ base: 0, md: 255 }}
             px={{ base: 4, md: 4 }}
             height="20"
             alignItems="center"

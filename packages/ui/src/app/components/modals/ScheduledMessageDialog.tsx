@@ -39,7 +39,7 @@ export const ScheduledMessageDialog = ({
     const [scheduledFor, setScheduledFor] = useState(null as Date | null);
     const [scheduleType, setScheduleType] = useState(scheduleTypeOptions[0] as any | null);
     const [intervalType, setIntervalType] = useState(intervalTypeOpts[0] as any | null);
-    const [interval, setIntervalValue] = useState(null as number | null);
+    const [interval, setIntervalValue] = useState(1);
     const [messageError, setMessageError] = useState('');
     const hasMessageError = (messageError ?? '').length > 0;
     const [guidError, setGuidError] = useState('');
@@ -56,7 +56,7 @@ export const ScheduledMessageDialog = ({
         setScheduledFor(null);
         setScheduleType(scheduleTypeOptions[0] as any | null);
         setIntervalType(intervalTypeOpts[0] as any | null);
-        setIntervalValue(null);
+        setIntervalValue(1);
         setMessageError('');
         setGuidError('');
         setIntervalError('');
@@ -206,8 +206,6 @@ export const ScheduledMessageDialog = ({
                                     return;
                                 }
 
-                                console.log(interval);
-                                console.log(typeof interval);
                                 if (!interval) {
                                     setIntervalError('Please enter a valid interval!');
                                     return;
