@@ -19,6 +19,22 @@ export class ScheduledMessagesInterface {
             interval?: number;
         }
     ): Promise<ScheduledMessage> {
+        if (schedule.type === "recurring" && !schedule.intervalType) {
+            throw new Error("Recurring schedule must have an interval type");
+        }
+
+        if (schedule.type === "recurring" && (!schedule.interval || schedule.interval === 0)) {
+            throw new Error("Recurring schedule must have an interval > 0");
+        }
+
+        if (!scheduledFor) {
+            throw new Error("Scheduled For date is required");
+        }
+
+        if (scheduledFor.getTime() < new Date().getTime()) {
+            throw new Error("Scheduled For date must be in the future");
+        }
+
         const msg = new ScheduledMessage();
         msg.type = type;
         msg.payload = payload;

@@ -149,6 +149,10 @@ export class ScheduledMessagesService {
 
     getNextRecurringDate(schedule: NodeJS.Dict<any>): Date {
         const nextTs = this.getMillisecondsForSchedule(schedule);
+        if (nextTs === 0) {
+            throw new Error("Invalid schedule! Next schedule would have been 0 ms in the future.");
+        }
+
         const now = new Date().getTime();
         return new Date(now + nextTs);
     }
