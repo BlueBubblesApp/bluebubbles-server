@@ -10,13 +10,12 @@ import {
     Input,
     FormControl,
     FormErrorMessage,
-    FormLabel,
-    Text,
+    FormLabel
 } from '@chakra-ui/react';
 import { FocusableElement } from '@chakra-ui/utils';
 import { ScheduledMessageItem } from '../tables/ScheduledMessagesTable';
-import { GroupBase, Options, Select } from 'chakra-react-select';
-import { scheduledMessageTypeOptions } from 'app/constants';
+import { Options, Select } from 'chakra-react-select';
+import { intervalTypeOpts, scheduledMessageTypeOptions, scheduleTypeOptions } from 'app/constants';
 
 
 interface ScheduledMessageDialogProps {
@@ -38,8 +37,8 @@ export const ScheduledMessageDialog = ({
     const [message, setMessage] = useState('');
     const [chatGuid, setChatGuid] = useState('');
     const [scheduledFor, setScheduledFor] = useState(null as Date | null);
-    const [scheduleType, setScheduleType] = useState('once');
-    const [intervalType, setIntervalType] = useState(null as string | null);
+    const [scheduleType, setScheduleType] = useState(scheduleTypeOptions[0] as any | null);
+    const [intervalType, setIntervalType] = useState(intervalTypeOpts[0] as any | null);
     const [interval, setIntervalValue] = useState(null as number | null);
     const [messageError, setMessageError] = useState('');
     const hasMessageError = (messageError ?? '').length > 0;
@@ -47,18 +46,20 @@ export const ScheduledMessageDialog = ({
     const hasGuidError = (guidError ?? '').length > 0;
     const [dateError, setDateError] = useState('');
     const hasDateError = (dateError ?? '').length > 0;
-
+    const [intervalError, setIntervalError] = useState('');
+    const hasIntervalError = (intervalError ?? '').length > 0;
 
     const _onClose = () => {
-        setType('send-message');
+        setType(scheduledMessageTypeOptions[0] as any | null);
         setMessage('');
         setChatGuid('');
         setScheduledFor(null);
-        setScheduleType('once');
-        setIntervalType(null);
+        setScheduleType(scheduleTypeOptions[0] as any | null);
+        setIntervalType(intervalTypeOpts[0] as any | null);
         setIntervalValue(null);
         setMessageError('');
         setGuidError('');
+        setIntervalError('');
 
         if (onClose) onClose();
     };
@@ -117,15 +118,15 @@ export const ScheduledMessageDialog = ({
                                 <FormErrorMessage>{messageError}</FormErrorMessage>
                             ) : null}
                         </FormControl>
-                        {/* <FormControl mt={5}>
+                        <FormControl mt={5}>
                             <FormLabel>Schedule Type</FormLabel>
                             <Select
                                 size='md'
-                                options={scheduledMessageTypeOptions as unknown as Options<string>}
-                                value={type}
-                                onChange={setType}
+                                options={scheduleTypeOptions as unknown as Options<string>}
+                                value={scheduleType}
+                                onChange={setScheduleType}
                             />
-                        </FormControl> */}
+                        </FormControl>
                         <FormControl isInvalid={hasDateError} mt={5}>
                             <FormLabel htmlFor='scheduledFor'>Scheduled For</FormLabel>
                             <Input
@@ -141,6 +142,32 @@ export const ScheduledMessageDialog = ({
                                 <FormErrorMessage>{dateError}</FormErrorMessage>
                             ) : null}
                         </FormControl>
+                        {scheduleType.value === 'recurring' ? (
+                            <>
+                                <FormControl isInvalid={hasIntervalError} mt={5}>
+                                    <FormLabel htmlFor='scheduleInterval'>Every</FormLabel>
+                                    <Input
+                                        id='scheduleInterval'
+                                        type='number'
+                                        value={interval ?? 1}
+                                        onChange={(e) => {
+                                            setIntervalValue(Number.parseInt(e.target.value));
+                                        }}
+                                    />
+                                    {hasIntervalError ? (
+                                        <FormErrorMessage>{intervalError}</FormErrorMessage>
+                                    ) : null}
+                                </FormControl>
+                                <FormControl mt={5}>
+                                    <Select
+                                        size='md'
+                                        options={intervalTypeOpts as unknown as Options<string>}
+                                        value={intervalType}
+                                        onChange={setIntervalType}
+                                    />
+                                </FormControl>
+                            </>
+                        ) : null}
                     </AlertDialogBody>
 
                     <AlertDialogFooter>
@@ -158,11 +185,6 @@ export const ScheduledMessageDialog = ({
                             bg='brand.primary'
                             ref={modalRef as React.LegacyRef<HTMLButtonElement> | undefined}
                             onClick={() => {
-                                if (message.length === 0) {
-                                    setMessageError('Please enter a message to send!');
-                                    return;
-                                }
-
                                 if (chatGuid.length === 0) {
                                     setGuidError('Please enter a phone number or chat GUID!');
                                     return;
@@ -173,9 +195,24 @@ export const ScheduledMessageDialog = ({
                                     guid = `iMessage;-;${guid}`;
                                 }
 
+                                if (message.length === 0) {
+                                    setMessageError('Please enter a message to send!');
+                                    return;
+                                }
+
                                 const now = new Date();
                                 if (!scheduledFor || scheduledFor < now) {
                                     setDateError('Please enter a date in the future!');
+                                    return;
+                                }
+
+                                console.log(interval);
+                                console.log(typeof interval);
+                                if (!interval) {
+                                    setIntervalError('Please enter a valid interval!');
+                                    return;
+                                } else if (interval < 1) {
+                                    setIntervalError('Interval must be > 0!');
                                     return;
                                 }
 
@@ -189,7 +226,9 @@ export const ScheduledMessageDialog = ({
                                         },
                                         scheduledFor: scheduledFor.getTime(),
                                         schedule: {
-                                            type: 'once'
+                                            type: scheduleType.value,
+                                            interval: interval ?? 1,
+                                            intervalType: intervalType.value
                                         }
                                     });
                                 }

@@ -60,6 +60,40 @@ export const scheduledMessageTypeOptions = [
     }
 ];
 
+export const scheduleTypeOptions = [
+    {
+        label: 'One-Time',
+        value: 'once'
+    },
+    {
+        label: 'Recurring',
+        value: 'recurring'
+    }
+];
+
+export const intervalTypeOpts = [
+    {
+        label: 'Hour(s)',
+        value: 'hourly'
+    },
+    {
+        label: 'Day(s)',
+        value: 'daily'
+    },
+    {
+        label: 'Week(s)',
+        value: 'weekly'
+    },
+    {
+        label: 'Month(s)',
+        value: 'monthly'
+    },
+    {
+        label: 'Year(s)',
+        value: 'yearly'
+    }
+];
+
 export const intervalTypeToLabel: Record<string, string> = {
     'hourly': 'Hour(s)',
     'daily': 'Day(s)',
