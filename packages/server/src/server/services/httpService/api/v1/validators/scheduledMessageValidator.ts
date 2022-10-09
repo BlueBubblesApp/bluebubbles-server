@@ -12,6 +12,12 @@ export class ScheduledMessageValidator {
         schedule: "json-object|required"
     };
 
+    /**
+     * Validates the client inputs when creating a new scheduled message.
+     *
+     * @param ctx The Koa context.
+     * @param next The next function.
+     */
     static async validateScheduledMessage(ctx: RouterContext, next: Next) {
         const { payload, scheduledFor, schedule } = ValidateInput(
             ctx?.request?.body,
