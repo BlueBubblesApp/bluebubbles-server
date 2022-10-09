@@ -334,6 +334,14 @@ export class ScheduledMessagesService {
         scheduledMessage.status = ScheduledMessageStatus.IN_PROGRESS;
         this.saveScheduledMessage(scheduledMessage);
 
+        // Inject the method based on if it's not already provided,
+        // or if the private api is enabled on the server & connected.
+        if (!scheduledMessage.payload.method) {
+            const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
+            scheduledMessage.payload.method =
+                papiEnabled && !!Server().privateApiHelper.helper ? "private-api" : "apple-script";
+        }
+
         // Send the message
         try {
             if (scheduledMessage.type === ScheduledMessageType.SEND_MESSAGE) {
