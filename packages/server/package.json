@@ -91,7 +91,7 @@
         "electron-log": "^4.4.7",
         "electron-updater": "^4.5.2",
         "find-process": "^1.4.4",
-        "firebase-admin": "^11.0.1",
+        "firebase-admin": "^11.1.0",
         "google-libphonenumber": "^3.2.10",
         "koa": "^2.13.1",
         "koa-body": "^4.2.0",
