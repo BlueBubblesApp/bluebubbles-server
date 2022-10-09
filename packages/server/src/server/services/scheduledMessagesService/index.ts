@@ -4,6 +4,9 @@ import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { SendMessageParams } from "@server/api/v1/types";
 import { FindOneOptions } from "typeorm";
 
+/**
+ * The possible states of a scheduled message
+ */
 export enum ScheduledMessageStatus {
     PENDING = "pending",
     IN_PROGRESS = "in-progress",
@@ -11,15 +14,26 @@ export enum ScheduledMessageStatus {
     ERROR = "error"
 }
 
+/**
+ * The possible types of a actions a scheduled message
+ * can perform
+ */
 export enum ScheduledMessageType {
     SEND_MESSAGE = "send-message"
 }
 
+/**
+ * The possible schedule types for a scheduled message
+ */
 export enum ScheduledMessageScheduleType {
     ONCE = "once",
     RECURRING = "recurring"
 }
 
+/**
+ * The possible schedule interval types for a recurring
+ * scheduled message
+ */
 export enum ScheduledMessageScheduleRecurringType {
     HOURLY = "hourly",
     DAILY = "daily",
@@ -34,11 +48,22 @@ export enum ScheduledMessageScheduleRecurringType {
 export class ScheduledMessagesService {
     private timers: Record<string, NodeJS.Timeout> = {};
 
+    /**
+     * Saves a scheduled message to the DB, as well
+     * as emits a message letting the UI know that
+     * the scheduled message has been updated.
+     *
+     * @param scheduledMessage The scheduled message to save
+     */
     async saveScheduledMessage(scheduledMessage: ScheduledMessage) {
         Server().emitToUI("scheduled-message-update", scheduledMessage);
         await Server().repo.scheduledMessages().save(scheduledMessage);
     }
 
+    /**
+     * Loads all scheduled messages from the DB and attempts
+     * to schedules them.
+     */
     async loadAndSchedule() {
         const schedules = await this.getScheduledMessages();
         for (const schedule of schedules) {
@@ -46,11 +71,22 @@ export class ScheduledMessagesService {
         }
     }
 
+    /**
+     * Gets the scheduled messages from the DB.
+     *
+     * @returns All of the scheduled messages
+     */
     async getScheduledMessages() {
         const repo = Server().repo.scheduledMessages();
         return await repo.find();
     }
 
+    /**
+     * Creates a new scheduled message.
+     *
+     * @param scheduledMessage The scheduled message to create
+     * @returns The created scheduled message
+     */
     async createScheduledMessage(scheduledMessage: ScheduledMessage): Promise<ScheduledMessage> {
         Server().log(`Creating new scheduled message: ${scheduledMessage.toString()}`);
 
@@ -61,6 +97,11 @@ export class ScheduledMessagesService {
         return newScheduledMessage;
     }
 
+    /**
+     * Deletes a scheduled message by its' ID.
+     *
+     * @param id The ID of the scheduled message to delete
+     */
     async deleteScheduledMessage(id: number): Promise<void> {
         const repo = Server().repo.scheduledMessages();
         const findOptions: FindOneOptions<ScheduledMessage> = { where: { id } } as FindOneOptions<ScheduledMessage>;
@@ -72,12 +113,24 @@ export class ScheduledMessagesService {
             throw new Error("Scheduled message not found");
         }
 
+        this.removeTimer(id);
+    }
+
+    /**
+     * Removes a timer from the timers object.
+     *
+     * @param id The timer to remove (by ID)
+     */
+    removeTimer(id: number) {
         if (Object.keys(this.timers).includes(String(id))) {
             clearTimeout(this.timers[String(id)]);
             delete this.timers[String(id)];
         }
     }
 
+    /**
+     * Deletes all scheduled messages.
+     */
     async deleteScheduledMessages(): Promise<void> {
         const repo = Server().repo.scheduledMessages();
         const scheduledMessages = await repo.find();
@@ -85,23 +138,36 @@ export class ScheduledMessagesService {
         await repo.clear();
 
         for (const id of ids) {
-            if (Object.keys(this.timers).includes(String(id))) {
-                clearTimeout(this.timers[String(id)]);
-                delete this.timers[String(id)];
-            }
+            this.removeTimer(id);
         }
     }
 
+    /**
+     * Attempts to schedule a scheduled message. If the message
+     * is in progress, it will be skipped, and attempted to be
+     * rescheduled if it's recurring. If the message is already
+     * complete, it will be skipped and rescheduled if recurring.
+     * If the message's scheduled time is in the past, it will be
+     * skipped and attempted to be rescheduled if it's recurring.
+     *
+     * @param scheduledMessage The scheduled message to schedule.
+     */
     async scheduleMessage(scheduledMessage: ScheduledMessage): Promise<void> {
         // If it's in progress, mark it as failed
         if (scheduledMessage.status === ScheduledMessageStatus.IN_PROGRESS) {
-            scheduledMessage.status = ScheduledMessageStatus.ERROR;
-            scheduledMessage.error = "Server was restarted while the scheduled message was in progress.";
-            await this.saveScheduledMessage(scheduledMessage);
-            return;
+            Server().log(`Cancelled: ${scheduledMessage.toString()}`);
+            return this.handleInterruptedMessage(scheduledMessage);
         }
 
-        if (scheduledMessage.status !== ScheduledMessageStatus.PENDING) return;
+        if (scheduledMessage.status === ScheduledMessageStatus.COMPLETE) {
+            Server().log(`Already Complete: ${scheduledMessage.toString()}`);
+            return this.tryReschedule(scheduledMessage);
+        }
+
+        if (scheduledMessage.status === ScheduledMessageStatus.ERROR) {
+            Server().log(`Already Errored: ${scheduledMessage.toString()}`);
+            return this.tryReschedule(scheduledMessage);
+        }
 
         const now = new Date();
         const diff = scheduledMessage.scheduledFor.getTime() - now.getTime();
@@ -119,10 +185,45 @@ export class ScheduledMessagesService {
         }
     }
 
+    /**
+     * Sets the correct error for an expired message and will
+     * attempt to reschedule it if it's recurring.
+     *
+     * @param scheduledMessage The message to expire
+     */
     async handleExpiredMessage(scheduledMessage: ScheduledMessage): Promise<void> {
+        await this.setScheduledMessageError(
+            scheduledMessage,
+            "Message expired before it could be sent. Or the server was not online at the time."
+        );
+    }
+
+    /**
+     * Sets the correct error for an interrupted message and will
+     * attempt to reschedule it if it's recurring.
+     *
+     * @param scheduledMessage The message to interrupt
+     */
+    async handleInterruptedMessage(scheduledMessage: ScheduledMessage): Promise<void> {
+        await this.setScheduledMessageError(
+            scheduledMessage,
+            "Server was restarted while the scheduled message was in progress."
+        );
+    }
+
+    /**
+     * Sets an error for the scheduled message. This will also
+     * try to reschedule the message if it's recurring.
+     *
+     * @param scheduledMessage The scheduled message to set the error for
+     * @param error The error to set
+     */
+    async setScheduledMessageError(scheduledMessage: ScheduledMessage, error: string): Promise<void> {
         // Set the status to error, and remove the schedule for it
         scheduledMessage.status = ScheduledMessageStatus.ERROR;
-        scheduledMessage.error = "Message expired before it could be sent. Or the server was not online at the time.";
+        scheduledMessage.error = error;
+
+        Server().log(`Scheduled Message Error: ${error}`);
 
         // Reschedule the message
         await this.tryReschedule(scheduledMessage);
@@ -131,22 +232,31 @@ export class ScheduledMessagesService {
         await this.saveScheduledMessage(scheduledMessage);
     }
 
+    /**
+     * Tries to reschedule a message if it's recurring.
+     *
+     * @param scheduledMessage The message to try and reschedule
+     */
     async tryReschedule(scheduledMessage: ScheduledMessage): Promise<void> {
         // Remove the timer from the timers object
-        if (Object.keys(this.timers).includes(String(scheduledMessage.id))) {
-            clearTimeout(this.timers[String(scheduledMessage.id)]);
-            delete this.timers[String(scheduledMessage.id)];
-        }
+        this.removeTimer(scheduledMessage.id);
 
         // If it's a recurring message, schedule it again
         const isRecurring = scheduledMessage.schedule.type === ScheduledMessageScheduleType.RECURRING;
         if (isRecurring) {
+            Server().log(`Rescheduling: ${scheduledMessage.toString()}`);
             scheduledMessage.status = ScheduledMessageStatus.PENDING;
             scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage.schedule);
             await this.scheduleMessage(scheduledMessage);
         }
     }
 
+    /**
+     * Gets the next date for a recurring message.
+     *
+     * @param schedule The scheduling configruation
+     * @returns A future date
+     */
     getNextRecurringDate(schedule: NodeJS.Dict<any>): Date {
         const nextTs = this.getMillisecondsForSchedule(schedule);
         if (nextTs === 0) {
@@ -157,6 +267,12 @@ export class ScheduledMessagesService {
         return new Date(now + nextTs);
     }
 
+    /**
+     * Gets the number of milliseconds until the next schedule.
+     *
+     * @param schedule The configured schedule
+     * @returns The number of milliseconds until the next schedule
+     */
     getMillisecondsForSchedule(schedule: NodeJS.Dict<any>) {
         if (schedule.type !== ScheduledMessageScheduleType.RECURRING) {
             return null;
@@ -180,6 +296,11 @@ export class ScheduledMessagesService {
         }
     }
 
+    /**
+     * Sends a scheduled message.
+     *
+     * @param scheduledMessage The message to send
+     */
     async sendScheduledMessage(scheduledMessage: ScheduledMessage): Promise<void> {
         Server().log(`Sending: ${scheduledMessage.toString()}`);
 
@@ -211,12 +332,15 @@ export class ScheduledMessagesService {
         await this.saveScheduledMessage(scheduledMessage);
     }
 
+    /**
+     * Starts the scheduled message service.
+     */
     start() {
         this.loadAndSchedule();
     }
 
     /**
-     * Stops all the timers
+     * Stops the scheduled message service & clears all timers
      */
     stop() {
         for (const timer of Object.values(this.timers)) {
