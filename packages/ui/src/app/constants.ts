@@ -40,6 +40,10 @@ export const webhookEventOptions = [
         value: 'typing-indicator'
     },
     {
+        label: 'Scheduled Message Errors',
+        value: 'scheduled-message-error'
+    },
+    {
         label: 'Server Update',
         value: 'server-update'
     },
