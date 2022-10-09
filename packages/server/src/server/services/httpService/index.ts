@@ -101,6 +101,9 @@ export class HttpService {
         // Allow cross origin requests
         this.koaApp.use(koaCors());
 
+        // This allows us to properly pull the IP from the request
+        this.koaApp.proxy = true;
+
         // This is used here so that we can catch errors in KoaBody as well
         this.koaApp.use(ErrorMiddleware);
 
