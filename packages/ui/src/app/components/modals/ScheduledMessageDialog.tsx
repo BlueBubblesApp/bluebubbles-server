@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { ipcRenderer } from 'electron';
+import React, { useEffect, useState } from 'react';
 import {
     AlertDialog,
     AlertDialogOverlay,
@@ -10,7 +11,10 @@ import {
     Input,
     FormControl,
     FormErrorMessage,
-    FormLabel
+    FormLabel,
+    RadioGroup,
+    Stack,
+    Radio
 } from '@chakra-ui/react';
 import { FocusableElement } from '@chakra-ui/utils';
 import { ScheduledMessageItem } from '../tables/ScheduledMessagesTable';
@@ -35,8 +39,11 @@ export const ScheduledMessageDialog = ({
 }: ScheduledMessageDialogProps): JSX.Element => {
     const [type, setType] = useState(scheduledMessageTypeOptions[0] as any | null);
     const [message, setMessage] = useState('');
+    const [chatType, setChatType] = useState('dm');
     const [chatGuid, setChatGuid] = useState('');
     const [scheduledFor, setScheduledFor] = useState(null as Date | null);
+    const [groups, setGroups] = useState([] as any | null);
+    const [selectedGroup, setSelectedGroup] = useState(null as any | null);
     const [scheduleType, setScheduleType] = useState(scheduleTypeOptions[0] as any | null);
     const [intervalType, setIntervalType] = useState(intervalTypeOpts[0] as any | null);
     const [interval, setIntervalValue] = useState(1);
@@ -49,9 +56,26 @@ export const ScheduledMessageDialog = ({
     const [intervalError, setIntervalError] = useState('');
     const hasIntervalError = (intervalError ?? '').length > 0;
 
+    useEffect(() => {
+        ipcRenderer.invoke('get-chats').then((chats: any[]) => {
+            chats.sort((a, b) => a.displayName && !b.displayName ? -1 : 1);
+            const groups = chats.filter((e: any) => e.style === 43).map((e: any) => {
+                let label = e.displayName ?? '';
+                if (label.length === 0) {
+                    label = e.participants.map((e: any) => e.address).join(', ');
+                }
+                return { label, value: e.guid };
+            });
+            setGroups(groups);
+        });
+    }, []);
+
     const _onClose = () => {
         setType(scheduledMessageTypeOptions[0] as any | null);
         setMessage('');
+        setChatType('dm');
+        setGroups([]);
+        setSelectedGroup(null);
         setChatGuid('');
         setScheduledFor(null);
         setScheduleType(scheduleTypeOptions[0] as any | null);
@@ -86,22 +110,46 @@ export const ScheduledMessageDialog = ({
                                 onChange={setType}
                             />
                         </FormControl>
-                        <FormControl isInvalid={hasGuidError} mt={5}>
-                            <FormLabel htmlFor='message'>Phone Number / Chat GUID</FormLabel>
-                            <Input
-                                id='chatGuid'
-                                type='text'
-                                value={chatGuid ?? ''}
-                                placeholder=''
-                                onChange={(e) => {
-                                    setGuidError('');
-                                    setChatGuid(e.target.value);
-                                }}
-                            />
-                            {hasGuidError ? (
-                                <FormErrorMessage>{guidError}</FormErrorMessage>
-                            ) : null}
+                        <FormControl mt={5}>
+                            <RadioGroup onChange={setChatType} value={chatType}>
+                                <Stack direction='row'>
+                                    <Radio value='dm'>Direct Message</Radio>
+                                    <Radio value='group'>Group Chat</Radio>
+                                </Stack>
+                            </RadioGroup>
                         </FormControl>
+                        {chatType === 'dm' ? (
+                            <FormControl isInvalid={hasGuidError} mt={5}>
+                                <FormLabel htmlFor='message'>Phone Number / Chat GUID</FormLabel>
+                                <Input
+                                    id='chatGuid'
+                                    type='text'
+                                    value={chatGuid ?? ''}
+                                    placeholder=''
+                                    onChange={(e) => {
+                                        setGuidError('');
+                                        setChatGuid(e.target.value);
+                                    }}
+                                />
+                                {hasGuidError ? (
+                                    <FormErrorMessage>{guidError}</FormErrorMessage>
+                                ) : null}
+                            </FormControl>
+                        ) : null}
+                        {chatType === 'group' ? (
+                            <FormControl mt={5}>
+                                <FormLabel>Select Group Chat</FormLabel>
+                                <Select
+                                    size='md'
+                                    options={groups as unknown as Options<string>}
+                                    value={selectedGroup}
+                                    onChange={(e) => {
+                                        setSelectedGroup(e);
+                                        setChatGuid((e as any).value);
+                                    }}
+                                />
+                            </FormControl>
+                        ) : null}
                         <FormControl isInvalid={hasMessageError} mt={5}>
                             <FormLabel htmlFor='message'>Message</FormLabel>
                             <Input
@@ -191,7 +239,7 @@ export const ScheduledMessageDialog = ({
                                 }
 
                                 let guid = chatGuid;
-                                if (!guid.startsWith('iMessage;-;')) {
+                                if (chatType === 'dm' && !guid.includes(';-;')) {
                                     guid = `iMessage;-;${guid}`;
                                 }
 

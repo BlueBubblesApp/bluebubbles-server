@@ -101,6 +101,7 @@ export const ScheduledMessagesTable = ({
                             freq = `Every ${item.schedule.interval} ${intervalTypeToLabel[item.schedule.intervalType as string]}`;
                         }
 
+                        const chatText = `Sending to ${item.payload.chatGuid}`;
                         return (
                             <Tr key={item.id}>
                                 <Td alignContent='left'>
@@ -113,7 +114,11 @@ export const ScheduledMessagesTable = ({
                                 <Td>
                                     <Text>{item.type}</Text>
                                 </Td>
-                                <Td><Text>{item.payload.message}</Text></Td>
+                                <Td>
+                                    <Tooltip label={chatText} hasArrow aria-label={chatText.toLowerCase()}>
+                                        <Text>{item.payload.message}</Text>
+                                    </Tooltip>
+                                </Td>
                                 <Td><Text>{date.toLocaleString()}</Text></Td>
                                 <Td alignContent='left'>
                                     <Tooltip label={freq} hasArrow aria-label={freq.toLowerCase()}>

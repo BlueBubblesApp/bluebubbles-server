@@ -10,6 +10,7 @@ import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { BlueBubblesHelperService } from "../privateApi";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
 import { ScheduledMessagesInterface } from "@server/api/v1/interfaces/scheduledMessagesInterface";
+import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
 export class IPCService {
     /**
@@ -331,6 +332,10 @@ export class IPCService {
                 new Date(msg.scheduledFor),
                 msg.schedule
             );
+        });
+
+        ipcMain.handle("get-chats", async (_, msg) => {
+            return ChatInterface.get({ limit: 10000 });
         });
     }
 }
