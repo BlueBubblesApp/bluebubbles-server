@@ -19,6 +19,7 @@ import { TransactionManager } from "@server/managers/transactionManager";
 import * as net from "net";
 import { ValidRemoveTapback } from "../../types";
 import { MAX_PORT, MIN_PORT } from "./constants";
+import { TYPING_INDICATOR } from "@server/events";
 
 type BundleStatus = {
     success: boolean;
@@ -489,9 +490,9 @@ export class BlueBubblesHelperService {
                     if (data.event === "ping") {
                         Server().log("Private API Helper connected!");
                     } else if (data.event === "started-typing") {
-                        Server().emitMessage("typing-indicator", { display: true, guid: data.guid }, "normal", false);
+                        Server().emitMessage(TYPING_INDICATOR, { display: true, guid: data.guid }, "normal", false);
                     } else if (data.event === "stopped-typing") {
-                        Server().emitMessage("typing-indicator", { display: false, guid: data.guid }, "normal", false);
+                        Server().emitMessage(TYPING_INDICATOR, { display: false, guid: data.guid }, "normal", false);
                     }
                 }
             }

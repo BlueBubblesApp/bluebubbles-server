@@ -59,6 +59,15 @@ import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
 import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
+import {
+    GROUP_NAME_CHANGE,
+    MESSAGE_UPDATED,
+    NEW_MESSAGE,
+    NEW_SERVER,
+    PARTICIPANT_ADDED,
+    PARTICIPANT_LEFT,
+    PARTICIPANT_REMOVED
+} from "./events";
 
 const findProcess = require("find-process");
 
@@ -818,7 +827,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // If the URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
-            if (this.httpService) await this.emitMessage("new-server", nextConfig.server_address, "high");
+            if (this.httpService) await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
             if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
         }
 
@@ -932,7 +941,7 @@ class BlueBubblesServer extends EventEmitter {
         resp.tempGuid = tempGuid;
 
         // We are emitting this as a new message, the only difference being the included tempGuid
-        await this.emitMessage("new-message", resp);
+        await this.emitMessage(NEW_MESSAGE, resp);
     }
 
     async emitMessageError(message: Message, tempGuid: string = null) {
@@ -1037,7 +1046,7 @@ class BlueBubblesServer extends EventEmitter {
 
             // Emit it to the socket and FCM devices
             await this.emitMessage(
-                "new-message",
+                NEW_MESSAGE,
                 await MessageSerializer.serialize({
                     message: newMessage,
                     enforceMaxSize: true
@@ -1066,7 +1075,7 @@ class BlueBubblesServer extends EventEmitter {
             // Emit it to the socket and FCM devices
             // Since this is a message update, we do not need to include the participants
             await this.emitMessage(
-                "updated-message",
+                MESSAGE_UPDATED,
                 MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false })
             );
         });
@@ -1088,7 +1097,7 @@ class BlueBubblesServer extends EventEmitter {
 
             // Emit it to the socket and FCM devices
             await this.emitMessage(
-                "new-message",
+                NEW_MESSAGE,
                 await MessageSerializer.serialize({
                     message: newMessage,
                     enforceMaxSize: true
@@ -1101,7 +1110,7 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
             // Group name changes don't require the participants to be loaded
             await this.emitMessage(
-                "group-name-change",
+                GROUP_NAME_CHANGE,
                 await MessageSerializer.serialize({ message: item, loadChatParticipants: false })
             );
         });
@@ -1109,19 +1118,19 @@ class BlueBubblesServer extends EventEmitter {
         groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-removed", await MessageSerializer.serialize({ message: item }));
+            await this.emitMessage(PARTICIPANT_REMOVED, await MessageSerializer.serialize({ message: item }));
         });
 
         groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-added", await MessageSerializer.serialize({ message: item }));
+            await this.emitMessage(PARTICIPANT_ADDED, await MessageSerializer.serialize({ message: item }));
         });
 
         groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-left", await MessageSerializer.serialize({ message: item }));
+            await this.emitMessage(PARTICIPANT_LEFT, await MessageSerializer.serialize({ message: item }));
         });
 
         outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));

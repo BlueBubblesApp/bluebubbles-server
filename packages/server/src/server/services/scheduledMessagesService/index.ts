@@ -3,6 +3,7 @@ import { ScheduledMessage } from "@server/databases/server/entity";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { SendMessageParams } from "@server/api/v1/types";
 import { FindOneOptions } from "typeorm";
+import { SCHEDULED_MESSAGE_ERROR } from "@server/events";
 
 /**
  * The possible states of a scheduled message
@@ -57,8 +58,17 @@ export class ScheduledMessagesService {
      *
      * @param scheduledMessage A scheduled message that was updated
      */
-    notifyListeners(scheduledMessage?: ScheduledMessage) {
+    notifyUpdate(scheduledMessage?: ScheduledMessage) {
         Server().emitToUI("scheduled-message-update", scheduledMessage ?? null);
+    }
+
+    /**
+     * Notifies all client of a failed scheduled message.
+     *
+     * @param scheduledMessage The failed scheduled message
+     */
+    notifyError(scheduledMessage: ScheduledMessage) {
+        Server().emitMessage(SCHEDULED_MESSAGE_ERROR, scheduledMessage, "normal", true);
     }
 
     /**
@@ -69,7 +79,7 @@ export class ScheduledMessagesService {
      * @param scheduledMessage The scheduled message to save
      */
     async saveScheduledMessage(scheduledMessage: ScheduledMessage) {
-        this.notifyListeners(scheduledMessage);
+        this.notifyUpdate(scheduledMessage);
         await Server().repo.scheduledMessages().save(scheduledMessage);
     }
 
@@ -127,7 +137,7 @@ export class ScheduledMessagesService {
         }
 
         this.removeTimer(id);
-        this.notifyListeners();
+        this.notifyUpdate();
     }
 
     /**
@@ -155,7 +165,7 @@ export class ScheduledMessagesService {
             this.removeTimer(id);
         }
 
-        this.notifyListeners();
+        this.notifyUpdate();
     }
 
     /**
@@ -335,6 +345,8 @@ export class ScheduledMessagesService {
             Server().log(`Failed to send scheduled message: ${ex?.message ?? String(ex)}`);
             scheduledMessage.status = ScheduledMessageStatus.ERROR;
             scheduledMessage.error = String(ex);
+
+            this.notifyError(scheduledMessage);
         } finally {
             if (scheduledMessage.status !== ScheduledMessageStatus.ERROR) {
                 scheduledMessage.status = ScheduledMessageStatus.COMPLETE;

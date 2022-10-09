@@ -38,6 +38,7 @@ import {
     createNoDataResponse
 } from "./responses";
 import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 
 const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
@@ -913,7 +914,7 @@ export class SocketRoutes {
                 return response(cb, "error", createBadRequestResponse("No chat status provided!"));
 
             // Send the notification out to all clients
-            Server().emitMessage("chat-read-status-changed", {
+            Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
                 chatGuid: params.chatGuid,
                 status: params.status
             });

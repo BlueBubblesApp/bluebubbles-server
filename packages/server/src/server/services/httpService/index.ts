@@ -22,6 +22,7 @@ import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
 import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
 import { ErrorMiddleware } from "./api/v1/middleware/errorMiddleware";
 import { createServerErrorResponse } from "./api/v1/responses";
+import { HELLO_WORLD } from "@server/events";
 
 /**
  * This service class handles all routing for incoming socket
@@ -209,7 +210,7 @@ export class HttpService {
             Server().log(`Successfully started HTTP${isNotEmpty(this.httpOpts) ? "S" : ""} server`);
 
             // Once we start, let's send a hello-world to all the clients
-            Server().emitMessage("hello-world", null);
+            Server().emitMessage(HELLO_WORLD, null);
         });
     }
 

@@ -6,6 +6,7 @@ import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
 import { startChat } from "../apple/scripts";
 import { MessageInterface } from "./messageInterface";
+import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 
 export class ChatInterface {
     static async get({
@@ -290,7 +291,7 @@ export class ChatInterface {
 
     static async markRead(chatGuid: string): Promise<void> {
         await Server().privateApiHelper.markChatRead(chatGuid);
-        await Server().emitMessage("chat-read-status-changed", {
+        await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
             chatGuid,
             read: true
         });
@@ -298,7 +299,7 @@ export class ChatInterface {
 
     static async markUnread(chatGuid: string): Promise<void> {
         await Server().privateApiHelper.markChatUnread(chatGuid);
-        await Server().emitMessage("chat-read-status-changed", {
+        await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
             chatGuid,
             read: false
         });
