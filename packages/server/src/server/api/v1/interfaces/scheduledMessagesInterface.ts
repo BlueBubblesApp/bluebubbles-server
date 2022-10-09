@@ -4,11 +4,31 @@ import { ScheduledMessageScheduleType, ScheduledMessageType } from "@server/serv
 import { FindOneOptions } from "typeorm";
 import { SendMessageParams } from "../types";
 
+/**
+ * An interface for the scheduled messages API.
+ * Any piece of code interacting with the scheduled
+ * messages API should use this interface instead
+ * of directly calling the DB or the service.
+ */
 export class ScheduledMessagesInterface {
+    /**
+     * Gets all scheduled messages from the DB.
+     *
+     * @returns The scheduled messages.
+     */
     static async getScheduledMessages(): Promise<ScheduledMessage[]> {
         return await Server().scheduledMessages.getScheduledMessages();
     }
 
+    /**
+     * Creates a new scheduled message.
+     *
+     * @param type The type of the scheduled message.
+     * @param payload The payload to invoke the action type.
+     * @param scheduledFor The date the message should be sent.
+     * @param schedule The schedule configuration.
+     * @returns The newly created scheduled message.
+     */
     static async createScheduledMessage(
         type: ScheduledMessageType,
         payload: SendMessageParams,
@@ -44,14 +64,28 @@ export class ScheduledMessagesInterface {
         return await Server().scheduledMessages.createScheduledMessage(msg);
     }
 
+    /**
+     * Deletes a single scheduled message by ID/
+     *
+     * @param id The ID of the scheduled message to delete.
+     */
     static async deleteScheduledMessage(id: number): Promise<void> {
         return await Server().scheduledMessages.deleteScheduledMessage(id);
     }
 
+    /**
+     * Deletes all scheduled messages from the DB.
+     */
     static async deleteScheduledMessages(): Promise<void> {
         return await Server().scheduledMessages.deleteScheduledMessages();
     }
 
+    /**
+     * Gets a specific scheduled message by ID.
+     *
+     * @param id The ID of the scheduled message to get.
+     * @returns The scheduled message.
+     */
     static async getScheduledMessage(id: number): Promise<ScheduledMessage> {
         const repo = Server().repo.scheduledMessages();
         const findOpts: FindOneOptions<ScheduledMessage> = { where: { id } } as FindOneOptions<ScheduledMessage>;

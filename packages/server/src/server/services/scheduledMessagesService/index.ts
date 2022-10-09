@@ -46,7 +46,20 @@ export enum ScheduledMessageScheduleRecurringType {
  * Service that manages scheduled messages
  */
 export class ScheduledMessagesService {
+    /**
+     * A cache of all active timers & scheduled messages.
+     */
     private timers: Record<string, NodeJS.Timeout> = {};
+
+    /**
+     * Emits a message to any listeners, letting them know
+     * that a scheduled message has been updated.
+     *
+     * @param scheduledMessage A scheduled message that was updated
+     */
+    notifyListeners(scheduledMessage?: ScheduledMessage) {
+        Server().emitToUI("scheduled-message-update", scheduledMessage ?? null);
+    }
 
     /**
      * Saves a scheduled message to the DB, as well
@@ -56,7 +69,7 @@ export class ScheduledMessagesService {
      * @param scheduledMessage The scheduled message to save
      */
     async saveScheduledMessage(scheduledMessage: ScheduledMessage) {
-        Server().emitToUI("scheduled-message-update", scheduledMessage);
+        this.notifyListeners(scheduledMessage);
         await Server().repo.scheduledMessages().save(scheduledMessage);
     }
 
@@ -114,6 +127,7 @@ export class ScheduledMessagesService {
         }
 
         this.removeTimer(id);
+        this.notifyListeners();
     }
 
     /**
@@ -140,6 +154,8 @@ export class ScheduledMessagesService {
         for (const id of ids) {
             this.removeTimer(id);
         }
+
+        this.notifyListeners();
     }
 
     /**
