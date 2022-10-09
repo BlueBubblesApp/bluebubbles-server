@@ -187,12 +187,14 @@ export class ScheduledMessagesService {
 
         if (scheduledMessage.status === ScheduledMessageStatus.COMPLETE) {
             Server().log(`Already Complete: ${scheduledMessage.toString()}`);
-            return this.tryReschedule(scheduledMessage);
+            this.tryReschedule(scheduledMessage);
+            return;
         }
 
         if (scheduledMessage.status === ScheduledMessageStatus.ERROR) {
             Server().log(`Already Errored: ${scheduledMessage.toString()}`);
-            return this.tryReschedule(scheduledMessage);
+            this.tryReschedule(scheduledMessage);
+            return;
         }
 
         const now = new Date();
@@ -262,19 +264,28 @@ export class ScheduledMessagesService {
      * Tries to reschedule a message if it's recurring.
      *
      * @param scheduledMessage The message to try and reschedule
+     * @returns True if the message was rescheduled, false otherwise
      */
-    async tryReschedule(scheduledMessage: ScheduledMessage): Promise<void> {
+    async tryReschedule(scheduledMessage: ScheduledMessage, removeTimer = true, recalc = true): Promise<boolean> {
         // Remove the timer from the timers object
-        this.removeTimer(scheduledMessage.id);
+        if (removeTimer) {
+            this.removeTimer(scheduledMessage.id);
+        }
 
         // If it's a recurring message, schedule it again
         const isRecurring = scheduledMessage.schedule.type === ScheduledMessageScheduleType.RECURRING;
         if (isRecurring) {
+            if (recalc) {
+                scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage.schedule);
+            }
+
             Server().log(`Rescheduling: ${scheduledMessage.toString()}`);
             scheduledMessage.status = ScheduledMessageStatus.PENDING;
-            scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage.schedule);
             await this.scheduleMessage(scheduledMessage);
+            return true;
         }
+
+        return false;
     }
 
     /**
@@ -332,7 +343,12 @@ export class ScheduledMessagesService {
 
         // Set the status to in-progress
         scheduledMessage.status = ScheduledMessageStatus.IN_PROGRESS;
-        this.saveScheduledMessage(scheduledMessage);
+
+        // Calculate the next schedule time
+        scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage.schedule);
+
+        // Save the updated information
+        await this.saveScheduledMessage(scheduledMessage);
 
         // Inject the method based on if it's not already provided,
         // or if the private api is enabled on the server & connected.
@@ -361,8 +377,9 @@ export class ScheduledMessagesService {
             }
         }
 
-        // Reschedule the message
-        await this.tryReschedule(scheduledMessage);
+        // Don't recalculate because we already did it above,
+        // before the action was taken.
+        await this.tryReschedule(scheduledMessage, true, false);
 
         // Save the message
         await this.saveScheduledMessage(scheduledMessage);
