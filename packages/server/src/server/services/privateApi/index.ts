@@ -454,14 +454,15 @@ export class BlueBubblesHelperService {
         if (!Object.keys(this.typingCache).includes(guid)) {
             shouldEmit = true;
         } else {
-            const lastSeen = this.typingCache[guid].lastSeen;
-
-            // If the last time we saw the guid was more than 5 seconds ago, we should emit the event
-            if (now - lastSeen > 5000) {
+            // If the last value was different than the current value, we should emit the event
+            if (this.typingCache[guid].lastValue !== display) {
                 shouldEmit = true;
-            } else if (this.typingCache[guid].lastValue !== display) {
-                // If the last value was different than the current value, we should emit the event
-                shouldEmit = true;
+            } else {
+                // If the value is the same, we should emit the event if it's been more than 5 seconds
+                const lastSeen = this.typingCache[guid].lastSeen;
+                if (now - lastSeen > 5000) {
+                    shouldEmit = true;
+                }
             }
         }
 
