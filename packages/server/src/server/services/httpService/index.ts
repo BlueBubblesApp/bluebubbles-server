@@ -112,7 +112,7 @@ export class HttpService {
             koaBody({
                 jsonLimit: "10mb",
                 textLimit: "10mb",
-                formLimit: "101mb", // 101 to account for a 100mb attachment and some text
+                formLimit: "1000mb",
                 multipart: true
             })
         );
