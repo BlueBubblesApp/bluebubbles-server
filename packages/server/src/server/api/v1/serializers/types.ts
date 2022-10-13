@@ -14,6 +14,7 @@ export interface MessageSerializerSingleParams {
     loadChatParticipants?: boolean;
     enforceMaxSize?: boolean;
     maxSizeBytes?: number;
+    isForNotification?: boolean;
 }
 
 export interface MessageSerializerParams {
@@ -24,4 +25,5 @@ export interface MessageSerializerParams {
     loadChatParticipants?: boolean;
     enforceMaxSize?: boolean;
     maxSizeBytes?: number;
+    isForNotification?: boolean;
 }

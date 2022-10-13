@@ -937,7 +937,11 @@ class BlueBubblesServer extends EventEmitter {
 
         // Convert to a response JSON
         // Since we sent the message, we don't need to include the participants
-        const resp = await MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false });
+        const resp = await MessageSerializer.serialize({
+            message: newMessage,
+            loadChatParticipants: false,
+            isForNotification: true
+        });
         resp.tempGuid = tempGuid;
 
         // We are emitting this as a new message, the only difference being the included tempGuid
@@ -952,7 +956,11 @@ class BlueBubblesServer extends EventEmitter {
          * 4: Message Timeout
          */
         // Since this is a message send error, we don't need to include the participants
-        const data = await MessageSerializer.serialize({ message, loadChatParticipants: false });
+        const data = await MessageSerializer.serialize({
+            message,
+            loadChatParticipants: false,
+            isForNotification: true
+        });
         if (isNotEmpty(tempGuid)) {
             data.tempGuid = tempGuid;
         }
@@ -1049,7 +1057,8 @@ class BlueBubblesServer extends EventEmitter {
                 NEW_MESSAGE,
                 await MessageSerializer.serialize({
                     message: newMessage,
-                    enforceMaxSize: true
+                    enforceMaxSize: true,
+                    isForNotification: true
                 })
             );
         });
@@ -1076,7 +1085,11 @@ class BlueBubblesServer extends EventEmitter {
             // Since this is a message update, we do not need to include the participants
             await this.emitMessage(
                 MESSAGE_UPDATED,
-                MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false })
+                MessageSerializer.serialize({
+                    message: newMessage,
+                    loadChatParticipants: false,
+                    isForNotification: true
+                })
             );
         });
 
@@ -1111,26 +1124,48 @@ class BlueBubblesServer extends EventEmitter {
             // Group name changes don't require the participants to be loaded
             await this.emitMessage(
                 GROUP_NAME_CHANGE,
-                await MessageSerializer.serialize({ message: item, loadChatParticipants: false })
+                await MessageSerializer.serialize({
+                    message: item,
+                    loadChatParticipants: false,
+                    isForNotification: true
+                })
             );
         });
 
         groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
-            await this.emitMessage(PARTICIPANT_REMOVED, await MessageSerializer.serialize({ message: item }));
+            await this.emitMessage(
+                PARTICIPANT_REMOVED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                })
+            );
         });
 
         groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
-            await this.emitMessage(PARTICIPANT_ADDED, await MessageSerializer.serialize({ message: item }));
+            await this.emitMessage(
+                PARTICIPANT_ADDED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                })
+            );
         });
 
         groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
-            await this.emitMessage(PARTICIPANT_LEFT, await MessageSerializer.serialize({ message: item }));
+            await this.emitMessage(
+                PARTICIPANT_LEFT,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                })
+            );
         });
 
         outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));

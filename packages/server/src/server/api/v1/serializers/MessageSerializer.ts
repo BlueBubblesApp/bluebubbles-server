@@ -2,9 +2,8 @@ import { Server } from "@server";
 import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { isEmpty, isNotEmpty, sanitizeStr } from "@server/helpers/utils";
+import { isEmpty, isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 import { HandleResponse, MessageResponse } from "@server/types";
-import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 import type { MessageSerializerParams, MessageSerializerSingleParams } from "./types";
 
 export class MessageSerializer {
@@ -21,7 +20,8 @@ export class MessageSerializer {
         enforceMaxSize = false,
         // Max payload size is 4000 bytes
         // https://firebase.google.com/docs/cloud-messaging/concept-options#notifications_and_data_messages
-        maxSizeBytes = 4000
+        maxSizeBytes = 4000,
+        isForNotification = false
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
         return (
             await MessageSerializer.serializeList({
@@ -31,7 +31,8 @@ export class MessageSerializer {
                 parseMessageSummary,
                 loadChatParticipants,
                 enforceMaxSize,
-                maxSizeBytes
+                maxSizeBytes,
+                isForNotification
             })
         )[0];
     }
@@ -47,7 +48,8 @@ export class MessageSerializer {
         parseMessageSummary = false,
         loadChatParticipants = true,
         enforceMaxSize = false,
-        maxSizeBytes = 4000
+        maxSizeBytes = 4000,
+        isForNotification = false
     }: MessageSerializerParams): Promise<MessageResponse[]> {
         // Convert the messages to their serialized versions
         const messageResponses: MessageResponse[] = [];
@@ -56,7 +58,8 @@ export class MessageSerializer {
                 await MessageSerializer.convert({
                     message: message,
                     attachmentConfig,
-                    loadChatParticipants
+                    loadChatParticipants,
+                    isForNotification
                 })
             );
         }
@@ -100,8 +103,13 @@ export class MessageSerializer {
         // for those on macOS Ventura. Otherwise, set it to null to not clutter the payload.
         if (!parseAttributedBody || !parseMessageSummary) {
             for (let i = 0; i < messageResponses.length; i++) {
-                if (!parseAttributedBody) messageResponses[i].attributedBody = null;
-                if (!parseMessageSummary) messageResponses[i].messageSummaryInfo = null;
+                if (!parseAttributedBody && "attributedBody" in messageResponses[i]) {
+                    messageResponses[i].attributedBody = null;
+                }
+
+                if (!parseMessageSummary && "messageSummaryInfo" in messageResponses[i]) {
+                    messageResponses[i].messageSummaryInfo = null;
+                }
             }
         }
 
@@ -129,14 +137,14 @@ export class MessageSerializer {
             convert: true,
             getData: false,
             loadMetadata: true
-        }
+        },
+        isForNotification = false
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
-        return {
+        let output = {
             originalROWID: message.ROWID,
             guid: message.guid,
             text: message.universalText(true),
             attributedBody: message.attributedBody,
-            messageSummaryInfo: message.messageSummaryInfo,
             handle: message.handle ? await getHandleResponse(message.handle) : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
@@ -151,41 +159,68 @@ export class MessageSerializer {
                 )
             ),
             subject: message.subject,
-            country: message.country,
             error: message.error,
             dateCreated: message.dateCreated ? message.dateCreated.getTime() : null,
             dateRead: message.dateRead ? message.dateRead.getTime() : null,
             dateDelivered: message.dateDelivered ? message.dateDelivered.getTime() : null,
             isFromMe: message.isFromMe,
-            isDelayed: message.isDelayed,
-            isAutoReply: message.isAutoReply,
-            isSystemMessage: message.isSystemMessage,
-            isServiceMessage: message.isServiceMessage,
-            isForward: message.isForward,
             isArchived: message.isArchived,
-            cacheRoomnames: message.cacheRoomnames,
-            isAudioMessage: message.isAudioMessage,
-            hasDdResults: message.hasDdResults,
-            datePlayed: message.datePlayed ? message.datePlayed.getTime() : null,
             itemType: message.itemType,
             groupTitle: message.groupTitle,
             groupActionType: message.groupActionType,
-            isExpired: message.isExpirable,
             balloonBundleId: message.balloonBundleId,
             associatedMessageGuid: message.associatedMessageGuid,
             associatedMessageType: message.associatedMessageType,
             expressiveSendStyleId: message.expressiveSendStyleId,
-            timeExpressiveSendStyleId: message.timeExpressiveSendStyleId
-                ? message.timeExpressiveSendStyleId.getTime()
-                : null,
-            replyToGuid: message.replyToGuid,
-            isCorrupt: message.isCorrupt,
-            isSpam: message.isSpam,
-            threadOriginatorGuid: message.threadOriginatorGuid,
-            threadOriginatorPart: message.threadOriginatorPart,
-            dateEdited: message.dateEdited ? message.dateEdited.getTime() : null,
-            dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : null,
-            partCount: message.partCount
+            threadOriginatorGuid: message.threadOriginatorGuid
         };
+
+        if (!isForNotification) {
+            output = {
+                ...output,
+                ...{
+                    country: message.country,
+                    isDelayed: message.isDelayed,
+                    isAutoReply: message.isAutoReply,
+                    isSystemMessage: message.isSystemMessage,
+                    isServiceMessage: message.isServiceMessage,
+                    isForward: message.isForward,
+                    threadOriginatorPart: message.threadOriginatorPart,
+                    isCorrupt: message.isCorrupt,
+                    datePlayed: message.datePlayed ? message.datePlayed.getTime() : null,
+                    cacheRoomnames: message.cacheRoomnames,
+                    isSpam: message.isSpam,
+                    isExpired: message.isExpirable,
+                    hasDdResults: message.hasDdResults,
+                    timeExpressiveSendStyleId: message.timeExpressiveSendStyleId
+                        ? message.timeExpressiveSendStyleId.getTime()
+                        : null,
+                    isAudioMessage: message.isAudioMessage,
+                    replyToGuid: message.replyToGuid
+                }
+            };
+        }
+
+        if (isMinHighSierra) {
+            output = {
+                ...output,
+                ...{
+                    messageSummaryInfo: message.messageSummaryInfo
+                }
+            };
+        }
+
+        if (isMinVentura) {
+            output = {
+                ...output,
+                ...{
+                    dateEdited: message.dateEdited ? message.dateEdited.getTime() : null,
+                    dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : null,
+                    partCount: message.partCount
+                }
+            };
+        }
+
+        return output;
     }
 }
