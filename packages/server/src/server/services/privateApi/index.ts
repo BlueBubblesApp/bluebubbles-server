@@ -35,6 +35,8 @@ export class BlueBubblesHelperService {
 
     transactionManager: TransactionManager;
 
+    typingCache: Record<string, Record<string, any>> = {};
+
     static get port(): number {
         return clamp(MIN_PORT + os.userInfo().uid - 501, MIN_PORT, MAX_PORT);
     }
@@ -443,6 +445,37 @@ export class BlueBubblesHelperService {
         return this.writeData("check-typing-status", { chatGuid });
     }
 
+    async handleTypingIndicator(event: string, guid: string) {
+        const display = event === "started-typing";
+        let shouldEmit = false;
+
+        // If the guid hasn't been seen before, we should emit the event
+        const now = new Date().getTime();
+        if (!Object.keys(this.typingCache).includes(guid)) {
+            shouldEmit = true;
+        } else {
+            const lastSeen = this.typingCache[guid].lastSeen;
+
+            // If the last time we saw the guid was more than 5 seconds ago, we should emit the event
+            if (now - lastSeen > 5000) {
+                shouldEmit = true;
+            } else if (this.typingCache[guid].lastValue !== display) {
+                // If the last value was different than the current value, we should emit the event
+                shouldEmit = true;
+            }
+        }
+
+        if (shouldEmit) {
+            // Update the cache values
+            this.typingCache[guid] = {
+                lastSeen: now,
+                lastValue: display
+            };
+
+            Server().emitMessage(TYPING_INDICATOR, { display, guid }, "normal", false);
+        }
+    }
+
     setupListeners() {
         this.helper.on("data", (eventRaw: string) => {
             if (eventRaw == null) {
@@ -489,10 +522,8 @@ export class BlueBubblesHelperService {
                 } else if (data.event) {
                     if (data.event === "ping") {
                         Server().log("Private API Helper connected!");
-                    } else if (data.event === "started-typing") {
-                        Server().emitMessage(TYPING_INDICATOR, { display: true, guid: data.guid }, "normal", false);
-                    } else if (data.event === "stopped-typing") {
-                        Server().emitMessage(TYPING_INDICATOR, { display: false, guid: data.guid }, "normal", false);
+                    } else if (data.event === "started-typing" || data.event === "stopped-typing") {
+                        this.handleTypingIndicator(data.event, data.guid);
                     }
                 }
             }
