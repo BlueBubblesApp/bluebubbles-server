@@ -55,6 +55,8 @@ export class FileSystem {
 
     public static attachmentsDir = path.join(FileSystem.baseDir, "Attachments");
 
+    public static iMessageAttachmentsDir = path.join(userHomeDir(), "Library", "Messages", "Attachments");
+
     public static messagesAttachmentsDir = path.join(
         userHomeDir(),
         "Library",
@@ -127,6 +129,7 @@ export class FileSystem {
         if (!fs.existsSync(FileSystem.settingsDir)) fs.mkdirSync(FileSystem.settingsDir);
 
         if (isMinMonterey) {
+            if (!fs.existsSync(FileSystem.iMessageAttachmentsDir)) fs.mkdirSync(FileSystem.iMessageAttachmentsDir);
             if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) fs.mkdirSync(FileSystem.messagesAttachmentsDir);
         }
     }
