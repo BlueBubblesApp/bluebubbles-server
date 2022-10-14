@@ -31,7 +31,7 @@ const confirmationActions: ConfirmationItems = {
         message: (
             'Cloudflare registers brand new domains on the fly to assign to your server. After ' +
             'switching your proxy service to Cloudflare, it is highly recommended that you toggle your ' + 
-            'device\'s WiFi/Network off and then back on.<br /><br />Note: This is to ensure that new ' +
+            'client device\'s WiFi/Network off and then back on.<br /><br />Note: This is to ensure that new ' +
             'domains can be found by your device\'s DNS service.'
         ),
         func: () => {
