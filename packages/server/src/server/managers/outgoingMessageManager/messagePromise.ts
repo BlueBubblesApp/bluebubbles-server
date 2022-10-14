@@ -80,7 +80,9 @@ export class MessagePromise {
                 // This will trigger our hook handlers, created in the constructor
                 this.reject("Message send timeout");
             },
-            this.isAttachment ? 60000 * 3 : 30000
+            // 5 minute timeout for videos (since the max video size is larger not)
+            // 30 second timeout for messages
+            this.isAttachment ? 60000 * 5 : 30000
         );
     }
 
