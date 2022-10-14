@@ -82,7 +82,7 @@ export class MessagePromise {
             },
             // 5 minute timeout for videos (since the max video size is larger not)
             // 30 second timeout for messages
-            this.isAttachment ? 60000 * 5 : 30000
+            this.isAttachment ? 60000 * 5 : 60000
         );
     }
 
