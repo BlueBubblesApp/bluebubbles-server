@@ -276,7 +276,7 @@ export class ScheduledMessagesService {
         const isRecurring = scheduledMessage.schedule.type === ScheduledMessageScheduleType.RECURRING;
         if (isRecurring) {
             if (recalc) {
-                scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage.schedule);
+                scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage);
             }
 
             Server().log(`Rescheduling: ${scheduledMessage.toString()}`);
@@ -294,14 +294,24 @@ export class ScheduledMessagesService {
      * @param schedule The scheduling configruation
      * @returns A future date
      */
-    getNextRecurringDate(schedule: NodeJS.Dict<any>): Date {
-        const nextTs = this.getMillisecondsForSchedule(schedule);
+    getNextRecurringDate(scheduledMessage: ScheduledMessage): Date {
+        let nowTime = new Date().getTime();
+        const previousTime = scheduledMessage.scheduledFor.getTime();
+        const nextTs = this.getMillisecondsForSchedule(scheduledMessage.schedule);
         if (nextTs === 0) {
             throw new Error("Invalid schedule! Next schedule would have been 0 ms in the future.");
         }
 
-        const now = new Date().getTime();
-        return new Date(now + nextTs);
+        // Calculate when the next time should be.
+        // Basically, add the schedule'd time to the previous scheduled time
+        // until it's in the future.
+        let startTime = previousTime;
+        while (startTime < nowTime) {
+            startTime += nextTs;
+            nowTime = new Date().getTime();
+        }
+
+        return new Date(startTime);
     }
 
     /**
@@ -345,7 +355,7 @@ export class ScheduledMessagesService {
         scheduledMessage.status = ScheduledMessageStatus.IN_PROGRESS;
 
         // Calculate the next schedule time
-        scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage.schedule);
+        scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage);
 
         // Save the updated information
         await this.saveScheduledMessage(scheduledMessage);
