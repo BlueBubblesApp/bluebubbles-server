@@ -411,3 +411,47 @@ export const shortenString = (value: string, maxLen = 25): string => {
 export const safeTrim = (value: string) => {
     return (value ?? "").trim();
 };
+
+export const resultAwaiter = async ({
+    maxWaitMs = 30000,
+    initialWaitMs = 250,
+    waitMultiplier = 1.5,
+    getData,
+    extraLoopCondition = null,
+    dataLoopCondition = null
+}: {
+    maxWaitMs?: number;
+    initialWaitMs?: number;
+    waitMultiplier?: number;
+    getData: (previousData: any | null) => any;
+    extraLoopCondition?: (data: any | null) => boolean;
+    dataLoopCondition?: (data: any | null) => boolean;
+}): Promise<any | null> => {
+    let waitTime = initialWaitMs;
+    let totalTime = 0;
+
+    // Set a default value for the condition
+    // so we can easily use it in the loop.
+    if (!extraLoopCondition) {
+        extraLoopCondition = _ => true;
+    }
+
+    // Set a default value for the condition
+    // so we can easily use it in the loop.
+    if (!dataLoopCondition) {
+        dataLoopCondition = _ => !data;
+    }
+
+    let data = await getData(null);
+    while (dataLoopCondition(data) && totalTime < maxWaitMs && extraLoopCondition(data)) {
+        // Give it a bit to execute
+        await waitMs(waitTime);
+        totalTime += waitTime;
+
+        // Re-fetch the message with the updated information
+        data = await getData(data);
+        waitTime = waitTime * waitMultiplier;
+    }
+
+    return data;
+};

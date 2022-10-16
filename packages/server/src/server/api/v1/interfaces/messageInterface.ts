@@ -2,7 +2,7 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus, isNotEmpty, waitMs } from "@server/helpers/utils";
+import { checkPrivateApiStatus, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ActionHandler } from "@server/api/v1/apple/actions";
@@ -171,25 +171,17 @@ export class MessageInterface {
             throw new Error("Failed to send message!");
         }
 
-        // Fetch the chat based on the return data
-        let retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
-        let tryCount = 0;
-        while (!retMessage) {
-            tryCount += 1;
-
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 40) break;
-
-            // Give it a bit to execute
-            await waitMs(250);
-
-            // Re-fetch the message with the updated information
-            retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
-        }
+        const maxWaitMs = 30000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(result.identifier, true, false);
+            }
+        });
 
         // Check if the name changed
         if (!retMessage) {
-            throw new Error("Failed to send message! Message not found after 5 seconds!");
+            throw new Error(`Failed to send message! Message not found in database after ${maxWaitMs / 1000} seconds!`);
         }
 
         return retMessage;
@@ -201,25 +193,21 @@ export class MessageInterface {
         const currentEditDate = msg?.dateEdited ?? 0;
         await Server().privateApiHelper.unsendMessage({ chatGuid, messageGuid, partIndex: partIndex ?? 0 });
 
-        // Fetch the chat based on the return data
-        let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
-        let tryCount = 0;
-        while (!retMessage || retMessage.dateEdited <= currentEditDate) {
-            tryCount += 1;
-
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 40) break;
-
-            // Give it a bit to execute
-            await waitMs(250);
-
-            // Re-fetch the message with the updated information
-            retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
-        }
+        const maxWaitMs = 30000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(messageGuid, true, false);
+            },
+            extraLoopCondition: data => {
+                if (!data) return false;
+                return (data?.dateEdited ?? 0) > currentEditDate;
+            }
+        });
 
         // Check if the name changed
         if (!retMessage) {
-            throw new Error("Failed to unsend message! Message not found after 5 seconds!");
+            throw new Error(`Failed to unsend message! Message not edited (unsent) after ${maxWaitMs / 1000} seconds!`);
         }
 
         return retMessage;
@@ -243,25 +231,21 @@ export class MessageInterface {
             partIndex: partIndex ?? 0
         });
 
-        // Fetch the chat based on the return data
-        let retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
-        let tryCount = 0;
-        while (!retMessage || retMessage.dateEdited <= currentEditDate) {
-            tryCount += 1;
-
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 40) break;
-
-            // Give it a bit to execute
-            await waitMs(250);
-
-            // Re-fetch the message with the updated information
-            retMessage = await Server().iMessageRepo.getMessage(messageGuid, true, false);
-        }
+        const maxWaitMs = 30000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(messageGuid, true, false);
+            },
+            extraLoopCondition: data => {
+                if (!data) return false;
+                return (data?.dateEdited ?? 0) > currentEditDate;
+            }
+        });
 
         // Check if the name changed
         if (!retMessage) {
-            throw new Error("Failed to edit message! Message not found after 5 seconds!");
+            throw new Error(`Failed to edit message! Message not edited after ${maxWaitMs / 1000} seconds!`);
         }
 
         return retMessage;
@@ -317,21 +301,13 @@ export class MessageInterface {
             Server().log(`Reaction sent with Message GUID: ${result.identifier}`, "debug");
         }
 
-        // Fetch the chat based on the return data
-        let retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
-        let tryCount = 0;
-        while (!retMessage) {
-            tryCount += 1;
-
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 20) break;
-
-            // Give it a bit to execute
-            await waitMs(500);
-
-            // Re-fetch the message with the updated information
-            retMessage = await Server().iMessageRepo.getMessage(result.identifier, true, false);
-        }
+        const maxWaitMs = 30000;
+        let retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(result.identifier, true, false);
+            }
+        });
 
         // If we can't get the message via the transaction, try via the promise
         if (!retMessage) {
@@ -340,7 +316,9 @@ export class MessageInterface {
 
         // Check if the name changed
         if (!retMessage) {
-            throw new Error("Failed to send reaction! Message not found after 5 seconds!");
+            throw new Error(
+                `Failed to send reaction! Message not found in database after ${maxWaitMs / 1000} seconds!`
+            );
         }
 
         // Return the message
