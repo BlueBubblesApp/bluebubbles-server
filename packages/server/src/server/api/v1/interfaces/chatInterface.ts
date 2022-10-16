@@ -1,5 +1,5 @@
-import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
+import { Chat } from "@server/databases/imessage/entity/Chat";
+import { Handle } from "@server/databases/imessage/entity/Handle";
 import {
     checkPrivateApiStatus,
     isEmpty,
@@ -14,6 +14,8 @@ import { ChatResponse, HandleResponse } from "@server/types";
 import { startChat } from "../apple/scripts";
 import { MessageInterface } from "./messageInterface";
 import { CHAT_READ_STATUS_CHANGED } from "@server/events";
+import { ChatSerializer } from "../serializers/ChatSerializer";
+import { HandleSerializer } from "../serializers/HandleSerializer";
 
 export class ChatInterface {
     static async get({
@@ -49,15 +51,14 @@ export class ChatInterface {
 
         const results = [];
         for (const chat of chats ?? []) {
-            const chatRes = await getChatResponse(chat);
+            const chatRes = await ChatSerializer.serialize({ chat });
 
             // Insert the cached participants from the original request
             if (Object.keys(chatCache).includes(chat.guid)) {
                 chatRes.participants = await Promise.all(
-                    chatCache[chat.guid].map(async (e): Promise<HandleResponse> => {
-                        const test = await getHandleResponse(e);
-                        return test;
-                    })
+                    chatCache[chat.guid].map(
+                        async (e): Promise<HandleResponse> => await HandleSerializer.serialize({ handle: e })
+                    )
                 );
             }
 
@@ -104,6 +105,7 @@ export class ChatInterface {
         const maxWaitMs = 30000;
         const retChat = await resultAwaiter({
             maxWaitMs,
+            dataLoopCondition: data => !!data,
             getData: async (previousData: any | null) => {
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: false });
                 return chats[0] ?? previousData;

@@ -70,8 +70,8 @@ export type HandleResponse = {
     messages?: MessageResponse[];
     chats?: ChatResponse[];
     address: string;
-    country: string;
-    uncanonicalizedId: string;
+    country?: string;
+    uncanonicalizedId?: string;
 };
 
 export type ChatResponse = {
@@ -83,29 +83,29 @@ export type ChatResponse = {
     style: number;
     chatIdentifier: string;
     isArchived: boolean;
-    isFiltered: boolean;
+    isFiltered?: boolean;
     displayName: string;
-    groupId: string;
+    groupId?: string;
 };
 
 export type AttachmentResponse = {
     originalROWID: number;
     guid: string;
-    messages: string[];
-    data: string; // Base64 string
+    messages?: string[];
+    data?: string; // Base64 string
     blurhash?: string;
     height?: number;
     width?: number;
     uti: string;
     mimeType: string;
-    transferState: number;
+    transferState?: number;
     totalBytes: number;
-    isOutgoing: boolean;
+    isOutgoing?: boolean;
     transferName: string;
-    isSticker: boolean;
-    hideAttachment: boolean;
-    originalGuid: string;
-    metadata: { [key: string]: string | boolean | number };
+    isSticker?: boolean;
+    hideAttachment?: boolean;
+    originalGuid?: string;
+    metadata?: { [key: string]: string | boolean | number };
 };
 
 export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";

@@ -2,13 +2,13 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { Server } from "@server";
-import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { HandleInterface } from "@server/api/v1/interfaces/handleInterface";
 import { isEmpty } from "@server/helpers/utils";
 import { arrayHasOne } from "@server/utils/CollectionUtils";
 import { Success } from "../responses/success";
 import { NotFound } from "../responses/errors";
 import { parseWithQuery } from "../utils";
+import { HandleSerializer } from "@server/api/v1/serializers/HandleSerializer";
 
 export class HandleRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -20,7 +20,7 @@ export class HandleRouter {
         const address = ctx.params.guid;
         const handles = await Server().iMessageRepo.getHandles({ address });
         if (isEmpty(handles)) throw new NotFound({ error: "Handle not found!" });
-        return new Success(ctx, { data: await getHandleResponse(handles[0]) }).send();
+        return new Success(ctx, { data: await HandleSerializer.serialize({ handle: handles[0] }) }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
@@ -28,7 +28,7 @@ export class HandleRouter {
 
         // Pull out the filters
         const withQuery = parseWithQuery(body?.with);
-        const withChats = arrayHasOne(withQuery, ['chat', 'chats']);
+        const withChats = arrayHasOne(withQuery, ["chat", "chats"]);
         const withChatParticipants = arrayHasOne(withQuery, ["chat.participants", "chats.participants"]);
         const address = body?.address;
 

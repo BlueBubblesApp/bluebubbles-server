@@ -73,8 +73,10 @@ export class MessageRouter {
         return new Success(ctx, {
             data: await MessageSerializer.serialize({
                 message,
-                parseAttributedBody: withAttributedBody,
-                parseMessageSummary: withMessageSummaryInfo
+                config: {
+                    parseAttributedBody: withAttributedBody,
+                    parseMessageSummary: withMessageSummaryInfo
+                }
             })
         }).send();
     }
@@ -136,9 +138,11 @@ export class MessageRouter {
                 loadMetadata: withAttachmentMetadata,
                 convert: convertAttachments
             },
-            parseAttributedBody: withAttributedBody,
-            parseMessageSummary: withMessageSummaryInfo,
-            loadChatParticipants: withChatParticipants
+            config: {
+                parseAttributedBody: withAttributedBody,
+                parseMessageSummary: withMessageSummaryInfo,
+                loadChatParticipants: withChatParticipants
+            }
         });
 
         // Build metadata to return
@@ -174,9 +178,11 @@ export class MessageRouter {
             // No need to load the participants since we sent the message
             const data = await MessageSerializer.serialize({
                 message: sentMessage,
-                loadChatParticipants: false,
-                parseAttributedBody: true,
-                parseMessageSummary: true
+                config: {
+                    loadChatParticipants: false,
+                    parseAttributedBody: true,
+                    parseMessageSummary: true
+                }
             });
 
             // Inject the TempGUID back into the response
@@ -201,7 +207,12 @@ export class MessageRouter {
                 throw new IMessageError({
                     message: "Message Send Error",
                     // No need to load the participants since we sent the message
-                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    data: await MessageSerializer.serialize({
+                        message: ex,
+                        config: {
+                            loadChatParticipants: false
+                        }
+                    }),
                     error: "Failed to send message! See attached message error code."
                 });
             } else if (ex instanceof MessagePromiseRejection) {
@@ -209,7 +220,12 @@ export class MessageRouter {
                     message: "Message Send Error",
                     // No need to load the participants since we sent the message
                     data: ex?.msg
-                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        ? await MessageSerializer.serialize({
+                              message: ex.msg,
+                              config: {
+                                  loadChatParticipants: false
+                              }
+                          })
                         : null,
                     error: "Failed to send message! See attached message error code."
                 });
@@ -243,9 +259,11 @@ export class MessageRouter {
             // No need to load the participants since we sent the message
             const data = await MessageSerializer.serialize({
                 message: sentMessage,
-                loadChatParticipants: false,
-                parseAttributedBody: true,
-                parseMessageSummary: true
+                config: {
+                    loadChatParticipants: false,
+                    parseAttributedBody: true,
+                    parseMessageSummary: true
+                }
             });
             return new Success(ctx, { message: "Attachment sent!", data }).send();
         } catch (ex: any) {
@@ -256,7 +274,12 @@ export class MessageRouter {
                 throw new IMessageError({
                     message: "Attachment Send Error",
                     // No need to load the participants since we sent the message
-                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    data: await MessageSerializer.serialize({
+                        message: ex,
+                        config: {
+                            loadChatParticipants: false
+                        }
+                    }),
                     error: "Failed to send attachment! See attached message error code."
                 });
             } else if (ex instanceof MessagePromiseRejection) {
@@ -264,7 +287,12 @@ export class MessageRouter {
                     message: "Attachment Send Error",
                     // No need to load the participants since we sent the message
                     data: ex?.msg
-                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        ? await MessageSerializer.serialize({
+                              message: ex.msg,
+                              config: {
+                                  loadChatParticipants: false
+                              }
+                          })
                         : null,
                     error: "Failed to send attachment! See attached message error code."
                 });
@@ -289,9 +317,11 @@ export class MessageRouter {
                 // No need to load the participants since we sent the message
                 data: await MessageSerializer.serialize({
                     message: sentMessage,
-                    loadChatParticipants: false,
-                    parseAttributedBody: true,
-                    parseMessageSummary: true
+                    config: {
+                        loadChatParticipants: false,
+                        parseAttributedBody: true,
+                        parseMessageSummary: true
+                    }
                 })
             }).send();
         } catch (ex: any) {
@@ -299,7 +329,12 @@ export class MessageRouter {
                 throw new IMessageError({
                     message: "Reaction Send Error",
                     // No need to load the participants since we sent the message
-                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    data: await MessageSerializer.serialize({
+                        message: ex,
+                        config: {
+                            loadChatParticipants: false
+                        }
+                    }),
                     error: "Failed to send reaction! See attached message error code."
                 });
             } else if (ex instanceof MessagePromiseRejection) {
@@ -307,7 +342,12 @@ export class MessageRouter {
                     message: "Reaction Send Error",
                     // No need to load the participants since we sent the message
                     data: ex?.msg
-                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        ? await MessageSerializer.serialize({
+                              message: ex.msg,
+                              config: {
+                                  loadChatParticipants: false
+                              }
+                          })
                         : null,
                     error: "Failed to send reaction! See attached message error code."
                 });
@@ -336,9 +376,11 @@ export class MessageRouter {
                 // No need to load the participants since we sent the message
                 data: await MessageSerializer.serialize({
                     message: unsentMessage,
-                    loadChatParticipants: false,
-                    parseAttributedBody: true,
-                    parseMessageSummary: true
+                    config: {
+                        loadChatParticipants: false,
+                        parseAttributedBody: true,
+                        parseMessageSummary: true
+                    }
                 })
             }).send();
         } catch (ex: any) {
@@ -346,7 +388,12 @@ export class MessageRouter {
                 throw new IMessageError({
                     message: "Unsend Message Error",
                     // No need to load the participants since we sent the message
-                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    data: await MessageSerializer.serialize({
+                        message: ex,
+                        config: {
+                            loadChatParticipants: false
+                        }
+                    }),
                     error: "Failed to unsend message! See attached message error code."
                 });
             } else if (ex instanceof MessagePromiseRejection) {
@@ -354,7 +401,12 @@ export class MessageRouter {
                     message: "Unsend Message Error",
                     // No need to load the participants since we sent the message
                     data: ex?.msg
-                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        ? await MessageSerializer.serialize({
+                              message: ex.msg,
+                              config: {
+                                  loadChatParticipants: false
+                              }
+                          })
                         : null,
                     error: "Failed to unsend message! See attached message error code."
                 });
@@ -390,9 +442,11 @@ export class MessageRouter {
                 // No need to load the participants since we sent the message
                 data: await MessageSerializer.serialize({
                     message: changedMessage,
-                    loadChatParticipants: false,
-                    parseAttributedBody: true,
-                    parseMessageSummary: true
+                    config: {
+                        loadChatParticipants: false,
+                        parseAttributedBody: true,
+                        parseMessageSummary: true
+                    }
                 })
             }).send();
         } catch (ex: any) {
@@ -400,7 +454,12 @@ export class MessageRouter {
                 throw new IMessageError({
                     message: "Message Edit Error",
                     // No need to load the participants since we sent the message
-                    data: await MessageSerializer.serialize({ message: ex, loadChatParticipants: false }),
+                    data: await MessageSerializer.serialize({
+                        message: ex,
+                        config: {
+                            loadChatParticipants: false
+                        }
+                    }),
                     error: "Failed to edit message! See attached message error code."
                 });
             } else if (ex instanceof MessagePromiseRejection) {
@@ -408,7 +467,12 @@ export class MessageRouter {
                     message: "Message Edit Error",
                     // No need to load the participants since we sent the message
                     data: ex?.msg
-                        ? await MessageSerializer.serialize({ message: ex.msg, loadChatParticipants: false })
+                        ? await MessageSerializer.serialize({
+                              message: ex.msg,
+                              config: {
+                                  loadChatParticipants: false
+                              }
+                          })
                         : null,
                     error: "Failed to edit message! See attached message error code."
                 });

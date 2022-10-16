@@ -1,37 +1,24 @@
 import { Server } from "@server";
-import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { isEmpty, isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 import { HandleResponse, MessageResponse } from "@server/types";
-import type { MessageSerializerParams, MessageSerializerSingleParams } from "./types";
+import { AttachmentSerializer } from "./AttachmentSerializer";
+import { ChatSerializer } from "./ChatSerializer";
+import { DEFAULT_ATTACHMENT_CONFIG, DEFAULT_MESSAGE_CONFIG } from "./constants";
+import { HandleSerializer } from "./HandleSerializer";
+import type { MessageSerializerMultiParams, MessageSerializerSingleParams } from "./types";
 
 export class MessageSerializer {
     static async serialize({
         message,
-        attachmentConfig = {
-            convert: true,
-            getData: false,
-            loadMetadata: true
-        },
-        parseAttributedBody = false,
-        parseMessageSummary = false,
-        loadChatParticipants = true,
-        enforceMaxSize = false,
-        // Max payload size is 4000 bytes
-        // https://firebase.google.com/docs/cloud-messaging/concept-options#notifications_and_data_messages
-        maxSizeBytes = 4000,
+        config = DEFAULT_MESSAGE_CONFIG,
+        attachmentConfig = DEFAULT_ATTACHMENT_CONFIG,
         isForNotification = false
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
         return (
             await MessageSerializer.serializeList({
                 messages: [message],
-                attachmentConfig,
-                parseAttributedBody,
-                parseMessageSummary,
-                loadChatParticipants,
-                enforceMaxSize,
-                maxSizeBytes,
+                config: { ...DEFAULT_MESSAGE_CONFIG, ...config },
+                attachmentConfig: { ...DEFAULT_ATTACHMENT_CONFIG, ...attachmentConfig },
                 isForNotification
             })
         )[0];
@@ -39,26 +26,18 @@ export class MessageSerializer {
 
     static async serializeList({
         messages,
-        attachmentConfig = {
-            convert: true,
-            getData: false,
-            loadMetadata: true
-        },
-        parseAttributedBody = false,
-        parseMessageSummary = false,
-        loadChatParticipants = true,
-        enforceMaxSize = false,
-        maxSizeBytes = 4000,
+        config = DEFAULT_MESSAGE_CONFIG,
+        attachmentConfig = DEFAULT_ATTACHMENT_CONFIG,
         isForNotification = false
-    }: MessageSerializerParams): Promise<MessageResponse[]> {
+    }: MessageSerializerMultiParams): Promise<MessageResponse[]> {
         // Convert the messages to their serialized versions
         const messageResponses: MessageResponse[] = [];
         for (const message of messages) {
             messageResponses.push(
                 await MessageSerializer.convert({
                     message: message,
-                    attachmentConfig,
-                    loadChatParticipants,
+                    config: { ...DEFAULT_MESSAGE_CONFIG, ...config },
+                    attachmentConfig: { ...DEFAULT_ATTACHMENT_CONFIG, ...attachmentConfig },
                     isForNotification
                 })
             );
@@ -66,7 +45,7 @@ export class MessageSerializer {
 
         // Handle fetching the chat participants with the messages (if requested)
         const chatCache: { [key: string]: HandleResponse[] } = {};
-        if (loadChatParticipants) {
+        if (config.loadChatParticipants) {
             for (let i = 0; i < messages.length; i++) {
                 // If there aren't any chats for this message, skip it
                 if (isEmpty(messages[i]?.chats ?? [])) continue;
@@ -86,9 +65,10 @@ export class MessageSerializer {
                             withParticipants: true
                         });
                         if (isNotEmpty(chats)) {
-                            chatCache[messages[i]?.chats[k].guid] = await Promise.all(
-                                (chats[0].participants ?? []).map(async p => await getHandleResponse(p))
-                            );
+                            chatCache[messages[i]?.chats[k].guid] = await HandleSerializer.serializeList({
+                                handles: chats[0].participants ?? [],
+                                config: { includeChats: false, includeMessages: false }
+                            });
                             messageResponses[i].chats[k].participants = chatCache[messages[i]?.chats[k].guid];
                         }
                     } else {
@@ -101,24 +81,24 @@ export class MessageSerializer {
         // The parse options are enforced _after_ the convert function is called.
         // This is so that we can properly extract the text from the attributed body
         // for those on macOS Ventura. Otherwise, set it to null to not clutter the payload.
-        if (!parseAttributedBody || !parseMessageSummary) {
+        if (!config.parseAttributedBody || !config.parseMessageSummary) {
             for (let i = 0; i < messageResponses.length; i++) {
-                if (!parseAttributedBody && "attributedBody" in messageResponses[i]) {
+                if (!config.parseAttributedBody && "attributedBody" in messageResponses[i]) {
                     messageResponses[i].attributedBody = null;
                 }
 
-                if (!parseMessageSummary && "messageSummaryInfo" in messageResponses[i]) {
+                if (!config.parseMessageSummary && "messageSummaryInfo" in messageResponses[i]) {
                     messageResponses[i].messageSummaryInfo = null;
                 }
             }
         }
 
-        if (enforceMaxSize) {
+        if (config.enforceMaxSize) {
             const strData = JSON.stringify(messageResponses);
             const len = Buffer.byteLength(strData, "utf8");
 
             // If we've reached out max size, we need to clear the participants
-            if (len > maxSizeBytes) {
+            if (len > config.maxSizeBytes) {
                 for (let i = 0; i < messageResponses.length; i++) {
                     for (let c = 0; c < (messageResponses[i]?.chats ?? []).length; c++) {
                         if (isEmpty(messageResponses[i].chats[c].participants)) continue;
@@ -133,31 +113,28 @@ export class MessageSerializer {
 
     private static async convert({
         message,
-        attachmentConfig = {
-            convert: true,
-            getData: false,
-            loadMetadata: true
-        },
+        config = DEFAULT_MESSAGE_CONFIG,
+        attachmentConfig = DEFAULT_ATTACHMENT_CONFIG,
         isForNotification = false
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
-        let output = {
+        let output: MessageResponse = {
             originalROWID: message.ROWID,
             guid: message.guid,
             text: message.universalText(true),
             attributedBody: message.attributedBody,
-            handle: message.handle ? await getHandleResponse(message.handle) : null,
+            handle: message.handle
+                ? await HandleSerializer.serialize({
+                      handle: message.handle,
+                      config: { includeChats: false, includeMessages: false }
+                  })
+                : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
-            chats: await Promise.all((message.chats ?? []).map(chat => getChatResponse(chat))),
-            attachments: await Promise.all(
-                (message.attachments ?? []).map(a =>
-                    getAttachmentResponse(a, {
-                        convert: attachmentConfig.convert,
-                        getData: attachmentConfig.getData,
-                        loadMetadata: attachmentConfig.loadMetadata
-                    })
-                )
-            ),
+            attachments: await AttachmentSerializer.serializeList({
+                attachments: message.attachments ?? [],
+                config: attachmentConfig,
+                isForNotification
+            }),
             subject: message.subject,
             error: message.error,
             dateCreated: message.dateCreated ? message.dateCreated.getTime() : null,
@@ -201,13 +178,16 @@ export class MessageSerializer {
             };
         }
 
+        if (config.includeChats) {
+            output.chats = await ChatSerializer.serializeList({
+                chats: message?.chats ?? [],
+                config: { includeParticipants: false, includeMessages: false },
+                isForNotification
+            });
+        }
+
         if (isMinHighSierra) {
-            output = {
-                ...output,
-                ...{
-                    messageSummaryInfo: message.messageSummaryInfo
-                }
-            };
+            output.messageSummaryInfo = message.messageSummaryInfo;
         }
 
         if (isMinVentura) {

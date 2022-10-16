@@ -939,7 +939,9 @@ class BlueBubblesServer extends EventEmitter {
         // Since we sent the message, we don't need to include the participants
         const resp = await MessageSerializer.serialize({
             message: newMessage,
-            loadChatParticipants: false,
+            config: {
+                loadChatParticipants: false
+            },
             isForNotification: true
         });
         resp.tempGuid = tempGuid;
@@ -958,7 +960,9 @@ class BlueBubblesServer extends EventEmitter {
         // Since this is a message send error, we don't need to include the participants
         const data = await MessageSerializer.serialize({
             message,
-            loadChatParticipants: false,
+            config: {
+                loadChatParticipants: false
+            },
             isForNotification: true
         });
         if (isNotEmpty(tempGuid)) {
@@ -1057,7 +1061,9 @@ class BlueBubblesServer extends EventEmitter {
                 NEW_MESSAGE,
                 await MessageSerializer.serialize({
                     message: newMessage,
-                    enforceMaxSize: true,
+                    config: {
+                        enforceMaxSize: true
+                    },
                     isForNotification: true
                 })
             );
@@ -1087,7 +1093,9 @@ class BlueBubblesServer extends EventEmitter {
                 MESSAGE_UPDATED,
                 MessageSerializer.serialize({
                     message: newMessage,
-                    loadChatParticipants: false,
+                    config: {
+                        loadChatParticipants: false
+                    },
                     isForNotification: true
                 })
             );
@@ -1113,7 +1121,10 @@ class BlueBubblesServer extends EventEmitter {
                 NEW_MESSAGE,
                 await MessageSerializer.serialize({
                     message: newMessage,
-                    enforceMaxSize: true
+                    config: {
+                        enforceMaxSize: true
+                    },
+                    isForNotification: true
                 }),
                 "high"
             );
@@ -1126,7 +1137,9 @@ class BlueBubblesServer extends EventEmitter {
                 GROUP_NAME_CHANGE,
                 await MessageSerializer.serialize({
                     message: item,
-                    loadChatParticipants: false,
+                    config: {
+                        loadChatParticipants: false
+                    },
                     isForNotification: true
                 })
             );
