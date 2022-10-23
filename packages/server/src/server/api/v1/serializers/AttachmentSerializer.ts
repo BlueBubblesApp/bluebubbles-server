@@ -55,14 +55,6 @@ export class AttachmentSerializer {
         // If the attachment isn't finished downloading, the path will be null
         if (fPath) {
             try {
-                Server().log(
-                    `Handling attachment response for GUID: ${attachment.guid} (Original: ${
-                        attachment.originalGuid ?? "N/A"
-                    })`,
-                    "debug"
-                );
-                Server().log(`Detected MIME Type: ${mimeType}`, "debug");
-
                 // If we want to resize the image, do so here
                 if (config.convert) {
                     const converters = [convertImage, convertAudio];
