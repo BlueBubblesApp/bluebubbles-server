@@ -7,6 +7,7 @@ export type ServerMetadataResponse = {
     helper_connected: boolean;
     proxy_service: string;
     detected_icloud: string;
+    macos_time_sync: number | null;
 };
 
 /**

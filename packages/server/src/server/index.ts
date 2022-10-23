@@ -635,17 +635,6 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
-    async getTimeSync() {
-        try {
-            return await FileSystem.execShellCommand(`sntp time.apple.com`);
-        } catch (ex) {
-            this.log("Failed to sync time with time servers!", "warn");
-            this.log(ex);
-        }
-
-        return null;
-    }
-
     private async preChecks(): Promise<void> {
         this.log("Running pre-start checks...");
 
@@ -675,7 +664,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
-        this.log(`Server Metadata -> Time Synchronization: ${((await this.getTimeSync()) ?? "").trim()}`, "debug");
+        this.log(`Server Metadata -> Time Synchronization: ${(await FileSystem.getTimeSync()) ?? "N/A"}`, "debug");
         this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
 
         if (!this.region) {
@@ -746,16 +735,14 @@ class BlueBubblesServer extends EventEmitter {
             });
         }
 
-        // Show a warning if the time is off by a reasonable amount (1 minute)
+        // Show a warning if the time is off by a reasonable amount (5 seconds)
         try {
-            const syncString = await this.getTimeSync();
-            if (syncString !== null) {
+            const syncOffset = await FileSystem.getTimeSync();
+            if (syncOffset !== null) {
                 try {
-                    const spl = syncString.split("+/-");
-                    const left = spl[0].split(" ").slice(0, -1);
-                    const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
-                    if (offset >= 15) {
-                        this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
+                    if (Math.abs(syncOffset) >= 5) {
+                        this.log(`Your macOS time is not synchronized! Offset: ${syncOffset}`, "warn");
+                        this.log(`To fix your time, open terminal and run: "sudo sntp -sS time.apple.com"`, "debug");
                     }
                 } catch (ex) {
                     this.log("Unable to parse time synchronization offset!", "debug");

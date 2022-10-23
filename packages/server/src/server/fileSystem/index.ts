@@ -627,4 +627,20 @@ export class FileSystem {
 
         return account;
     }
+
+    static async getTimeSync(): Promise<number | null> {
+        try {
+            const output = (await FileSystem.execShellCommand(`sntp time.apple.com`)).trim();
+            const matches = output.match(/[+-]?([0-9]*[.])?[0-9]+ \+\/- [+-]?([0-9]*[.])?[0-9]+/g);
+            if (matches && matches.length > 0) {
+                const time = matches[0].split(" +/- ")[0];
+                return Number.parseFloat(time);
+            }
+        } catch (ex) {
+            Server().log("Failed to sync time with time servers!", "warn");
+            Server().log(ex);
+        }
+
+        return null;
+    }
 }
