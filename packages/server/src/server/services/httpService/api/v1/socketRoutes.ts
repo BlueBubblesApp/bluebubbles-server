@@ -20,9 +20,7 @@ import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/ty
 import { ErrorTypes, ResponseFormat, ResponseJson } from "@server/services/httpService/api/v1/responses/types";
 
 // Entities
-import { getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
-import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
+import { Handle } from "@server/databases/imessage/entity/Handle";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { ActionHandler } from "@server/api/v1/apple/actions";
 import { QueueItem } from "@server/services/queueService";
@@ -38,8 +36,11 @@ import {
     createNoDataResponse
 } from "./responses";
 import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { CHAT_READ_STATUS_CHANGED } from "@server/events";
+import { ChatSerializer } from "@server/api/v1/serializers/ChatSerializer";
+import { HandleSerializer } from "@server/api/v1/serializers/HandleSerializer";
+import { AttachmentSerializer } from "@server/api/v1/serializers/AttachmentSerializer";
 
-const osVersion = macosVersion();
 const unknownError = "Unknown Error. Check server logs!";
 
 export class SocketRoutes {
@@ -233,15 +234,14 @@ export class SocketRoutes {
             const results = [];
             for (const chat of chats ?? []) {
                 if (chat.guid.startsWith("urn:")) continue;
-                const chatRes = await getChatResponse(chat);
+                const chatRes = await ChatSerializer.serialize({ chat });
 
                 // Insert the cached participants from the original request
                 if (Object.keys(chatCache).includes(chat.guid)) {
                     chatRes.participants = await Promise.all(
-                        chatCache[chat.guid].map(async (e): Promise<HandleResponse> => {
-                            const test = await getHandleResponse(e);
-                            return test;
-                        })
+                        chatCache[chat.guid].map(
+                            async (e): Promise<HandleResponse> => await HandleSerializer.serialize({ handle: e })
+                        )
                     );
                 }
 
@@ -289,7 +289,7 @@ export class SocketRoutes {
                 return response(cb, "error", createBadRequestResponse("Chat does not exist (get-chat)!"));
             }
 
-            return response(cb, "chat", createSuccessResponse(await getChatResponse(chats[0])));
+            return response(cb, "chat", createSuccessResponse(await ChatSerializer.serialize({ chat: chats[0] })));
         });
 
         /**
@@ -327,7 +327,9 @@ export class SocketRoutes {
             const messages = await Server().iMessageRepo.getMessages(dbParams);
             const results = await MessageSerializer.serializeList({
                 messages,
-                loadChatParticipants: params?.withChatParticipants ?? params?.withChats ?? false
+                config: {
+                    loadChatParticipants: params?.withChatParticipants ?? params?.withChats ?? false
+                }
             });
             return response(cb, "chat-messages", createSuccessResponse(results));
         });
@@ -367,7 +369,9 @@ export class SocketRoutes {
             const messages = await Server().iMessageRepo.getMessages(dbParams);
             const results = await MessageSerializer.serializeList({
                 messages,
-                loadChatParticipants: params?.withChatParticipants ?? params?.withChats ?? false
+                config: {
+                    loadChatParticipants: params?.withChatParticipants ?? params?.withChats ?? false
+                }
             });
 
             return response(cb, "messages", createSuccessResponse(results));
@@ -383,7 +387,7 @@ export class SocketRoutes {
             const attachment = await Server().iMessageRepo.getAttachment(params?.identifier, params?.withMessages);
             if (!attachment) return response(cb, "error", createBadRequestResponse("Attachment does not exist"));
 
-            const res = await getAttachmentResponse(attachment, { getData: true });
+            const res = await AttachmentSerializer.serialize({ attachment, config: { loadData: true } });
             return response(cb, "attachment", createSuccessResponse(res));
         });
 
@@ -451,7 +455,12 @@ export class SocketRoutes {
             });
             if (isEmpty(messages)) return response(cb, "last-chat-message", createNoDataResponse());
 
-            const result = await MessageSerializer.serialize({ message: messages[0], loadChatParticipants: false });
+            const result = await MessageSerializer.serialize({
+                message: messages[0],
+                config: {
+                    loadChatParticipants: false
+                }
+            });
             return response(cb, "last-chat-message", createSuccessResponse(result));
         });
 
@@ -469,7 +478,7 @@ export class SocketRoutes {
 
             const handles = [];
             for (const handle of chats[0].participants ?? []) {
-                const handleRes = await getHandleResponse(handle);
+                const handleRes = await HandleSerializer.serialize({ handle });
                 handles.push(handleRes);
             }
 
@@ -563,7 +572,12 @@ export class SocketRoutes {
                             ErrorTypes.IMESSAGE_ERROR,
                             "Message sent with an error. See attached message",
                             // No need to load the participants since we sent the message
-                            await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false })
+                            await MessageSerializer.serialize({
+                                message: sentMessage,
+                                config: {
+                                    loadChatParticipants: false
+                                }
+                            })
                         )
                     );
                 } else {
@@ -572,7 +586,12 @@ export class SocketRoutes {
                         cb,
                         "message-sent",
                         createSuccessResponse(
-                            await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false })
+                            await MessageSerializer.serialize({
+                                message: sentMessage,
+                                config: {
+                                    loadChatParticipants: false
+                                }
+                            })
                         )
                     );
                 }
@@ -729,7 +748,11 @@ export class SocketRoutes {
 
             try {
                 const newChat = await Server().iMessageRepo.getChats({ chatGuid });
-                return response(cb, "chat-started", createSuccessResponse(await getChatResponse(newChat[0])));
+                return response(
+                    cb,
+                    "chat-started",
+                    createSuccessResponse(await ChatSerializer.serialize({ chat: newChat[0] }))
+                );
             } catch (ex: any) {
                 let err = ex?.message ?? ex ?? unknownError;
 
@@ -757,7 +780,11 @@ export class SocketRoutes {
                     await ActionHandler.privateRenameGroupChat(params.identifier, params.newName);
 
                     const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
-                    return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
+                    return response(
+                        cb,
+                        "group-renamed",
+                        createSuccessResponse(await ChatSerializer.serialize({ chat: chats[0] }))
+                    );
                 } catch (ex: any) {
                     return response(cb, "rename-group-error", createServerErrorResponse(ex?.message ?? ex));
                 }
@@ -767,7 +794,11 @@ export class SocketRoutes {
                 await ActionHandler.renameGroupChat(params.identifier, params.newName);
 
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
-                return response(cb, "group-renamed", createSuccessResponse(await getChatResponse(chats[0])));
+                return response(
+                    cb,
+                    "group-renamed",
+                    createSuccessResponse(await ChatSerializer.serialize({ chat: chats[0] }))
+                );
             } catch (ex: any) {
                 return response(cb, "rename-group-error", createServerErrorResponse(ex?.message ?? ex));
             }
@@ -787,7 +818,11 @@ export class SocketRoutes {
                 if (safeTrim(result) !== "success") return response(cb, "error", createBadRequestResponse(result));
 
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
-                return response(cb, "participant-added", createSuccessResponse(await getChatResponse(chats[0])));
+                return response(
+                    cb,
+                    "participant-added",
+                    createSuccessResponse(await ChatSerializer.serialize({ chat: chats[0] }))
+                );
             } catch (ex: any) {
                 return response(cb, "add-participant-error", createServerErrorResponse(ex?.message ?? ex));
             }
@@ -807,7 +842,11 @@ export class SocketRoutes {
                 if (safeTrim(result) !== "success") return response(cb, "error", createBadRequestResponse(result));
 
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
-                return response(cb, "participant-removed", createSuccessResponse(await getChatResponse(chats[0])));
+                return response(
+                    cb,
+                    "participant-removed",
+                    createSuccessResponse(await ChatSerializer.serialize({ chat: chats[0] }))
+                );
             } catch (ex: any) {
                 return response(cb, "remove-participant-error", createServerErrorResponse(ex?.message ?? ex));
             }
@@ -866,7 +905,12 @@ export class SocketRoutes {
                         "tapback-sent",
                         // No need to load the participants since we sent the message
                         createSuccessResponse(
-                            await MessageSerializer.serialize({ message: sentMessage, loadChatParticipants: false }),
+                            await MessageSerializer.serialize({
+                                message: sentMessage,
+                                config: {
+                                    loadChatParticipants: false
+                                }
+                            }),
                             "Successfully sent reaction!"
                         )
                     );
@@ -913,7 +957,7 @@ export class SocketRoutes {
                 return response(cb, "error", createBadRequestResponse("No chat status provided!"));
 
             // Send the notification out to all clients
-            Server().emitMessage("chat-read-status-changed", {
+            Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
                 chatGuid: params.chatGuid,
                 status: params.status
             });

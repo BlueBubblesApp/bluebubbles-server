@@ -5,5 +5,6 @@ import { Queue } from "./Queue";
 import { Webhook } from "./Webhook";
 import { Contact } from "./Contact";
 import { ContactAddress } from "./ContactAddress";
+import { ScheduledMessage } from "./ScheduledMessage";
 
-export { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress };
+export { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage };

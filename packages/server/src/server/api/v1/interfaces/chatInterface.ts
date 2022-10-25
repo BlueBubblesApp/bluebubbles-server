@@ -1,11 +1,21 @@
-import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getHandleResponse, Handle } from "@server/databases/imessage/entity/Handle";
-import { checkPrivateApiStatus, isEmpty, isMinBigSur, isNotEmpty, slugifyAddress, waitMs } from "@server/helpers/utils";
+import { Chat } from "@server/databases/imessage/entity/Chat";
+import { Handle } from "@server/databases/imessage/entity/Handle";
+import {
+    checkPrivateApiStatus,
+    isEmpty,
+    isMinBigSur,
+    isNotEmpty,
+    resultAwaiter,
+    slugifyAddress
+} from "@server/helpers/utils";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ChatResponse, HandleResponse } from "@server/types";
 import { startChat } from "../apple/scripts";
 import { MessageInterface } from "./messageInterface";
+import { CHAT_READ_STATUS_CHANGED } from "@server/events";
+import { ChatSerializer } from "../serializers/ChatSerializer";
+import { HandleSerializer } from "../serializers/HandleSerializer";
 
 export class ChatInterface {
     static async get({
@@ -41,15 +51,14 @@ export class ChatInterface {
 
         const results = [];
         for (const chat of chats ?? []) {
-            const chatRes = await getChatResponse(chat);
+            const chatRes = await ChatSerializer.serialize({ chat });
 
             // Insert the cached participants from the original request
             if (Object.keys(chatCache).includes(chat.guid)) {
                 chatRes.participants = await Promise.all(
-                    chatCache[chat.guid].map(async (e): Promise<HandleResponse> => {
-                        const test = await getHandleResponse(e);
-                        return test;
-                    })
+                    chatCache[chat.guid].map(
+                        async (e): Promise<HandleResponse> => await HandleSerializer.serialize({ handle: e })
+                    )
                 );
             }
 
@@ -83,10 +92,7 @@ export class ChatInterface {
     }
 
     static async setDisplayName(chat: Chat, displayName: string): Promise<Chat> {
-        let theChat = chat;
         const prevName = chat.displayName;
-        let newName = chat.displayName;
-
         checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
@@ -94,33 +100,28 @@ export class ChatInterface {
             throw new Error("Chat is not a group chat!");
         }
 
-        await Server().privateApiHelper.setDisplayName(theChat.guid, displayName);
+        await Server().privateApiHelper.setDisplayName(chat.guid, displayName);
 
-        let tryCount = 0;
-        while (newName === prevName) {
-            tryCount += 1;
-
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 20) break;
-
-            // Give it a bit to execute
-            await waitMs(500);
-
-            // Re-fetch the chat with the updated information
-            const chats = await Server().iMessageRepo.getChats({ chatGuid: theChat.guid, withParticipants: false });
-            theChat = chats[0] ?? theChat;
-
-            // Save the new name
-            newName = theChat.displayName;
-            if (newName !== prevName) break;
-        }
+        const maxWaitMs = 30000;
+        const retChat = await resultAwaiter({
+            maxWaitMs,
+            dataLoopCondition: data => !!data,
+            getData: async (previousData: any | null) => {
+                const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: false });
+                return chats[0] ?? previousData;
+            },
+            extraLoopCondition: data => {
+                if (!data) return false;
+                return data?.displayName === prevName;
+            }
+        });
 
         // Check if the name changed
-        if (newName === prevName) {
-            throw new Error("Failed to set new display name! Operation took longer than 5 seconds!");
+        if (retChat?.displayName === prevName) {
+            throw new Error(`Failed to set new display name! Operation took longer than ${maxWaitMs / 1000} seconds!`);
         }
 
-        return theChat;
+        return retChat;
     }
 
     static async create({
@@ -152,7 +153,7 @@ export class ChatInterface {
 
         // Sanitize the addresses
         const theAddrs = addresses.map(e => slugifyAddress(e));
-        let chatGuid;
+        let chatGuid: string;
         let sentMessage;
         if (isMinBigSur) {
             // If we made it this far and this is Big Sur+, we know there is a message and 1 participant
@@ -177,24 +178,21 @@ export class ChatInterface {
 
         // Fetch the chat based on the return data
         Server().log(`Verifying Chat creation for GUID: ${chatGuid}`, "debug");
-        let chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-        let tryCount = 0;
-        while (isEmpty(chats)) {
-            tryCount += 1;
 
-            // If we've tried 10 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 20) break;
-
-            // Give it a bit to execute
-            await waitMs(500);
-
-            // Re-fetch the chat with the updated information
-            chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
-        }
+        const maxWaitMs = 30000;
+        const chats = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+            },
+            dataLoopCondition: data => {
+                return isEmpty(data);
+            }
+        });
 
         // Check if the name changed
         if (isEmpty(chats)) {
-            throw new Error("Failed to create new chat! Chat not found after 5 seconds!");
+            throw new Error(`Failed to create new chat! Chat not found after ${maxWaitMs / 1000} seconds!`);
         }
 
         // If we have a message, want to send via the private api, and are not on Big Sur, send the message
@@ -211,45 +209,35 @@ export class ChatInterface {
     }
 
     static async toggleParticipant(chat: Chat, address: string, action: "add" | "remove"): Promise<Chat> {
-        let theChat = chat;
-        const prevCount = chat.participants.length;
-        let newCount = chat.participants.length;
-
+        const prevCount = (chat?.participants ?? []).length;
         checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
-        if (chat.participants.length === 1) {
+        if (prevCount === 1) {
             throw new Error("Chat is not a group chat!");
         }
 
         Server().log(`Toggling Participant [Action: ${action}]: ${address}...`, "debug");
-        await Server().privateApiHelper.toggleParticipant(theChat.guid, address, action);
+        await Server().privateApiHelper.toggleParticipant(chat.guid, address, action);
 
-        let tryCount = 0;
-        while (newCount === prevCount) {
-            tryCount += 1;
-
-            // If we've tried 20 times and there is no change, break out (~10 seconds)
-            if (tryCount >= 20) break;
-
-            // Give it a bit to execute
-            await waitMs(500);
-
-            // Re-fetch the chat with the updated information
-            const chats = await Server().iMessageRepo.getChats({ chatGuid: theChat.guid, withParticipants: true });
-            theChat = chats[0] ?? theChat;
-
-            // Save the new name
-            newCount = theChat.participants.length;
-            if (newCount !== prevCount) break;
-        }
+        const maxWaitMs = 30000;
+        const retChat = await resultAwaiter({
+            maxWaitMs,
+            getData: async (previousData: any | null) => {
+                const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
+                return chats[0] ?? previousData;
+            },
+            dataLoopCondition: data => {
+                return (data?.participants ?? []).length === prevCount;
+            }
+        });
 
         // Check if the name changed
-        if (newCount === prevCount) {
+        if ((retChat?.participants ?? []).length === prevCount) {
             throw new Error(`Failed to ${action} participant to chat! Operation took longer than 5 seconds!`);
         }
 
-        return theChat;
+        return retChat;
     }
 
     static async delete({ chat, guid }: { chat?: Chat; guid?: string } = {}): Promise<void> {
@@ -264,27 +252,35 @@ export class ChatInterface {
         // Tell the private API to delete the chat
         await Server().privateApiHelper.deleteChat(theChat.guid);
 
-        let tryCount = 0;
-        let success = false;
-        while (tryCount < 10) {
-            tryCount += 1;
-
-            // See if the chat exists in the DB
-            const chat = await repo.findOneBy({ guid: theChat.guid });
-
-            // If it doesn't, we're all good and can break out. It's been deleted.
-            // Otherwise, we need to check again after our wait time
-            if (!chat) {
-                success = true;
-                break;
-            }
-
-            // Give it a bit to execute
-            await waitMs(500);
-        }
+        // Wait for the DB changes to propogate
+        const maxWaitMs = 30000;
+        const success = !!(await resultAwaiter({
+            maxWaitMs,
+            getData: async () => {
+                return await repo.findOneBy({ guid: theChat.guid });
+            },
+            // Loop until we don't have data (chat is deleted)
+            dataLoopCondition: data => !!data
+        }));
 
         if (!success) {
             throw new Error(`Failed to delete chat! Chat still exists. (GUID: ${theChat.guid})`);
         }
+    }
+
+    static async markRead(chatGuid: string): Promise<void> {
+        await Server().privateApiHelper.markChatRead(chatGuid);
+        await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
+            chatGuid,
+            read: true
+        });
+    }
+
+    static async markUnread(chatGuid: string): Promise<void> {
+        await Server().privateApiHelper.markChatUnread(chatGuid);
+        await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
+            chatGuid,
+            read: false
+        });
     }
 }

@@ -13,6 +13,7 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 
+export const isMinVentura = macosVersion.isGreaterThanOrEqualTo("13.0");
 export const isMinMonterey = macosVersion.isGreaterThanOrEqualTo("12.0");
 export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
 export const isMinCatalina = macosVersion.isGreaterThanOrEqualTo("10.15");
@@ -409,4 +410,48 @@ export const shortenString = (value: string, maxLen = 25): string => {
 // Safely trims a string
 export const safeTrim = (value: string) => {
     return (value ?? "").trim();
+};
+
+export const resultAwaiter = async ({
+    maxWaitMs = 30000,
+    initialWaitMs = 250,
+    waitMultiplier = 1.5,
+    getData,
+    extraLoopCondition = null,
+    dataLoopCondition = null
+}: {
+    maxWaitMs?: number;
+    initialWaitMs?: number;
+    waitMultiplier?: number;
+    getData: (previousData: any | null) => any;
+    extraLoopCondition?: (data: any | null) => boolean;
+    dataLoopCondition?: (data: any | null) => boolean;
+}): Promise<any | null> => {
+    let waitTime = initialWaitMs;
+    let totalTime = 0;
+
+    // Set a default value for the condition
+    // so we can easily use it in the loop.
+    if (!extraLoopCondition) {
+        extraLoopCondition = _ => true;
+    }
+
+    // Set a default value for the condition
+    // so we can easily use it in the loop.
+    if (!dataLoopCondition) {
+        dataLoopCondition = _ => !data;
+    }
+
+    let data = await getData(null);
+    while (dataLoopCondition(data) && totalTime < maxWaitMs && extraLoopCondition(data)) {
+        // Give it a bit to execute
+        await waitMs(waitTime);
+        totalTime += waitTime;
+
+        // Re-fetch the message with the updated information
+        data = await getData(data);
+        waitTime = waitTime * waitMultiplier;
+    }
+
+    return data;
 };

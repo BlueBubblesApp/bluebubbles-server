@@ -1,4 +1,4 @@
-import { ServerConfig } from "./databases/server";
+import { NSAttributedString } from "node-typedstream";
 
 export type ServerMetadataResponse = {
     os_version: string;
@@ -7,6 +7,7 @@ export type ServerMetadataResponse = {
     helper_connected: boolean;
     proxy_service: string;
     detected_icloud: string;
+    macos_time_sync: number | null;
 };
 
 /**
@@ -22,43 +23,47 @@ export type MessageResponse = {
     tempGuid?: string;
     guid: string;
     text: string;
-    attributedBody?: NodeJS.Dict<any>[];
+    attributedBody?: NSAttributedString[];
+    messageSummaryInfo?: NodeJS.Dict<any>[];
     handle?: HandleResponse | null;
     handleId: number;
     otherHandle: number;
     chats?: ChatResponse[];
     attachments?: AttachmentResponse[];
     subject: string;
-    country: string;
+    country?: string;
     error: number;
     dateCreated: number;
     dateRead: number | null;
     dateDelivered: number | null;
     isFromMe: boolean;
-    isDelayed: boolean;
-    isAutoReply: boolean;
-    isSystemMessage: boolean;
-    isServiceMessage: boolean;
-    isForward: boolean;
+    isDelayed?: boolean;
+    isAutoReply?: boolean;
+    isSystemMessage?: boolean;
+    isServiceMessage?: boolean;
+    isForward?: boolean;
     isArchived: boolean;
-    hasDdResults: boolean;
-    cacheRoomnames: string | null;
-    isAudioMessage: boolean;
-    datePlayed: number | null;
+    hasDdResults?: boolean;
+    cacheRoomnames?: string | null;
+    isAudioMessage?: boolean;
+    datePlayed?: number | null;
     itemType: number;
     groupTitle: string | null;
     groupActionType: number;
-    isExpired: boolean;
+    isExpired?: boolean;
     balloonBundleId: string | null;
     associatedMessageGuid: string | null;
     associatedMessageType: string | null;
     expressiveSendStyleId: string | null;
-    timeExpressiveSendStyleId: number | null;
+    timeExpressiveSendStyleId?: number | null;
     replyToGuid?: string | null;
     isCorrupt?: boolean;
     isSpam?: boolean;
     threadOriginatorGuid?: string | null;
     threadOriginatorPart?: string | null;
+    dateRetracted?: number | null;
+    dateEdited?: number | null;
+    partCount?: number | null;
 };
 
 export type HandleResponse = {
@@ -66,8 +71,8 @@ export type HandleResponse = {
     messages?: MessageResponse[];
     chats?: ChatResponse[];
     address: string;
-    country: string;
-    uncanonicalizedId: string;
+    country?: string;
+    uncanonicalizedId?: string;
 };
 
 export type ChatResponse = {
@@ -79,29 +84,29 @@ export type ChatResponse = {
     style: number;
     chatIdentifier: string;
     isArchived: boolean;
-    isFiltered: boolean;
+    isFiltered?: boolean;
     displayName: string;
-    groupId: string;
+    groupId?: string;
 };
 
 export type AttachmentResponse = {
     originalROWID: number;
     guid: string;
-    messages: string[];
-    data: string; // Base64 string
+    messages?: string[];
+    data?: string; // Base64 string
     blurhash?: string;
     height?: number;
     width?: number;
     uti: string;
     mimeType: string;
-    transferState: number;
+    transferState?: number;
     totalBytes: number;
-    isOutgoing: boolean;
+    isOutgoing?: boolean;
     transferName: string;
-    isSticker: boolean;
-    hideAttachment: boolean;
-    originalGuid: string;
-    metadata: { [key: string]: string | boolean | number };
+    isSticker?: boolean;
+    hideAttachment?: boolean;
+    originalGuid?: string;
+    metadata?: { [key: string]: string | boolean | number };
 };
 
 export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";

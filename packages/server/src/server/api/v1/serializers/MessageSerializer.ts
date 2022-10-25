@@ -1,86 +1,51 @@
 import { Server } from "@server";
-import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { isEmpty, isNotEmpty, sanitizeStr } from "@server/helpers/utils";
-import { ObjCHelperService } from "@server/services";
+import { isEmpty, isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 import { HandleResponse, MessageResponse } from "@server/types";
-import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
-import type { MessageSerializerParams, MessageSerializerSingleParams } from "./types";
+import { AttachmentSerializer } from "./AttachmentSerializer";
+import { ChatSerializer } from "./ChatSerializer";
+import { DEFAULT_ATTACHMENT_CONFIG, DEFAULT_MESSAGE_CONFIG } from "./constants";
+import { HandleSerializer } from "./HandleSerializer";
+import type { MessageSerializerMultiParams, MessageSerializerSingleParams } from "./types";
 
 export class MessageSerializer {
     static async serialize({
         message,
-        attachmentConfig = {
-            convert: true,
-            getData: false,
-            loadMetadata: true
-        },
-        parseAttributedBody = true,
-        loadChatParticipants = true,
-        enforceMaxSize = false,
-        // Max payload size is 4000 bytes
-        // https://firebase.google.com/docs/cloud-messaging/concept-options#notifications_and_data_messages
-        maxSizeBytes = 4000
+        config = DEFAULT_MESSAGE_CONFIG,
+        attachmentConfig = DEFAULT_ATTACHMENT_CONFIG,
+        isForNotification = false
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
         return (
             await MessageSerializer.serializeList({
                 messages: [message],
-                attachmentConfig,
-                parseAttributedBody,
-                loadChatParticipants,
-                enforceMaxSize,
-                maxSizeBytes
+                config: { ...DEFAULT_MESSAGE_CONFIG, ...config },
+                attachmentConfig: { ...DEFAULT_ATTACHMENT_CONFIG, ...attachmentConfig },
+                isForNotification
             })
         )[0];
     }
 
     static async serializeList({
         messages,
-        attachmentConfig = {
-            convert: true,
-            getData: false,
-            loadMetadata: true
-        },
-        parseAttributedBody = true,
-        loadChatParticipants = true,
-        enforceMaxSize = false,
-        maxSizeBytes = 4000
-    }: MessageSerializerParams): Promise<MessageResponse[]> {
-        // Bulk serialize the attributed bodies
-        let attributedMessages: NodeJS.Dict<any> = [];
-        if (parseAttributedBody) {
-            attributedMessages = await ObjCHelperService.bulkDeserializeAttributedBody(messages);
-        }
-
+        config = DEFAULT_MESSAGE_CONFIG,
+        attachmentConfig = DEFAULT_ATTACHMENT_CONFIG,
+        isForNotification = false
+    }: MessageSerializerMultiParams): Promise<MessageResponse[]> {
         // Convert the messages to their serialized versions
         const messageResponses: MessageResponse[] = [];
         for (const message of messages) {
             messageResponses.push(
                 await MessageSerializer.convert({
                     message: message,
-                    attachmentConfig,
-                    parseAttributedBody,
-                    loadChatParticipants
+                    config: { ...DEFAULT_MESSAGE_CONFIG, ...config },
+                    attachmentConfig: { ...DEFAULT_ATTACHMENT_CONFIG, ...attachmentConfig },
+                    isForNotification
                 })
             );
         }
 
-        // Link the decoded attributed bodies to the original messages
-        if (parseAttributedBody) {
-            for (const item of attributedMessages?.data ?? []) {
-                if (isEmpty(item?.id) || isEmpty(item?.body)) continue;
-                const matchIndex = messageResponses.findIndex(m => m.guid === item.id);
-                if (matchIndex === -1) continue;
-
-                // Make sure the response is a list so we can support multiple attribute bodies later
-                messageResponses[matchIndex].attributedBody = !Array.isArray(item.body) ? [item.body] : item.body;
-            }
-        }
-
         // Handle fetching the chat participants with the messages (if requested)
         const chatCache: { [key: string]: HandleResponse[] } = {};
-        if (loadChatParticipants) {
+        if (config.loadChatParticipants) {
             for (let i = 0; i < messages.length; i++) {
                 // If there aren't any chats for this message, skip it
                 if (isEmpty(messages[i]?.chats ?? [])) continue;
@@ -100,9 +65,10 @@ export class MessageSerializer {
                             withParticipants: true
                         });
                         if (isNotEmpty(chats)) {
-                            chatCache[messages[i]?.chats[k].guid] = await Promise.all(
-                                (chats[0].participants ?? []).map(async p => await getHandleResponse(p))
-                            );
+                            chatCache[messages[i]?.chats[k].guid] = await HandleSerializer.serializeList({
+                                handles: chats[0].participants ?? [],
+                                config: { includeChats: false, includeMessages: false }
+                            });
                             messageResponses[i].chats[k].participants = chatCache[messages[i]?.chats[k].guid];
                         }
                     } else {
@@ -112,12 +78,27 @@ export class MessageSerializer {
             }
         }
 
-        if (enforceMaxSize) {
+        // The parse options are enforced _after_ the convert function is called.
+        // This is so that we can properly extract the text from the attributed body
+        // for those on macOS Ventura. Otherwise, set it to null to not clutter the payload.
+        if (!config.parseAttributedBody || !config.parseMessageSummary) {
+            for (let i = 0; i < messageResponses.length; i++) {
+                if (!config.parseAttributedBody && "attributedBody" in messageResponses[i]) {
+                    messageResponses[i].attributedBody = null;
+                }
+
+                if (!config.parseMessageSummary && "messageSummaryInfo" in messageResponses[i]) {
+                    messageResponses[i].messageSummaryInfo = null;
+                }
+            }
+        }
+
+        if (config.enforceMaxSize) {
             const strData = JSON.stringify(messageResponses);
             const len = Buffer.byteLength(strData, "utf8");
 
             // If we've reached out max size, we need to clear the participants
-            if (len > maxSizeBytes) {
+            if (len > config.maxSizeBytes) {
                 for (let i = 0; i < messageResponses.length; i++) {
                     for (let c = 0; c < (messageResponses[i]?.chats ?? []).length; c++) {
                         if (isEmpty(messageResponses[i].chats[c].participants)) continue;
@@ -127,74 +108,99 @@ export class MessageSerializer {
             }
         }
 
-        // For Ventura, we need to check for the text message within the attributed body, so we can use it as the text.
-        // It will be null/empty on Ventura.
-        for (let i = 0; i < messageResponses.length; i++) {
-            const msgText = sanitizeStr(messageResponses[i].text ?? '');
-            const bodyText = AttributedBodyUtils.extractText(messageResponses[i].attributedBody);
-            if (isEmpty(msgText) && isNotEmpty(bodyText)) {
-                messageResponses[i].text = sanitizeStr(bodyText);
-            }
-        }
-
         return messageResponses;
     }
 
     private static async convert({
         message,
-        attachmentConfig = {
-            convert: true,
-            getData: false,
-            loadMetadata: true
-        }
+        config = DEFAULT_MESSAGE_CONFIG,
+        attachmentConfig = DEFAULT_ATTACHMENT_CONFIG,
+        isForNotification = false
     }: MessageSerializerSingleParams): Promise<MessageResponse> {
-        return {
+        let output: MessageResponse = {
             originalROWID: message.ROWID,
             guid: message.guid,
-            text: message.text,
-            attributedBody: null,
-            handle: message.handle ? await getHandleResponse(message.handle) : null,
+            text: message.universalText(true),
+            attributedBody: message.attributedBody,
+            handle: message.handle
+                ? await HandleSerializer.serialize({
+                      handle: message.handle,
+                      config: { includeChats: false, includeMessages: false }
+                  })
+                : null,
             handleId: message.handleId,
             otherHandle: message.otherHandle,
-            chats: await Promise.all((message.chats ?? []).map(chat => getChatResponse(chat))),
-            attachments: await Promise.all((message.attachments ?? []).map(a => getAttachmentResponse(a, {
-                convert: attachmentConfig.convert,
-                getData: attachmentConfig.getData,
-                loadMetadata: attachmentConfig.loadMetadata
-            }))),
+            attachments: await AttachmentSerializer.serializeList({
+                attachments: message.attachments ?? [],
+                config: attachmentConfig,
+                isForNotification
+            }),
             subject: message.subject,
-            country: message.country,
             error: message.error,
             dateCreated: message.dateCreated ? message.dateCreated.getTime() : null,
             dateRead: message.dateRead ? message.dateRead.getTime() : null,
             dateDelivered: message.dateDelivered ? message.dateDelivered.getTime() : null,
             isFromMe: message.isFromMe,
-            isDelayed: message.isDelayed,
-            isAutoReply: message.isAutoReply,
-            isSystemMessage: message.isSystemMessage,
-            isServiceMessage: message.isServiceMessage,
-            isForward: message.isForward,
             isArchived: message.isArchived,
-            cacheRoomnames: message.cacheRoomnames,
-            isAudioMessage: message.isAudioMessage,
-            hasDdResults: message.hasDdResults,
-            datePlayed: message.datePlayed ? message.datePlayed.getTime() : null,
             itemType: message.itemType,
             groupTitle: message.groupTitle,
             groupActionType: message.groupActionType,
-            isExpired: message.isExpirable,
             balloonBundleId: message.balloonBundleId,
             associatedMessageGuid: message.associatedMessageGuid,
             associatedMessageType: message.associatedMessageType,
             expressiveSendStyleId: message.expressiveSendStyleId,
-            timeExpressiveSendStyleId: message.timeExpressiveSendStyleId
-                ? message.timeExpressiveSendStyleId.getTime()
-                : null,
-            replyToGuid: message.replyToGuid,
-            isCorrupt: message.isCorrupt,
-            isSpam: message.isSpam,
-            threadOriginatorGuid: message.threadOriginatorGuid,
-            threadOriginatorPart: message.threadOriginatorPart
+            threadOriginatorGuid: message.threadOriginatorGuid
         };
+
+        if (!isForNotification) {
+            output = {
+                ...output,
+                ...{
+                    country: message.country,
+                    isDelayed: message.isDelayed,
+                    isAutoReply: message.isAutoReply,
+                    isSystemMessage: message.isSystemMessage,
+                    isServiceMessage: message.isServiceMessage,
+                    isForward: message.isForward,
+                    threadOriginatorPart: message.threadOriginatorPart,
+                    isCorrupt: message.isCorrupt,
+                    datePlayed: message.datePlayed ? message.datePlayed.getTime() : null,
+                    cacheRoomnames: message.cacheRoomnames,
+                    isSpam: message.isSpam,
+                    isExpired: message.isExpirable,
+                    hasDdResults: message.hasDdResults,
+                    timeExpressiveSendStyleId: message.timeExpressiveSendStyleId
+                        ? message.timeExpressiveSendStyleId.getTime()
+                        : null,
+                    isAudioMessage: message.isAudioMessage,
+                    replyToGuid: message.replyToGuid
+                }
+            };
+        }
+
+        if (config.includeChats) {
+            output.chats = await ChatSerializer.serializeList({
+                chats: message?.chats ?? [],
+                config: { includeParticipants: false, includeMessages: false },
+                isForNotification
+            });
+        }
+
+        if (isMinHighSierra) {
+            output.messageSummaryInfo = message.messageSummaryInfo;
+        }
+
+        if (isMinVentura) {
+            output = {
+                ...output,
+                ...{
+                    dateEdited: message.dateEdited ? message.dateEdited.getTime() : null,
+                    dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : null,
+                    partCount: message.partCount
+                }
+            };
+        }
+
+        return output;
     }
 }

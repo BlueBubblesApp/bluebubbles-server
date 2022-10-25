@@ -1,21 +1,39 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinTable, JoinColumn, ManyToMany } from "typeorm";
 import { conditional } from "conditional-decorator";
 
-import { Server } from "@server";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
-import { DateTransformer } from "@server/databases/transformers/DateTransformer";
+import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
 import { MessageTypeTransformer } from "@server/databases/transformers/MessageTypeTransformer";
-import { MessageResponse } from "@server/types";
-import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
-import { Chat, getChatResponse } from "@server/databases/imessage/entity/Chat";
-import { Attachment, getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
-import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinSierra, sanitizeStr } from "@server/helpers/utils";
-import { invisibleMediaChar } from "@server/services/httpService/constants";
+import { Handle } from "@server/databases/imessage/entity/Handle";
+import { Chat } from "@server/databases/imessage/entity/Chat";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import {
+    isEmpty,
+    isMinBigSur,
+    isMinCatalina,
+    isMinHighSierra,
+    isMinSierra,
+    isMinVentura,
+    sanitizeStr
+} from "@server/helpers/utils";
+import { NSAttributedString } from "node-typedstream";
+import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
+import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 
 @Entity("message")
 export class Message {
+    universalText(sanitize = false): string | null {
+        let text = this.text;
+        const attributedText = AttributedBodyUtils.extractText(this.attributedBody);
+        if (isEmpty(text) && !isEmpty(attributedText)) {
+            text = attributedText;
+        }
+
+        return sanitize ? sanitizeStr(text) : text;
+    }
+
     contentString(maxText = 15): string {
-        let text = sanitizeStr((this.text ?? "").replace(invisibleMediaChar, ""));
+        let text = this.universalText(true) ?? "";
         const textLen = text.length;
         const attachments = this.attachments ?? [];
         const attachmentsLen = attachments.length;
@@ -104,9 +122,10 @@ export class Message {
 
     @Column({
         type: "blob",
-        nullable: true
+        nullable: true,
+        transformer: AttributedBodyTransformer
     })
-    attributedBody: Blob;
+    attributedBody: NSAttributedString[] | null;
 
     @Column({ type: "integer", nullable: true, default: 0 })
     version: number;
@@ -134,7 +153,7 @@ export class Message {
         name: "date",
         type: "date",
         nullable: true,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     dateCreated: Date;
 
@@ -142,7 +161,7 @@ export class Message {
         name: "date_read",
         type: "date",
         nullable: true,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     dateRead: Date;
 
@@ -150,7 +169,7 @@ export class Message {
         name: "date_delivered",
         type: "date",
         nullable: true,
-        transformer: DateTransformer
+        transformer: AppleDateTransformer
     })
     dateDelivered: Date;
 
@@ -328,7 +347,7 @@ export class Message {
     @Column({
         name: "date_played",
         type: "integer",
-        transformer: DateTransformer,
+        transformer: AppleDateTransformer,
         default: 0
     })
     datePlayed: Date;
@@ -446,14 +465,22 @@ export class Message {
         Column({
             name: "time_expressive_send_played",
             type: "integer",
-            transformer: DateTransformer,
+            transformer: AppleDateTransformer,
             default: 0
         })
     )
     timeExpressiveSendStyleId: Date;
 
-    @conditional(isMinHighSierra, Column({ name: "message_summary_info", type: "blob", nullable: true }))
-    messageSummaryInfo: Blob;
+    @conditional(
+        isMinHighSierra,
+        Column({
+            name: "message_summary_info",
+            type: "blob",
+            nullable: true,
+            transformer: AttributedBodyTransformer
+        })
+    )
+    messageSummaryInfo: NodeJS.Dict<any>[] | null;
 
     @conditional(
         isMinCatalina,
@@ -506,4 +533,36 @@ export class Message {
         })
     )
     threadOriginatorPart: string;
+
+    @conditional(
+        isMinVentura,
+        Column({
+            name: "date_retracted",
+            type: "date",
+            transformer: AppleDateTransformer,
+            default: 0
+        })
+    )
+    dateRetracted: Date;
+
+    @conditional(
+        isMinVentura,
+        Column({
+            name: "date_edited",
+            type: "date",
+            transformer: AppleDateTransformer,
+            default: 0
+        })
+    )
+    dateEdited: Date;
+
+    @conditional(
+        isMinVentura,
+        Column({
+            name: "part_count",
+            type: "integer",
+            default: null
+        })
+    )
+    partCount: number;
 }

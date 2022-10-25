@@ -4,9 +4,10 @@ import { EventEmitter } from "events";
 import { DataSource } from "typeorm";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress } from "./entity";
+import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
+import { ScheduledMessageTable1665083072000 } from "./migrations/1665083072000-ScheduledMessageTable";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
@@ -42,10 +43,10 @@ export class ServerRepository extends EventEmitter {
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
-            entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress],
-            migrations: [ContactTables1654432080899],
+            entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage],
+            migrations: [ContactTables1654432080899, ScheduledMessageTable1665083072000],
             migrationsRun: !shouldSync,
-            migrationsTableName: 'migrations',
+            migrationsTableName: "migrations",
             synchronize: shouldSync
         });
 
@@ -104,6 +105,13 @@ export class ServerRepository extends EventEmitter {
      */
     contactAddresses() {
         return this.db.getRepository(ContactAddress);
+    }
+
+    /**
+     * Get the scheduled messages repo
+     */
+    scheduledMessages() {
+        return this.db.getRepository(ScheduledMessage);
     }
 
     private async loadConfig() {

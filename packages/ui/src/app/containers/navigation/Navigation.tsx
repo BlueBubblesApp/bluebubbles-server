@@ -35,7 +35,7 @@ import {
 import { FiHome, FiSettings, FiMenu, FiBell, FiMonitor, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
 import { FaDiscord } from 'react-icons/fa';
 import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart } from 'react-icons/ai';
-import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle } from 'react-icons/bs';
+import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill } from 'react-icons/bs';
 import { BiNotification } from 'react-icons/bi';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
 import { IconType } from 'react-icons';
@@ -56,6 +56,7 @@ import './styles.css';
 
 import { useAppSelector, useAppDispatch } from '../../hooks';
 import { readAll, clear as clearAlerts, NotificationItem } from '../../slices/NotificationsSlice';
+import { ScheduledMessagesLayout } from 'app/layouts/scheduledMessages/ScheduledMessagesLayout';
 
 
 interface LinkItemProps {
@@ -69,6 +70,7 @@ const LinkItems: Array<LinkItemProps> = [
     { name: 'Contacts', icon: BsPersonCircle, to: '/contacts' },
     { name: 'Debug & Logs', icon: AiOutlineBug, to: '/logs' },
     { name: 'Google FCM', icon: BiNotification, to: '/fcm' },
+    { name: 'Scheduled Messages', icon: BsFillCalendarCheckFill, to: '/scheduled-messages' },
     { name: 'API & Webhooks', icon: AiOutlineApi, to: '/webhooks' },
     { name: 'Guides & Links', icon: BsBook, to: '/guides' },
     { name: 'Settings', icon: FiSettings, to: '/settings' }
@@ -117,6 +119,7 @@ export const Navigation = (): JSX.Element => {
                         <Route path="/contacts" element={<ContactsLayout />} />
                         <Route path="/fcm" element={<FcmLayout />} />
                         <Route path="/devices" element={<DevicesLayout />} />
+                        <Route path="/scheduled-messages" element={<ScheduledMessagesLayout />} />
                         <Route path="/webhooks" element={<ApiLayout />} />
                         <Route path="/guides" element={<GuidesLayout />} />
                         <Route path="/" element={<HomeLayout />} />
@@ -168,6 +171,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
         <Box
             borderRight="1px"
             borderRightColor={useColorModeValue('gray.200', 'gray.700')}
+            minW='16em'
             w={{ base: 'full', md: 60 }}
             pos="fixed"
             h="full"
@@ -234,7 +238,7 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
 
     return (
         <Flex
-            ml={{ base: 0, md: 60 }}
+            ml={{ base: 0, md: 255 }}
             px={{ base: 4, md: 4 }}
             height="20"
             alignItems="center"

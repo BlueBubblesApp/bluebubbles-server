@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import { autoUpdater, UpdateCheckResult } from "electron-updater";
 import * as semver from "semver";
 import { Server } from "@server";
+import { SERVER_UPDATE } from "@server/events";
 
 export class UpdateService {
     window: BrowserWindow;
@@ -67,7 +68,7 @@ export class UpdateService {
         this.updateInfo = res;
 
         if (this.hasUpdate) {
-            Server().emitMessage("server-update", res.updateInfo.version);
+            Server().emitMessage(SERVER_UPDATE, res.updateInfo.version);
             Server().emitToUI("update-available", res.updateInfo.version);
 
             if (showUpdateDialog) {

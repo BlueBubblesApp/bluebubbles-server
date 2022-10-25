@@ -40,6 +40,10 @@ export const webhookEventOptions = [
         value: 'typing-indicator'
     },
     {
+        label: 'Scheduled Message Errors',
+        value: 'scheduled-message-error'
+    },
+    {
         label: 'Server Update',
         value: 'server-update'
     },
@@ -52,3 +56,52 @@ export const webhookEventOptions = [
         value: 'hello-world'
     }
 ];
+
+export const scheduledMessageTypeOptions = [
+    {
+        label: 'Send Message',
+        value: 'send-message'
+    }
+];
+
+export const scheduleTypeOptions = [
+    {
+        label: 'One-Time',
+        value: 'once'
+    },
+    {
+        label: 'Recurring',
+        value: 'recurring'
+    }
+];
+
+export const intervalTypeOpts = [
+    {
+        label: 'Hour(s)',
+        value: 'hourly'
+    },
+    {
+        label: 'Day(s)',
+        value: 'daily'
+    },
+    {
+        label: 'Week(s)',
+        value: 'weekly'
+    },
+    {
+        label: 'Month(s)',
+        value: 'monthly'
+    },
+    {
+        label: 'Year(s)',
+        value: 'yearly'
+    }
+];
+
+export const intervalTypeToLabel: Record<string, string> = {
+    'hourly': 'Hour(s)',
+    'daily': 'Day(s)',
+    'weekly': 'Week(s)',
+    'monthly': 'Month(s)',
+    'yearly': 'Year(s)'
+};
