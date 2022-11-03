@@ -4,6 +4,7 @@ import {
     checkPrivateApiStatus,
     isEmpty,
     isMinBigSur,
+    isMinVentura,
     isNotEmpty,
     resultAwaiter,
     slugifyAddress
@@ -51,7 +52,15 @@ export class ChatInterface {
 
         const results = [];
         for (const chat of chats ?? []) {
-            const chatRes = await ChatSerializer.serialize({ chat });
+            const chatRes = await ChatSerializer.serialize({
+                chat,
+                config: { includeMessages: withLastMessage },
+                messageConfig: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true
+                }
+            });
 
             // Insert the cached participants from the original request
             if (Object.keys(chatCache).includes(chat.guid)) {
@@ -277,7 +286,10 @@ export class ChatInterface {
     }
 
     static async markUnread(chatGuid: string): Promise<void> {
-        await Server().privateApiHelper.markChatUnread(chatGuid);
+        if (isMinVentura) {
+            await Server().privateApiHelper.markChatUnread(chatGuid);
+        }
+
         await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
             chatGuid,
             read: false

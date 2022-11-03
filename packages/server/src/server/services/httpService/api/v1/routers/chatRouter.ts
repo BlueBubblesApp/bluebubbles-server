@@ -79,6 +79,7 @@ export class ChatRouter {
             "messages.messageSummaryInfo",
             "messages.message-summary-info"
         ]);
+        const withPayloadData = arrayHasOne(withQuery, ["message.payloadData", "message.payload-data"]);
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
         const chats = await Server().iMessageRepo.getChats({
@@ -107,7 +108,8 @@ export class ChatRouter {
             config: {
                 loadChatParticipants: false,
                 parseAttributedBody: withAttributedBody,
-                parseMessageSummary: withMessageSummaryInfo
+                parseMessageSummary: withMessageSummaryInfo,
+                parsePayloadData: withPayloadData
             }
         });
 
