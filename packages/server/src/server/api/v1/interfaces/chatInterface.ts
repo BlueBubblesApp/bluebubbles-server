@@ -4,6 +4,7 @@ import {
     checkPrivateApiStatus,
     isEmpty,
     isMinBigSur,
+    isMinVentura,
     isNotEmpty,
     resultAwaiter,
     slugifyAddress
@@ -285,7 +286,10 @@ export class ChatInterface {
     }
 
     static async markUnread(chatGuid: string): Promise<void> {
-        await Server().privateApiHelper.markChatUnread(chatGuid);
+        if (isMinVentura) {
+            await Server().privateApiHelper.markChatUnread(chatGuid);
+        }
+
         await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
             chatGuid,
             read: false
