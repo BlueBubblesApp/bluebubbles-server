@@ -23,6 +23,7 @@ export interface HandleSerializerParams {
 export interface MessageSerializerParams {
     parseAttributedBody?: boolean;
     parseMessageSummary?: boolean;
+    parsePayloadData?: boolean;
     includeChats?: boolean;
     loadChatParticipants?: boolean;
     enforceMaxSize?: boolean;

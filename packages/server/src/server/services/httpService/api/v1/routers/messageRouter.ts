@@ -50,6 +50,7 @@ export class MessageRouter {
         const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
         const withAttributedBody = arrayHasOne(withQuery, ["attributedBody", "attributed-body"]);
         const withMessageSummaryInfo = arrayHasOne(withQuery, ["messageSummaryInfo", "message-summary-info"]);
+        const withPayloadData = arrayHasOne(withQuery, ["payloadData", "payload-data"]);
 
         // Fetch the info for the message by GUID
         const message = await Server().iMessageRepo.getMessage(guid, withChats, withAttachments);
@@ -75,7 +76,8 @@ export class MessageRouter {
                 message,
                 config: {
                     parseAttributedBody: withAttributedBody,
-                    parseMessageSummary: withMessageSummaryInfo
+                    parseMessageSummary: withMessageSummaryInfo,
+                    parsePayloadData: withPayloadData
                 }
             })
         }).send();
@@ -103,6 +105,7 @@ export class MessageRouter {
         const withChatParticipants = arrayHasOne(withQuery, ["chat.participants", "chats.participants"]);
         const withAttributedBody = arrayHasOne(withQuery, ["attributedbody", "attributed-body"]);
         const withMessageSummaryInfo = arrayHasOne(withQuery, ["messageSummaryInfo", "message-summary-info"]);
+        const withPayloadData = arrayHasOne(withQuery, ["payloadData", "payload-data"]);
 
         // We don't need to worry about it not being a number because
         // the validator checks for that. It also checks for min values.
@@ -141,6 +144,7 @@ export class MessageRouter {
             config: {
                 parseAttributedBody: withAttributedBody,
                 parseMessageSummary: withMessageSummaryInfo,
+                parsePayloadData: withPayloadData,
                 loadChatParticipants: withChatParticipants
             }
         });
@@ -181,7 +185,8 @@ export class MessageRouter {
                 config: {
                     loadChatParticipants: false,
                     parseAttributedBody: true,
-                    parseMessageSummary: true
+                    parseMessageSummary: true,
+                    parsePayloadData: true
                 }
             });
 
@@ -262,7 +267,8 @@ export class MessageRouter {
                 config: {
                     loadChatParticipants: false,
                     parseAttributedBody: true,
-                    parseMessageSummary: true
+                    parseMessageSummary: true,
+                    parsePayloadData: true
                 }
             });
             return new Success(ctx, { message: "Attachment sent!", data }).send();
@@ -320,7 +326,8 @@ export class MessageRouter {
                     config: {
                         loadChatParticipants: false,
                         parseAttributedBody: true,
-                        parseMessageSummary: true
+                        parseMessageSummary: true,
+                        parsePayloadData: true
                     }
                 })
             }).send();
@@ -379,7 +386,8 @@ export class MessageRouter {
                     config: {
                         loadChatParticipants: false,
                         parseAttributedBody: true,
-                        parseMessageSummary: true
+                        parseMessageSummary: true,
+                        parsePayloadData: true
                     }
                 })
             }).send();
@@ -445,7 +453,8 @@ export class MessageRouter {
                     config: {
                         loadChatParticipants: false,
                         parseAttributedBody: true,
-                        parseMessageSummary: true
+                        parseMessageSummary: true,
+                        parsePayloadData: true
                     }
                 })
             }).send();

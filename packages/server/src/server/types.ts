@@ -64,6 +64,8 @@ export type MessageResponse = {
     dateRetracted?: number | null;
     dateEdited?: number | null;
     partCount?: number | null;
+    payloadData?: NodeJS.Dict<any>[];
+    hasPayloadData?: boolean;
 };
 
 export type HandleResponse = {

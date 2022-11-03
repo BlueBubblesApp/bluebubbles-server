@@ -434,8 +434,16 @@ export class Message {
     @conditional(isMinHighSierra, Column({ name: "balloon_bundle_id", type: "text", nullable: true }))
     balloonBundleId: string;
 
-    @conditional(isMinHighSierra, Column({ name: "payload_data", type: "blob", nullable: true }))
-    payloadData: Blob;
+    @conditional(
+        isMinHighSierra,
+        Column({
+            name: "payload_data",
+            type: "blob",
+            nullable: true,
+            transformer: AttributedBodyTransformer
+        })
+    )
+    payloadData: NodeJS.Dict<any>[] | null;
 
     @conditional(isMinHighSierra, Column({ name: "expressive_send_style_id", type: "text", nullable: true }))
     expressiveSendStyleId: string;

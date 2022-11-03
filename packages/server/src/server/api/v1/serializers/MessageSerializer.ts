@@ -81,7 +81,7 @@ export class MessageSerializer {
         // The parse options are enforced _after_ the convert function is called.
         // This is so that we can properly extract the text from the attributed body
         // for those on macOS Ventura. Otherwise, set it to null to not clutter the payload.
-        if (!config.parseAttributedBody || !config.parseMessageSummary) {
+        if (!config.parseAttributedBody || !config.parseMessageSummary || !config.parsePayloadData) {
             for (let i = 0; i < messageResponses.length; i++) {
                 if (!config.parseAttributedBody && "attributedBody" in messageResponses[i]) {
                     messageResponses[i].attributedBody = null;
@@ -89,6 +89,10 @@ export class MessageSerializer {
 
                 if (!config.parseMessageSummary && "messageSummaryInfo" in messageResponses[i]) {
                     messageResponses[i].messageSummaryInfo = null;
+                }
+
+                if (!config.parsePayloadData && "payloadData" in messageResponses[i]) {
+                    messageResponses[i].payloadData = null;
                 }
             }
         }
@@ -141,6 +145,7 @@ export class MessageSerializer {
             dateRead: message.dateRead ? message.dateRead.getTime() : null,
             dateDelivered: message.dateDelivered ? message.dateDelivered.getTime() : null,
             isFromMe: message.isFromMe,
+            hasDdResults: message.hasDdResults,
             isArchived: message.isArchived,
             itemType: message.itemType,
             groupTitle: message.groupTitle,
@@ -149,7 +154,8 @@ export class MessageSerializer {
             associatedMessageGuid: message.associatedMessageGuid,
             associatedMessageType: message.associatedMessageType,
             expressiveSendStyleId: message.expressiveSendStyleId,
-            threadOriginatorGuid: message.threadOriginatorGuid
+            threadOriginatorGuid: message.threadOriginatorGuid,
+            hasPayloadData: !!message.payloadData
         };
 
         if (!isForNotification) {
@@ -168,7 +174,6 @@ export class MessageSerializer {
                     cacheRoomnames: message.cacheRoomnames,
                     isSpam: message.isSpam,
                     isExpired: message.isExpirable,
-                    hasDdResults: message.hasDdResults,
                     timeExpressiveSendStyleId: message.timeExpressiveSendStyleId
                         ? message.timeExpressiveSendStyleId.getTime()
                         : null,
@@ -188,6 +193,7 @@ export class MessageSerializer {
 
         if (isMinHighSierra) {
             output.messageSummaryInfo = message.messageSummaryInfo;
+            output.payloadData = message.payloadData;
         }
 
         if (isMinVentura) {

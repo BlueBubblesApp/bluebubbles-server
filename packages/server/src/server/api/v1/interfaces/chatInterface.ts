@@ -51,7 +51,15 @@ export class ChatInterface {
 
         const results = [];
         for (const chat of chats ?? []) {
-            const chatRes = await ChatSerializer.serialize({ chat });
+            const chatRes = await ChatSerializer.serialize({
+                chat,
+                config: { includeMessages: withLastMessage },
+                messageConfig: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true
+                }
+            });
 
             // Insert the cached participants from the original request
             if (Object.keys(chatCache).includes(chat.guid)) {

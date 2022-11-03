@@ -8,6 +8,7 @@ export const DEFAULT_ATTACHMENT_CONFIG = {
 export const DEFAULT_MESSAGE_CONFIG = {
     parseAttributedBody: false,
     parseMessageSummary: false,
+    parsePayloadData: false,
     loadChatParticipants: true,
     includeChats: true,
     enforceMaxSize: false,
