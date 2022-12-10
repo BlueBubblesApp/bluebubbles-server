@@ -1,10 +1,9 @@
 import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { EventCache } from "@server/eventCache";
-import { ChangeListener } from "./changeListener";
-import { getCacheName } from "../helpers/utils";
+import { MessageChangeListener } from "./messageChangeListener";
 
-export class IncomingMessageListener extends ChangeListener {
+export class IncomingMessageListener extends MessageChangeListener {
     repo: MessageRepository;
 
     constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
@@ -33,15 +32,12 @@ export class IncomingMessageListener extends ChangeListener {
         });
 
         // Emit the new message
-        entries.forEach(async (entry: any) => {
-            const cacheName = getCacheName(entry);
+        entries.forEach(async (entry: Message) => {
+            const event = this.processMessageEvent(entry);
+            if (!event) return;
 
-            // Skip over any that we've finished
-            if (this.cache.find(cacheName)) return;
-
-            // Add to cache
-            this.cache.add(cacheName);
-            super.emit("new-entry", this.transformEntry(entry));
+            // Emit the event
+            super.emit(event, this.transformEntry(entry));
         });
     }
 

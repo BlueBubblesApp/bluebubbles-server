@@ -23,7 +23,7 @@ import {
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
+import { MessageChangeListener } from "@server/databases/imessage/listeners/messageChangeListener";
 
 // Service Imports
 import {
@@ -137,7 +137,7 @@ class BlueBubblesServer extends EventEmitter {
 
     actionHandler: ActionHandler;
 
-    chatListeners: ChangeListener[];
+    chatListeners: MessageChangeListener[];
 
     eventCache: EventCache;
 
