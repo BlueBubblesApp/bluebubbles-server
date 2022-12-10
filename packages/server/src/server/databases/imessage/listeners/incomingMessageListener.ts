@@ -28,7 +28,6 @@ export class IncomingMessageListener extends ChangeListener {
 
         const entries = await this.repo.getMessages({
             after: offsetDate,
-            before,
             withChats: true,
             where: query
         });
