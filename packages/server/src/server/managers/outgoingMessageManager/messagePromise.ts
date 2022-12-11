@@ -71,8 +71,6 @@ export class MessagePromise {
 
         // Create a timeout for how long until we "error-out".
         // Timeouts should change based on if it's an attachment or message
-        // 3 minute timeout for attachments
-        // 30 second timeout for messages
         setTimeout(
             () => {
                 if (this.isResolved) return;
@@ -80,9 +78,9 @@ export class MessagePromise {
                 // This will trigger our hook handlers, created in the constructor
                 this.reject("Message send timeout");
             },
-            // 5 minute timeout for videos (since the max video size is larger not)
-            // 30 second timeout for messages
-            this.isAttachment ? 60000 * 5 : 60000
+            // 5 minute timeout for attachments
+            // 2 minute timeout for messages
+            this.isAttachment ? 60000 * 5 : 60000 * 2
         );
     }
 

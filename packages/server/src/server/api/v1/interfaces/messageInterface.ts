@@ -1,4 +1,5 @@
 import { Server } from "@server";
+import * as fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
@@ -144,7 +145,12 @@ export class MessageInterface {
 
         // Send the message
         await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
-        return await awaiter.promise;
+        const ret = await awaiter.promise;
+
+        // Delete the attachment
+        fs.unlink(newPath, _ => null);
+
+        return ret;
     }
 
     static async sendMessagePrivateApi({
