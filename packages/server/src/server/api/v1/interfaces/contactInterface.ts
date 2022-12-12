@@ -93,10 +93,12 @@ export class ContactInterface {
                 extraProps.includes("contactImageThumbnail");
             const avatar = useAvatar ? e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail : null;
 
-            let displayName = null;
-            if (isNotEmpty(e?.firstName) && isEmpty(e?.lastName)) displayName = e.firstName;
-            if (isNotEmpty(e?.firstName) && isNotEmpty(e?.lastName)) displayName = `${e.firstName} ${e.lastName}`;
-            if (isEmpty(displayName) && isNotEmpty(e?.nickname)) displayName = e.nickname;
+            let displayName = e?.displayName;
+            if (isEmpty(displayName)) {
+                if (isNotEmpty(e?.firstName) && isEmpty(e?.lastName)) displayName = e.firstName;
+                if (isNotEmpty(e?.firstName) && isNotEmpty(e?.lastName)) displayName = `${e.firstName} ${e.lastName}`;
+                if (isEmpty(displayName) && isNotEmpty(e?.nickname)) displayName = e.nickname;
+            }
 
             return {
                 phoneNumbers: ContactInterface.extractPhoneNumbers(e),
