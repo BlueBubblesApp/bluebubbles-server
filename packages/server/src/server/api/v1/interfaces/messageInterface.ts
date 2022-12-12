@@ -1,4 +1,5 @@
 import { Server } from "@server";
+import * as fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
@@ -144,7 +145,12 @@ export class MessageInterface {
 
         // Send the message
         await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
-        return await awaiter.promise;
+        const ret = await awaiter.promise;
+
+        // Delete the attachment
+        fs.unlink(newPath, _ => null);
+
+        return ret;
     }
 
     static async sendMessagePrivateApi({
@@ -273,16 +279,42 @@ export class MessageInterface {
         // Default the message to the other message surrounded by greek quotes
         let msg = `“${text}”`;
 
-        // If it's a media-only message and we have at least 1 attachment,
-        // set the message according to the first attachment's MIME type
-        if (isOnlyMedia && isNotEmpty(message.attachments)) {
-            if (message.attachments[0].mimeType.startsWith("image")) {
+        let matchingGuid: string = null;
+        for (const i of message?.attributedBody ?? []) {
+            for (const run of i?.runs ?? []) {
+                if (run?.attributes?.__kIMMessagePartAttributeName === partIndex) {
+                    matchingGuid = run?.attributes?.__kIMFileTransferGUIDAttributeName;
+                    if (matchingGuid) break;
+                }
+            }
+
+            if (matchingGuid) break;
+        }
+
+        // If we have a matching guid, we know it's an attachment. Pull it out
+        let attachment = (message?.attachments ?? []).find(a => a.guid === matchingGuid);
+
+        // If we don't have a match, but we know it's media only, select the first attachment
+        if (!attachment && isOnlyMedia && isNotEmpty(message.attachments)) {
+            attachment = message?.attachments[0];
+        }
+
+        // If we have an attachment, build the message based on the mime type
+        if (attachment) {
+            const mime = attachment.mimeType ?? "";
+            const uti = attachment.uti ?? "";
+            if (mime.startsWith("image")) {
                 msg = `an image`;
-            } else if (message.attachments[0].mimeType.startsWith("video")) {
+            } else if (mime.startsWith("video")) {
                 msg = `a movie`;
+            } else if (mime.startsWith("audio") || uti.includes("coreaudio-format")) {
+                msg = `an audio message`;
             } else {
                 msg = `an attachment`;
             }
+        } else {
+            // If there is no attachment, use the message text
+            msg = msg.replace(invisibleMediaChar, "");
         }
 
         // Build the final message to match on

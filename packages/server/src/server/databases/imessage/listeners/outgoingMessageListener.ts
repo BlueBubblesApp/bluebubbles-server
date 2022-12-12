@@ -1,12 +1,11 @@
 import { Server } from "@server";
 import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
-import { getCacheName } from "@server/databases/imessage/helpers/utils";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { isNotEmpty, waitMs } from "@server/helpers/utils";
-import { ChangeListener } from "./changeListener";
+import { isNotEmpty } from "@server/helpers/utils";
+import { MessageChangeListener } from "./messageChangeListener";
 
-export class OutgoingMessageListener extends ChangeListener {
+export class OutgoingMessageListener extends MessageChangeListener {
     repo: MessageRepository;
 
     notSent: number[];
@@ -100,35 +99,26 @@ export class OutgoingMessageListener extends ChangeListener {
 
         // 6: Emit all the messages that were successfully sent
         for (const entry of [...newSent, ...lookbackSent]) {
-            const cacheName = getCacheName(entry);
-
-            // Skip over any that we've finished
-            if (this.cache.find(cacheName)) continue;
-
-            // Add to cache
-            this.cache.add(cacheName);
+            const event = this.processMessageEvent(entry);
+            if (!event) return;
 
             // Resolve the promise for sent messages from a client
             Server().messageManager.resolve(entry);
 
             // Emit it as normal entry
-            super.emit("new-entry", entry);
+            super.emit(event, entry);
         }
 
         // 6: Emit all the messages that failed sent
         for (const entry of lookbackErrored) {
-            const cacheName = getCacheName(entry);
-
-            // Skip over any that we've finished
-            if (this.cache.find(cacheName)) continue;
-
-            // Add to cache
-            this.cache.add(cacheName);
+            const event = this.processMessageEvent(entry);
+            if (!event) return;
 
             // Reject the corresponding promise.
             // This will emit a message send error
             const success = await Server().messageManager.reject("message-send-error", entry);
-            Server().log(`Errored Msg -> ${cacheName} -> ${entry.contentString()} -> ${success} (Code: ${entry.error})`,
+            Server().log(
+                `Errored Msg -> ${entry.guid} -> ${entry.contentString()} -> ${success} (Code: ${entry.error})`,
                 "debug"
             );
 
@@ -161,20 +151,14 @@ export class OutgoingMessageListener extends ChangeListener {
 
         // Emit the new message
         for (const entry of entries) {
-            // Compile so it's unique based on dates as well as ROWID
-            const cacheName = `updated-${getCacheName(entry)}`;
-
-            // Skip over any that we've finished
-            if (this.cache.find(cacheName)) continue;
-
-            // Add to cache
-            this.cache.add(cacheName);
+            const event = this.processMessageEvent(entry);
+            if (!event) return;
 
             // Resolve the promise
             Server().messageManager.resolve(entry);
 
             // Emit it as a normal update
-            super.emit("updated-entry", entry);
+            super.emit(event, entry);
         }
     }
 }

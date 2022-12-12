@@ -19,13 +19,13 @@ export const SettingsLayout = (): JSX.Element => {
                 <DatabaseSettings />
                 <UpdateSettings />
                 <ThemeSettings />
-                <Stack direction='row' align='flex-start' flexWrap={'wrap'}>
-                    <Box py={5}>
+                <Stack direction='row' align='flex-start' flexWrap='wrap' p={5}>
+                    <Box>
                         <Text fontSize='2xl'>Permission Status</Text>
                         <Divider orientation='horizontal' my={3}/>
                         <PermissionRequirements />
                     </Box>
-                    <Box py={5}>
+                    <Box pl={5}>
                         <Text fontSize='2xl'>Attachment Management</Text>
                         <Divider orientation='horizontal' my={3}/>
                         <AttachmentCacheBox />

@@ -23,7 +23,7 @@ import {
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
+import { MessageChangeListener } from "@server/databases/imessage/listeners/messageChangeListener";
 
 // Service Imports
 import {
@@ -137,7 +137,7 @@ class BlueBubblesServer extends EventEmitter {
 
     actionHandler: ActionHandler;
 
-    chatListeners: ChangeListener[];
+    chatListeners: MessageChangeListener[];
 
     eventCache: EventCache;
 
@@ -878,8 +878,16 @@ class BlueBubblesServer extends EventEmitter {
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal", sendFcmMessage = true) {
-        this.httpService.socketServer.emit(type, data);
+    async emitMessage(
+        type: string,
+        data: any,
+        priority: "normal" | "high" = "normal",
+        sendFcmMessage = true,
+        sendSocket = true
+    ) {
+        if (sendSocket) {
+            this.httpService.socketServer.emit(type, data);
+        }
 
         // Send notification to devices
         try {
@@ -1043,7 +1051,23 @@ class BlueBubblesServer extends EventEmitter {
             const newMessage = await insertChatParticipants(item);
             this.log(`New Message from You, ${newMessage.contentString()}`);
 
-            // Emit it to the socket and FCM devices
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                NEW_MESSAGE,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        parseAttributedBody: true,
+                        parseMessageSummary: true,
+                        parsePayloadData: true,
+                        loadChatParticipants: false,
+                        includeChats: true
+                    }
+                })
+            );
+
+            // Emit it to the FCM devices, but not socket
             await this.emitMessage(
                 NEW_MESSAGE,
                 await MessageSerializer.serialize({
@@ -1052,7 +1076,10 @@ class BlueBubblesServer extends EventEmitter {
                         enforceMaxSize: true
                     },
                     isForNotification: true
-                })
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
@@ -1074,17 +1101,37 @@ class BlueBubblesServer extends EventEmitter {
             const localeTime = time.toLocaleString();
             this.log(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
 
-            // Emit it to the socket and FCM devices
-            // Since this is a message update, we do not need to include the participants
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                MESSAGE_UPDATED,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        parseAttributedBody: true,
+                        parseMessageSummary: true,
+                        parsePayloadData: true,
+                        loadChatParticipants: false,
+                        includeChats: true
+                    }
+                })
+            );
+
+            // Emit it to the FCM devices only
+            // Since this is a message update, we do not need to include the participants or chats
             await this.emitMessage(
                 MESSAGE_UPDATED,
                 MessageSerializer.serialize({
                     message: newMessage,
                     config: {
-                        loadChatParticipants: false
+                        loadChatParticipants: false,
+                        includeChats: false
                     },
                     isForNotification: true
-                })
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
@@ -1103,7 +1150,23 @@ class BlueBubblesServer extends EventEmitter {
             const newMessage = await insertChatParticipants(item);
             this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
-            // Emit it to the socket and FCM devices
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                NEW_MESSAGE,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        parseAttributedBody: true,
+                        parseMessageSummary: true,
+                        parsePayloadData: true,
+                        loadChatParticipants: false,
+                        includeChats: true
+                    }
+                })
+            );
+
+            // Emit it to the FCM devices only
             await this.emitMessage(
                 NEW_MESSAGE,
                 await MessageSerializer.serialize({
@@ -1113,12 +1176,28 @@ class BlueBubblesServer extends EventEmitter {
                     },
                     isForNotification: true
                 }),
-                "high"
+                "high",
+                true,
+                false
             );
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
             this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                GROUP_NAME_CHANGE,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
             // Group name changes don't require the participants to be loaded
             await this.emitMessage(
                 GROUP_NAME_CHANGE,
@@ -1128,43 +1207,97 @@ class BlueBubblesServer extends EventEmitter {
                         loadChatParticipants: false
                     },
                     isForNotification: true
-                })
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
         groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                PARTICIPANT_REMOVED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
             await this.emitMessage(
                 PARTICIPANT_REMOVED,
                 await MessageSerializer.serialize({
                     message: item,
                     isForNotification: true
-                })
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
         groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                PARTICIPANT_ADDED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
             await this.emitMessage(
                 PARTICIPANT_ADDED,
                 await MessageSerializer.serialize({
                     message: item,
                     isForNotification: true
-                })
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
         groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                PARTICIPANT_LEFT,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
             await this.emitMessage(
                 PARTICIPANT_LEFT,
                 await MessageSerializer.serialize({
                     message: item,
                     isForNotification: true
-                })
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
