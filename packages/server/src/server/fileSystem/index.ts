@@ -201,7 +201,7 @@ export class FileSystem {
     }
 
     static clearAttachmentCaches() {
-        const files = [FileSystem.attachmentsDir, FileSystem.attachmentCacheDir, FileSystem.messagesAttachmentsDir];
+        const files = [FileSystem.attachmentsDir, FileSystem.attachmentCacheDir];
 
         for (const file of files) {
             if (fs.existsSync(file)) {
@@ -214,7 +214,7 @@ export class FileSystem {
 
     static async getCachedAttachmentsSize(): Promise<number> {
         let size = 0;
-        const files = [FileSystem.attachmentsDir, FileSystem.attachmentCacheDir, FileSystem.messagesAttachmentsDir];
+        const files = [FileSystem.attachmentsDir, FileSystem.attachmentCacheDir];
 
         for (const file of files) {
             if (fs.existsSync(file)) {
