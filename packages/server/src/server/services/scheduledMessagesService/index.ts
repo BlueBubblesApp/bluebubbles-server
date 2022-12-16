@@ -295,6 +295,10 @@ export class ScheduledMessagesService {
      * @returns A future date
      */
     getNextRecurringDate(scheduledMessage: ScheduledMessage): Date {
+        if (scheduledMessage.schedule.type !== ScheduledMessageScheduleType.RECURRING) {
+            throw new Error('Schedule must be of type "recurring" to get the next date!');
+        }
+
         let nowTime = new Date().getTime();
         const previousTime = scheduledMessage.scheduledFor.getTime();
         const nextTs = this.getMillisecondsForSchedule(scheduledMessage.schedule);
@@ -354,8 +358,10 @@ export class ScheduledMessagesService {
         // Set the status to in-progress
         scheduledMessage.status = ScheduledMessageStatus.IN_PROGRESS;
 
-        // Calculate the next schedule time
-        scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage);
+        // Calculate the next schedule time (for recurring only)
+        if (scheduledMessage.schedule.type === ScheduledMessageScheduleType.RECURRING) {
+            scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage);
+        }
 
         // Save the updated information
         await this.saveScheduledMessage(scheduledMessage);
