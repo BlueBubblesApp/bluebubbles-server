@@ -17,6 +17,7 @@ import { PrivateApiField } from '../../../components/fields/PrivateApiField';
 import { DockBadgeField } from '../../../components/fields/DockBadgeField';
 import { HideDockIconField } from '../../../components/fields/HideDockIconField';
 import { StartViaTerminalField } from '../../../components/fields/StartViaTerminalField';
+import { FacetimeDetectionField } from '../../../components/fields/FacetimeDetectionField';
 
 
 export const FeatureSettings = (): JSX.Element => {
@@ -27,6 +28,8 @@ export const FeatureSettings = (): JSX.Element => {
                 <Divider orientation='horizontal' />
                 <Spacer />
                 <PrivateApiField />
+                <Spacer />
+                <FacetimeDetectionField />
                 <Spacer />
                 <AutoCaffeinateField />
                 <Spacer />

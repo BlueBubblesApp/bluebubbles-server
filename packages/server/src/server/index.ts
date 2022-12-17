@@ -440,18 +440,7 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             if (facetimeServiceEnabled) {
-                this.log("Starting Facetime service...");
-                this.facetime.listen().catch(ex => {
-                    if (ex.message.includes("assistive access")) {
-                        this.log(
-                            "Failed to start Facetime service! Please enable Accessibility permissions " +
-                                "for BlueBubbles in System Preferences > Security & Privacy > Privacy > Accessibility",
-                            "error"
-                        );
-                    } else {
-                        this.log(`Failed to start Facetime service! ${ex.message}`, "error");
-                    }
-                });
+                this.startFacetimeListener();
             }
         } catch (ex: any) {
             this.log(`Failed to start Facetime service! ${ex.message}`, "error");
@@ -467,6 +456,21 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Starting iMessage Database listeners...");
             this.startChatListeners();
         }
+    }
+
+    startFacetimeListener() {
+        this.log("Starting Facetime service...");
+        this.facetime.listen().catch(ex => {
+            if (ex.message.includes("assistive access")) {
+                this.log(
+                    "Failed to start Facetime service! Please enable Accessibility permissions " +
+                        "for BlueBubbles in System Preferences > Security & Privacy > Privacy > Accessibility",
+                    "error"
+                );
+            } else {
+                this.log(`Failed to start Facetime service! ${ex.message}`, "error");
+            }
+        });
     }
 
     async stopServices(): Promise<void> {
@@ -904,6 +908,15 @@ class BlueBubblesServer extends EventEmitter {
                 Server().caffeinate.start();
             } else {
                 Server().caffeinate.stop();
+            }
+        }
+
+        // Handle change in facetime service toggle
+        if (prevConfig.facetime_detection !== nextConfig.facetime_detection) {
+            if (nextConfig.facetime_detection) {
+                this.startFacetimeListener();
+            } else {
+                this.facetime.stop();
             }
         }
 
