@@ -1,4 +1,8 @@
 export const SCHEDULED_MESSAGE_ERROR = "scheduled-message-error";
+export const SCHEDULED_MESSAGE_SENT = "scheduled-message-sent";
+export const SCHEDULED_MESSAGE_DELETED = "scheduled-message-deleted";
+export const SCHEDULED_MESSAGE_UPDATED = "scheduled-message-updated";
+export const SCHEDULED_MESSAGE_CREATED = "scheduled-message-created";
 export const NEW_MESSAGE = "new-message";
 export const MESSAGE_SEND_ERROR = "message-send-error";
 export const MESSAGE_UPDATED = "updated-message";

@@ -3,7 +3,13 @@ import { ScheduledMessage } from "@server/databases/server/entity";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { SendMessageParams } from "@server/api/v1/types";
 import { FindOneOptions } from "typeorm";
-import { SCHEDULED_MESSAGE_ERROR } from "@server/events";
+import {
+    SCHEDULED_MESSAGE_CREATED,
+    SCHEDULED_MESSAGE_DELETED,
+    SCHEDULED_MESSAGE_ERROR,
+    SCHEDULED_MESSAGE_SENT,
+    SCHEDULED_MESSAGE_UPDATED
+} from "@server/events";
 
 /**
  * The possible states of a scheduled message
@@ -58,8 +64,27 @@ export class ScheduledMessagesService {
      *
      * @param scheduledMessage A scheduled message that was updated
      */
-    notifyUpdate(scheduledMessage?: ScheduledMessage) {
+    notifyUpdateUi(scheduledMessage?: ScheduledMessage) {
         Server().emitToUI("scheduled-message-update", scheduledMessage ?? null);
+    }
+
+    /**
+     * Emits a message to any listeners, letting them know
+     * that a scheduled message has been updated.
+     *
+     * @param scheduledMessage A scheduled message that was updated
+     */
+    notifyUpdate(scheduledMessage?: ScheduledMessage) {
+        Server().emitMessage(SCHEDULED_MESSAGE_UPDATED, scheduledMessage, "normal");
+    }
+
+    /**
+     * Notifies all client of a created scheduled message.
+     *
+     * @param scheduledMessage The failed scheduled message
+     */
+    notifyCreated(scheduledMessage: ScheduledMessage) {
+        Server().emitMessage(SCHEDULED_MESSAGE_CREATED, scheduledMessage, "normal");
     }
 
     /**
@@ -68,7 +93,25 @@ export class ScheduledMessagesService {
      * @param scheduledMessage The failed scheduled message
      */
     notifyError(scheduledMessage: ScheduledMessage) {
-        Server().emitMessage(SCHEDULED_MESSAGE_ERROR, scheduledMessage, "normal", true);
+        Server().emitMessage(SCHEDULED_MESSAGE_ERROR, scheduledMessage, "normal");
+    }
+
+    /**
+     * Notifies all client of a sent scheduled message.
+     *
+     * @param scheduledMessage The sent scheduled message
+     */
+    notifySuccess(scheduledMessage: ScheduledMessage) {
+        Server().emitMessage(SCHEDULED_MESSAGE_SENT, scheduledMessage, "normal");
+    }
+
+    /**
+     * Notifies all client of a deleted scheduled message.
+     *
+     * @param scheduledMessage The deleted scheduled message
+     */
+    notifyDeleted(scheduledMessages: ScheduledMessage[]) {
+        Server().emitMessage(SCHEDULED_MESSAGE_DELETED, scheduledMessages, "normal");
     }
 
     /**
@@ -79,8 +122,9 @@ export class ScheduledMessagesService {
      * @param scheduledMessage The scheduled message to save
      */
     async saveScheduledMessage(scheduledMessage: ScheduledMessage) {
-        this.notifyUpdate(scheduledMessage);
         await Server().repo.scheduledMessages().save(scheduledMessage);
+        this.notifyUpdateUi(scheduledMessage);
+        this.notifyCreated(scheduledMessage);
     }
 
     /**
@@ -124,6 +168,34 @@ export class ScheduledMessagesService {
      * Deletes a scheduled message by its' ID.
      *
      * @param id The ID of the scheduled message to delete
+     * @param scheduledMessage The new scheduled message information
+     */
+    async updateScheduledMessage(id: number, scheduledMessage: ScheduledMessage): Promise<ScheduledMessage> {
+        const repo = Server().repo.scheduledMessages();
+        const findOptions: FindOneOptions<ScheduledMessage> = { where: { id } } as FindOneOptions<ScheduledMessage>;
+        const existingMessage = await repo.findOne(findOptions);
+        if (!existingMessage) {
+            throw new Error("Scheduled message not found");
+        }
+
+        Server().log(`Updating scheduled message: ${existingMessage.toString()}`);
+        const updateRes = await repo.update(id, scheduledMessage);
+        scheduledMessage.id = existingMessage.id;
+
+        if (updateRes.affected === 1) {
+            this.removeTimer(id);
+            await this.scheduleMessage(scheduledMessage);
+            this.notifyUpdateUi();
+            this.notifyUpdate(scheduledMessage);
+        }
+
+        return scheduledMessage;
+    }
+
+    /**
+     * Deletes a scheduled message by its' ID.
+     *
+     * @param id The ID of the scheduled message to delete
      */
     async deleteScheduledMessage(id: number): Promise<void> {
         const repo = Server().repo.scheduledMessages();
@@ -138,6 +210,7 @@ export class ScheduledMessagesService {
 
         this.removeTimer(id);
         this.notifyUpdate();
+        this.notifyDeleted([scheduledMessage]);
     }
 
     /**
@@ -165,7 +238,8 @@ export class ScheduledMessagesService {
             this.removeTimer(id);
         }
 
-        this.notifyUpdate();
+        this.notifyUpdateUi();
+        this.notifyDeleted(scheduledMessages);
     }
 
     /**
@@ -381,6 +455,7 @@ export class ScheduledMessagesService {
             }
 
             scheduledMessage.sentAt = new Date();
+            this.notifySuccess(scheduledMessage);
         } catch (ex: any) {
             Server().log(`Failed to send scheduled message: ${ex?.message ?? String(ex)}`);
             scheduledMessage.status = ScheduledMessageStatus.ERROR;
