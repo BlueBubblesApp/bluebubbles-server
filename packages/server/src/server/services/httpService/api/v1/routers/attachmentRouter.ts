@@ -7,9 +7,9 @@ import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
 import { isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
-import { getAttachmentResponse } from "@server/databases/imessage/entity/Attachment";
 import { FileStream, Success } from "../responses/success";
 import { NotFound, ServerError } from "../responses/errors";
+import { AttachmentSerializer } from "@server/api/v1/serializers/AttachmentSerializer";
 
 export class AttachmentRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -23,7 +23,7 @@ export class AttachmentRouter {
         // Fetch the info for the attachment by GUID
         const attachment = await Server().iMessageRepo.getAttachment(guid);
         if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
-        return new Success(ctx, { data: await getAttachmentResponse(attachment) }).send();
+        return new Success(ctx, { data: await AttachmentSerializer.serialize({ attachment }) }).send();
     }
 
     static async download(ctx: RouterContext, _: Next) {
@@ -39,7 +39,7 @@ export class AttachmentRouter {
         let mimeType = attachment.getMimeType();
 
         const g = attachment.guid;
-        const og = attachment.originalGuid ?? 'N/A';
+        const og = attachment.originalGuid ?? "N/A";
         Server().log(`Attachment download request (MIME: ${mimeType}; GUID: ${g}; Original GUID: ${og})`, "debug");
 
         // If we want to resize the image, do so here

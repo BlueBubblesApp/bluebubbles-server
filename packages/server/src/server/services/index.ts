@@ -10,9 +10,9 @@ import { QueueService } from "./queueService";
 import { IPCService } from "./ipcService";
 import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
-import { ObjCHelperService } from "./objCHelperService";
 import { FindMyService } from "./findMyService";
 import { FacetimeService } from "./facetimeService";
+import { ScheduledMessagesService } from "./scheduledMessagesService";
 
 export {
     HttpService,
@@ -27,7 +27,7 @@ export {
     CertificateService,
     CloudflareService,
     WebhookService,
-    FacetimeService
-    ObjCHelperService,
-    FindMyService
+    FacetimeService,
+    FindMyService,
+    ScheduledMessagesService
 };

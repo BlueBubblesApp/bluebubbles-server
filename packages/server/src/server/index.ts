@@ -23,7 +23,7 @@ import {
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { ChangeListener } from "@server/databases/imessage/listeners/changeListener";
+import { MessageChangeListener } from "@server/databases/imessage/listeners/messageChangeListener";
 
 // Service Imports
 import {
@@ -38,7 +38,8 @@ import {
     UpdateService,
     CloudflareService,
     WebhookService,
-    FacetimeService
+    FacetimeService,
+    ScheduledMessagesService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -59,6 +60,15 @@ import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
 import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
+import {
+    GROUP_NAME_CHANGE,
+    MESSAGE_UPDATED,
+    NEW_MESSAGE,
+    NEW_SERVER,
+    PARTICIPANT_ADDED,
+    PARTICIPANT_LEFT,
+    PARTICIPANT_REMOVED
+} from "./events";
 
 const findProcess = require("find-process");
 
@@ -120,6 +130,8 @@ class BlueBubblesServer extends EventEmitter {
 
     updater: UpdateService;
 
+    scheduledMessages: ScheduledMessagesService;
+
     messageManager: OutgoingMessageManager;
 
     queue: QueueService;
@@ -130,7 +142,7 @@ class BlueBubblesServer extends EventEmitter {
 
     actionHandler: ActionHandler;
 
-    chatListeners: ChangeListener[];
+    chatListeners: MessageChangeListener[];
 
     eventCache: EventCache;
 
@@ -159,10 +171,10 @@ class BlueBubblesServer extends EventEmitter {
         let status = true;
         if (isMinMojave) {
             const authStatus = getAuthStatus("full-disk-access");
-            if (authStatus === 'authorized') {
+            if (authStatus === "authorized") {
                 status = true;
             } else {
-                this.log(`FullDiskAccess Permission Status: ${authStatus}`, 'debug');
+                this.log(`FullDiskAccess Permission Status: ${authStatus}`, "debug");
             }
         }
 
@@ -205,6 +217,7 @@ class BlueBubblesServer extends EventEmitter {
         this.updater = null;
         this.messageManager = null;
         this.webhookService = null;
+        this.scheduledMessages = null;
 
         this.hasSetup = false;
         this.hasStarted = false;
@@ -383,11 +396,16 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             this.log("Starting Facetime service...");
-            if (this.facetime == null)
-                this.facetime = new FacetimeService();
-            this.facetime.start();
+            this.facetime = new FacetimeService();
         } catch (ex: any) {
             this.log(`Failed to start Facetime service! ${ex.message}`, "error");
+        }
+        
+        try {
+            this.log("Initializing Scheduled Messages Service...");
+            this.scheduledMessages = new ScheduledMessagesService();
+        } catch (ex: any) {
+            this.log(`Failed to start Scheduled Message service! ${ex.message}`, "error");
         }
     }
 
@@ -415,6 +433,20 @@ class BlueBubblesServer extends EventEmitter {
             await this.fcm.start();
         } catch (ex: any) {
             this.log(`Failed to start FCM service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Starting Scheduled Messages service...");
+            await this.scheduledMessages.start();
+        } catch (ex: any) {
+            this.log(`Failed to start Scheduled Messages service! ${ex.message}`, "error");
+        }
+        
+        try {
+            this.log("Starting Facetime service...");
+            this.facetime.start();
+        } catch (ex: any) {
+            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
@@ -464,6 +496,12 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
         }
 
+        try {
+            this.scheduledMessages?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Scheduled Messages service! ${ex?.message ?? ex}`, "error");
+        }
+
         this.log("Finished stopping services...");
     }
 
@@ -484,14 +522,14 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            await this.iMessageRepo?.db?.close();
+            await this.iMessageRepo?.db?.destroy();
         } catch (ex: any) {
             this.log(`Failed to close iMessage Database connection! ${ex?.message ?? ex}`);
         }
 
         try {
-            if (this.repo?.db?.isConnected) {
-                await this.repo?.db?.close();
+            if (this.repo?.db?.isInitialized) {
+                await this.repo?.db?.destroy();
             }
         } catch (ex: any) {
             this.log(`Failed to close Server Database connection! ${ex?.message ?? ex}`);
@@ -621,17 +659,6 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
-    async getTimeSync() {
-        try {
-            return await FileSystem.execShellCommand(`sntp time.apple.com`);
-        } catch (ex) {
-            this.log("Failed to sync time with time servers!", "warn");
-            this.log(ex);
-        }
-
-        return null;
-    }
-
     private async preChecks(): Promise<void> {
         this.log("Running pre-start checks...");
 
@@ -661,7 +688,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
         this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
         this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
-        this.log(`Server Metadata -> Time Synchronization: ${((await this.getTimeSync()) ?? "").trim()}`, "debug");
+        this.log(`Server Metadata -> Time Synchronization: ${(await FileSystem.getTimeSync()) ?? "N/A"}`, "debug");
         this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
 
         if (!this.region) {
@@ -732,16 +759,14 @@ class BlueBubblesServer extends EventEmitter {
             });
         }
 
-        // Show a warning if the time is off by a reasonable amount (1 minute)
+        // Show a warning if the time is off by a reasonable amount (5 seconds)
         try {
-            const syncString = await this.getTimeSync();
-            if (syncString !== null) {
+            const syncOffset = await FileSystem.getTimeSync();
+            if (syncOffset !== null) {
                 try {
-                    const spl = syncString.split("+/-");
-                    const left = spl[0].split(" ").slice(0, -1);
-                    const offset = Math.abs(Number.parseFloat(left[left.length - 1].replace("+", "").replace("-", "")));
-                    if (offset >= 15) {
-                        this.log(`Your macOS time is not synchronized! Offset: ${offset}`, "warn");
+                    if (Math.abs(syncOffset) >= 5) {
+                        this.log(`Your macOS time is not synchronized! Offset: ${syncOffset}`, "warn");
+                        this.log(`To fix your time, open terminal and run: "sudo sntp -sS time.apple.com"`, "debug");
                     }
                 } catch (ex) {
                     this.log("Unable to parse time synchronization offset!", "debug");
@@ -813,7 +838,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // If the URL is different, emit the change to the listeners
         if (prevConfig.server_address !== nextConfig.server_address) {
-            if (this.httpService) await this.emitMessage("new-server", nextConfig.server_address, "high");
+            if (this.httpService) await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
             if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
         }
 
@@ -877,8 +902,16 @@ class BlueBubblesServer extends EventEmitter {
      * @param type The type of notification
      * @param data Associated data with the notification (as a string)
      */
-    async emitMessage(type: string, data: any, priority: "normal" | "high" = "normal", sendFcmMessage = true) {
-        this.httpService.socketServer.emit(type, data);
+    async emitMessage(
+        type: string,
+        data: any,
+        priority: "normal" | "high" = "normal",
+        sendFcmMessage = true,
+        sendSocket = true
+    ) {
+        if (sendSocket) {
+            this.httpService.socketServer.emit(type, data);
+        }
 
         // Send notification to devices
         try {
@@ -923,11 +956,17 @@ class BlueBubblesServer extends EventEmitter {
 
         // Convert to a response JSON
         // Since we sent the message, we don't need to include the participants
-        const resp = await MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false });
+        const resp = await MessageSerializer.serialize({
+            message: newMessage,
+            config: {
+                loadChatParticipants: false
+            },
+            isForNotification: true
+        });
         resp.tempGuid = tempGuid;
 
         // We are emitting this as a new message, the only difference being the included tempGuid
-        await this.emitMessage("new-message", resp);
+        await this.emitMessage(NEW_MESSAGE, resp);
     }
 
     async emitMessageError(message: Message, tempGuid: string = null) {
@@ -938,7 +977,13 @@ class BlueBubblesServer extends EventEmitter {
          * 4: Message Timeout
          */
         // Since this is a message send error, we don't need to include the participants
-        const data = await MessageSerializer.serialize({ message, loadChatParticipants: false });
+        const data = await MessageSerializer.serialize({
+            message,
+            config: {
+                loadChatParticipants: false
+            },
+            isForNotification: true
+        });
         if (isNotEmpty(tempGuid)) {
             data.tempGuid = tempGuid;
         }
@@ -1030,11 +1075,36 @@ class BlueBubblesServer extends EventEmitter {
             const newMessage = await insertChatParticipants(item);
             this.log(`New Message from You, ${newMessage.contentString()}`);
 
-            // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await MessageSerializer.serialize({
-                message: newMessage,
-                enforceMaxSize: true
-            }));
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                NEW_MESSAGE,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        parseAttributedBody: true,
+                        parseMessageSummary: true,
+                        parsePayloadData: true,
+                        loadChatParticipants: false,
+                        includeChats: true
+                    }
+                })
+            );
+
+            // Emit it to the FCM devices, but not socket
+            await this.emitMessage(
+                NEW_MESSAGE,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        enforceMaxSize: true
+                    },
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
+            );
         });
 
         /**
@@ -1055,11 +1125,37 @@ class BlueBubblesServer extends EventEmitter {
             const localeTime = time.toLocaleString();
             this.log(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
 
-            // Emit it to the socket and FCM devices
-            // Since this is a message update, we do not need to include the participants
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                MESSAGE_UPDATED,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        parseAttributedBody: true,
+                        parseMessageSummary: true,
+                        parsePayloadData: true,
+                        loadChatParticipants: false,
+                        includeChats: true
+                    }
+                })
+            );
+
+            // Emit it to the FCM devices only
+            // Since this is a message update, we do not need to include the participants or chats
             await this.emitMessage(
-                "updated-message",
-                MessageSerializer.serialize({ message: newMessage, loadChatParticipants: false })
+                MESSAGE_UPDATED,
+                MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        loadChatParticipants: false,
+                        includeChats: false
+                    },
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
@@ -1078,38 +1174,155 @@ class BlueBubblesServer extends EventEmitter {
             const newMessage = await insertChatParticipants(item);
             this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
 
-            // Emit it to the socket and FCM devices
-            await this.emitMessage("new-message", await MessageSerializer.serialize({
-                message: newMessage,
-                enforceMaxSize: true
-            }), "high");
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                NEW_MESSAGE,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        parseAttributedBody: true,
+                        parseMessageSummary: true,
+                        parsePayloadData: true,
+                        loadChatParticipants: false,
+                        includeChats: true
+                    }
+                })
+            );
+
+            // Emit it to the FCM devices only
+            await this.emitMessage(
+                NEW_MESSAGE,
+                await MessageSerializer.serialize({
+                    message: newMessage,
+                    config: {
+                        enforceMaxSize: true
+                    },
+                    isForNotification: true
+                }),
+                "high",
+                true,
+                false
+            );
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
             this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                GROUP_NAME_CHANGE,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
             // Group name changes don't require the participants to be loaded
             await this.emitMessage(
-                "group-name-change",
-                await MessageSerializer.serialize({ message: item, loadChatParticipants: false })
+                GROUP_NAME_CHANGE,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: false
+                    },
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
             );
         });
 
         groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-removed", await MessageSerializer.serialize({ message: item }));
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                PARTICIPANT_REMOVED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
+            await this.emitMessage(
+                PARTICIPANT_REMOVED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
+            );
         });
 
         groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-added", await MessageSerializer.serialize({ message: item }));
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                PARTICIPANT_ADDED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
+            await this.emitMessage(
+                PARTICIPANT_ADDED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
+            );
         });
 
         groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.log(`[${from}] left [${item.cacheRoomnames}]`);
-            await this.emitMessage("participant-left", await MessageSerializer.serialize({ message: item }));
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                PARTICIPANT_LEFT,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
+            await this.emitMessage(
+                PARTICIPANT_LEFT,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
+            );
         });
 
         outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));

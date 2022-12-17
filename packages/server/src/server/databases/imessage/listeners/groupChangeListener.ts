@@ -1,8 +1,8 @@
 import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { ChangeListener } from "./changeListener";
+import { MessageChangeListener } from "./messageChangeListener";
 
-export class GroupChangeListener extends ChangeListener {
+export class GroupChangeListener extends MessageChangeListener {
     repo: MessageRepository;
 
     frequencyMs: number;
@@ -21,7 +21,6 @@ export class GroupChangeListener extends ChangeListener {
         const offsetDate = new Date(after.getTime() - 5000);
         const entries = await this.repo.getMessages({
             after: offsetDate,
-            before,
             withChats: true,
             withHandle: true,
             where: [

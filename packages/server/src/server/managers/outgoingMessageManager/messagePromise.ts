@@ -1,7 +1,8 @@
 import { Server } from "@server";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { getFilenameWithoutExtension, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { getFilenameWithoutExtension, isEmpty, isNotEmpty, onlyAlphaNumeric } from "@server/helpers/utils";
+import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
 
 export class MessagePromiseRejection extends Error {
     error: string;
@@ -70,8 +71,6 @@ export class MessagePromise {
 
         // Create a timeout for how long until we "error-out".
         // Timeouts should change based on if it's an attachment or message
-        // 3 minute timeout for attachments
-        // 30 second timeout for messages
         setTimeout(
             () => {
                 if (this.isResolved) return;
@@ -79,7 +78,9 @@ export class MessagePromise {
                 // This will trigger our hook handlers, created in the constructor
                 this.reject("Message send timeout");
             },
-            this.isAttachment ? 60000 * 3 : 30000
+            // 5 minute timeout for attachments
+            // 2 minute timeout for messages
+            this.isAttachment ? 60000 * 5 : 60000 * 2
         );
     }
 
@@ -116,10 +117,27 @@ export class MessagePromise {
         }
     }
 
+    isSameChatGuid(chatGuid: string) {
+        if (isEmpty(chatGuid)) return false;
+
+        // Variations to account for area codes
+        const opts = [
+            chatGuid,
+            chatGuid.replace(";-;+", ";-;"),
+            chatGuid.replace(/;-;\+\d/, ";-;"),
+            chatGuid.replace(/;-;\+\d\d/, ";-;")
+        ];
+        for (const opt of opts) {
+            if (opt === this.chatGuid) return true;
+        }
+
+        return false;
+    }
+
     isSame(message: Message) {
         // If we have chats, we need to make sure this promise is for that chat
         // We use endsWith to support when the chatGuid is just an address
-        if (isNotEmpty(message.chats) && !message.chats.some((c: Chat) => c.guid.endsWith(this.chatGuid))) {
+        if (isNotEmpty(message.chats) && !message.chats.some((c: Chat) => this.isSameChatGuid(c.guid))) {
             return false;
         }
 
@@ -144,8 +162,11 @@ export class MessagePromise {
         const cmpSubject = isNotEmpty(this.subject) && isNotEmpty(message.subject);
         if (cmpSubject && this.subject !== onlyAlphaNumeric(message.subject)) return false;
 
+        // Compare the original text to the message's text or attributed body (if available)
+        const messageText = onlyAlphaNumeric(message.universalText(true));
+
         // Check if the text matches
-        return this.text === onlyAlphaNumeric(message.text) && this.sentAt <= message.dateCreated.getTime();
+        return this.text === messageText && this.sentAt <= message.dateCreated.getTime();
     }
 }
 

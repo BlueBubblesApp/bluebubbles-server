@@ -3,7 +3,6 @@ import { Next } from "koa";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { getChatResponse } from "@server/databases/imessage/entity/Chat";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { isEmpty, isNotEmpty, isTruthyBool } from "@server/helpers/utils";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
@@ -13,6 +12,7 @@ import { arrayHasOne } from "@server/utils/CollectionUtils";
 import { FileStream, Success } from "../responses/success";
 import { IMessageError, NotFound } from "../responses/errors";
 import { parseWithQuery } from "../utils";
+import { ChatSerializer } from "@server/api/v1/serializers/ChatSerializer";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -20,7 +20,7 @@ export class ChatRouter {
 
         // We want to include the archived by default
         // Using != instead of !== because we want to treat null and undefined as equal
-        const withArchived = (includeArchived != null) ? isTruthyBool(includeArchived as string) : true;
+        const withArchived = includeArchived != null ? isTruthyBool(includeArchived as string) : true;
 
         // Get all the chats so we can parse through them for the breakdown
         const chats = await Server().iMessageRepo.getChats({ withArchived });
@@ -50,11 +50,13 @@ export class ChatRouter {
 
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
-        const res = await getChatResponse(chats[0]);
+        const res = await ChatSerializer.serialize({ chat: chats[0] });
         if (withLastMessage) {
             res.lastMessage = await MessageSerializer.serialize({
                 message: await Server().iMessageRepo.getChatLastMessage(ctx.params.guid),
-                loadChatParticipants: false
+                config: {
+                    loadChatParticipants: false
+                }
             });
         }
 
@@ -66,9 +68,18 @@ export class ChatRouter {
         const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
         const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
         const withAttributedBody = arrayHasOne(withQuery, [
-            "message.attributedbody", "message.attributed-body",
-            "messages.attributedody", "messages.attributed-body"
+            "message.attributedbody",
+            "message.attributed-body",
+            "messages.attributedody",
+            "messages.attributed-body"
         ]);
+        const withMessageSummaryInfo = arrayHasOne(withQuery, [
+            "message.messageSummaryInfo",
+            "message.message-summary-info",
+            "messages.messageSummaryInfo",
+            "messages.message-summary-info"
+        ]);
+        const withPayloadData = arrayHasOne(withQuery, ["message.payloadData", "message.payload-data"]);
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
         const chats = await Server().iMessageRepo.getChats({
@@ -94,8 +105,12 @@ export class ChatRouter {
         const messages = await Server().iMessageRepo.getMessages(opts);
         const results = await MessageSerializer.serializeList({
             messages,
-            loadChatParticipants: false,
-            parseAttributedBody: withAttributedBody
+            config: {
+                loadChatParticipants: false,
+                parseAttributedBody: withAttributedBody,
+                parseMessageSummary: withMessageSummaryInfo,
+                parsePayloadData: withPayloadData
+            }
         });
 
         return new Success(ctx, { data: results }).send();
@@ -106,7 +121,7 @@ export class ChatRouter {
 
         // Pull out the filters
         const withQuery = parseWithQuery(body?.with);
-            
+
         const withLastMessage = arrayHasOne(withQuery, ["lastmessage", "last-message"]);
         const guid = body?.guid;
         const { sort, offset, limit } = body;
@@ -158,7 +173,7 @@ export class ChatRouter {
             throw new IMessageError({ message: "Chat update executed with errors!", error: errors.join(", ") });
         }
 
-        const data = await getChatResponse(chat);
+        const data = await ChatSerializer.serialize({ chat });
         if (isEmpty(updated)) {
             return new Success(ctx, { data, message: "Chat not updated! No update information provided!" }).send();
         }
@@ -181,7 +196,7 @@ export class ChatRouter {
         if (!chat) throw new IMessageError({ error: "Failed to create chat!" });
 
         // Convert the data to an API response
-        const data = await getChatResponse(chat);
+        const data = await ChatSerializer.serialize({ chat });
 
         // Inject the tempGuid back into the messages (if available)
         if (isNotEmpty(tempGuid)) {
@@ -199,13 +214,14 @@ export class ChatRouter {
 
     static async markRead(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
-        await Server().privateApiHelper.markChatRead(guid);
-        await Server().emitMessage("chat-read-status-changed", {
-            chatGuid: guid,
-            read: true
-        });
-
+        await ChatInterface.markRead(guid);
         return new Success(ctx, { message: "Successfully marked chat as read!" }).send();
+    }
+
+    static async markUnread(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.markUnread(guid);
+        return new Success(ctx, { message: "Successfully marked chat as unread!" }).send();
     }
 
     static async removeParticipant(ctx: RouterContext, next: Next): Promise<void> {
@@ -224,7 +240,7 @@ export class ChatRouter {
         let chat = chats[0];
         chat = await ChatInterface.toggleParticipant(chat, address, action);
 
-        return new Success(ctx, { data: await getChatResponse(chat) }).send();
+        return new Success(ctx, { data: await ChatSerializer.serialize({ chat }) }).send();
     }
 
     static async getGroupIcon(ctx: RouterContext, _: Next): Promise<void> {

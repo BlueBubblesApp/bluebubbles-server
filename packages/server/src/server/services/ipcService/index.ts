@@ -9,6 +9,8 @@ import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
 import { BlueBubblesHelperService } from "../privateApi";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
+import { ScheduledMessagesInterface } from "@server/api/v1/interfaces/scheduledMessagesInterface";
+import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
 
 export class IPCService {
     /**
@@ -309,6 +311,31 @@ export class IPCService {
 
         ipcMain.handle("clear-attachment-caches", async (_, __) => {
             FileSystem.clearAttachmentCaches();
+        });
+
+        ipcMain.handle("delete-scheduled-message", async (_, id: number) => {
+            return ScheduledMessagesInterface.deleteScheduledMessage(id);
+        });
+
+        ipcMain.handle("delete-scheduled-messages", async (_, __) => {
+            return ScheduledMessagesInterface.deleteScheduledMessages();
+        });
+
+        ipcMain.handle("get-scheduled-messages", async (_, __) => {
+            return ScheduledMessagesInterface.getScheduledMessages();
+        });
+
+        ipcMain.handle("create-scheduled-message", async (_, msg) => {
+            return ScheduledMessagesInterface.createScheduledMessage(
+                msg.type,
+                msg.payload,
+                new Date(msg.scheduledFor),
+                msg.schedule
+            );
+        });
+
+        ipcMain.handle("get-chats", async (_, msg) => {
+            return ChatInterface.get({ limit: 10000 });
         });
     }
 }

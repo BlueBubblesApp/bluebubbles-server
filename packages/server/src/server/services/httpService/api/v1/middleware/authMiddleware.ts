@@ -8,7 +8,10 @@ export const AuthMiddleware = async (ctx: Context, next: Next) => {
 
     // Make sure we have a token
     const token = (params?.guid ?? params?.password ?? params?.token) as string;
-    if (!token) throw new Unauthorized({ error: "Missing server password!" });
+    if (!token) {
+        Server().log(`Client (IP: ${ctx.request.ip}) attempted to access the API without a token.`, "debug");
+        throw new Unauthorized({ error: "Missing server password!" });
+    }
 
     // Make sure we have a password from the database
     const password = String(Server().repo.getConfig("password") as string);
@@ -17,7 +20,10 @@ export const AuthMiddleware = async (ctx: Context, next: Next) => {
     }
 
     // Validate the passwords match
-    if (safeTrim(password) !== safeTrim(token)) throw new Unauthorized();
+    if (safeTrim(password) !== safeTrim(token)) {
+        Server().log(`Client (IP: ${ctx.request.ip}) tried to authenticate with an incorrect password.`, "debug");
+        throw new Unauthorized();
+    }
 
     // Go to the next middleware
     await next();

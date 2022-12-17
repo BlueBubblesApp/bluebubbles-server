@@ -1,9 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
-import { Handle, getHandleResponse } from "@server/databases/imessage/entity/Handle";
+import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { ChatResponse } from "@server/types";
-import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
 
 @Entity("chat")
 export class Chat {
@@ -86,19 +84,3 @@ export class Chat {
     })
     successfulQuery: boolean;
 }
-
-export const getChatResponse = async (tableData: Chat): Promise<ChatResponse> => {
-    return {
-        originalROWID: tableData.ROWID,
-        guid: tableData.guid,
-        participants: await Promise.all((tableData?.participants ?? []).map(handle => getHandleResponse(handle))),
-        messages: await Promise.all((tableData?.messages ?? []).map(
-            msg => MessageSerializer.serialize({ message: msg, loadChatParticipants: false }))),
-        style: tableData.style,
-        chatIdentifier: tableData.chatIdentifier,
-        isArchived: tableData.isArchived,
-        isFiltered: tableData.isFiltered,
-        displayName: tableData.displayName,
-        groupId: tableData.groupId
-    };
-};

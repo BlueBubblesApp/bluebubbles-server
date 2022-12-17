@@ -22,6 +22,7 @@ import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
 import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
 import { ErrorMiddleware } from "./api/v1/middleware/errorMiddleware";
 import { createServerErrorResponse } from "./api/v1/responses";
+import { HELLO_WORLD } from "@server/events";
 
 /**
  * This service class handles all routing for incoming socket
@@ -100,6 +101,9 @@ export class HttpService {
         // Allow cross origin requests
         this.koaApp.use(koaCors());
 
+        // This allows us to properly pull the IP from the request
+        this.koaApp.proxy = true;
+
         // This is used here so that we can catch errors in KoaBody as well
         this.koaApp.use(ErrorMiddleware);
 
@@ -108,7 +112,7 @@ export class HttpService {
             koaBody({
                 jsonLimit: "10mb",
                 textLimit: "10mb",
-                formLimit: "101mb", // 101 to account for a 100mb attachment and some text
+                formLimit: "1000mb",
                 multipart: true
             })
         );
@@ -209,7 +213,7 @@ export class HttpService {
             Server().log(`Successfully started HTTP${isNotEmpty(this.httpOpts) ? "S" : ""} server`);
 
             // Once we start, let's send a hello-world to all the clients
-            Server().emitMessage("hello-world", null);
+            Server().emitMessage(HELLO_WORLD, null);
         });
     }
 

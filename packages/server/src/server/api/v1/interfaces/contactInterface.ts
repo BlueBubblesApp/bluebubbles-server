@@ -17,44 +17,48 @@ type GenericContactParams = {
 };
 
 export class ContactInterface {
-    
     static apiExtraProperties: string[] = [
-        'jobTitle', 'departmentName', 'organizationName', 'middleName', 'note',
-        'contactImage', 'contactThumbnailImage', 'instantMessageAddresses', 'socialProfiles'
-    ]
+        "jobTitle",
+        "departmentName",
+        "organizationName",
+        "middleName",
+        "note",
+        "contactImage",
+        "contactThumbnailImage",
+        "instantMessageAddresses",
+        "socialProfiles"
+    ];
 
     private static extractEmails = (contact: any) => {
         // Normalize all the email records
         const emails = [...(contact?.emails ?? []), ...(contact?.emailAddresses ?? []), ...(contact?.addresses ?? [])]
             // Make sure all the emails are in the same format { address: xxxxxxx }
-            .map((e) => {
-                const address = (typeof(e) === 'string') ? e : (
-                    e?.address ?? e?.value ?? e?.email ?? null);
+            .map(e => {
+                const address = typeof e === "string" ? e : e?.address ?? e?.value ?? e?.email ?? null;
                 return { address, id: e?.id ?? e?.identifier ?? null };
             })
             // Make sure that each address has a value and is actually an email
-            .filter((e) => {
-                return isNotEmpty(e.address) && e.address.includes('@')
+            .filter(e => {
+                return isNotEmpty(e.address) && e.address.includes("@");
             });
 
-        return deduplicateObjectArray(emails, 'address');
+        return deduplicateObjectArray(emails, "address");
     };
 
     private static extractPhoneNumbers = (contact: any) => {
         // Normalize all the email records
         const phones = [...(contact?.phones ?? []), ...(contact?.phoneNumbers ?? []), ...(contact?.addresses ?? [])]
             // Make sure all the numbers are in the same format { address: xxxxxxx }
-            .map((e) => {
-                const address = (typeof(e) === 'string') ? e : (
-                    e?.address ?? e?.value ?? e?.phone ?? e?.number ?? null);
+            .map(e => {
+                const address = typeof e === "string" ? e : e?.address ?? e?.value ?? e?.phone ?? e?.number ?? null;
                 return { address, id: e?.id ?? e?.identifier ?? null };
             })
             // Make sure that each address has a value and is actually an email
-            .filter((e) => {
-                return isNotEmpty(e.address) && !e.address.includes('@')
+            .filter(e => {
+                return isNotEmpty(e.address) && !e.address.includes("@");
             });
 
-        return deduplicateObjectArray(phones, 'address');
+        return deduplicateObjectArray(phones, "address");
     };
 
     /**
@@ -69,12 +73,13 @@ export class ContactInterface {
         {
             extraProps = []
         }: {
-            extraProps?: string[]
-        } = {}): any {
+            extraProps?: string[];
+        } = {}
+    ): any {
         return records.map((contact: NodeJS.Dict<any>) => {
             // We have to make a copy so that when we "delete", we aren't deleting from the master copy.
             const e = { ...contact };
-            
+
             // Only include extra properties that are asked for.
             for (const prop of ContactInterface.apiExtraProperties) {
                 if (!extraProps.includes(prop) && Object.keys(e).includes(prop)) {
@@ -82,16 +87,26 @@ export class ContactInterface {
                 }
             }
 
-            const useAvatar = extraProps.includes('avatar') ||
-                extraProps.includes('contactImage') ||
-                extraProps.includes('contactImageThumbnail');
+            const useAvatar =
+                extraProps.includes("avatar") ||
+                extraProps.includes("contactImage") ||
+                extraProps.includes("contactImageThumbnail");
             const avatar = useAvatar ? e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail : null;
+
+            let displayName = e?.displayName;
+            if (isEmpty(displayName)) {
+                if (isNotEmpty(e?.firstName) && isEmpty(e?.lastName)) displayName = e.firstName;
+                if (isNotEmpty(e?.firstName) && isNotEmpty(e?.lastName)) displayName = `${e.firstName} ${e.lastName}`;
+                if (isEmpty(displayName) && isNotEmpty(e?.nickname)) displayName = e.nickname;
+            }
+
             return {
                 phoneNumbers: ContactInterface.extractPhoneNumbers(e),
                 emails: ContactInterface.extractEmails(e),
                 firstName: e?.firstName,
                 lastName: e?.lastName,
-                displayName: e?.displayName ?? e.nickname,
+                displayName,
+                nickname: e?.nickname,
                 birthday: e?.birthday,
                 avatar: isNotEmpty(avatar) ? base64.bytesToBase64(avatar) : "",
                 sourceType,
@@ -236,7 +251,7 @@ export class ContactInterface {
         let contactAddress = Server().repo.contactAddresses().create({ address, type: addressType });
         const existingAddress = await Server()
             .repo.contactAddresses()
-            .findOne({ where: { address, contact: { id: contact.id }}, relations: { contact: true } });
+            .findOne({ where: { address, contact: { id: contact.id } }, relations: { contact: true } });
         if (!existingAddress) {
             contactAddress = await Server().repo.contactAddresses().save(contactAddress);
         } else {
@@ -260,9 +275,9 @@ export class ContactInterface {
      */
     static async createContact({
         id,
-        firstName = '',
-        lastName = '',
-        displayName = '',
+        firstName = "",
+        lastName = "",
+        displayName = "",
         phoneNumbers = [],
         emails = [],
         avatar = null,
@@ -282,15 +297,15 @@ export class ContactInterface {
 
         // Throw an error if we don't have enough information to update an entry
         if (updateEntry && isEmpty(id) && isEmpty(firstName) && isEmpty(lastName) && isEmpty(displayName)) {
-            throw new Error((
-                'To update an existing contact, you must provide one of the following: ' +
-                'id, firstName, lastName, displayName'
-            ));
+            throw new Error(
+                "To update an existing contact, you must provide one of the following: " +
+                    "id, firstName, lastName, displayName"
+            );
         }
 
         // Throw an error if we don't have enough information to create a new entry
         if (!updateEntry && isEmpty(firstName) && isEmpty(displayName)) {
-            throw new Error('To create a new contact, please provide a firstName/lastName or displayName');
+            throw new Error("To create a new contact, please provide a firstName/lastName or displayName");
         }
 
         let existingContacts: Contact[] = [];
@@ -305,12 +320,13 @@ export class ContactInterface {
         }
 
         if (updateEntry && existingContacts.length > 1) {
-            throw new Error((
-                'Failed to update Contact! Criteria returned multiple Contacts. ' + 
-                'Please add additional criteria, i.e.: firstName, lastName, displayName'
-            ));
-        } if (!updateEntry && isNotEmpty(existingContacts)) {
-            throw new Error('Failed to create new Contact! Existing contact with similar info already exists!');
+            throw new Error(
+                "Failed to update Contact! Criteria returned multiple Contacts. " +
+                    "Please add additional criteria, i.e.: firstName, lastName, displayName"
+            );
+        }
+        if (!updateEntry && isNotEmpty(existingContacts)) {
+            throw new Error("Failed to create new Contact! Existing contact with similar info already exists!");
         }
 
         contact = isEmpty(existingContacts) ? null : existingContacts[0];
@@ -464,7 +480,7 @@ export class ContactInterface {
      * @returns A list of new contacts added
      */
     static async importFromVcf(filePath: string): Promise<any[]> {
-        Server().log(`Importing VCF from path: ${filePath}`, 'debug');
+        Server().log(`Importing VCF from path: ${filePath}`, "debug");
 
         const content = fs.readFileSync(filePath, { encoding: "utf-8" }).toString() ?? "";
         const parsed = vcf.parse(content);
@@ -519,11 +535,11 @@ export class ContactInterface {
 
         return output;
     }
-    
+
     /**
      * Deletes all contacts from the "local" database
      */
-     static async deleteAllContacts(): Promise<void> {
+    static async deleteAllContacts(): Promise<void> {
         const repo = Server().repo.contacts();
         await repo.clear();
     }

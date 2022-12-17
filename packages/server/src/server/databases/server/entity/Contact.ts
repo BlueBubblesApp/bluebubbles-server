@@ -1,14 +1,5 @@
 import { Base64Transformer } from "@server/databases/transformers/Base64Transformer";
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn,
-    OneToMany,
-    JoinTable,
-    Unique
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Unique } from "typeorm";
 import { ContactAddress } from "./ContactAddress";
 
 @Entity({ name: "contact" })
@@ -17,13 +8,13 @@ export class Contact {
     @PrimaryGeneratedColumn({ name: "id" })
     id: number;
 
-    @Column("text", { name: "first_name", nullable: false, default: '' })
+    @Column("text", { name: "first_name", nullable: false, default: "" })
     firstName: string;
 
-    @Column("text", { name: "last_name", nullable: false, default: '' })
+    @Column("text", { name: "last_name", nullable: false, default: "" })
     lastName: string;
 
-    @Column("text", { name: "display_name", nullable: false, default: '' })
+    @Column("text", { name: "display_name", nullable: false, default: "" })
     displayName: string;
 
     @OneToMany(() => ContactAddress, contactAddress => contactAddress.contact)

@@ -1,6 +1,6 @@
-import { getHandleResponse } from "@server/databases/imessage/entity/Handle";
 import { Server } from "@server";
 import { ChatResponse, HandleResponse } from "@server/types";
+import { HandleSerializer } from "../serializers/HandleSerializer";
 import { ChatInterface } from "./chatInterface";
 
 export class HandleInterface {
@@ -44,18 +44,16 @@ export class HandleInterface {
         }
 
         const results = await Promise.all(
-            handles.map(
-                async (e): Promise<HandleResponse> => {
-                    const test = await getHandleResponse(e);
+            handles.map(async (e): Promise<HandleResponse> => {
+                const test = await HandleSerializer.serialize({ handle: e });
 
-                    // Add in the cached chats
-                    if (withChats && Object.keys(handleChatMap).includes(test.address)) {
-                        test.chats = handleChatMap[test.address];
-                    }
-
-                    return test;
+                // Add in the cached chats
+                if (withChats && Object.keys(handleChatMap).includes(test.address)) {
+                    test.chats = handleChatMap[test.address];
                 }
-            )
+
+                return test;
+            })
         );
 
         return results;

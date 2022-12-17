@@ -8,6 +8,8 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
     try {
         await next();
     } catch (ex: any) {
+        Server().log(`Raw Error: ${String(ex)}`, "debug");
+
         // Log the error, no matter what it is
         let errStr = `API Error: ${ex?.message ?? ex}`;
         if (ex?.error?.message) {

@@ -31,6 +31,8 @@ import { FcmValidator } from "./validators/fcmValidator";
 import { AttachmentValidator } from "./validators/attachmentValidator";
 import { ChatValidator } from "./validators/chatValidator";
 import { AlertsValidator } from "./validators/alertsValidator";
+import { ScheduledMessageValidator } from "./validators/scheduledMessageValidator";
+import { ScheduledMessageRouter } from "./routers/scheduledMessageRouter";
 
 export class HttpRoutes {
     static version = 1;
@@ -244,6 +246,12 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/unread",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.markUnread
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/participant/add",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
@@ -279,7 +287,7 @@ export class HttpRoutes {
                         path: ":guid",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: ChatRouter.deleteChat
-                    },
+                    }
                 ]
             },
             {
@@ -331,9 +339,48 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: "schedule",
+                        controller: ScheduledMessageRouter.getScheduledMessages
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "schedule",
+                        validators: [ScheduledMessageValidator.validateScheduledMessage],
+                        controller: ScheduledMessageRouter.createScheduledMessage
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "schedule/:id",
+                        controller: ScheduledMessageRouter.getById
+                    },
+                    {
+                        method: HttpMethod.PUT,
+                        path: "schedule/:id",
+                        validators: [ScheduledMessageValidator.validateScheduledMessage],
+                        controller: ScheduledMessageRouter.updateScheduledMessage
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: "schedule/:id",
+                        controller: ScheduledMessageRouter.deleteById
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: ":guid",
                         validators: [MessageValidator.validateFind],
                         controller: MessageRouter.find
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/edit",
+                        validators: [MessageValidator.validateEdit],
+                        controller: MessageRouter.editMessage
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/unsend",
+                        validators: [MessageValidator.validateUnsend],
+                        controller: MessageRouter.unsendMessage
                     }
                 ]
             },

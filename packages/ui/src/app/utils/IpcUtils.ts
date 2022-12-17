@@ -1,4 +1,5 @@
 import { ContactItem } from 'app/components/tables/ContactsTable';
+import { ScheduledMessageItem } from 'app/components/tables/ScheduledMessagesTable';
 import { ipcRenderer } from 'electron';
 import { MultiSelectValue } from '../types';
 import { showErrorToast, showSuccessToast } from './ToastUtils';
@@ -124,4 +125,16 @@ export const getAttachmentCacheInfo = async () => {
 
 export const clearAttachmentCache = async () => {
     return await ipcRenderer.invoke('clear-attachment-caches');
+};
+
+export const deleteScheduledMessage = async (id: number) => {
+    return await ipcRenderer.invoke('delete-scheduled-message', id);
+};
+
+export const deleteScheduledMessages = async () => {
+    return await ipcRenderer.invoke('delete-scheduled-messages');
+};
+
+export const createScheduledMessage = async (message: ScheduledMessageItem) => {
+    return await ipcRenderer.invoke('create-scheduled-message', message);
 };

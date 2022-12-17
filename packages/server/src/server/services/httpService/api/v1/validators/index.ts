@@ -2,6 +2,14 @@ import Validator, { ValidationErrors } from "validatorjs";
 import { isNotEmpty } from "@server/helpers/utils";
 import { BadRequest } from "../responses/errors";
 
+Validator.register(
+    "json-object",
+    (value, requirement, attribute) => {
+        return typeof value === "object" && value !== null;
+    },
+    "The :attribute must be a valid json object."
+);
+
 export const getFirstError = (errors: ValidationErrors) => {
     for (const err of Object.keys(errors)) {
         if (isNotEmpty(errors[err])) {
