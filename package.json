@@ -1,6 +1,6 @@
 {
     "name": "bluebubbles-server",
-    "version": "1.4.3",
+    "version": "1.5.0",
     "description": "BlueBubbles Server is the app that powers the BlueBubbles app ecosystem",
     "private": true,
     "workspaces": [
