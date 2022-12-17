@@ -369,10 +369,6 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
-        if(facetimeServiceEnabled) {
-            this.facetime = new FacetimeService();
-        }
-
         try {
             this.log("Initializing proxy services...");
             this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
@@ -395,12 +391,12 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Starting Facetime service...");
+            this.log("Initializing Facetime service...");
             this.facetime = new FacetimeService();
         } catch (ex: any) {
             this.log(`Failed to start Facetime service! ${ex.message}`, "error");
         }
-        
+
         try {
             this.log("Initializing Scheduled Messages Service...");
             this.scheduledMessages = new ScheduledMessagesService();
@@ -441,10 +437,22 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.log(`Failed to start Scheduled Messages service! ${ex.message}`, "error");
         }
-        
+
         try {
-            this.log("Starting Facetime service...");
-            this.facetime.start();
+            if (facetimeServiceEnabled) {
+                this.log("Starting Facetime service...");
+                this.facetime.listen().catch(ex => {
+                    if (ex.message.includes("assistive access")) {
+                        this.log(
+                            "Failed to start Facetime service! Please enable Accessibility permissions " +
+                                "for BlueBubbles in System Preferences > Security & Privacy > Privacy > Accessibility",
+                            "error"
+                        );
+                    } else {
+                        this.log(`Failed to start Facetime service! ${ex.message}`, "error");
+                    }
+                });
+            }
         } catch (ex: any) {
             this.log(`Failed to start Facetime service! ${ex.message}`, "error");
         }
@@ -494,6 +502,12 @@ class BlueBubblesServer extends EventEmitter {
             await this.httpService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
+        }
+
+        try {
+            this.facetime?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Facetime service! ${ex?.message ?? ex}`, "error");
         }
 
         try {
