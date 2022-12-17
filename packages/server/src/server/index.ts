@@ -38,6 +38,7 @@ import {
     UpdateService,
     CloudflareService,
     WebhookService,
+    FacetimeService,
     ScheduledMessagesService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
@@ -72,6 +73,8 @@ import {
 const findProcess = require("find-process");
 
 const osVersion = macosVersion();
+
+const facetimeServiceEnabled = true;
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -118,6 +121,8 @@ class BlueBubblesServer extends EventEmitter {
     privateApiHelper: BlueBubblesHelperService;
 
     fcm: FCMService;
+
+    facetime: FacetimeService;
 
     networkChecker: NetworkService;
 
@@ -204,6 +209,7 @@ class BlueBubblesServer extends EventEmitter {
         this.httpService = null;
         this.privateApiHelper = null;
         this.fcm = null;
+        this.facetime = null;
         this.caffeinate = null;
         this.networkChecker = null;
         this.queue = null;
@@ -363,6 +369,10 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
+        if(facetimeServiceEnabled) {
+            this.facetime = new FacetimeService();
+        }
+
         try {
             this.log("Initializing proxy services...");
             this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
@@ -385,10 +395,17 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
+            this.log("Starting Facetime service...");
+            this.facetime = new FacetimeService();
+        } catch (ex: any) {
+            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
+        }
+        
+        try {
             this.log("Initializing Scheduled Messages Service...");
             this.scheduledMessages = new ScheduledMessagesService();
         } catch (ex: any) {
-            this.log(`Failed to start Webhook service! ${ex.message}`, "error");
+            this.log(`Failed to start Scheduled Message service! ${ex.message}`, "error");
         }
     }
 
@@ -423,6 +440,13 @@ class BlueBubblesServer extends EventEmitter {
             await this.scheduledMessages.start();
         } catch (ex: any) {
             this.log(`Failed to start Scheduled Messages service! ${ex.message}`, "error");
+        }
+        
+        try {
+            this.log("Starting Facetime service...");
+            this.facetime.start();
+        } catch (ex: any) {
+            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
