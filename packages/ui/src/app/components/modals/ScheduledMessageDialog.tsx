@@ -197,11 +197,19 @@ export const ScheduledMessageDialog = ({
                                 type='datetime-local'
                                 defaultValue={toLocalIsoString(scheduledFor)}
                                 onChange={(e) => {
-                                    if (e.target.value.length !== 0) {
-                                        setScheduledFor(new Date(e.target.value));
-                                    }
-
                                     setDateError('');
+                                    if (e.target.value.length !== 0) {
+                                        let date;
+
+                                        try {
+                                            date = new Date(e.target.value);
+                                        } catch (e) {
+                                            setDateError('Invalid date');
+                                            return;
+                                        }
+
+                                        setScheduledFor(date);
+                                    }
                                 }}
                             />
                             {hasDateError ? (
