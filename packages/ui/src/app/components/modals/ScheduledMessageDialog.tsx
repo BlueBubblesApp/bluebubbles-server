@@ -30,6 +30,21 @@ interface ScheduledMessageDialogProps {
     modalRef: React.RefObject<FocusableElement>;
 }
 
+const toLocalIsoString = (date: Date | null) => {
+    if (!date) return '';
+
+    const pad = (num: number) => {
+        return (num < 10 ? '0' : '') + num;
+    };
+  
+    return date.getFullYear() +
+        '-' + pad(date.getMonth() + 1) +
+        '-' + pad(date.getDate()) +
+        'T' + pad(date.getHours()) +
+        ':' + pad(date.getMinutes()) +
+        ':' + pad(date.getSeconds());
+};
+
 export const ScheduledMessageDialog = ({
     onCancel,
     onCreate,
@@ -180,10 +195,13 @@ export const ScheduledMessageDialog = ({
                             <Input
                                 id='scheduledFor'
                                 type='datetime-local'
-                                value={scheduledFor?.toISOString().split('.')[0] ?? ''}
+                                defaultValue={toLocalIsoString(scheduledFor)}
                                 onChange={(e) => {
+                                    if (e.target.value.length !== 0) {
+                                        setScheduledFor(new Date(e.target.value));
+                                    }
+
                                     setDateError('');
-                                    setScheduledFor(new Date(e.target.value));
                                 }}
                             />
                             {hasDateError ? (
