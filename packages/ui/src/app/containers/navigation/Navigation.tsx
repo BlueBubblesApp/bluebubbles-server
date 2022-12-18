@@ -256,7 +256,7 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
             />
 
             <Text display={{ base: 'flex', md: 'none' }} fontSize="2xl" fontFamily="monospace" fontWeight="bold">
-                <img src={logo} className="logo-small" alt="logo" />
+                <img style={{ minWidth: '48px' }} src={logo} className="logo-small" alt="logo" />
             </Text>
 
             <HStack spacing={{ base: '0', md: '1' }}>
