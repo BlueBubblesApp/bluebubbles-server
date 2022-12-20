@@ -11,6 +11,30 @@ import { SendMessageParams } from "../types";
  * of directly calling the DB or the service.
  */
 export class ScheduledMessagesInterface {
+    static validateSchedule(
+        scheduledFor: Date,
+        schedule: {
+            type: ScheduledMessageScheduleType;
+            intervalType?: string;
+            interval?: number;
+        }
+    ) {
+        if (schedule.type === "recurring" && !schedule.intervalType) {
+            throw new Error("Recurring schedule must have an interval type");
+        }
+
+        if (schedule.type === "recurring" && (!schedule.interval || schedule.interval === 0)) {
+            throw new Error("Recurring schedule must have an interval > 0");
+        }
+
+        if (!scheduledFor) {
+            throw new Error("Scheduled For date is required");
+        }
+
+        if (scheduledFor.getTime() < new Date().getTime()) {
+            throw new Error("Scheduled For date must be in the future");
+        }
+    }
     /**
      * Gets all scheduled messages from the DB.
      *
@@ -39,21 +63,7 @@ export class ScheduledMessagesInterface {
             interval?: number;
         }
     ): Promise<ScheduledMessage> {
-        if (schedule.type === "recurring" && !schedule.intervalType) {
-            throw new Error("Recurring schedule must have an interval type");
-        }
-
-        if (schedule.type === "recurring" && (!schedule.interval || schedule.interval === 0)) {
-            throw new Error("Recurring schedule must have an interval > 0");
-        }
-
-        if (!scheduledFor) {
-            throw new Error("Scheduled For date is required");
-        }
-
-        if (scheduledFor.getTime() < new Date().getTime()) {
-            throw new Error("Scheduled For date must be in the future");
-        }
+        ScheduledMessagesInterface.validateSchedule(scheduledFor, schedule);
 
         const msg = new ScheduledMessage();
         msg.type = type;
@@ -62,6 +72,37 @@ export class ScheduledMessagesInterface {
         msg.schedule = schedule;
         msg.status = "pending";
         return await Server().scheduledMessages.createScheduledMessage(msg);
+    }
+
+    /**
+     * Updates an existing scheduled message.
+     *
+     * @param type The type of the scheduled message.
+     * @param payload The payload to invoke the action type.
+     * @param scheduledFor The date the message should be sent.
+     * @param schedule The schedule configuration.
+     * @returns The newly created scheduled message.
+     */
+    static async updateScheduledMessage(
+        id: number,
+        type: ScheduledMessageType,
+        payload: SendMessageParams,
+        scheduledFor: Date,
+        schedule: {
+            type: ScheduledMessageScheduleType;
+            intervalType?: string;
+            interval?: number;
+        }
+    ): Promise<ScheduledMessage> {
+        ScheduledMessagesInterface.validateSchedule(scheduledFor, schedule);
+
+        const msg = new ScheduledMessage();
+        msg.type = type;
+        msg.payload = payload;
+        msg.scheduledFor = scheduledFor;
+        msg.schedule = schedule;
+
+        return await Server().scheduledMessages.updateScheduledMessage(id, msg);
     }
 
     /**

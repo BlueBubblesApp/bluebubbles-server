@@ -33,6 +33,30 @@ export class ScheduledMessageRouter {
     }
 
     /**
+     * HTTP route for handling the updating an existing scheduled message
+     *
+     * @param ctx The Koa context.
+     * @param _ The next function.
+     */
+    static async updateScheduledMessage(ctx: RouterContext, _: Next) {
+        const id = ctx.params.id;
+        const { type, payload, scheduledFor, schedule } = ctx.request.body;
+
+        const data = await ScheduledMessagesInterface.updateScheduledMessage(
+            Number.parseInt(id),
+            type,
+            payload,
+            scheduledFor,
+            schedule
+        );
+
+        return new Success(ctx, {
+            message: "Successfully updated the scheduled message!",
+            data
+        }).send();
+    }
+
+    /**
      * HTTP route for handling fetching a single scheduled message.
      *
      * @param ctx The Koa context.

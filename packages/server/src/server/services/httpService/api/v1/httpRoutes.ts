@@ -354,6 +354,12 @@ export class HttpRoutes {
                         controller: ScheduledMessageRouter.getById
                     },
                     {
+                        method: HttpMethod.PUT,
+                        path: "schedule/:id",
+                        validators: [ScheduledMessageValidator.validateScheduledMessage],
+                        controller: ScheduledMessageRouter.updateScheduledMessage
+                    },
+                    {
                         method: HttpMethod.DELETE,
                         path: "schedule/:id",
                         controller: ScheduledMessageRouter.deleteById

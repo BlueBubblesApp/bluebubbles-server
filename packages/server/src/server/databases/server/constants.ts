@@ -1,3 +1,5 @@
+import { Server } from "@server";
+
 export const DEFAULT_SOCKET_PORT = 1234;
 export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     tutorial_is_done: () => 0,
@@ -20,5 +22,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     enable_private_api: () => 0,
     use_oled_dark_mode: () => 0,
     db_poll_interval: () => 1000,
-    dock_badge: () => 1
+    dock_badge: () => 1,
+    facetime_detection: () => (Server().hasAccessibilityAccess ? 1 : 0)
 };

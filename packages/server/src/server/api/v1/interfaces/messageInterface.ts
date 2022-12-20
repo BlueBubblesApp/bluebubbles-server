@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
+import { checkPrivateApiStatus, isMinMonterey, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ActionHandler } from "@server/api/v1/apple/actions";
@@ -147,8 +147,14 @@ export class MessageInterface {
         await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
         const ret = await awaiter.promise;
 
-        // Delete the attachment
-        fs.unlink(newPath, _ => null);
+        // Delete the attachment.
+        // Only if below Monterey. On Monterey, we store attachments
+        // within the iMessage App Support directory. When AppleScript sees this
+        // it _does not_ copy the attachment to a permanent location.
+        // This means that if we delete the attachment, it won't be downloadable anymore.
+        if (!isMinMonterey) {
+            fs.unlink(newPath, _ => null);
+        }
 
         return ret;
     }

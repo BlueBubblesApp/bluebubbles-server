@@ -5,7 +5,7 @@ import { BadRequest } from "../responses/errors";
 import { ScheduledMessageScheduleType } from "@server/services/scheduledMessagesService";
 
 export class ScheduledMessageValidator {
-    static createRules = {
+    static defaultRules = {
         type: "string|in:send-message|required",
         payload: "json-object|required",
         scheduledFor: "numeric|min:1|required",
@@ -21,7 +21,7 @@ export class ScheduledMessageValidator {
     static async validateScheduledMessage(ctx: RouterContext, next: Next) {
         const { payload, scheduledFor, schedule } = ValidateInput(
             ctx?.request?.body,
-            ScheduledMessageValidator.createRules
+            ScheduledMessageValidator.defaultRules
         );
 
         const required = ["chatGuid", "message", "method"];
