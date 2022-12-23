@@ -333,7 +333,7 @@ export class MessageRepository {
                 after: convertDateTo2001Time(after as Date)
             });
         if (before)
-            query.andWhere("message.date_delivered < :before", {
+            query.andWhere("message.date_delivered <= :before", {
                 before: convertDateTo2001Time(before as Date)
             });
 
@@ -343,7 +343,7 @@ export class MessageRepository {
                 after: convertDateTo2001Time(after as Date)
             });
         if (before)
-            query.andWhere("message.date_read < :before", {
+            query.andWhere("message.date_read <= :before", {
                 before: convertDateTo2001Time(before as Date)
             });
 
@@ -353,7 +353,17 @@ export class MessageRepository {
                 after: convertDateTo2001Time(after as Date)
             });
         if (before && isMinVentura)
-            query.andWhere("message.date_edited < :before", {
+            query.andWhere("message.date_edited <= :before", {
+                before: convertDateTo2001Time(before as Date)
+            });
+
+        // Add date_retracted constraints
+        if (after && isMinVentura)
+            query.orWhere("message.date_retracted >= :after", {
+                after: convertDateTo2001Time(after as Date)
+            });
+        if (before && isMinVentura)
+            query.andWhere("message.date_retracted <= :before", {
                 before: convertDateTo2001Time(before as Date)
             });
 
