@@ -1,7 +1,11 @@
-import { checkForIncomingFacetime10, checkForIncomingFacetime11 } from "@server/api/v1/apple/scripts";
+import {
+    checkForIncomingFacetime10,
+    checkForIncomingFacetime11,
+    checkForIncomingFacetime13
+} from "@server/api/v1/apple/scripts";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { isMinBigSur, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 import { INCOMING_FACETIME } from "@server/events";
 
 export class FacetimeService {
@@ -49,10 +53,14 @@ export class FacetimeService {
                 let hasErrored = false;
 
                 try {
-                    if (isMinBigSur) {
+                    if (isMinVentura) {
+                        facetimeCallIncoming = (
+                            await FileSystem.executeAppleScript(checkForIncomingFacetime13())
+                        ).replace("\n", ""); // If on macos 13
+                    } else if (isMinBigSur) {
                         facetimeCallIncoming = (
                             await FileSystem.executeAppleScript(checkForIncomingFacetime11())
-                        ).replace("\n", ""); // If on macos 11 and up
+                        ).replace("\n", ""); // If on macos 11 and 12
                     } else {
                         facetimeCallIncoming = (
                             await FileSystem.executeAppleScript(checkForIncomingFacetime10())

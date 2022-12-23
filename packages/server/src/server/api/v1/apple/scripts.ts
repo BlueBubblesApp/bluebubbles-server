@@ -875,25 +875,42 @@ export const checkForIncomingFacetime11 = () => {
         end if
         set notificationGroup to group 1 of UI element 1 of scroll area 1 of window 1 of application process "NotificationCenter"
         
-        if (exists static text 1 of notificationGroup) and (value of static text 1 of notificationGroup = "FaceTime") then
+        if (exists static text 1 of notificationGroup) and (value of static text 1 of notificationGroup starts with "FaceTime") then
             set callerName to value of static text 2 of notificationGroup
             return callerName
         else
             return ""
         end if
-    end tell`
+    end tell`;
 };
+
+export const checkForIncomingFacetime13 = () => {
+    return `tell application "System Events"
+        if not (exists group 1 of UI element 1 of scroll area 1 of group 1 of window 1 of application process "NotificationCenter") then
+            return ""
+        end if
+        
+        set notificationGroup to group 1 of UI element 1 of scroll area 1 of group 1 of window 1 of application process "NotificationCenter"
+        set callType to value of static text 1 of notificationGroup
+        if not (callType starts with "FaceTime") then
+            return ""
+        end if
+        
+        set callerName to value of static text 2 of notificationGroup
+        return callerName
+    end tell`;
+}
 
 export const checkForIncomingFacetime10 = () => {
     return `tell application "System Events"
         tell application process "NotificationCenter"
             if not (exists static text 2 of window 1) then
                 return ""
-            else if (value of static text 1 of window 1 = "FaceTime") then
+            else if (value of static text 1 of window 1 starts with "FaceTime") then
                 return value of static text 2 of window 1
             else
                 return ""
             end if
         end tell
-    end tell`
+    end tell`;
 };
