@@ -68,6 +68,11 @@ export class FacetimeService {
                     }
                 } catch (e: any) {
                     if ((e?.message ?? "").includes("assistive access")) {
+                        Server().log("Facetime listener detected an assistive access error");
+                        this.flush();
+                        return reject(e);
+                    } else if ((e?.message ?? "").includes("can't open default scripting component")) {
+                        Server().log("Facetime listener detected an osascript component error");
                         this.flush();
                         return reject(e);
                     } else {
@@ -115,7 +120,7 @@ export class FacetimeService {
                     this.hadPreviousCall = this.isGettingCall;
                 }
 
-                setTimeout(serviceLoop, 2000);
+                setTimeout(serviceLoop, 4000);
             };
 
             setTimeout(serviceLoop, 0);
