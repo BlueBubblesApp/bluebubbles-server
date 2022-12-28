@@ -232,7 +232,19 @@ export class IPCService {
 
             // If we don't get a top , return "Unknown"
             if (!currentTop) return "Unknown";
-            if (isGroup && (currentTop as string).length === 0) {
+
+            // If this is an individual, get their contact info
+            if (!isGroup) {
+                try {
+                    const res = await ContactInterface.queryContacts([currentTop]);
+                    const contact = res && res.length > 0 ? res[0] : null;
+                    if (contact?.displayName) {
+                        return contact.displayName;
+                    }
+                } catch {
+                    // Don't do anything if we fail. The fallback will be applied
+                }
+            } else if ((currentTop as string).length === 0) {
                 return "Unnamed Group";
             }
 
