@@ -11,12 +11,6 @@ import { isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
 
-export const getCacheName = (message: Message) => {
-    const delivered = message.dateDelivered ? message.dateDelivered.getTime() : 0;
-    const read = message.dateRead ? message.dateRead.getTime() : 0;
-    return `${message.guid}:${delivered}:${read}`;
-};
-
 export const convertAudio = async (
     attachment: Attachment,
     { originalMimeType = null }: { originalMimeType?: string } = {}
