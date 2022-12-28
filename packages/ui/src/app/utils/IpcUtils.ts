@@ -1,4 +1,3 @@
-import { ContactItem } from 'app/components/tables/ContactsTable';
 import { ScheduledMessageItem } from 'app/components/tables/ScheduledMessagesTable';
 import { ipcRenderer } from 'electron';
 import { MultiSelectValue } from '../types';
@@ -95,10 +94,6 @@ export const reinstallHelperBundle = async () => {
             description: res.message
         });
     }
-};
-
-export const getContactName = async (value: string): Promise<ContactItem> => {
-    return await syncInvokeIpc('get-contact-name', value);
 };
 
 export const syncInvokeIpc = async (event: string, data: any = null): Promise<any> => {
