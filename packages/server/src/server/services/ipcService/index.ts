@@ -176,11 +176,6 @@ export class IPCService {
             return await ContactInterface.importFromVcf(path);
         });
 
-        ipcMain.handle("get-contact-name", async (event, address) => {
-            const res = await ContactInterface.queryContacts([address]);
-            return res && res.length > 0 ? res[0] : null;
-        });
-
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {
             await Server().repo.setConfig("tutorial_is_done", toggle);
 
@@ -217,6 +212,43 @@ export class IPCService {
             if (!Server().iMessageRepo?.db) return 0;
             const count = await Server().iMessageRepo.getChatMessageCounts("individual");
             return count;
+        });
+
+        ipcMain.handle("get-best-friend", async (event, args) => {
+            if (!Server().iMessageRepo?.db) return 0;
+            const counts = await Server().iMessageRepo.getChatMessageCounts("individual");
+
+            let currentTopCount = 0;
+            let currentTop: string | null = null;
+            let isGroup = false;
+            counts.forEach((item: any) => {
+                if (!currentTop || item.message_count > currentTopCount) {
+                    const guid = item.chat_guid.replace("iMessage", "").replace(";+;", "").replace(";-;", "");
+                    currentTopCount = item.message_count;
+                    isGroup = (item.group_name ?? "").length > 0;
+                    currentTop = isGroup ? item.group_name : guid;
+                }
+            });
+
+            // If we don't get a top , return "Unknown"
+            if (!currentTop) return "Unknown";
+
+            // If this is an individual, get their contact info
+            if (!isGroup) {
+                try {
+                    const res = await ContactInterface.queryContacts([currentTop]);
+                    const contact = res && res.length > 0 ? res[0] : null;
+                    if (contact?.displayName) {
+                        return contact.displayName;
+                    }
+                } catch {
+                    // Don't do anything if we fail. The fallback will be applied
+                }
+            } else if ((currentTop as string).length === 0) {
+                return "Unnamed Group";
+            }
+
+            return currentTop;
         });
 
         ipcMain.handle("refresh-api-contacts", async (_, __) => {

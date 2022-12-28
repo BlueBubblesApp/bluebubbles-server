@@ -318,7 +318,6 @@ export class SocketRoutes {
                 before: params?.before,
                 withChats: params?.withChats ?? false,
                 withAttachments: params?.withAttachments ?? true,
-                withHandle: params?.withHandle ?? true,
                 sort: params?.sort ?? "DESC"
             };
 
@@ -358,7 +357,6 @@ export class SocketRoutes {
                 before: params?.before,
                 withChats: params?.withChats ?? true, // Default to true
                 withAttachments: params?.withAttachments ?? true, // Default to true
-                withHandle: params?.withHandle ?? true, // Default to true
                 sort: params?.sort ?? "ASC" // We want to older messages at the top
             };
 

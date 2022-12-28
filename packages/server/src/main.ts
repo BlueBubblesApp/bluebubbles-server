@@ -7,10 +7,10 @@ import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
 
-app.commandLine.appendSwitch('in-process-gpu');
+app.commandLine.appendSwitch("in-process-gpu");
 
 // Patch in original user data directory
-app.setPath('userData', app.getPath('userData').replace('@bluebubbles/server', 'bluebubbles-server'));
+app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
 
 let win: BrowserWindow;
 let tray: Tray;
@@ -41,13 +41,12 @@ if (!gotTheLock) {
 process.on("uncaughtException", error => {
     // Print the exception
     Server().log(`Uncaught Exception: ${error.message}`, "error");
-    if (error?.stack) Server().log(`Uncaught Exception StackTrace: ${error?.stack}`, 'debug');
-    
+    if (error?.stack) Server().log(`Uncaught Exception StackTrace: ${error?.stack}`, "debug");
 });
 
-const handleExit = async (event: any = null) => {
+const handleExit = async (event: any = null, { exit = true } = {}) => {
     if (event) event.preventDefault();
-    console.trace('handleExit');
+    console.trace("handleExit");
     if (isHandlingExit) return;
     isHandlingExit = true;
 
@@ -55,8 +54,10 @@ const handleExit = async (event: any = null) => {
     if (Server() && !Server().isStopping) {
         await Server().stopServices();
     }
-    
-    app.exit(0);
+
+    if (exit) {
+        app.exit(0);
+    }
 };
 
 const buildTray = () => {
@@ -141,8 +142,8 @@ const createTray = () => {
             tray.setContextMenu(buildTray());
         });
     } catch (ex: any) {
-        Server().log('Failed to load macOS tray entry!', 'error');
-        Server().log(ex?.message ?? String(ex), 'debug');
+        Server().log("Failed to load macOS tray entry!", "error");
+        Server().log(ex?.message ?? String(ex), "debug");
     }
 };
 
@@ -179,7 +180,7 @@ const createWindow = async () => {
     // Make links open in the browser
     win.webContents.setWindowOpenHandler((details: HandlerDetails) => {
         shell.openExternal(details.url);
-        return { action: 'deny' };
+        return { action: "deny" };
     });
 
     // Hook onto when we load the UI
@@ -201,7 +202,7 @@ app.on("ready", () => {
 });
 
 app.on("activate", () => {
-    if (win === null) createWindow();
+    if (win == null) createWindow();
 });
 
 app.on("window-all-closed", () => {
@@ -213,7 +214,7 @@ app.on("window-all-closed", () => {
 /**
  * Basically, we want to gracefully exist whenever there is a Ctrl + C or other exit command
  */
-app.on("before-quit", (event) => handleExit(event));
+app.on("before-quit", event => handleExit(event));
 
 /**
  * All code below this point has to do with the command-line functionality.

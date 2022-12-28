@@ -85,14 +85,14 @@ export const hideMessages = () => {
  * The AppleScript used to send a message with or without an attachment
  */
 export const startMessages = () => {
-    return startApp('Messages');
+    return startApp("Messages");
 };
 
 /**
  * The AppleScript used to send a message with or without an attachment
  */
 export const startFindMyFrields = () => {
-    return startApp('FindMy');
+    return startApp("FindMy");
 };
 
 /**
@@ -116,14 +116,14 @@ export const showApp = (appName: string) => {
 /**
  * The AppleScript used to send a message with or without an attachment
  */
- export const hideFindMyFriends = () => {
-    return hideApp('FindMy');
+export const hideFindMyFriends = () => {
+    return hideApp("FindMy");
 };
 
 /**
  * The AppleScript used to send a message with or without an attachment
  */
- export const startApp = (appName: string) => {
+export const startApp = (appName: string) => {
     return `set appName to "${appName}"
         if application appName is running then
             return 0
@@ -252,7 +252,7 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
             delay 2
         end try
         
-        ${scriptCopy ?? ''}
+        ${scriptCopy ?? ""}
         tell application "System Events" to tell application process "Messages"
             set frontmost to true
             keystroke "n" using {command down}
@@ -265,7 +265,7 @@ export const sendAttachmentAccessibility = (attachmentPath: string, participants
             delay 0.5
             key code 51
             delay 0.5
-            ${scriptClip ?? ''}
+            ${scriptClip ?? ""}
             delay 0.5
             keystroke "v" using {command down}
             delay 3.0
@@ -873,27 +873,61 @@ export const checkForIncomingFacetime11 = () => {
         if not (exists group 1 of UI element 1 of scroll area 1 of window 1 of application process "NotificationCenter") then
             return ""
         end if
-        set notificationGroup to group 1 of UI element 1 of scroll area 1 of window 1 of application process "NotificationCenter"
         
-        if (exists static text 1 of notificationGroup) and (value of static text 1 of notificationGroup = "FaceTime") then
-            set callerName to value of static text 2 of notificationGroup
-            return callerName
-        else
+        set notificationGroup to group 1 of UI element 1 of scroll area 1 of window 1 of application process "NotificationCenter"
+        try
+            if (exists static text 1 of notificationGroup) and (exists static text 2 of notificationGroup) and (value of static text 1 of notificationGroup starts with "FaceTime") then
+                return value of static text 2 of notificationGroup
+            else
+                return ""
+            end if
+        on error
+            return ""
+        end try
+    end tell`;
+};
+
+export const checkForIncomingFacetime13 = () => {
+    return `tell application "System Events"
+        if not (exists group 1 of UI element 1 of scroll area 1 of group 1 of window 1 of application process "NotificationCenter") then
             return ""
         end if
-    end tell`
+        
+        set notificationGroup to group 1 of UI element 1 of scroll area 1 of group 1 of window 1 of application process "NotificationCenter"
+        
+        try
+            if (exists static text 1 of notificationGroup) and (exists static text 2 of notificationGroup) then
+                set callType to value of static text 1 of notificationGroup
+                if not (callType starts with "FaceTime") then
+                    return ""
+                end if
+
+                return value of static text 2 of notificationGroup
+            end if
+        on error
+            return ""
+        end try
+        
+        return ""
+    end tell`;
 };
 
 export const checkForIncomingFacetime10 = () => {
     return `tell application "System Events"
         tell application process "NotificationCenter"
-            if not (exists static text 2 of window 1) then
-                return ""
-            else if (value of static text 1 of window 1 = "FaceTime") then
-                return value of static text 2 of window 1
-            else
+            if not (exists static text 1 of window 1) or not (exists static text 2 of window 1) then
                 return ""
             end if
+            
+            try
+                if (value of static text 1 of window 1 starts with "FaceTime") then
+                    return value of static text 2 of window 1
+                else
+                    return ""
+                end if
+            on error
+                return ""
+            end try
         end tell
-    end tell`
+    end tell`;
 };

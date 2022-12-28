@@ -66,7 +66,6 @@ export class ChatRouter {
     static async getMessages(ctx: RouterContext, _: Next) {
         const withQuery = parseWithQuery(ctx?.request?.query?.with);
         const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
-        const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
         const withAttributedBody = arrayHasOne(withQuery, [
             "message.attributedbody",
             "message.attributed-body",
@@ -93,7 +92,6 @@ export class ChatRouter {
         const opts: DBMessageParams = {
             chatGuid: ctx.params.guid,
             withAttachments,
-            withHandle,
             offset: offset ? Number.parseInt(offset as string, 10) : 0,
             limit: limit ? Number.parseInt(limit as string, 10) : 100,
             sort: sort as "ASC" | "DESC",

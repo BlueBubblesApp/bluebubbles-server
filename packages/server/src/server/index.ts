@@ -1144,12 +1144,19 @@ class BlueBubblesServer extends EventEmitter {
             // ATTENTION: If "from" is null, it means you sent the message from a group chat
             // Check the isFromMe key prior to checking the "from" key
             const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
-            const time = newMessage.dateDelivered || newMessage.dateRead;
-            const updateType = newMessage.dateRead ? "Text Read" : "Text Delivered";
+            const time =
+                newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted;
+            const updateType = newMessage.dateRetracted
+                ? "Text Unsent"
+                : newMessage.dateEdited
+                ? "Text Edited"
+                : newMessage.dateRead
+                ? "Text Read"
+                : "Text Delivered";
 
             // Husky pre-commit validator was complaining, so I created vars
             const content = newMessage.contentString();
-            const localeTime = time.toLocaleString();
+            const localeTime = time?.toLocaleString();
             this.log(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
 
             // Manually send the message to the socket so we can serialize it with

@@ -260,13 +260,11 @@ export class ScheduledMessagesService {
         }
 
         if (scheduledMessage.status === ScheduledMessageStatus.COMPLETE) {
-            Server().log(`Already Complete: ${scheduledMessage.toString()}`);
             this.tryReschedule(scheduledMessage);
             return;
         }
 
         if (scheduledMessage.status === ScheduledMessageStatus.ERROR) {
-            Server().log(`Already Errored: ${scheduledMessage.toString()}`);
             this.tryReschedule(scheduledMessage);
             return;
         }

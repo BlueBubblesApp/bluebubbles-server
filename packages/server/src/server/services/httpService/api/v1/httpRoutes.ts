@@ -18,6 +18,7 @@ import { UiRouter } from "./routers/uiRouter";
 import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
 import { MetricsMiddleware } from "./middleware/metricsMiddleware";
+import { TimeoutMiddleware } from "./middleware/timeoutMiddleware";
 import { LogMiddleware } from "./middleware/logMiddleware";
 import { ErrorMiddleware } from "./middleware/errorMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
@@ -42,7 +43,7 @@ export class HttpRoutes {
     }
 
     private static get unprotected() {
-        return [MetricsMiddleware, ErrorMiddleware, LogMiddleware];
+        return [MetricsMiddleware, ErrorMiddleware, LogMiddleware, TimeoutMiddleware];
     }
 
     static api: HttpDefinition = {

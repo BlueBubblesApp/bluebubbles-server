@@ -35,7 +35,7 @@ export const HomeLayout = (): JSX.Element => {
     const fcmClient = useAppSelector(state => state.config.fcm_client);
     const password = useAppSelector(state => state.config.password);
     const port = useAppSelector(state => state.config.socket_port);
-    const qrCode = fcmClient ? buildQrData(password, address, fcmClient) : null;
+    const qrCode: any = fcmClient ? buildQrData(password, address, fcmClient) : null;
 
     return (
         <Box p={3} borderRadius={10}>

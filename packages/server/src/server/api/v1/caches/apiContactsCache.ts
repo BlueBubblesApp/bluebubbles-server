@@ -1,4 +1,3 @@
-import { Server } from "@server";
 import { getContactPermissionStatus } from "@server/utils/PermissionUtils";
 import { ContactInterface } from "../interfaces/contactInterface";
 
