@@ -75,16 +75,20 @@ export class OutgoingMessageListener extends MessageChangeListener {
         }
 
         // 4: Find all unsent messages
-        const lookbackMessages = await this.repo.getMessages({
-            withChats: true,
-            where: [
-                ...baseQuery,
-                {
-                    statement: `message.ROWID in (${unsentIds.join(", ")})`,
-                    args: null
-                }
-            ]
-        });
+        let lookbackMessages: any[] = [];
+        if (isNotEmpty(unsentIds)) {
+            lookbackMessages = await this.repo.getMessages({
+                withChats: true,
+                where: [
+                    ...baseQuery,
+                    {
+                        statement: `message.ROWID in (${unsentIds.join(", ")})`,
+                        args: null
+                    }
+                ]
+            });
+        }
+
         if (isNotEmpty(lookbackMessages)) {
             Server().log(`Detected ${lookbackMessages.length} sent (previously unsent) message(s)`, "debug");
         }

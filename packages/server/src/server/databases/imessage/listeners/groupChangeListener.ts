@@ -22,7 +22,6 @@ export class GroupChangeListener extends MessageChangeListener {
         const entries = await this.repo.getMessages({
             after: offsetDate,
             withChats: true,
-            withHandle: true,
             where: [
                 {
                     statement: "message.text IS NULL",

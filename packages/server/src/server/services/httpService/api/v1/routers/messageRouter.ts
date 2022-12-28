@@ -101,7 +101,6 @@ export class MessageRouter {
         const withChats = arrayHasOne(withQuery, ["chat", "chats"]);
         const withAttachments = arrayHasOne(withQuery, ["attachment", "attachments"]);
         const withAttachmentMetadata = arrayHasOne(withQuery, ["attachment.metadata", "attachments.metadata"]);
-        const withHandle = arrayHasOne(withQuery, ["handle", "handles"]);
         const withChatParticipants = arrayHasOne(withQuery, ["chat.participants", "chats.participants"]);
         const withAttributedBody = arrayHasOne(withQuery, ["attributedbody", "attributed-body"]);
         const withMessageSummaryInfo = arrayHasOne(withQuery, ["messageSummaryInfo", "message-summary-info"]);
@@ -126,7 +125,6 @@ export class MessageRouter {
             chatGuid,
             withChats: withChats || withChatParticipants,
             withAttachments,
-            withHandle,
             offset,
             limit,
             sort,
