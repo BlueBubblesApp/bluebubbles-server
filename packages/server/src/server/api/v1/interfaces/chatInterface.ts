@@ -1,5 +1,5 @@
-import { Chat } from "@server/databases/imessage/entity/Chat";
-import { Handle } from "@server/databases/imessage/entity/Handle";
+import {Chat} from "@server/databases/imessage/entity/Chat";
+import {Handle} from "@server/databases/imessage/entity/Handle";
 import {
     checkPrivateApiStatus,
     isEmpty,
@@ -9,14 +9,14 @@ import {
     resultAwaiter,
     slugifyAddress
 } from "@server/helpers/utils";
-import { Server } from "@server";
-import { FileSystem } from "@server/fileSystem";
-import { ChatResponse, HandleResponse } from "@server/types";
-import { startChat } from "../apple/scripts";
-import { MessageInterface } from "./messageInterface";
-import { CHAT_READ_STATUS_CHANGED } from "@server/events";
-import { ChatSerializer } from "../serializers/ChatSerializer";
-import { HandleSerializer } from "../serializers/HandleSerializer";
+import {Server} from "@server";
+import {FileSystem} from "@server/fileSystem";
+import {ChatResponse, HandleResponse} from "@server/types";
+import {startChat} from "../apple/scripts";
+import {MessageInterface} from "./messageInterface";
+import {CHAT_READ_STATUS_CHANGED} from "@server/events";
+import {ChatSerializer} from "../serializers/ChatSerializer";
+import {HandleSerializer} from "../serializers/HandleSerializer";
 
 export class ChatInterface {
     static async get({
@@ -136,12 +136,14 @@ export class ChatInterface {
     static async create({
         addresses,
         message = null,
+        fileTransferGUIDs = null,
         method = "apple-script",
         service = "iMessage",
         tempGuid
     }: {
         addresses: string[];
         message?: string | null;
+        fileTransferGUIDs?: string[];
         method?: "apple-script" | "private-api";
         service?: "iMessage" | "SMS";
         tempGuid?: string;
@@ -206,7 +208,13 @@ export class ChatInterface {
 
         // If we have a message, want to send via the private api, and are not on Big Sur, send the message
         if (isNotEmpty(message) && !isMinBigSur) {
-            sentMessage = await MessageInterface.sendMessageSync({ chatGuid, message, method, tempGuid });
+            sentMessage = await MessageInterface.sendMessageSync({
+                chatGuid,
+                fileTransferGUIDs,
+                message,
+                method,
+                tempGuid
+            });
         }
 
         const chat = chats[0];

@@ -3,23 +3,23 @@ import * as os from "os";
 import * as fs from "fs";
 import CompareVersions from "compare-versions";
 import cpr from "recursive-copy";
-import { parse as ParsePlist } from "plist";
-import { Server } from "@server";
-import { FileSystem } from "@server/fileSystem";
-import { ValidTapback } from "@server/types";
-import { clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty } from "@server/helpers/utils";
-import { restartMessages } from "@server/api/v1/apple/scripts";
+import {parse as ParsePlist} from "plist";
+import {Server} from "@server";
+import {FileSystem} from "@server/fileSystem";
+import {ValidTapback} from "@server/types";
+import {clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty} from "@server/helpers/utils";
+import {restartMessages} from "@server/api/v1/apple/scripts";
 import {
     TransactionPromise,
     TransactionResult,
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
-import { TransactionManager } from "@server/managers/transactionManager";
+import {TransactionManager} from "@server/managers/transactionManager";
 
 import * as net from "net";
-import { ValidRemoveTapback } from "../../types";
-import { MAX_PORT, MIN_PORT } from "./constants";
-import { TYPING_INDICATOR } from "@server/events";
+import {ValidRemoveTapback} from "../../types";
+import {MAX_PORT, MIN_PORT} from "./constants";
+import {TYPING_INDICATOR} from "@server/events";
 
 type BundleStatus = {
     success: boolean;
@@ -389,6 +389,7 @@ export class BlueBubblesHelperService {
         subject: string = null,
         effectId: string = null,
         selectedMessageGuid: string = null,
+        fileTransferGUIDs: string[] = null,
         partIndex = 0
     ): Promise<TransactionResult> {
         if (!chatGuid || !message) {
@@ -405,12 +406,46 @@ export class BlueBubblesHelperService {
                 attributedBody,
                 effectId,
                 selectedMessageGuid,
+                fileTransferGUIDs,
                 partIndex
             },
             request
         );
     }
-
+    async addFileTransfer(filePath: string) : Promise<TransactionResult>{
+        if(!filePath || !filePath.includes("Library/Messages")){
+            throw new Error("Unable To register File Transfer. " +
+                "Ensure `filePath` is in \"Library/Messages\". Invalid params!");
+        }
+        const request = new TransactionPromise(TransactionType.ATTACHMENT);
+        return this.writeData(
+            "new-transfer",
+            {
+                filePath
+            },
+            request
+        );
+    }
+    async sendAttachment(
+        filePath: string,
+        effectId: string = null,
+        chatGuid: string,
+        ) : Promise<TransactionResult>{
+        if(!filePath || !filePath.includes("Library/Messages")){
+            throw new Error("Unable To register File Transfer. " +
+                "Ensure `filePath` is in \"Library/Messages\". Invalid params!");
+        }
+        const request = new TransactionPromise(TransactionType.ATTACHMENT);
+        return this.writeData(
+            "send-attachment",
+            {
+                chatGuid,
+                filePath,
+                effectId
+            },
+            request
+        );
+    }
     async addParticipant(chatGuid: string, address: string) {
         return this.toggleParticipant(chatGuid, address, "add");
     }

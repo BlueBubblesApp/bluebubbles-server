@@ -1,18 +1,18 @@
 /* eslint-disable prefer-const */
-import { RouterContext } from "koa-router";
-import { Next } from "koa";
-import type { File } from "formidable";
+import {RouterContext} from "koa-router";
+import {Next} from "koa";
+import type {File} from "formidable";
 
-import { Server } from "@server";
-import { isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { Message } from "@server/databases/imessage/entity/Message";
-import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
-import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
-import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
-import { arrayHasOne } from "@server/utils/CollectionUtils";
-import { Success } from "../responses/success";
-import { BadRequest, IMessageError, NotFound } from "../responses/errors";
-import { parseWithQuery } from "../utils";
+import {Server} from "@server";
+import {isEmpty, isNotEmpty} from "@server/helpers/utils";
+import {Message} from "@server/databases/imessage/entity/Message";
+import {MessageInterface} from "@server/api/v1/interfaces/messageInterface";
+import {MessagePromiseRejection} from "@server/managers/outgoingMessageManager/messagePromise";
+import {MessageSerializer} from "@server/api/v1/serializers/MessageSerializer";
+import {arrayHasOne} from "@server/utils/CollectionUtils";
+import {Success} from "../responses/success";
+import {BadRequest, IMessageError, NotFound} from "../responses/errors";
+import {parseWithQuery} from "../utils";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
@@ -153,7 +153,8 @@ export class MessageRouter {
     }
 
     static async sendText(ctx: RouterContext, _: Next) {
-        let { tempGuid, message, attributedBody, method, chatGuid, effectId, subject, selectedMessageGuid, partIndex } =
+        let { tempGuid, message, attributedBody, method, chatGuid,
+            effectId, subject, selectedMessageGuid, fileTransferGUIDs, partIndex } =
             ctx?.request?.body ?? {};
 
         // Add to send cache
@@ -169,6 +170,7 @@ export class MessageRouter {
                 subject,
                 effectId,
                 selectedMessageGuid,
+                fileTransferGUIDs,
                 tempGuid,
                 partIndex
             });
@@ -240,7 +242,7 @@ export class MessageRouter {
 
     static async sendAttachment(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const { tempGuid, chatGuid, name } = ctx.request?.body ?? {};
+        const { tempGuid, chatGuid, name, method, effectId } = ctx.request?.body ?? {};
         const attachment = files?.attachment as File;
 
         // Add to send cache
@@ -252,7 +254,9 @@ export class MessageRouter {
                 chatGuid,
                 attachmentPath: attachment.path,
                 attachmentName: name,
-                attachmentGuid: tempGuid
+                attachmentGuid: tempGuid,
+                effectId,
+                method,
             });
 
             // Remove from cache

@@ -1,5 +1,5 @@
-import type { Message } from "@server/databases/imessage/entity/Message";
-import type { ValidRemoveTapback, ValidTapback } from "@server/types";
+import type {Message} from "@server/databases/imessage/entity/Message";
+import type {ValidRemoveTapback, ValidTapback} from "@server/types";
 
 export type SendMessageParams = {
     chatGuid: string;
@@ -9,6 +9,7 @@ export type SendMessageParams = {
     subject?: string;
     effectId?: string;
     selectedMessageGuid?: string;
+    fileTransferGUIDs?: string[];
     tempGuid?: string;
     partIndex?: number;
 };
@@ -21,6 +22,12 @@ export type SendMessagePrivateApiParams = {
     effectId?: string;
     selectedMessageGuid?: string;
     partIndex?: number;
+    fileTransferGUIDs?: string[];
+};
+export type SendAttachmentPrivateApiParams = {
+    filePath:string;
+    chatGuid: string;
+    effectId?: string;
 };
 
 export type UnsendMessageParams = {
@@ -39,6 +46,8 @@ export type EditMessageParams = {
 
 export type SendAttachmentParams = {
     chatGuid: string;
+    method?: "apple-script" | "private-api";
+    effectId?: string;
     attachmentPath: string;
     attachmentName?: string;
     attachmentGuid?: string;

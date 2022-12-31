@@ -1,20 +1,21 @@
-import { Server } from "@server";
+import {Server} from "@server";
 import * as fs from "fs";
-import { FileSystem } from "@server/fileSystem";
-import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
-import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus, isMinMonterey, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
-import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
-import { invisibleMediaChar } from "@server/services/httpService/constants";
-import { ActionHandler } from "@server/api/v1/apple/actions";
+import {FileSystem} from "@server/fileSystem";
+import {MessagePromise} from "@server/managers/outgoingMessageManager/messagePromise";
+import {Message} from "@server/databases/imessage/entity/Message";
+import {checkPrivateApiStatus, isMinMonterey, isNotEmpty, resultAwaiter} from "@server/helpers/utils";
+import {negativeReactionTextMap, reactionTextMap} from "@server/api/v1/apple/mappings";
+import {invisibleMediaChar} from "@server/services/httpService/constants";
+import {ActionHandler} from "@server/api/v1/apple/actions";
 import type {
-    SendMessageParams,
+    EditMessageParams,
     SendAttachmentParams,
+    SendMessageParams,
     SendMessagePrivateApiParams,
     SendReactionParams,
-    UnsendMessageParams,
-    EditMessageParams
+    UnsendMessageParams
 } from "@server/api/v1/types";
+import {SendAttachmentPrivateApiParams} from "@server/api/v1/types";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -50,6 +51,7 @@ export class MessageInterface {
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
+        fileTransferGUIDs = null,
         tempGuid = null,
         partIndex = 0
     }: SendMessageParams): Promise<Message> {
@@ -62,7 +64,7 @@ export class MessageInterface {
         const awaiter = new MessagePromise({
             chatGuid,
             text: message,
-            isAttachment: false,
+            isAttachment: fileTransferGUIDs == null,
             sentAt: now,
             subject,
             tempGuid
@@ -86,6 +88,7 @@ export class MessageInterface {
                 subject,
                 effectId,
                 selectedMessageGuid,
+                fileTransferGUIDs,
                 partIndex
             });
         } else {
@@ -109,7 +112,9 @@ export class MessageInterface {
         chatGuid,
         attachmentPath,
         attachmentName = null,
-        attachmentGuid = null
+        attachmentGuid = null,
+        method = 'apple-script',
+        effectId = null,
     }: SendAttachmentParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -142,10 +147,19 @@ export class MessageInterface {
             `Adding await for chat: "${chatGuid}"; attachment: ${aName}; tempGuid: ${attachmentGuid ?? "N/A"}`
         );
         Server().messageManager.add(awaiter);
+        let ret = null;
+        if (method === "apple-script") {
+            // Send the message
+            await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
+             ret = await awaiter.promise;
+        } else if (method === "private-api") {
+            ret = await MessageInterface.sendAttachmentPrivateApi({
+                chatGuid,
+                filePath: newPath,
+                effectId,
+            });
+        }
 
-        // Send the message
-        await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
-        const ret = await awaiter.promise;
 
         // Delete the attachment.
         // Only if below Monterey. On Monterey, we store attachments
@@ -166,6 +180,7 @@ export class MessageInterface {
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
+        fileTransferGUIDs,
         partIndex = 0
     }: SendMessagePrivateApiParams) {
         checkPrivateApiStatus();
@@ -176,6 +191,7 @@ export class MessageInterface {
             subject ?? null,
             effectId ?? null,
             selectedMessageGuid ?? null,
+            fileTransferGUIDs,
             partIndex ?? 0
         );
 
@@ -199,6 +215,33 @@ export class MessageInterface {
         return retMessage;
     }
 
+    static async sendAttachmentPrivateApi({
+        chatGuid,
+        effectId = null,
+        filePath,
+    }: SendAttachmentPrivateApiParams) {
+        checkPrivateApiStatus();
+        const result = await Server().privateApiHelper.sendAttachment(filePath,effectId, chatGuid);
+
+        if (!result?.identifier) {
+            throw new Error("Failed to send message!");
+        }
+
+        const maxWaitMs = 30000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(result.identifier, true, true);
+            }
+        });
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error(`Failed to send message! Message not found in database after ${maxWaitMs / 1000} seconds!`);
+        }
+
+        return retMessage;
+    }
     static async unsendMessage({ chatGuid, messageGuid, partIndex = 0 }: UnsendMessageParams) {
         checkPrivateApiStatus();
         const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);

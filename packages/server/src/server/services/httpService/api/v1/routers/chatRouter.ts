@@ -1,18 +1,18 @@
-import { RouterContext } from "koa-router";
-import { Next } from "koa";
+import {RouterContext} from "koa-router";
+import {Next} from "koa";
 
-import { Server } from "@server";
-import { FileSystem } from "@server/fileSystem";
-import { DBMessageParams } from "@server/databases/imessage/types";
-import { isEmpty, isNotEmpty, isTruthyBool } from "@server/helpers/utils";
-import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
-import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
-import { arrayHasOne } from "@server/utils/CollectionUtils";
+import {Server} from "@server";
+import {FileSystem} from "@server/fileSystem";
+import {DBMessageParams} from "@server/databases/imessage/types";
+import {isEmpty, isNotEmpty, isTruthyBool} from "@server/helpers/utils";
+import {ChatInterface} from "@server/api/v1/interfaces/chatInterface";
+import {MessageSerializer} from "@server/api/v1/serializers/MessageSerializer";
+import {arrayHasOne} from "@server/utils/CollectionUtils";
 
-import { FileStream, Success } from "../responses/success";
-import { IMessageError, NotFound } from "../responses/errors";
-import { parseWithQuery } from "../utils";
-import { ChatSerializer } from "@server/api/v1/serializers/ChatSerializer";
+import {FileStream, Success} from "../responses/success";
+import {IMessageError, NotFound} from "../responses/errors";
+import {parseWithQuery} from "../utils";
+import {ChatSerializer} from "@server/api/v1/serializers/ChatSerializer";
 
 export class ChatRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -186,11 +186,12 @@ export class ChatRouter {
         const { body } = ctx.request;
         const addresses = body?.addresses;
         const message = body?.message;
+        const fileTransferGUIDs = body?.fileTransferGUIDs;
         const method = body?.method;
         const service = body?.service;
         const tempGuid = body?.tempGuid;
 
-        const chat = await ChatInterface.create({ addresses, message, method, service, tempGuid });
+        const chat = await ChatInterface.create({ addresses, message, method, fileTransferGUIDs, service, tempGuid });
         if (!chat) throw new IMessageError({ error: "Failed to create chat!" });
 
         // Convert the data to an API response

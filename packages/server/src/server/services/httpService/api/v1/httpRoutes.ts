@@ -1,9 +1,9 @@
 import * as KoaRouter from "koa-router";
-import { Server } from "@server";
-import { isNotEmpty } from "@server/helpers/utils";
+import {Server} from "@server";
+import {isNotEmpty} from "@server/helpers/utils";
 
 // Middleware
-import { AuthMiddleware } from "./middleware/authMiddleware";
+import {AuthMiddleware} from "./middleware/authMiddleware";
 
 // Routers
 import { ThemeRouter } from "./routers/themeRouter";
@@ -34,6 +34,7 @@ import { ChatValidator } from "./validators/chatValidator";
 import { AlertsValidator } from "./validators/alertsValidator";
 import { ScheduledMessageValidator } from "./validators/scheduledMessageValidator";
 import { ScheduledMessageRouter } from "./routers/scheduledMessageRouter";
+import { FileTransferRouter } from "@server/services/httpService/api/v1/routers/fileTransferRouter";
 
 export class HttpRoutes {
     static version = 1;
@@ -179,6 +180,21 @@ export class HttpRoutes {
                         controller: FcmRouter.getClientConfig
                     }
                 ]
+            },
+            {
+              name:"FileTransfer",
+              middleware: HttpRoutes.protected,
+              prefix: "file-transfer",
+              routes:[
+                  {
+                      method: HttpMethod.POST,
+                      path: "new",
+                      validators: [], // TODO Add validator
+                      controller: FileTransferRouter.registerFileTransfer
+                  },
+              ]
+
+
             },
             {
                 name: "Attachment",
