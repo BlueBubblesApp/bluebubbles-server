@@ -1,5 +1,5 @@
-import type {Message} from "@server/databases/imessage/entity/Message";
-import type {ValidRemoveTapback, ValidTapback} from "@server/types";
+import type { Message } from "@server/databases/imessage/entity/Message";
+import type { ValidRemoveTapback, ValidTapback } from "@server/types";
 
 export type SendMessageParams = {
     chatGuid: string;

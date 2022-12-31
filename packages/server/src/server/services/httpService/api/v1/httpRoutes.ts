@@ -1,9 +1,9 @@
 import * as KoaRouter from "koa-router";
-import {Server} from "@server";
-import {isNotEmpty} from "@server/helpers/utils";
+import { Server } from "@server";
+import { isNotEmpty } from "@server/helpers/utils";
 
 // Middleware
-import {AuthMiddleware} from "./middleware/authMiddleware";
+import { AuthMiddleware } from "./middleware/authMiddleware";
 
 // Routers
 import { ThemeRouter } from "./routers/themeRouter";

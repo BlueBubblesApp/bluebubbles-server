@@ -3,23 +3,23 @@ import * as os from "os";
 import * as fs from "fs";
 import CompareVersions from "compare-versions";
 import cpr from "recursive-copy";
-import {parse as ParsePlist} from "plist";
-import {Server} from "@server";
-import {FileSystem} from "@server/fileSystem";
-import {ValidTapback} from "@server/types";
-import {clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty} from "@server/helpers/utils";
-import {restartMessages} from "@server/api/v1/apple/scripts";
+import { parse as ParsePlist } from "plist";
+import { Server } from "@server";
+import { FileSystem } from "@server/fileSystem";
+import { ValidTapback } from "@server/types";
+import { clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty } from "@server/helpers/utils";
+import { restartMessages } from "@server/api/v1/apple/scripts";
 import {
     TransactionPromise,
     TransactionResult,
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
-import {TransactionManager} from "@server/managers/transactionManager";
+import { TransactionManager } from "@server/managers/transactionManager";
 
 import * as net from "net";
-import {ValidRemoveTapback} from "../../types";
-import {MAX_PORT, MIN_PORT} from "./constants";
-import {TYPING_INDICATOR} from "@server/events";
+import { ValidRemoveTapback } from "../../types";
+import { MAX_PORT, MIN_PORT } from "./constants";
+import { TYPING_INDICATOR } from "@server/events";
 
 type BundleStatus = {
     success: boolean;

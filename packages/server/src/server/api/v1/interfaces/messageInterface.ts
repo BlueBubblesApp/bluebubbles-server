@@ -1,19 +1,19 @@
-import {Server} from "@server";
+import { Server } from "@server";
 import * as fs from "fs";
-import {FileSystem} from "@server/fileSystem";
-import {MessagePromise} from "@server/managers/outgoingMessageManager/messagePromise";
-import {Message} from "@server/databases/imessage/entity/Message";
-import {checkPrivateApiStatus, isMinMonterey, isNotEmpty, resultAwaiter} from "@server/helpers/utils";
-import {negativeReactionTextMap, reactionTextMap} from "@server/api/v1/apple/mappings";
-import {invisibleMediaChar} from "@server/services/httpService/constants";
-import {ActionHandler} from "@server/api/v1/apple/actions";
+import { FileSystem } from "@server/fileSystem";
+import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
+import { Message } from "@server/databases/imessage/entity/Message";
+import { checkPrivateApiStatus, isMinMonterey, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
+import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
+import { invisibleMediaChar } from "@server/services/httpService/constants";
+import { ActionHandler } from "@server/api/v1/apple/actions";
 import type {
-    EditMessageParams,
-    SendAttachmentParams,
     SendMessageParams,
+    SendAttachmentParams,
     SendMessagePrivateApiParams,
     SendReactionParams,
-    UnsendMessageParams
+    UnsendMessageParams,
+    EditMessageParams
 } from "@server/api/v1/types";
 import {SendAttachmentPrivateApiParams} from "@server/api/v1/types";
 

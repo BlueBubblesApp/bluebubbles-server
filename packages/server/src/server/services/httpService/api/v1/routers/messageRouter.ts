@@ -1,18 +1,18 @@
 /* eslint-disable prefer-const */
-import {RouterContext} from "koa-router";
-import {Next} from "koa";
-import type {File} from "formidable";
+import { RouterContext } from "koa-router";
+import { Next } from "koa";
+import type { File } from "formidable";
 
-import {Server} from "@server";
-import {isEmpty, isNotEmpty} from "@server/helpers/utils";
-import {Message} from "@server/databases/imessage/entity/Message";
-import {MessageInterface} from "@server/api/v1/interfaces/messageInterface";
-import {MessagePromiseRejection} from "@server/managers/outgoingMessageManager/messagePromise";
-import {MessageSerializer} from "@server/api/v1/serializers/MessageSerializer";
-import {arrayHasOne} from "@server/utils/CollectionUtils";
-import {Success} from "../responses/success";
-import {BadRequest, IMessageError, NotFound} from "../responses/errors";
-import {parseWithQuery} from "../utils";
+import { Server } from "@server";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { Message } from "@server/databases/imessage/entity/Message";
+import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
+import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
+import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
+import { arrayHasOne } from "@server/utils/CollectionUtils";
+import { Success } from "../responses/success";
+import { BadRequest, IMessageError, NotFound } from "../responses/errors";
+import { parseWithQuery } from "../utils";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
