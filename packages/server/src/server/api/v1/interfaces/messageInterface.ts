@@ -64,7 +64,7 @@ export class MessageInterface {
         const awaiter = new MessagePromise({
             chatGuid,
             text: message,
-            isAttachment: fileTransferGUIDs == null,
+            isAttachment: fileTransferGUIDs !== null,
             sentAt: now,
             subject,
             tempGuid
