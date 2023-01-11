@@ -91,7 +91,7 @@ export const startMessages = () => {
 /**
  * The AppleScript used to send a message with or without an attachment
  */
-export const startFindMyFrields = () => {
+export const startFindMyFriends = () => {
     return startApp("FindMy");
 };
 
