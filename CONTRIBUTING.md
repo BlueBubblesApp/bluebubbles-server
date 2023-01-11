@@ -6,7 +6,7 @@ We encourage all contributions to this project! All we ask are you follow these 
 * Comment your code
 * Follow Typescript and React best practices
     - [Typescript Best Practices](https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html)
-    - (React Best Practices](https://reactjs.org/docs/thinking-in-react.html)
+    - [React Best Practices](https://reactjs.org/docs/thinking-in-react.html)
 
 ## Pre-requisites
 
