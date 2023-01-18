@@ -73,6 +73,7 @@ export type HandleResponse = {
     messages?: MessageResponse[];
     chats?: ChatResponse[];
     address: string;
+    service: string;
     country?: string;
     uncanonicalizedId?: string;
 };
