@@ -3,9 +3,6 @@
     "version": "1.5.1",
     "main": "./dist/main.js",
     "license": "Apache-2.0",
-    "engines": {
-        "node": "16"
-    },
     "author": {
         "name": "BlueBubbles Development Team",
         "email": "bluebubblesapp@gmail.com"
