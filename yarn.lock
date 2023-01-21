@@ -10223,6 +10223,11 @@ node-addon-api@^1.6.3:
   resolved "https://registry.npmjs.org/node-addon-api/-/node-addon-api-1.7.2.tgz"
   integrity sha512-ibPK3iA+vaY1eEjESkQkM0BbCqFOaZMiXRTtdB0u7b4djtY6JnsjvPdUHVMg6xQt3B8fpTTWHI9A+ADjM9frzg==
 
+node-addon-api@^2.0.0:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-2.0.2.tgz#432cfa82962ce494b132e9d72a15b29f71ff5d32"
+  integrity sha512-Ntyt4AIXyaLIuMHF6IOoTakB3K+RWxwtsHNRxllEoA6vPwP9o4866g6YWDLUdnucilZhmkxiHwHr11gAENw+QA==
+
 node-addon-api@^3.0.2, node-addon-api@^3.1.0:
   version "3.2.1"
   resolved "https://registry.npmjs.org/node-addon-api/-/node-addon-api-3.2.1.tgz"
@@ -10281,13 +10286,13 @@ node-mac-contacts@1.5.0:
     bindings "^1.5.0"
     node-addon-api "^3.0.2"
 
-node-mac-permissions@^2.2.1:
-  version "2.2.1"
-  resolved "https://registry.npmjs.org/node-mac-permissions/-/node-mac-permissions-2.2.1.tgz"
-  integrity sha512-lmSuexF/XcAvtanSReDDrr61Bz4FveSmVl1wHY0Be6RV0+QpCK1RMpjWxtKG0ALqX4p+k2cJ/u7GBV8dkUeLeA==
+node-mac-permissions@2.2.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/node-mac-permissions/-/node-mac-permissions-2.2.0.tgz#9e30af329df86335a19882cb6c2e02ce4fc157ab"
+  integrity sha512-oLEZY46M47A/rcMacPEqo/5z6u7alXdMXhtE7xPDyMixZF35Grl9KGx3N2adE3//lEtGL6Tig98p+1gkonkwQg==
   dependencies:
     bindings "^1.5.0"
-    node-addon-api "^3.0.2"
+    node-addon-api "^2.0.0"
 
 node-releases@^2.0.3:
   version "2.0.5"
