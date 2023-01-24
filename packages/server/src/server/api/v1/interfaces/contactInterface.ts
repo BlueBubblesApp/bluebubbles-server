@@ -166,7 +166,7 @@ export class ContactInterface {
         // Compensate for if `avatar` is passed instead of contactImage
         if (extraProps.includes("avatar")) {
             if (!extraProps.includes("contactImage") && !extraProps.includes("contactThumbnailImage")) {
-                extraProps.push("contactImage");
+                extraProps.push("contactThumbnailImage");
             }
 
             extraProps = extraProps.filter(e => e !== "avatar");

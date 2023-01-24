@@ -111,7 +111,7 @@ export const ContactsLayout = (): JSX.Element => {
         });
     };
 
-    const loadContacts = (showToast = false, extraProps: string[] = ['avatar']) => {
+    const loadContacts = (showToast = false, extraProps: string[] = ['contactThumbnailImage']) => {
         ipcRenderer.invoke('get-contacts', extraProps).then((contactList: any[]) => {
             setContacts(contactList.map((e: any) => { 
                 // Patch the ID as a string

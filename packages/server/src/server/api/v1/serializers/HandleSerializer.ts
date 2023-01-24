@@ -53,7 +53,8 @@ export class HandleSerializer {
     }: HandleSerializerSingleParams): Promise<HandleResponse> {
         let output: HandleResponse = {
             originalROWID: handle.ROWID,
-            address: handle.id
+            address: handle.id,
+            service: handle.service
         };
 
         if (config.includeChats) {

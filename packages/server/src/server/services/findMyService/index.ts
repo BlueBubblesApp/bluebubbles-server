@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { hideFindMyFriends, showApp, startFindMyFrields } from "@server/api/v1/apple/scripts";
+import { hideFindMyFriends, showApp, startFindMyFriends  } from "@server/api/v1/apple/scripts";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 
@@ -69,7 +69,7 @@ export class FindMyService {
 
         // Make sure the Find My app is open.
         // Give it 3 seconds to open
-        await FileSystem.executeAppleScript(startFindMyFrields());
+        await FileSystem.executeAppleScript(startFindMyFriends());
         await waitMs(3000);
 
         // Bring the Find My app to the foreground so it refreshes the devices

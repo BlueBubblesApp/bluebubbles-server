@@ -381,7 +381,7 @@ export class ScheduledMessagesService {
         // Calculate when the next time should be.
         // Basically, add the schedule'd time to the previous scheduled time
         // until it's in the future.
-        let startTime = previousTime;
+        let startTime = previousTime + nextTs;
         while (startTime < nowTime) {
             startTime += nextTs;
             nowTime = new Date().getTime();
