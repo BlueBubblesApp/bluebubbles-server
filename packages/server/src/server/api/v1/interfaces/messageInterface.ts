@@ -13,7 +13,8 @@ import type {
     SendMessagePrivateApiParams,
     SendReactionParams,
     UnsendMessageParams,
-    EditMessageParams
+    EditMessageParams,
+    SendAttachmentPrivateApiParams
 } from "@server/api/v1/types";
 
 export class MessageInterface {
@@ -109,12 +110,14 @@ export class MessageInterface {
         chatGuid,
         attachmentPath,
         attachmentName = null,
-        attachmentGuid = null
+        attachmentGuid = null,
+        method = 'apple-script',
+        isAudioMessage = false
     }: SendAttachmentParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
         // Copy the attachment to a more permanent storage
-        const newPath = FileSystem.copyAttachment(attachmentPath, attachmentName);
+        const newPath = FileSystem.copyAttachment(attachmentPath, attachmentName, method);
 
         Server().log(`Sending attachment "${attachmentName}" to ${chatGuid}`, "debug");
 
@@ -143,20 +146,47 @@ export class MessageInterface {
         );
         Server().messageManager.add(awaiter);
 
-        // Send the message
-        await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
-        const ret = await awaiter.promise;
+        let sentMessage = null;
+        if (method === "apple-script") {
+            // Attempt to send the attachment
+            await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
+            sentMessage = await awaiter.promise;
+        } else if (method === "private-api") {
+            sentMessage = await MessageInterface.sendAttachmentPrivateApi({
+                chatGuid,
+                filePath: newPath,
+                isAudioMessage
+            });
+
+            try {
+                // Wait for the promise so that we can confirm the message was sent.
+                // Wrapped in a try/catch because if the private API returned a sentMessage,
+                // we know it sent, and maybe it just took a while (longer than the timeout).
+                // Only wait for the promise if it's not sent yet.
+                if (sentMessage && !sentMessage.isSent) {
+                    sentMessage = await awaiter.promise;
+                }
+            } catch (e) {
+                if (sentMessage) {
+                    Server().log('Attachment sent via Private API, but message match failed', 'debug');
+                } else {
+                    throw e;
+                }
+            }
+        } else {
+            throw new Error(`Invalid send method: ${method}`);
+        }
 
         // Delete the attachment.
         // Only if below Monterey. On Monterey, we store attachments
         // within the iMessage App Support directory. When AppleScript sees this
         // it _does not_ copy the attachment to a permanent location.
         // This means that if we delete the attachment, it won't be downloadable anymore.
-        if (!isMinMonterey) {
+        if (!isMinMonterey && method === "apple-script") {
             fs.unlink(newPath, _ => null);
         }
 
-        return ret;
+        return sentMessage;
     }
 
     static async sendMessagePrivateApi({
@@ -194,6 +224,50 @@ export class MessageInterface {
         // Check if the name changed
         if (!retMessage) {
             throw new Error(`Failed to send message! Message not found in database after ${maxWaitMs / 1000} seconds!`);
+        }
+
+        return retMessage;
+    }
+
+    static async sendAttachmentPrivateApi({
+        chatGuid,
+        filePath,
+        isAudioMessage = false
+    }: SendAttachmentPrivateApiParams): Promise<Message> {
+        checkPrivateApiStatus();
+
+        if (filePath.endsWith(".mp3")) {
+            try {
+                const newPath = `${filePath.substring(0, filePath.length - 4)}.caf`;
+                await FileSystem.convertMp3ToCaf(filePath, newPath);
+                filePath = newPath;
+            } catch (ex) {
+                Server().log("Failed to convert MP3 to CAF!", "warn");
+            }
+        }
+
+        const result = await Server().privateApiHelper.sendAttachment(
+            chatGuid,
+            filePath,
+            isAudioMessage ? 1 : 0
+        );
+
+        if (!result?.identifier) {
+            throw new Error("Failed to send attachment!");
+        }
+
+        const maxWaitMs = 30000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(result.identifier, true, false);
+            }
+        });
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error(
+                `Failed to send attachment! Attachment not found in database after ${maxWaitMs / 1000} seconds!`);
         }
 
         return retMessage;
