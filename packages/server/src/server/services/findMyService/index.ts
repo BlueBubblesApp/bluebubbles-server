@@ -1,9 +1,11 @@
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { hideFindMyFriends, showApp, startFindMyFriends  } from "@server/api/v1/apple/scripts";
+import { hideFindMyFriends, showApp, startFindMyFriends } from "@server/api/v1/apple/scripts";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
+import { FindMyDevice, FindMyItem } from "@server/services/findMyService/types";
+import { transformFindMyItemToDevice } from "@server/services/findMyService/utils";
 
 /**
  * This services manages the connection to the connected
@@ -36,7 +38,7 @@ export class FindMyService {
         // return null because we want to indicate it's not capable
         if (!db) return null;
 
-        // Get the references 
+        // Get the references
         const cacheRef = await Server().findMyRepo.getLatestCacheReference();
         if (!cacheRef) return null;
 
@@ -50,16 +52,40 @@ export class FindMyService {
         return await FindMyService.getFriends();
     }
 
-    static getDevices(): NodeJS.Dict<any> | null {
-        const devicesPath = path.join(FileSystem.findMyDir, 'Devices.data');
-        if (!fs.existsSync(devicesPath)) return null;
+    private static readDataFile<T extends "Devices" | "Items">(
+        type: T
+    ): Promise<Array<T extends "Devices" ? FindMyDevice : FindMyItem> | null> {
+        const devicesPath = path.join(FileSystem.findMyDir, `${type}.data`);
+        return new Promise((resolve, reject) => {
+            fs.readFile(devicesPath, { encoding: "utf-8" }, (err, data) => {
+                // Couldn't read the file
+                if (err) return resolve(null);
 
-        const data = fs.readFileSync(devicesPath, { encoding: 'utf-8' });
+                try {
+                    return resolve(JSON.parse(data));
+                } catch {
+                    reject(new Error(`Failed to read FindMy ${type} cache file! It is not in the correct format!`));
+                }
+            });
+        });
+    }
 
+    static async getDevices(): Promise<Array<FindMyDevice> | null> {
         try {
-            return JSON.parse(data);
+            const [devices, items] = await Promise.all([
+                FindMyService.readDataFile("Devices"),
+                FindMyService.readDataFile("Items")
+            ]);
+
+            // Return null if neither of the files exist
+            if (!devices && !items) return null;
+
+            // Transform the items to match the same shape as devices
+            const transformedItems = (items ?? []).map(transformFindMyItemToDevice);
+
+            return [...(devices ?? []), ...transformedItems];
         } catch {
-            throw new Error('Failed to read FindMy cache file! It is not in the correct format!');
+            return null;
         }
     }
 
@@ -88,7 +114,7 @@ export class FindMyService {
         await FindMyService.refresh();
 
         // Get the new locations
-        return FindMyService.getDevices();
+        return await FindMyService.getDevices();
     }
 
 
