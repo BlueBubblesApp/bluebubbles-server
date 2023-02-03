@@ -18,6 +18,7 @@ import { DockBadgeField } from '../../../components/fields/DockBadgeField';
 import { HideDockIconField } from '../../../components/fields/HideDockIconField';
 import { StartViaTerminalField } from '../../../components/fields/StartViaTerminalField';
 import { FacetimeDetectionField } from '../../../components/fields/FacetimeDetectionField';
+import { StartMinimizedField } from '../../../components/fields/StartMinimizedField';
 
 
 export const FeatureSettings = (): JSX.Element => {
@@ -34,6 +35,8 @@ export const FeatureSettings = (): JSX.Element => {
                 <AutoCaffeinateField />
                 <Spacer />
                 <AutoStartField />
+                <Spacer />
+                <StartMinimizedField />
                 <Spacer />
                 <DockBadgeField />
                 <Spacer />

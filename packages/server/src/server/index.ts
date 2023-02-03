@@ -683,6 +683,12 @@ class BlueBubblesServer extends EventEmitter {
         // Set the dock icon according to the config
         this.setDockIcon();
 
+        // Start minimized if enabled
+        const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
+        if (startMinimized) {
+            this.window.minimize();
+        }
+
         try {
             // Restart via terminal if configured
             const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;

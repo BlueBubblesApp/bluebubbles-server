@@ -23,5 +23,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     use_oled_dark_mode: () => 0,
     db_poll_interval: () => 1000,
     dock_badge: () => 1,
-    facetime_detection: () => (Server().hasAccessibilityAccess ? 1 : 0)
+    facetime_detection: () => (Server().hasAccessibilityAccess ? 1 : 0),
+    start_minimized: () => 1
 };
