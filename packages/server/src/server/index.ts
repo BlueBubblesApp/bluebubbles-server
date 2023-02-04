@@ -52,7 +52,8 @@ import {
     isMinMojave,
     isMinMonterey,
     isMinSierra,
-    isNotEmpty
+    isNotEmpty,
+    waitMs
 } from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
@@ -581,6 +582,9 @@ class BlueBubblesServer extends EventEmitter {
 
         // After setup is complete, start the update checker
         try {
+            // Wait 5 seconds before starting the update checker.
+            // This is just to not use up too much CPU on startup
+            await waitMs(5000);
             this.log("Initializing Update Service..");
             this.updater = new UpdateService(this.window);
 
