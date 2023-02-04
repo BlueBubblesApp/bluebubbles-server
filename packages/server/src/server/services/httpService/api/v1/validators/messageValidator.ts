@@ -115,7 +115,11 @@ export class MessageValidator {
         tempGuid: "string",
         method: "string|in:apple-script,private-api",
         name: "required|string",
-        isAudioMessage: "boolean"
+        isAudioMessage: "boolean",
+        effectId: "string",
+        subject: "string",
+        selectedMessageGuid: "string",
+        partIndex: "numeric|min:0"
     };
 
     static async validateAttachment(ctx: RouterContext, next: Next) {
@@ -123,11 +127,14 @@ export class MessageValidator {
         const {
             tempGuid,
             method,
-            isAudioMessage
+            isAudioMessage,
+            effectId,
+            subject,
+            selectedMessageGuid
         } = ValidateInput(ctx.request?.body, MessageValidator.sendAttachmentRules);
 
         let saniMethod = method;
-        if (isAudioMessage) {
+        if (isAudioMessage || effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
             saniMethod = "private-api";
         }
 

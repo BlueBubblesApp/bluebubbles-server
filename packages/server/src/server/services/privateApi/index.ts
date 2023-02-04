@@ -411,11 +411,25 @@ export class BlueBubblesHelperService {
         );
     }
 
-    async sendAttachment(
+    async sendAttachment({
+        chatGuid,
+        filePath,
+        isAudioMessage = 0,
+        attributedBody = null,
+        subject = null,
+        effectId = null,
+        selectedMessageGuid = null,
+        partIndex = 0
+    }: {
         chatGuid: string,
         filePath: string,
-        isAudioMessage = 0
-    ): Promise<TransactionResult> {
+        isAudioMessage?: number,
+        attributedBody?: Record<string, any> | null;
+        subject?: string;
+        effectId?: string;
+        selectedMessageGuid?: string;
+        partIndex?: number;
+    }): Promise<TransactionResult> {
         if (!chatGuid || !filePath) {
             throw new Error("Failed to send attachment. Invalid params!");
         }
@@ -426,7 +440,12 @@ export class BlueBubblesHelperService {
             {
                 chatGuid,
                 filePath,
-                isAudioMessage
+                isAudioMessage,
+                attributedBody,
+                subject,
+                effectId,
+                selectedMessageGuid,
+                partIndex
             },
             request
         );

@@ -27,6 +27,11 @@ export type SendAttachmentPrivateApiParams = {
     chatGuid: string;
     filePath: string;
     isAudioMessage?: boolean;
+    attributedBody?: Record<string, any> | null;
+    subject?: string;
+    effectId?: string;
+    selectedMessageGuid?: string;
+    partIndex?: number;
 };
 
 export type UnsendMessageParams = {
@@ -50,6 +55,11 @@ export type SendAttachmentParams = {
     attachmentName?: string;
     attachmentGuid?: string;
     isAudioMessage?: boolean;
+    attributedBody?: Record<string, any> | null;
+    subject?: string;
+    effectId?: string;
+    selectedMessageGuid?: string;
+    partIndex?: number;
 };
 
 export type SendReactionParams = {

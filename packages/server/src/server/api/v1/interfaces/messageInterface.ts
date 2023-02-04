@@ -112,6 +112,11 @@ export class MessageInterface {
         attachmentName = null,
         attachmentGuid = null,
         method = 'apple-script',
+        attributedBody = null,
+        subject = null,
+        effectId = null,
+        selectedMessageGuid = null,
+        partIndex = 0,
         isAudioMessage = false
     }: SendAttachmentParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
@@ -155,6 +160,11 @@ export class MessageInterface {
             sentMessage = await MessageInterface.sendAttachmentPrivateApi({
                 chatGuid,
                 filePath: newPath,
+                attributedBody,
+                subject,
+                effectId,
+                selectedMessageGuid,
+                partIndex,
                 isAudioMessage
             });
 
@@ -232,6 +242,11 @@ export class MessageInterface {
     static async sendAttachmentPrivateApi({
         chatGuid,
         filePath,
+        attributedBody = null,
+        subject = null,
+        effectId = null,
+        selectedMessageGuid = null,
+        partIndex = 0,
         isAudioMessage = false
     }: SendAttachmentPrivateApiParams): Promise<Message> {
         checkPrivateApiStatus();
@@ -246,11 +261,16 @@ export class MessageInterface {
             }
         }
 
-        const result = await Server().privateApiHelper.sendAttachment(
+        const result = await Server().privateApiHelper.sendAttachment({
             chatGuid,
             filePath,
-            isAudioMessage ? 1 : 0
-        );
+            attributedBody,
+            subject,
+            effectId,
+            selectedMessageGuid,
+            partIndex,
+            isAudioMessage: isAudioMessage ? 1 : 0
+        });
 
         if (!result?.identifier) {
             throw new Error("Failed to send attachment!");
