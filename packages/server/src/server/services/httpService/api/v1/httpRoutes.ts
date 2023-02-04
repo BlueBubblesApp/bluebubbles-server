@@ -34,6 +34,7 @@ import { ChatValidator } from "./validators/chatValidator";
 import { AlertsValidator } from "./validators/alertsValidator";
 import { ScheduledMessageValidator } from "./validators/scheduledMessageValidator";
 import { ScheduledMessageRouter } from "./routers/scheduledMessageRouter";
+import { ThemeValidator } from "./validators/themeValidator";
 
 export class HttpRoutes {
     static version = 1;
@@ -444,7 +445,14 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: "theme",
+                        validators: [ThemeValidator.validate],
                         controller: ThemeRouter.create
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: "theme",
+                        validators: [ThemeValidator.validateDelete],
+                        controller: ThemeRouter.delete
                     },
                     {
                         method: HttpMethod.GET,
@@ -456,6 +464,12 @@ export class HttpRoutes {
                         path: "settings",
                         validators: [SettingsValidator.validate],
                         controller: SettingsRouter.create
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: "settings",
+                        validators: [SettingsValidator.validateDelete],
+                        controller: SettingsRouter.delete
                     }
                 ]
             }
