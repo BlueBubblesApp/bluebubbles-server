@@ -414,7 +414,7 @@ export class BlueBubblesHelperService {
     async sendAttachment({
         chatGuid,
         filePath,
-        isAudioMessage = 0,
+        isAudioMessage = false,
         attributedBody = null,
         subject = null,
         effectId = null,
@@ -423,7 +423,7 @@ export class BlueBubblesHelperService {
     }: {
         chatGuid: string,
         filePath: string,
-        isAudioMessage?: number,
+        isAudioMessage?: boolean,
         attributedBody?: Record<string, any> | null;
         subject?: string;
         effectId?: string;
@@ -440,7 +440,7 @@ export class BlueBubblesHelperService {
             {
                 chatGuid,
                 filePath,
-                isAudioMessage,
+                isAudioMessage: isAudioMessage ? 1 : 0,
                 attributedBody,
                 subject,
                 effectId,

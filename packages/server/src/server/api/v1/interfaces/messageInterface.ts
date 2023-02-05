@@ -269,7 +269,7 @@ export class MessageInterface {
             effectId,
             selectedMessageGuid,
             partIndex,
-            isAudioMessage: isAudioMessage ? 1 : 0
+            isAudioMessage
         });
 
         if (!result?.identifier) {

@@ -148,6 +148,7 @@ export class MessageValidator {
 
         // Inject the method (we have to force it to thing it's anything)
         (ctx.request.body as any).method = saniMethod;
+        (ctx.request.body as any).isAudioMessage = isAudioMessage === 'true' ? true : false;
 
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
