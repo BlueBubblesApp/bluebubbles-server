@@ -120,7 +120,7 @@ export class FacetimeService {
                     this.hadPreviousCall = this.isGettingCall;
                 }
 
-                setTimeout(serviceLoop, 4000);
+                setTimeout(serviceLoop, 5000);
             };
 
             setTimeout(serviceLoop, 0);
