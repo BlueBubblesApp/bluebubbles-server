@@ -5,7 +5,7 @@ import {
 } from "@server/api/v1/apple/scripts";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { isMinBigSur, isMinVentura, isNotEmpty } from "@server/helpers/utils";
+import { isMinBigSur, isMinVentura, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { INCOMING_FACETIME } from "@server/events";
 
 export class FacetimeService {
@@ -32,10 +32,15 @@ export class FacetimeService {
         this.notificationSent = false;
     }
 
-    async listen(): Promise<void> {
+    async listen({delay = 30000} = {}): Promise<void> {
         if (this.isRunning) {
             Server().log("Facetime listener already running");
             return this.serviceAwaiter;
+        }
+
+        if (delay && delay > 0) {
+            Server().log(`Delaying FaceTime listener start by ${delay} ms...`);
+            await waitMs(delay);
         }
 
         Server().log("Starting FaceTime listener...");
