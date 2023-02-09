@@ -127,7 +127,9 @@ export class MessageInterface {
         Server().log(`Sending attachment "${attachmentName}" to ${chatGuid}`, "debug");
 
         // Make sure messages is open
-        await FileSystem.startMessages();
+        if (method === 'apple-script') {
+            await FileSystem.startMessages();
+        }
 
         // Since we convert mp3s to cafs we need to correct the name for the awaiter
         let aName = attachmentName;
