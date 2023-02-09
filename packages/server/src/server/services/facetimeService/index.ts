@@ -32,7 +32,7 @@ export class FacetimeService {
         this.notificationSent = false;
     }
 
-    async listen({delay = 30000} = {}): Promise<void> {
+    async listen({ delay = 30000 } = {}): Promise<void> {
         if (this.isRunning) {
             Server().log("Facetime listener already running");
             return this.serviceAwaiter;
