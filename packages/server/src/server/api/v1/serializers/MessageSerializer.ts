@@ -103,6 +103,10 @@ export class MessageSerializer {
 
             // If we've reached out max size, we need to clear the participants
             if (len > config.maxSizeBytes) {
+                Server().log(
+                    `MessageSerializer: Max size reached (${config.maxSizeBytes} bytes). Clearing participants.`,
+                    'debug'
+                );
                 for (let i = 0; i < messageResponses.length; i++) {
                     for (let c = 0; c < (messageResponses[i]?.chats ?? []).length; c++) {
                         if (isEmpty(messageResponses[i].chats[c].participants)) continue;
