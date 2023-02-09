@@ -422,7 +422,7 @@ class BlueBubblesServer extends EventEmitter {
         try {
             await this.startProxyServices();
         } catch (ex: any) {
-            this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
+            this.log(`Failed to connect to proxy service! ${ex.message}`, "error");
         }
 
         try {
