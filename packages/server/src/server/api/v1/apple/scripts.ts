@@ -89,14 +89,7 @@ export const startMessages = () => {
 };
 
 /**
- * The AppleScript used to send a message with or without an attachment
- */
-export const startFindMyFriends = () => {
-    return startApp("FindMy");
-};
-
-/**
- * The AppleScript used to send a message with or without an attachment
+ * The AppleScript used to hide an app
  */
 export const hideApp = (appName: string) => {
     return `tell application "System Events" to tell application process "${appName}"
@@ -105,7 +98,16 @@ export const hideApp = (appName: string) => {
 };
 
 /**
- * The AppleScript used to send a message with or without an attachment
+ * The AppleScript used to quit an app
+ */
+export const quitApp = (appName: string) => {
+    return `tell application "${appName}"
+        quit
+    end tell`;
+};
+
+/**
+ * The AppleScript used to show an app
  */
 export const showApp = (appName: string) => {
     return `tell application "System Events" to tell application process "${appName}"
@@ -113,8 +115,31 @@ export const showApp = (appName: string) => {
     end tell`;
 };
 
+// === FindMy ===
+
 /**
- * The AppleScript used to send a message with or without an attachment
+ * The AppleScript used to start the FindMy app
+ */
+export const startFindMyFriends = () => {
+    return startApp("FindMy");
+};
+
+/**
+ * The AppleScript used to show the FindMy app
+ */
+export const showFindMyFriends = () => {
+    return showApp("FindMy");
+};
+
+/**
+ * The AppleScript used to quit the FindMy app
+ */
+export const quitFindMyFriends = () => {
+    return quitApp("FindMy");
+};
+
+/**
+ * The AppleScript used to hide the FindMy app
  */
 export const hideFindMyFriends = () => {
     return hideApp("FindMy");
@@ -131,6 +156,8 @@ export const startApp = (appName: string) => {
             tell application appName to reopen
         end if`;
 };
+
+// === Messages ===
 
 /**
  * The AppleScript used to send a message with or without an attachment
@@ -805,6 +832,8 @@ export const checkTypingIndicator = (chatName: string) => {
     end splitText`;
 };
 
+// === Contacts ===
+
 /**
  * Export contacts to a VCF file
  */
@@ -839,6 +868,8 @@ export const exportContacts = () => {
             end try
         end tell`;
 };
+
+// === System ===
 
 export const runTerminalScript = (path: string) => {
     return `tell application "Terminal" to do script "${escapeOsaExp(path)}"`;
