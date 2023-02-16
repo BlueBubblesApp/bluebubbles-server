@@ -77,8 +77,8 @@ export const ConnectionSettings = (): JSX.Element => {
                         <AccordionIcon />
                     </AccordionButton>
                     <AccordionPanel pb={4}>
-                        <EncryptCommunicationsField />
-                        <Box m={15} />
+                        {/* <EncryptCommunicationsField />
+                        <Box m={15} /> */}
                         {(proxyService === 'dynamic-dns') ? (<UseHttpsField />) : null}
                     </AccordionPanel>
                 </AccordionItem>
