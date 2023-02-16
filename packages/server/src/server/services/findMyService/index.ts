@@ -100,7 +100,7 @@ export class FindMyService {
         const devicesPath = path.join(FileSystem.findMyDir, "Devices.data");
         if (!fs.existsSync(devicesPath)) return null;
 
-        // Quict the FindMy app if it's been more than 2 minutes since the last refresh
+        // Quit the FindMy app if it's been more than 2 minutes since the last refresh
         const now = new Date().getTime();
         if (now - FindMyService.quitAppTime > 120_000) {
             FindMyService.quitAppTime = now;
