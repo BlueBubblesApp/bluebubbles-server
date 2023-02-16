@@ -1,7 +1,12 @@
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { hideFindMyFriends, showApp, startFindMyFriends } from "@server/api/v1/apple/scripts";
+import {
+    hideFindMyFriends,
+    startFindMyFriends,
+    showFindMyFriends,
+    quitFindMyFriends
+} from "@server/api/v1/apple/scripts";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 import { FindMyDevice, FindMyItem } from "@server/services/findMyService/types";
@@ -12,6 +17,8 @@ import { transformFindMyItemToDevice } from "@server/services/findMyService/util
  * Google FCM server. This is used to handle/manage notifications
  */
 export class FindMyService {
+    // Unix timestamp in milliseconds
+    static quitAppTime = 0;
 
     private static cacheFileExists(guid: string): boolean {
         const cPath = path.join(FileSystem.findMyFriendsDir, "fsCachedData", guid);
@@ -21,12 +28,12 @@ export class FindMyService {
     private static readCacheFile(guid: string): NodeJS.Dict<any> | null {
         if (!FindMyService.cacheFileExists(guid)) return null;
         const cPath = path.join(FileSystem.findMyFriendsDir, "fsCachedData", guid);
-        const data = fs.readFileSync(cPath, { encoding: 'utf-8' });
+        const data = fs.readFileSync(cPath, { encoding: "utf-8" });
 
         try {
             return JSON.parse(data);
         } catch {
-            throw new Error('Failed to read FindMy cache file! It is not in the correct format!');
+            throw new Error("Failed to read FindMy cache file! It is not in the correct format!");
         }
     }
 
@@ -90,8 +97,16 @@ export class FindMyService {
     }
 
     static async refresh(): Promise<void> {
-        const devicesPath = path.join(FileSystem.findMyDir, 'Devices.data');
+        const devicesPath = path.join(FileSystem.findMyDir, "Devices.data");
         if (!fs.existsSync(devicesPath)) return null;
+
+        // If the FindMy app has been running for longer than 2min, then we quit it to ensure it does a full refresh
+        const now = new Date().getTime();
+        if (now - FindMyService.quitAppTime > 120_000) {
+            FindMyService.quitAppTime = now;
+            await FileSystem.executeAppleScript(quitFindMyFriends());
+            await waitMs(3000);
+        }
 
         // Make sure the Find My app is open.
         // Give it 3 seconds to open
@@ -100,15 +115,15 @@ export class FindMyService {
 
         // Bring the Find My app to the foreground so it refreshes the devices
         // Give it 5 seconods to refresh
-        await FileSystem.executeAppleScript(showApp('FindMy'));
+        await FileSystem.executeAppleScript(showFindMyFriends());
         await waitMs(5000);
 
         // Re-hide the Find My App
-        await FileSystem.executeAppleScript(hideFindMyFriends()); 
+        await FileSystem.executeAppleScript(hideFindMyFriends());
     }
 
     static async refreshDevices(): Promise<NodeJS.Dict<any> | null> {
-        const devicesPath = path.join(FileSystem.findMyDir, 'Devices.data');
+        const devicesPath = path.join(FileSystem.findMyDir, "Devices.data");
         if (!fs.existsSync(devicesPath)) return null;
 
         await FindMyService.refresh();
@@ -116,6 +131,4 @@ export class FindMyService {
         // Get the new locations
         return await FindMyService.getDevices();
     }
-
-
 }
