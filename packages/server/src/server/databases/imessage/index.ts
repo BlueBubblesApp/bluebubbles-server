@@ -1,5 +1,5 @@
 /* eslint-disable no-param-reassign */
-import { Brackets, DataSource } from "typeorm";
+import { Brackets, DataSource, SelectQueryBuilder } from "typeorm";
 
 import { DBMessageParams, ChatParams, HandleParams } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
@@ -256,18 +256,7 @@ export class MessageRepository {
         }
 
         if (after || before) {
-            query.andWhere(
-                new Brackets(qb => {
-                    if (after)
-                        qb.andWhere("message.date >= :after", {
-                            after: convertDateTo2001Time(after as Date)
-                        });
-                    if (before)
-                        qb.andWhere("message.date <= :before", {
-                            before: convertDateTo2001Time(before as Date)
-                        });
-                })
-            );
+            this.applyMessageDateQuery(query, after as Date, before as Date);
         }
 
         // Add pagination params
@@ -347,65 +336,7 @@ export class MessageRepository {
 
         // Add date_delivered constraints
         if (after || before) {
-            query.andWhere(
-                new Brackets(qb => {
-                    qb.orWhere(
-                        new Brackets(qb2 => {
-                            if (after)
-                                qb2.andWhere("message.date_delivered >= :after", {
-                                    after: convertDateTo2001Time(after as Date)
-                                });
-                            if (before)
-                                qb2.andWhere("message.date_delivered <= :before", {
-                                    before: convertDateTo2001Time(before as Date)
-                                });
-                        })
-                    );
-
-                    qb.orWhere(
-                        new Brackets(qb2 => {
-                            if (after)
-                                qb2.andWhere("message.date_read >= :after", {
-                                    after: convertDateTo2001Time(after as Date)
-                                });
-                            if (before)
-                                qb2.andWhere("message.date_read <= :before", {
-                                    before: convertDateTo2001Time(before as Date)
-                                });
-                        })
-                    );
-
-                    if (isMinVentura) {
-                        qb.orWhere(
-                            new Brackets(qb2 => {
-                                if (after)
-                                    qb2.andWhere("message.date_edited >= :after", {
-                                        after: convertDateTo2001Time(after as Date)
-                                    });
-                                if (before)
-                                    qb2.andWhere("message.date_edited <= :before", {
-                                        before: convertDateTo2001Time(before as Date)
-                                    });
-                            })
-                        );
-                    }
-
-                    if (isMinVentura) {
-                        qb.orWhere(
-                            new Brackets(qb2 => {
-                                if (after)
-                                    qb2.andWhere("message.date_retracted >= :after", {
-                                        after: convertDateTo2001Time(after as Date)
-                                    });
-                                if (before)
-                                    qb2.andWhere("message.date_retracted <= :before", {
-                                        before: convertDateTo2001Time(before as Date)
-                                    });
-                            })
-                        );
-                    }
-                })
-            );
+            this.applyMessageUpdateDateQuery(query, after as Date, before as Date);
         }
 
         // Add pagination params
@@ -440,35 +371,13 @@ export class MessageRepository {
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
 
-        // Add date restraints
-        if (updated) {
-            if (after)
-                query.andWhere("message.date_delivered >= :after", {
-                    after: convertDateTo2001Time(after as Date)
-                });
-            if (before)
-                query.andWhere("message.date_delivered < :before", {
-                    before: convertDateTo2001Time(before as Date)
-                });
-
-            // Add date_read constraints
-            if (after)
-                query.orWhere("message.date_read >= :after", {
-                    after: convertDateTo2001Time(after as Date)
-                });
-            if (before)
-                query.andWhere("message.date_read < :before", {
-                    before: convertDateTo2001Time(before as Date)
-                });
-        } else {
-            if (after)
-                query.andWhere("message.date >= :after", {
-                    after: convertDateTo2001Time(after)
-                });
-            if (before)
-                query.andWhere("message.date < :before", {
-                    before: convertDateTo2001Time(before)
-                });
+        // Add date constraints
+        if (after || before) {
+            if (updated) {
+                this.applyMessageUpdateDateQuery(query, after, before);
+            } else {
+                this.applyMessageDateQuery(query, after, before);
+            }
         }
 
         // Add pagination params
@@ -577,6 +486,83 @@ export class MessageRepository {
         );
 
         return isEmpty(result) ? null : result[0].filename;
+    }
+
+    applyMessageDateQuery(query: SelectQueryBuilder<Message>, after?: Date, before?: Date) {
+        query.andWhere(
+            new Brackets(qb => {
+                if (after)
+                    qb.andWhere("message.date >= :after", {
+                        after: convertDateTo2001Time(after)
+                    });
+                if (before)
+                    qb.andWhere("message.date <= :before", {
+                        before: convertDateTo2001Time(before)
+                    });
+            })
+        );
+    }
+
+    applyMessageUpdateDateQuery(query: SelectQueryBuilder<Message>, after?: Date, before?: Date) {
+        query.andWhere(
+            new Brackets(qb => {
+                qb.orWhere(
+                    new Brackets(qb2 => {
+                        if (after)
+                            qb2.andWhere("message.date_delivered >= :after", {
+                                after: convertDateTo2001Time(after)
+                            });
+                        if (before)
+                            qb2.andWhere("message.date_delivered <= :before", {
+                                before: convertDateTo2001Time(before)
+                            });
+                    })
+                );
+
+                qb.orWhere(
+                    new Brackets(qb2 => {
+                        if (after)
+                            qb2.andWhere("message.date_read >= :after", {
+                                after: convertDateTo2001Time(after)
+                            });
+                        if (before)
+                            qb2.andWhere("message.date_read <= :before", {
+                                before: convertDateTo2001Time(before)
+                            });
+                    })
+                );
+
+                if (isMinVentura) {
+                    qb.orWhere(
+                        new Brackets(qb2 => {
+                            if (after)
+                                qb2.andWhere("message.date_edited >= :after", {
+                                    after: convertDateTo2001Time(after)
+                                });
+                            if (before)
+                                qb2.andWhere("message.date_edited <= :before", {
+                                    before: convertDateTo2001Time(before)
+                                });
+                        })
+                    );
+                }
+
+                if (isMinVentura) {
+                    qb.orWhere(
+                        new Brackets(qb2 => {
+                            if (after)
+                                qb2.andWhere("message.date_retracted >= :after", {
+                                    after: convertDateTo2001Time(after)
+                                });
+                            if (before)
+                                qb2.andWhere("message.date_retracted <= :before", {
+                                    before: convertDateTo2001Time(before)
+                                });
+                        })
+                    );
+                }
+            })
+        );
     }
 
     /**
