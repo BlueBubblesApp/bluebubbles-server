@@ -693,6 +693,14 @@ class BlueBubblesServer extends EventEmitter {
             this.window.minimize();
         }
 
+        // Disable the encryp coms setting if it's enabled.
+        // This is a temporary fix until the android client supports it again.
+        const encryptComs = Server().repo.getConfig("encrypt_coms") as boolean;
+        if (encryptComs) {
+            this.log("Disabling encrypt coms setting...");
+            Server().repo.setConfig("encrypt_coms", false);
+        }
+
         try {
             // Restart via terminal if configured
             const restartViaTerminal = Server().repo.getConfig("start_via_terminal") as boolean;
