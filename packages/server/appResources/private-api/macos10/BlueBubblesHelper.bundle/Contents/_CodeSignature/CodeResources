@@ -8,6 +8,22 @@
 		<data>
 		GOS5kxzLZzPuPU7AMvjis6Oltjk=
 		</data>
+		<key>Resources/SocialAppsCore/IMAccount-AliasAdditions.h</key>
+		<data>
+		k3hVO7/+cKZSupuS+4makuvqQ3o=
+		</data>
+		<key>Resources/SocialAppsCore/SOAccountAlias.h</key>
+		<data>
+		hsOAN73xrV8SAvF4lLs3OVEtSyc=
+		</data>
+		<key>Resources/SocialAppsCore/SOAccountAliasController.h</key>
+		<data>
+		72KEKFyBqsA7Kd2a3HObxvQzhPo=
+		</data>
+		<key>Resources/SocialAppsCore/SOAccountRegistrationController.h</key>
+		<data>
+		SLtcWTI/+Ghzd1OC6oRMTFSt7OE=
+		</data>
 	</dict>
 	<key>files2</key>
 	<dict>
@@ -16,6 +32,34 @@
 			<key>hash2</key>
 			<data>
 			OiPCSXEfNginSgTFrUsF7VuW3q3fk6E2Ih7+t73hGVY=
+			</data>
+		</dict>
+		<key>Resources/SocialAppsCore/IMAccount-AliasAdditions.h</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			egihpTZAMD/MEW4PSvmHINNYRzHJCKUmGYsWEFAiFcQ=
+			</data>
+		</dict>
+		<key>Resources/SocialAppsCore/SOAccountAlias.h</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			WSKWp1BVcMxEmCriwLZKZ5/VVZA7guKISbvt6Uph148=
+			</data>
+		</dict>
+		<key>Resources/SocialAppsCore/SOAccountAliasController.h</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			iADBnpDPFuRVFA9fr2+8AgtsA74Ws25vWftS+LowmDk=
+			</data>
+		</dict>
+		<key>Resources/SocialAppsCore/SOAccountRegistrationController.h</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			aS+oUmRnPXxh/QDBEJ5qpBEq7qTwwl08SxpahZbRJn0=
 			</data>
 		</dict>
 	</dict>

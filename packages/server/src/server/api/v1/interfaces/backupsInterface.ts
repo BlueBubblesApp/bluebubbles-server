@@ -18,6 +18,16 @@ export class BackupsInterface {
         fs.writeFileSync(themePath, JSON.stringify(data));
     }
 
+    static async deleteTheme(name: string): Promise<void> {
+        const saniName = `${slugify(name)}.json`;
+        const themePath = path.join(FileSystem.themesDir, saniName);
+
+        // Delete the file if it exists
+        if (fs.existsSync(themePath)) {
+            fs.unlinkSync(themePath);
+        }
+    }
+
     static async getThemeByName(name: string): Promise<any> {
         const saniName = `${slugify(name)}.json`;
         const themePath = path.join(FileSystem.themesDir, saniName);
@@ -60,6 +70,16 @@ export class BackupsInterface {
 
         // Write the JSON file
         fs.writeFileSync(settingsPath, JSON.stringify(data));
+    }
+
+    static async deleteSettings(name: string): Promise<void> {
+        const saniName = `${slugify(name)}.json`;
+        const settingsPath = path.join(FileSystem.settingsDir, saniName);
+
+        // Delete the file if it exists
+        if (fs.existsSync(settingsPath)) {
+            fs.unlinkSync(settingsPath);
+        }
     }
 
     static async getSettingsByName(name: string): Promise<any> {

@@ -411,6 +411,46 @@ export class BlueBubblesHelperService {
         );
     }
 
+    async sendAttachment({
+        chatGuid,
+        filePath,
+        isAudioMessage = false,
+        attributedBody = null,
+        subject = null,
+        effectId = null,
+        selectedMessageGuid = null,
+        partIndex = 0
+    }: {
+        chatGuid: string,
+        filePath: string,
+        isAudioMessage?: boolean,
+        attributedBody?: Record<string, any> | null;
+        subject?: string;
+        effectId?: string;
+        selectedMessageGuid?: string;
+        partIndex?: number;
+    }): Promise<TransactionResult> {
+        if (!chatGuid || !filePath) {
+            throw new Error("Failed to send attachment. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.ATTACHMENT);
+        return this.writeData(
+            "send-attachment",
+            {
+                chatGuid,
+                filePath,
+                isAudioMessage: isAudioMessage ? 1 : 0,
+                attributedBody,
+                subject,
+                effectId,
+                selectedMessageGuid,
+                partIndex
+            },
+            request
+        );
+    }
+
     async addParticipant(chatGuid: string, address: string) {
         return this.toggleParticipant(chatGuid, address, "add");
     }

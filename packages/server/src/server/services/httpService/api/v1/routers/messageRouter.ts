@@ -240,7 +240,17 @@ export class MessageRouter {
 
     static async sendAttachment(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const { tempGuid, chatGuid, name } = ctx.request?.body ?? {};
+        const {
+            tempGuid,
+            chatGuid,
+            name,
+            method,
+            subject,
+            selectedMessageGuid,
+            partIndex,
+            effectId,
+            isAudioMessage
+        } = ctx.request?.body ?? {};
         const attachment = files?.attachment as File;
 
         // Add to send cache
@@ -252,7 +262,13 @@ export class MessageRouter {
                 chatGuid,
                 attachmentPath: attachment.path,
                 attachmentName: name,
-                attachmentGuid: tempGuid
+                attachmentGuid: tempGuid,
+                method,
+                isAudioMessage,
+                subject,
+                effectId,
+                selectedMessageGuid,
+                partIndex
             });
 
             // Remove from cache

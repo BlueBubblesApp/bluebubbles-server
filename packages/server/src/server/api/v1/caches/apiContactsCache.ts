@@ -6,8 +6,6 @@ const contacts = require("node-mac-contacts");
 export class ApiContactsCache {
     contacts: any[] | null = null;
 
-    recentlyUpdated = false;
-
     getApiContacts() {
         // If we aren't authorized, return an empty array without setting this.contacts.
         // This way, if a permission is changed from Denied -> Authorized, we can still

@@ -52,7 +52,8 @@ import {
     isMinMojave,
     isMinMonterey,
     isMinSierra,
-    isNotEmpty
+    isNotEmpty,
+    waitMs
 } from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
 import { BlueBubblesHelperService } from "./services/privateApi";
@@ -421,7 +422,7 @@ class BlueBubblesServer extends EventEmitter {
         try {
             await this.startProxyServices();
         } catch (ex: any) {
-            this.log(`Failed to connect to Ngrok! ${ex.message}`, "error");
+            this.log(`Failed to connect to proxy service! ${ex.message}`, "error");
         }
 
         try {
@@ -581,6 +582,9 @@ class BlueBubblesServer extends EventEmitter {
 
         // After setup is complete, start the update checker
         try {
+            // Wait 5 seconds before starting the update checker.
+            // This is just to not use up too much CPU on startup
+            await waitMs(5000);
             this.log("Initializing Update Service..");
             this.updater = new UpdateService(this.window);
 
@@ -682,6 +686,20 @@ class BlueBubblesServer extends EventEmitter {
 
         // Set the dock icon according to the config
         this.setDockIcon();
+
+        // Start minimized if enabled
+        const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
+        if (startMinimized) {
+            this.window.minimize();
+        }
+
+        // Disable the encryp coms setting if it's enabled.
+        // This is a temporary fix until the android client supports it again.
+        const encryptComs = Server().repo.getConfig("encrypt_coms") as boolean;
+        if (encryptComs) {
+            this.log("Disabling encrypt coms setting...");
+            Server().repo.setConfig("encrypt_coms", false);
+        }
 
         try {
             // Restart via terminal if configured

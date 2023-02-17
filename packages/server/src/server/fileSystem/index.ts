@@ -171,9 +171,9 @@ export class FileSystem {
      * @param name Name for the attachment
      * @param buffer The attachment bytes (buffer)
      */
-    static copyAttachment(originalPath: string, name: string): string {
+    static copyAttachment(originalPath: string, name: string, method = 'apple-script'): string {
         let newPath = path.join(FileSystem.attachmentsDir, name);
-        if (isMinMonterey) {
+        if (isMinMonterey || method === 'private-api') {
             if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) fs.mkdirSync(FileSystem.messagesAttachmentsDir);
             newPath = path.join(FileSystem.messagesAttachmentsDir, name);
         } else {

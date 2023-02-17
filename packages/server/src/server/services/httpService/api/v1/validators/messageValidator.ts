@@ -112,13 +112,43 @@ export class MessageValidator {
 
     static sendAttachmentRules = {
         chatGuid: "required|string",
-        tempGuid: "required|string",
-        name: "required|string"
+        tempGuid: "string",
+        method: "string|in:apple-script,private-api",
+        name: "required|string",
+        isAudioMessage: "boolean",
+        effectId: "string",
+        subject: "string",
+        selectedMessageGuid: "string",
+        partIndex: "numeric|min:0"
     };
 
     static async validateAttachment(ctx: RouterContext, next: Next) {
         const { files } = ctx.request;
-        const { tempGuid } = ValidateInput(ctx.request?.body, MessageValidator.sendAttachmentRules);
+        const {
+            tempGuid,
+            method,
+            isAudioMessage,
+            effectId,
+            subject,
+            selectedMessageGuid
+        } = ValidateInput(ctx.request?.body, MessageValidator.sendAttachmentRules);
+
+        let saniMethod = method;
+        if (isAudioMessage || effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
+            saniMethod = "private-api";
+        }
+
+        // Default the method to AppleScript
+        saniMethod = saniMethod ?? "apple-script";
+
+        // If we are sending via apple-script, we require a tempGuid
+        if (saniMethod === "apple-script" && isEmpty(tempGuid)) {
+            throw new BadRequest({ error: `A 'tempGuid' is required when sending via AppleScript` });
+        }
+
+        // Inject the method (we have to force it to thing it's anything)
+        (ctx.request.body as any).method = saniMethod;
+        (ctx.request.body as any).isAudioMessage = isAudioMessage === 'true' ? true : false;
 
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {

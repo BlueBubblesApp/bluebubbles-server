@@ -40,7 +40,7 @@ import { tapbackUIMap } from "./mappings";
  */
 export class ActionHandler {
     static sendMessageHandler = async (chatGuid: string, message: string, attachment: string) => {
-        let messageScript;
+        let messageScript: string;
 
         let theAttachment = attachment;
         if (theAttachment !== null && theAttachment.endsWith(".mp3")) {

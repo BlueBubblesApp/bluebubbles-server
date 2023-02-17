@@ -17,7 +17,7 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 3. Install the server dependencies
     - `yarn`
 4. Run the dev server (this will start both the renderer and server)
-    - `yarn run start-dev`
+    - `yarn start`
 
 ## Structure / Directory Map
 

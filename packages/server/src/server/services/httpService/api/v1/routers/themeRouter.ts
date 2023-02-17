@@ -19,6 +19,14 @@ export class ThemeRouter {
         return new Success(ctx, { message: "Successfully saved theme!" }).send();
     }
 
+    static async delete(ctx: RouterContext, _: Next) {
+        const { name } = ctx.request.body;
+
+        // Save the theme to a file
+        await BackupsInterface.deleteTheme(name);
+        return new Success(ctx, { message: "Successfully deleted theme!" }).send();
+    }
+
     static async get(ctx: RouterContext, _: Next) {
         const name = ctx.query.name as string;
         let res: any;
