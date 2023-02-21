@@ -133,11 +133,6 @@ export class MessageValidator {
             saniMethod = "private-api";
         }
 
-        // Only allow private api attachment sending on Catalina+
-        if (saniMethod === "private-api" && !isMinCatalina) {
-            saniMethod = "apple-script";
-        }
-
         // If we are sending via apple-script, we require a tempGuid
         if (saniMethod === "apple-script" && isEmpty(tempGuid)) {
             throw new BadRequest({ error: `A 'tempGuid' is required when sending via AppleScript` });
