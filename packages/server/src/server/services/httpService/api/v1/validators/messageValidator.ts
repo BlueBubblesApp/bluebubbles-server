@@ -2,7 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 import type { File } from "formidable";
 import { Server } from "@server";
-import { isEmpty } from "@server/helpers/utils";
+import { isEmpty, isMinCatalina } from "@server/helpers/utils";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 
 import { ValidateInput } from "./index";
@@ -124,22 +124,14 @@ export class MessageValidator {
 
     static async validateAttachment(ctx: RouterContext, next: Next) {
         const { files } = ctx.request;
-        const {
-            tempGuid,
-            method,
-            isAudioMessage,
-            effectId,
-            subject,
-            selectedMessageGuid
-        } = ValidateInput(ctx.request?.body, MessageValidator.sendAttachmentRules);
-
-        let saniMethod = method;
-        if (isAudioMessage || effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
+        const { tempGuid, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
+            ctx.request?.body,
+            MessageValidator.sendAttachmentRules
+        );
+        let saniMethod = method ?? "apple-script";
+        if (effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
             saniMethod = "private-api";
         }
-
-        // Default the method to AppleScript
-        saniMethod = saniMethod ?? "apple-script";
 
         // If we are sending via apple-script, we require a tempGuid
         if (saniMethod === "apple-script" && isEmpty(tempGuid)) {
@@ -148,7 +140,7 @@ export class MessageValidator {
 
         // Inject the method (we have to force it to thing it's anything)
         (ctx.request.body as any).method = saniMethod;
-        (ctx.request.body as any).isAudioMessage = isAudioMessage === 'true' ? true : false;
+        (ctx.request.body as any).isAudioMessage = isAudioMessage === "true" ? true : false;
 
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
