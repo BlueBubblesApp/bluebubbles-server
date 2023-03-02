@@ -10,6 +10,8 @@ export class OutgoingMessageListener extends MessageChangeListener {
 
     notSent: number[];
 
+    lastRowId = 0;
+
     constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
         super({ cache, pollFrequency });
 
@@ -47,19 +49,33 @@ export class OutgoingMessageListener extends MessageChangeListener {
     }
 
     async emitOutgoingMessages(after: Date) {
-        const baseQuery = [
+        const baseQuery: DBWhereItem[] = [
             {
                 statement: "message.is_from_me = :fromMe",
                 args: { fromMe: 1 }
             }
         ];
 
+        // If we have a last row id, only get messages after that
+        if (this.lastRowId !== 0) {
+            baseQuery.push({
+                statement: "message.ROWID > :rowId",
+                args: { rowId: this.lastRowId }
+            });
+        }
+
         // 1: Check for new messages
+        // Do not use the "after" parameter if we have a last row id
         const newMessages = await this.repo.getMessages({
-            after,
+            after: this.lastRowId === 0 ? after : null,
             withChats: true,
-            where: [...baseQuery]
+            where: baseQuery
         });
+
+        // The 0th entry should be the newest since we sort by DESC
+        if (isNotEmpty(newMessages)) {
+            this.lastRowId = newMessages[0].ROWID;
+        }
 
         // 2: Divide the new messages into sent/unsent buckets
         const newUnsent = newMessages.filter(e => !e.isSent);
@@ -80,7 +96,7 @@ export class OutgoingMessageListener extends MessageChangeListener {
             lookbackMessages = await this.repo.getMessages({
                 withChats: true,
                 where: [
-                    ...baseQuery,
+                    baseQuery[0],
                     {
                         statement: `message.ROWID in (${unsentIds.join(", ")})`,
                         args: null
@@ -138,14 +154,11 @@ export class OutgoingMessageListener extends MessageChangeListener {
     }
 
     async emitUpdatedMessages(after: Date) {
-        const baseQuery: DBWhereItem[] = [];
-
         // Get updated entries from myself only
         const entries = await this.repo.getUpdatedMessages({
             after,
             withChats: true,
             where: [
-                ...baseQuery,
                 {
                     statement: "message.is_from_me = :isFromMe",
                     args: { isFromMe: 1 }
