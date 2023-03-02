@@ -16,29 +16,55 @@ import { parseWithQuery } from "../utils";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
-        const total = await Server().iMessageRepo.getMessageCount(null, null, true);
+        const { after, before, chatGuid, minRowId, maxRowId } = ctx.request.query;
+        const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
+        const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
+        const minRowIdValue = isNotEmpty(minRowId) ? Number.parseInt(minRowId as string, 10) : null;
+        const maxRowIdValue = isNotEmpty(maxRowId) ? Number.parseInt(maxRowId as string, 10) : null;
+        const total = await Server().iMessageRepo.getMessageCount({
+            after: afterDate,
+            before: beforeDate,
+            chatGuid: chatGuid as string,
+            minRowId: minRowIdValue,
+            maxRowId: maxRowIdValue,
+            isFromMe: true
+        });
+
         return new Success(ctx, { data: { total } }).send();
     }
 
     static async count(ctx: RouterContext, _: Next) {
-        const { after, before, chatGuid } = ctx.request.query;
+        const { after, before, chatGuid, minRowId, maxRowId } = ctx.request.query;
         const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
         const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
-        const total = await Server().iMessageRepo.getMessageCount(afterDate, beforeDate, false, chatGuid as string);
+        const minRowIdValue = isNotEmpty(minRowId) ? Number.parseInt(minRowId as string, 10) : null;
+        const maxRowIdValue = isNotEmpty(maxRowId) ? Number.parseInt(maxRowId as string, 10) : null;
+        const total = await Server().iMessageRepo.getMessageCount({
+            after: afterDate,
+            before: beforeDate,
+            chatGuid: chatGuid as string,
+            minRowId: minRowIdValue,
+            maxRowId: maxRowIdValue
+        });
+
         return new Success(ctx, { data: { total } }).send();
     }
 
     static async countUpdated(ctx: RouterContext, _: Next) {
-        const { after, before, chatGuid } = ctx.request.query;
+        const { after, before, chatGuid, minRowId, maxRowId } = ctx.request.query;
         const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
         const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
-        const total = await Server().iMessageRepo.getMessageCount(
-            afterDate,
-            beforeDate,
-            false,
-            chatGuid as string,
-            true
-        );
+        const minRowIdValue = isNotEmpty(minRowId) ? Number.parseInt(minRowId as string, 10) : null;
+        const maxRowIdValue = isNotEmpty(maxRowId) ? Number.parseInt(maxRowId as string, 10) : null;
+        const total = await Server().iMessageRepo.getMessageCount({
+            after: afterDate,
+            before: beforeDate,
+            chatGuid: chatGuid as string,
+            updated: true,
+            minRowId: minRowIdValue,
+            maxRowId: maxRowIdValue
+        });
+
         return new Success(ctx, { data: { total } }).send();
     }
 
@@ -147,8 +173,15 @@ export class MessageRouter {
             }
         });
 
+        const total = await Server().iMessageRepo.getMessageCount({
+            chatGuid,
+            before,
+            after,
+            where: where ?? []
+        });
+
         // Build metadata to return
-        const metadata = { offset, limit, total: data.length };
+        const metadata = { offset, limit, total: total, count: data.length };
         return new Success(ctx, { data, message: "Successfully fetched messages!", metadata }).send();
     }
 
@@ -240,17 +273,8 @@ export class MessageRouter {
 
     static async sendAttachment(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const {
-            tempGuid,
-            chatGuid,
-            name,
-            method,
-            subject,
-            selectedMessageGuid,
-            partIndex,
-            effectId,
-            isAudioMessage
-        } = ctx.request?.body ?? {};
+        const { tempGuid, chatGuid, name, method, subject, selectedMessageGuid, partIndex, effectId, isAudioMessage } =
+            ctx.request?.body ?? {};
         const attachment = files?.attachment as File;
 
         // Add to send cache

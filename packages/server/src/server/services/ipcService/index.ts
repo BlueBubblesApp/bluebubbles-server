@@ -186,7 +186,11 @@ export class IPCService {
 
         ipcMain.handle("get-message-count", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getMessageCount(args?.after, args?.before, args?.isFromMe);
+            const count = await Server().iMessageRepo.getMessageCount({
+                after: args?.after,
+                before: args?.before,
+                isFromMe: args?.isFromMe
+            });
             return count;
         });
 

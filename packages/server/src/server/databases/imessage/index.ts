@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 import { Brackets, DataSource, SelectQueryBuilder } from "typeorm";
 
-import { DBMessageParams, ChatParams, HandleParams } from "@server/databases/imessage/types";
+import { DBMessageParams, ChatParams, HandleParams, DBWhereItem } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
@@ -354,7 +354,25 @@ export class MessageRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getMessageCount(after?: Date, before?: Date, isFromMe = false, chatGuid: string = null, updated = false) {
+    async getMessageCount({
+        after = null,
+        before = null,
+        isFromMe = false,
+        where = [],
+        chatGuid = null,
+        updated = false,
+        minRowId = null,
+        maxRowId = null
+    }: {
+        after?: Date;
+        before?: Date;
+        isFromMe?: boolean;
+        where?: DBWhereItem[];
+        chatGuid?: string;
+        updated?: boolean;
+        minRowId?: number;
+        maxRowId?: number;
+    } = {}): Promise<number> {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Message).createQueryBuilder("message");
 
@@ -370,6 +388,19 @@ export class MessageRepository {
         }
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
+        if (minRowId != null) query.andWhere("message.ROWID >= :minRowId", { minRowId });
+        if (maxRowId != null) query.andWhere("message.ROWID <= :maxRowId", { maxRowId });
+
+        // Add any custom WHERE clauses
+        if (isNotEmpty(where)) {
+            query.andWhere(
+                new Brackets(qb => {
+                    for (const item of where) {
+                        qb.andWhere(item.statement, item.args);
+                    }
+                })
+            );
+        }
 
         // Add date constraints
         if (after || before) {
@@ -380,11 +411,7 @@ export class MessageRepository {
             }
         }
 
-        // Add pagination params
-        query.orderBy("message.date", "DESC");
-
-        const count = await query.getCount();
-        return count;
+        return await query.getCount();
     }
 
     /**
