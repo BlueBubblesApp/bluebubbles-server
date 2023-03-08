@@ -110,8 +110,8 @@ export class HttpService {
         // Increase size limits from the default 1mb
         this.koaApp.use(
             koaBody({
-                jsonLimit: "10mb",
-                textLimit: "10mb",
+                jsonLimit: "100mb",
+                textLimit: "100mb",
                 formLimit: "1000mb",
                 multipart: true
             })
