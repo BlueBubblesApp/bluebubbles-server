@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "t
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
+import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
 
 @Entity("chat")
 export class Chat {
@@ -36,8 +37,12 @@ export class Chat {
     @Column({ name: "account_id", type: "text", nullable: true })
     accountId: number;
 
-    @Column({ type: "blob", nullable: true })
-    properties: Blob;
+    @Column({
+        type: "blob",
+        nullable: true,
+        transformer: AttributedBodyTransformer
+    })
+    properties: NodeJS.Dict<any>[] | null;
 
     @Column({ name: "chat_identifier", type: "text", nullable: true })
     chatIdentifier: string;

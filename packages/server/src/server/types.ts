@@ -84,6 +84,7 @@ export type ChatResponse = {
     participants?: HandleResponse[];
     messages?: MessageResponse[];
     lastMessage?: MessageResponse;
+    properties?: NodeJS.Dict<any>[] | null;
     style: number;
     chatIdentifier: string;
     isArchived: boolean;
