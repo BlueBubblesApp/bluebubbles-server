@@ -12,6 +12,7 @@ import {
     isMinBigSur,
     isMinCatalina,
     isMinHighSierra,
+    isMinMonterey,
     isMinSierra,
     isMinVentura,
     sanitizeStr
@@ -573,6 +574,28 @@ export class Message {
         })
     )
     partCount: number;
+
+    @conditional(
+        isMinMonterey,
+        Column({
+            name: "was_delivered_quietly",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    wasDeliveredQuietly: boolean;
+
+    @conditional(
+        isMinMonterey,
+        Column({
+            name: "did_notify_recipient",
+            type: "integer",
+            transformer: BooleanTransformer,
+            default: 0
+        })
+    )
+    didNotifyRecipient: boolean;
 
     get isDigitalTouch(): boolean {
         return this.balloonBundleId === "com.apple.DigitalTouchBalloonProvider";
