@@ -552,7 +552,7 @@ export class BlueBubblesHelperService {
                     continue;
                 }
 
-                Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
+                // Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
                 let data;
 
                 // Handle in a timeout so that we handle each event asyncronously
