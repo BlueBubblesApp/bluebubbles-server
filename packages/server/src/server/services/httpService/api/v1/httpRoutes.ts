@@ -427,6 +427,12 @@ export class HttpRoutes {
                         path: ":guid",
                         validators: [HandleValidator.validateFind],
                         controller: HandleRouter.find
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: ":guid/focus",
+                        validators: [HandleValidator.validateFind],
+                        controller: HandleRouter.getFocusStatus
                     }
                 ]
             },

@@ -54,4 +54,14 @@ export class HandleRouter {
 
         return new Success(ctx, { data: results, metadata }).send();
     }
+
+    static async getFocusStatus(ctx: RouterContext, _: Next) {
+        const address = ctx.params.guid;
+        const handles = await Server().iMessageRepo.getHandles({ address });
+        if (isEmpty(handles)) throw new NotFound({ error: "Handle not found!" });
+
+        // Get the status from the private api
+        const status = await HandleInterface.getFocusStatus(handles[0]);
+        return new Success(ctx, { data: { status } }).send();
+    }
 }

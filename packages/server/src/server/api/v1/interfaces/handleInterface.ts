@@ -2,6 +2,8 @@ import { Server } from "@server";
 import { ChatResponse, HandleResponse } from "@server/types";
 import { HandleSerializer } from "../serializers/HandleSerializer";
 import { ChatInterface } from "./chatInterface";
+import { Handle } from "@server/databases/imessage/entity/Handle";
+import { checkPrivateApiStatus, isEmpty, isMinMonterey } from "@server/helpers/utils";
 
 export class HandleInterface {
     static async get({
@@ -57,5 +59,16 @@ export class HandleInterface {
         );
 
         return results;
+    }
+
+    static async getFocusStatus(handle: Handle): Promise<string> {
+        checkPrivateApiStatus();
+        if (!isMinMonterey) throw new Error("Focus status is only available on Monterey and newer!");
+
+        const focusStatus = await Server().privateApiHelper.checkFocusStatus(handle.id);
+        if (isEmpty(focusStatus?.data)) return "unknown";
+
+        if (focusStatus?.data?.silenced == 1) return "silenced";
+        return "none";
     }
 }
