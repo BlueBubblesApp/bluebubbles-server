@@ -545,6 +545,11 @@ export class MessageRouter {
         if (!mediaPath) throw new NotFound({ error: "No embedded media found!" });
 
         const fullPath = FileSystem.getRealPath(mediaPath);
-        return new FileStream(ctx, fullPath, "video/quicktime").send();
+        let mimeType = "image/png";
+        if (message.isDigitalTouch) {
+            mimeType = "video/quicktime";
+        }
+
+        return new FileStream(ctx, fullPath, mimeType).send();
     }
 }
