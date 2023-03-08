@@ -111,6 +111,8 @@ export const Server = (win: BrowserWindow = null) => {
 class BlueBubblesServer extends EventEmitter {
     window: BrowserWindow;
 
+    uiLoaded: boolean;
+
     repo: ServerRepository;
 
     iMessageRepo: MessageRepository;
@@ -195,6 +197,7 @@ class BlueBubblesServer extends EventEmitter {
         super();
 
         this.window = window;
+        this.uiLoaded = false;
 
         // Databases
         this.repo = null;
@@ -231,7 +234,10 @@ class BlueBubblesServer extends EventEmitter {
 
     emitToUI(event: string, data: any) {
         try {
-            if (this.window) this.window.webContents.send(event, data);
+            if (!this.uiLoaded) return;
+            if (this.window && !this.window.webContents.isDestroyed()) {
+                this.window.webContents.send(event, data);
+            }
         } catch {
             /* Ignore errors here */
         }
