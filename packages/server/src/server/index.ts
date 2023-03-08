@@ -62,6 +62,7 @@ import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
 import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
 import {
+    GROUP_ICON_CHANGED,
     GROUP_NAME_CHANGE,
     MESSAGE_UPDATED,
     NEW_MESSAGE,
@@ -1230,7 +1231,7 @@ class BlueBubblesServer extends EventEmitter {
          */
         incomingMsgListener.on("new-entry", async (item: Message) => {
             const newMessage = await insertChatParticipants(item);
-            this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
+            this.log(`New message from [${newMessage.handle?.id ?? "You"}]: [${newMessage.contentString()}]`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1373,6 +1374,35 @@ class BlueBubblesServer extends EventEmitter {
 
             await this.emitMessage(
                 PARTICIPANT_LEFT,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
+            );
+        });
+
+        groupEventListener.on("group-icon-changed", async (item: Message) => {
+            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            this.log(`[${from}] changed the group photo`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                GROUP_ICON_CHANGED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
+            await this.emitMessage(
+                GROUP_ICON_CHANGED,
                 await MessageSerializer.serialize({
                     message: item,
                     isForNotification: true
