@@ -8,6 +8,7 @@ type MessageState = {
     dateRead: number;
     dateEdited: number;
     dateRetracted: number;
+    didNotifyRecipient: boolean;
 };
 
 export abstract class MessageChangeListener extends EventEmitter {
@@ -82,6 +83,9 @@ export abstract class MessageChangeListener extends EventEmitter {
         const retracted = message?.dateRetracted ? message.dateRetracted.getTime() : 0;
         if (retracted > state.dateRetracted) return "updated-entry";
 
+        // If the "notified" state changed, it's an update
+        if (message.didNotifyRecipient !== state.didNotifyRecipient) return "updated-entry";
+
         return null;
     }
 
@@ -98,7 +102,8 @@ export abstract class MessageChangeListener extends EventEmitter {
             dateDelivered: message?.dateDelivered ? message.dateDelivered.getTime() : 0,
             dateRead: message?.dateRead ? message.dateRead.getTime() : 0,
             dateEdited: message.dateEdited ? message.dateEdited.getTime() : 0,
-            dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : 0
+            dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : 0,
+            didNotifyRecipient: message.didNotifyRecipient ?? false
         };
 
         return event;

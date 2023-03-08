@@ -2,8 +2,9 @@ import { Server } from "@server";
 import { MessageRepository } from "@server/databases/imessage";
 import { EventCache } from "@server/eventCache";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { isNotEmpty } from "@server/helpers/utils";
+import { isMinMonterey, isNotEmpty } from "@server/helpers/utils";
 import { MessageChangeListener } from "./messageChangeListener";
+import type { Message } from "../entity/Message";
 
 export class OutgoingMessageListener extends MessageChangeListener {
     repo: MessageRepository;
@@ -166,8 +167,27 @@ export class OutgoingMessageListener extends MessageChangeListener {
             ]
         });
 
+        // Get entries that have an updated "didNotifyRecipient" value (true), only for Monterey+
+        let notifiedEntries: Message[] = [];
+        if (isMinMonterey) {
+            notifiedEntries = await this.repo.getMessages({
+                after,
+                withChats: true,
+                where: [
+                    {
+                        statement: "message.is_from_me = :isFromMe",
+                        args: { isFromMe: 1 }
+                    },
+                    {
+                        statement: "message.did_notify_recipient = :didNotifyRecipient",
+                        args: { didNotifyRecipient: 1 }
+                    }
+                ]
+            });
+        }
+
         // Emit the new message
-        for (const entry of entries) {
+        for (const entry of [...entries, ...notifiedEntries]) {
             const event = this.processMessageEvent(entry);
             if (!event) return;
 
