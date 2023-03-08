@@ -280,6 +280,7 @@ export class ChatInterface {
 
     static async setGroupChatIcon(chat: Chat, iconPath: string): Promise<void> {
         checkPrivateApiStatus();
+        if (!isMinBigSur) throw new Error("Setting group chat icons are only supported on macOS Big Sur or newer!");
         if (isEmpty(iconPath)) throw new Error("No icon path provided!");
         if (!fs.existsSync(iconPath)) throw new Error("Icon path does not exist!");
 
