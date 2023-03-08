@@ -265,4 +265,10 @@ export class ChatRouter {
         await ChatInterface.delete({ guid });
         return new Success(ctx, { message: `Successfully deleted chat!` }).send();
     }
+
+    static async leaveChat(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.leave({ guid });
+        return new Success(ctx, { message: `Successfully left chat!` }).send();
+    }
 }

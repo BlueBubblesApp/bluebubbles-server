@@ -421,9 +421,9 @@ export class BlueBubblesHelperService {
         selectedMessageGuid = null,
         partIndex = 0
     }: {
-        chatGuid: string,
-        filePath: string,
-        isAudioMessage?: boolean,
+        chatGuid: string;
+        filePath: string;
+        isAudioMessage?: boolean;
         attributedBody?: Record<string, any> | null;
         subject?: string;
         effectId?: string;
@@ -475,6 +475,15 @@ export class BlueBubblesHelperService {
 
         const request = new TransactionPromise(TransactionType.CHAT);
         return this.writeData("set-display-name", { chatGuid, newName }, request);
+    }
+
+    async leaveChat(chatGuid: string): Promise<TransactionResult> {
+        if (!chatGuid) {
+            throw new Error("Failed to leave chat. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.writeData("leave-chat", { chatGuid }, request);
     }
 
     async getTypingStatus(chatGuid: string): Promise<TransactionResult> {

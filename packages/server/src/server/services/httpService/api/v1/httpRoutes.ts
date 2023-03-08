@@ -254,6 +254,12 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/leave",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.leaveChat
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/participant/add",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],

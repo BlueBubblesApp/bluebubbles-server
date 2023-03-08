@@ -277,6 +277,19 @@ export class ChatInterface {
         }
     }
 
+    static async leave({ chat, guid }: { chat?: Chat; guid?: string } = {}): Promise<void> {
+        checkPrivateApiStatus();
+
+        const repo = Server().iMessageRepo.db.getRepository(Chat);
+        if (!chat && isEmpty(guid)) throw new Error("No chat or chat GUID provided!");
+
+        const theChat = chat ?? (await repo.findOneBy({ guid }));
+        if (!theChat) return;
+
+        // Tell the private API to delete the chat
+        await Server().privateApiHelper.leaveChat(theChat.guid);
+    }
+
     static async markRead(chatGuid: string): Promise<void> {
         await Server().privateApiHelper.markChatRead(chatGuid);
         await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
