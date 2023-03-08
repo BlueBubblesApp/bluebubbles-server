@@ -279,26 +279,30 @@ export class ChatInterface {
         }
     }
 
-    static async setGroupChatIcon(chat: Chat, iconPath: string): Promise<void> {
+    static async setGroupChatIcon(chat: Chat, iconPath: string | null): Promise<void> {
         checkPrivateApiStatus();
         if (!isMinBigSur) throw new Error("Setting group chat icons are only supported on macOS Big Sur or newer!");
-        if (isEmpty(iconPath)) throw new Error("No icon path provided!");
-        if (!fs.existsSync(iconPath)) throw new Error("Icon path does not exist!");
+
+        // The icon path can be null when unsetting the icon
+        if (isNotEmpty(iconPath)) {
+            if (!fs.existsSync(iconPath)) {
+                throw new Error("Icon path does not exist!");
+            }
+
+            // Extract filename from path
+            const filename = iconPath.split("/").slice(-1)[0];
+
+            // Copy the file to the Messages Attachments folder
+            iconPath = FileSystem.copyAttachment(iconPath, `${chat.chatIdentifier}-${filename}`, "private-api");
+        }
 
         // Make sure we are executing this on a group chat
         if (chat.participants.length === 1) {
             throw new Error("Chat is not a group chat!");
         }
 
-        // Extract filename from path
-        const filename = iconPath.split("/").slice(-1)[0];
-
-        // Copy the attachment to the Messages Attachments folder.
-        // Prefix the name with the chat identifier to avoid collisions
-        const newPath = FileSystem.copyAttachment(iconPath, `${chat.chatIdentifier}-${filename}`, "private-api");
-
         // Change the chat icon
-        await Server().privateApiHelper.setGroupChatIcon(chat.guid, newPath);
+        await Server().privateApiHelper.setGroupChatIcon(chat.guid, iconPath);
     }
 
     static async getGroupChatIcon(chat: Chat): Promise<Attachment | null> {

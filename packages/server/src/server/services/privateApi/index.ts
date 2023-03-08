@@ -504,8 +504,8 @@ export class BlueBubblesHelperService {
         return this.writeData("set-display-name", { chatGuid, newName }, request);
     }
 
-    async setGroupChatIcon(chatGuid: string, filePath: string): Promise<TransactionResult> {
-        if (!chatGuid || !filePath) {
+    async setGroupChatIcon(chatGuid: string, filePath: string | null): Promise<TransactionResult> {
+        if (!chatGuid) {
             throw new Error("Failed to set group chat icon. Invalid params!");
         }
 

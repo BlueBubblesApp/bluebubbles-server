@@ -274,10 +274,16 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
-                        path: ":guid/icon/set",
+                        path: ":guid/icon",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateGroupChatIcon],
                         controller: ChatRouter.setGroupChatIcon
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid/icon",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.removeGroupChatIcon
                     },
                     {
                         method: HttpMethod.GET,

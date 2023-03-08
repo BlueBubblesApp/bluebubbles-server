@@ -268,9 +268,18 @@ export class ChatRouter {
         const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
-        // Add the participant to the chat
         await ChatInterface.setGroupChatIcon(chats[0], icon.path);
         return new Success(ctx, { message: "Successfully set group chat icon!" }).send();
+    }
+
+    static async removeGroupChatIcon(ctx: RouterContext, _: Next) {
+        const { guid } = ctx.params;
+
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        await ChatInterface.setGroupChatIcon(chats[0], null);
+        return new Success(ctx, { message: "Successfully removed group chat icon!" }).send();
     }
 
     static async deleteChat(ctx: RouterContext, _: Next): Promise<void> {
