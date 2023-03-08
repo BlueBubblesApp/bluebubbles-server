@@ -18,6 +18,7 @@ import { MessageInterface } from "./messageInterface";
 import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 import { ChatSerializer } from "../serializers/ChatSerializer";
 import { HandleSerializer } from "../serializers/HandleSerializer";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
 export class ChatInterface {
     static async get({
@@ -298,6 +299,24 @@ export class ChatInterface {
 
         // Change the chat icon
         await Server().privateApiHelper.setGroupChatIcon(chat.guid, newPath);
+    }
+
+    static async getGroupChatIcon(chat: Chat): Promise<Attachment | null> {
+        let iconGuid = null;
+        for (const item of chat.properties ?? []) {
+            if (isNotEmpty(item.groupPhotoGuid)) {
+                iconGuid = item.groupPhotoGuid;
+            }
+        }
+
+        if (isEmpty(iconGuid)) return null;
+
+        // Find the corresponding attachment
+        const attachment = await Server().iMessageRepo.getAttachment(iconGuid);
+        if (!attachment) return null;
+
+        // Return the attachment path
+        return attachment;
     }
 
     static async leave({ chat, guid }: { chat?: Chat; guid?: string } = {}): Promise<void> {

@@ -249,15 +249,15 @@ export class ChatRouter {
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         const chat = chats[0];
-        const iconPath = await Server().iMessageRepo.getGroupIconPath(chat.guid);
-        if (!iconPath) {
+        const icon = await ChatInterface.getGroupChatIcon(chat);
+        if (!icon) {
             throw new NotFound({
                 message: "The requested resource was not found",
                 error: "Unable to find icon for the selected chat"
             });
         }
 
-        return new FileStream(ctx, FileSystem.getRealPath(iconPath), "image/jfif").send();
+        return new FileStream(ctx, FileSystem.getRealPath(icon.filePath), icon.getMimeType() ?? "image/jfif").send();
     }
 
     static async setGroupChatIcon(ctx: RouterContext, _: Next) {

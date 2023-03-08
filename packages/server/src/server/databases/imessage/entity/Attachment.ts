@@ -5,6 +5,7 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import { isMinSierra, isMinHighSierra, isEmpty } from "@server/helpers/utils";
 import { conditional } from "conditional-decorator";
 import * as mime from "mime-types";
+import { FileSystem } from "@server/fileSystem";
 
 @Entity("attachment")
 export class Attachment {
@@ -120,7 +121,8 @@ export class Attachment {
     originalGuid: string;
 
     getMimeType(): string {
-        let mType = this.mimeType ?? mime.lookup(this.filePath);
+        const fPath = FileSystem.getRealPath(this.filePath);
+        let mType = this.mimeType ?? mime.lookup(fPath);
         if (!mType || isEmpty(mType as any)) mType = "application/octet-stream";
         return mType;
     }
