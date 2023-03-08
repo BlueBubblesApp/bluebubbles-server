@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import {
@@ -275,6 +276,27 @@ export class ChatInterface {
         if (!success) {
             throw new Error(`Failed to delete chat! Chat still exists. (GUID: ${theChat.guid})`);
         }
+    }
+
+    static async setGroupChatIcon(chat: Chat, iconPath: string): Promise<void> {
+        checkPrivateApiStatus();
+        if (isEmpty(iconPath)) throw new Error("No icon path provided!");
+        if (!fs.existsSync(iconPath)) throw new Error("Icon path does not exist!");
+
+        // Make sure we are executing this on a group chat
+        if (chat.participants.length === 1) {
+            throw new Error("Chat is not a group chat!");
+        }
+
+        // Extract filename from path
+        const filename = iconPath.split("/").slice(-1)[0];
+
+        // Copy the attachment to the Messages Attachments folder.
+        // Prefix the name with the chat identifier to avoid collisions
+        const newPath = FileSystem.copyAttachment(iconPath, `${chat.chatIdentifier}-${filename}`, "private-api");
+
+        // Change the chat icon
+        await Server().privateApiHelper.setGroupChatIcon(chat.guid, newPath);
     }
 
     static async leave({ chat, guid }: { chat?: Chat; guid?: string } = {}): Promise<void> {

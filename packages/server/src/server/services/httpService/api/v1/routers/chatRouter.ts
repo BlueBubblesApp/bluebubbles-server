@@ -260,6 +260,19 @@ export class ChatRouter {
         return new FileStream(ctx, FileSystem.getRealPath(iconPath), "image/jfif").send();
     }
 
+    static async setGroupChatIcon(ctx: RouterContext, _: Next) {
+        const { files } = ctx.request;
+        const { guid } = ctx.params;
+        const icon = files?.icon as unknown as File;
+
+        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        // Add the participant to the chat
+        await ChatInterface.setGroupChatIcon(chats[0], icon.path);
+        return new Success(ctx, { message: "Successfully set group chat icon!" }).send();
+    }
+
     static async deleteChat(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
         await ChatInterface.delete({ guid });

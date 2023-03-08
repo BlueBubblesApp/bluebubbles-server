@@ -477,6 +477,15 @@ export class BlueBubblesHelperService {
         return this.writeData("set-display-name", { chatGuid, newName }, request);
     }
 
+    async setGroupChatIcon(chatGuid: string, filePath: string): Promise<TransactionResult> {
+        if (!chatGuid || !filePath) {
+            throw new Error("Failed to set group chat icon. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.writeData("update-group-photo", { chatGuid, filePath }, request);
+    }
+
     async leaveChat(chatGuid: string): Promise<TransactionResult> {
         if (!chatGuid) {
             throw new Error("Failed to leave chat. Invalid params!");

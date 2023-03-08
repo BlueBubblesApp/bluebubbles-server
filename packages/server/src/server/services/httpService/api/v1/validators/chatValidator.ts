@@ -2,6 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { ValidateInput } from "./index";
+import { BadRequest } from "../responses/errors";
 
 export class ChatValidator {
     static getMessagesRules = {
@@ -58,6 +59,18 @@ export class ChatValidator {
 
     static async validateToggleParticipant(ctx: RouterContext, next: Next) {
         ValidateInput(ctx?.request?.body, ChatValidator.toggleParticipantRules);
+        await next();
+    }
+
+    static async validateGroupChatIcon(ctx: RouterContext, next: Next) {
+        const { files } = ctx.request;
+
+        // Make sure the message isn't already in the queue
+        const icon = files?.icon as unknown as File;
+        if (!icon || icon.size === 0) {
+            throw new BadRequest({ error: "Icon not provided or was empty!" });
+        }
+
         await next();
     }
 }
