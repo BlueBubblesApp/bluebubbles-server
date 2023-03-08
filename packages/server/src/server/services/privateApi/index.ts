@@ -451,6 +451,15 @@ export class BlueBubblesHelperService {
         );
     }
 
+    async getEmbeddedMedia(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
+        if (!chatGuid || !messageGuid) {
+            throw new Error("Failed to get embedded media. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.writeData("balloon-bundle-media-path", { chatGuid, messageGuid }, request);
+    }
+
     async addParticipant(chatGuid: string, address: string) {
         return this.toggleParticipant(chatGuid, address, "add");
     }

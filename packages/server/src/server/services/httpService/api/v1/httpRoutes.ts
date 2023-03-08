@@ -396,6 +396,13 @@ export class HttpRoutes {
                         path: ":guid/unsend",
                         validators: [MessageValidator.validateUnsend],
                         controller: MessageRouter.unsendMessage
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: ":guid/embedded-media",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [MessageValidator.validateGetEmbeddedMedia],
+                        controller: MessageRouter.getEmbeddedMedia
                     }
                 ]
             },

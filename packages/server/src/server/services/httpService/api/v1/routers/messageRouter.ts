@@ -4,13 +4,14 @@ import { Next } from "koa";
 import type { File } from "formidable";
 
 import { Server } from "@server";
+import { FileSystem } from "@server/fileSystem";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
 import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
 import { arrayHasOne } from "@server/utils/CollectionUtils";
-import { Success } from "../responses/success";
+import { FileStream, Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
 import { parseWithQuery } from "../utils";
 
@@ -527,5 +528,23 @@ export class MessageRouter {
                 throw new IMessageError({ message: "Message Edit Error", error: ex?.message ?? ex.toString() });
             }
         }
+    }
+
+    static async getEmbeddedMedia(ctx: RouterContext, _: Next) {
+        const { guid: messageGuid } = ctx?.params ?? {};
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+
+        // Pull the associated chat
+        if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
+        const chat = message.chats[0];
+
+        const mediaPath = await MessageInterface.getEmbeddedMedia(chat, message);
+        if (!mediaPath) throw new NotFound({ error: "No embedded media found!" });
+
+        const fullPath = FileSystem.getRealPath(mediaPath);
+        return new FileStream(ctx, fullPath, "video/quicktime").send();
     }
 }

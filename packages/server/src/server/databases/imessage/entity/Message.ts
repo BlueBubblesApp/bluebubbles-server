@@ -573,4 +573,12 @@ export class Message {
         })
     )
     partCount: number;
+
+    get isDigitalTouch(): boolean {
+        return this.balloonBundleId === "com.apple.DigitalTouchBalloonProvider";
+    }
+
+    get isHandwritten(): boolean {
+        return this.balloonBundleId === "com.apple.Handwriting.HandwritingProvider";
+    }
 }

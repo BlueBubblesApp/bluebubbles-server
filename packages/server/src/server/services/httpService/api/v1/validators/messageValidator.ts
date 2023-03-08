@@ -191,4 +191,13 @@ export class MessageValidator {
         ValidateInput(ctx.request?.body, MessageValidator.unsendParamRules);
         await next();
     }
+
+    static getEmbeddedMediaRules = {
+        guid: "required|string"
+    };
+
+    static async validateGetEmbeddedMedia(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx?.params ?? {}, MessageValidator.getEmbeddedMediaRules);
+        await next();
+    }
 }

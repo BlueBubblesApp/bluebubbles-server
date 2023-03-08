@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus, isMinMonterey, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
+import { checkPrivateApiStatus, isMinMonterey, isMinVentura, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ActionHandler } from "@server/api/v1/apple/actions";
@@ -16,6 +16,7 @@ import type {
     EditMessageParams,
     SendAttachmentPrivateApiParams
 } from "@server/api/v1/types";
+import { Chat } from "@server/databases/imessage/entity/Chat";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -111,7 +112,7 @@ export class MessageInterface {
         attachmentPath,
         attachmentName = null,
         attachmentGuid = null,
-        method = 'apple-script',
+        method = "apple-script",
         attributedBody = null,
         subject = null,
         effectId = null,
@@ -127,7 +128,7 @@ export class MessageInterface {
         Server().log(`Sending attachment "${attachmentName}" to ${chatGuid}`, "debug");
 
         // Make sure messages is open
-        if (method === 'apple-script') {
+        if (method === "apple-script") {
             await FileSystem.startMessages();
         }
 
@@ -180,7 +181,7 @@ export class MessageInterface {
                 }
             } catch (e) {
                 if (sentMessage) {
-                    Server().log('Attachment sent via Private API, but message match failed', 'debug');
+                    Server().log("Attachment sent via Private API, but message match failed", "debug");
                 } else {
                     throw e;
                 }
@@ -289,7 +290,8 @@ export class MessageInterface {
         // Check if the name changed
         if (!retMessage) {
             throw new Error(
-                `Failed to send attachment! Attachment not found in database after ${maxWaitMs / 1000} seconds!`);
+                `Failed to send attachment! Attachment not found in database after ${maxWaitMs / 1000} seconds!`
+            );
         }
 
         return retMessage;
@@ -297,6 +299,8 @@ export class MessageInterface {
 
     static async unsendMessage({ chatGuid, messageGuid, partIndex = 0 }: UnsendMessageParams) {
         checkPrivateApiStatus();
+        if (!isMinVentura) throw new Error("Unsend message is only supported on macOS Ventura and newer!");
+
         const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
         const currentEditDate = msg?.dateEdited ?? 0;
         await Server().privateApiHelper.unsendMessage({ chatGuid, messageGuid, partIndex: partIndex ?? 0 });
@@ -329,6 +333,8 @@ export class MessageInterface {
         partIndex = 0
     }: EditMessageParams) {
         checkPrivateApiStatus();
+        if (!isMinVentura) throw new Error("Unsend message is only supported on macOS Ventura and newer!");
+
         const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
         const currentEditDate = msg?.dateEdited ?? 0;
         await Server().privateApiHelper.editMessage({
@@ -457,5 +463,17 @@ export class MessageInterface {
 
         // Return the message
         return retMessage;
+    }
+
+    static async getEmbeddedMedia(chat: Chat, message: Message): Promise<string | null> {
+        checkPrivateApiStatus();
+        if (!message.isDigitalTouch && !message.isHandwritten) {
+            throw new Error("Message must be a digital touch message or handwritten message!");
+        }
+
+        // Get the media path via the private api
+        const transaction = await Server().privateApiHelper.getEmbeddedMedia(chat.guid, message.guid);
+        if (!transaction?.data) return null;
+        return transaction.data;
     }
 }
