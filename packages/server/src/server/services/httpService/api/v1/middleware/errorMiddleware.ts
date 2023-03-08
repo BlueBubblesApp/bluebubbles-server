@@ -12,8 +12,8 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
 
         // Log the error, no matter what it is
         let errStr = `API Error: ${ex?.message ?? ex}`;
-        if (ex?.error?.message) {
-            errStr = `${errStr} -> ${ex?.error?.message}`;
+        if (ex?.response?.error?.message) {
+            errStr = `${errStr} -> ${ex?.response?.error?.message}`;
         }
         if (ex?.data) {
             errStr = `${errStr} (has data: true)`;
