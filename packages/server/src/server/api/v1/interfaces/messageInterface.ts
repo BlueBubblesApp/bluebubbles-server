@@ -473,7 +473,8 @@ export class MessageInterface {
 
         // Get the media path via the private api
         const transaction = await Server().privateApiHelper.getEmbeddedMedia(chat.guid, message.guid);
-        if (!transaction?.data) return null;
-        return transaction.data;
+        if (!transaction?.data?.path) return null;
+        const mediaPath = transaction.data.path.replace("file://", "");
+        return mediaPath;
     }
 }
