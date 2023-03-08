@@ -485,36 +485,6 @@ export class MessageRepository {
         return result;
     }
 
-    async getGroupIconPath(chatGuid: string) {
-        if (!chatGuid.includes(";+;")) {
-            throw new Error("Chat must be a group chat to change the icon!");
-        }
-
-        // Get messages with sender and the chat it's from
-        // Credits: Ian Welker (Creator of SMServer)
-        const result = await this.db.getRepository(Chat).query(
-            `SELECT
-                ROWID,
-                filename
-            FROM attachment
-            WHERE ROWID IN (
-                SELECT attachment_id FROM message_attachment_join
-                WHERE message_id in (
-                    SELECT ROWID FROM message
-                    WHERE group_action_type is 1 AND cache_has_attachments IS 1 AND ROWID in (
-                        SELECT message_id FROM chat_message_join WHERE chat_id in (
-                            SELECT ROWID FROM chat
-                            WHERE guid is '${chatGuid}'
-                        )
-                    )
-                    ORDER BY date DESC
-                )
-            );`
-        );
-
-        return isEmpty(result) ? null : result[0].filename;
-    }
-
     applyMessageDateQuery(query: SelectQueryBuilder<Message>, after?: Date, before?: Date) {
         query.andWhere(
             new Brackets(qb => {
