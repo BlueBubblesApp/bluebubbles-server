@@ -465,6 +465,32 @@ export class MessageInterface {
         return retMessage;
     }
 
+    static async notifySilencedMessage(chat: Chat, message: Message): Promise<Message> {
+        checkPrivateApiStatus();
+        if (!isMinMonterey) {
+            throw new Error("Notifing silenced messages is only supported on macOS Monterey and newer!");
+        }
+
+        if (message.didNotifyRecipient) {
+            throw new Error("The recipient has already been notified of this message!");
+        }
+
+        // Notify the recipient
+        await Server().privateApiHelper.notifySilencedMessage(chat.guid, message.guid);
+
+        // Wait for the didNotifyRecipient flag to be true
+        const maxWaitMs = 30000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            dataLoopCondition: (data: Message) => !data.didNotifyRecipient,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(message.guid, true, false);
+            }
+        });
+
+        return retMessage;
+    }
+
     static async getEmbeddedMedia(chat: Chat, message: Message): Promise<string | null> {
         checkPrivateApiStatus();
         if (!message.isDigitalTouch && !message.isHandwritten) {

@@ -552,4 +552,29 @@ export class MessageRouter {
 
         return new FileStream(ctx, fullPath, mimeType).send();
     }
+
+    static async notify(ctx: RouterContext, _: Next) {
+        const { guid: messageGuid } = ctx?.params ?? {};
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+
+        // Pull the associated chat
+        if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
+        const chat = message.chats[0];
+
+        // Attempt to notify the user
+        const retMessage = await MessageInterface.notifySilencedMessage(chat, message);
+        return new Success(ctx, {
+            data: await MessageSerializer.serialize({
+                message: retMessage,
+                config: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true
+                }
+            })
+        }).send();
+    }
 }

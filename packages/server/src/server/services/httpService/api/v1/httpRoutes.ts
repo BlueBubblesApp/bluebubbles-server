@@ -398,6 +398,11 @@ export class HttpRoutes {
                         controller: MessageRouter.unsendMessage
                     },
                     {
+                        method: HttpMethod.POST,
+                        path: ":guid/notify",
+                        controller: MessageRouter.notify
+                    },
+                    {
                         method: HttpMethod.GET,
                         path: ":guid/embedded-media",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
