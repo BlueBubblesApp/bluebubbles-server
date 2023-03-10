@@ -53,6 +53,8 @@ export class GroupChangeListener extends MessageChangeListener {
                 super.emit("participant-left", this.transformEntry(entry));
             } else if (entry.itemType === 3 && entry.groupActionType === 1) {
                 super.emit("group-icon-changed", this.transformEntry(entry));
+            } else if (entry.itemType === 3 && entry.groupActionType === 2) {
+                super.emit("group-icon-removed", this.transformEntry(entry));
             } else {
                 console.warn(`Unhandled message item type: [${entry.itemType}]`);
             }
