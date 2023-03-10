@@ -20,6 +20,14 @@ export const webhookEventOptions = [
         value: 'group-name-change'
     },
     {
+        label: 'Group Icon Changes',
+        value: 'group-icon-changed'
+    },
+    {
+        label: 'Group Icon Removal',
+        value: 'group-icon-removed'
+    },
+    {
         label: 'Participant Removed',
         value: 'participant-removed'
     },
