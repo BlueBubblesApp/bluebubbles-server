@@ -3,6 +3,9 @@ import { BooleanTransformer } from "@server/databases/transformers/BooleanTransf
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
+import { isMinHighSierra } from "@server/helpers/utils";
+import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
+import { conditional } from "conditional-decorator";
 
 @Entity("chat")
 export class Chat {
@@ -63,6 +66,17 @@ export class Chat {
         transformer: BooleanTransformer
     })
     isArchived: boolean;
+
+    @conditional(
+        isMinHighSierra,
+        Column({
+            name: "last_read_message_timestamp",
+            type: "date",
+            transformer: AppleDateTransformer,
+            default: 0
+        })
+    )
+    lastReadMessageTimestamp: Date;
 
     @Column({ name: "last_addressed_handle", type: "text", nullable: true })
     lastAddressedHandle: string;

@@ -47,7 +47,8 @@ export class MessageRepository {
         withArchived = true,
         withLastMessage = false,
         offset = 0,
-        limit = null
+        limit = null,
+        where = []
     }: ChatParams = {}) {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
@@ -63,6 +64,17 @@ export class MessageRepository {
 
         if (!withArchived) query.andWhere("chat.is_archived == 0");
         if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
+
+        // Add any custom WHERE clauses
+        if (isNotEmpty(where)) {
+            query.andWhere(
+                new Brackets(qb => {
+                    for (const item of where) {
+                        qb.andWhere(item.statement, item.args);
+                    }
+                })
+            );
+        }
 
         // Add clause to fetch with last message
         if (withLastMessage) {

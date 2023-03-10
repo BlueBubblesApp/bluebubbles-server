@@ -23,7 +23,6 @@ import {
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { MessageChangeListener } from "@server/databases/imessage/listeners/messageChangeListener";
 
 // Service Imports
 import {
@@ -49,6 +48,7 @@ import {
     insertChatParticipants,
     isEmpty,
     isMinBigSur,
+    isMinHighSierra,
     isMinMojave,
     isMinMonterey,
     isMinSierra,
@@ -62,6 +62,7 @@ import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
 import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
 import {
+    CHAT_READ_STATUS_CHANGED,
     GROUP_ICON_CHANGED,
     GROUP_ICON_REMOVED,
     GROUP_NAME_CHANGE,
@@ -72,6 +73,9 @@ import {
     PARTICIPANT_LEFT,
     PARTICIPANT_REMOVED
 } from "./events";
+import { ChatUpdateListener } from "./databases/imessage/listeners/chatUpdateListener";
+import { ChangeListener } from "./databases/imessage/listeners/changeListener";
+import { Chat } from "./databases/imessage/entity/Chat";
 
 const findProcess = require("find-process");
 
@@ -147,7 +151,7 @@ class BlueBubblesServer extends EventEmitter {
 
     actionHandler: ActionHandler;
 
-    chatListeners: MessageChangeListener[];
+    chatListeners: ChangeListener[];
 
     eventCache: EventCache;
 
@@ -1118,6 +1122,21 @@ class BlueBubblesServer extends EventEmitter {
 
         // Add to listeners
         this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
+
+        if (isMinHighSierra) {
+            // Add listener for chat updates
+            // Multiply by 2 because this really doesn't need to be as frequent
+            const chatUpdateListener = new ChatUpdateListener(this.iMessageRepo, this.eventCache, pollInterval * 2);
+            this.chatListeners.push(chatUpdateListener);
+
+            chatUpdateListener.on(CHAT_READ_STATUS_CHANGED, async (item: Chat) => {
+                Server().log(`Chat read [${item.guid}]`);
+                await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
+                    chatGuid: item.guid,
+                    read: true
+                });
+            });
+        }
 
         /**
          * Message listener for my messages only. We need this because messages from ourselves

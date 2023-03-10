@@ -23,6 +23,7 @@ export type ChatParams = {
     withArchived?: boolean;
     offset?: number;
     limit?: number;
+    where?: DBWhereItem[];
 };
 
 export type HandleParams = {
