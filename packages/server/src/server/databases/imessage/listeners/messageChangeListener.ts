@@ -84,7 +84,8 @@ export abstract class MessageChangeListener extends EventEmitter {
         if (retracted > state.dateRetracted) return "updated-entry";
 
         // If the "notified" state changed, it's an update
-        if (message.didNotifyRecipient !== state.didNotifyRecipient) return "updated-entry";
+        const didNotify = message.didNotifyRecipient ?? false;
+        if (didNotify !== state.didNotifyRecipient) return "updated-entry";
 
         return null;
     }
