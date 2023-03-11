@@ -28,12 +28,11 @@ export abstract class MessageChangeListener extends ChangeListener {
         this.getLastRowId().then((rowId: number) => {
             // Don't set it if we've already got a last row ID or the return was already 0
             if (this.lastRowId > 0 || !rowId || rowId === 0) return;
-            console.log(this.lastRowId);
             this.lastRowId = rowId;
         });
     }
 
-    async getLastRowId(): Promise<number | null> {
+    async getLastRowId(): Promise<number> {
         const messages = await this.repo.getMessages({ limit: 1, sort: "DESC" });
         if (isEmpty(messages)) return 0;
         return messages[0]?.ROWID ?? 0;
