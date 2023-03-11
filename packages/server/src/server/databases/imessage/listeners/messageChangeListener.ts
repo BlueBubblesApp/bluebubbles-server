@@ -26,7 +26,8 @@ export abstract class MessageChangeListener extends ChangeListener {
 
         this.repo = repo;
         this.getLastRowId().then((rowId: number) => {
-            if (!rowId || rowId === 0) return;
+            // Don't set it if we've already got a last row ID or the return was already 0
+            if (this.lastRowId > 0 || !rowId || rowId === 0) return;
             console.log(this.lastRowId);
             this.lastRowId = rowId;
         });
