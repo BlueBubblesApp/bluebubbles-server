@@ -111,7 +111,7 @@ export class ChatRouter {
             }
         });
 
-        const metadata = { offset, limit, total: totalCount, count: messages.length };
+        const metadata = { offset: opts.offset, limit: opts.limit, total: totalCount, count: messages.length };
         return new Success(ctx, { data: results, metadata }).send();
     }
 
