@@ -1,21 +1,9 @@
-import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { EventCache } from "@server/eventCache";
 import { MessageChangeListener } from "./messageChangeListener";
 import { DBWhereItem } from "../types";
 import { isNotEmpty } from "@server/helpers/utils";
 
 export class IncomingMessageListener extends MessageChangeListener {
-    repo: MessageRepository;
-
-    lastRowId = 0;
-
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
-        super({ cache, pollFrequency });
-
-        this.repo = repo;
-    }
-
     async getEntries(after: Date, before: Date): Promise<void> {
         const where: DBWhereItem[] = [
             {

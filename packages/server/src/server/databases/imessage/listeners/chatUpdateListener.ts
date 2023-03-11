@@ -6,15 +6,10 @@ import { convertDateTo2001Time } from "../helpers/dateUtil";
 export class ChatUpdateListener extends ChatChangeListener {
     repo: MessageRepository;
 
-    notSent: number[];
-
-    lastRowId = 0;
-
     constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
         super({ cache, pollFrequency });
 
         this.repo = repo;
-        this.notSent = [];
     }
 
     /**

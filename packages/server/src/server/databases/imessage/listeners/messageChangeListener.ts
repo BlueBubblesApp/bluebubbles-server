@@ -1,5 +1,8 @@
+import { EventCache } from "@server/eventCache";
+import { MessageRepository } from "..";
 import { Message } from "../entity/Message";
 import { ChangeListener } from "./changeListener";
+import { isEmpty } from "@server/helpers/utils";
 
 type MessageState = {
     dateCreated: number;
@@ -13,6 +16,27 @@ type MessageState = {
 export abstract class MessageChangeListener extends ChangeListener {
     // Cache of the last state of the message that has been seen by a listener
     cacheState: Record<string, MessageState> = {};
+
+    lastRowId = 0;
+
+    repo: MessageRepository;
+
+    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
+        super({ cache, pollFrequency });
+
+        this.repo = repo;
+        this.getLastRowId().then((rowId: number) => {
+            if (!rowId || rowId === 0) return;
+            console.log(this.lastRowId);
+            this.lastRowId = rowId;
+        });
+    }
+
+    async getLastRowId(): Promise<number | null> {
+        const messages = await this.repo.getMessages({ limit: 1, sort: "DESC" });
+        if (isEmpty(messages)) return 0;
+        return messages[0]?.ROWID ?? 0;
+    }
 
     checkCache() {
         // Purge emitted messages if it gets above 250 items

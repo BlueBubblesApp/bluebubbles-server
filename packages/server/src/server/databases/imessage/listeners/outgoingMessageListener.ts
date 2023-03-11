@@ -1,24 +1,11 @@
 import { Server } from "@server";
-import { MessageRepository } from "@server/databases/imessage";
-import { EventCache } from "@server/eventCache";
 import { DBWhereItem } from "@server/databases/imessage/types";
 import { isMinMonterey, isNotEmpty } from "@server/helpers/utils";
 import { MessageChangeListener } from "./messageChangeListener";
 import type { Message } from "../entity/Message";
 
 export class OutgoingMessageListener extends MessageChangeListener {
-    repo: MessageRepository;
-
-    notSent: number[];
-
-    lastRowId = 0;
-
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
-        super({ cache, pollFrequency });
-
-        this.repo = repo;
-        this.notSent = [];
-    }
+    notSent: number[] = [];
 
     /**
      * Gets sent entries from yourself. This method has a very different flow

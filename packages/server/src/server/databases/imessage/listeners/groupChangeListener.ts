@@ -1,8 +1,8 @@
 import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { MessageChangeListener } from "./messageChangeListener";
+import { ChangeListener } from "./changeListener";
 
-export class GroupChangeListener extends MessageChangeListener {
+export class GroupChangeListener extends ChangeListener {
     repo: MessageRepository;
 
     frequencyMs: number;
