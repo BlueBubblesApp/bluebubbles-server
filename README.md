@@ -19,6 +19,15 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 4. Run the dev server (this will start both the renderer and server)
     - `yarn start`
 
+### macOS Warning
+
+If you are using macOS 10.x and are having issues building/running the server, please downgrade the `node-mac-permissions` dependency to `v2.2.0`. The reason it's on a newer version is to fix a production crashing issue on Big Sur+. Please downgrade it manually for testing on macOS v10.x.
+
+```bash
+cd packages/server
+yarn add node-mac-permissions@2.2.0
+```
+
 ## Structure / Directory Map
 
 ### Back-end
