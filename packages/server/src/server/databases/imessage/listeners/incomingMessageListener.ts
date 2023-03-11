@@ -14,9 +14,6 @@ export class IncomingMessageListener extends MessageChangeListener {
         super({ cache, pollFrequency });
 
         this.repo = repo;
-
-        // Start the listener
-        this.start();
     }
 
     async getEntries(after: Date, before: Date): Promise<void> {

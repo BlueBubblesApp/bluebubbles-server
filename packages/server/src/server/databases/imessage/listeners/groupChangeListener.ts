@@ -12,9 +12,6 @@ export class GroupChangeListener extends MessageChangeListener {
 
         this.repo = repo;
         this.frequencyMs = pollFrequency;
-
-        // Start the listener
-        this.start();
     }
 
     async getEntries(after: Date, before: Date): Promise<void> {

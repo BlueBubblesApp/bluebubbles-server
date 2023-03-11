@@ -18,9 +18,6 @@ export class OutgoingMessageListener extends MessageChangeListener {
 
         this.repo = repo;
         this.notSent = [];
-
-        // Start the listener
-        this.start();
     }
 
     /**

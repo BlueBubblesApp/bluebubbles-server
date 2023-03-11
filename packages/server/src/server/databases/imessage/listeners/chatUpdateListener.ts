@@ -15,9 +15,6 @@ export class ChatUpdateListener extends ChatChangeListener {
 
         this.repo = repo;
         this.notSent = [];
-
-        // Start the listener
-        this.start();
     }
 
     /**
