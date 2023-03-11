@@ -86,7 +86,7 @@ export class MessageRouter {
         // If we want participants of the chat, fetch them
         if (withParticipants) {
             for (const i of message.chats ?? []) {
-                const chats = await Server().iMessageRepo.getChats({
+                const [chats, __] = await Server().iMessageRepo.getChats({
                     chatGuid: i.guid,
                     withParticipants,
                     withLastMessage: false,
@@ -139,7 +139,7 @@ export class MessageRouter {
         limit = limit ? Number.parseInt(limit, 10) : 100;
 
         if (chatGuid) {
-            const chats = await Server().iMessageRepo.getChats({ chatGuid });
+            const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid });
             if (isEmpty(chats))
                 return new Success(ctx, {
                     message: `No chat found with GUID: ${chatGuid}`,
@@ -148,7 +148,7 @@ export class MessageRouter {
         }
 
         // Fetch the info for the message by GUID
-        const messages = await Server().iMessageRepo.getMessages({
+        const [messages, totalCount] = await Server().iMessageRepo.getMessages({
             chatGuid,
             withChats: withChats || withChatParticipants,
             withAttachments,
@@ -174,15 +174,8 @@ export class MessageRouter {
             }
         });
 
-        const total = await Server().iMessageRepo.getMessageCount({
-            chatGuid,
-            before,
-            after,
-            where: where ?? []
-        });
-
         // Build metadata to return
-        const metadata = { offset, limit, total: total, count: data.length };
+        const metadata = { offset, limit, total: totalCount, count: data.length };
         return new Success(ctx, { data, message: "Successfully fetched messages!", metadata }).send();
     }
 

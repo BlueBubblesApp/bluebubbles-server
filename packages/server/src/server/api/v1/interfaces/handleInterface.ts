@@ -12,8 +12,8 @@ export class HandleInterface {
         withChatParticipants = false,
         limit = null,
         offset = 0
-    }: any): Promise<HandleResponse[]> {
-        const handles = await Server().iMessageRepo.getHandles({
+    }: any): Promise<[HandleResponse[], number]> {
+        const [handles, total] = await Server().iMessageRepo.getHandles({
             address,
             limit,
             offset
@@ -22,7 +22,7 @@ export class HandleInterface {
         // As long as there are results, we should fetch chats and match them
         const handleChatMap: { [key: string]: ChatResponse[] } = {};
         if (handles && withChats) {
-            const chats = await ChatInterface.get();
+            const [chats, _] = await ChatInterface.get();
 
             // Store chats (by address) in a cache for easy accessing
             for (const i of chats) {
@@ -58,7 +58,7 @@ export class HandleInterface {
             })
         );
 
-        return results;
+        return [results, total];
     }
 
     static async getFocusStatus(handle: Handle): Promise<string> {

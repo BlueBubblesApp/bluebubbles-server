@@ -51,7 +51,7 @@ export class OutgoingMessageListener extends MessageChangeListener {
 
         // 1: Check for new messages
         // Do not use the "after" parameter if we have a last row id
-        const newMessages = await this.repo.getMessages({
+        const [newMessages, _] = await this.repo.getMessages({
             after: this.lastRowId === 0 ? after : null,
             withChats: true,
             where: baseQuery
@@ -78,7 +78,7 @@ export class OutgoingMessageListener extends MessageChangeListener {
         // 4: Find all unsent messages
         let lookbackMessages: any[] = [];
         if (isNotEmpty(unsentIds)) {
-            lookbackMessages = await this.repo.getMessages({
+            [lookbackMessages] = await this.repo.getMessages({
                 withChats: true,
                 where: [
                     baseQuery[0],
@@ -154,7 +154,7 @@ export class OutgoingMessageListener extends MessageChangeListener {
         // Get entries that have an updated "didNotifyRecipient" value (true), only for Monterey+
         let notifiedEntries: Message[] = [];
         if (isMinMonterey) {
-            notifiedEntries = await this.repo.getMessages({
+            [notifiedEntries] = await this.repo.getMessages({
                 after,
                 withChats: true,
                 where: [

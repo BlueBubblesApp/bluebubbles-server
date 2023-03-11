@@ -18,7 +18,7 @@ export class HandleRouter {
 
     static async find(ctx: RouterContext, _: Next) {
         const address = ctx.params.guid;
-        const handles = await Server().iMessageRepo.getHandles({ address });
+        const [handles, __] = await Server().iMessageRepo.getHandles({ address });
         if (isEmpty(handles)) throw new NotFound({ error: "Handle not found!" });
         return new Success(ctx, { data: await HandleSerializer.serialize({ handle: handles[0] }) }).send();
     }
@@ -36,15 +36,7 @@ export class HandleRouter {
         const offset = Number.parseInt(body?.offset, 10);
         const limit = Number.parseInt(body?.limit ?? 100, 10);
 
-        // Build metadata to return
-        const metadata = {
-            total: await Server().iMessageRepo.getHandleCount(),
-            offset,
-            limit
-        };
-
-        // Get the hanle
-        const results = await HandleInterface.get({
+        const [results, total] = await HandleInterface.get({
             address,
             withChats,
             withChatParticipants,
@@ -52,12 +44,20 @@ export class HandleRouter {
             offset
         });
 
+        // Build metadata to return
+        const metadata = {
+            total,
+            offset,
+            limit,
+            count: results.length
+        };
+
         return new Success(ctx, { data: results, metadata }).send();
     }
 
     static async getFocusStatus(ctx: RouterContext, _: Next) {
         const address = ctx.params.guid;
-        const handles = await Server().iMessageRepo.getHandles({ address });
+        const [handles, __] = await Server().iMessageRepo.getHandles({ address });
         if (isEmpty(handles)) throw new NotFound({ error: "Handle not found!" });
 
         // Get the status from the private api

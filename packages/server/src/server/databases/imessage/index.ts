@@ -8,7 +8,6 @@ import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import { isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
-import { isEmpty } from "@firebase/util";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -49,15 +48,15 @@ export class MessageRepository {
         offset = 0,
         limit = null,
         where = []
-    }: ChatParams = {}) {
+    }: ChatParams = {}): Promise<[Chat[], number]> {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
         if (withParticipants) {
-            query.leftJoinAndSelect("chat.participants", "handle");
+            query.innerJoinAndSelect("chat.participants", "handle");
         }
 
-        // Add inner join with messages if we want the last message too
+        // Left join because technically a chat might not have a last message
         if (withLastMessage) {
             query.leftJoinAndSelect("chat.messages", "message");
         }
@@ -84,20 +83,19 @@ export class MessageRepository {
         }
 
         // Set page params
-        query.offset(offset);
-        if (limit) query.limit(limit);
+        query.skip(offset);
+        if (limit) query.take(limit);
 
         // Get results
-        const chats = await query.getMany();
-        return chats;
+        return await query.getManyAndCount();
     }
 
     async getChatLastMessage(chatGuid: string): Promise<Message> {
         const query = this.db.getRepository(Message).createQueryBuilder("message");
         query.innerJoinAndSelect("message.chats", "chat");
         query.andWhere("chat.guid = :guid", { guid: chatGuid });
-        query.orderBy("date", "DESC");
-        query.limit(1);
+        query.orderBy("message.dateCreated", "DESC");
+        query.take(1);
 
         // Get results
         const message = await query.getOne();
@@ -179,7 +177,7 @@ export class MessageRepository {
      *
      * @param handle Get a specific handle from the DB
      */
-    async getHandles({ address = null, limit = 1000, offset = 0 }: HandleParams) {
+    async getHandles({ address = null, limit = 1000, offset = 0 }: HandleParams): Promise<[Handle[], number]> {
         // Start a query
         const query = this.db.getRepository(Handle).createQueryBuilder("handle");
 
@@ -189,11 +187,10 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.offset(offset);
-        query.limit(limit);
+        query.skip(offset);
+        query.take(limit);
 
-        const handles = await query.getMany();
-        return handles;
+        return await query.getManyAndCount();
     }
 
     /**
@@ -216,7 +213,7 @@ export class MessageRepository {
         withAttachments = true,
         sort = "DESC",
         where = []
-    }: DBMessageParams) {
+    }: DBMessageParams): Promise<[Message[], number]> {
         // Sanitize some params
         if (after && typeof after === "number") after = new Date(after);
         if (before && typeof before === "number") before = new Date(before);
@@ -272,12 +269,11 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.orderBy("message.date", sort);
-        query.offset(offset);
-        query.limit(limit);
+        query.orderBy("message.dateCreated", sort);
+        query.skip(offset);
+        query.take(limit);
 
-        const messages = await query.getMany();
-        return messages;
+        return await query.getManyAndCount();
     }
 
     /**
@@ -352,12 +348,11 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.orderBy("message.date", sort);
-        query.offset(offset);
-        query.limit(limit);
+        query.orderBy("message.dateCreated", sort);
+        query.skip(offset);
+        query.take(limit);
 
-        const messages = await query.getMany();
-        return messages;
+        return await query.getMany();
     }
 
     /**
@@ -424,6 +419,17 @@ export class MessageRepository {
         }
 
         return await query.getCount();
+    }
+
+    async getAttachmentsForMessage(message: Message) {
+        const attachments = this.db
+            .getRepository(Attachment)
+            .createQueryBuilder("attachment")
+            // Inner join because an attachment can't exist without a message
+            .innerJoinAndSelect("attachment.messages", "message")
+            .where("message.ROWID = :id", { id: message.ROWID });
+
+        return await attachments.getMany();
     }
 
     /**

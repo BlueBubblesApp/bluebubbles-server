@@ -36,7 +36,7 @@ export class ChatUpdateListener extends ChatChangeListener {
 
     async emitChatReadUpdates(after: Date) {
         // 1: Check for updated chats
-        const updatedChats = await this.repo.getChats({
+        const [updatedChats, _] = await this.repo.getChats({
             where: [
                 {
                     statement: "chat.last_read_message_timestamp >= :after",

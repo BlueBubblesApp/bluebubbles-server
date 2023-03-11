@@ -60,7 +60,7 @@ export class MessageSerializer {
 
                     // Get the participants for this chat, or load it from our cache
                     if (!Object.keys(chatCache).includes(messages[i]?.chats[k].guid)) {
-                        const chats = await Server().iMessageRepo.getChats({
+                        const [chats, _] = await Server().iMessageRepo.getChats({
                             chatGuid: messages[i]?.chats[k].guid,
                             withParticipants: true
                         });

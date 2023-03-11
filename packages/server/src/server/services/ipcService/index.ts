@@ -371,7 +371,8 @@ export class IPCService {
         });
 
         ipcMain.handle("get-chats", async (_, msg) => {
-            return ChatInterface.get({ limit: 10000 });
+            const [chats, __] = await ChatInterface.get({ limit: 10000 });
+            return chats;
         });
     }
 }

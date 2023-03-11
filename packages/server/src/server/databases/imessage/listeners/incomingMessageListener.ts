@@ -22,7 +22,7 @@ export class IncomingMessageListener extends MessageChangeListener {
 
         // Do not use the "after" parameter if we have a last row id
         // Offset 15 seconds to account for the "Apple" delay
-        const entries = await this.repo.getMessages({
+        const [entries, _] = await this.repo.getMessages({
             after: this.lastRowId === 0 ? new Date(after.getTime() - 15000) : null,
             withChats: true,
             where

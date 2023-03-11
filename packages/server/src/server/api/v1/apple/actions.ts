@@ -1,5 +1,4 @@
 /* eslint-disable max-len */
-import * as fs from "fs";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
@@ -28,8 +27,7 @@ import {
     slugifyAddress,
     isNotEmpty,
     isEmpty,
-    safeTrim,
-    isMinMonterey
+    safeTrim
 } from "../../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
 
@@ -344,7 +342,7 @@ export class ActionHandler {
     static openChat = async (chatGuid: string): Promise<string> => {
         Server().log(`Executing Action: Open Chat (Chat: ${chatGuid})`, "debug");
 
-        const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+        const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
         if (isEmpty(chats)) throw new Error("Chat does not exist");
         if (chats[0].participants.length > 1) throw new Error("Chat is a group chat");
 
