@@ -834,7 +834,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Check for contact permissions
-        const contactStatus = await requestContactPermission();
+        const contactStatus = requestContactPermission();
         this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         this.log("Finished post-start checks...");
     }
