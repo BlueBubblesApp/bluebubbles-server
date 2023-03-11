@@ -114,7 +114,7 @@
         "reflect-metadata": "^0.1.13",
         "slugify": "^1.6.0",
         "socket.io": "3.1.2",
-        "typeorm": "^0.3.6",
+        "typeorm": "0.3.6",
         "validatorjs": "^3.22.1",
         "vcf": "^2.1.1",
         "zx": "^4.3.0"
