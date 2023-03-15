@@ -176,7 +176,7 @@ export class ChatInterface {
                 tempGuid
             });
 
-            chatGuid = `${service};-;${getiMessageAddressFormat(theAddrs[0])}`;
+            chatGuid = `${service};-;${getiMessageAddressFormat(theAddrs[0], true)}`;
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
             Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
