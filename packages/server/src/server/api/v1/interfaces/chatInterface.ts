@@ -194,11 +194,7 @@ export class ChatInterface {
         const chats = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
-                const [chats, __] = await Server().iMessageRepo.getChats({
-                    chatGuid,
-                    withParticipants: true,
-                    globGuid: true
-                });
+                const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
                 return chats;
             },
             dataLoopCondition: data => {
