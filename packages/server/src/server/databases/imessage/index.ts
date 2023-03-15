@@ -42,6 +42,7 @@ export class MessageRepository {
      */
     async getChats({
         chatGuid = null,
+        globGuid = false,
         withParticipants = true,
         withArchived = true,
         withLastMessage = false,
@@ -62,7 +63,13 @@ export class MessageRepository {
         }
 
         if (!withArchived) query.andWhere("chat.is_archived == 0");
-        if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
+        if (chatGuid) {
+            if (globGuid) {
+                query.andWhere("chat.guid LIKE :guid", { guid: `%${chatGuid}%` });
+            } else {
+                query.andWhere("chat.guid = :guid", { guid: chatGuid });
+            }
+        }
 
         // Add any custom WHERE clauses
         if (isNotEmpty(where)) {

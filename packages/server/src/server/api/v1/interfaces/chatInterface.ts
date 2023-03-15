@@ -2,6 +2,7 @@ import * as fs from "fs";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import {
     checkPrivateApiStatus,
+    getiMessageAddressFormat,
     isEmpty,
     isMinBigSur,
     isMinVentura,
@@ -174,6 +175,8 @@ export class ChatInterface {
                 method: "apple-script",
                 tempGuid
             });
+
+            chatGuid = `${service};-;${getiMessageAddressFormat(theAddrs[0])}`;
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
             Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
@@ -191,7 +194,11 @@ export class ChatInterface {
         const chats = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
-                const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+                const [chats, __] = await Server().iMessageRepo.getChats({
+                    chatGuid,
+                    withParticipants: true,
+                    globGuid: true
+                });
                 return chats;
             },
             dataLoopCondition: data => {
