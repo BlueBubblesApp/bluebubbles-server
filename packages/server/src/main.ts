@@ -185,7 +185,42 @@ const createWindow = async () => {
 
     // Hook onto when we load the UI
     win.webContents.on("dom-ready", async () => {
-        win.webContents.send("config-update", Server().repo.config);
+        Server().uiLoaded = true;
+
+        if (!win.webContents.isDestroyed()) {
+            win.webContents.send("config-update", Server().repo.config);
+        }
+    });
+
+    // Hook onto when the UI finishes loading
+    win.webContents.on("did-finish-load", async () => {
+        Server().uiLoaded = true;
+    });
+
+    // Hook onto when the UI fails to load
+    win.webContents.on(
+        "did-fail-load",
+        async (event, errorCode, errorDescription, validatedURL, frameProcessId, frameRoutingId) => {
+            Server().uiLoaded = false;
+            Server().log(`Failed to load UI! Error: [${errorCode}] ${errorDescription}`, "error");
+        }
+    );
+
+    // Hook onto when the renderer process crashes
+    win.webContents.on("render-process-gone", async (event, details) => {
+        Server().uiLoaded = false;
+        Server().log(`Renderer process crashed! Error: [${details.exitCode}] ${details.reason}`, "error");
+    });
+
+    // Hook onto when the webcontents are destroyed
+    win.webContents.on("destroyed", async () => {
+        Server().uiLoaded = false;
+        Server().log(`Webcontents were destroyed.`, "debug");
+    });
+
+    // Hook onto when there is a preload error
+    win.webContents.on("preload-error", async (event, preloadPath, error) => {
+        Server().log(`A preload error occurred: Error: ${error.message}.`, "error");
     });
 
     // Set the new window in the Server()

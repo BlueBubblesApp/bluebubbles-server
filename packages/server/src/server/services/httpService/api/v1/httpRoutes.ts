@@ -254,6 +254,12 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/leave",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.leaveChat
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/participant/add",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
@@ -265,6 +271,19 @@ export class HttpRoutes {
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
                         controller: ChatRouter.removeParticipant
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/icon",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [ChatValidator.validateGroupChatIcon],
+                        controller: ChatRouter.setGroupChatIcon
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid/icon",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.removeGroupChatIcon
                     },
                     {
                         method: HttpMethod.GET,
@@ -383,6 +402,18 @@ export class HttpRoutes {
                         path: ":guid/unsend",
                         validators: [MessageValidator.validateUnsend],
                         controller: MessageRouter.unsendMessage
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/notify",
+                        controller: MessageRouter.notify
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: ":guid/embedded-media",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [MessageValidator.validateGetEmbeddedMedia],
+                        controller: MessageRouter.getEmbeddedMedia
                     }
                 ]
             },
@@ -407,6 +438,12 @@ export class HttpRoutes {
                         path: ":guid",
                         validators: [HandleValidator.validateFind],
                         controller: HandleRouter.find
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: ":guid/focus",
+                        validators: [HandleValidator.validateFind],
+                        controller: HandleRouter.getFocusStatus
                     }
                 ]
             },

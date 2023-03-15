@@ -1,6 +1,8 @@
-import { EventEmitter } from "events";
 import { EventCache } from "@server/eventCache";
+import { MessageRepository } from "..";
 import { Message } from "../entity/Message";
+import { ChangeListener } from "./changeListener";
+import { isEmpty } from "@server/helpers/utils";
 
 type MessageState = {
     dateCreated: number;
@@ -8,34 +10,32 @@ type MessageState = {
     dateRead: number;
     dateEdited: number;
     dateRetracted: number;
+    didNotifyRecipient: boolean;
 };
 
-export abstract class MessageChangeListener extends EventEmitter {
-    stopped: boolean;
-
-    // Cache of messages that have been "seen" by a listener
-    cache: EventCache;
-
+export abstract class MessageChangeListener extends ChangeListener {
     // Cache of the last state of the message that has been seen by a listener
-    cacheState: Record<string, MessageState>;
+    cacheState: Record<string, MessageState> = {};
 
-    lastCheck: Date;
+    lastRowId = 0;
 
-    pollFrequency: number;
+    repo: MessageRepository;
 
-    constructor({ cache = new EventCache(), pollFrequency = 1000 }: { cache?: EventCache; pollFrequency?: number }) {
-        super();
+    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
+        super({ cache, pollFrequency });
 
-        this.cache = cache;
-        this.cacheState = {};
-        this.stopped = false;
-        this.pollFrequency = pollFrequency;
-        this.lastCheck = new Date();
+        this.repo = repo;
+        this.getLastRowId().then((rowId: number) => {
+            // Don't set it if we've already got a last row ID or the return was already 0
+            if (this.lastRowId > 0 || !rowId || rowId === 0) return;
+            this.lastRowId = rowId;
+        });
     }
 
-    stop() {
-        this.stopped = true;
-        this.removeAllListeners();
+    async getLastRowId(): Promise<number> {
+        const [messages, _] = await this.repo.getMessages({ limit: 1, sort: "DESC" });
+        if (isEmpty(messages)) return 0;
+        return messages[0]?.ROWID ?? 0;
     }
 
     checkCache() {
@@ -82,6 +82,10 @@ export abstract class MessageChangeListener extends EventEmitter {
         const retracted = message?.dateRetracted ? message.dateRetracted.getTime() : 0;
         if (retracted > state.dateRetracted) return "updated-entry";
 
+        // If the "notified" state changed, it's an update
+        const didNotify = message.didNotifyRecipient ?? false;
+        if (didNotify !== state.didNotifyRecipient) return "updated-entry";
+
         return null;
     }
 
@@ -98,53 +102,10 @@ export abstract class MessageChangeListener extends EventEmitter {
             dateDelivered: message?.dateDelivered ? message.dateDelivered.getTime() : 0,
             dateRead: message?.dateRead ? message.dateRead.getTime() : 0,
             dateEdited: message.dateEdited ? message.dateEdited.getTime() : 0,
-            dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : 0
+            dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : 0,
+            didNotifyRecipient: message.didNotifyRecipient ?? false
         };
 
         return event;
     }
-
-    start() {
-        this.cache.purge();
-        this.lastCheck = new Date();
-
-        // Start checking
-        this.checkForNewEntries();
-    }
-
-    async checkForNewEntries(): Promise<void> {
-        if (this.stopped) return;
-
-        // Store the date when we started checking
-        const beforeCheck = new Date();
-
-        try {
-            // We pass the last check because we don't want it to change
-            // while we process asynchronously
-            await this.getEntries(this.lastCheck, beforeCheck);
-
-            // Save the date for when we started checking
-            this.lastCheck = beforeCheck;
-        } catch (err) {
-            super.emit("error", err);
-        }
-
-        // Check the cache and see if it needs to be purged
-        this.checkCache();
-
-        // If the time it took to do the checking is less than 1 second, find the difference
-        const after = new Date();
-        const processTime = after.getTime() - beforeCheck.getTime();
-        let waitTime = this.pollFrequency;
-
-        // If the processing time took less than the poll frequency, only wait out the remainder
-        // If the processing time took more than the poll frequency, don't wait at all
-        if (processTime < this.pollFrequency) waitTime = this.pollFrequency - processTime;
-        if (processTime >= this.pollFrequency) waitTime = 0;
-
-        // Re-run check emssages code
-        setTimeout(() => this.checkForNewEntries(), waitTime);
-    }
-
-    abstract getEntries(after: Date, before: Date): Promise<void>;
 }

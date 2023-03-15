@@ -23,7 +23,7 @@ export class ChatRouter {
         const withArchived = includeArchived != null ? isTruthyBool(includeArchived as string) : true;
 
         // Get all the chats so we can parse through them for the breakdown
-        const chats = await Server().iMessageRepo.getChats({ withArchived });
+        const [chats, totalCount] = await Server().iMessageRepo.getChats({ withArchived });
         const serviceCounts: { [key: string]: number } = {};
         for (const chat of chats) {
             if (!Object.keys(serviceCounts).includes(chat.serviceName)) {
@@ -33,7 +33,7 @@ export class ChatRouter {
             serviceCounts[chat.serviceName] += 1;
         }
 
-        const data = { total: chats.length, breakdown: serviceCounts };
+        const data = { total: totalCount, breakdown: serviceCounts };
         return new Success(ctx, { data }).send();
     }
 
@@ -42,7 +42,7 @@ export class ChatRouter {
         const withParticipants = withQuery.includes("participants");
         const withLastMessage = withQuery.includes("lastmessage");
 
-        const chats = await Server().iMessageRepo.getChats({
+        const [chats, __] = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
             withParticipants,
             withArchived: true
@@ -81,7 +81,7 @@ export class ChatRouter {
         const withPayloadData = arrayHasOne(withQuery, ["message.payloadData", "message.payload-data"]);
         const { sort, before, after, offset, limit } = ctx?.request.query ?? {};
 
-        const chats = await Server().iMessageRepo.getChats({
+        const [chats, __] = await Server().iMessageRepo.getChats({
             chatGuid: ctx.params.guid,
             withParticipants: false,
             withArchived: true
@@ -100,7 +100,7 @@ export class ChatRouter {
         };
 
         // Fetch the info for the message by GUID
-        const messages = await Server().iMessageRepo.getMessages(opts);
+        const [messages, totalCount] = await Server().iMessageRepo.getMessages(opts);
         const results = await MessageSerializer.serializeList({
             messages,
             config: {
@@ -111,7 +111,8 @@ export class ChatRouter {
             }
         });
 
-        return new Success(ctx, { data: results }).send();
+        const metadata = { offset: opts.offset, limit: opts.limit, total: totalCount, count: messages.length };
+        return new Success(ctx, { data: results, metadata }).send();
     }
 
     static async query(ctx: RouterContext, _: Next) {
@@ -125,7 +126,7 @@ export class ChatRouter {
         const { sort, offset, limit } = body;
 
         // Fetch the chats
-        const results = await ChatInterface.get({
+        const [results, total] = await ChatInterface.get({
             guid,
             withLastMessage,
             offset: offset ? Number.parseInt(offset, 10) : 0,
@@ -135,7 +136,8 @@ export class ChatRouter {
 
         // Build metadata to return
         const metadata = {
-            total: results.length,
+            count: results.length,
+            total,
             offset,
             limit
         };
@@ -148,7 +150,7 @@ export class ChatRouter {
         const { guid } = ctx.params;
         const displayName = body?.displayName;
 
-        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         let chat = chats[0];
@@ -231,7 +233,7 @@ export class ChatRouter {
         const { guid } = ctx.params;
         const address = body?.address;
 
-        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         // Add the participant to the chat
@@ -244,24 +246,52 @@ export class ChatRouter {
     static async getGroupIcon(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
 
-        const chats = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: false });
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: false });
         if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
 
         const chat = chats[0];
-        const iconPath = await Server().iMessageRepo.getGroupIconPath(chat.guid);
-        if (!iconPath) {
+        const icon = await ChatInterface.getGroupChatIcon(chat);
+        if (!icon) {
             throw new NotFound({
                 message: "The requested resource was not found",
                 error: "Unable to find icon for the selected chat"
             });
         }
 
-        return new FileStream(ctx, FileSystem.getRealPath(iconPath), "image/jfif").send();
+        return new FileStream(ctx, FileSystem.getRealPath(icon.filePath), icon.getMimeType() ?? "image/jfif").send();
+    }
+
+    static async setGroupChatIcon(ctx: RouterContext, _: Next) {
+        const { files } = ctx.request;
+        const { guid } = ctx.params;
+        const icon = files?.icon as unknown as File;
+
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        await ChatInterface.setGroupChatIcon(chats[0], icon.path);
+        return new Success(ctx, { message: "Successfully set group chat icon!" }).send();
+    }
+
+    static async removeGroupChatIcon(ctx: RouterContext, _: Next) {
+        const { guid } = ctx.params;
+
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid: guid, withParticipants: true });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        await ChatInterface.setGroupChatIcon(chats[0], null);
+        return new Success(ctx, { message: "Successfully removed group chat icon!" }).send();
     }
 
     static async deleteChat(ctx: RouterContext, _: Next): Promise<void> {
         const { guid } = ctx.params;
         await ChatInterface.delete({ guid });
         return new Success(ctx, { message: `Successfully deleted chat!` }).send();
+    }
+
+    static async leaveChat(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.leave({ guid });
+        return new Success(ctx, { message: `Successfully left chat!` }).send();
     }
 }

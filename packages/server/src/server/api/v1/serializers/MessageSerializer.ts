@@ -1,5 +1,5 @@
 import { Server } from "@server";
-import { isEmpty, isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isMinHighSierra, isMinMonterey, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 import { HandleResponse, MessageResponse } from "@server/types";
 import { AttachmentSerializer } from "./AttachmentSerializer";
 import { ChatSerializer } from "./ChatSerializer";
@@ -60,7 +60,7 @@ export class MessageSerializer {
 
                     // Get the participants for this chat, or load it from our cache
                     if (!Object.keys(chatCache).includes(messages[i]?.chats[k].guid)) {
-                        const chats = await Server().iMessageRepo.getChats({
+                        const [chats, _] = await Server().iMessageRepo.getChats({
                             chatGuid: messages[i]?.chats[k].guid,
                             withParticipants: true
                         });
@@ -105,7 +105,7 @@ export class MessageSerializer {
             if (len > config.maxSizeBytes) {
                 Server().log(
                     `MessageSerializer: Max size reached (${config.maxSizeBytes} bytes). Clearing participants.`,
-                    'debug'
+                    "debug"
                 );
                 for (let i = 0; i < messageResponses.length; i++) {
                     for (let c = 0; c < (messageResponses[i]?.chats ?? []).length; c++) {
@@ -185,6 +185,16 @@ export class MessageSerializer {
                     replyToGuid: message.replyToGuid
                 }
             };
+
+            if (isMinMonterey) {
+                output = {
+                    ...output,
+                    ...{
+                        wasDeliveredQuietly: message.wasDeliveredQuietly ?? false,
+                        didNotifyRecipient: message.didNotifyRecipient ?? false
+                    }
+                };
+            }
         }
 
         if (config.includeChats) {

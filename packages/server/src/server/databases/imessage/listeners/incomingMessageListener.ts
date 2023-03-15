@@ -1,32 +1,37 @@
-import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { EventCache } from "@server/eventCache";
 import { MessageChangeListener } from "./messageChangeListener";
+import { DBWhereItem } from "../types";
+import { isNotEmpty } from "@server/helpers/utils";
 
 export class IncomingMessageListener extends MessageChangeListener {
-    repo: MessageRepository;
-
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
-        super({ cache, pollFrequency });
-
-        this.repo = repo;
-
-        // Start the listener
-        this.start();
-    }
-
     async getEntries(after: Date, before: Date): Promise<void> {
+        const where: DBWhereItem[] = [
+            {
+                statement: "message.is_from_me = :fromMe",
+                args: { fromMe: 0 }
+            }
+        ];
+
+        // If we have a last row id, only get messages after that
+        if (this.lastRowId !== 0) {
+            where.push({
+                statement: "message.ROWID > :rowId",
+                args: { rowId: this.lastRowId }
+            });
+        }
+
+        // Do not use the "after" parameter if we have a last row id
         // Offset 15 seconds to account for the "Apple" delay
-        const entries = await this.repo.getMessages({
-            after: new Date(after.getTime() - 15000),
+        const [entries, _] = await this.repo.getMessages({
+            after: this.lastRowId === 0 ? new Date(after.getTime() - 15000) : null,
             withChats: true,
-            where: [
-                {
-                    statement: "message.is_from_me = :fromMe",
-                    args: { fromMe: 0 }
-                }
-            ]
+            where
         });
+
+        // The 0th entry should be the newest since we sort by DESC
+        if (isNotEmpty(entries)) {
+            this.lastRowId = entries[0].ROWID;
+        }
 
         // Emit the new message
         entries.forEach(async (entry: Message) => {

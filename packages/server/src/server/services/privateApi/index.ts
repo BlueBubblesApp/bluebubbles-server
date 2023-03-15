@@ -421,9 +421,9 @@ export class BlueBubblesHelperService {
         selectedMessageGuid = null,
         partIndex = 0
     }: {
-        chatGuid: string,
-        filePath: string,
-        isAudioMessage?: boolean,
+        chatGuid: string;
+        filePath: string;
+        isAudioMessage?: boolean;
         attributedBody?: Record<string, any> | null;
         subject?: string;
         effectId?: string;
@@ -451,6 +451,24 @@ export class BlueBubblesHelperService {
         );
     }
 
+    async getEmbeddedMedia(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
+        if (!chatGuid || !messageGuid) {
+            throw new Error("Failed to get embedded media. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.writeData("balloon-bundle-media-path", { chatGuid, messageGuid }, request);
+    }
+
+    async notifySilencedMessage(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
+        if (!chatGuid || !messageGuid) {
+            throw new Error("Failed to notify for silenced message. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.writeData("notify-anyways", { chatGuid, messageGuid }, request);
+    }
+
     async addParticipant(chatGuid: string, address: string) {
         return this.toggleParticipant(chatGuid, address, "add");
     }
@@ -468,6 +486,15 @@ export class BlueBubblesHelperService {
         return this.writeData(`${action}-participant`, { chatGuid, address }, request);
     }
 
+    async checkFocusStatus(address: string): Promise<TransactionResult> {
+        if (isEmpty(address)) {
+            throw new Error(`Failed to check focus status. Invalid params!`);
+        }
+
+        const request = new TransactionPromise(TransactionType.HANDLE);
+        return this.writeData("check-focus-status", { address }, request);
+    }
+
     async setDisplayName(chatGuid: string, newName: string): Promise<TransactionResult> {
         if (!chatGuid || !newName) {
             throw new Error("Failed to set chat display name. Invalid params!");
@@ -475,6 +502,24 @@ export class BlueBubblesHelperService {
 
         const request = new TransactionPromise(TransactionType.CHAT);
         return this.writeData("set-display-name", { chatGuid, newName }, request);
+    }
+
+    async setGroupChatIcon(chatGuid: string, filePath: string | null): Promise<TransactionResult> {
+        if (!chatGuid) {
+            throw new Error("Failed to set group chat icon. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.writeData("update-group-photo", { chatGuid, filePath }, request);
+    }
+
+    async leaveChat(chatGuid: string): Promise<TransactionResult> {
+        if (!chatGuid) {
+            throw new Error("Failed to leave chat. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.CHAT);
+        return this.writeData("leave-chat", { chatGuid }, request);
     }
 
     async getTypingStatus(chatGuid: string): Promise<TransactionResult> {
@@ -534,7 +579,7 @@ export class BlueBubblesHelperService {
                     continue;
                 }
 
-                Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
+                // Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
                 let data;
 
                 // Handle in a timeout so that we handle each event asyncronously
@@ -557,7 +602,8 @@ export class BlueBubblesHelperService {
                         if (isNotEmpty(data?.error ?? "")) {
                             this.transactionManager.promises[idx].reject(data.error);
                         } else {
-                            this.transactionManager.promises[idx].resolve(data.identifier, data?.data);
+                            const result = this.readTransactionData(data);
+                            this.transactionManager.promises[idx].resolve(data.identifier, result);
                         }
                     }
                 } else if (data.event) {
@@ -569,6 +615,24 @@ export class BlueBubblesHelperService {
                 }
             }
         });
+    }
+
+    private readTransactionData(response: NodeJS.Dict<any>) {
+        // If there is a non-empty data key, return that
+        if (isNotEmpty(response?.data)) return response.data;
+
+        // Otherwise, strip the "standard" keys and return the rest as the data
+        const data = { ...response };
+        const stripKeys = ["transactionId", "error", "identifier"];
+        for (const key of stripKeys) {
+            if (Object.keys(data).includes(key)) {
+                delete data[key];
+            }
+        }
+
+        // Return null if there is no data
+        if (isEmpty(data)) return null;
+        return data;
     }
 
     private async writeData(

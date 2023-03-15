@@ -151,7 +151,7 @@ export const getContactRecord = async (chat: Chat, member: Handle) => {
 export const generateChatNameList = async (chatGuid: string) => {
     if (!chatGuid) throw new Error("No chat GUID provided");
     // First, lets get the members of the chat
-    const chats = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+    const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
     if (isEmpty(chats)) throw new Error("Chat does not exist");
 
     const chat = chats[0];
@@ -297,7 +297,7 @@ export const insertChatParticipants = async (message: Message): Promise<Message>
     }
 
     for (const chat of theMessage.chats) {
-        const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
+        const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
         if (isEmpty(chats)) continue;
 
         chat.participants = chats[0].participants;

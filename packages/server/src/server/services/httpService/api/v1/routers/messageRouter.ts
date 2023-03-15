@@ -4,41 +4,68 @@ import { Next } from "koa";
 import type { File } from "formidable";
 
 import { Server } from "@server";
+import { FileSystem } from "@server/fileSystem";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
 import { MessageSerializer } from "@server/api/v1/serializers/MessageSerializer";
 import { arrayHasOne } from "@server/utils/CollectionUtils";
-import { Success } from "../responses/success";
+import { FileStream, Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
 import { parseWithQuery } from "../utils";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
-        const total = await Server().iMessageRepo.getMessageCount(null, null, true);
+        const { after, before, chatGuid, minRowId, maxRowId } = ctx.request.query;
+        const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
+        const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
+        const minRowIdValue = isNotEmpty(minRowId) ? Number.parseInt(minRowId as string, 10) : null;
+        const maxRowIdValue = isNotEmpty(maxRowId) ? Number.parseInt(maxRowId as string, 10) : null;
+        const total = await Server().iMessageRepo.getMessageCount({
+            after: afterDate,
+            before: beforeDate,
+            chatGuid: chatGuid as string,
+            minRowId: minRowIdValue,
+            maxRowId: maxRowIdValue,
+            isFromMe: true
+        });
+
         return new Success(ctx, { data: { total } }).send();
     }
 
     static async count(ctx: RouterContext, _: Next) {
-        const { after, before, chatGuid } = ctx.request.query;
+        const { after, before, chatGuid, minRowId, maxRowId } = ctx.request.query;
         const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
         const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
-        const total = await Server().iMessageRepo.getMessageCount(afterDate, beforeDate, false, chatGuid as string);
+        const minRowIdValue = isNotEmpty(minRowId) ? Number.parseInt(minRowId as string, 10) : null;
+        const maxRowIdValue = isNotEmpty(maxRowId) ? Number.parseInt(maxRowId as string, 10) : null;
+        const total = await Server().iMessageRepo.getMessageCount({
+            after: afterDate,
+            before: beforeDate,
+            chatGuid: chatGuid as string,
+            minRowId: minRowIdValue,
+            maxRowId: maxRowIdValue
+        });
+
         return new Success(ctx, { data: { total } }).send();
     }
 
     static async countUpdated(ctx: RouterContext, _: Next) {
-        const { after, before, chatGuid } = ctx.request.query;
+        const { after, before, chatGuid, minRowId, maxRowId } = ctx.request.query;
         const beforeDate = isNotEmpty(before) ? new Date(Number.parseInt(before as string, 10)) : null;
         const afterDate = isNotEmpty(after) ? new Date(Number.parseInt(after as string, 10)) : null;
-        const total = await Server().iMessageRepo.getMessageCount(
-            afterDate,
-            beforeDate,
-            false,
-            chatGuid as string,
-            true
-        );
+        const minRowIdValue = isNotEmpty(minRowId) ? Number.parseInt(minRowId as string, 10) : null;
+        const maxRowIdValue = isNotEmpty(maxRowId) ? Number.parseInt(maxRowId as string, 10) : null;
+        const total = await Server().iMessageRepo.getMessageCount({
+            after: afterDate,
+            before: beforeDate,
+            chatGuid: chatGuid as string,
+            updated: true,
+            minRowId: minRowIdValue,
+            maxRowId: maxRowIdValue
+        });
+
         return new Success(ctx, { data: { total } }).send();
     }
 
@@ -59,7 +86,7 @@ export class MessageRouter {
         // If we want participants of the chat, fetch them
         if (withParticipants) {
             for (const i of message.chats ?? []) {
-                const chats = await Server().iMessageRepo.getChats({
+                const [chats, __] = await Server().iMessageRepo.getChats({
                     chatGuid: i.guid,
                     withParticipants,
                     withLastMessage: false,
@@ -112,7 +139,7 @@ export class MessageRouter {
         limit = limit ? Number.parseInt(limit, 10) : 100;
 
         if (chatGuid) {
-            const chats = await Server().iMessageRepo.getChats({ chatGuid });
+            const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid });
             if (isEmpty(chats))
                 return new Success(ctx, {
                     message: `No chat found with GUID: ${chatGuid}`,
@@ -121,7 +148,7 @@ export class MessageRouter {
         }
 
         // Fetch the info for the message by GUID
-        const messages = await Server().iMessageRepo.getMessages({
+        const [messages, totalCount] = await Server().iMessageRepo.getMessages({
             chatGuid,
             withChats: withChats || withChatParticipants,
             withAttachments,
@@ -148,7 +175,7 @@ export class MessageRouter {
         });
 
         // Build metadata to return
-        const metadata = { offset, limit, total: data.length };
+        const metadata = { offset, limit, total: totalCount, count: data.length };
         return new Success(ctx, { data, message: "Successfully fetched messages!", metadata }).send();
     }
 
@@ -240,17 +267,8 @@ export class MessageRouter {
 
     static async sendAttachment(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const {
-            tempGuid,
-            chatGuid,
-            name,
-            method,
-            subject,
-            selectedMessageGuid,
-            partIndex,
-            effectId,
-            isAudioMessage
-        } = ctx.request?.body ?? {};
+        const { tempGuid, chatGuid, name, method, subject, selectedMessageGuid, partIndex, effectId, isAudioMessage } =
+            ctx.request?.body ?? {};
         const attachment = files?.attachment as File;
 
         // Add to send cache
@@ -503,5 +521,53 @@ export class MessageRouter {
                 throw new IMessageError({ message: "Message Edit Error", error: ex?.message ?? ex.toString() });
             }
         }
+    }
+
+    static async getEmbeddedMedia(ctx: RouterContext, _: Next) {
+        const { guid: messageGuid } = ctx?.params ?? {};
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+
+        // Pull the associated chat
+        if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
+        const chat = message.chats[0];
+
+        const mediaPath = await MessageInterface.getEmbeddedMedia(chat, message);
+        if (!mediaPath) throw new NotFound({ error: "No embedded media found!" });
+
+        const fullPath = FileSystem.getRealPath(mediaPath);
+        let mimeType = "image/png";
+        if (message.isDigitalTouch) {
+            mimeType = "video/quicktime";
+        }
+
+        return new FileStream(ctx, fullPath, mimeType).send();
+    }
+
+    static async notify(ctx: RouterContext, _: Next) {
+        const { guid: messageGuid } = ctx?.params ?? {};
+
+        // Fetch the message we are reacting to
+        const message = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+        if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+
+        // Pull the associated chat
+        if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
+        const chat = message.chats[0];
+
+        // Attempt to notify the user
+        const retMessage = await MessageInterface.notifySilencedMessage(chat, message);
+        return new Success(ctx, {
+            data: await MessageSerializer.serialize({
+                message: retMessage,
+                config: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true
+                }
+            })
+        }).send();
     }
 }

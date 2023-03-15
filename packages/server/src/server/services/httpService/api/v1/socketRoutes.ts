@@ -210,7 +210,7 @@ export class SocketRoutes {
                 sort = null;
             }
 
-            const chats = await Server().iMessageRepo.getChats({
+            const [chats, _] = await Server().iMessageRepo.getChats({
                 withParticipants,
                 withLastMessage,
                 withArchived: params?.withArchived ?? false,
@@ -222,7 +222,7 @@ export class SocketRoutes {
             // We need to fetch all the chats with their participants, then cache the participants
             // so we can merge the participant list with the chats
             const chatCache: { [key: string]: Handle[] } = {};
-            const tmpChats = await Server().iMessageRepo.getChats({
+            const [tmpChats, __] = await Server().iMessageRepo.getChats({
                 withParticipants: true,
                 withArchived: params?.withArchived ?? false
             });
@@ -281,7 +281,7 @@ export class SocketRoutes {
             const chatGuid = params?.chatGuid;
             if (!chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided"));
 
-            const chats = await Server().iMessageRepo.getChats({
+            const [chats, _] = await Server().iMessageRepo.getChats({
                 chatGuid,
                 withParticipants: params?.withParticipants ?? true
             });
@@ -303,7 +303,7 @@ export class SocketRoutes {
             if (!params?.identifier)
                 return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-            const chats = await Server().iMessageRepo.getChats({
+            const [chats, __] = await Server().iMessageRepo.getChats({
                 chatGuid: params?.identifier
             });
 
@@ -323,7 +323,7 @@ export class SocketRoutes {
 
             if (params?.where) dbParams.where = params.where;
 
-            const messages = await Server().iMessageRepo.getMessages(dbParams);
+            const [messages, _] = await Server().iMessageRepo.getMessages(dbParams);
             const results = await MessageSerializer.serializeList({
                 messages,
                 config: {
@@ -344,7 +344,7 @@ export class SocketRoutes {
             // See if there is a chat and make sure it exists
             const chatGuid = params?.chatGuid;
             if (isNotEmpty(chatGuid)) {
-                const chats = await Server().iMessageRepo.getChats({ chatGuid });
+                const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid });
                 if (isEmpty(chats))
                     return response(cb, "error", createBadRequestResponse("Chat does not exist (get-messages)"));
             }
@@ -364,7 +364,7 @@ export class SocketRoutes {
             if (params?.where) dbParams.where = params.where;
 
             // Get the messages
-            const messages = await Server().iMessageRepo.getMessages(dbParams);
+            const [messages, _] = await Server().iMessageRepo.getMessages(dbParams);
             const results = await MessageSerializer.serializeList({
                 messages,
                 config: {
@@ -443,11 +443,11 @@ export class SocketRoutes {
             if (!params?.identifier)
                 return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-            const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
+            const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
             if (isEmpty(chats))
                 return response(cb, "error", createBadRequestResponse("Chat does not exist (get-last-chat-message)"));
 
-            const messages = await Server().iMessageRepo.getMessages({
+            const [messages, _] = await Server().iMessageRepo.getMessages({
                 chatGuid: chats[0].guid,
                 limit: 1
             });
@@ -469,7 +469,7 @@ export class SocketRoutes {
             if (!params?.identifier)
                 return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
 
-            const chats = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
+            const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid: params?.identifier });
 
             if (isEmpty(chats))
                 return response(cb, "error", createBadRequestResponse("Chat does not exist (get-participants)"));
@@ -496,7 +496,7 @@ export class SocketRoutes {
 
             // Make sure the chat exists (if group chat)
             if (chatGuid.includes(";+;")) {
-                const chats = await Server().iMessageRepo.getChats({ chatGuid });
+                const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid });
                 if (isEmpty(chats))
                     return response(
                         cb,
@@ -655,7 +655,7 @@ export class SocketRoutes {
             if (!hasMore) {
                 // Make sure the chat exists before we send the response
                 if (chatGuid.includes(";+;")) {
-                    const chats = await Server().iMessageRepo.getChats({ chatGuid });
+                    const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid });
                     if (isEmpty(chats))
                         return response(
                             cb,
@@ -745,7 +745,7 @@ export class SocketRoutes {
             }
 
             try {
-                const newChat = await Server().iMessageRepo.getChats({ chatGuid });
+                const [newChat, _] = await Server().iMessageRepo.getChats({ chatGuid });
                 return response(
                     cb,
                     "chat-started",
@@ -777,7 +777,7 @@ export class SocketRoutes {
                 try {
                     await ActionHandler.privateRenameGroupChat(params.identifier, params.newName);
 
-                    const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
+                    const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                     return response(
                         cb,
                         "group-renamed",
@@ -791,7 +791,7 @@ export class SocketRoutes {
             try {
                 await ActionHandler.renameGroupChat(params.identifier, params.newName);
 
-                const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
+                const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                 return response(
                     cb,
                     "group-renamed",
@@ -815,7 +815,7 @@ export class SocketRoutes {
                 const result = await ActionHandler.addParticipant(params.identifier, params.address);
                 if (safeTrim(result) !== "success") return response(cb, "error", createBadRequestResponse(result));
 
-                const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
+                const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                 return response(
                     cb,
                     "participant-added",
@@ -839,7 +839,7 @@ export class SocketRoutes {
                 const result = await ActionHandler.removeParticipant(params.identifier, params.address);
                 if (safeTrim(result) !== "success") return response(cb, "error", createBadRequestResponse(result));
 
-                const chats = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
+                const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid: params.identifier });
                 return response(
                     cb,
                     "participant-removed",

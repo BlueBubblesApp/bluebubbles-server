@@ -1,14 +1,13 @@
 /* eslint-disable no-param-reassign */
 import { Brackets, DataSource, SelectQueryBuilder } from "typeorm";
 
-import { DBMessageParams, ChatParams, HandleParams } from "@server/databases/imessage/types";
+import { DBMessageParams, ChatParams, HandleParams, DBWhereItem } from "@server/databases/imessage/types";
 import { convertDateTo2001Time } from "@server/databases/imessage/helpers/dateUtil";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import { isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
-import { isEmpty } from "@firebase/util";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
@@ -43,26 +42,45 @@ export class MessageRepository {
      */
     async getChats({
         chatGuid = null,
+        globGuid = false,
         withParticipants = true,
         withArchived = true,
         withLastMessage = false,
         offset = 0,
-        limit = null
-    }: ChatParams = {}) {
+        limit = null,
+        where = []
+    }: ChatParams = {}): Promise<[Chat[], number]> {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
         // Inner-join because a chat must have participants
         if (withParticipants) {
-            query.leftJoinAndSelect("chat.participants", "handle");
+            query.innerJoinAndSelect("chat.participants", "handle");
         }
 
-        // Add inner join with messages if we want the last message too
+        // Left join because technically a chat might not have a last message
         if (withLastMessage) {
             query.leftJoinAndSelect("chat.messages", "message");
         }
 
         if (!withArchived) query.andWhere("chat.is_archived == 0");
-        if (chatGuid) query.andWhere("chat.guid = :guid", { guid: chatGuid });
+        if (chatGuid) {
+            if (globGuid) {
+                query.andWhere("chat.guid LIKE :guid", { guid: `%${chatGuid}%` });
+            } else {
+                query.andWhere("chat.guid = :guid", { guid: chatGuid });
+            }
+        }
+
+        // Add any custom WHERE clauses
+        if (isNotEmpty(where)) {
+            query.andWhere(
+                new Brackets(qb => {
+                    for (const item of where) {
+                        qb.andWhere(item.statement, item.args);
+                    }
+                })
+            );
+        }
 
         // Add clause to fetch with last message
         if (withLastMessage) {
@@ -72,20 +90,19 @@ export class MessageRepository {
         }
 
         // Set page params
-        query.offset(offset);
-        if (limit) query.limit(limit);
+        query.skip(offset);
+        if (limit) query.take(limit);
 
         // Get results
-        const chats = await query.getMany();
-        return chats;
+        return await query.getManyAndCount();
     }
 
     async getChatLastMessage(chatGuid: string): Promise<Message> {
         const query = this.db.getRepository(Message).createQueryBuilder("message");
         query.innerJoinAndSelect("message.chats", "chat");
         query.andWhere("chat.guid = :guid", { guid: chatGuid });
-        query.orderBy("date", "DESC");
-        query.limit(1);
+        query.orderBy("message.dateCreated", "DESC");
+        query.take(1);
 
         // Get results
         const message = await query.getOne();
@@ -167,7 +184,7 @@ export class MessageRepository {
      *
      * @param handle Get a specific handle from the DB
      */
-    async getHandles({ address = null, limit = 1000, offset = 0 }: HandleParams) {
+    async getHandles({ address = null, limit = 1000, offset = 0 }: HandleParams): Promise<[Handle[], number]> {
         // Start a query
         const query = this.db.getRepository(Handle).createQueryBuilder("handle");
 
@@ -177,11 +194,10 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.offset(offset);
-        query.limit(limit);
+        query.skip(offset);
+        query.take(limit);
 
-        const handles = await query.getMany();
-        return handles;
+        return await query.getManyAndCount();
     }
 
     /**
@@ -204,7 +220,7 @@ export class MessageRepository {
         withAttachments = true,
         sort = "DESC",
         where = []
-    }: DBMessageParams) {
+    }: DBMessageParams): Promise<[Message[], number]> {
         // Sanitize some params
         if (after && typeof after === "number") after = new Date(after);
         if (before && typeof before === "number") before = new Date(before);
@@ -260,12 +276,11 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.orderBy("message.date", sort);
-        query.offset(offset);
-        query.limit(limit);
+        query.orderBy("message.dateCreated", sort);
+        query.skip(offset);
+        query.take(limit);
 
-        const messages = await query.getMany();
-        return messages;
+        return await query.getManyAndCount();
     }
 
     /**
@@ -340,12 +355,11 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.orderBy("message.date", sort);
-        query.offset(offset);
-        query.limit(limit);
+        query.orderBy("message.dateCreated", sort);
+        query.skip(offset);
+        query.take(limit);
 
-        const messages = await query.getMany();
-        return messages;
+        return await query.getMany();
     }
 
     /**
@@ -354,7 +368,25 @@ export class MessageRepository {
      * @param after The earliest date to get messages from
      * @param before The latest date to get messages from
      */
-    async getMessageCount(after?: Date, before?: Date, isFromMe = false, chatGuid: string = null, updated = false) {
+    async getMessageCount({
+        after = null,
+        before = null,
+        isFromMe = false,
+        where = [],
+        chatGuid = null,
+        updated = false,
+        minRowId = null,
+        maxRowId = null
+    }: {
+        after?: Date;
+        before?: Date;
+        isFromMe?: boolean;
+        where?: DBWhereItem[];
+        chatGuid?: string;
+        updated?: boolean;
+        minRowId?: number;
+        maxRowId?: number;
+    } = {}): Promise<number> {
         // Get messages with sender and the chat it's from
         const query = this.db.getRepository(Message).createQueryBuilder("message");
 
@@ -370,6 +402,19 @@ export class MessageRepository {
         }
 
         if (isFromMe) query.andWhere("message.is_from_me = 1");
+        if (minRowId != null) query.andWhere("message.ROWID >= :minRowId", { minRowId });
+        if (maxRowId != null) query.andWhere("message.ROWID <= :maxRowId", { maxRowId });
+
+        // Add any custom WHERE clauses
+        if (isNotEmpty(where)) {
+            query.andWhere(
+                new Brackets(qb => {
+                    for (const item of where) {
+                        qb.andWhere(item.statement, item.args);
+                    }
+                })
+            );
+        }
 
         // Add date constraints
         if (after || before) {
@@ -380,11 +425,18 @@ export class MessageRepository {
             }
         }
 
-        // Add pagination params
-        query.orderBy("message.date", "DESC");
+        return await query.getCount();
+    }
 
-        const count = await query.getCount();
-        return count;
+    async getAttachmentsForMessage(message: Message) {
+        const attachments = this.db
+            .getRepository(Attachment)
+            .createQueryBuilder("attachment")
+            // Inner join because an attachment can't exist without a message
+            .innerJoinAndSelect("attachment.messages", "message")
+            .where("message.ROWID = :id", { id: message.ROWID });
+
+        return await attachments.getMany();
     }
 
     /**
@@ -456,36 +508,6 @@ export class MessageRepository {
         );
 
         return result;
-    }
-
-    async getGroupIconPath(chatGuid: string) {
-        if (!chatGuid.includes(";+;")) {
-            throw new Error("Chat must be a group chat to change the icon!");
-        }
-
-        // Get messages with sender and the chat it's from
-        // Credits: Ian Welker (Creator of SMServer)
-        const result = await this.db.getRepository(Chat).query(
-            `SELECT
-                ROWID,
-                filename
-            FROM attachment
-            WHERE ROWID IN (
-                SELECT attachment_id FROM message_attachment_join
-                WHERE message_id in (
-                    SELECT ROWID FROM message
-                    WHERE group_action_type is 1 AND cache_has_attachments IS 1 AND ROWID in (
-                        SELECT message_id FROM chat_message_join WHERE chat_id in (
-                            SELECT ROWID FROM chat
-                            WHERE guid is '${chatGuid}'
-                        )
-                    )
-                    ORDER BY date DESC
-                )
-            );`
-        );
-
-        return isEmpty(result) ? null : result[0].filename;
     }
 
     applyMessageDateQuery(query: SelectQueryBuilder<Message>, after?: Date, before?: Date) {

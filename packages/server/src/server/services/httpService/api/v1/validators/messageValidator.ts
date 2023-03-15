@@ -12,7 +12,9 @@ export class MessageValidator {
     static countParamRules = {
         chatGuid: "string",
         after: "numeric|min:0",
-        before: "numeric|min:1"
+        before: "numeric|min:1",
+        minRowId: "numeric|min:0",
+        maxRowId: "numeric|min:1"
     };
 
     static async validateCount(ctx: RouterContext, next: Next) {
@@ -23,7 +25,9 @@ export class MessageValidator {
     static updatedCountParamRules = {
         chatGuid: "string",
         after: "required|numeric|min:0",
-        before: "numeric|min:1"
+        before: "numeric|min:1",
+        minRowId: "numeric|min:0",
+        maxRowId: "numeric|min:1"
     };
 
     static async validateUpdatedCount(ctx: RouterContext, next: Next) {
@@ -185,6 +189,15 @@ export class MessageValidator {
 
     static async validateUnsend(ctx: RouterContext, next: Next) {
         ValidateInput(ctx.request?.body, MessageValidator.unsendParamRules);
+        await next();
+    }
+
+    static getEmbeddedMediaRules = {
+        guid: "required|string"
+    };
+
+    static async validateGetEmbeddedMedia(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx?.params ?? {}, MessageValidator.getEmbeddedMediaRules);
         await next();
     }
 }

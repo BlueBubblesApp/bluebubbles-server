@@ -1,24 +1,11 @@
 import { Server } from "@server";
-import { MessageRepository } from "@server/databases/imessage";
-import { EventCache } from "@server/eventCache";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { isNotEmpty } from "@server/helpers/utils";
+import { isMinMonterey, isNotEmpty } from "@server/helpers/utils";
 import { MessageChangeListener } from "./messageChangeListener";
+import type { Message } from "../entity/Message";
 
 export class OutgoingMessageListener extends MessageChangeListener {
-    repo: MessageRepository;
-
-    notSent: number[];
-
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
-        super({ cache, pollFrequency });
-
-        this.repo = repo;
-        this.notSent = [];
-
-        // Start the listener
-        this.start();
-    }
+    notSent: number[] = [];
 
     /**
      * Gets sent entries from yourself. This method has a very different flow
@@ -47,19 +34,33 @@ export class OutgoingMessageListener extends MessageChangeListener {
     }
 
     async emitOutgoingMessages(after: Date) {
-        const baseQuery = [
+        const baseQuery: DBWhereItem[] = [
             {
                 statement: "message.is_from_me = :fromMe",
                 args: { fromMe: 1 }
             }
         ];
 
+        // If we have a last row id, only get messages after that
+        if (this.lastRowId !== 0) {
+            baseQuery.push({
+                statement: "message.ROWID > :rowId",
+                args: { rowId: this.lastRowId }
+            });
+        }
+
         // 1: Check for new messages
-        const newMessages = await this.repo.getMessages({
-            after,
+        // Do not use the "after" parameter if we have a last row id
+        const [newMessages, _] = await this.repo.getMessages({
+            after: this.lastRowId === 0 ? after : null,
             withChats: true,
-            where: [...baseQuery]
+            where: baseQuery
         });
+
+        // The 0th entry should be the newest since we sort by DESC
+        if (isNotEmpty(newMessages)) {
+            this.lastRowId = newMessages[0].ROWID;
+        }
 
         // 2: Divide the new messages into sent/unsent buckets
         const newUnsent = newMessages.filter(e => !e.isSent);
@@ -77,10 +78,10 @@ export class OutgoingMessageListener extends MessageChangeListener {
         // 4: Find all unsent messages
         let lookbackMessages: any[] = [];
         if (isNotEmpty(unsentIds)) {
-            lookbackMessages = await this.repo.getMessages({
+            [lookbackMessages] = await this.repo.getMessages({
                 withChats: true,
                 where: [
-                    ...baseQuery,
+                    baseQuery[0],
                     {
                         statement: `message.ROWID in (${unsentIds.join(", ")})`,
                         args: null
@@ -138,14 +139,11 @@ export class OutgoingMessageListener extends MessageChangeListener {
     }
 
     async emitUpdatedMessages(after: Date) {
-        const baseQuery: DBWhereItem[] = [];
-
         // Get updated entries from myself only
         const entries = await this.repo.getUpdatedMessages({
             after,
             withChats: true,
             where: [
-                ...baseQuery,
                 {
                     statement: "message.is_from_me = :isFromMe",
                     args: { isFromMe: 1 }
@@ -153,8 +151,27 @@ export class OutgoingMessageListener extends MessageChangeListener {
             ]
         });
 
+        // Get entries that have an updated "didNotifyRecipient" value (true), only for Monterey+
+        let notifiedEntries: Message[] = [];
+        if (isMinMonterey) {
+            [notifiedEntries] = await this.repo.getMessages({
+                after,
+                withChats: true,
+                where: [
+                    {
+                        statement: "message.is_from_me = :isFromMe",
+                        args: { isFromMe: 1 }
+                    },
+                    {
+                        statement: "message.did_notify_recipient = :didNotifyRecipient",
+                        args: { didNotifyRecipient: 1 }
+                    }
+                ]
+            });
+        }
+
         // Emit the new message
-        for (const entry of entries) {
+        for (const entry of [...entries, ...notifiedEntries]) {
             const event = this.processMessageEvent(entry);
             if (!event) return;
 

@@ -1,7 +1,8 @@
+import * as fs from "fs";
 import { Chat } from "@server/databases/imessage/entity/Chat";
-import { Handle } from "@server/databases/imessage/entity/Handle";
 import {
     checkPrivateApiStatus,
+    getiMessageAddressFormat,
     isEmpty,
     isMinBigSur,
     isMinVentura,
@@ -11,12 +12,14 @@ import {
 } from "@server/helpers/utils";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { ChatResponse, HandleResponse } from "@server/types";
+import { ChatResponse } from "@server/types";
 import { startChat } from "../apple/scripts";
 import { MessageInterface } from "./messageInterface";
 import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 import { ChatSerializer } from "../serializers/ChatSerializer";
-import { HandleSerializer } from "../serializers/HandleSerializer";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import { Message } from "@server/databases/imessage/entity/Message";
+import { MessageSerializer } from "../serializers/MessageSerializer";
 
 export class ChatInterface {
     static async get({
@@ -26,28 +29,32 @@ export class ChatInterface {
         offset = 0,
         limit = null,
         sort = "lastmessage"
-    }: any = {}): Promise<ChatResponse[]> {
-        const chats = await Server().iMessageRepo.getChats({
+    }: any = {}): Promise<[ChatResponse[], number]> {
+        // First fetch chats without the last message.
+        // This is because fetching the last message will make the participants list 1 for each chat.
+        // It will also only return chats that have a last message.
+        const [chats, totalChats] = await Server().iMessageRepo.getChats({
             chatGuid: guid as string,
-            withParticipants: false,
-            withLastMessage,
+            withLastMessage: false,
             withArchived,
             offset,
             limit
         });
 
-        // If the query is with the last message, it makes the participants list 1 for each chat
-        // We need to fetch all the chats with their participants, then cache the participants
-        // so we can merge the participant list with the chats
-        const chatCache: { [key: string]: Handle[] } = {};
-        const tmpChats = await Server().iMessageRepo.getChats({
-            chatGuid: guid as string,
-            withParticipants: true,
-            withArchived
-        });
+        const lastMessageCache: { [key: string]: Message | null } = {};
+        if (withLastMessage) {
+            const [tmpChats, _] = await Server().iMessageRepo.getChats({
+                chatGuid: guid as string,
+                withLastMessage: true,
+                withParticipants: false,
+                withArchived,
+                offset,
+                limit
+            });
 
-        for (const chat of tmpChats) {
-            chatCache[chat.guid] = chat.participants;
+            for (const chat of tmpChats) {
+                lastMessageCache[chat.guid] = chat.messages.length > 0 ? chat.messages[0] : null;
+            }
         }
 
         const results = [];
@@ -62,22 +69,12 @@ export class ChatInterface {
                 }
             });
 
-            // Insert the cached participants from the original request
-            if (Object.keys(chatCache).includes(chat.guid)) {
-                chatRes.participants = await Promise.all(
-                    chatCache[chat.guid].map(
-                        async (e): Promise<HandleResponse> => await HandleSerializer.serialize({ handle: e })
-                    )
-                );
-            }
-
+            // Insert the lastmessage from the cache into the chat
             if (withLastMessage) {
-                // Set the last message, if applicable
-                if (isNotEmpty(chatRes.messages)) {
-                    [chatRes.lastMessage] = chatRes.messages;
-
-                    // Remove the last message from the result
-                    delete chatRes.messages;
+                if (Object.keys(lastMessageCache).includes(chat.guid) && lastMessageCache[chat.guid]) {
+                    chatRes.lastMessage = await MessageSerializer.serialize({
+                        message: lastMessageCache[chat.guid] as Message
+                    });
                 }
             }
 
@@ -97,7 +94,7 @@ export class ChatInterface {
             }
         }
 
-        return results;
+        return [results, totalChats];
     }
 
     static async setDisplayName(chat: Chat, displayName: string): Promise<Chat> {
@@ -116,7 +113,10 @@ export class ChatInterface {
             maxWaitMs,
             dataLoopCondition: data => !!data,
             getData: async (previousData: any | null) => {
-                const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: false });
+                const [chats, _] = await Server().iMessageRepo.getChats({
+                    chatGuid: chat.guid,
+                    withParticipants: false
+                });
                 return chats[0] ?? previousData;
             },
             extraLoopCondition: data => {
@@ -175,6 +175,8 @@ export class ChatInterface {
                 method: "apple-script",
                 tempGuid
             });
+
+            chatGuid = `${service};-;${getiMessageAddressFormat(theAddrs[0], true)}`;
         } else {
             const result = await FileSystem.executeAppleScript(startChat(theAddrs, service, null));
             Server().log(`StartChat AppleScript Returned: ${result}`, "debug");
@@ -192,7 +194,8 @@ export class ChatInterface {
         const chats = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
-                return await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+                const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
+                return chats;
             },
             dataLoopCondition: data => {
                 return isEmpty(data);
@@ -275,6 +278,63 @@ export class ChatInterface {
         if (!success) {
             throw new Error(`Failed to delete chat! Chat still exists. (GUID: ${theChat.guid})`);
         }
+    }
+
+    static async setGroupChatIcon(chat: Chat, iconPath: string | null): Promise<void> {
+        checkPrivateApiStatus();
+        if (!isMinBigSur) throw new Error("Setting group chat icons are only supported on macOS Big Sur or newer!");
+
+        // The icon path can be null when unsetting the icon
+        if (isNotEmpty(iconPath)) {
+            if (!fs.existsSync(iconPath)) {
+                throw new Error("Icon path does not exist!");
+            }
+
+            // Extract filename from path
+            const filename = iconPath.split("/").slice(-1)[0];
+
+            // Copy the file to the Messages Attachments folder
+            iconPath = FileSystem.copyAttachment(iconPath, `${chat.chatIdentifier}-${filename}`, "private-api");
+        }
+
+        // Make sure we are executing this on a group chat
+        if (chat.participants.length === 1) {
+            throw new Error("Chat is not a group chat!");
+        }
+
+        // Change the chat icon
+        await Server().privateApiHelper.setGroupChatIcon(chat.guid, iconPath);
+    }
+
+    static async getGroupChatIcon(chat: Chat): Promise<Attachment | null> {
+        let iconGuid = null;
+        for (const item of chat.properties ?? []) {
+            if (isNotEmpty(item.groupPhotoGuid)) {
+                iconGuid = item.groupPhotoGuid;
+            }
+        }
+
+        if (isEmpty(iconGuid)) return null;
+
+        // Find the corresponding attachment
+        const attachment = await Server().iMessageRepo.getAttachment(iconGuid);
+        if (!attachment) return null;
+
+        // Return the attachment path
+        return attachment;
+    }
+
+    static async leave({ chat, guid }: { chat?: Chat; guid?: string } = {}): Promise<void> {
+        checkPrivateApiStatus();
+
+        const repo = Server().iMessageRepo.db.getRepository(Chat);
+        if (!chat && isEmpty(guid)) throw new Error("No chat or chat GUID provided!");
+
+        const theChat = chat ?? (await repo.findOneBy({ guid }));
+        if (!theChat) return;
+
+        // Tell the private API to delete the chat
+        await Server().privateApiHelper.leaveChat(theChat.guid);
     }
 
     static async markRead(chatGuid: string): Promise<void> {

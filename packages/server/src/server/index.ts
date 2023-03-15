@@ -23,7 +23,6 @@ import {
     GroupChangeListener
 } from "@server/databases/imessage/listeners";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { MessageChangeListener } from "@server/databases/imessage/listeners/messageChangeListener";
 
 // Service Imports
 import {
@@ -49,6 +48,7 @@ import {
     insertChatParticipants,
     isEmpty,
     isMinBigSur,
+    isMinHighSierra,
     isMinMojave,
     isMinMonterey,
     isMinSierra,
@@ -62,6 +62,9 @@ import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
 import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
 import {
+    CHAT_READ_STATUS_CHANGED,
+    GROUP_ICON_CHANGED,
+    GROUP_ICON_REMOVED,
     GROUP_NAME_CHANGE,
     MESSAGE_UPDATED,
     NEW_MESSAGE,
@@ -70,6 +73,9 @@ import {
     PARTICIPANT_LEFT,
     PARTICIPANT_REMOVED
 } from "./events";
+import { ChatUpdateListener } from "./databases/imessage/listeners/chatUpdateListener";
+import { ChangeListener } from "./databases/imessage/listeners/changeListener";
+import { Chat } from "./databases/imessage/entity/Chat";
 
 const findProcess = require("find-process");
 
@@ -111,6 +117,8 @@ export const Server = (win: BrowserWindow = null) => {
 class BlueBubblesServer extends EventEmitter {
     window: BrowserWindow;
 
+    uiLoaded: boolean;
+
     repo: ServerRepository;
 
     iMessageRepo: MessageRepository;
@@ -143,7 +151,7 @@ class BlueBubblesServer extends EventEmitter {
 
     actionHandler: ActionHandler;
 
-    chatListeners: MessageChangeListener[];
+    chatListeners: ChangeListener[];
 
     eventCache: EventCache;
 
@@ -195,6 +203,7 @@ class BlueBubblesServer extends EventEmitter {
         super();
 
         this.window = window;
+        this.uiLoaded = false;
 
         // Databases
         this.repo = null;
@@ -231,7 +240,10 @@ class BlueBubblesServer extends EventEmitter {
 
     emitToUI(event: string, data: any) {
         try {
-            if (this.window) this.window.webContents.send(event, data);
+            if (!this.uiLoaded) return;
+            if (this.window && !this.window.webContents.isDestroyed()) {
+                this.window.webContents.send(event, data);
+            }
         } catch {
             /* Ignore errors here */
         }
@@ -455,7 +467,7 @@ class BlueBubblesServer extends EventEmitter {
 
         if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
             this.log("Starting iMessage Database listeners...");
-            this.startChatListeners();
+            await this.startChatListeners();
         }
     }
 
@@ -822,7 +834,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Check for contact permissions
-        const contactStatus = await requestContactPermission();
+        const contactStatus = requestContactPermission();
         this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         this.log("Finished post-start checks...");
     }
@@ -869,7 +881,7 @@ class BlueBubblesServer extends EventEmitter {
         // If the poll interval changed, we need to restart the listeners
         if (prevConfig.db_poll_interval !== nextConfig.db_poll_interval) {
             this.removeChatListeners();
-            this.startChatListeners();
+            await this.startChatListeners();
         }
 
         // If the URL is different, emit the change to the listeners
@@ -1089,7 +1101,7 @@ class BlueBubblesServer extends EventEmitter {
      * iMessages from your chat database. Anytime there is a new message,
      * we will emit a message to the socket, as well as the FCM server
      */
-    private startChatListeners() {
+    private async startChatListeners() {
         if (!this.hasDiskAccess) {
             AlertsInterface.create(
                 "info",
@@ -1101,15 +1113,29 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting chat listeners...");
         const pollInterval = (this.repo.getConfig("db_poll_interval") as number) ?? 1000;
 
-        // Create a listener to listen for new/updated messages
+        // Create DB listeners.
+        // Poll intervals are based on "listener priority"
         const incomingMsgListener = new IncomingMessageListener(this.iMessageRepo, this.eventCache, pollInterval);
         const outgoingMsgListener = new OutgoingMessageListener(this.iMessageRepo, this.eventCache, pollInterval * 1.5);
-
-        // No real rhyme or reason to multiply this by 2. It's just not as much a priority
-        const groupEventListener = new GroupChangeListener(this.iMessageRepo, pollInterval * 2);
+        const groupEventListener = new GroupChangeListener(this.iMessageRepo, 5000);
 
         // Add to listeners
         this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
+
+        if (isMinHighSierra) {
+            // Add listener for chat updates
+            // Multiply by 2 because this really doesn't need to be as frequent
+            const chatUpdateListener = new ChatUpdateListener(this.iMessageRepo, this.eventCache, 5000);
+            this.chatListeners.push(chatUpdateListener);
+
+            chatUpdateListener.on(CHAT_READ_STATUS_CHANGED, async (item: Chat) => {
+                Server().log(`Chat read [${item.guid}]`);
+                await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
+                    chatGuid: item.guid,
+                    read: true
+                });
+            });
+        }
 
         /**
          * Message listener for my messages only. We need this because messages from ourselves
@@ -1224,7 +1250,7 @@ class BlueBubblesServer extends EventEmitter {
          */
         incomingMsgListener.on("new-entry", async (item: Message) => {
             const newMessage = await insertChatParticipants(item);
-            this.log(`New message from [${newMessage.handle?.id}]: [${newMessage.contentString()}]`);
+            this.log(`New message from [${newMessage.handle?.id ?? "You"}]: [${newMessage.contentString()}]`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1377,9 +1403,73 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
+        groupEventListener.on("group-icon-changed", async (item: Message) => {
+            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            this.log(`[${from}] changed a group photo`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                GROUP_ICON_CHANGED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
+            await this.emitMessage(
+                GROUP_ICON_CHANGED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
+            );
+        });
+
+        groupEventListener.on("group-icon-removed", async (item: Message) => {
+            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            this.log(`[${from}] removed a group photo`);
+
+            // Manually send the message to the socket so we can serialize it with
+            // all the extra data
+            this.httpService.socketServer.emit(
+                GROUP_ICON_REMOVED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    config: {
+                        loadChatParticipants: true,
+                        includeChats: true
+                    }
+                })
+            );
+
+            await this.emitMessage(
+                GROUP_ICON_REMOVED,
+                await MessageSerializer.serialize({
+                    message: item,
+                    isForNotification: true
+                }),
+                "normal",
+                true,
+                false
+            );
+        });
+
         outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
         incomingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
         groupEventListener.on("error", (error: Error) => this.log(error.message, "error"));
+
+        // Start the listeners with a 500ms delay between each to prevent locks.
+        for (const i of this.chatListeners) {
+            await waitMs(500);
+            i.start();
+        }
     }
 
     private removeChatListeners() {
