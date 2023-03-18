@@ -178,10 +178,10 @@ const createWindow = async () => {
     });
 
     // Make links open in the browser
-    win.webContents.on("new-window", (event, url) => {
-        event.preventDefault();
-        shell.openExternal(url);
-    });
+    // win.webContents.on("new-window", (event: any, url: string) => {
+    //     event.preventDefault();
+    //     shell.openExternal(url);
+    // });
 
     // Hook onto when we load the UI
     win.webContents.on("dom-ready", async () => {
