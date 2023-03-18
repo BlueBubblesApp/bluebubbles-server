@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeTheme, shell } from "electron";
 import * as process from "process";
 import * as path from "path";
 import { FileSystem } from "@server/fileSystem";
@@ -178,9 +178,9 @@ const createWindow = async () => {
     });
 
     // Make links open in the browser
-    win.webContents.setWindowOpenHandler((details: HandlerDetails) => {
-        shell.openExternal(details.url);
-        return { action: "deny" };
+    win.webContents.on("new-window", (event, url) => {
+        event.preventDefault();
+        shell.openExternal(url);
     });
 
     // Hook onto when we load the UI
@@ -209,7 +209,7 @@ const createWindow = async () => {
     // Hook onto when the renderer process crashes
     win.webContents.on("render-process-gone", async (event, details) => {
         Server().uiLoaded = false;
-        Server().log(`Renderer process crashed! Error: [${details.exitCode}] ${details.reason}`, "error");
+        Server().log(`Renderer process crashed! Error: ${details.reason}`, "error");
     });
 
     // Hook onto when the webcontents are destroyed

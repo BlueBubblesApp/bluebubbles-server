@@ -20,7 +20,7 @@
     },
     "homepage": "https://www.bluebubbles.app",
     "devEngines": {
-        "node": "18.x",
+        "node": "14.x",
         "npm": ">=8.x",
         "yarn": ">=1.x"
     },

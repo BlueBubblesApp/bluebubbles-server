@@ -1,5 +1,5 @@
 import { createStandaloneToast, ToastId } from '@chakra-ui/react';
-import { AnyAction } from '@reduxjs/toolkit';
+// import { AnyAction, ActionCreatorWithoutPayload } from '@reduxjs/toolkit';
 import { getRandomInt } from './GenericUtils';
 
 const toast = createStandaloneToast();
@@ -10,7 +10,7 @@ export type ConfirmationItems = {
     [key: string]: {
         message: string,
         shouldDispatch?: boolean,
-        func: (args?: NodeJS.Dict<any>) => void | AnyAction | Promise<void>
+        func: any
     }
 };
 
