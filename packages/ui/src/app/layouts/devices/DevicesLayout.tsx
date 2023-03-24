@@ -41,7 +41,7 @@ const confirmationActions: ConfirmationItems = {
             'by restarting the app.'
         ),
         shouldDispatch: true,
-        func: clear
+        func: clear as (args?: NodeJS.Dict<any>) => void
     }
 };
 
