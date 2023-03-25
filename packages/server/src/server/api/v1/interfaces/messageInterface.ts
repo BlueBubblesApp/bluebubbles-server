@@ -540,7 +540,7 @@ export class MessageInterface {
             if (parts[0].attachment) {
                 const currentPath = path.join(FileSystem.messagesAttachmentsDir, parts[i].attachment);
                 const newPath = FileSystem.copyAttachment(currentPath, parts[i].name, "private-api");
-                parts[i].attachment = newPath;
+                parts[i].filePath = newPath;
 
                 // Delete the original
                 fs.unlinkSync(currentPath);
