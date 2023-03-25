@@ -39,6 +39,7 @@ export class AttachmentRouter {
 
         let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
+        if (!fs.existsSync(aPath)) throw new ServerError({ error: "Attachment does not exist in disk!" });
 
         const g = attachment.guid;
         const og = attachment.originalGuid ?? "N/A";
@@ -96,6 +97,24 @@ export class AttachmentRouter {
 
         Server().log(`Sending attachment (${mimeType}) with path: ${aPath}`, "debug");
         return new FileStream(ctx, aPath, mimeType).send();
+    }
+
+    static async downloadLive(ctx: RouterContext, _: Next) {
+        const { guid } = ctx.params;
+
+        // Fetch the info for the attachment by GUID
+        const attachment = await Server().iMessageRepo.getAttachment(guid);
+        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
+
+        const aPath = FileSystem.getRealPath(attachment.filePath);
+        if (!fs.existsSync(aPath)) throw new NotFound({ error: "Attachment does not exist in disk!" });
+
+        // Replace the extension with .mov (if there is one). Otherwise just append .mov
+        const ext = aPath.split(".").pop();
+        const livePath = ext ? aPath.replace(`.${ext}`, ".mov") : `${aPath}.mov`;
+        if (!fs.existsSync(livePath)) throw new NotFound({ error: "Live photo does not exist for this attachment!" });
+
+        return new FileStream(ctx, livePath, "video/quicktime").send();
     }
 
     static async blurhash(ctx: RouterContext, _: Next) {

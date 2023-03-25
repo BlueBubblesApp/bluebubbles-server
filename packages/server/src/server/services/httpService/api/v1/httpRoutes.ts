@@ -212,6 +212,11 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: ":guid/live",
+                        controller: AttachmentRouter.downloadLive
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: ":guid",
                         validators: [AttachmentValidator.validateFind],
                         controller: AttachmentRouter.find

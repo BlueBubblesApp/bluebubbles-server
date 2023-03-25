@@ -243,6 +243,11 @@ export class MessageValidator {
                     throw new BadRequest({ error: `Attachment '${part.attachment}' does not exist` });
                 }
             }
+
+            // If there is a mention, but no text, throw an error
+            if (part.mention && !part.text) {
+                throw new BadRequest({ error: "A mention must have text" });
+            }
         }
 
         // Make sure the message isn't already in the queue
