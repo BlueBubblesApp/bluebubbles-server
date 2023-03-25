@@ -75,6 +75,8 @@ export class ChatInterface {
                     chatRes.lastMessage = await MessageSerializer.serialize({
                         message: lastMessageCache[chat.guid] as Message
                     });
+                } else {
+                    chatRes.lastMessage = null;
                 }
             }
 

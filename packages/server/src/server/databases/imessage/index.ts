@@ -86,8 +86,9 @@ export class MessageRepository {
         if (withLastMessage) {
             query.groupBy("chat.guid");
             query.having("message.ROWID = MAX(message.ROWID)");
-            query.orderBy("message.ROWID", "DESC");
         }
+
+        query.orderBy("chat.ROWID", "DESC");
 
         // Set page params
         query.skip(offset);
