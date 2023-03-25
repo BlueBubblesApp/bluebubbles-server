@@ -260,6 +260,20 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/participant",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [ChatValidator.validateToggleParticipant],
+                        controller: ChatRouter.addParticipant
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid/participant",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [ChatValidator.validateToggleParticipant],
+                        controller: ChatRouter.removeParticipant
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/participant/add",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
