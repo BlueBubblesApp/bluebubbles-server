@@ -113,6 +113,7 @@ export type AttachmentResponse = {
     hideAttachment?: boolean;
     originalGuid?: string;
     metadata?: { [key: string]: string | boolean | number };
+    hasLivePhoto?: boolean;
 };
 
 export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";
