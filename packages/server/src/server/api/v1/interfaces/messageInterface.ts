@@ -74,6 +74,14 @@ export class MessageInterface {
         Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}; tempGuid: ${tempGuid ?? "N/A"}`);
         Server().messageManager.add(awaiter);
 
+        // Remove the chat from the typing cache
+        if (Server().typingCache.includes(chatGuid)) {
+            Server().typingCache = Server().typingCache.filter(c => c !== chatGuid);
+
+            // Try to stop typing for that chat. Don't await so we don't block the message
+            Server().privateApiHelper.stopTyping(chatGuid);
+        }
+
         // Try to send the iMessage
         let sentMessage = null;
         if (method === "apple-script") {

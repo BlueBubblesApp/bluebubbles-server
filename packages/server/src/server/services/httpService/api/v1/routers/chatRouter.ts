@@ -294,4 +294,16 @@ export class ChatRouter {
         await ChatInterface.leave({ guid });
         return new Success(ctx, { message: `Successfully left chat!` }).send();
     }
+
+    static async startTyping(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.startTyping(guid);
+        return new Success(ctx, { message: `Successfully started typing!` }).send();
+    }
+
+    static async stopTyping(ctx: RouterContext, _: Next): Promise<void> {
+        const { guid } = ctx.params;
+        await ChatInterface.startTyping(guid);
+        return new Success(ctx, { message: `Successfully stopped typing!` }).send();
+    }
 }

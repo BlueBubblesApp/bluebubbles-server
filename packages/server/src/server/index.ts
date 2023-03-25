@@ -169,6 +169,8 @@ class BlueBubblesServer extends EventEmitter {
 
     region: string | null;
 
+    typingCache: string[];
+
     get hasDiskAccess(): boolean {
         // As long as we've tried to initialize the DB, we know if we do/do not have access.
         const dbInit: boolean | null = this.iMessageRepo?.db?.isInitialized;
@@ -236,6 +238,7 @@ class BlueBubblesServer extends EventEmitter {
         this.isStopping = false;
 
         this.region = null;
+        this.typingCache = [];
     }
 
     emitToUI(event: string, data: any) {

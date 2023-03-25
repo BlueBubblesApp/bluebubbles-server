@@ -288,6 +288,18 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/typing",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.startTyping
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid/typing",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.stopTyping
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/icon",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateGroupChatIcon],
