@@ -1,8 +1,10 @@
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { nativeImage } from "electron";
+import fs from "fs";
 
 import { Server } from "@server";
+import { generateMd5Hash } from "@server/utils/CryptoUtils";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
 import { isTruthyBool } from "@server/helpers/utils";
@@ -135,5 +137,17 @@ export class AttachmentRouter {
         }
 
         return new Success(ctx, { data: blurhash }).send();
+    }
+
+    static async uploadAttachment(ctx: RouterContext, _: Next) {
+        const { files } = ctx.request;
+        const attachment = files?.attachment as unknown as File;
+
+        const buffer = fs.readFileSync(attachment.path);
+        const hash = generateMd5Hash(buffer);
+
+        // Create a filename using the hash & extension of the attachment
+        await AttachmentInterface.upload(attachment.path, hash);
+        return new Success(ctx, { data: { hash } }).send();
     }
 }

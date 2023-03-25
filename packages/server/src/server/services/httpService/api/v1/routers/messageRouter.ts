@@ -340,6 +340,92 @@ export class MessageRouter {
         }
     }
 
+    static async sendMultipartMessage(ctx: RouterContext, _: Next) {
+        let { parts, tempGuid, attributedBody, chatGuid, effectId, subject, selectedMessageGuid, partIndex } =
+            ctx?.request?.body ?? {};
+
+        // Remove from cache
+        if (isNotEmpty(tempGuid)) {
+            Server().httpService.sendCache.add(tempGuid);
+        }
+
+        try {
+            // Send the message
+            const sentMessage = await MessageInterface.sendMultipart({
+                chatGuid,
+                parts,
+                attributedBody,
+                subject,
+                effectId,
+                selectedMessageGuid,
+                partIndex
+            });
+
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
+            // Convert to an API response
+            // No need to load the participants since we sent the message
+            const data = await MessageSerializer.serialize({
+                message: sentMessage,
+                config: {
+                    loadChatParticipants: false,
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true
+                }
+            });
+
+            // Inject the TempGUID back into the response
+            if (isNotEmpty(tempGuid)) {
+                data.tempGuid = tempGuid;
+            }
+
+            if ((data.error ?? 0) !== 0) {
+                throw new IMessageError({
+                    message: "Message sent with an error. See attached message",
+                    error: "Message failed to send!",
+                    data
+                });
+            } else {
+                return new Success(ctx, { message: "Message sent!", data }).send();
+            }
+        } catch (ex: any) {
+            // Remove from cache
+            Server().httpService.sendCache.remove(tempGuid);
+
+            if (ex instanceof Message) {
+                throw new IMessageError({
+                    message: "Message Send Error",
+                    // No need to load the participants since we sent the message
+                    data: await MessageSerializer.serialize({
+                        message: ex,
+                        config: {
+                            loadChatParticipants: false
+                        }
+                    }),
+                    error: "Failed to send message! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Message Send Error",
+                    // No need to load the participants since we sent the message
+                    data: ex?.msg
+                        ? await MessageSerializer.serialize({
+                              message: ex.msg,
+                              config: {
+                                  loadChatParticipants: false
+                              }
+                          })
+                        : null,
+                    error: "Failed to send message! See attached message error code."
+                });
+            } else {
+                throw new IMessageError({ message: "Message Send Error", error: ex?.message ?? ex.toString() });
+            }
+        }
+    }
+
     static async react(ctx: RouterContext, _: Next) {
         const { chatGuid, selectedMessageGuid, reaction, partIndex } = ctx?.request?.body ?? {};
 
