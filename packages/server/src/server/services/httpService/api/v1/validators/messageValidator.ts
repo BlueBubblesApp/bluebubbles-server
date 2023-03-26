@@ -220,23 +220,21 @@ export class MessageValidator {
             MessageValidator.multipartRules
         );
 
+        // Validate the parts. We have a few rules for this:
+        // 1. Each part must be a dictionary
+        // 2. Each part must have a partIndex
+        // 3. Each part must have either a text or attachment
+        // 4. Each attachment part must have a name
+        // 5. Each attachment must have been uploaded prior using the /attachment/upload endpoint
+        // 6. Each mention must have text
         for (const part of parts) {
-            // Make sure each part if a dictionary
-            if (typeof part !== "object") {
-                throw new BadRequest({ error: "Each part must be a dictionary" });
-            }
-
-            // Make sure each part has either a text or attachment
-            if (!part.text && !part.attachment) {
+            if (typeof part !== "object") throw new BadRequest({ error: "Each part must be a dictionary" });
+            if (part.partIndex == null) throw new BadRequest({ error: "Each part must have a partIndex" });
+            if (typeof part.partIndex !== "number") throw new BadRequest({ error: "Each partIndex must be a number" });
+            if (!part.text && !part.attachment)
                 throw new BadRequest({ error: "Each part must have either a text or attachment" });
-            }
-
-            // If the part if an attachment, make sure it has a name
-            if (part.attachment && !part.attachment.name) {
+            if (part.attachment && !part.attachment.name)
                 throw new BadRequest({ error: "Each attachment must have a name" });
-            }
-
-            // If the part is an attachment, make sure that the attachment exists (has been uploaded)
             if (part.attachment) {
                 const aPath = path.join(FileSystem.messagesAttachmentsDir, part.attachment);
                 if (!fs.existsSync(aPath)) {
@@ -244,10 +242,7 @@ export class MessageValidator {
                 }
             }
 
-            // If there is a mention, but no text, throw an error
-            if (part.mention && !part.text) {
-                throw new BadRequest({ error: "A mention must have text" });
-            }
+            if (part.mention && !part.text) throw new BadRequest({ error: "A mention must have text" });
         }
 
         // Make sure the message isn't already in the queue
