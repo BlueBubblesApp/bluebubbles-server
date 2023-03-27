@@ -306,6 +306,13 @@ class BlueBubblesServer extends EventEmitter {
         // Get the current macOS theme
         this.getTheme();
 
+        try {
+            this.log("Initializing filesystem...");
+            FileSystem.setup();
+        } catch (ex: any) {
+            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
+        }
+
         // Initialize and connect to the server database
         await this.initDatabase();
 
@@ -360,13 +367,18 @@ class BlueBubblesServer extends EventEmitter {
         this.findMyRepo = new FindMyRepository();
     }
 
-    async initServices(): Promise<void> {
+    initFcm(): void {
         try {
             this.log("Initializing connection to Google FCM...");
             this.fcm = new FCMService();
         } catch (ex: any) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
         }
+    }
+
+
+    async initServices(): Promise<void> {
+        this.initFcm();
 
         try {
             this.log("Initializing up sockets...");
@@ -632,13 +644,6 @@ class BlueBubblesServer extends EventEmitter {
         // Setup lightweight message cache
         this.log("Initializing event cache...");
         this.eventCache = new EventCache();
-
-        try {
-            this.log("Initializing filesystem...");
-            FileSystem.setup();
-        } catch (ex: any) {
-            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
-        }
 
         try {
             this.log("Initializing caffeinate service...");
