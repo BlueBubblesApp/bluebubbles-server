@@ -337,6 +337,7 @@ export class FileSystem {
      * @param contents The object data for the FCM client
      */
     static saveFCMClient(contents: any): void {
+        if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
         const filePath = path.join(FileSystem.fcmDir, "client.json");
         if (!contents && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
@@ -351,6 +352,7 @@ export class FileSystem {
      * @param contents The object data for the FCM server
      */
     static saveFCMServer(contents: any): void {
+        if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
         const filePath = path.join(FileSystem.fcmDir, "server.json");
         if (!contents && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
