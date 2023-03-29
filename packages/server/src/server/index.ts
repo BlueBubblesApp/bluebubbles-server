@@ -783,7 +783,12 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Make sure Messages is running
-        await FileSystem.startMessages();
+        try {
+            await FileSystem.startMessages();
+        } catch (ex: any) {
+            this.log(`Unable to start Messages.app! CLI Error: ${ex?.message ?? String(ex)}`);
+        }
+
         const msgCheckInterval = setInterval(async () => {
             try {
                 // This won't start it if it's already open
