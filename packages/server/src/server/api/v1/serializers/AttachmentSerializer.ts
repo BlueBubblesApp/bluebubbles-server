@@ -107,7 +107,7 @@ export class AttachmentSerializer {
         if (!isForNotification) {
             // Get the path for a possible live photo
             const ext = fPath.split(".").pop();
-            const livePath = ext ? fPath.replace(`.${ext}`, ".mov") : `${fPath}.mov`;
+            const livePath = ext !== fPath ? fPath.replace(`.${ext}`, ".mov") : `${fPath}.mov`;
             
             output = {
                 ...output,
