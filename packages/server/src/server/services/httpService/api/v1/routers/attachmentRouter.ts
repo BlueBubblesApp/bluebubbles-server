@@ -111,7 +111,7 @@ export class AttachmentRouter {
 
         // Replace the extension with .mov (if there is one). Otherwise just append .mov
         const ext = aPath.split(".").pop();
-        const livePath = ext ? aPath.replace(`.${ext}`, ".mov") : `${aPath}.mov`;
+        const livePath = ext !== aPath ? aPath.replace(`.${ext}`, ".mov") : `${aPath}.mov`;
         if (!fs.existsSync(livePath)) throw new NotFound({ error: "Live photo does not exist for this attachment!" });
 
         return new FileStream(ctx, livePath, "video/quicktime").send();
