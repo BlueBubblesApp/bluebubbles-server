@@ -117,7 +117,7 @@ export class AttachmentSerializer {
                     hideAttachment: attachment.hideAttachment,
                     isSticker: attachment.isSticker,
                     originalGuid: attachment.originalGuid,
-                    hasLivePhoto: fs.existsSync(livePath)
+                    hasLivePhoto: !fPath.endsWith('.mov') && fs.existsSync(livePath)
                 }
             };
         }
