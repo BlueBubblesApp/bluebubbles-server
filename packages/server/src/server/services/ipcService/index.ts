@@ -68,11 +68,22 @@ export class IPCService {
 
         ipcMain.handle("set-fcm-server", async (_, args) => {
             FileSystem.saveFCMServer(args);
+            if (!Server().fcm) {
+                Server().initFcm();
+                await Server().fcm.start();
+            } else {
+                await Server().fcm.restart();
+            }
         });
 
         ipcMain.handle("set-fcm-client", async (_, args) => {
             FileSystem.saveFCMClient(args);
-            await Server().fcm.start();
+            if (!Server().fcm) {
+                Server().initFcm();
+                await Server().fcm.start();
+            } else {
+                await Server().fcm.restart();
+            }
         });
 
         ipcMain.handle("get-devices", async (event, args) => {

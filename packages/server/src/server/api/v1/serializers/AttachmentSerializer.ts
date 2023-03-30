@@ -105,6 +105,10 @@ export class AttachmentSerializer {
         };
 
         if (!isForNotification) {
+            // Get the path for a possible live photo
+            const ext = fPath.split(".").pop();
+            const livePath = ext ? fPath.replace(`.${ext}`, ".mov") : `${fPath}.mov`;
+            
             output = {
                 ...output,
                 ...{
@@ -112,7 +116,8 @@ export class AttachmentSerializer {
                     isOutgoing: attachment.isOutgoing,
                     hideAttachment: attachment.hideAttachment,
                     isSticker: attachment.isSticker,
-                    originalGuid: attachment.originalGuid
+                    originalGuid: attachment.originalGuid,
+                    hasLivePhoto: !fPath.endsWith('.mov') && fs.existsSync(livePath)
                 }
             };
         }

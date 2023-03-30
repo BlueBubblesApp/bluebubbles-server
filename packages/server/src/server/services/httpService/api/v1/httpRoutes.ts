@@ -192,6 +192,13 @@ export class HttpRoutes {
                         controller: AttachmentRouter.count
                     },
                     {
+                        method: HttpMethod.POST,
+                        path: "upload",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [AttachmentValidator.validateUpload],
+                        controller: AttachmentRouter.uploadAttachment
+                    },
+                    {
                         method: HttpMethod.GET,
                         path: ":guid/download",
                         validators: [AttachmentValidator.validateDownload],
@@ -202,6 +209,11 @@ export class HttpRoutes {
                         path: ":guid/blurhash",
                         validators: [AttachmentValidator.validateDownload],
                         controller: AttachmentRouter.blurhash
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: ":guid/live",
+                        controller: AttachmentRouter.downloadLive
                     },
                     {
                         method: HttpMethod.GET,
@@ -260,6 +272,20 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: ":guid/participant",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [ChatValidator.validateToggleParticipant],
+                        controller: ChatRouter.addParticipant
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid/participant",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [ChatValidator.validateToggleParticipant],
+                        controller: ChatRouter.removeParticipant
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: ":guid/participant/add",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
@@ -271,6 +297,18 @@ export class HttpRoutes {
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateToggleParticipant],
                         controller: ChatRouter.removeParticipant
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/typing",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.startTyping
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":guid/typing",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.stopTyping
                     },
                     {
                         method: HttpMethod.POST,
@@ -327,6 +365,12 @@ export class HttpRoutes {
                         path: "attachment",
                         validators: [MessageValidator.validateAttachment],
                         controller: MessageRouter.sendAttachment
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "multipart",
+                        validators: [MessageValidator.validateMultipart],
+                        controller: MessageRouter.sendMultipartMessage
                     },
                     {
                         method: HttpMethod.POST,

@@ -36,7 +36,10 @@ export class FCMService {
         // Do nothing if the config doesn't exist
         const serverConfig = FileSystem.getFCMServer();
         const clientConfig = FileSystem.getFCMClient();
-        if (!serverConfig || !clientConfig) return false;
+        if (!serverConfig || !clientConfig) {
+            Server().log("FCM is not fully configured. Skipping...");
+            return false;
+        }
 
         // Initialize the app
         admin.initializeApp(
@@ -184,6 +187,11 @@ export class FCMService {
         }
 
         return { responses: [], successCount: 0, failureCount: 0 };
+    }
+
+    async restart() {
+        await FCMService.stop();
+        await this.start();
     }
 
     static async stop() {

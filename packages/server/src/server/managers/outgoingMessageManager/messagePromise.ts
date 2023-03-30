@@ -78,9 +78,9 @@ export class MessagePromise {
                 // This will trigger our hook handlers, created in the constructor
                 this.reject("Message send timeout");
             },
-            // 10 minute timeout for attachments
+            // 20 minute timeout for attachments
             // 2 minute timeout for messages
-            this.isAttachment ? 60000 * 10 : 60000 * 2
+            this.isAttachment ? 60000 * 20 : 60000 * 2
         );
     }
 

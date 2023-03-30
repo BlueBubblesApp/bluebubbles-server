@@ -69,3 +69,14 @@ export type SendReactionParams = {
     tempGuid?: string | null;
     partIndex?: number | null;
 };
+
+export type SendMultipartTextParams = {
+    chatGuid: string;
+    isAudioMessage?: boolean;
+    attributedBody?: Record<string, any> | null;
+    subject?: string;
+    effectId?: string;
+    selectedMessageGuid?: string;
+    partIndex?: number;
+    parts: Record<string, any>[];
+};

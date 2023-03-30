@@ -169,6 +169,8 @@ class BlueBubblesServer extends EventEmitter {
 
     region: string | null;
 
+    typingCache: string[];
+
     get hasDiskAccess(): boolean {
         // As long as we've tried to initialize the DB, we know if we do/do not have access.
         const dbInit: boolean | null = this.iMessageRepo?.db?.isInitialized;
@@ -236,6 +238,7 @@ class BlueBubblesServer extends EventEmitter {
         this.isStopping = false;
 
         this.region = null;
+        this.typingCache = [];
     }
 
     emitToUI(event: string, data: any) {
@@ -303,6 +306,13 @@ class BlueBubblesServer extends EventEmitter {
         // Get the current macOS theme
         this.getTheme();
 
+        try {
+            this.log("Initializing filesystem...");
+            FileSystem.setup();
+        } catch (ex: any) {
+            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
+        }
+
         // Initialize and connect to the server database
         await this.initDatabase();
 
@@ -357,13 +367,18 @@ class BlueBubblesServer extends EventEmitter {
         this.findMyRepo = new FindMyRepository();
     }
 
-    async initServices(): Promise<void> {
+    initFcm(): void {
         try {
             this.log("Initializing connection to Google FCM...");
             this.fcm = new FCMService();
         } catch (ex: any) {
             this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
         }
+    }
+
+
+    async initServices(): Promise<void> {
+        this.initFcm();
 
         try {
             this.log("Initializing up sockets...");
@@ -631,13 +646,6 @@ class BlueBubblesServer extends EventEmitter {
         this.eventCache = new EventCache();
 
         try {
-            this.log("Initializing filesystem...");
-            FileSystem.setup();
-        } catch (ex: any) {
-            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
-        }
-
-        try {
             this.log("Initializing caffeinate service...");
             this.caffeinate = new CaffeinateService();
             if (this.repo.getConfig("auto_caffeinate")) {
@@ -775,7 +783,12 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Make sure Messages is running
-        await FileSystem.startMessages();
+        try {
+            await FileSystem.startMessages();
+        } catch (ex: any) {
+            this.log(`Unable to start Messages.app! CLI Error: ${ex?.message ?? String(ex)}`, "warn");
+        }
+
         const msgCheckInterval = setInterval(async () => {
             try {
                 // This won't start it if it's already open
@@ -834,7 +847,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Check for contact permissions
-        const contactStatus = requestContactPermission();
+        const contactStatus = await requestContactPermission();
         this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         this.log("Finished post-start checks...");
     }

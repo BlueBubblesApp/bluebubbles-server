@@ -451,6 +451,35 @@ export class BlueBubblesHelperService {
         );
     }
 
+    async sendMultipart(
+        chatGuid: string,
+        parts: Record<string, any>[],
+        attributedBody: Record<string, any> = null,
+        subject: string = null,
+        effectId: string = null,
+        selectedMessageGuid: string = null,
+        partIndex = 0
+    ): Promise<TransactionResult> {
+        if (!chatGuid || isEmpty(parts)) {
+            throw new Error("Failed to send multipart message. Invalid params!");
+        }
+
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.writeData(
+            "send-multipart",
+            {
+                chatGuid,
+                subject,
+                parts,
+                attributedBody,
+                effectId,
+                selectedMessageGuid,
+                partIndex
+            },
+            request
+        );
+    }
+
     async getEmbeddedMedia(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
         if (!chatGuid || !messageGuid) {
             throw new Error("Failed to get embedded media. Invalid params!");

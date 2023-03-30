@@ -75,6 +75,8 @@ export class ChatInterface {
                     chatRes.lastMessage = await MessageSerializer.serialize({
                         message: lastMessageCache[chat.guid] as Message
                     });
+                } else {
+                    chatRes.lastMessage = null;
                 }
             }
 
@@ -354,5 +356,25 @@ export class ChatInterface {
             chatGuid,
             read: false
         });
+    }
+
+    static async startTyping(chatGuid: string): Promise<void> {
+        checkPrivateApiStatus();
+        await Server().privateApiHelper.startTyping(chatGuid);
+
+        // Add the chat to the typing cache
+        if (!Server().typingCache.includes(chatGuid)) {
+            Server().typingCache.push(chatGuid);
+        }
+    }
+
+    static async stopTyping(chatGuid: string): Promise<void> {
+        checkPrivateApiStatus();
+        await Server().privateApiHelper.stopTyping(chatGuid);
+        
+        // Remove the chat from the typing cache
+        if (Server().typingCache.includes(chatGuid)) {
+            Server().typingCache = Server().typingCache.filter(c => c !== chatGuid);
+        }
     }
 }

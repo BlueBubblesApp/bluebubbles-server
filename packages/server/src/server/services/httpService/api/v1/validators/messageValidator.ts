@@ -1,8 +1,11 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 import type { File } from "formidable";
+import path from "path";
+import fs from "fs";
 import { Server } from "@server";
-import { isEmpty, isMinCatalina } from "@server/helpers/utils";
+import { isEmpty } from "@server/helpers/utils";
+import { FileSystem } from "@server/fileSystem";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 
 import { ValidateInput } from "./index";
@@ -198,6 +201,55 @@ export class MessageValidator {
 
     static async validateGetEmbeddedMedia(ctx: RouterContext, next: Next) {
         ValidateInput(ctx?.params ?? {}, MessageValidator.getEmbeddedMediaRules);
+        await next();
+    }
+
+    static multipartRules = {
+        chatGuid: "required|string",
+        tempGuid: "string",
+        effectId: "string",
+        subject: "string",
+        selectedMessageGuid: "string",
+        partIndex: "numeric|min:0",
+        parts: "required|array",
+    };
+
+    static async validateMultipart(ctx: RouterContext, next: Next) {
+        const { parts, tempGuid } = ValidateInput(
+            ctx.request.body,
+            MessageValidator.multipartRules
+        );
+
+        // Validate the parts. We have a few rules for this:
+        // 1. Each part must be a dictionary
+        // 2. Each part must have a partIndex
+        // 3. Each part must have either a text or attachment
+        // 4. Each attachment part must have a name
+        // 5. Each attachment must have been uploaded prior using the /attachment/upload endpoint
+        // 6. Each mention must have text
+        for (const part of parts) {
+            if (typeof part !== "object") throw new BadRequest({ error: "Each part must be a dictionary" });
+            if (part.partIndex == null) throw new BadRequest({ error: "Each part must have a partIndex" });
+            if (typeof part.partIndex !== "number") throw new BadRequest({ error: "Each partIndex must be a number" });
+            if (!part.text && !part.attachment)
+                throw new BadRequest({ error: "Each part must have either a text or attachment" });
+            if (part.attachment && !part.attachment.name)
+                throw new BadRequest({ error: "Each attachment must have a name" });
+            if (part.attachment) {
+                const aPath = path.join(FileSystem.messagesAttachmentsDir, part.attachment);
+                if (!fs.existsSync(aPath)) {
+                    throw new BadRequest({ error: `Attachment '${part.attachment}' does not exist` });
+                }
+            }
+
+            if (part.mention && !part.text) throw new BadRequest({ error: "A mention must have text" });
+        }
+
+        // Make sure the message isn't already in the queue
+        if (Server().httpService.sendCache.find(tempGuid)) {
+            throw new BadRequest({ error: "Message is already queued to be sent!" });
+        }
+
         await next();
     }
 }

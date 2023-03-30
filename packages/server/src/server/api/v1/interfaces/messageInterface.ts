@@ -3,7 +3,14 @@ import * as fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { checkPrivateApiStatus, isMinMonterey, isMinVentura, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
+import {
+    checkPrivateApiStatus,
+    isEmpty,
+    isMinMonterey,
+    isMinVentura,
+    isNotEmpty,
+    resultAwaiter
+} from "@server/helpers/utils";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ActionHandler } from "@server/api/v1/apple/actions";
@@ -14,9 +21,11 @@ import type {
     SendReactionParams,
     UnsendMessageParams,
     EditMessageParams,
-    SendAttachmentPrivateApiParams
+    SendAttachmentPrivateApiParams,
+    SendMultipartTextParams
 } from "@server/api/v1/types";
 import { Chat } from "@server/databases/imessage/entity/Chat";
+import path from "path";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -73,6 +82,14 @@ export class MessageInterface {
         // Add the promise to the manager
         Server().log(`Adding await for chat: "${chatGuid}"; text: ${awaiter.text}; tempGuid: ${tempGuid ?? "N/A"}`);
         Server().messageManager.add(awaiter);
+
+        // Remove the chat from the typing cache
+        if (Server().typingCache.includes(chatGuid)) {
+            Server().typingCache = Server().typingCache.filter(c => c !== chatGuid);
+
+            // Try to stop typing for that chat. Don't await so we don't block the message
+            Server().privateApiHelper.stopTyping(chatGuid);
+        }
 
         // Try to send the iMessage
         let sentMessage = null;
@@ -502,5 +519,62 @@ export class MessageInterface {
         if (!transaction?.data?.path) return null;
         const mediaPath = transaction.data.path.replace("file://", "");
         return mediaPath;
+    }
+
+    static async sendMultipart({
+        chatGuid,
+        attributedBody = null,
+        subject = null,
+        effectId = null,
+        selectedMessageGuid = null,
+        partIndex = 0,
+        parts = []
+    }: SendMultipartTextParams): Promise<Message> {
+        checkPrivateApiStatus();
+        if (!chatGuid) throw new Error("No chat GUID provided");
+        if (isEmpty(parts)) throw new Error("No parts provided");
+
+        // Copy the attachments with the correct name.
+        // And delete the original
+        for (let i = 0; i < parts.length; i++) {
+            if (parts[0].attachment) {
+                const currentPath = path.join(FileSystem.messagesAttachmentsDir, parts[i].attachment);
+                const newPath = FileSystem.copyAttachment(currentPath, parts[i].name, "private-api");
+                parts[i].filePath = newPath;
+
+                // Delete the original
+                fs.unlinkSync(currentPath);
+            }
+        }
+        
+        // Send the message
+        const result = await Server().privateApiHelper.sendMultipart(
+            chatGuid,
+            parts,
+            attributedBody ?? null,
+            subject ?? null,
+            effectId ?? null,
+            selectedMessageGuid ?? null,
+            partIndex ?? 0
+        );
+
+        if (!result?.identifier) {
+            throw new Error("Failed to send message!");
+        }
+
+        const maxWaitMs = 30000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(result.identifier, true, false);
+            }
+        });
+
+        // Check if the name changed
+        if (!retMessage) {
+            throw new Error(`Failed to send message! Message not found in database after ${maxWaitMs / 1000} seconds!`);
+        }
+
+        return retMessage;
     }
 }

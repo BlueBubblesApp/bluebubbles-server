@@ -1,8 +1,10 @@
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { nativeImage } from "electron";
+import fs from "fs";
 
 import { Server } from "@server";
+import { generateMd5Hash } from "@server/utils/CryptoUtils";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
 import { isTruthyBool } from "@server/helpers/utils";
@@ -37,6 +39,7 @@ export class AttachmentRouter {
 
         let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
+        if (!fs.existsSync(aPath)) throw new ServerError({ error: "Attachment does not exist in disk!" });
 
         const g = attachment.guid;
         const og = attachment.originalGuid ?? "N/A";
@@ -96,6 +99,24 @@ export class AttachmentRouter {
         return new FileStream(ctx, aPath, mimeType).send();
     }
 
+    static async downloadLive(ctx: RouterContext, _: Next) {
+        const { guid } = ctx.params;
+
+        // Fetch the info for the attachment by GUID
+        const attachment = await Server().iMessageRepo.getAttachment(guid);
+        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
+
+        const aPath = FileSystem.getRealPath(attachment.filePath);
+        if (!fs.existsSync(aPath)) throw new NotFound({ error: "Attachment does not exist in disk!" });
+
+        // Replace the extension with .mov (if there is one). Otherwise just append .mov
+        const ext = aPath.split(".").pop();
+        const livePath = ext ? aPath.replace(`.${ext}`, ".mov") : `${aPath}.mov`;
+        if (!fs.existsSync(livePath)) throw new NotFound({ error: "Live photo does not exist for this attachment!" });
+
+        return new FileStream(ctx, livePath, "video/quicktime").send();
+    }
+
     static async blurhash(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
         const { height, width, quality } = ctx.request.query;
@@ -135,5 +156,17 @@ export class AttachmentRouter {
         }
 
         return new Success(ctx, { data: blurhash }).send();
+    }
+
+    static async uploadAttachment(ctx: RouterContext, _: Next) {
+        const { files } = ctx.request;
+        const attachment = files?.attachment as unknown as File;
+
+        const buffer = fs.readFileSync(attachment.path);
+        const hash = generateMd5Hash(buffer);
+
+        // Create a filename using the hash & extension of the attachment
+        await AttachmentInterface.upload(attachment.path, hash);
+        return new Success(ctx, { data: { hash } }).send();
     }
 }

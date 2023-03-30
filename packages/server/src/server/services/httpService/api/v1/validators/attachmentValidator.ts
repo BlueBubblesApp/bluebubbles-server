@@ -2,6 +2,7 @@ import { RouterContext } from "koa-router";
 import { Next } from "koa";
 
 import { ValidateInput } from "./index";
+import { BadRequest } from "../responses/errors";
 
 export class AttachmentValidator {
     static findParamRules = {
@@ -22,6 +23,18 @@ export class AttachmentValidator {
 
     static async validateDownload(ctx: RouterContext, next: Next) {
         ValidateInput(ctx?.request?.query, AttachmentValidator.downloadRules);
+        await next();
+    }
+
+    static async validateUpload(ctx: RouterContext, next: Next) {
+        const { files } = ctx.request;
+
+        // Make sure the message isn't already in the queue
+        const attachment = files?.attachment as unknown as File;
+        if (!attachment || attachment.size === 0) {
+            throw new BadRequest({ error: "Attachment not provided or was empty!" });
+        }
+
         await next();
     }
 }
