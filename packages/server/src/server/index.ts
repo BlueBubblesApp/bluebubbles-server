@@ -963,6 +963,11 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
+        // If the password changes, we need to make sure the clients connected to the socket are kicked.
+        if (prevConfig.password !== nextConfig.password) {
+            this.httpService.kickClients();
+        }
+
         this.emitToUI("config-update", nextConfig);
     }
 

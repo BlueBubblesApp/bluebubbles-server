@@ -251,6 +251,13 @@ export class HttpService {
         });
     }
 
+    kickClients() {
+        if (!this.socketServer) return;
+        this.socketServer.sockets.sockets.forEach(socket => {
+            socket.disconnect();
+        });
+    }
+
     async stop(): Promise<void> {
         Server().log("Stopping HTTP Service...");
 
