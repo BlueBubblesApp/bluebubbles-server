@@ -7,6 +7,7 @@ import { FileSystem } from "@server/fileSystem";
 import { AttachmentResponse } from "@server/types";
 import { DEFAULT_ATTACHMENT_CONFIG } from "./constants";
 import type { AttachmentSerializerMultiParams, AttachmentSerializerSingleParams } from "./types";
+import { AttachmentInterface } from "../interfaces/attachmentInterface";
 
 export class AttachmentSerializer {
     static async serialize({
@@ -105,10 +106,6 @@ export class AttachmentSerializer {
         };
 
         if (!isForNotification) {
-            // Get the path for a possible live photo
-            const ext = fPath.split(".").pop();
-            const livePath = ext !== fPath ? fPath.replace(`.${ext}`, ".mov") : `${fPath}.mov`;
-            
             output = {
                 ...output,
                 ...{
@@ -117,7 +114,7 @@ export class AttachmentSerializer {
                     hideAttachment: attachment.hideAttachment,
                     isSticker: attachment.isSticker,
                     originalGuid: attachment.originalGuid,
-                    hasLivePhoto: !fPath.endsWith('.mov') && fs.existsSync(livePath)
+                    hasLivePhoto: !!AttachmentInterface.getLivePhotoPath(attachment)
                 }
             };
         }

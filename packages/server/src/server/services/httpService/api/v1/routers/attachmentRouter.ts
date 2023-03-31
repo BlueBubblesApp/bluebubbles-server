@@ -7,7 +7,7 @@ import { Server } from "@server";
 import { generateMd5Hash } from "@server/utils/CryptoUtils";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
-import { isTruthyBool } from "@server/helpers/utils";
+import { isEmpty, isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { FileStream, Success } from "../responses/success";
 import { NotFound, ServerError } from "../responses/errors";
@@ -104,18 +104,16 @@ export class AttachmentRouter {
 
         // Fetch the info for the attachment by GUID
         const attachment = await Server().iMessageRepo.getAttachment(guid);
-        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
+        if (!attachment || isEmpty(attachment.filePath)) throw new NotFound({ error: "Attachment does not exist!" });
 
         const aPath = FileSystem.getRealPath(attachment.filePath);
         if (!fs.existsSync(aPath)) throw new NotFound({ error: "Attachment does not exist in disk!" });
 
         // Replace the extension with .mov (if there is one). Otherwise just append .mov
-        const ext = aPath.split(".").pop();
-        const livePath = ext !== aPath ? aPath.replace(`.${ext}`, ".mov") : `${aPath}.mov`;
-        if (aPath.endsWith('.mov') || !fs.existsSync(livePath))
-            throw new NotFound({ error: "Live photo does not exist for this attachment!" });
+        const livePhotoPath = AttachmentInterface.getLivePhotoPath(attachment);
+        if (!livePhotoPath) throw new NotFound({ error: "Live photo does not exist for this attachment!" });
 
-        return new FileStream(ctx, livePath, "video/quicktime").send();
+        return new FileStream(ctx, livePhotoPath, "video/quicktime").send();
     }
 
     static async blurhash(ctx: RouterContext, _: Next) {
