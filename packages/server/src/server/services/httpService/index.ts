@@ -113,7 +113,8 @@ export class HttpService {
                 jsonLimit: "100mb",
                 textLimit: "100mb",
                 formLimit: "1000mb",
-                multipart: true
+                multipart: true,
+                parsedMethods: ['POST', 'PUT', 'PATCH', 'DELETE']
             })
         );
 
