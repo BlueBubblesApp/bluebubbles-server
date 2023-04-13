@@ -68,21 +68,23 @@ export const ConnectionSettings = (): JSX.Element => {
             <LocalPortField />
 
             <Spacer />
-            <Accordion allowMultiple>
-                <AccordionItem>
-                    <AccordionButton>
-                        <Box flex='1' textAlign='left' width="15em">
-                            Advanced Connection Settings
-                        </Box>
-                        <AccordionIcon />
-                    </AccordionButton>
-                    <AccordionPanel pb={4}>
-                        {/* <EncryptCommunicationsField />
-                        <Box m={15} /> */}
-                        {(proxyService === 'dynamic-dns') ? (<UseHttpsField />) : null}
-                    </AccordionPanel>
-                </AccordionItem>
-            </Accordion>
+            {(proxyService === 'dynamic-dns') ? (
+                <Accordion allowMultiple>
+                    <AccordionItem>
+                        <AccordionButton>
+                            <Box flex='1' textAlign='left' width="15em">
+                                Advanced Connection Settings
+                            </Box>
+                            <AccordionIcon />
+                        </AccordionButton>
+                        <AccordionPanel pb={4}>
+                            {/* <EncryptCommunicationsField />
+                            <Box m={15} /> */}
+                            <UseHttpsField />
+                        </AccordionPanel>
+                    </AccordionItem>
+                </Accordion>
+            ) : null}
         </Stack>
     );
 };
