@@ -113,7 +113,8 @@ export class HttpService {
                 jsonLimit: "100mb",
                 textLimit: "100mb",
                 formLimit: "1000mb",
-                multipart: true
+                multipart: true,
+                parsedMethods: ['POST', 'PUT', 'PATCH', 'DELETE']
             })
         );
 
@@ -248,6 +249,13 @@ export class HttpService {
             } else {
                 resolve(null);
             }
+        });
+    }
+
+    kickClients() {
+        if (!this.socketServer) return;
+        this.socketServer.sockets.sockets.forEach(socket => {
+            socket.disconnect();
         });
     }
 
