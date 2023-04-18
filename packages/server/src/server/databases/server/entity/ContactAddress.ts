@@ -5,7 +5,6 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     ManyToOne,
-    JoinTable,
     Unique
 } from "typeorm";
 import { Contact } from "./Contact";
