@@ -100,7 +100,12 @@ export class ChatInterface {
     }
 
     static async setDisplayName(chat: Chat, displayName: string): Promise<Chat> {
-        const prevName = chat.displayName;
+        // If nothing changed, return the original chat
+        const prevName = chat.displayName ?? '';
+        if (prevName === displayName) {
+            return chat;
+        }
+
         checkPrivateApiStatus();
 
         // Make sure we are executing this on a group chat
@@ -113,7 +118,6 @@ export class ChatInterface {
         const maxWaitMs = 30000;
         const retChat = await resultAwaiter({
             maxWaitMs,
-            dataLoopCondition: data => !!data,
             getData: async (previousData: any | null) => {
                 const [chats, _] = await Server().iMessageRepo.getChats({
                     chatGuid: chat.guid,
@@ -121,9 +125,9 @@ export class ChatInterface {
                 });
                 return chats[0] ?? previousData;
             },
+            // Keep looping if the name is the same as before
             extraLoopCondition: data => {
-                if (!data) return false;
-                return data?.displayName === prevName;
+                return (data?.displayName ?? '') === prevName;
             }
         });
 
@@ -199,6 +203,7 @@ export class ChatInterface {
                 const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
                 return chats;
             },
+            // Keep looping if we don't get any chats back
             dataLoopCondition: data => {
                 return isEmpty(data);
             }
@@ -241,6 +246,7 @@ export class ChatInterface {
                 const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
                 return chats[0] ?? previousData;
             },
+            // Keep looping if the participant count is the same as before
             dataLoopCondition: data => {
                 return (data?.participants ?? []).length === prevCount;
             }
@@ -273,7 +279,7 @@ export class ChatInterface {
             getData: async () => {
                 return await repo.findOneBy({ guid: theChat.guid });
             },
-            // Loop until we don't have data (chat is deleted)
+            // Keep looping if we keep finding the chat
             dataLoopCondition: data => !!data
         }));
 
