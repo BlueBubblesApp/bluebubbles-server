@@ -430,20 +430,21 @@ export const resultAwaiter = async ({
     let waitTime = initialWaitMs;
     let totalTime = 0;
 
-    // Set a default value for the condition
-    // so we can easily use it in the loop.
+    // Defaults to false because true means keep looping.
+    // This condition is OR'd with the data loop condition.
+    // If this was true, it would keep looping indefinitely.
     if (!extraLoopCondition) {
-        extraLoopCondition = _ => true;
+        extraLoopCondition = _ => false;
     }
 
-    // Set a default value for the condition
-    // so we can easily use it in the loop.
+    // Set the default check for the loop condition to be if the data is null.
+    // If it's null, keep looping.
     if (!dataLoopCondition) {
         dataLoopCondition = _ => !data;
     }
 
     let data = await getData(null);
-    while (dataLoopCondition(data) && totalTime < maxWaitMs && extraLoopCondition(data)) {
+    while ((dataLoopCondition(data) || extraLoopCondition(data)) && totalTime < maxWaitMs) {
         // Give it a bit to execute
         await waitMs(waitTime);
         totalTime += waitTime;

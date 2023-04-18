@@ -328,9 +328,9 @@ export class MessageInterface {
             getData: async _ => {
                 return await Server().iMessageRepo.getMessage(messageGuid, true, false);
             },
+            // Keep looping if the edit date is less than or equal to the original edit date.
             extraLoopCondition: data => {
-                if (!data) return false;
-                return (data?.dateEdited ?? 0) > currentEditDate;
+                return (data?.dateEdited ?? 0) <= currentEditDate;
             }
         });
 
@@ -368,9 +368,9 @@ export class MessageInterface {
             getData: async _ => {
                 return await Server().iMessageRepo.getMessage(messageGuid, true, false);
             },
+            // Keep looping if the edit date is less than or equal to the original edit date.
             extraLoopCondition: data => {
-                if (!data) return false;
-                return (data?.dateEdited ?? 0) > currentEditDate;
+                return (data?.dateEdited ?? 0) <= currentEditDate;
             }
         });
 
@@ -499,6 +499,7 @@ export class MessageInterface {
         const maxWaitMs = 30000;
         const retMessage = await resultAwaiter({
             maxWaitMs,
+            // Keep looping until the didNotifyRecipient flag is true
             dataLoopCondition: (data: Message) => !data.didNotifyRecipient,
             getData: async _ => {
                 return await Server().iMessageRepo.getMessage(message.guid, true, false);
