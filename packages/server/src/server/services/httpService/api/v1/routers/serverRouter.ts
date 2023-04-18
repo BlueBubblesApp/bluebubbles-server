@@ -8,6 +8,8 @@ import { Success } from "../responses/success";
 import { AlertsInterface } from "@server/api/v1/interfaces/alertsInterface";
 import { isEmpty } from "@server/helpers/utils";
 import { BadRequest } from "../responses/errors";
+import { autoUpdater } from "electron-updater";
+import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
@@ -16,6 +18,20 @@ export class ServerRouter {
 
     static async checkForUpdate(ctx: RouterContext, _: Next) {
         return new Success(ctx, { data: await GeneralInterface.checkForUpdate() }).send();
+    }
+
+    static async installUpdate(ctx: RouterContext, _: Next) {
+        const updateMetadata = await GeneralInterface.checkForUpdate();
+        if (!updateMetadata?.available) {
+            throw new BadRequest({ message: "No update available!", error: "NO_UPDATE_AVAILABLE" });
+        }
+
+        // Once the update is downloaded, it should be installed automatically.
+        // Ref: updateService/index.ts
+        Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
+        await autoUpdater.downloadUpdate();
+
+        return new Success(ctx, { message: 'Update has started downloading!' }).send();
     }
 
     static async restartServices(ctx: RouterContext, _: Next) {

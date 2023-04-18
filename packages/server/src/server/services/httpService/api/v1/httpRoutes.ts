@@ -136,6 +136,11 @@ export class HttpRoutes {
                         controller: ServerRouter.checkForUpdate
                     },
                     {
+                        method: HttpMethod.POST,
+                        path: "update/install",
+                        controller: ServerRouter.installUpdate
+                    },
+                    {
                         method: HttpMethod.GET,
                         path: "alert",
                         controller: ServerRouter.getAlerts
