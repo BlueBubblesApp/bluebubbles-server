@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain, systemPreferences } from "electron";
 import { askForAccessibilityAccess, askForFullDiskAccess } from "node-mac-permissions";
+import process from "process";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
@@ -308,6 +309,10 @@ export class IPCService {
 
         ipcMain.handle("restart-via-terminal", (_, __) => {
             Server().restartViaTerminal();
+        });
+
+        ipcMain.handle("get-binary-path", async (_, __) => {
+            return process.execPath;
         });
 
         ipcMain.handle("hot-restart", async (_, __) => {

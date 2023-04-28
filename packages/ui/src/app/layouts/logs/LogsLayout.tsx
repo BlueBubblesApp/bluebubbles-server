@@ -19,12 +19,12 @@ import { BsChevronDown, BsBootstrapReboot, BsTerminal } from 'react-icons/bs';
 import { VscDebugRestart } from 'react-icons/vsc';
 import { AiOutlineClear, AiOutlineInfoCircle } from 'react-icons/ai';
 import { GoFileSubmodule } from 'react-icons/go';
-import { FiExternalLink } from 'react-icons/fi';
+import { FiExternalLink, FiCopy } from 'react-icons/fi';
 import { LogsTable } from '../../components/tables/LogsTable';
 import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 import { clearEventCache } from '../../actions/DebugActions';
-import { hasKey } from '../../utils/GenericUtils';
+import { hasKey, copyToClipboard } from '../../utils/GenericUtils';
 import { useAppSelector , useAppDispatch} from '../../hooks';
 import { AnyAction } from '@reduxjs/toolkit';
 import { clear as clearLogs, setDebug } from '../../slices/LogsSlice';
@@ -33,8 +33,15 @@ import {
     openAppLocation,
     restartViaTerminal,
     restartServices,
-    fullRestart
+    fullRestart,
+    getBinaryPath,
 } from '../../utils/IpcUtils';
+
+
+const copyBinaryPath = async () => {
+    const path = await getBinaryPath();
+    copyToClipboard(path);
+};
 
 
 const confirmationActions: ConfirmationItems = {
@@ -142,6 +149,9 @@ export const LogsLayout = (): JSX.Element => {
                                 </MenuItem>
                                 <MenuItem icon={<GoFileSubmodule />} onClick={() => openAppLocation()}>
                                     Open App Location
+                                </MenuItem>
+                                <MenuItem icon={<FiCopy />} onClick={() => copyBinaryPath()}>
+                                    Copy Binary Path
                                 </MenuItem>
                                 <MenuItem icon={<AiOutlineClear />} onClick={() => clearLogs()}>
                                     Clear Logs
