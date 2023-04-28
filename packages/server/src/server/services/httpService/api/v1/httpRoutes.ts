@@ -450,6 +450,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: ":guid/notify",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: MessageRouter.notify
                     },
                     {
