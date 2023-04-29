@@ -137,3 +137,7 @@ export const createScheduledMessage = async (message: ScheduledMessageItem) => {
 export const getBinaryPath = async () => {
     return await ipcRenderer.invoke('get-binary-path');
 };
+
+export const installUpdate = async () => {
+    return await ipcRenderer.invoke('install-update');
+};

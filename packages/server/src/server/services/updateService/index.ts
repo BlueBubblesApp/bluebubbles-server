@@ -46,8 +46,9 @@ export class UpdateService {
         ipcMain.handle("install-update", async (_, __) => {
             Server().log("Downloading update...");
             await Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
-            await autoUpdater.downloadUpdate();
-            Server().log("Finished downloading update...");
+            autoUpdater.downloadUpdate().then(() => {
+                Server().log("Finished downloading update...");    
+            });
         });
     }
 
