@@ -37,7 +37,7 @@ import { MessageInterface } from "../interfaces/messageInterface";
  * variables
  */
 export class ActionHandler {
-    static sendMessageHandler = async (chatGuid: string, message: string, attachment: string, isAudioMessage = false) => {
+    static sendMessage = async (chatGuid: string, message: string, attachment: string, isAudioMessage = false) => {
         let messageScript: string;
 
         let theAttachment = attachment;
