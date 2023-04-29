@@ -10,12 +10,20 @@ import { certSubject, validForDays, millisADay } from "./constants";
 import { onlyAlphaNumeric } from "@server/helpers/utils";
 
 export class CertificateService {
+    static get usingCustomPaths(): boolean {
+        const cliCert = Server().args['cert-path'];
+        const cliKey = Server().args['key-path'];
+        return !!(cliCert && cliKey);
+    }
+
     static get certPath(): string {
-        return path.join(FileSystem.certsDir, "server.pem");
+        const cliPath = Server().args['cert-path'];
+        return cliPath ?? path.join(FileSystem.certsDir, "server.pem");
     }
 
     static get keyPath(): string {
-        return path.join(FileSystem.certsDir, "server.key");
+        const cliPath = Server().args['key-path'];
+        return cliPath ?? path.join(FileSystem.certsDir, "server.key");
     }
 
     static get expirationPath(): string {
@@ -79,6 +87,9 @@ export class CertificateService {
     }
 
     private static removeCertificate() {
+        // Don't remove the certificate if the user specified a custom path
+        if (CertificateService.usingCustomPaths) return;
+
         fs.unlinkSync(CertificateService.certPath);
         fs.unlinkSync(CertificateService.keyPath);
     }
@@ -108,6 +119,9 @@ export class CertificateService {
     }
 
     static generateCertificate() {
+        // Don't generate a certificate if the user specified a custom path
+        if (CertificateService.usingCustomPaths) return;
+
         // Generate a keypair and create an X.509v3 certificate
         const keys = pki.rsa.generateKeyPair(2048);
 
