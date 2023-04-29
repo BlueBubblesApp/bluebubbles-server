@@ -1,8 +1,9 @@
 import "reflect-metadata";
-import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails,  } from "electron";
 import * as process from "process";
 import * as path from "path";
 import { FileSystem } from "@server/fileSystem";
+import { ParseArguments } from "@server/helpers/argParser";
 
 import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
@@ -12,12 +13,17 @@ app.commandLine.appendSwitch("in-process-gpu");
 // Patch in original user data directory
 app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
 
+
+// Parse the CLI args
+const parsedArgs = ParseArguments(process.argv);
+const noGui = parsedArgs["no-gui"] || false;
+
 let win: BrowserWindow;
 let tray: Tray;
 let isHandlingExit = false;
 
 // Instantiate the server
-Server(win);
+Server(parsedArgs, win);
 
 // Only 1 instance is allowed
 const gotTheLock = app.requestSingleInstanceLock();
@@ -148,6 +154,11 @@ const createTray = () => {
 };
 
 const createWindow = async () => {
+    if (noGui) {
+        Server().log("GUI disabled, skipping window creation...");
+        return;
+    }
+
     win = new BrowserWindow({
         title: "BlueBubbles Server",
         useContentSize: true,
@@ -224,7 +235,7 @@ const createWindow = async () => {
     });
 
     // Set the new window in the Server()
-    Server(win);
+    Server(parsedArgs, win);
 };
 
 app.on("ready", () => {

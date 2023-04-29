@@ -97,7 +97,7 @@ ServerLog.transports.file.resolvePath = () =>
  * Plus, we only want one instance of it running at all times.
  */
 let server: BlueBubblesServer = null;
-export const Server = (win: BrowserWindow = null) => {
+export const Server = (args: Record<string, any> = {}, win: BrowserWindow = null) => {
     // If we already have a server, update the window (if not null) and return
     // the same instance
     if (server) {
@@ -105,7 +105,8 @@ export const Server = (win: BrowserWindow = null) => {
         return server;
     }
 
-    server = new BlueBubblesServer(win);
+    // Only use args when instantiating a new server object
+    server = new BlueBubblesServer(args, win);
     return server;
 };
 
@@ -115,6 +116,8 @@ export const Server = (win: BrowserWindow = null) => {
  * up when running the application.
  */
 class BlueBubblesServer extends EventEmitter {
+    args: Record<string, any>;
+
     window: BrowserWindow;
 
     uiLoaded: boolean;
@@ -201,9 +204,10 @@ class BlueBubblesServer extends EventEmitter {
      *
      * @param window The browser window associated with the Electron app
      */
-    constructor(window: BrowserWindow) {
+    constructor(args: Record<string, any>, window: BrowserWindow) {
         super();
 
+        this.args = args;
         this.window = window;
         this.uiLoaded = false;
 
@@ -297,6 +301,40 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
+    /**
+     * This will load any DB config options set via the CLI args.
+     * This will also check to make sure that the values match the type
+     * of the config value.
+     */
+    loadSettingsFromArgs() {
+        for (const [key, value] of Object.entries(this.args)) {
+            // If the key exists in the DB config, set it.
+            // Account for if the user uses dashes instead of underscores
+            let normalizedKey;
+            if (key in this.repo.config) {
+                normalizedKey = key;
+            } else if (key.replaceAll("-", "_") in this.repo.config) {
+                normalizedKey = key.replaceAll("-", "_");
+            } else {
+                continue;
+            }
+
+            // Make sure the value matches the type of the config value
+            const configValue = this.repo.config[normalizedKey];
+            if (configValue != null && typeof configValue !== typeof value) {
+                Server().log((
+                    `[CLI] Invalid type for config value "${normalizedKey}"! ` +
+                    `Expected ${typeof configValue}, got ${typeof value}`
+                ), "warn");
+                continue;
+            }
+
+            // Set the value
+            Server().log(`[CLI] etting config value ${normalizedKey} to ${value}`, "debug")
+            this.repo.setConfig(normalizedKey, value);
+        }
+    }
+
     async initServer(): Promise<void> {
         // If we've already started up, don't do anything
         if (this.hasStarted) return;
@@ -315,6 +353,9 @@ class BlueBubblesServer extends EventEmitter {
 
         // Initialize and connect to the server database
         await this.initDatabase();
+
+        // Load settings from args
+        this.loadSettingsFromArgs();
 
         this.log("Starting IPC Listeners..");
         IPCService.startIpcListeners();
