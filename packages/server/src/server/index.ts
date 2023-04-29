@@ -310,9 +310,12 @@ class BlueBubblesServer extends EventEmitter {
         // This flag is true by default. If it's set to false, all
         // config values will not be stored in teh DB.
         const persist = this.args['persist-config'] ?? true;
+        this.loadSettingsFromDict(this.args, persist);
+    }
 
+    loadSettingsFromDict(data: Record<string, any>, persist = true) {
         // Iterate through the args and find the matching config.
-        for (const [key, value] of Object.entries(this.args)) {
+        for (const [key, value] of Object.entries(data)) {
             // If the key exists in the DB config, set it.
             // Account for if the user uses dashes instead of underscores
             let normalizedKey;
@@ -328,14 +331,14 @@ class BlueBubblesServer extends EventEmitter {
             const configValue = this.repo.config[normalizedKey];
             if (configValue != null && typeof configValue !== typeof value) {
                 Server().log((
-                    `[CLI] Invalid type for config value "${normalizedKey}"! ` +
+                    `[ENV] Invalid type for config value "${normalizedKey}"! ` +
                     `Expected ${typeof configValue}, got ${typeof value}`
                 ), "warn");
                 continue;
             }
 
             // Set the value
-            Server().log(`[CLI] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug")
+            Server().log(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug")
             this.repo.setConfig(normalizedKey, value, persist);
         }
     }

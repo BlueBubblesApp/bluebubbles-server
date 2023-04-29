@@ -53,6 +53,8 @@ export const userHomeDir = () => {
 export class FileSystem {
     public static baseDir = path.join(app.getPath("userData"), subdir);
 
+    public static cfgFile = path.join(userHomeDir(), 'bluebubbles.yml');
+
     public static attachmentsDir = path.join(FileSystem.baseDir, "Attachments");
 
     public static iMessageAttachmentsDir = path.join(userHomeDir(), "Library", "Messages", "Attachments");

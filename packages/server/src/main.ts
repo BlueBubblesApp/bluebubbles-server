@@ -1,7 +1,9 @@
 import "reflect-metadata";
 import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails,  } from "electron";
-import * as process from "process";
-import * as path from "path";
+import process from "process";
+import path from "path";
+import fs from "fs";
+import yaml from "js-yaml";
 import { FileSystem } from "@server/fileSystem";
 import { ParseArguments } from "@server/helpers/argParser";
 
@@ -13,9 +15,15 @@ app.commandLine.appendSwitch("in-process-gpu");
 // Patch in original user data directory
 app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
 
+// Load the config file
+let cfg = {};
+if (fs.existsSync(FileSystem.cfgFile)) {
+    cfg = yaml.load(fs.readFileSync(FileSystem.cfgFile, "utf8"));
+}
 
-// Parse the CLI args
-const parsedArgs = ParseArguments(process.argv);
+// Parse the CLI args and marge with config args
+const args = ParseArguments(process.argv);
+const parsedArgs: Record<string, any> = { ...cfg, ...args };
 const noGui = parsedArgs["no-gui"] || false;
 
 let win: BrowserWindow;
