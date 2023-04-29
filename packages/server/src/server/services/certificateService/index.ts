@@ -39,6 +39,9 @@ export class CertificateService {
     }
 
     private static refreshCertificate() {
+        // Don't refresh the certificate if the user specified a custom path
+        if (CertificateService.usingCustomPaths) return;
+
         let shouldRefresh = false;
 
         // If the file doesn't exist, definitely refresh it
