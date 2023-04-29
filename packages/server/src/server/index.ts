@@ -307,6 +307,11 @@ class BlueBubblesServer extends EventEmitter {
      * of the config value.
      */
     loadSettingsFromArgs() {
+        // This flag is true by default. If it's set to false, all
+        // config values will not be stored in teh DB.
+        const persist = this.args['persist-config'] ?? true;
+
+        // Iterate through the args and find the matching config.
         for (const [key, value] of Object.entries(this.args)) {
             // If the key exists in the DB config, set it.
             // Account for if the user uses dashes instead of underscores
@@ -330,8 +335,8 @@ class BlueBubblesServer extends EventEmitter {
             }
 
             // Set the value
-            Server().log(`[CLI] etting config value ${normalizedKey} to ${value}`, "debug")
-            this.repo.setConfig(normalizedKey, value);
+            Server().log(`[CLI] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug")
+            this.repo.setConfig(normalizedKey, value, persist);
         }
     }
 

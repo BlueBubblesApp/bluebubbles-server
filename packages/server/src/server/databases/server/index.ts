@@ -144,17 +144,19 @@ export class ServerRepository extends EventEmitter {
      * @param name The name of the config item
      * @param value The value for the config item
      */
-    async setConfig(name: string, value: Date | string | boolean | number): Promise<void> {
+    async setConfig(name: string, value: Date | string | boolean | number, persist = true): Promise<void> {
         const orig = { ...this.config };
         const saniVal = ServerRepository.convertToDbValue(value);
-        const item = await this.configs().findOneBy({ name });
 
         // Either change or create the new Config object
-        if (item) {
-            await this.configs().update(item, { value: saniVal });
-        } else {
-            const cfg = this.configs().create({ name, value: saniVal });
-            await this.configs().save(cfg);
+        if (persist) {
+            const item = await this.configs().findOneBy({ name });
+            if (item) {
+                await this.configs().update(item, { value: saniVal });
+            } else {
+                const cfg = this.configs().create({ name, value: saniVal });
+                await this.configs().save(cfg);
+            }
         }
 
         this.config[name] = ServerRepository.convertFromDbValue(saniVal);
