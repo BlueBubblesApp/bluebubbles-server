@@ -267,21 +267,22 @@ export class ChatInterface {
         if (!chat && isEmpty(guid)) throw new Error("No chat or chat GUID provided!");
 
         const theChat = chat ?? (await repo.findOneBy({ guid }));
-        if (!theChat) return;
+        if (!theChat) throw new Error(`Failed to delete chat! Chat not found. (GUID: ${guid})`);
 
         // Tell the private API to delete the chat
         await Server().privateApiHelper.deleteChat(theChat.guid);
 
         // Wait for the DB changes to propogate
         const maxWaitMs = 30000;
-        const success = !!(await resultAwaiter({
+        const success = await resultAwaiter({
             maxWaitMs,
             getData: async () => {
-                return await repo.findOneBy({ guid: theChat.guid });
+                const res = await repo.findOneBy({ guid: theChat.guid });
+                return !res ? true : false;
             },
-            // Keep looping if we keep finding the chat
-            dataLoopCondition: data => !!data
-        }));
+            // Keep looping if we keep finding the chat (getData returns false)
+            dataLoopCondition: data => !data
+        });
 
         if (!success) {
             throw new Error(`Failed to delete chat! Chat still exists. (GUID: ${theChat.guid})`);
