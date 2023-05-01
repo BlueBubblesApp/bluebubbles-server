@@ -10,6 +10,15 @@ import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
 
+
+export const getConversionPath = (attachment: Attachment, extension: string): string => {
+    const guid = attachment.originalGuid ?? attachment.guid;
+    const newDir = `${FileSystem.convertDir}/${guid}`;
+    if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
+    const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
+    return `${newDir}/${newName}.${extension}`;
+}
+
 export const convertAudio = async (
     attachment: Attachment,
     {
@@ -21,11 +30,7 @@ export const convertAudio = async (
     } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const guid = attachment.originalGuid ?? attachment.guid;
-    const newDir = `${FileSystem.convertDir}/${guid}`;
-    if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
-    const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
-    const newPath = `${newDir}/${newName}.mp3`;
+    const newPath = getConversionPath(attachment, "mp3");
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
@@ -73,11 +78,7 @@ export const convertImage = async (
     } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const guid = attachment.originalGuid ?? attachment.guid;
-    const newDir = `${FileSystem.convertDir}/${guid}`;
-    if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
-    const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
-    const newPath = `${newDir}/${newName}.jpeg`;
+    const newPath = getConversionPath(attachment, "jpeg");
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext: string = null;
