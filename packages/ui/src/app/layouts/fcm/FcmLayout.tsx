@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     Box,
     Divider,
@@ -20,21 +20,31 @@ import {
     PopoverArrow,
     PopoverTrigger,
     useBoolean,
-    Link
+    Link,
+    Tabs,
+    Tab,
+    TabList,
+    TabPanels,
+    TabPanel,
+    Image
 } from '@chakra-ui/react';
-import { BsChevronDown } from 'react-icons/bs';
+import { BsChevronDown, BsCheckAll } from 'react-icons/bs';
 import { FiTrash } from 'react-icons/fi';
 
 import { DropZone } from '../../components/DropZone';
+import { LogsTable } from '../../components/tables/LogsTable';
 import { isValidServerConfig, isValidClientConfig, isValidFirebaseUrl } from '../../utils/FcmUtils';
 import { ErrorDialog, ErrorItem } from '../../components/modals/ErrorDialog';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 import { hasKey, readFile } from '../../utils/GenericUtils';
+import { getOauthUrl } from '../../utils/IpcUtils';
 import { clearFcmConfiguration, saveFcmClient, saveFcmServer } from '../../actions/FcmActions';
 import { setConfig } from '../../slices/ConfigSlice';
 import { AiOutlineInfoCircle } from 'react-icons/ai';
+import { RiErrorWarningLine } from 'react-icons/ri';
 import { baseTheme } from '../../../theme';
 import { useAppDispatch, useAppSelector } from '../../hooks';
+import GoogleIcon from '../../../images/walkthrough/google-icon.png';
 
 
 let dragCounter = 0;
@@ -62,10 +72,17 @@ export const FcmLayout = (): JSX.Element => {
     const serverLoaded = (useAppSelector(state => state.config.fcm_server !== null) ?? false);
     const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
     const [isDragging, setDragging] = useBoolean();
+    let logs = useAppSelector(state => state.logStore.logs);
+    const [oauthUrl, setOauthUrl] = useState('');
     const [errors, setErrors] = useState([] as Array<ErrorItem>);
     const [requiresConfirmation, setRequiresConfirmation] = useState(null as string | null);
     const alertOpen = errors.length > 0;
-    
+
+    useEffect(() => {
+        getOauthUrl().then(url => setOauthUrl(url));
+    }, []);
+
+    logs = logs.filter(log => log.message.startsWith('[GCP]'));
 
     const onDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -147,120 +164,171 @@ export const FcmLayout = (): JSX.Element => {
 
     return (
         <Box
-            p={3}
+            p={8}
             borderRadius={10}
             onDragEnter={(e) => onDragEnter(e)}
             onDragLeave={() => onDragLeave()}
             onDragOver={(e) => onDragOver(e)}
             onDrop={(e) => onDrop(e)}
         >
-            <Stack direction='column' p={5}>
-                <Text fontSize='2xl'>Controls</Text>
-                <Divider orientation='horizontal' />
-                <Flex flexDirection="row" justifyContent="flex-start">
-                    <Menu>
-                        <MenuButton
-                            as={Button}
-                            rightIcon={<BsChevronDown />}
-                            width="12em"
-                            mr={5}
-                        >
-                            Manage
-                        </MenuButton>
-                        <MenuList>
-                            <MenuItem icon={<FiTrash />} onClick={() => confirm('clearConfiguration')}>
-                                Clear Configuration
-                            </MenuItem>
-                        </MenuList>
-                    </Menu>
-                </Flex>
-            </Stack>
-            <Stack direction='column' p={5}>
-                <Text fontSize='2xl'>Firebase Links</Text>
-                <Divider orientation='horizontal' />
-                <Spacer />
-                <Stack direction='row' mt={3}>
-                    <Button
-                        size='xs'
-                    >
+            <Text fontSize='2xl'>Firebase Notifications</Text>
+            <Divider orientation='horizontal' />
+            <Text fontSize='md' mt={5} mb={5}>
+                BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications to your devices.
+            </Text>
+            <Tabs>
+                <TabList>
+                    <Tab>Google Login</Tab>
+                    <Tab>Manual Setup</Tab>
+                </TabList>
+                <TabPanels>
+                    <TabPanel>
+                        <Text fontSize='md'>
+                            Using the button below, you can authorize BlueBubbles to manage your Google Cloud Platform account temporarily.
+                            This will allow BlueBubbles to automatically create your Firebase project and setup the necessary configurations.
+                        </Text>
                         <Link
-                            href="https://console.firebase.google.com/u/0/project/_/database"
+                            href={oauthUrl}
                             target="_blank"
+                            _hover={{ textDecoration: 'none' }}
                         >
-                            Enable Realtime Database
+                            <Stack direction='row' alignItems='center'>
+                                <Button pl={10} pr={10} mt={3} leftIcon={<Image src={GoogleIcon} mr={1} width={5} />} variant='outline'>
+                                    Continue with Google
+                                </Button>
+                                {(clientLoaded && serverLoaded) ? (
+                                    <Box pt={3}>
+                                        <BsCheckAll size={24} color='green' />
+                                    </Box>
+                                ) : (
+                                    <Box pt={3}>
+                                        <RiErrorWarningLine size={24} />
+                                    </Box>
+                                )}
+                            </Stack>
                         </Link>
-                    </Button>
-                    <Button
-                        size='xs'
-                    >
-                        <Link
-                            href="https://console.firebase.google.com/u/0/project/_/settings/general"
-                            target="_blank"
-                        >
-                            Google Services Download
-                        </Link>
-                    </Button>
-                    <Button
-                        size='xs'
-                    >
-                        <Link
-                            href="https://console.firebase.google.com/u/0/project/_/settings/serviceaccounts/adminsdk"
-                            target="_blank"
-                        >
-                            Admin SDK Download
-                        </Link>
-                    </Button>
-                </Stack>
-            </Stack>
-            <Stack direction='column' p={5}>
-                <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
-                    <Text fontSize='2xl'>Configuration</Text>
-                    <Popover trigger='hover'>
-                        <PopoverTrigger>
-                            <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
-                                <AiOutlineInfoCircle />
-                            </Box>
-                        </PopoverTrigger>
-                        <PopoverContent>
-                            <PopoverArrow />
-                            <PopoverCloseButton />
-                            <PopoverHeader>Information</PopoverHeader>
-                            <PopoverBody>
-                                <Text>
-                                    Drag and drop your JSON configuration files from your Google Firebase Console. If you
-                                    do not have these configuration files. Please go to
-                                    <span style={{ color: baseTheme.colors.brand.primary }}>
-                                        <Link href='https://bluebubbles.app/install' color='brand.primary' target='_blank'> Our Website </Link>
-                                    </span>
-                                    to learn how.
-                                </Text>
-                                <Text>
-                                    These configurations enable the BlueBubbles server to send notifications and other
-                                    messages to all of the clients via Google FCM. Google Play Services is required
-                                    for Android Devices.
-                                </Text>
-                            </PopoverBody>
-                        </PopoverContent>
-                    </Popover>
-                </Flex>
-                <Divider orientation='horizontal' />
-                <Spacer />
-
-                <SimpleGrid columns={2} spacing={5}>
-                    <DropZone
-                        text="Drag n' Drop Google Services JSON"
-                        loadedText="Google Services JSON Successfully Loaded!"
-                        isDragging={isDragging}
-                        isLoaded={clientLoaded}
-                    />
-                    <DropZone
-                        text="Drag n' Drop Admin SDK JSON"
-                        loadedText="Admin SDK JSON Successfully Loaded!"
-                        isDragging={isDragging}
-                        isLoaded={serverLoaded}
-                    />
-                </SimpleGrid>
-            </Stack>
+                        <Box mt={3} />
+                        <LogsTable logs={logs} caption={'Once authenticated, you can monitor the project setup process via these logs.'} />
+                    </TabPanel>
+                    <TabPanel>
+                        <Text fontSize='md'>
+                            The manual setup with Google FCM is a bit tedious, but it is a "set it and forget it" feature.
+                            You may also want to do a manual setup if you have multiple iMessage accounts and want to use
+                            the same Google account for notifications. Follow the
+                            instructions here: <Link
+                                as='span'
+                                href='https://bluebubbles.app/install/'
+                                color='brand.primary'
+                                target='_blank'>https://bluebubbles.app/install</Link>
+                        </Text>
+                        <Stack direction='column' pt={2} pb={5}>
+                            <Text fontSize='2xl'>Firebase Links</Text>
+                            <Divider orientation='horizontal' />
+                            <Spacer />
+                            <Stack direction='row' mt={3}>
+                                <Button
+                                    size='xs'
+                                >
+                                    <Link
+                                        href="https://console.firebase.google.com/u/0/project/_/database"
+                                        target="_blank"
+                                    >
+                                        Enable Realtime Database
+                                    </Link>
+                                </Button>
+                                <Button
+                                    size='xs'
+                                >
+                                    <Link
+                                        href="https://console.firebase.google.com/u/0/project/_/settings/general"
+                                        target="_blank"
+                                    >
+                                        Google Services Download
+                                    </Link>
+                                </Button>
+                                <Button
+                                    size='xs'
+                                >
+                                    <Link
+                                        href="https://console.firebase.google.com/u/0/project/_/settings/serviceaccounts/adminsdk"
+                                        target="_blank"
+                                    >
+                                        Admin SDK Download
+                                    </Link>
+                                </Button>
+                            </Stack>
+                        </Stack>
+                        <Stack direction='column' pb={5}>
+                            <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
+                                <Text fontSize='2xl'>Configuration</Text>
+                                <Popover trigger='hover'>
+                                    <PopoverTrigger>
+                                        <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
+                                            <AiOutlineInfoCircle />
+                                        </Box>
+                                    </PopoverTrigger>
+                                    <PopoverContent>
+                                        <PopoverArrow />
+                                        <PopoverCloseButton />
+                                        <PopoverHeader>Information</PopoverHeader>
+                                        <PopoverBody>
+                                            <Text>
+                                                Drag and drop your JSON configuration files from your Google Firebase Console. If you
+                                                do not have these configuration files. Please go to
+                                                <span style={{ color: baseTheme.colors.brand.primary }}>
+                                                    <Link href='https://bluebubbles.app/install' color='brand.primary' target='_blank'> Our Website </Link>
+                                                </span>
+                                                to learn how.
+                                            </Text>
+                                            <Text>
+                                                These configurations enable the BlueBubbles server to send notifications and other
+                                                messages to all of the clients via Google FCM. Google Play Services is required
+                                                for Android Devices.
+                                            </Text>
+                                        </PopoverBody>
+                                    </PopoverContent>
+                                </Popover>
+                            </Flex>
+                            <Divider orientation='horizontal' />
+                            <Spacer />
+                            <Stack direction='column'>
+                                <Flex flexDirection="row" justifyContent="flex-start">
+                                    <Menu>
+                                        <MenuButton
+                                            as={Button}
+                                            rightIcon={<BsChevronDown />}
+                                            width="12em"
+                                            mr={5}
+                                        >
+                                            Manage
+                                        </MenuButton>
+                                        <MenuList>
+                                            <MenuItem icon={<FiTrash />} onClick={() => confirm('clearConfiguration')}>
+                                                Clear Configuration
+                                            </MenuItem>
+                                        </MenuList>
+                                    </Menu>
+                                </Flex>
+                            </Stack>
+                            <Box mt={3} />
+                            <SimpleGrid columns={2} spacing={5}>
+                                <DropZone
+                                    text="Drag n' Drop Google Services JSON"
+                                    loadedText="Google Services JSON Successfully Loaded!"
+                                    isDragging={isDragging}
+                                    isLoaded={clientLoaded}
+                                />
+                                <DropZone
+                                    text="Drag n' Drop Admin SDK JSON"
+                                    loadedText="Admin SDK JSON Successfully Loaded!"
+                                    isDragging={isDragging}
+                                    isLoaded={serverLoaded}
+                                />
+                            </SimpleGrid>
+                        </Stack>
+                    </TabPanel>
+                </TabPanels>
+            </Tabs>
 
             <ErrorDialog
                 errors={errors}

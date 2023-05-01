@@ -33,9 +33,9 @@ import {
     Divider
 } from '@chakra-ui/react';
 import { FiHome, FiSettings, FiMenu, FiBell, FiMonitor, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
-import { FaDiscord } from 'react-icons/fa';
+import { FaDiscord, FaGoogle } from 'react-icons/fa';
 import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart, AiOutlineDownload } from 'react-icons/ai';
-import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill, BsGoogle } from 'react-icons/bs';
+import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill } from 'react-icons/bs';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
 import { IconType } from 'react-icons';
 import { ReactText } from 'react';
@@ -82,7 +82,7 @@ const LinkItems: Array<LinkItemProps> = [
     { name: 'Devices', icon: FiMonitor, to: '/devices' },
     { name: 'Contacts', icon: BsPersonCircle, to: '/contacts' },
     { name: 'Debug & Logs', icon: AiOutlineBug, to: '/logs' },
-    { name: 'Google FCM', icon: BsGoogle, to: '/fcm' },
+    { name: 'Google FCM', icon: FaGoogle, to: '/fcm' },
     { name: 'Scheduled Messages', icon: BsFillCalendarCheckFill, to: '/scheduled-messages' },
     { name: 'API & Webhooks', icon: AiOutlineApi, to: '/webhooks' },
     { name: 'Guides & Links', icon: BsBook, to: '/guides' },
