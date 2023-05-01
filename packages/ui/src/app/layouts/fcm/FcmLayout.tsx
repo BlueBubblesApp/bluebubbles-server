@@ -37,7 +37,7 @@ import { isValidServerConfig, isValidClientConfig, isValidFirebaseUrl } from '..
 import { ErrorDialog, ErrorItem } from '../../components/modals/ErrorDialog';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 import { hasKey, readFile } from '../../utils/GenericUtils';
-import { getOauthUrl } from '../../utils/IpcUtils';
+import { getOauthUrl, restartOauthService } from '../../utils/IpcUtils';
 import { clearFcmConfiguration, saveFcmClient, saveFcmServer } from '../../actions/FcmActions';
 import { setConfig } from '../../slices/ConfigSlice';
 import { AiOutlineInfoCircle } from 'react-icons/ai';
@@ -193,7 +193,14 @@ export const FcmLayout = (): JSX.Element => {
                             _hover={{ textDecoration: 'none' }}
                         >
                             <Stack direction='row' alignItems='center'>
-                                <Button pl={10} pr={10} mt={3} leftIcon={<Image src={GoogleIcon} mr={1} width={5} />} variant='outline'>
+                                <Button
+                                    pl={10}
+                                    pr={10}
+                                    mt={3}
+                                    leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
+                                    variant='outline'
+                                    onClick={() => restartOauthService()}
+                                >
                                     Continue with Google
                                 </Button>
                                 {(clientLoaded && serverLoaded) ? (

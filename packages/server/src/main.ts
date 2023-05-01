@@ -164,7 +164,7 @@ const createTray = () => {
 
 const createOauthWindow = async (url: string) => {
     // Create new Browser window
-    if (oauthWindow) oauthWindow.close();
+    if (oauthWindow && !oauthWindow.isDestroyed) oauthWindow.destroy();
     oauthWindow = new BrowserWindow({
         width: 800,
         height: 600,

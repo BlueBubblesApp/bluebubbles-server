@@ -394,5 +394,10 @@ export class IPCService {
         ipcMain.handle("get-oauth-url", async (_, __) => {
             return await Server().oauthService?.getOauthUrl();
         });
+
+        ipcMain.handle("restart-oauth-service", async (_, __) => {
+            if (Server().oauthService?.running) return;
+            await Server().oauthService?.restart();
+        });
     }
 }

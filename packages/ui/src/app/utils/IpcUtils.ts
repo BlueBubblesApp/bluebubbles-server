@@ -145,3 +145,7 @@ export const installUpdate = async () => {
 export const getOauthUrl = async () => {
     return await ipcRenderer.invoke('get-oauth-url');
 };
+
+export const restartOauthService = async () => {
+    return await ipcRenderer.invoke('restart-oauth-service');
+};

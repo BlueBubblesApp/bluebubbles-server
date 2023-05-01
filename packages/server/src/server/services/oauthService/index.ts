@@ -15,6 +15,8 @@ import { isNotEmpty, waitMs } from "@server/helpers/utils";
  * This service class hhandles the initial oauth workflows
  */
 export class OauthService {
+    running = false;
+
     koaApp: KoaApp;
 
     httpServer: http.Server;
@@ -155,6 +157,7 @@ export class OauthService {
      */
     start() {
         Server().log("Starting OAuth Service...");
+        this.running = true;
 
         // Start the server
         this.httpServer.listen(this.port, () => {
@@ -428,6 +431,7 @@ export class OauthService {
      */
     async stop(): Promise<void> {
         Server().log("Stopping OAuth Service...");
+        this.running = false;
 
         try {
             await this.closeHttp();
