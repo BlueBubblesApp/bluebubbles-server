@@ -16,9 +16,10 @@ import { AiFillEye, AiFillEyeInvisible, AiOutlineSave } from 'react-icons/ai';
 
 export interface ServerPasswordFieldProps {
     helpText?: string;
+    errorOnEmpty?: boolean
 }
 
-export const ServerPasswordField = ({ helpText }: ServerPasswordFieldProps): JSX.Element => {
+export const ServerPasswordField = ({ helpText, errorOnEmpty = false }: ServerPasswordFieldProps): JSX.Element => {
     const dispatch = useAppDispatch();
 
     const password: string = (useAppSelector(state => state.config.password) ?? '');
@@ -27,7 +28,15 @@ export const ServerPasswordField = ({ helpText }: ServerPasswordFieldProps): JSX
     const [passwordError, setPasswordError] = useState('');
     const hasPasswordError: boolean = (passwordError?? '').length > 0;
 
-    useEffect(() => { setNewPassword(password); }, [password]);
+    useEffect(() => {
+        setNewPassword(password);
+    }, [password]);
+
+    useEffect(() => {
+        if (errorOnEmpty && password.length === 0) {
+            setPasswordError('Enter a password, then click the save button');
+        }
+    }, []);
 
     /**
      * A handler & validator for saving a new password.
