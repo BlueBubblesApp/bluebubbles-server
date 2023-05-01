@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails,  } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails } from "electron";
 import process from "process";
 import path from "path";
 import fs from "fs";
@@ -27,6 +27,7 @@ const parsedArgs: Record<string, any> = { ...cfg, ...args };
 const noGui = parsedArgs["no-gui"] || false;
 
 let win: BrowserWindow;
+let oauthWindow: BrowserWindow = null;
 let tray: Tray;
 let isHandlingExit = false;
 
@@ -161,6 +162,35 @@ const createTray = () => {
     }
 };
 
+const createOauthWindow = async (url: string) => {
+    // Create new Browser window
+    if (oauthWindow) oauthWindow.close();
+    oauthWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+            nodeIntegration: true,
+        }
+    });
+
+    oauthWindow.loadURL(url);
+    oauthWindow.webContents.on('did-finish-load', () => {
+        const url = oauthWindow.webContents.getURL();
+        if (url.split('#')[0] !== Server().oauthService?.callbackUrl) return;
+
+        // Extract the token from the URL
+        const hash = url.split('#')[1];
+        const params = new URLSearchParams(hash);
+        const token = params.get('access_token');
+        Server().oauthService.authToken = token;
+        Server().oauthService.handleProjectCreation();
+
+        // Clear the window data
+        oauthWindow.close();
+        oauthWindow = null;
+    });
+};
+
 const createWindow = async () => {
     if (noGui) {
         Server().log("GUI disabled, skipping window creation...");
@@ -198,7 +228,12 @@ const createWindow = async () => {
 
     // Make links open in the browser
     win.webContents.setWindowOpenHandler((details: HandlerDetails) => {
-        shell.openExternal(details.url);
+        if (details.url.startsWith('https://accounts.google.com/o/oauth2/v2/auth')) {
+            createOauthWindow(details.url);
+        } else {
+            shell.openExternal(details.url);
+        }
+        
         return { action: "deny" };
     });
 

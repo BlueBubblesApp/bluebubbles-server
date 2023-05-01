@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     Box,
     Text,
@@ -9,15 +9,24 @@ import {
     SimpleGrid,
     useBoolean,
     Stack,
-    Button
+    Button,
+    Tabs,
+    Tab,
+    TabList,
+    TabPanels,
+    TabPanel,
+    Image
 } from '@chakra-ui/react';
+import { LogsTable } from '../../../components/tables/LogsTable';
 import { DropZone } from '../../../components/DropZone';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { ErrorDialog, ErrorItem } from '../../../components/modals/ErrorDialog';
 import { readFile } from '../../../utils/GenericUtils';
+import { getOauthUrl } from '../../../utils/IpcUtils';
 import { isValidClientConfig, isValidFirebaseUrl, isValidServerConfig } from '../../../utils/FcmUtils';
 import { saveFcmClient, saveFcmServer } from '../../../actions/FcmActions';
 import { setConfig } from '../../../slices/ConfigSlice';
+import GoogleIcon from '../../../../images/walkthrough/google-icon.png';
 
 
 let dragCounter = 0;
@@ -29,8 +38,16 @@ export const NotificationsWalkthrough = (): JSX.Element => {
     const serverLoaded = (useAppSelector(state => state.config.fcm_server !== null) ?? false);
     const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
     const [isDragging, setDragging] = useBoolean();
+    let logs = useAppSelector(state => state.logStore.logs);
+    const [oauthUrl, setOauthUrl] = useState('');
     const [errors, setErrors] = useState([] as Array<ErrorItem>);
     const alertOpen = errors.length > 0;
+
+    useEffect(() => {
+        getOauthUrl().then(url => setOauthUrl(url));
+    }, []);
+
+    logs = logs.filter(log => log.message.startsWith('[GCP]'));
 
     const onDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -126,63 +143,93 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                     <AlertIcon />
                     If you do not complete this setup, you will not receive notifications!
                 </Alert>
-                <Text fontSize='md' mt={5}>
-                    The setup with Google FCM is a bit tedious, but it is a "set it and forget it" feature. Follow the
-                    instructions here: <Link
-                        as='span'
-                        href='https://bluebubbles.app/install/'
-                        color='brand.primary'
-                        target='_blank'>https://bluebubbles.app/install</Link>
-                </Text>
-                <Text fontSize='3xl' mt={3}>Firebase Links</Text>
-                <Stack direction='row' mt={3}>
-                    <Button
-                        size='xs'
-                    >
-                        <Link
-                            href="https://console.firebase.google.com/u/0/project/_/database"
-                            target="_blank"
-                        >
-                            Enable Realtime Database
-                        </Link>
-                    </Button>
-                    <Button
-                        size='xs'
-                    >
-                        <Link
-                            href="https://console.firebase.google.com/u/0/project/_/settings/general"
-                            target="_blank"
-                        >
-                            Google Services JSON Download
-                        </Link>
-                    </Button>
-                    <Button
-                        size='xs'
-                    >
-                        <Link
-                            href="https://console.firebase.google.com/u/0/project/_/settings/serviceaccounts/adminsdk"
-                            target="_blank"
-                        >
-                            Admin SDK JSON Download
-                        </Link>
-                    </Button>
-                </Stack>
+                <Box mt={3} />
+                <Tabs>
+                    <TabList>
+                        <Tab>Google Login</Tab>
+                        <Tab>Manual Setup</Tab>
+                    </TabList>
+                    <TabPanels>
+                        <TabPanel>
+                            <Text fontSize='md'>
+                                Using the button below, you can authorize BlueBubbles to manage your Google Cloud Platform account temporarily.
+                                This will allow BlueBubbles to automatically create your Firebase project and setup the necessary configurations.
+                            </Text>
+                            <Link
+                                href={oauthUrl}
+                                target="_blank"
+                                _hover={{ textDecoration: 'none' }}
+                            >
+                                <Button pl={10} pr={10} mt={3} leftIcon={<Image src={GoogleIcon} mr={1} width={5} />} variant='outline'>
+                                    Continue with Google
+                                </Button>
+                            </Link>
+                            <Box mt={3} />
+                            <LogsTable logs={logs} caption={'Once authenticated, you can monitor the project setup process via these logs.'} />
+                        </TabPanel>
+                        <TabPanel>
+                            <Text fontSize='md' mt={5}>
+                                The manual setup with Google FCM is a bit tedious, but it is a "set it and forget it" feature.
+                                You may also want to do a manual setup if you have multiple iMessage accounts and want to use
+                                the same Google account for notifications. Follow the
+                                instructions here: <Link
+                                    as='span'
+                                    href='https://bluebubbles.app/install/'
+                                    color='brand.primary'
+                                    target='_blank'>https://bluebubbles.app/install</Link>
+                            </Text>
+                            <Text fontSize='3xl' mt={3}>Firebase Links</Text>
+                            <Stack direction='row' mt={3}>
+                                <Button
+                                    size='xs'
+                                >
+                                    <Link
+                                        href="https://console.firebase.google.com/u/0/project/_/database"
+                                        target="_blank"
+                                    >
+                                        Enable Realtime Database
+                                    </Link>
+                                </Button>
+                                <Button
+                                    size='xs'
+                                >
+                                    <Link
+                                        href="https://console.firebase.google.com/u/0/project/_/settings/general"
+                                        target="_blank"
+                                    >
+                                        Google Services JSON Download
+                                    </Link>
+                                </Button>
+                                <Button
+                                    size='xs'
+                                >
+                                    <Link
+                                        href="https://console.firebase.google.com/u/0/project/_/settings/serviceaccounts/adminsdk"
+                                        target="_blank"
+                                    >
+                                        Admin SDK JSON Download
+                                    </Link>
+                                </Button>
+                            </Stack>
 
-                <Text fontSize='3xl' mt={3}>Firebase Configurations</Text>
-                <SimpleGrid columns={2} spacing={5} mt={5}>
-                    <DropZone
-                        text="Drag n' Drop Google Services JSON"
-                        loadedText="Google Services JSON Successfully Loaded!"
-                        isDragging={isDragging}
-                        isLoaded={clientLoaded}
-                    />
-                    <DropZone
-                        text="Drag n' Drop Admin SDK JSON"
-                        loadedText="Admin SDK JSON Successfully Loaded!"
-                        isDragging={isDragging}
-                        isLoaded={serverLoaded}
-                    />
-                </SimpleGrid>
+                            <Text fontSize='3xl' mt={3}>Firebase Configurations</Text>
+                            <SimpleGrid columns={2} spacing={5} mt={5}>
+                                <DropZone
+                                    text="Drag n' Drop Google Services JSON"
+                                    loadedText="Google Services JSON Successfully Loaded!"
+                                    isDragging={isDragging}
+                                    isLoaded={clientLoaded}
+                                />
+                                <DropZone
+                                    text="Drag n' Drop Admin SDK JSON"
+                                    loadedText="Admin SDK JSON Successfully Loaded!"
+                                    isDragging={isDragging}
+                                    isLoaded={serverLoaded}
+                                />
+                            </SimpleGrid>
+                        </TabPanel>
+                    </TabPanels>
+                </Tabs>
             </Box>
 
             <ErrorDialog

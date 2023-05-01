@@ -38,7 +38,8 @@ import {
     CloudflareService,
     WebhookService,
     FacetimeService,
-    ScheduledMessagesService
+    ScheduledMessagesService,
+    OauthService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -152,6 +153,8 @@ class BlueBubblesServer extends EventEmitter {
 
     webhookService: WebhookService;
 
+    oauthService: OauthService;
+
     actionHandler: ActionHandler;
 
     chatListeners: ChangeListener[];
@@ -234,6 +237,7 @@ class BlueBubblesServer extends EventEmitter {
         this.messageManager = null;
         this.webhookService = null;
         this.scheduledMessages = null;
+        this.oauthService = null;
 
         this.hasSetup = false;
         this.hasStarted = false;
@@ -425,6 +429,15 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
+    initOauthService(): void {
+        try {
+            this.log("Initializing OAuth service...");
+            this.oauthService = new OauthService();
+        } catch (ex: any) {
+            this.log(`Failed to setup OAuth service! ${ex.message}`, "error");
+        }
+    }
+
 
     async initServices(): Promise<void> {
         this.initFcm();
@@ -435,6 +448,8 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
+
+        this.initOauthService();
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
@@ -493,6 +508,13 @@ class BlueBubblesServer extends EventEmitter {
             this.httpService.start();
         } catch (ex: any) {
             this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+        }
+
+        // Only start the oauth service if the tutorial isn't done
+        const tutorialDone = this.repo.getConfig("tutorial_is_done") as boolean;
+        this.oauthService.initialize();
+        if (!tutorialDone) {
+            this.oauthService.start();
         }
 
         try {
@@ -583,6 +605,12 @@ class BlueBubblesServer extends EventEmitter {
             await this.httpService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
+        }
+
+        try {
+            await this.oauthService?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop OAuth service! ${ex?.message ?? ex}`, "error");
         }
 
         try {
@@ -926,6 +954,11 @@ class BlueBubblesServer extends EventEmitter {
             await this.restartProxyServices();
             if (this.httpService) await this.httpService.restart(true);
             proxiesRestarted = true;
+        }
+
+        // Start the oauth service if the user resets the tutorial
+        if (prevConfig.tutorial_is_done === true && nextConfig.tutorial_is_done === false) {
+            await this.oauthService.restart();
         }
 
         // If we toggle the custom cert option, restart the http service

@@ -390,5 +390,9 @@ export class IPCService {
             const [chats, __] = await ChatInterface.get({ limit: 10000 });
             return chats;
         });
+
+        ipcMain.handle("get-oauth-url", async (_, __) => {
+            return await Server().oauthService?.getOauthUrl();
+        });
     }
 }

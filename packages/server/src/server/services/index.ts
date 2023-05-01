@@ -13,6 +13,7 @@ import { WebhookService } from "./webhookService";
 import { FindMyService } from "./findMyService";
 import { FacetimeService } from "./facetimeService";
 import { ScheduledMessagesService } from "./scheduledMessagesService";
+import { OauthService } from "./oauthService";
 
 export {
     HttpService,
@@ -29,5 +30,6 @@ export {
     WebhookService,
     FacetimeService,
     FindMyService,
-    ScheduledMessagesService
+    ScheduledMessagesService,
+    OauthService
 };
