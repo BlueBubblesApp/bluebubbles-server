@@ -141,3 +141,7 @@ export const getBinaryPath = async () => {
 export const installUpdate = async () => {
     return await ipcRenderer.invoke('install-update');
 };
+
+export const getOauthUrl = async () => {
+    return await ipcRenderer.invoke('get-oauth-url');
+};
