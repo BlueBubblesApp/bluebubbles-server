@@ -1,12 +1,14 @@
 import { NSAttributedString } from "node-typedstream";
 
 export type ServerMetadataResponse = {
+    computer_id: string;
     os_version: string;
     server_version: string;
     private_api: boolean;
     helper_connected: boolean;
     proxy_service: string;
     detected_icloud: string;
+    detected_imessage: string;
     macos_time_sync: number | null;
 };
 

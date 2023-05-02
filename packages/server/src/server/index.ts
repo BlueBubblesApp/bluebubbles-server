@@ -202,6 +202,10 @@ class BlueBubblesServer extends EventEmitter {
         return systemPreferences.isTrustedAccessibilityClient(false) === true;
     }
 
+    get computerIdentifier(): string {
+        return `${os.userInfo().username}@${os.hostname()}`;
+    }
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
