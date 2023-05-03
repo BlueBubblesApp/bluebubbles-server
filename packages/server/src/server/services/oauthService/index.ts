@@ -10,6 +10,7 @@ import { OAuth2Client } from "google-auth-library";
 import { google } from "googleapis";
 import { generateRandomString } from "@server/utils/CryptoUtils";
 import { isNotEmpty, waitMs } from "@server/helpers/utils";
+import { ProgressStatus } from "@server/types";
 
 /**
  * This service class hhandles the initial oauth workflows
@@ -87,6 +88,8 @@ export class OauthService {
      */
     async handleProjectCreation() {
         try {
+            Server().emitToUI("oauth-status", ProgressStatus.IN_PROGRESS);
+
             Server().log(`[GCP] Creating project, "${this.projectName}"...`);
             const project = await this.createGoogleCloudProject();
             const projectId = project.projectId;
@@ -109,7 +112,7 @@ export class OauthService {
             await this.createAndroidApp(projectId);
             Server().log(`[GCP] Created Android Configuration!`);
 
-            Server().log(`[GCP] Generating Client & Server JSON...`);
+            Server().log(`[GCP] Generating Client & Server JSON (this may take some time)...`);
             const serviceAccountJson = await this.getServiceAccount(projectId);
             const servicesJson = await this.getGoogleServicesJson(projectId);
             Server().log(`[GCP] Generated Client & Server JSON!`);
@@ -124,6 +127,7 @@ export class OauthService {
                 `You may now continue with setup.`
             ));
             this.completed = true;
+            Server().emitToUI("oauth-status", ProgressStatus.COMPLETED);
 
             // Shutdown the service
             await this.stop();
@@ -134,6 +138,7 @@ export class OauthService {
             }
             // eslint-disable-next-line max-len
             Server().log(`[GCP] Use the Google Login button and try again. If the issue persists, please contact support.`, 'debug');
+            Server().emitToUI("oauth-status", ProgressStatus.FAILED);
         }
     }
 

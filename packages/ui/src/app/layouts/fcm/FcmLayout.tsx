@@ -1,3 +1,4 @@
+import { ipcRenderer } from 'electron';
 import React, { useRef, useState, useEffect } from 'react';
 import {
     Box,
@@ -26,7 +27,8 @@ import {
     TabList,
     TabPanels,
     TabPanel,
-    Image
+    Image,
+    Spinner
 } from '@chakra-ui/react';
 import { BsChevronDown, BsCheckAll } from 'react-icons/bs';
 import { FiTrash } from 'react-icons/fi';
@@ -40,6 +42,7 @@ import { hasKey, readFile } from '../../utils/GenericUtils';
 import { getOauthUrl, restartOauthService } from '../../utils/IpcUtils';
 import { clearFcmConfiguration, saveFcmClient, saveFcmServer } from '../../actions/FcmActions';
 import { setConfig } from '../../slices/ConfigSlice';
+import { ProgressStatus } from '../../types';
 import { AiOutlineInfoCircle } from 'react-icons/ai';
 import { RiErrorWarningLine } from 'react-icons/ri';
 import { baseTheme } from '../../../theme';
@@ -73,6 +76,7 @@ export const FcmLayout = (): JSX.Element => {
     const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
     const [isDragging, setDragging] = useBoolean();
     let logs = useAppSelector(state => state.logStore.logs);
+    const [authStatus, setAuthStatus] = useState((serverLoaded && clientLoaded) ? ProgressStatus.COMPLETED : ProgressStatus.NOT_STARTED);
     const [oauthUrl, setOauthUrl] = useState('');
     const [errors, setErrors] = useState([] as Array<ErrorItem>);
     const [requiresConfirmation, setRequiresConfirmation] = useState(null as string | null);
@@ -83,6 +87,10 @@ export const FcmLayout = (): JSX.Element => {
     }, []);
 
     logs = logs.filter(log => log.message.startsWith('[GCP]'));
+
+    ipcRenderer.on('oauth-status', (_: any, data: ProgressStatus) => {
+        setAuthStatus(data);
+    });
 
     const onDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -162,6 +170,16 @@ export const FcmLayout = (): JSX.Element => {
         setRequiresConfirmation(confirmationType);
     };
 
+    const getOauthIcon = () => {
+        if (authStatus === ProgressStatus.IN_PROGRESS) {
+            return <Spinner size='md' speed='0.65s' />;
+        } else if (authStatus === ProgressStatus.COMPLETED) {
+            return <BsCheckAll size={24} color='green' />;
+        }
+
+        return <RiErrorWarningLine size={24} />;
+    };
+
     return (
         <Box
             p={8}
@@ -203,15 +221,9 @@ export const FcmLayout = (): JSX.Element => {
                                 >
                                     Continue with Google
                                 </Button>
-                                {(clientLoaded && serverLoaded) ? (
-                                    <Box pt={3}>
-                                        <BsCheckAll size={24} color='green' />
-                                    </Box>
-                                ) : (
-                                    <Box pt={3}>
-                                        <RiErrorWarningLine size={24} />
-                                    </Box>
-                                )}
+                                <Box pt={3} pl={2}>
+                                    {getOauthIcon()}
+                                </Box>
                             </Stack>
                         </Link>
                         <Box mt={3} />

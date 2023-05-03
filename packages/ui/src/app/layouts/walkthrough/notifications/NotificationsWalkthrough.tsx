@@ -1,3 +1,4 @@
+import { ipcRenderer } from 'electron';
 import React, { useRef, useState, useEffect } from 'react';
 import {
     Box,
@@ -15,18 +16,22 @@ import {
     TabList,
     TabPanels,
     TabPanel,
-    Image
+    Image,
+    Spinner
 } from '@chakra-ui/react';
 import { LogsTable } from '../../../components/tables/LogsTable';
 import { DropZone } from '../../../components/DropZone';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { ErrorDialog, ErrorItem } from '../../../components/modals/ErrorDialog';
+import { BsCheckAll } from 'react-icons/bs';
+import { RiErrorWarningLine } from 'react-icons/ri';
 import { readFile } from '../../../utils/GenericUtils';
 import { getOauthUrl } from '../../../utils/IpcUtils';
 import { isValidClientConfig, isValidFirebaseUrl, isValidServerConfig } from '../../../utils/FcmUtils';
 import { saveFcmClient, saveFcmServer } from '../../../actions/FcmActions';
 import { setConfig } from '../../../slices/ConfigSlice';
 import GoogleIcon from '../../../../images/walkthrough/google-icon.png';
+import { ProgressStatus } from 'app/types';
 
 
 let dragCounter = 0;
@@ -38,6 +43,7 @@ export const NotificationsWalkthrough = (): JSX.Element => {
     const serverLoaded = (useAppSelector(state => state.config.fcm_server !== null) ?? false);
     const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
     const [isDragging, setDragging] = useBoolean();
+    const [authStatus, setAuthStatus] = useState(ProgressStatus.NOT_STARTED);
     let logs = useAppSelector(state => state.logStore.logs);
     const [oauthUrl, setOauthUrl] = useState('');
     const [errors, setErrors] = useState([] as Array<ErrorItem>);
@@ -48,6 +54,10 @@ export const NotificationsWalkthrough = (): JSX.Element => {
     }, []);
 
     logs = logs.filter(log => log.message.startsWith('[GCP]'));
+
+    ipcRenderer.on('oauth-status', (_: any, data: ProgressStatus) => {
+        setAuthStatus(data);
+    });
 
     const onDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -123,6 +133,18 @@ export const NotificationsWalkthrough = (): JSX.Element => {
         setErrors([]);
     };
 
+    const getOauthIcon = () => {
+        if (authStatus === ProgressStatus.IN_PROGRESS) {
+            return <Spinner size='md' speed='0.65s' />;
+        } else if (authStatus === ProgressStatus.COMPLETED) {
+            return <BsCheckAll size={24} color='green' />;
+        } else if (authStatus === ProgressStatus.FAILED) {
+            return <RiErrorWarningLine size={24} />;
+        }
+
+        return null;
+    };
+
     return (
         <SlideFade in={true} offsetY='150px'>
             <Box
@@ -160,9 +182,20 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                                 target="_blank"
                                 _hover={{ textDecoration: 'none' }}
                             >
-                                <Button pl={10} pr={10} mt={3} leftIcon={<Image src={GoogleIcon} mr={1} width={5} />} variant='outline'>
-                                    Continue with Google
-                                </Button>
+                                <Stack direction='row' alignItems='center'>
+                                    <Button
+                                        pl={10}
+                                        pr={10}
+                                        mt={3}
+                                        leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
+                                        variant='outline'
+                                    >
+                                        Continue with Google
+                                    </Button>
+                                    <Box pt={3} pl={2}>
+                                        {getOauthIcon()}
+                                    </Box>
+                                </Stack>
                             </Link>
                             <Box mt={3} />
                             <LogsTable logs={logs} caption={'Once authenticated, you can monitor the project setup process via these logs.'} />

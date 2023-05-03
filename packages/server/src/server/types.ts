@@ -120,3 +120,9 @@ export type AttachmentResponse = {
 
 export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";
 export type ValidRemoveTapback = "-love" | "-like" | "-dislike" | "-laugh" | "-emphasize" | "-question";
+export enum ProgressStatus {
+    NOT_STARTED = 'NOT_STARTED',
+    IN_PROGRESS = 'IN_PROGRESS',
+    COMPLETED = 'COMPLETED',
+    FAILED = 'FAILED',
+};
