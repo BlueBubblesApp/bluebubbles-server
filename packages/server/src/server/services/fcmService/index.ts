@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
+import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 
 const AppName = "BlueBubbles";
 
@@ -64,6 +65,8 @@ export class FCMService {
 
         if (this.dbType === DbType.REALTIME) {
             await this.setRealtimeRules();
+        } else if (this.dbType === DbType.FIRESTORE) {
+            await this.setFirestoreRules();
         }
 
         this.listen();
@@ -77,6 +80,42 @@ export class FCMService {
         }
 
         return true;
+    }
+
+    async setFirestoreRules() {
+        const source: RulesFile = {
+            name: "firestore.rules",
+            content: (
+                "rules_version = '2';\n" +
+                "service cloud.firestore {\n" +
+                "  match /databases/{database}/documents {\n" +
+                "    match /server/config {\n" +
+                "      allow read;\n" +
+                "    }\n" +
+                "\n" +
+                "    match /server/commands {\n" +
+                "      allow write;\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+            )
+        };
+
+        const rules = admin.app(AppName).securityRules();
+        let shouldRefresh = true;
+        
+        try {
+            // Get the current ruleset and only set the rules if they are different
+            const currentRuleset = await rules.getFirestoreRuleset();
+            const firestoreRules = currentRuleset?.source?.find((rule) => rule.name === source.name);
+            if (firestoreRules?.content === source.content) shouldRefresh = false;
+        } catch (ex: any) {
+            // Do nothing
+        }
+
+        if (!shouldRefresh) return;
+        const ruleset = await rules.createRuleset(source);
+        await rules.releaseFirestoreRuleset(ruleset.name);
     }
 
     async setRealtimeRules() {
