@@ -516,8 +516,15 @@ class BlueBubblesServer extends EventEmitter {
 
         // Only start the oauth service if the tutorial isn't done
         const tutorialDone = this.repo.getConfig("tutorial_is_done") as boolean;
+        const oauthToken = this.args['oauth-token'];
         this.oauthService.initialize();
-        if (!tutorialDone) {
+
+        // If the user passed an oauth token, use that to setup the project
+        if (isNotEmpty(oauthToken)) {
+            this.oauthService.authToken = oauthToken;
+            await this.oauthService.handleProjectCreation();
+        } else if (!tutorialDone) {
+            // if there isn't a token, and the tutorial isn't done, start the oauth service
             this.oauthService.start();
         }
 
