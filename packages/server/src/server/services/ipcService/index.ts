@@ -12,6 +12,7 @@ import { BlueBubblesHelperService } from "../privateApi";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
 import { ScheduledMessagesInterface } from "@server/api/v1/interfaces/scheduledMessagesInterface";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
+import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 
 export class IPCService {
     /**
@@ -55,7 +56,9 @@ export class IPCService {
 
         ipcMain.handle("get-config", async (_, __) => {
             if (!Server().repo.db) return {};
-            return Server().repo?.config;
+            const cfg = Server().repo?.config;
+            const serverInfo = await GeneralInterface.getServerMetadata();
+            return { ...cfg, ...serverInfo };
         });
 
         ipcMain.handle("get-alerts", async (_, __) => {
