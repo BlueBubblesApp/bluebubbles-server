@@ -20,6 +20,7 @@ import { VscDebugRestart } from 'react-icons/vsc';
 import { AiOutlineClear, AiOutlineInfoCircle } from 'react-icons/ai';
 import { GoFileSubmodule } from 'react-icons/go';
 import { FiExternalLink, FiCopy } from 'react-icons/fi';
+import { store } from '../../store';
 import { LogsTable } from '../../components/tables/LogsTable';
 import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
@@ -153,7 +154,7 @@ export const LogsLayout = (): JSX.Element => {
                                 <MenuItem icon={<FiCopy />} onClick={() => copyBinaryPath()}>
                                     Copy Binary Path
                                 </MenuItem>
-                                <MenuItem icon={<AiOutlineClear />} onClick={() => clearLogs()}>
+                                <MenuItem icon={<AiOutlineClear />} onClick={() => store.dispatch(clearLogs())}>
                                     Clear Logs
                                 </MenuItem>
                             </MenuList>

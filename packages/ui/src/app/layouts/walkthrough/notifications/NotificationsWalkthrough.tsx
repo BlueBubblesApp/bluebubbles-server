@@ -19,6 +19,8 @@ import {
     Image,
     Spinner
 } from '@chakra-ui/react';
+import { store } from '../../../store';
+import { filter as filterLogs } from '../../../slices/LogsSlice';
 import { LogsTable } from '../../../components/tables/LogsTable';
 import { DropZone } from '../../../components/DropZone';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
@@ -50,6 +52,7 @@ export const NotificationsWalkthrough = (): JSX.Element => {
     const alertOpen = errors.length > 0;
 
     useEffect(() => {
+        ipcRenderer.removeAllListeners('oauth-status');
         getOauthUrl().then(url => setOauthUrl(url));
     }, []);
 
@@ -189,6 +192,7 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                                         mt={3}
                                         leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
                                         variant='outline'
+                                        onClick={() => store.dispatch(filterLogs((item) => !item.message.startsWith('[GCP]')))}
                                     >
                                         Continue with Google
                                     </Button>

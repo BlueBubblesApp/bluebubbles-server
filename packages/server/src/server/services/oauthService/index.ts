@@ -309,7 +309,7 @@ export class OauthService {
         }
 
         if (removed > 0) {
-            Server().log(`[GCP] Removed ${removed} existing ServiceAccount keys`);
+            Server().log(`[GCP] Removed ${removed} existing ServiceAccount key(s)`);
             await waitMs(5000);  // Wait 5 seconds for the keys to be removed
             Server().log(`[GCP] Creating new Service Account key...`);
         }

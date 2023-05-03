@@ -33,6 +33,8 @@ import {
 import { BsChevronDown, BsCheckAll } from 'react-icons/bs';
 import { FiTrash } from 'react-icons/fi';
 
+import { store } from '../../store';
+import { filter as filterLogs } from '../../slices/LogsSlice';
 import { DropZone } from '../../components/DropZone';
 import { LogsTable } from '../../components/tables/LogsTable';
 import { isValidServerConfig, isValidClientConfig, isValidFirebaseUrl } from '../../utils/FcmUtils';
@@ -83,6 +85,7 @@ export const FcmLayout = (): JSX.Element => {
     const alertOpen = errors.length > 0;
 
     useEffect(() => {
+        ipcRenderer.removeAllListeners('oauth-status');
         getOauthUrl().then(url => setOauthUrl(url));
     }, []);
 
@@ -217,7 +220,10 @@ export const FcmLayout = (): JSX.Element => {
                                     mt={3}
                                     leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
                                     variant='outline'
-                                    onClick={() => restartOauthService()}
+                                    onClick={() => {
+                                        store.dispatch(filterLogs((item) => !item.message.startsWith('[GCP]')));
+                                        restartOauthService();
+                                    }}
                                 >
                                     Continue with Google
                                 </Button>
