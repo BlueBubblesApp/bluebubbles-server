@@ -1184,7 +1184,7 @@ class BlueBubblesServer extends EventEmitter {
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [
             {
-                name: "Accessibility",
+                name: "Accessibility (Optional)",
                 pass: systemPreferences.isTrustedAccessibilityClient(false),
                 solution: "Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles"
             },
