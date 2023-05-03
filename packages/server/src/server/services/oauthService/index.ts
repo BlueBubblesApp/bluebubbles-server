@@ -94,28 +94,24 @@ export class OauthService {
             const project = await this.createGoogleCloudProject();
             const projectId = project.projectId;
             const projectNumber = project.projectNumber;
-            Server().log(`[GCP] Project created!`);
 
             Server().log(`[GCP] Enabling Firestore...`);
             await this.enableFirestoreApi(projectNumber);
-            Server().log(`[GCP] Firestore enabled!`);
 
             Server().log(`[GCP] Adding Firebase...`);
             await this.addFirebase(projectId);
-            Server().log(`[GCP] Added Firebase!`);
 
             Server().log(`[GCP] Creating Firestore...`);
             await this.createDatabase(projectId);
-            Server().log(`[GCP] Created Firestore!`);
 
             Server().log(`[GCP] Creating Android Configuration...`);
             await this.createAndroidApp(projectId);
-            Server().log(`[GCP] Created Android Configuration!`);
 
-            Server().log(`[GCP] Generating Client & Server JSON (this may take some time)...`);
+            Server().log(`[GCP] Generating Service Account JSON (this may take some time)...`);
             const serviceAccountJson = await this.getServiceAccount(projectId);
+
+            Server().log(`[GCP] Generating Google Services JSON (this may take some time)...`);
             const servicesJson = await this.getGoogleServicesJson(projectId);
-            Server().log(`[GCP] Generated Client & Server JSON!`);
 
             // Save the configurations
             FileSystem.saveFCMServer(serviceAccountJson);
@@ -133,6 +129,7 @@ export class OauthService {
             await this.stop();
         } catch (ex: any) {
             Server().log(`[GCP] Failed to create project: ${ex?.message}`, "error");
+            console.log(ex.response.data);
             if (ex?.response?.data?.error) {
                 Server().log(`[GCP] (${ex.response.data.error.code}) ${ex.response.data.error.message}`, "debug");
             }
@@ -298,6 +295,25 @@ export class OauthService {
     
         // eslint-disable-next-line max-len
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${accountId}/keys`;
+
+        // Get the existing keys, deleting all the user managed keys
+        const getRes = await this.sendRequest('GET', url);
+        const existingKeys = getRes.data.keys ?? [];
+        const userManagedKeys = existingKeys.filter((key: any) => key.keyType === 'USER_MANAGED');
+
+        let removed = 0;
+        for (const key of userManagedKeys) {
+            const deleteUrl = `https://iam.googleapis.com/v1/${key.name}`;
+            await this.sendRequest('DELETE', deleteUrl);
+            removed += 1;
+        }
+
+        if (removed > 0) {
+            Server().log(`[GCP] Removed ${removed} existing ServiceAccount keys`);
+            await waitMs(5000);  // Wait 5 seconds for the keys to be removed
+            Server().log(`[GCP] Creating new Service Account key...`);
+        }
+
         const response = await this.sendRequest('POST', url);
         const b64Key = response.data.privateKeyData;
         const privateKeyData = Buffer.from((b64Key), 'base64').toString('utf-8');
@@ -390,7 +406,7 @@ export class OauthService {
      * @param data The data to send (optional)
      * @returns The response object
      */
-    async sendRequest(method: 'GET' | 'POST', url: string, data: Record<string, any> = null) {
+    async sendRequest(method: 'GET' | 'POST' | 'DELETE', url: string, data: Record<string, any> = null) {
         if (!this.authToken) throw new Error("Missing auth token");
 
         const headers: Record<string, string> = {
@@ -398,7 +414,7 @@ export class OauthService {
             Accept: 'application/json'
         };
 
-        if (method === 'POST' && data) {
+        if (['POST', 'DELETE'].includes(method) && data) {
             headers['Content-Type'] = 'application/json'
         }
 
