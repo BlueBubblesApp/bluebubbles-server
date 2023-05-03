@@ -219,14 +219,14 @@ export const FcmLayout = (): JSX.Element => {
                     </TabPanel>
                     <TabPanel>
                         <Text fontSize='md'>
-                            The manual setup with Google FCM is a bit tedious, but it is a "set it and forget it" feature.
-                            You may also want to do a manual setup if you have multiple iMessage accounts and want to use
-                            the same Google account for notifications. Follow the
+                            The manual setup with Google FCM is optional and can allow for a more flexible setup for complex deployments.
+                            For instance, you may want to do a manual setup if you have multiple iMessage accounts and want to use
+                            the same Google account for notifications. Follow the step by step
                             instructions here: <Link
                                 as='span'
-                                href='https://bluebubbles.app/install/'
+                                href='https://docs.bluebubbles.app/server/installation-guides/manual-setup'
                                 color='brand.primary'
-                                target='_blank'>https://bluebubbles.app/install</Link>
+                                target='_blank'>Manual Setup Docs</Link>
                         </Text>
                         <Stack direction='column' pt={2} pb={5}>
                             <Text fontSize='2xl'>Firebase Links</Text>
