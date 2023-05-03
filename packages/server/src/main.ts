@@ -26,7 +26,6 @@ if (fs.existsSync(FileSystem.cfgFile)) {
 // Parse the CLI args and marge with config args
 const args = ParseArguments(process.argv);
 const parsedArgs: Record<string, any> = { ...cfg, ...args };
-const noGui = parsedArgs["headless"] || false;
 
 let win: BrowserWindow;
 let oauthWindow: BrowserWindow = null;
@@ -78,6 +77,7 @@ const handleExit = async (event: any = null, { exit = true } = {}) => {
 };
 
 const buildTray = () => {
+    const headless = (Server().repo?.getConfig("headless") as boolean) ?? false;
     let updateOpt: any = {
         label: "Check for Updates",
         type: "normal",
@@ -117,17 +117,25 @@ const buildTray = () => {
         },
         updateOpt,
         {
+            // The checkmark will cover when this is enabled
+            label: `Headless Mode${headless ? '' : ' (Disabled)'}`,
+            type: "checkbox",
+            checked: headless,
+            click: async () => {
+                const toggled = !headless;
+                await Server().repo.setConfig("headless", toggled);
+                if (!toggled) {
+                    createWindow();
+                } else if (toggled && win) {
+                    win.destroy();
+                }
+            }
+        },
+        {
             label: "Restart",
             type: "normal",
             click: () => {
                 Server().relaunch();
-            }
-        },
-        {
-            label: `Restart ${noGui ? '(with GUI)' : '(Headless)'}`,
-            type: "normal",
-            click: () => {
-                Server().relaunch({ headless: !noGui });
             }
         },
         {
@@ -214,8 +222,9 @@ const createOauthWindow = async (url: string) => {
 };
 
 const createWindow = async () => {
-    if (noGui) {
-        Server().log("GUI disabled, skipping window creation...");
+    const headless = (Server().repo?.getConfig("headless") as boolean) ?? false;
+    if (headless) {
+        Server().log("Headless mode enabled, skipping window creation...");
         return;
     }
 
@@ -307,17 +316,19 @@ Server().on('update-available', (_) => {
     createTray();
 });
 
-app.on("ready", () => {
-    createTray();
+Server().on('ready', () => {
     createWindow();
+    createTray();
+});
 
+app.on("ready", () => {
     nativeTheme.on("updated", () => {
         createTray();
     });
 });
 
 app.on("activate", () => {
-    if (win == null) createWindow();
+    if (win == null && Server().repo) createWindow();
 });
 
 app.on("window-all-closed", () => {

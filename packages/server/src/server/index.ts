@@ -369,6 +369,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Initialize and connect to the server database
         await this.initDatabase();
+        this.emit('ready');
 
         // Load settings from args
         this.loadSettingsFromArgs();
@@ -1627,6 +1628,18 @@ class BlueBubblesServer extends EventEmitter {
             args = [...args, "--headless"];
         } else if (headless === false && args.includes('--headless')) {
             args = args.filter(i => i !== "--headless");
+        }
+
+        // Remove the oauth-token flag & value if it exists.
+        // We don't need to recreate the firebase project, and it's probably expired.
+        const oauthIndex = args.findIndex(i => i === "--oauth-token");
+        if (oauthIndex !== -1) {
+            // Remove the next arg if it's not a flag
+            if (args[oauthIndex + 1] && !args[oauthIndex + 1].startsWith("--")) {
+                args.splice(oauthIndex, 2);
+            } else {
+                args.splice(oauthIndex, 1);
+            }
         }
 
         // Relaunch the app

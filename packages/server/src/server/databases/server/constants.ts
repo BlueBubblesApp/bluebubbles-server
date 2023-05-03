@@ -24,5 +24,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     db_poll_interval: () => 1000,
     dock_badge: () => 1,
     facetime_detection: () => 0,
-    start_minimized: () => 0
+    start_minimized: () => 0,
+    headless: () => 0,
 };
