@@ -16,7 +16,7 @@ export const PrivateApiWalkthrough = (): JSX.Element => {
     return (
         <SlideFade in={true} offsetY='150px'>
             <Box px={5}>
-                <Text fontSize='4xl'>Private API Setup (Advanced)</Text>
+                <Text fontSize='4xl'>Private API Setup (Advanced | Optional)</Text>
                 <Text fontSize='md' mt={5}>
                     You may already know this, but BlueBubbles is one of the only cross-platform iMessage solution that
                     supports sending reactions, replies, subjects, and effects. This is because we developed an Objective-C
