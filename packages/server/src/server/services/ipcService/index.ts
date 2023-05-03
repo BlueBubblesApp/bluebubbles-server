@@ -278,6 +278,13 @@ export class IPCService {
             return await Server().checkPermissions();
         });
 
+        ipcMain.handle("get-current-permissions", async (_, __) => {
+            return {
+                accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+                full_disk_access: Server().hasDiskAccess,
+            }
+        });
+
         ipcMain.handle("prompt_accessibility", async (_, __) => {
             return {
                 abPerms: systemPreferences.isTrustedAccessibilityClient(true) ? "authorized" : "denied"
