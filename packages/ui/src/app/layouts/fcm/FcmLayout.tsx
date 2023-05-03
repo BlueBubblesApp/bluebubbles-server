@@ -1,6 +1,8 @@
 import { ipcRenderer } from 'electron';
 import React, { useRef, useState, useEffect } from 'react';
 import {
+    Alert,
+    AlertIcon,
     Box,
     Divider,
     Flex,
@@ -183,6 +185,25 @@ export const FcmLayout = (): JSX.Element => {
         return <RiErrorWarningLine size={24} />;
     };
 
+    const getAlertStatus = () => {
+        if (clientLoaded && serverLoaded) {
+            return (
+                <Alert status='success'>
+                    <AlertIcon />
+                    Google Firebase notifications are configured!
+                </Alert>
+            );
+        } else {
+            return (
+                <Alert status='warning'>
+                    <AlertIcon />
+                    Google Firebase is not configured! Failing to configure Firebase Notifications will
+                    prevent notifications from being delivered to your Android device.
+                </Alert>
+            );
+        }
+    };
+
     return (
         <Box
             p={8}
@@ -196,8 +217,10 @@ export const FcmLayout = (): JSX.Element => {
             <Divider orientation='horizontal' />
             <Text fontSize='md' mt={5} mb={5}>
                 BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications to your devices.
+                <b>This is only required for Android Notifications</b>
             </Text>
-            <Tabs>
+            {getAlertStatus()}
+            <Tabs mt={2}>
                 <TabList>
                     <Tab>Google Login</Tab>
                     <Tab>Manual Setup</Tab>
@@ -206,7 +229,8 @@ export const FcmLayout = (): JSX.Element => {
                     <TabPanel>
                         <Text fontSize='md'>
                             Using the button below, you can authorize BlueBubbles to manage your Google Cloud Platform account temporarily.
-                            This will allow BlueBubbles to automatically create your Firebase project and setup the necessary configurations.
+                            This will allow BlueBubbles to automatically create your Firebase project and setup the necessary configurations
+                            so your Android device can receive notifications.
                         </Text>
                         <Link
                             href={oauthUrl}

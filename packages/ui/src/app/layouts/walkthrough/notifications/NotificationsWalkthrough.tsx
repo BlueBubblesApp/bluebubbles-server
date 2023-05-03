@@ -159,7 +159,7 @@ export const NotificationsWalkthrough = (): JSX.Element => {
             >
                 <Text fontSize='4xl'>Notifications &amp; Firebase</Text>
                 <Text fontSize='md' mt={5}>
-                    BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications to your devices.
+                    BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications to your Android device.
                     We do this so the client do not need to hold a connection to the server at all times. As a result,
                     BlueBubbles can deliver notifications even when the app is running in the background. It also means
                     BlueBubbles will use less battery when running in the background.
@@ -178,7 +178,8 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                         <TabPanel>
                             <Text fontSize='md'>
                                 Using the button below, you can authorize BlueBubbles to manage your Google Cloud Platform account temporarily.
-                                This will allow BlueBubbles to automatically create your Firebase project and setup the necessary configurations.
+                                This will allow BlueBubbles to automatically create your Firebase project and setup the necessary configurations
+                                so your Android device can receive notifications.
                             </Text>
                             <Link
                                 href={oauthUrl}
