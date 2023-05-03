@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification, autoUpdater as nativeUpdater } from "electron";
 import { autoUpdater, UpdateCheckResult } from "electron-updater";
 import * as semver from "semver";
 import { Server } from "@server";
@@ -40,8 +40,7 @@ export class UpdateService {
         autoUpdater.on("update-downloaded", async (_) => {
             Server().log("Installing update...");
             await Server().emitMessage(SERVER_UPDATE_INSTALLING, null);
-            autoUpdater.autoInstallOnAppQuit = true;
-            Server().relaunch();
+            autoUpdater.quitAndInstall();
         });
 
         ipcMain.handle("install-update", async (_, __) => {
@@ -74,6 +73,7 @@ export class UpdateService {
         if (this.hasUpdate) {
             Server().emitMessage(SERVER_UPDATE, res.updateInfo.version);
             Server().emitToUI("update-available", res.updateInfo.version);
+            Server().emit("update-available", res.updateInfo.version)
 
             if (showUpdateDialog) {
                 const notification = {

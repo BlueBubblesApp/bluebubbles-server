@@ -9,6 +9,8 @@ import { ParseArguments } from "@server/helpers/argParser";
 
 import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
+import { autoUpdater } from "electron-updater";
+import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
 
 app.commandLine.appendSwitch("in-process-gpu");
 
@@ -76,6 +78,27 @@ const handleExit = async (event: any = null, { exit = true } = {}) => {
 };
 
 const buildTray = () => {
+    let updateOpt: any = {
+        label: "Check for Updates",
+        type: "normal",
+        click: async () => {
+            if (Server()) {
+                await Server().updater.checkForUpdate({ showNoUpdateDialog: true });
+            }
+        }
+    };
+
+    if (Server()?.updater?.hasUpdate ?? false) {
+        updateOpt = {
+            label: `Install Update (${Server().updater.updateInfo.updateInfo.version})`,
+            type: "normal",
+            click: async () => {
+                Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
+                await autoUpdater.downloadUpdate();
+            }
+        };
+    }
+
     return Menu.buildFromTemplate([
         {
             label: `BlueBubbles Server v${app.getVersion()}`,
@@ -92,15 +115,7 @@ const buildTray = () => {
                 }
             }
         },
-        {
-            label: "Check for Updates",
-            type: "normal",
-            click: async () => {
-                if (Server()) {
-                    await Server().updater.checkForUpdate({ showNoUpdateDialog: true });
-                }
-            }
-        },
+        updateOpt,
         {
             label: "Restart",
             type: "normal",
@@ -112,7 +127,7 @@ const buildTray = () => {
             label: `Restart ${noGui ? '(with GUI)' : '(Headless)'}`,
             type: "normal",
             click: () => {
-                Server().relaunch(!noGui);
+                Server().relaunch({ headless: !noGui });
             }
         },
         {
@@ -287,6 +302,10 @@ const createWindow = async () => {
     // Set the new window in the Server()
     Server(parsedArgs, win);
 };
+
+Server().on('update-available', (_) => {
+    createTray();
+});
 
 app.on("ready", () => {
     createTray();

@@ -1607,21 +1607,36 @@ class BlueBubblesServer extends EventEmitter {
         await this.startServices();
     }
 
-    async relaunch(headless = false) {
+    async relaunch({
+        headless = null,
+        exit = true,
+        quit = false
+    }: {
+        headless?: boolean | null;
+        exit?: boolean,
+        quit?: boolean
+    } = {}) {
         this.isRestarting = true;
 
         // Close everything gracefully
         await this.stopAll();
 
         // Relaunch the process
-        let args = ["--relaunch"];
-        if (headless && !process.argv.includes('--headless')) {
+        let args = process.argv.slice(1).concat(['--relaunch']);
+        if (headless === true && !args.includes('--headless')) {
             args = [...args, "--headless"];
+        } else if (headless === false && args.includes('--headless')) {
+            args = args.filter(i => i !== "--headless");
         }
 
         // Relaunch the app
-        app.relaunch({ args: process.argv.slice(1).concat(args) });
-        app.exit(0);
+        app.relaunch({ args });
+
+        if (quit) {
+            app.quit();
+        } else if (exit) {
+            app.exit(0);
+        }
     }
 
     async stopAll() {
