@@ -149,3 +149,7 @@ export const getOauthUrl = async () => {
 export const restartOauthService = async () => {
     return await ipcRenderer.invoke('restart-oauth-service');
 };
+
+export const getCurrentPermissions = async () => {
+    return await ipcRenderer.invoke('get-current-permissions');
+};
