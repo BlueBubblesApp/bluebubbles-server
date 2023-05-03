@@ -40,7 +40,8 @@ export class UpdateService {
         autoUpdater.on("update-downloaded", async (_) => {
             Server().log("Installing update...");
             await Server().emitMessage(SERVER_UPDATE_INSTALLING, null);
-            autoUpdater.quitAndInstall(false, true);
+            autoUpdater.autoInstallOnAppQuit = true;
+            Server().relaunch();
         });
 
         ipcMain.handle("install-update", async (_, __) => {

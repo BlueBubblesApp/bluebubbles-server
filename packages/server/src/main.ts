@@ -24,7 +24,7 @@ if (fs.existsSync(FileSystem.cfgFile)) {
 // Parse the CLI args and marge with config args
 const args = ParseArguments(process.argv);
 const parsedArgs: Record<string, any> = { ...cfg, ...args };
-const noGui = parsedArgs["no-gui"] || false;
+const noGui = parsedArgs["headless"] || false;
 
 let win: BrowserWindow;
 let oauthWindow: BrowserWindow = null;
@@ -106,6 +106,13 @@ const buildTray = () => {
             type: "normal",
             click: () => {
                 Server().relaunch();
+            }
+        },
+        {
+            label: `Restart ${noGui ? '(with GUI)' : '(Headless)'}`,
+            type: "normal",
+            click: () => {
+                Server().relaunch(!noGui);
             }
         },
         {
