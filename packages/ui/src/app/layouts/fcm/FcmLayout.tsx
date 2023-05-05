@@ -190,14 +190,14 @@ export const FcmLayout = (): JSX.Element => {
             return (
                 <Alert status='success'>
                     <AlertIcon />
-                    Google Firebase notifications are configured!
+                    Firebase notifications are configured!
                 </Alert>
             );
         } else {
             return (
                 <Alert status='warning'>
                     <AlertIcon />
-                    Google Firebase is not configured! Failing to configure Firebase Notifications will
+                    Firebase is not configured! Failing to configure Firebase Notifications will
                     prevent notifications from being delivered to your Android device.
                 </Alert>
             );
