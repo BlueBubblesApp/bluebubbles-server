@@ -118,6 +118,7 @@
         "slugify": "^1.6.0",
         "socket.io": "3.1.2",
         "typeorm": "0.3.6",
+        "typescript": "^5.0.4",
         "validatorjs": "^3.22.1",
         "vcf": "^2.1.1",
         "zx": "^4.3.0"
