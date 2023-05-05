@@ -369,13 +369,15 @@ class BlueBubblesServer extends EventEmitter {
 
         // Initialize and connect to the server database
         await this.initDatabase();
-        this.emit('ready');
 
         // Load settings from args
         this.loadSettingsFromArgs();
 
         this.log("Starting IPC Listeners..");
         IPCService.startIpcListeners();
+
+        // Let listeners know the server is ready
+        this.emit('ready');
 
         // Do some pre-flight checks
         // Make sure settings are correct and all things are a go
@@ -1608,6 +1610,48 @@ class BlueBubblesServer extends EventEmitter {
         await this.startServices();
     }
 
+    buildRelaunchArgs() {
+        // Relaunch the process
+        const args = process.argv.slice(1);
+
+        const removeArg = (name: string) => {
+            const oauthIndex = args.findIndex(i => i === `--${name}`);
+            if (oauthIndex !== -1) {
+                // Remove the next arg if it's not a flag
+                if (args[oauthIndex + 1] && !args[oauthIndex + 1].startsWith("--")) {
+                    args.splice(oauthIndex, 2);
+                } else {
+                    args.splice(oauthIndex, 1);
+                }
+            }
+        };
+
+        // If we are persisting configs, remove any flags that are stored in the DB
+        const persist = this.args['persist-config'] ?? true;
+        if (persist) {
+            const configKeys = Object.keys(Server().repo.config);
+            for (const key of configKeys) {
+                // Add the underscored or dashed version of the option.
+                const keyOpts = [key];
+                if (key.includes("_")) {
+                    keyOpts.push(key.replace(/_/g, "-"));
+                } else if (key.includes("-")) {
+                    keyOpts.push(key.replace(/-/g, "_"));
+                }
+
+                for (const opt of keyOpts) {
+                    removeArg(opt);
+                }
+            }
+        }
+
+
+        // Remove the oauth-token flag & value if it exists.
+        removeArg("oauth-token");
+
+        return args;
+    }
+
     async relaunch({
         headless = null,
         exit = true,
@@ -1623,24 +1667,8 @@ class BlueBubblesServer extends EventEmitter {
         await this.stopAll();
 
         // Relaunch the process
-        let args = process.argv.slice(1).concat(['--relaunch']);
-        if (headless === true && !args.includes('--headless')) {
-            args = [...args, "--headless"];
-        } else if (headless === false && args.includes('--headless')) {
-            args = args.filter(i => i !== "--headless");
-        }
-
-        // Remove the oauth-token flag & value if it exists.
-        // We don't need to recreate the firebase project, and it's probably expired.
-        const oauthIndex = args.findIndex(i => i === "--oauth-token");
-        if (oauthIndex !== -1) {
-            // Remove the next arg if it's not a flag
-            if (args[oauthIndex + 1] && !args[oauthIndex + 1].startsWith("--")) {
-                args.splice(oauthIndex, 2);
-            } else {
-                args.splice(oauthIndex, 1);
-            }
-        }
+        let args = this.buildRelaunchArgs();
+        args = args.concat(["--relaunch"]);
 
         // Relaunch the app
         app.relaunch({ args });
@@ -1663,8 +1691,11 @@ class BlueBubblesServer extends EventEmitter {
         // Close everything gracefully
         await this.stopAll();
 
+        let relaunchArgs = this.buildRelaunchArgs();
+        relaunchArgs = [process.execPath, ...relaunchArgs];
+
         // Kick off the restart script
-        FileSystem.executeAppleScript(runTerminalScript(process.execPath));
+        FileSystem.executeAppleScript(runTerminalScript(relaunchArgs.join(' ')));
 
         // Exit the current instance
         app.exit(0);
