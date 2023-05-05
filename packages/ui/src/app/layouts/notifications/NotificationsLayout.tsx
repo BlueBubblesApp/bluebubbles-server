@@ -56,7 +56,7 @@ import GoogleIcon from '../../../images/walkthrough/google-icon.png';
 
 let dragCounter = 0;
 
-export const FcmLayout = (): JSX.Element => {
+export const NotificationsLayout = (): JSX.Element => {
     const dispatch = useAppDispatch();
     const alertRef = useRef(null);
     const confirmationActions: NodeJS.Dict<any> = {
@@ -213,10 +213,10 @@ export const FcmLayout = (): JSX.Element => {
             onDragOver={(e) => onDragOver(e)}
             onDrop={(e) => onDrop(e)}
         >
-            <Text fontSize='2xl'>Firebase Notifications</Text>
+            <Text fontSize='2xl'>Android Notifications</Text>
             <Divider orientation='horizontal' />
             <Text fontSize='md' mt={5} mb={5}>
-                BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications to your devices.
+                BlueBubbles utilizes Google Firebase to deliver notifications to your devices.
                 <b>This is only required for Android Notifications</b>
             </Text>
             {getAlertStatus()}

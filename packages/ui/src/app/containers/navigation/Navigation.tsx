@@ -32,10 +32,10 @@ import {
     Badge,
     Divider
 } from '@chakra-ui/react';
-import { FiHome, FiSettings, FiMenu, FiBell, FiMonitor, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
+import { FiHome, FiSettings, FiMenu, FiBell, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
 import { FaDiscord, FaGoogle } from 'react-icons/fa';
 import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart, AiOutlineDownload } from 'react-icons/ai';
-import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill } from 'react-icons/bs';
+import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill, BsPhone } from 'react-icons/bs';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
 import { IconType } from 'react-icons';
 import { ReactText } from 'react';
@@ -46,7 +46,7 @@ import { HomeLayout } from '../../layouts/home/HomeLayout';
 import { DevicesLayout } from '../../layouts/devices/DevicesLayout';
 import { LogsLayout } from '../../layouts/logs/LogsLayout';
 import { SettingsLayout } from '../../layouts/settings/SettingsLayout';
-import { FcmLayout } from '../../layouts/fcm/FcmLayout';
+import { NotificationsLayout } from '../../layouts/notifications/NotificationsLayout';
 import { ApiLayout } from '../../layouts/api/ApiLayout';
 import { GuidesLayout } from '../../layouts/guides/GuidesLayout';
 import logo from '../../../images/logo/icon-64.png';
@@ -79,12 +79,12 @@ interface LinkItemProps {
 }
 const LinkItems: Array<LinkItemProps> = [
     { name: 'Home', icon: FiHome, to: '/' },
-    { name: 'Devices', icon: FiMonitor, to: '/devices' },
     { name: 'Contacts', icon: BsPersonCircle, to: '/contacts' },
-    { name: 'Debug & Logs', icon: AiOutlineBug, to: '/logs' },
-    { name: 'Google FCM', icon: FaGoogle, to: '/fcm' },
+    { name: 'Android Devices', icon: BsPhone, to: '/devices' },
+    { name: 'Android Notifications', icon: FaGoogle, to: '/notifications' },
     { name: 'Scheduled Messages', icon: BsFillCalendarCheckFill, to: '/scheduled-messages' },
     { name: 'API & Webhooks', icon: AiOutlineApi, to: '/webhooks' },
+    { name: 'Debug & Logs', icon: AiOutlineBug, to: '/logs' },
     { name: 'Guides & Links', icon: BsBook, to: '/guides' },
     { name: 'Settings', icon: FiSettings, to: '/settings' }
 ];
@@ -130,7 +130,7 @@ export const Navigation = (): JSX.Element => {
                         <Route path="/settings" element={<SettingsLayout />} />
                         <Route path="/logs" element={<LogsLayout />} />
                         <Route path="/contacts" element={<ContactsLayout />} />
-                        <Route path="/fcm" element={<FcmLayout />} />
+                        <Route path="/notifications" element={<NotificationsLayout />} />
                         <Route path="/devices" element={<DevicesLayout />} />
                         <Route path="/scheduled-messages" element={<ScheduledMessagesLayout />} />
                         <Route path="/webhooks" element={<ApiLayout />} />
