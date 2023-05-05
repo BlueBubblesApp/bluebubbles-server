@@ -109,7 +109,7 @@ export const DevicesLayout = (): JSX.Element => {
             </Stack>
             <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
-                    <Text fontSize='2xl'>Devices</Text>
+                    <Text fontSize='2xl'>Android Devices</Text>
                     <Popover trigger='hover'>
                         <PopoverTrigger>
                             <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
