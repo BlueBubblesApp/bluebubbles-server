@@ -2,7 +2,7 @@ import { createStandaloneToast, ToastId } from '@chakra-ui/react';
 import { AnyAction } from '@reduxjs/toolkit';
 import { getRandomInt } from './GenericUtils';
 
-const toast = createStandaloneToast();
+const standaloneToast = createStandaloneToast();
 
 export type ToastStatus = 'info' | 'warning' | 'success' | 'error';
 
@@ -82,5 +82,5 @@ export const showToast = ({
     onCloseComplete
 }: ToastParams): void => {
     const finalId = `${id}-${String(getRandomInt(10000))}`;
-    toast({ id: finalId, title, description, status, duration, isClosable, onCloseComplete });
+    standaloneToast.toast({ id: finalId, title, description, status, duration, isClosable, onCloseComplete });
 };
