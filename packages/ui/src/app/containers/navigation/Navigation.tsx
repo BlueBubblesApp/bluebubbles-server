@@ -34,7 +34,7 @@ import {
 } from '@chakra-ui/react';
 import { FiHome, FiSettings, FiMenu, FiBell, FiMonitor, FiGithub, FiMessageCircle, FiTrash } from 'react-icons/fi';
 import { FaDiscord } from 'react-icons/fa';
-import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart } from 'react-icons/ai';
+import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart, AiOutlineDownload } from 'react-icons/ai';
 import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill } from 'react-icons/bs';
 import { BiNotification } from 'react-icons/bi';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
@@ -55,9 +55,23 @@ import { NotificationsTable } from '../../components/tables/NotificationsTable';
 import './styles.css';
 
 import { useAppSelector, useAppDispatch } from '../../hooks';
+import { installUpdate } from '../../utils/IpcUtils';
+import { showSuccessToast } from '../../utils/ToastUtils';
 import { readAll, clear as clearAlerts, NotificationItem } from '../../slices/NotificationsSlice';
 import { ScheduledMessagesLayout } from 'app/layouts/scheduledMessages/ScheduledMessagesLayout';
 
+
+const downloadAndInstallUpdate = async () => {
+    await installUpdate();
+    showSuccessToast({
+        id: 'update',
+        title: 'Update Downloading',
+        description: (
+            'Downloading & Installing update in the background. ' +
+            'The server will automatically restart when the update is complete.'
+        )
+    });
+};
 
 interface LinkItemProps {
     name: string;
@@ -235,6 +249,7 @@ interface MobileProps extends FlexProps {
 }
 const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileProps) => {
     const { colorMode, toggleColorMode } = useColorMode();
+    const updateAvailable: boolean = (useAppSelector(state => state.config.update_available) ?? false);
 
     return (
         <Flex
@@ -260,12 +275,23 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
             </Text>
 
             <HStack spacing={{ base: '0', md: '1' }}>
+                {(updateAvailable) ? (
+                    <Tooltip label="Install Update" aria-label="update-tip">
+                        <IconButton
+                            size="lg"
+                            variant="ghost"
+                            aria-label="update"
+                            icon={<AiOutlineDownload />}
+                            onClick={downloadAndInstallUpdate}
+                        />
+                    </Tooltip>
+                ): null}
                 <Tooltip label="Website Home" aria-label="website-tip">
                     <Link href="https://bluebubbles.app" style={{ textDecoration: 'none' }} target="_blank">
                         <IconButton size="lg" variant="ghost" aria-label="website" icon={<AiOutlineHome />} />
                     </Link>
                 </Tooltip>
-                <Tooltip label="BlueBubbles Web" aria-label="website-tip">
+                <Tooltip label="BlueBubbles Web" aria-label="web-tip">
                     <Link href="https://bluebubbles.app/web" style={{ textDecoration: 'none' }} target="_blank">
                         <IconButton size="lg" variant="ghost" aria-label="bluebubbles web" icon={<FiMessageCircle />} />
                     </Link>

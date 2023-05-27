@@ -6,6 +6,7 @@ import { isMinSierra, isMinHighSierra, isEmpty } from "@server/helpers/utils";
 import { conditional } from "conditional-decorator";
 import * as mime from "mime-types";
 import { FileSystem } from "@server/fileSystem";
+import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
 
 @Entity("attachment")
 export class Attachment {
@@ -59,8 +60,13 @@ export class Attachment {
     })
     isOutgoing: boolean;
 
-    @Column({ type: "blob", name: "user_info", nullable: true })
-    userInfo: Blob;
+    @Column({
+        type: "blob",
+        name: "user_info",
+        nullable: true,
+        transformer: AttributedBodyTransformer
+    })
+    userInfo: NodeJS.Dict<any>[] | null;
 
     @Column({ type: "text", name: "transfer_name", nullable: false })
     transferName: string;
@@ -94,10 +100,11 @@ export class Attachment {
         Column({
             type: "blob",
             name: "attribution_info",
-            nullable: true
+            nullable: true,
+            transformer: AttributedBodyTransformer
         })
     )
-    attributionInfo: Blob;
+    attributionInfo: NodeJS.Dict<any>[] | null;
 
     @conditional(
         isMinSierra,
@@ -120,9 +127,22 @@ export class Attachment {
     )
     originalGuid: string;
 
+    private getMimeTypeFromUserInfo(): string | null {
+        if (isEmpty(this.userInfo)) return null;
+        return this.userInfo[0]['mime-type'] ?? null;
+    }
+
+    getDimensions(): { height: number, width: number } | null {
+        if (isEmpty(this.attributionInfo)) return null;
+        const height = this.attributionInfo[0]?.pgensh;
+        const width = this.attributionInfo[0]?.pgensw;
+        if (!height || !width) return null;
+        return { height, width };
+    }
+
     getMimeType(): string {
         const fPath = FileSystem.getRealPath(this.filePath);
-        let mType = this.mimeType ?? mime.lookup(fPath);
+        let mType = this.mimeType ?? this.getMimeTypeFromUserInfo() ?? mime.lookup(fPath);
         if (!mType || isEmpty(mType as any)) mType = "application/octet-stream";
         return mType;
     }

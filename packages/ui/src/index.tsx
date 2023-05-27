@@ -144,6 +144,15 @@ ipcRenderer.on('refresh-alerts', (_: any, __: any) => {
     loadAlerts(true);
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ipcRenderer.on('update-available', (_: any, data: any) => {
+    store.dispatch(setConfig({
+        name: 'update_available',
+        value: true,
+        saveToDb: false
+    }));
+});
+
 ReactDOM.render(
     <React.StrictMode>
         <Provider store={store}>

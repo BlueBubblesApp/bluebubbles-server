@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import { autoUpdater, UpdateCheckResult } from "electron-updater";
 import * as semver from "semver";
 import { Server } from "@server";
-import { SERVER_UPDATE } from "@server/events";
+import { SERVER_UPDATE, SERVER_UPDATE_DOWNLOADING, SERVER_UPDATE_INSTALLING } from "@server/events";
 
 export class UpdateService {
     window: BrowserWindow;
@@ -37,15 +37,18 @@ export class UpdateService {
             autoUpdater.autoInstallOnAppQuit = false;
         }
 
-        autoUpdater.on("update-downloaded", info => {
+        autoUpdater.on("update-downloaded", async (_) => {
             Server().log("Installing update...");
+            await Server().emitMessage(SERVER_UPDATE_INSTALLING, null);
             autoUpdater.quitAndInstall(false, true);
         });
 
         ipcMain.handle("install-update", async (_, __) => {
             Server().log("Downloading update...");
-            await autoUpdater.downloadUpdate();
-            Server().log("Finished downloading update...");
+            await Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
+            autoUpdater.downloadUpdate().then(() => {
+                Server().log("Finished downloading update...");    
+            });
         });
     }
 

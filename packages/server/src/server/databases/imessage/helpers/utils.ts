@@ -109,6 +109,13 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
     } else if (attachment.mimeType.startsWith("image")) {
         metadata = await FileSystem.getImageMetadata(attachment.filePath);
 
+        // Try to get the dimentions from the attachment object iself (attribution info)
+        const dimensions = attachment.getDimensions();
+        if (dimensions) {
+            metadata.height = dimensions.height;
+            metadata.width = dimensions.width;
+        }
+
         try {
             // If we got no height/width data, let's try to fallback to other code to fetch it
             if (handledImageMimes.includes(attachment.mimeType) && (!metadata?.height || !metadata?.width)) {

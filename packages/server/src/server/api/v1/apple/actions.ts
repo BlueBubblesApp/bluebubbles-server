@@ -14,8 +14,7 @@ import {
     exportContacts,
     restartMessages,
     openChat,
-    sendMessageFallback,
-    sendAttachmentAccessibility
+    sendMessageFallback
 } from "@server/api/v1/apple/scripts";
 import { ValidRemoveTapback } from "../../../types";
 
@@ -30,6 +29,7 @@ import {
     safeTrim
 } from "../../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
+import { MessageInterface } from "../interfaces/messageInterface";
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -37,11 +37,11 @@ import { tapbackUIMap } from "./mappings";
  * variables
  */
 export class ActionHandler {
-    static sendMessageHandler = async (chatGuid: string, message: string, attachment: string) => {
+    static sendMessage = async (chatGuid: string, message: string, attachment: string, isAudioMessage = false) => {
         let messageScript: string;
 
         let theAttachment = attachment;
-        if (theAttachment !== null && theAttachment.endsWith(".mp3")) {
+        if (theAttachment !== null && theAttachment.endsWith(".mp3") && isAudioMessage) {
             try {
                 const newPath = `${theAttachment.substring(0, theAttachment.length - 4)}.caf`;
                 await FileSystem.convertMp3ToCaf(theAttachment, newPath);
@@ -108,89 +108,6 @@ export class ActionHandler {
 
             Server().log(msg, "warn");
             throw new Error(msg);
-        }
-    };
-
-    /**
-     * Sends a message by executing the sendMessage AppleScript
-     *
-     * @param chatGuid The GUID for the chat
-     * @param message The message to send
-     * @param attachmentName The name of the attachment to send (optional)
-     * @param attachment The bytes (buffer) for the attachment
-     *
-     * @returns The command line response
-     */
-    static sendMessage = async (
-        tempGuid: string,
-        chatGuid: string,
-        message: string,
-        attachmentGuid?: string,
-        attachmentName?: string,
-        attachment?: Uint8Array
-    ): Promise<void> => {
-        if (!chatGuid) throw new Error("No chat GUID provided");
-
-        // Add attachment, if present
-        if (attachment) {
-            FileSystem.saveAttachment(attachmentName, attachment);
-        }
-
-        Server().log(`Sending message "${message}" ${attachment ? "with attachment" : ""} to ${chatGuid}`, "debug");
-
-        // Make sure messages is open
-        await FileSystem.startMessages();
-
-        // We need offsets here due to iMessage's save times being a bit off for some reason
-        const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
-
-        // Create the awaiter
-        let messageAwaiter = null;
-        if (isNotEmpty(message)) {
-            messageAwaiter = new MessagePromise({
-                chatGuid,
-                text: message,
-                isAttachment: false,
-                sentAt: now,
-                tempGuid
-            });
-            Server().log(`Adding await for chat: "${chatGuid}"; text: ${messageAwaiter.text}`);
-            Server().messageManager.add(messageAwaiter);
-        }
-
-        // Since we convert mp3s to cafs, we need to modify the attachment name here too
-        // This is mainly just for the awaiter
-        let aName = attachmentName;
-        if (aName !== null && aName.endsWith(".mp3")) {
-            aName = `${aName.substring(0, aName.length - 4)}.caf`;
-        }
-
-        // Create the awaiter
-        let attachmentAwaiter = null;
-        if (attachment && isNotEmpty(aName)) {
-            attachmentAwaiter = new MessagePromise({
-                chatGuid,
-                text: aName,
-                isAttachment: true,
-                sentAt: now,
-                tempGuid: attachmentGuid
-            });
-            Server().log(`Adding await for chat: "${chatGuid}"; attachment: ${aName}`);
-            Server().messageManager.add(attachmentAwaiter);
-        }
-
-        // Hande-off params to send handler to actually send
-        const theAttachment = attachment ? `${FileSystem.attachmentsDir}/${attachmentName}` : null;
-        await ActionHandler.sendMessageHandler(chatGuid, message, theAttachment);
-
-        // Wait for the attachment first
-        if (attachmentAwaiter) {
-            await attachmentAwaiter.promise;
-        }
-
-        // Next, wait for the message
-        if (messageAwaiter) {
-            await messageAwaiter.promise;
         }
     };
 
@@ -577,7 +494,12 @@ export class ActionHandler {
         // If there is a message attached, try to send it
         try {
             if (isNotEmpty(message) && isNotEmpty(tempGuid)) {
-                await ActionHandler.sendMessage(tempGuid, ret, message);
+                await MessageInterface.sendMessageSync({
+                    chatGuid: ret,
+                    message: message,
+                    tempGuid: tempGuid,
+                    method: "apple-script"
+                });
             }
         } catch (ex: any) {
             throw new Error(`Failed to send message to chat, ${ret}!`);
@@ -611,7 +533,12 @@ export class ActionHandler {
         const chatGuid = `${service};-;${buddy}`;
 
         // Send the message to the chat
-        await ActionHandler.sendMessage(tempGuid, chatGuid, message);
+        await MessageInterface.sendMessageSync({
+            chatGuid: chatGuid,
+            message: message,
+            tempGuid: tempGuid,
+            method: "apple-script"
+        });
 
         // Return the chat GUID
         return chatGuid;

@@ -45,12 +45,13 @@ export class AttachmentInterface {
         if (isEmpty(fPath)) return null;
 
         // Get the extension
-        const ext = fPath.split(".").pop();
+        const ext = fPath.split(".").pop() ?? '';
 
         // If the extension is not an image extension, return null
-        if (!AttachmentInterface.livePhotoExts.includes(ext)) return null;
+        if (!AttachmentInterface.livePhotoExts.includes(ext.toLowerCase())) return null;
 
         // Get the path to the live photo by replacing the extension with .mov
+        // fs.existsSync is case-insensitive on macOS
         const livePath = ext !== fPath ? fPath.replace(`.${ext}`, ".mov") : `${fPath}.mov`;
         const realPath = FileSystem.getRealPath(livePath);
         

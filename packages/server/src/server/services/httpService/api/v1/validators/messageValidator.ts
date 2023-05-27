@@ -233,7 +233,7 @@ export class MessageValidator {
             if (typeof part.partIndex !== "number") throw new BadRequest({ error: "Each partIndex must be a number" });
             if (!part.text && !part.attachment)
                 throw new BadRequest({ error: "Each part must have either a text or attachment" });
-            if (part.attachment && !part.attachment.name)
+            if (part.attachment && !part.name)
                 throw new BadRequest({ error: "Each attachment must have a name" });
             if (part.attachment) {
                 const aPath = path.join(FileSystem.messagesAttachmentsDir, part.attachment);

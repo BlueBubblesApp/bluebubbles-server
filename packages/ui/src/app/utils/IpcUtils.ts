@@ -133,3 +133,11 @@ export const deleteScheduledMessages = async () => {
 export const createScheduledMessage = async (message: ScheduledMessageItem) => {
     return await ipcRenderer.invoke('create-scheduled-message', message);
 };
+
+export const getBinaryPath = async () => {
+    return await ipcRenderer.invoke('get-binary-path');
+};
+
+export const installUpdate = async () => {
+    return await ipcRenderer.invoke('install-update');
+};

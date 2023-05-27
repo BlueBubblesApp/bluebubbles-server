@@ -1,8 +1,11 @@
 import "reflect-metadata";
-import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails } from "electron";
-import * as process from "process";
-import * as path from "path";
+import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails,  } from "electron";
+import process from "process";
+import path from "path";
+import fs from "fs";
+import yaml from "js-yaml";
 import { FileSystem } from "@server/fileSystem";
+import { ParseArguments } from "@server/helpers/argParser";
 
 import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
@@ -12,12 +15,23 @@ app.commandLine.appendSwitch("in-process-gpu");
 // Patch in original user data directory
 app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
 
+// Load the config file
+let cfg = {};
+if (fs.existsSync(FileSystem.cfgFile)) {
+    cfg = yaml.load(fs.readFileSync(FileSystem.cfgFile, "utf8"));
+}
+
+// Parse the CLI args and marge with config args
+const args = ParseArguments(process.argv);
+const parsedArgs: Record<string, any> = { ...cfg, ...args };
+const noGui = parsedArgs["no-gui"] || false;
+
 let win: BrowserWindow;
 let tray: Tray;
 let isHandlingExit = false;
 
 // Instantiate the server
-Server(win);
+Server(parsedArgs, win);
 
 // Only 1 instance is allowed
 const gotTheLock = app.requestSingleInstanceLock();
@@ -148,6 +162,11 @@ const createTray = () => {
 };
 
 const createWindow = async () => {
+    if (noGui) {
+        Server().log("GUI disabled, skipping window creation...");
+        return;
+    }
+
     win = new BrowserWindow({
         title: "BlueBubbles Server",
         useContentSize: true,
@@ -224,7 +243,7 @@ const createWindow = async () => {
     });
 
     // Set the new window in the Server()
-    Server(win);
+    Server(parsedArgs, win);
 };
 
 app.on("ready", () => {

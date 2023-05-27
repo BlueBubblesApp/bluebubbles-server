@@ -6,8 +6,10 @@ import { ServerInterface } from "@server/api/v1/interfaces/serverInterface";
 import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { Success } from "../responses/success";
 import { AlertsInterface } from "@server/api/v1/interfaces/alertsInterface";
-import { isEmpty } from "@server/helpers/utils";
+import { isEmpty, isTruthyBool } from "@server/helpers/utils";
 import { BadRequest } from "../responses/errors";
+import { autoUpdater } from "electron-updater";
+import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
 
 export class ServerRouter {
     static async getInfo(ctx: RouterContext, _: Next) {
@@ -16,6 +18,28 @@ export class ServerRouter {
 
     static async checkForUpdate(ctx: RouterContext, _: Next) {
         return new Success(ctx, { data: await GeneralInterface.checkForUpdate() }).send();
+    }
+
+    static async installUpdate(ctx: RouterContext, _: Next) {
+        const waitParam = (ctx.request.query?.wait ?? "false") as string;
+        const wait = isTruthyBool(waitParam);
+
+        // Check if there even is an update
+        const updateMetadata = await GeneralInterface.checkForUpdate();
+        if (!updateMetadata?.available) {
+            throw new BadRequest({ message: "No update available!", error: "NO_UPDATE_AVAILABLE" });
+        }
+
+        // Once the update is downloaded, it should be installed automatically.
+        // Ref: updateService/index.ts
+        Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
+        const waiter = autoUpdater.downloadUpdate();
+        if (wait) {
+            Server().log("Waiting for update to download...", "debug");
+            await waiter;
+        }
+
+        return new Success(ctx, { message: 'Update has started downloading!' }).send();
     }
 
     static async restartServices(ctx: RouterContext, _: Next) {

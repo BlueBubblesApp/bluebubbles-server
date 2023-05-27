@@ -53,6 +53,8 @@ export const userHomeDir = () => {
 export class FileSystem {
     public static baseDir = path.join(app.getPath("userData"), subdir);
 
+    public static cfgFile = path.join(userHomeDir(), 'bluebubbles.yml');
+
     public static attachmentsDir = path.join(FileSystem.baseDir, "Attachments");
 
     public static iMessageAttachmentsDir = path.join(userHomeDir(), "Library", "Messages", "Attachments");
@@ -105,6 +107,22 @@ export class FileSystem {
     public static findMyDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.findmy.fmipcore");
 
     public static findMyFriendsDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.icloud.fmfd");
+
+    public static get usingCustomFcm(): boolean {
+        const fcmClient = Server().args['fcm-client'];
+        const fcmServer = Server().args['fcm-server'];
+        return !!(fcmClient && fcmServer);
+    }
+
+    public static get fcmClientPath(): string {
+        const fcmClient = Server().args['fcm-client'];
+        return fcmClient ?? path.join(FileSystem.fcmDir, "client.json");
+    }
+
+    public static get fcmServerPath(): string {
+        const fcmServer = Server().args['fcm-server'];
+        return fcmServer ?? path.join(FileSystem.fcmDir, "server.json");
+    }
 
     /**
      * Sets up all required directories and then, writes the scripts
@@ -337,8 +355,12 @@ export class FileSystem {
      * @param contents The object data for the FCM client
      */
     static saveFCMClient(contents: any): void {
+        if (FileSystem.usingCustomFcm) {
+            Server().log("Not saving FCM client file because custom FCM path is set", "debug");
+        }
+
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
-        const filePath = path.join(FileSystem.fcmDir, "client.json");
+        const filePath = FileSystem.fcmClientPath;
         if (!contents && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         } else {
@@ -352,8 +374,12 @@ export class FileSystem {
      * @param contents The object data for the FCM server
      */
     static saveFCMServer(contents: any): void {
+        if (FileSystem.usingCustomFcm) {
+            Server().log("Not saving FCM server file because custom FCM path is set", "debug");
+        }
+
         if (!fs.existsSync(FileSystem.fcmDir)) fs.mkdirSync(FileSystem.fcmDir);
-        const filePath = path.join(FileSystem.fcmDir, "server.json");
+        const filePath = FileSystem.fcmServerPath;
         if (!contents && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
         } else {
@@ -367,7 +393,7 @@ export class FileSystem {
      * @returns The parsed FCM client data
      */
     static getFCMClient(): any {
-        const filePath = path.join(FileSystem.fcmDir, "client.json");
+        const filePath = FileSystem.fcmClientPath;
         if (!fs.existsSync(filePath)) return null;
         const contents = fs.readFileSync(filePath, "utf8");
         if (!contents || contents.length === 0) return null;
@@ -380,7 +406,7 @@ export class FileSystem {
      * @returns The parsed FCM server data
      */
     static getFCMServer(): any {
-        const filePath = path.join(FileSystem.fcmDir, "server.json");
+        const filePath = FileSystem.fcmServerPath;
         if (!fs.existsSync(filePath)) return null;
         const contents = fs.readFileSync(filePath, "utf8");
         if (!contents || contents.length === 0) return null;

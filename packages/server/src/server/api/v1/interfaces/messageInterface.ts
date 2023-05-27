@@ -95,7 +95,7 @@ export class MessageInterface {
         let sentMessage = null;
         if (method === "apple-script") {
             // Attempt to send the message
-            await ActionHandler.sendMessageHandler(chatGuid, message ?? "", null);
+            await ActionHandler.sendMessage(chatGuid, message ?? "", null);
             sentMessage = await awaiter.promise;
         } else if (method === "private-api") {
             sentMessage = await MessageInterface.sendMessagePrivateApi({
@@ -151,7 +151,7 @@ export class MessageInterface {
 
         // Since we convert mp3s to cafs we need to correct the name for the awaiter
         let aName = attachmentName;
-        if (aName !== null && aName.endsWith(".mp3")) {
+        if (aName !== null && aName.endsWith(".mp3") && isAudioMessage) {
             aName = `${aName.substring(0, aName.length - 4)}.caf`;
         }
 
@@ -174,7 +174,7 @@ export class MessageInterface {
         let sentMessage = null;
         if (method === "apple-script") {
             // Attempt to send the attachment
-            await ActionHandler.sendMessageHandler(chatGuid, "", newPath);
+            await ActionHandler.sendMessage(chatGuid, "", newPath, isAudioMessage);
             sentMessage = await awaiter.promise;
         } else if (method === "private-api") {
             sentMessage = await MessageInterface.sendAttachmentPrivateApi({
@@ -271,7 +271,7 @@ export class MessageInterface {
     }: SendAttachmentPrivateApiParams): Promise<Message> {
         checkPrivateApiStatus();
 
-        if (filePath.endsWith(".mp3")) {
+        if (filePath.endsWith(".mp3") && isAudioMessage) {
             try {
                 const newPath = `${filePath.substring(0, filePath.length - 4)}.caf`;
                 await FileSystem.convertMp3ToCaf(filePath, newPath);

@@ -136,6 +136,11 @@ export class HttpRoutes {
                         controller: ServerRouter.checkForUpdate
                     },
                     {
+                        method: HttpMethod.POST,
+                        path: "update/install",
+                        controller: ServerRouter.installUpdate
+                    },
+                    {
                         method: HttpMethod.GET,
                         path: "alert",
                         controller: ServerRouter.getAlerts
@@ -450,6 +455,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: ":guid/notify",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: MessageRouter.notify
                     },
                     {
