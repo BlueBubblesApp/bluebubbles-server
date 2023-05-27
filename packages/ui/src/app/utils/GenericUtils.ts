@@ -43,20 +43,8 @@ export const hasKey = (object: NodeJS.Dict<any>, key: string): boolean => {
     return Object.keys(object).includes(key);
 };
 
-export const buildQrData = (password: string, address: string, fcmClient: NodeJS.Dict<any>): string => {
-    if (!fcmClient || fcmClient.length === 0) return '';
-
-    const output = [password, address || ''];
-
-    output.push(fcmClient.project_info.project_id);
-    output.push(fcmClient.project_info.storage_bucket);
-    output.push(fcmClient.client[0].api_key[0].current_key);
-    output.push(fcmClient.project_info.firebase_url);
-    const { client_id } = fcmClient.client[0].oauth_client[0];
-    output.push(client_id.substr(0, client_id.indexOf('-')));
-    output.push(fcmClient.client[0].client_info.mobilesdk_app_id);
-
-    return JSON.stringify(output);
+export const buildQrData = (password: string, address: string): string => {
+    return JSON.stringify([password, address ?? '']);
 };
 
 export const copyToClipboard = async (data: string) => {

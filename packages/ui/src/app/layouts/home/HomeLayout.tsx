@@ -32,10 +32,9 @@ import { TotalMessagesStatBox, TopGroupStatBox, BestFriendStatBox, DailyMessages
 
 export const HomeLayout = (): JSX.Element => {
     const address = useAppSelector(state => state.config.server_address);
-    const fcmClient = useAppSelector(state => state.config.fcm_client);
     const password = useAppSelector(state => state.config.password);
     const port = useAppSelector(state => state.config.socket_port);
-    const qrCode: any = fcmClient ? buildQrData(password, address, fcmClient) : null;
+    const qrCode: any = buildQrData(password, address);
 
     return (
         <Box p={3} borderRadius={10}>
