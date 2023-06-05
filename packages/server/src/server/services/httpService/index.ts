@@ -112,9 +112,13 @@ export class HttpService {
             koaBody({
                 jsonLimit: "100mb",
                 textLimit: "100mb",
-                formLimit: "1000mb",
+                formLimit: "1024mb",
                 multipart: true,
-                parsedMethods: ['POST', 'PUT', 'PATCH', 'DELETE']
+                parsedMethods: ['POST', 'PUT', 'PATCH', 'DELETE'],
+                formidable: {
+                    // 1GB (1024 b * 1024 kb * 1024 mb)
+                    maxFileSize: 1024 * 1024 * 1024  // Defaults to 200mb by default
+                }
             })
         );
 
