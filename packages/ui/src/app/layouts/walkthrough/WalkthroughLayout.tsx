@@ -87,6 +87,7 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
     const nextButton = (
         <Button
             disabled={!showNext}
+            isDisabled={!showNext}
             mt='20px'
             colorScheme='blue'
             onClick={() => {
