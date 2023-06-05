@@ -5,10 +5,14 @@ import { FileSystem } from "@server/fileSystem";
 import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { Success } from "../responses/success";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { NotFound } from "../responses/errors";
 
 export class FcmRouter {
     static async getClientConfig(ctx: RouterContext, _: Next) {
         const googleServices = FileSystem.getFCMClient();
+        if (isEmpty(googleServices)) {
+            throw new NotFound({ error: "Google Services file not found." });
+        }
 
         // As of May 2023, Google removed the `oauth_client[]` data from the `google-services.json` file.
         // As such, we need to manually add it back in so the client doesn't break when reading the file.
