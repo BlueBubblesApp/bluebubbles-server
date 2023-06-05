@@ -167,7 +167,7 @@ export class ChatInterface {
         }
 
         // Sanitize the addresses
-        const theAddrs = addresses.map(e => slugifyAddress(e));
+        const theAddrs: string[] = addresses.map(e => getiMessageAddressFormat(e));
         let chatGuid: string;
         let sentMessage;
         if (isMinBigSur) {

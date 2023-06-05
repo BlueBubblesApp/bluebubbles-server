@@ -524,7 +524,7 @@ export class ActionHandler {
         Server().log(`Executing Action: Create Single Chat (Participant: ${participant})`, "debug");
 
         // Slugify the address
-        const buddy = slugifyAddress(participant);
+        const buddy = getiMessageAddressFormat(participant);
 
         // Make sure messages is open
         await FileSystem.startMessages();
