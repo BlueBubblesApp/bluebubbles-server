@@ -117,7 +117,7 @@ export class HttpService {
                 parsedMethods: ['POST', 'PUT', 'PATCH', 'DELETE'],
                 formidable: {
                     // 1GB (1024 b * 1024 kb * 1024 mb)
-                    maxFileSize: 1024 * 1024 * 1024  // Defaults to 200mb by default
+                    maxFileSize: 1024 * 1024 * 1024  // Defaults to 200mb
                 }
             })
         );
