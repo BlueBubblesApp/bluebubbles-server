@@ -17,6 +17,7 @@ export interface FacetimeDetectionFieldProps {
 export const FacetimeDetectionField = ({ helpText }: FacetimeDetectionFieldProps): JSX.Element => {
     const facetimeDetection: boolean = (useAppSelector(state => state.config.facetime_detection) ?? false);
     const [permissions, setPermissions] = useState({} as any);
+    const isDisabled = !(permissions?.accessibility ?? false);
 
     useEffect(() => {
         getCurrentPermissions().then(permissions => {
@@ -25,7 +26,7 @@ export const FacetimeDetectionField = ({ helpText }: FacetimeDetectionFieldProps
     }, []);
 
     return (
-        <FormControl isDisabled={!(permissions?.accessibility ?? false)}>
+        <FormControl isDisabled={isDisabled}>
             <Checkbox id='facetime_detection' isChecked={facetimeDetection} onChange={onCheckboxToggle}>Incoming Facetime Detection</Checkbox>
             <FormHelperText>
                 {helpText ?? (

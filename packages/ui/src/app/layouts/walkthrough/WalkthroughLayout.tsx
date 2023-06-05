@@ -117,6 +117,7 @@ export const WalkthroughLayout = ({...rest}): JSX.Element => {
                 <Flex justifyContent='space-between' alignItems='center' mx={5}>
                     <Button
                         disabled={!showPrevious}
+                        isDisabled={!showPrevious}
                         mt='20px'
                         onClick={() => setStep(step - 1)}
                     >
