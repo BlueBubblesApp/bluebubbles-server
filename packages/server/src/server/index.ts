@@ -38,7 +38,8 @@ import {
     CloudflareService,
     WebhookService,
     FacetimeService,
-    ScheduledMessagesService
+    ScheduledMessagesService,
+    OauthService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -152,6 +153,8 @@ class BlueBubblesServer extends EventEmitter {
 
     webhookService: WebhookService;
 
+    oauthService: OauthService;
+
     actionHandler: ActionHandler;
 
     chatListeners: ChangeListener[];
@@ -199,6 +202,10 @@ class BlueBubblesServer extends EventEmitter {
         return systemPreferences.isTrustedAccessibilityClient(false) === true;
     }
 
+    get computerIdentifier(): string {
+        return `${os.userInfo().username}@${os.hostname()}`;
+    }
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -234,6 +241,7 @@ class BlueBubblesServer extends EventEmitter {
         this.messageManager = null;
         this.webhookService = null;
         this.scheduledMessages = null;
+        this.oauthService = null;
 
         this.hasSetup = false;
         this.hasStarted = false;
@@ -368,6 +376,9 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting IPC Listeners..");
         IPCService.startIpcListeners();
 
+        // Let listeners know the server is ready
+        this.emit('ready');
+
         // Do some pre-flight checks
         // Make sure settings are correct and all things are a go
         await this.preChecks();
@@ -425,6 +436,15 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
+    initOauthService(): void {
+        try {
+            this.log("Initializing OAuth service...");
+            this.oauthService = new OauthService();
+        } catch (ex: any) {
+            this.log(`Failed to setup OAuth service! ${ex.message}`, "error");
+        }
+    }
+
 
     async initServices(): Promise<void> {
         this.initFcm();
@@ -435,6 +455,8 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
+
+        this.initOauthService();
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
@@ -493,6 +515,20 @@ class BlueBubblesServer extends EventEmitter {
             this.httpService.start();
         } catch (ex: any) {
             this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+        }
+
+        // Only start the oauth service if the tutorial isn't done
+        const tutorialDone = this.repo.getConfig("tutorial_is_done") as boolean;
+        const oauthToken = this.args['oauth-token'];
+        this.oauthService.initialize();
+
+        // If the user passed an oauth token, use that to setup the project
+        if (isNotEmpty(oauthToken)) {
+            this.oauthService.authToken = oauthToken;
+            await this.oauthService.handleProjectCreation();
+        } else if (!tutorialDone) {
+            // if there isn't a token, and the tutorial isn't done, start the oauth service
+            this.oauthService.start();
         }
 
         try {
@@ -583,6 +619,12 @@ class BlueBubblesServer extends EventEmitter {
             await this.httpService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
+        }
+
+        try {
+            await this.oauthService?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop OAuth service! ${ex?.message ?? ex}`, "error");
         }
 
         try {
@@ -928,6 +970,11 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
+        // Start the oauth service if the user resets the tutorial
+        if (prevConfig.tutorial_is_done === true && nextConfig.tutorial_is_done === false) {
+            await this.oauthService.restart();
+        }
+
         // If we toggle the custom cert option, restart the http service
         if (prevConfig.use_custom_certificate !== nextConfig.use_custom_certificate && !proxiesRestarted) {
             if (this.httpService) await this.httpService.restart(true);
@@ -1147,7 +1194,7 @@ class BlueBubblesServer extends EventEmitter {
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [
             {
-                name: "Accessibility",
+                name: "Accessibility (Optional)",
                 pass: systemPreferences.isTrustedAccessibilityClient(false),
                 solution: "Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles"
             },
@@ -1563,15 +1610,74 @@ class BlueBubblesServer extends EventEmitter {
         await this.startServices();
     }
 
-    async relaunch() {
+    buildRelaunchArgs() {
+        // Relaunch the process
+        const args = process.argv.slice(1);
+
+        const removeArg = (name: string) => {
+            const oauthIndex = args.findIndex(i => i === `--${name}`);
+            if (oauthIndex !== -1) {
+                // Remove the next arg if it's not a flag
+                if (args[oauthIndex + 1] && !args[oauthIndex + 1].startsWith("--")) {
+                    args.splice(oauthIndex, 2);
+                } else {
+                    args.splice(oauthIndex, 1);
+                }
+            }
+        };
+
+        // If we are persisting configs, remove any flags that are stored in the DB
+        const persist = this.args['persist-config'] ?? true;
+        if (persist) {
+            const configKeys = Object.keys(Server().repo.config);
+            for (const key of configKeys) {
+                // Add the underscored or dashed version of the option.
+                const keyOpts = [key];
+                if (key.includes("_")) {
+                    keyOpts.push(key.replace(/_/g, "-"));
+                } else if (key.includes("-")) {
+                    keyOpts.push(key.replace(/-/g, "_"));
+                }
+
+                for (const opt of keyOpts) {
+                    removeArg(opt);
+                }
+            }
+        }
+
+
+        // Remove the oauth-token flag & value if it exists.
+        removeArg("oauth-token");
+
+        return args;
+    }
+
+    async relaunch({
+        headless = null,
+        exit = true,
+        quit = false
+    }: {
+        headless?: boolean | null;
+        exit?: boolean,
+        quit?: boolean
+    } = {}) {
         this.isRestarting = true;
 
         // Close everything gracefully
         await this.stopAll();
 
         // Relaunch the process
-        app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
-        app.exit(0);
+        let args = this.buildRelaunchArgs();
+        args = args.concat(["--relaunch"]);
+
+        // Relaunch the app
+        app.relaunch({ args });
+
+        if (quit) {
+            app.quit();
+        } else if (exit) {
+            app.exit(0);
+        }
     }
 
     async stopAll() {
@@ -1585,8 +1691,11 @@ class BlueBubblesServer extends EventEmitter {
         // Close everything gracefully
         await this.stopAll();
 
+        let relaunchArgs = this.buildRelaunchArgs();
+        relaunchArgs = [process.execPath, ...relaunchArgs];
+
         // Kick off the restart script
-        FileSystem.executeAppleScript(runTerminalScript(process.execPath));
+        FileSystem.executeAppleScript(runTerminalScript(relaunchArgs.join(' ')));
 
         // Exit the current instance
         app.exit(0);

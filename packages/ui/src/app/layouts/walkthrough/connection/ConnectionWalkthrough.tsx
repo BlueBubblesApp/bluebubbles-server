@@ -43,7 +43,7 @@ export const ConnectionWalkthrough = (): JSX.Element => {
                 </Alert>
 
                 <Stack direction='column' p={5}>
-                    <ServerPasswordField />
+                    <ServerPasswordField errorOnEmpty={true} />
                     <ProxyServiceField />
                     {(proxyService === 'ngrok') ? (
                         <>

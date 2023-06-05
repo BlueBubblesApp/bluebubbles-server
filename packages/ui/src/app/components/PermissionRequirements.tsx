@@ -56,7 +56,7 @@ export const PermissionRequirements = (): JSX.Element => {
     };
 
     return (
-        <Box border='1px solid' borderColor={useColorModeValue('gray.200', 'gray.700')} borderRadius='xl' p={3} width='300px'>
+        <Box border='1px solid' borderColor={useColorModeValue('gray.200', 'gray.700')} borderRadius='xl' p={3} width='350px'>
             <Stack direction='row' align='center'>
                 <Text fontSize='lg' fontWeight='bold'>macOS Permissions</Text>
                 <Box

@@ -141,3 +141,15 @@ export const getBinaryPath = async () => {
 export const installUpdate = async () => {
     return await ipcRenderer.invoke('install-update');
 };
+
+export const getOauthUrl = async () => {
+    return await ipcRenderer.invoke('get-oauth-url');
+};
+
+export const restartOauthService = async () => {
+    return await ipcRenderer.invoke('restart-oauth-service');
+};
+
+export const getCurrentPermissions = async () => {
+    return await ipcRenderer.invoke('get-current-permissions');
+};

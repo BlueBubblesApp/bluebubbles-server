@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails,  } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails } from "electron";
 import process from "process";
 import path from "path";
 import fs from "fs";
@@ -9,6 +9,8 @@ import { ParseArguments } from "@server/helpers/argParser";
 
 import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
+import { autoUpdater } from "electron-updater";
+import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
 
 app.commandLine.appendSwitch("in-process-gpu");
 
@@ -24,9 +26,9 @@ if (fs.existsSync(FileSystem.cfgFile)) {
 // Parse the CLI args and marge with config args
 const args = ParseArguments(process.argv);
 const parsedArgs: Record<string, any> = { ...cfg, ...args };
-const noGui = parsedArgs["no-gui"] || false;
 
 let win: BrowserWindow;
+let oauthWindow: BrowserWindow = null;
 let tray: Tray;
 let isHandlingExit = false;
 
@@ -75,6 +77,28 @@ const handleExit = async (event: any = null, { exit = true } = {}) => {
 };
 
 const buildTray = () => {
+    const headless = (Server().repo?.getConfig("headless") as boolean) ?? false;
+    let updateOpt: any = {
+        label: "Check for Updates",
+        type: "normal",
+        click: async () => {
+            if (Server()) {
+                await Server().updater.checkForUpdate({ showNoUpdateDialog: true });
+            }
+        }
+    };
+
+    if (Server()?.updater?.hasUpdate ?? false) {
+        updateOpt = {
+            label: `Install Update (${Server().updater.updateInfo.updateInfo.version})`,
+            type: "normal",
+            click: async () => {
+                Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
+                await autoUpdater.downloadUpdate();
+            }
+        };
+    }
+
     return Menu.buildFromTemplate([
         {
             label: `BlueBubbles Server v${app.getVersion()}`,
@@ -91,12 +115,19 @@ const buildTray = () => {
                 }
             }
         },
+        updateOpt,
         {
-            label: "Check for Updates",
-            type: "normal",
+            // The checkmark will cover when this is enabled
+            label: `Headless Mode${headless ? '' : ' (Disabled)'}`,
+            type: "checkbox",
+            checked: headless,
             click: async () => {
-                if (Server()) {
-                    await Server().updater.checkForUpdate({ showNoUpdateDialog: true });
+                const toggled = !headless;
+                await Server().repo.setConfig("headless", toggled);
+                if (!toggled) {
+                    createWindow();
+                } else if (toggled && win) {
+                    win.destroy();
                 }
             }
         },
@@ -161,9 +192,39 @@ const createTray = () => {
     }
 };
 
+const createOauthWindow = async (url: string) => {
+    // Create new Browser window
+    if (oauthWindow && !oauthWindow.isDestroyed) oauthWindow.destroy();
+    oauthWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+            nodeIntegration: true,
+        }
+    });
+
+    oauthWindow.loadURL(url);
+    oauthWindow.webContents.on('did-finish-load', () => {
+        const url = oauthWindow.webContents.getURL();
+        if (url.split('#')[0] !== Server().oauthService?.callbackUrl) return;
+
+        // Extract the token from the URL
+        const hash = url.split('#')[1];
+        const params = new URLSearchParams(hash);
+        const token = params.get('access_token');
+        Server().oauthService.authToken = token;
+        Server().oauthService.handleProjectCreation();
+
+        // Clear the window data
+        oauthWindow.close();
+        oauthWindow = null;
+    });
+};
+
 const createWindow = async () => {
-    if (noGui) {
-        Server().log("GUI disabled, skipping window creation...");
+    const headless = (Server().repo?.getConfig("headless") as boolean) ?? false;
+    if (headless) {
+        Server().log("Headless mode enabled, skipping window creation...");
         return;
     }
 
@@ -198,7 +259,12 @@ const createWindow = async () => {
 
     // Make links open in the browser
     win.webContents.setWindowOpenHandler((details: HandlerDetails) => {
-        shell.openExternal(details.url);
+        if (details.url.startsWith('https://accounts.google.com/o/oauth2/v2/auth')) {
+            createOauthWindow(details.url);
+        } else {
+            shell.openExternal(details.url);
+        }
+        
         return { action: "deny" };
     });
 
@@ -246,17 +312,23 @@ const createWindow = async () => {
     Server(parsedArgs, win);
 };
 
-app.on("ready", () => {
+Server().on('update-available', (_) => {
     createTray();
-    createWindow();
+});
 
+Server().on('ready', () => {
+    createWindow();
+    createTray();
+});
+
+app.on("ready", () => {
     nativeTheme.on("updated", () => {
         createTray();
     });
 });
 
 app.on("activate", () => {
-    if (win == null) createWindow();
+    if (win == null && Server().repo) createWindow();
 });
 
 app.on("window-all-closed", () => {

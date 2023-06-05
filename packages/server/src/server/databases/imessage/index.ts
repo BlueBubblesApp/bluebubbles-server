@@ -34,6 +34,16 @@ export class MessageRepository {
         return this.db;
     }
 
+    async getiMessageAccount() {
+        const query = this.db.getRepository(Chat)
+            .createQueryBuilder("chat")
+            .where("chat.service_name = 'iMessage'")
+            .limit(1)
+            .orderBy("chat.ROWID", "DESC");
+        const chat = await query.getOne();
+        return chat ? chat.accountLogin.split(':').at(-1) : null;
+    }
+
     /**
      * Get all the chats from the DB
      *

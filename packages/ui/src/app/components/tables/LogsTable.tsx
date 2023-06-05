@@ -11,10 +11,10 @@ import {
 import { LogItem } from '../../slices/LogsSlice';
 
 
-export const LogsTable = ({ logs }: { logs: Array<LogItem> }): JSX.Element => {
+export const LogsTable = ({ logs, caption }: { logs: Array<LogItem>, caption?: string }): JSX.Element => {
     return (
         <Table variant="striped" colorScheme="blue" size='sm'>
-            <TableCaption>Logs will stream in as they come in</TableCaption>
+            <TableCaption>{caption ?? 'Logs will stream in as they come in'}</TableCaption>
             <Thead>
                 <Tr>
                     <Th>Log</Th>

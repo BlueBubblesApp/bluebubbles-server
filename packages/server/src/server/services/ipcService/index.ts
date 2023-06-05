@@ -12,6 +12,7 @@ import { BlueBubblesHelperService } from "../privateApi";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
 import { ScheduledMessagesInterface } from "@server/api/v1/interfaces/scheduledMessagesInterface";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
+import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 
 export class IPCService {
     /**
@@ -55,7 +56,9 @@ export class IPCService {
 
         ipcMain.handle("get-config", async (_, __) => {
             if (!Server().repo.db) return {};
-            return Server().repo?.config;
+            const cfg = Server().repo?.config;
+            const serverInfo = await GeneralInterface.getServerMetadata();
+            return { ...cfg, ...serverInfo };
         });
 
         ipcMain.handle("get-alerts", async (_, __) => {
@@ -275,6 +278,13 @@ export class IPCService {
             return await Server().checkPermissions();
         });
 
+        ipcMain.handle("get-current-permissions", async (_, __) => {
+            return {
+                accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+                full_disk_access: Server().hasDiskAccess,
+            }
+        });
+
         ipcMain.handle("prompt_accessibility", async (_, __) => {
             return {
                 abPerms: systemPreferences.isTrustedAccessibilityClient(true) ? "authorized" : "denied"
@@ -389,6 +399,15 @@ export class IPCService {
         ipcMain.handle("get-chats", async (_, msg) => {
             const [chats, __] = await ChatInterface.get({ limit: 10000 });
             return chats;
+        });
+
+        ipcMain.handle("get-oauth-url", async (_, __) => {
+            return await Server().oauthService?.getOauthUrl();
+        });
+
+        ipcMain.handle("restart-oauth-service", async (_, __) => {
+            if (Server().oauthService?.running) return;
+            await Server().oauthService?.restart();
         });
     }
 }

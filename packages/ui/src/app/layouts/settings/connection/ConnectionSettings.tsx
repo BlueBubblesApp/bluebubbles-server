@@ -27,7 +27,7 @@ import { ProxyServiceField } from '../../../components/fields/ProxyServiceField'
 import { ServerPasswordField } from '../../../components/fields/ServerPasswordField';
 import { LocalPortField } from '../../../components/fields/LocalPortField';
 import { UseHttpsField } from '../../../components/fields/UseHttpsField';
-import { EncryptCommunicationsField } from '../../../components/fields/EncryptCommunicationsField';
+// import { EncryptCommunicationsField } from '../../../components/fields/EncryptCommunicationsField';
 
 
 export const ConnectionSettings = (): JSX.Element => {

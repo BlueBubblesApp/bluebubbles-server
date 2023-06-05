@@ -133,7 +133,7 @@ export const StatBox = (
                 letterSpacing='wide'
             >
                 {(text === null) ? (
-                    <SkeletonText height={20} mt={2} noOfLines={3} />
+                    <SkeletonText height={20} mt={2} noOfLines={2} />
                 ) : (
                     (typeof(text) === 'number') ? (
                         <Text fontSize='2vw'>{formatNumber(text)}</Text>

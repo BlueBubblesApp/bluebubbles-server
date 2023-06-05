@@ -1,8 +1,15 @@
 import * as admin from "firebase-admin";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
+import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 
 const AppName = "BlueBubbles";
+
+enum DbType {
+    UNKNOWN = "unknown",
+    FIRESTORE = "firestore",
+    REALTIME = "realtime"
+}
 
 /**
  * This services manages the connection to the connected
@@ -18,6 +25,10 @@ export class FCMService {
     }
 
     lastRestart = 0;
+
+    lastAddr: string = null;
+
+    dbType = DbType.UNKNOWN;
 
     /**
      * Starts the FCM app service
@@ -41,6 +52,8 @@ export class FCMService {
             return false;
         }
 
+        this.dbType = (clientConfig.project_info?.firebase_url) ? DbType.REALTIME : DbType.FIRESTORE;
+
         // Initialize the app
         admin.initializeApp(
             {
@@ -49,6 +62,12 @@ export class FCMService {
             },
             AppName
         );
+
+        if (this.dbType === DbType.REALTIME) {
+            await this.setRealtimeRules();
+        } else if (this.dbType === DbType.FIRESTORE) {
+            await this.setFirestoreRules();
+        }
 
         this.listen();
 
@@ -63,17 +82,43 @@ export class FCMService {
         return true;
     }
 
-    /**
-     * Sets the ngrok server URL within firebase
-     *
-     * @param serverUrl The new server URL
-     */
-    async setServerUrl(serverUrl: string): Promise<void> {
-        if (!(await this.start())) return;
-        if (!serverUrl) return;
+    async setFirestoreRules() {
+        const source: RulesFile = {
+            name: "firestore.rules",
+            content: (
+                "rules_version = '2';\n" +
+                "service cloud.firestore {\n" +
+                "  match /databases/{database}/documents {\n" +
+                "    match /server/config {\n" +
+                "      allow read;\n" +
+                "    }\n" +
+                "\n" +
+                "    match /server/commands {\n" +
+                "      allow write;\n" +
+                "    }\n" +
+                "  }\n" +
+                "}"
+            )
+        };
 
-        Server().log("Updating Server Address in Firebase Database...");
+        const rules = admin.app(AppName).securityRules();
+        let shouldRefresh = true;
+        
+        try {
+            // Get the current ruleset and only set the rules if they are different
+            const currentRuleset = await rules.getFirestoreRuleset();
+            const firestoreRules = currentRuleset?.source?.find((rule) => rule.name === source.name);
+            if (firestoreRules?.content === source.content) shouldRefresh = false;
+        } catch (ex: any) {
+            // Do nothing
+        }
 
+        if (!shouldRefresh) return;
+        const ruleset = await rules.createRuleset(source);
+        await rules.releaseFirestoreRuleset(ruleset.name);
+    }
+
+    async setRealtimeRules() {
         // Set the rules
         const source = JSON.stringify(
             {
@@ -95,6 +140,37 @@ export class FCMService {
 
         // Set read rules
         await db.setRules(source);
+    }
+
+    /**
+     * Sets the ngrok server URL within firebase
+     *
+     * @param serverUrl The new server URL
+     */
+    async setServerUrl(serverUrl: string): Promise<void> {
+        if (!(await this.start())) return;
+        if (!serverUrl || this.lastAddr === serverUrl) return;
+
+        Server().log(`Updating Server Address in ${this.dbType} Database...`);
+
+        if (this.dbType === DbType.FIRESTORE) {
+            await this.setServerUrlFirestore(serverUrl);
+        } else if (this.dbType === DbType.REALTIME) {
+            await this.setServerUrlRealtime(serverUrl);
+        }
+
+        this.lastAddr = serverUrl;
+    }
+
+    async setServerUrlFirestore(serverUrl: string): Promise<void> {
+        const db = admin.app(AppName).firestore();
+
+        // Set the server URL and cache value
+        await db.collection("server").doc('config').set({ serverUrl });
+    }
+
+    async setServerUrlRealtime(serverUrl: string): Promise<void> {
+        const db = admin.app(AppName).database();
 
         // Update the config
         const config = db.ref("config");
@@ -107,28 +183,47 @@ export class FCMService {
         const app = FCMService.getApp();
         if (!app) return;
 
+        if (this.dbType === DbType.FIRESTORE) {
+            this.listenFirestoreDb();
+        } else if (this.dbType === DbType.REALTIME) {
+            this.listenRealtimeDb();
+        }
+    }
+
+    private listenFirestoreDb() {
+        const app = FCMService.getApp();
+        const db = app.firestore();
+        db.collection("server")
+            .doc("config")
+            .onSnapshot((snapshot: admin.firestore.DocumentSnapshot)=> this.nextRestartHandler(
+                snapshot.data()?.nextRestart));
+    }
+
+    private listenRealtimeDb() {
+        const app = FCMService.getApp();
         const db = app.database();
         db.ref("config")
             .child("nextRestart")
-            .on("value", async (snapshot: admin.database.DataSnapshot) => {
-                const value = snapshot.val();
-                if (!value) return;
+            .on("value", (snapshot: admin.database.DataSnapshot) => this.nextRestartHandler(snapshot.val()));
+    }
 
-                try {
-                    if (value > this.lastRestart) {
-                        Server().log("Received request to restart via FCM! Restarting...");
+    private async nextRestartHandler(value: any) {
+        if (!value) return;
 
-                        // Update the last restart values
-                        await Server().repo.setConfig("last_fcm_restart", value);
-                        this.lastRestart = value;
+        try {
+            if (value > this.lastRestart) {
+                Server().log("Received request to restart via FCM! Restarting...");
 
-                        // Do a restart
-                        await Server().relaunch();
-                    }
-                } catch (ex: any) {
-                    Server().log(`Failed to restart after FCM request!\n${ex}`, "error");
-                }
-            });
+                // Update the last restart values
+                await Server().repo.setConfig("last_fcm_restart", value);
+                this.lastRestart = value;
+
+                // Do a restart
+                await Server().relaunch();
+            }
+        } catch (ex: any) {
+            Server().log(`Failed to restart after FCM request!\n${ex}`, "error");
+        }
     }
 
     /**
