@@ -89,13 +89,13 @@ export const NotificationsLayout = (): JSX.Element => {
     useEffect(() => {
         ipcRenderer.removeAllListeners('oauth-status');
         getOauthUrl().then(url => setOauthUrl(url));
+
+        ipcRenderer.on('oauth-status', (_: any, data: ProgressStatus) => {
+            setAuthStatus(data);
+        });
     }, []);
 
     logs = logs.filter(log => log.message.startsWith('[GCP]'));
-
-    ipcRenderer.on('oauth-status', (_: any, data: ProgressStatus) => {
-        setAuthStatus(data);
-    });
 
     const onDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
