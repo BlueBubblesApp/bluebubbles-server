@@ -145,7 +145,14 @@ export class OauthService {
      * @returns The OAuth URL
      */
     async getOauthUrl() {
-        const scopes = ["https://www.googleapis.com/auth/cloud-platform"];
+        const scopes = [
+            "https://www.googleapis.com/auth/cloudplatformprojects",
+            "https://www.googleapis.com/auth/service.management",
+            "https://www.googleapis.com/auth/firebase",
+            "https://www.googleapis.com/auth/datastore",
+            "https://www.googleapis.com/auth/iam"
+        ];
+
         const url = await this.oauthClient.generateAuthUrl({
             scope: scopes,
             response_type: 'token'
