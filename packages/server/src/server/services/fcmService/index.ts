@@ -63,10 +63,15 @@ export class FCMService {
             AppName
         );
 
-        if (this.dbType === DbType.REALTIME) {
-            await this.setRealtimeRules();
-        } else if (this.dbType === DbType.FIRESTORE) {
-            await this.setFirestoreRules();
+        try {
+            if (this.dbType === DbType.REALTIME) {
+                await this.setRealtimeRules();
+            } else if (this.dbType === DbType.FIRESTORE) {
+                await this.setFirestoreRules();
+            }
+        } catch (ex: any) {
+            Server().log("Failed to set Firebase Database Security Rules!", "warn");
+            Server().log(ex?.message ?? String(ex), "debug");
         }
 
         this.listen();
