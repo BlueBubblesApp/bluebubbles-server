@@ -1,0 +1,5 @@
+CREATE TABLE message_processing_task (
+    ROWID INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
+    guid TEXT NOT NULL,
+    task_flags INTEGER NOT NULL
+)
