@@ -10,9 +10,8 @@ import * as admin from "firebase-admin";
 import { OAuth2Client } from "google-auth-library";
 import { google } from "googleapis";
 import { generateRandomString } from "@server/utils/CryptoUtils";
-import { isNotEmpty, waitMs } from "@server/helpers/utils";
+import { isNotEmpty, resultAwaiter, waitMs } from "@server/helpers/utils";
 import { ProgressStatus } from "@server/types";
-import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 import { FCMService } from "../fcmService";
 
 /**
@@ -122,6 +121,7 @@ export class OauthService {
             FileSystem.saveFCMServer(serviceAccountJson);
             FileSystem.saveFCMClient(servicesJson);
 
+            // Set the security rules for the project.
             Server().log(`[GCP] Creating Firestore Security Rules...`);
             await this.createSecurityRules(projectId);
 
@@ -138,7 +138,30 @@ export class OauthService {
 
             // Start the FCM service.
             // Don't await because we don't want to catch the error here.
-            Server().fcm.restart();
+            FCMService.stop().then(async () => {
+                await Server().fcm.start({ initializeOnly: true });
+
+                // Make sure that the security rules propogate.
+                // We test this by trying to dispatch a server url update.
+                const result = await resultAwaiter({
+                    maxWaitMs: 60000 * 2,
+                    initialWaitMs: 5000,
+                    getData: async () => {
+                        try {
+                            await Server().fcm.dispatchServerUrlUpdate();
+                            return true;
+                        } catch (ex) {
+                            return false;
+                        }
+                    }
+                });
+
+                if (result) {
+                    Server().fcm.listen();
+                } else {
+                    Server().log(`[FCM] Failed to access Firestore after 2 minutes!`, "warn");
+                }
+            });
         } catch (ex: any) {
             Server().log(`[GCP] Failed to create project: ${ex?.message}`, "error");
             if (ex?.response?.data?.error) {

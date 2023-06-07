@@ -37,7 +37,11 @@ export class FCMService {
     /**
      * Starts the FCM app service
      */
-    async start(): Promise<boolean> {
+    async start({
+        initializeOnly = false
+    }: {
+        initializeOnly?: boolean;
+    } = {}): Promise<boolean> {
         // If we have already initialized the app, don't re-initialize
         const app = FCMService.getApp();
         if (app) return true;
@@ -78,21 +82,16 @@ export class FCMService {
             throw ex;
         }
 
-        if (this.dbType === DbType.REALTIME) {
-            await this.setRealtimeRules();
-        }
-
-        this.listen();
-
-        // Set the current ngrok URL if we are connected
-        for (const service of Server().proxyServices) {
-            if (service.isConnected()) {
-                await this.setServerUrl(service.url);
-                break;
+        if (!initializeOnly) {
+            if (this.dbType === DbType.REALTIME) {
+                await this.setRealtimeRules();
             }
+
+            this.dispatchServerUrlUpdate();
+            this.listen();
         }
 
-        this.hasInitialized = true;
+        this.hasInitialized = true;        
         return true;
     }
 
@@ -154,6 +153,16 @@ export class FCMService {
 
         // Set read rules
         await db.setRules(source);
+    }
+
+    async dispatchServerUrlUpdate(): Promise<void> {
+        // Set the current ngrok URL if we are connected
+        for (const service of Server().proxyServices) {
+            if (service.isConnected()) {
+                await this.setServerUrl(service.url);
+                break;
+            }
+        }
     }
 
     /**
@@ -229,6 +238,7 @@ export class FCMService {
         const app = FCMService.getApp();
         if (!app) return;
 
+        Server().log('Listening for changes in Firebase...');
         if (this.dbType === DbType.FIRESTORE) {
             this.listenFirestoreDb();
         } else if (this.dbType === DbType.REALTIME) {

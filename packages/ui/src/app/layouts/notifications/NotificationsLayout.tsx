@@ -35,7 +35,6 @@ import {
 import { BsChevronDown, BsCheckAll } from 'react-icons/bs';
 import { FiTrash } from 'react-icons/fi';
 
-import { store } from '../../store';
 import { filter as filterLogs } from '../../slices/LogsSlice';
 import { DropZone } from '../../components/DropZone';
 import { LogsTable } from '../../components/tables/LogsTable';
@@ -43,9 +42,9 @@ import { isValidServerConfig, isValidClientConfig, isValidFirebaseUrl } from '..
 import { ErrorDialog, ErrorItem } from '../../components/modals/ErrorDialog';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 import { hasKey, readFile } from '../../utils/GenericUtils';
-import { getOauthUrl, restartOauthService } from '../../utils/IpcUtils';
+import { getFcmConfig, getOauthUrl, restartOauthService } from '../../utils/IpcUtils';
 import { clearFcmConfiguration, saveFcmClient, saveFcmServer } from '../../actions/FcmActions';
-import { setConfig } from '../../slices/ConfigSlice';
+import { ConfigItem, setConfig, setConfigBulk } from '../../slices/ConfigSlice';
 import { ProgressStatus } from '../../types';
 import { AiOutlineInfoCircle } from 'react-icons/ai';
 import { RiErrorWarningLine } from 'react-icons/ri';
@@ -87,6 +86,31 @@ export const NotificationsLayout = (): JSX.Element => {
     const alertOpen = errors.length > 0;
 
     useEffect(() => {
+        // Load the FCM config from the server
+        getFcmConfig().then((cfg: any) => {
+            if (!cfg) return;
+
+            const items: Array<ConfigItem> = [
+                {
+                    name: 'fcm_client',
+                    value: cfg.fcm_client,
+                    saveToDb: false
+                },
+                {
+                    name: 'fcm_server',
+                    value: cfg.fcm_server,
+                    saveToDb: false
+                }
+            ];
+
+            dispatch(setConfigBulk(items));
+            if (!cfg.fcm_client || !cfg.fcm_server) {
+                setAuthStatus(ProgressStatus.NOT_STARTED);
+            } else {
+                setAuthStatus(ProgressStatus.COMPLETED);
+            }
+        });
+
         ipcRenderer.removeAllListeners('oauth-status');
         getOauthUrl().then(url => setOauthUrl(url));
 
@@ -245,7 +269,7 @@ export const NotificationsLayout = (): JSX.Element => {
                                     leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
                                     variant='outline'
                                     onClick={() => {
-                                        store.dispatch(filterLogs((item) => !item.message.startsWith('[GCP]')));
+                                        dispatch(filterLogs((item) => !item.message.startsWith('[GCP]')));
                                         restartOauthService();
                                     }}
                                 >
