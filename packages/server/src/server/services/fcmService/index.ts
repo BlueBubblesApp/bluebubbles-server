@@ -3,6 +3,7 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 import { App } from "firebase-admin/app";
+import axios from "axios";
 
 const AppName = "BlueBubbles";
 
@@ -31,6 +32,8 @@ export class FCMService {
 
     dbType = DbType.UNKNOWN;
 
+    hasInitialized = false;
+
     /**
      * Starts the FCM app service
      */
@@ -40,6 +43,7 @@ export class FCMService {
         if (app) return true;
 
         Server().log("Initializing new FCM App");
+        this.hasInitialized = false;
 
         // Load in the last restart date
         const lastRestart = Server().repo.getConfig("last_fcm_restart");
@@ -65,6 +69,15 @@ export class FCMService {
             AppName
         );
 
+        try {
+            // Validate the project exists
+            await this.validateProject(serverConfig.project_id);
+        } catch (ex) {
+            // Catch an error and stop the service
+            await FCMService.stop();
+            throw ex;
+        }
+
         if (this.dbType === DbType.REALTIME) {
             await this.setRealtimeRules();
         }
@@ -79,6 +92,7 @@ export class FCMService {
             }
         }
 
+        this.hasInitialized = true;
         return true;
     }
 
@@ -148,7 +162,7 @@ export class FCMService {
      * @param serverUrl The new server URL
      */
     async setServerUrl(serverUrl: string): Promise<void> {
-        if (!(await this.start())) return;
+        if (!this.hasInitialized || !(await this.start())) return;
         if (!serverUrl || this.lastAddr === serverUrl) return;
 
         Server().log(`Updating Server Address in ${this.dbType} Database...`);
@@ -177,6 +191,38 @@ export class FCMService {
         config.once("value", _ => {
             config.update({ serverUrl });
         });
+    }
+
+    async validateProject(projectId: string): Promise<void> {
+        const app = FCMService.getApp();
+        const auth = await app.options.credential.getAccessToken();
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${auth.access_token}`,
+            Accept: 'application/json'
+        };
+
+        try {
+            await axios.request({
+                method: 'GET',
+                url: `https://firebase.googleapis.com/v1beta1/projects/${projectId}`,
+                headers
+            });
+        } catch (ex: any) {
+            const errorResponse = ex?.response.data;
+            if (errorResponse?.error?.message) {
+                // If the project has been deleted, we should unload the FCM configs.
+                // And stop the service.
+                if (errorResponse.error.message.includes('has been deleted')) {
+                    Server().log(`Firebase Project ${projectId} has been deleted. Unloading FCM configs...`);
+                    FileSystem.saveFCMClient(null);
+                    FileSystem.saveFCMServer(null);
+                }
+
+                throw new Error(`Firebase Project Error: ${errorResponse.error.message}`);
+            } else {
+                throw new Error(`Firebase Project Error: ${ex?.message ?? String(ex)}`);
+            }
+        }
     }
 
     async listen() {
@@ -238,7 +284,7 @@ export class FCMService {
         priority: "normal" | "high" = "normal"
     ): Promise<admin.messaging.BatchResponse> {
         try {
-            if (!(await this.start())) return null;
+            if (!this.hasInitialized || !(await this.start())) return null;
 
             // Build out the notification message
             const payload: admin.messaging.MulticastMessage = {
