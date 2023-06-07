@@ -6,11 +6,14 @@ import axios from "axios";
 // Internal libraries
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
+import * as admin from "firebase-admin";
 import { OAuth2Client } from "google-auth-library";
 import { google } from "googleapis";
 import { generateRandomString } from "@server/utils/CryptoUtils";
 import { isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ProgressStatus } from "@server/types";
+import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
+import { FCMService } from "../fcmService";
 
 /**
  * This service class hhandles the initial oauth workflows
@@ -29,6 +32,8 @@ export class OauthService {
     port = 8641;
 
     authToken: string;
+
+    expiresIn: number;
 
     projectName = 'BlueBubbles'
 
@@ -117,6 +122,9 @@ export class OauthService {
             FileSystem.saveFCMServer(serviceAccountJson);
             FileSystem.saveFCMClient(servicesJson);
 
+            Server().log(`[GCP] Creating Firestore Security Rules...`);
+            await this.createSecurityRules(projectId);
+
             // Mark the service as completed
             Server().log((
                 `[GCP] Successfully created and configured your Google Project! ` +
@@ -127,9 +135,12 @@ export class OauthService {
 
             // Shutdown the service
             await this.stop();
+
+            // Start the FCM service.
+            // Don't await because we don't want to catch the error here.
+            Server().fcm.restart();
         } catch (ex: any) {
             Server().log(`[GCP] Failed to create project: ${ex?.message}`, "error");
-            console.log(ex.response.data);
             if (ex?.response?.data?.error) {
                 Server().log(`[GCP] (${ex.response.data.error.code}) ${ex.response.data.error.message}`, "debug");
             }
@@ -242,10 +253,16 @@ export class OauthService {
      * @throws An HTTP error if the error code is not 409
      */
     async createDatabase(projectId: string) {
+        const dbName = '(default)';
+
         try {
-            const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases?databaseId=(default)`;
+            const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases?databaseId=${dbName}`;
             const data = {type: "FIRESTORE_NATIVE", locationId : "nam5"};
             await this.sendRequest('POST', url, data);
+
+            // Wait for the DB to be created
+            await this.waitForData(
+                'GET', `https://firestore.googleapis.com/v1/projects/${projectId}/databases`, null, 'databases');
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
                 Server().log(`[GCP] Firestore already exists!`);
@@ -402,6 +419,29 @@ export class OauthService {
                 await waitMs(waitTime);
             }
         }
+    }
+
+    async createSecurityRules(projectId: string) {
+        // Create a custom SDK app using the auth token we received from
+        // the oauth consent flow. We do this here because when this is
+        // done using service account credentials, a permission error occurs.
+        const app = admin.initializeApp(
+            {
+                credential: {
+                    getAccessToken: async () => {
+                        return {
+                            access_token: this.authToken,
+                            expires_in: this.expiresIn
+                        }
+                    }
+                },
+                projectId
+            },
+            "BlueBubbles-OAuth"
+        );
+
+        await FCMService.setFirestoreRulesForApp(app);
+        await app.delete();
     }
 
     /**

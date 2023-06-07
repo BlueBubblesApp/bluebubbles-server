@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
+import { App } from "firebase-admin/app";
 
 const AppName = "BlueBubbles";
 
@@ -58,20 +59,14 @@ export class FCMService {
         admin.initializeApp(
             {
                 credential: admin.credential.cert(serverConfig),
-                databaseURL: clientConfig.project_info.firebase_url
+                databaseURL: clientConfig.project_info.firebase_url,
+                projectId: serverConfig.project_id
             },
             AppName
         );
 
-        try {
-            if (this.dbType === DbType.REALTIME) {
-                await this.setRealtimeRules();
-            } else if (this.dbType === DbType.FIRESTORE) {
-                await this.setFirestoreRules();
-            }
-        } catch (ex: any) {
-            Server().log("Failed to set Firebase Database Security Rules!", "warn");
-            Server().log(ex?.message ?? String(ex), "debug");
+        if (this.dbType === DbType.REALTIME) {
+            await this.setRealtimeRules();
         }
 
         this.listen();
@@ -87,7 +82,7 @@ export class FCMService {
         return true;
     }
 
-    async setFirestoreRules() {
+    static async setFirestoreRulesForApp(app: App): Promise<void> {
         const source: RulesFile = {
             name: "firestore.rules",
             content: (
@@ -106,7 +101,7 @@ export class FCMService {
             )
         };
 
-        const rules = admin.app(AppName).securityRules();
+        const rules = admin.securityRules(app);
         let shouldRefresh = true;
         
         try {

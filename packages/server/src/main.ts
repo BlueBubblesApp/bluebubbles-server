@@ -212,7 +212,9 @@ const createOauthWindow = async (url: string) => {
         const hash = url.split('#')[1];
         const params = new URLSearchParams(hash);
         const token = params.get('access_token');
+        const expires = params.get('expires_in');
         Server().oauthService.authToken = token;
+        Server().oauthService.expiresIn = Number.parseInt(expires);
         Server().oauthService.handleProjectCreation();
 
         // Clear the window data
