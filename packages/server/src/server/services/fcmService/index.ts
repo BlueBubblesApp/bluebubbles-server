@@ -234,7 +234,7 @@ export class FCMService {
         }
     }
 
-    async listen() {
+    listen() {
         const app = FCMService.getApp();
         if (!app) return;
 

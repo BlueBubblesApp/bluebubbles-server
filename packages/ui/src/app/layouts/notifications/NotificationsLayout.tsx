@@ -210,7 +210,7 @@ export const NotificationsLayout = (): JSX.Element => {
     };
 
     const getAlertStatus = () => {
-        if (clientLoaded && serverLoaded) {
+        if (authStatus === ProgressStatus.COMPLETED) {
             return (
                 <Alert status='success'>
                     <AlertIcon />

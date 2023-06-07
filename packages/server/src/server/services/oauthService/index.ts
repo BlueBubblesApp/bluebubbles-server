@@ -149,6 +149,7 @@ export class OauthService {
                     getData: async () => {
                         try {
                             await Server().fcm.dispatchServerUrlUpdate();
+                            Server().fcm.listen();
                             return true;
                         } catch (ex) {
                             return false;
@@ -156,10 +157,10 @@ export class OauthService {
                     }
                 });
 
-                if (result) {
-                    Server().fcm.listen();
-                } else {
+                if (!result) {
                     Server().log(`[FCM] Failed to access Firestore after 2 minutes!`, "warn");
+                } else {
+                    Server().log(`[FCM] Successfully accessed Firestore!`, "debug");
                 }
             });
         } catch (ex: any) {
