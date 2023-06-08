@@ -99,7 +99,11 @@ export const DynamicDnsDialog = ({
                                 if (address.length === 0) {
                                     setError('Please enter a Dynamic DNS address!');
                                     return;
+                                } else if (!address.startsWith('http://') && !address.startsWith('https://')) {
+                                    setError('Please enter a valid Dynamic DNS URL (including http:// or https://)!');
+                                    return;
                                 }
+                                
 
                                 if (onConfirm) onConfirm(address);
                                 onClose();
