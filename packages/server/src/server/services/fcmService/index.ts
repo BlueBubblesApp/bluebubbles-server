@@ -82,6 +82,8 @@ export class FCMService {
             throw ex;
         }
 
+        this.hasInitialized = true;
+
         if (!initializeOnly) {
             if (this.dbType === DbType.REALTIME) {
                 await this.setRealtimeRules();
@@ -90,8 +92,7 @@ export class FCMService {
             this.dispatchServerUrlUpdate();
             this.listen();
         }
-
-        this.hasInitialized = true;        
+    
         return true;
     }
 
