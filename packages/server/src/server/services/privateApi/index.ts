@@ -125,8 +125,8 @@ export class BlueBubblesHelperService {
 
                 // Execute shell command to start the dylib.
                 // eslint-disable-next-line max-len
-                // this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} /System/Applications/Messages.app/Contents/MacOS/Messages`;
-                // await this.dylibProcess;
+                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} /System/Applications/Messages.app/Contents/MacOS/Messages`;
+                await this.dylibProcess;
             } catch (ex: any) {
                 if (this.isStopping) return;
 
