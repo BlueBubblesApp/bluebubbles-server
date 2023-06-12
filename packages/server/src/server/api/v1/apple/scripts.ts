@@ -3,7 +3,7 @@ import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
-import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
@@ -14,7 +14,9 @@ const buildServiceScript = (inputService: string) => {
         theService = `"${theService}"`;
     }
 
-    let serviceScript = `set targetService to 1st service whose service type = ${theService}`;
+    const svcClass = isMinVentura ? 'account' : 'service';
+
+    let serviceScript = `set targetService to 1st ${svcClass} whose service type = ${theService}`;
     if (!isMinBigSur && theService !== "iMessage") {
         serviceScript = `set targetService to service ${theService}`;
     }
