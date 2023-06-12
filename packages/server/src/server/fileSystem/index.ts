@@ -479,6 +479,12 @@ export class FileSystem {
      * Makes sure that Messages is running
      */
     static async startMessages() {
+        // If we are managing the messages process, we don't need to make sure it's started
+        const papi_enabled = Server().repo.getConfig('enable_private_api') as boolean;
+        const papi_mode = Server().repo.getConfig('private_api_mode') as string;
+        if (papi_enabled && papi_mode === 'process-dylib') return;
+
+        // Start the messages app
         await FileSystem.executeAppleScript(startMessages());
     }
 

@@ -13,7 +13,6 @@ import {
 } from '@chakra-ui/react';
 import { AutoStartField } from '../../../components/fields/AutoStartField';
 import { AutoCaffeinateField } from '../../../components/fields/AutoCaffeinateField';
-import { PrivateApiField } from '../../../components/fields/PrivateApiField';
 import { DockBadgeField } from '../../../components/fields/DockBadgeField';
 import { HideDockIconField } from '../../../components/fields/HideDockIconField';
 import { StartViaTerminalField } from '../../../components/fields/StartViaTerminalField';
@@ -27,8 +26,6 @@ export const FeatureSettings = (): JSX.Element => {
             <Stack direction='column' p={5}>
                 <Text fontSize='2xl'>Features</Text>
                 <Divider orientation='horizontal' />
-                <Spacer />
-                <PrivateApiField />
                 <Spacer />
                 <FacetimeDetectionField />
                 <Spacer />

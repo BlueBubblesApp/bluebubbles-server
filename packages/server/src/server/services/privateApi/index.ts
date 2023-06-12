@@ -1,3 +1,4 @@
+import "zx/globals";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
@@ -37,6 +38,12 @@ export class BlueBubblesHelperService {
 
     typingCache: Record<string, Record<string, any>> = {};
 
+    dylibProcess: Promise<any>;
+
+    dylibFailureCounter: number;
+
+    dylibLastErrorTime: number;
+
     static get port(): number {
         return clamp(MIN_PORT + os.userInfo().uid - 501, MIN_PORT, MAX_PORT);
     }
@@ -44,7 +51,87 @@ export class BlueBubblesHelperService {
     constructor() {
         this.restartCounter = 0;
         this.transactionManager = new TransactionManager();
-        BlueBubblesHelperService.installBundle();
+    }
+
+    async start(): Promise<void> {
+        // Stop anything going on
+        this.stop();
+
+        // Configure & start the listener
+        Server().log("Starting Private API Helper...", "debug");
+        this.configureServer();
+
+        // we need to get the port to open the server on (to allow multiple users to use the bundle)
+        // we'll base this off the users uid (a unique id for each user, starting from 501)
+        // we'll subtract 501 to get an id starting at 0, incremented for each user
+        // then we add this to the base port to get a unique port for the socket
+        Server().log(`Starting Socket server on port ${BlueBubblesHelperService.port}`);
+        this.server.listen(BlueBubblesHelperService.port, "localhost", 511, () => {
+            this.restartCounter = 0;
+        });
+
+        this.startPerMode();
+    }
+
+    async startPerMode(): Promise<void> {
+        try {
+            const mode = (Server().repo.getConfig("private_api_mode") as string) ?? 'macforge';
+            if (mode === 'macforge') {
+                await this.startMacForge();
+            } else if (mode === 'process-dylib') {
+                await this.startProcessDylib();
+            } else {
+                Server().log(`Invalid Private API mode: ${mode}`);
+                return;
+            }
+        } catch (ex: any) {
+            Server().log(`Failed to start Private API: ${ex?.message ?? String(ex)}`, "error");
+            return;
+        }
+    }
+
+    async startMacForge(): Promise<void> {
+        await BlueBubblesHelperService.installBundle();
+    }
+
+    async startProcessDylib(): Promise<void> {
+        await BlueBubblesHelperService.uninstallBundle();
+        this.dylibFailureCounter = 0;
+        this.dylibLastErrorTime = 0;
+
+        const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
+        const localPath = path.join(FileSystem.resources, "private-api", macVer, "BlueBubblesHelper.dylib");
+        if (!fs.existsSync(localPath)) {
+            await Server().repo.setConfig("private_api_mode", "macforge");
+            throw new Error("Unable to locate embedded Private API DYLIB! Falling back to MacForge Bundle.");
+        }
+
+        // If there are 5 failures in a row, we'll stop trying to start it
+        while (this.dylibFailureCounter < 5) {
+            try {
+                // Execute shell command to start the dylib.
+                // eslint-disable-next-line max-len
+                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} /System/Applications/Messages.app/Contents/MacOS/Messages`;
+                await this.dylibProcess;
+            } catch (ex: any) {
+                // If the last time we errored was more than 15 seconds ago, reset the counter.
+                // This would indicate that the dylib was running, but then crashed.
+                // Rather than an immediate crash.
+                if (Date.now() - this.dylibLastErrorTime > 15000) {
+                    this.dylibFailureCounter = 0;
+                }
+
+                this.dylibFailureCounter += 1;
+                this.dylibLastErrorTime = Date.now();
+                if (this.dylibFailureCounter >= 5) {
+                    Server().log(`Failed to start dylib after 5 tries: ${ex?.message ?? String(ex)}`, "error");
+                }
+            }
+        }
+
+        if (this.dylibFailureCounter >= 5) {
+            Server().log("Failed to start Private API DYLIB 3 times in a row, giving up...", "error");
+        }
     }
 
     static async installBundle(force = false): Promise<BundleStatus> {
@@ -152,6 +239,38 @@ export class BlueBubblesHelperService {
         return status;
     }
 
+    static async uninstallBundle(): Promise<void> {
+        Server().log("Attempting to uninstall Private API Helper Bundle...", "debug");
+
+        // Remove from all paths. For MySIMBL & MacEnhance, as well as their user/library variants
+        // Technically, MacEnhance is only for Mojave+, however, users may have older versions installed
+        // If we find any of the directories, we should install to them
+        const opts = [
+            FileSystem.libMacForgePlugins,
+            // FileSystem.usrMacForgePlugins,
+            FileSystem.libMySimblPlugins
+            // FileSystem.usrMySimblPlugins
+        ];
+
+        for (const pluginPath of opts) {
+            if (!fs.existsSync(pluginPath)) continue;
+
+            const remotePath = path.join(pluginPath, "BlueBubblesHelper.bundle");
+
+            try {
+                // If the remote bundle doesn't exist, we just need to write it
+                if (fs.existsSync(remotePath)) {
+                    fs.unlinkSync(remotePath);
+                }
+            } catch (ex: any) {
+                Server().log((
+                    `Failed to remove MacForge bundle at, "${remotePath}": ` +
+                    `Please manually remove it to prevent conflicts`
+                ), 'warn');
+            }
+        }
+    }
+
     configureServer() {
         this.server = net.createServer((socket: net.Socket) => {
             this.helper = socket;
@@ -186,25 +305,6 @@ export class BlueBubblesHelperService {
         });
     }
 
-    start() {
-        // Stop anything going on
-        this.stop();
-
-        // Configure & start the listener
-        Server().log("Starting Private API Helper...", "debug");
-        this.configureServer();
-
-        // we need to get the port to open the server on (to allow multiple users to use the bundle)
-        // we'll base this off the users uid (a unique id for each user, starting from 501)
-        // we'll subtract 501 to get an id starting at 0, incremented for each user
-        // then we add this to the base port to get a unique port for the socket
-        Server().log(`Starting Socket server on port ${BlueBubblesHelperService.port}`);
-        // Listen and reset the restart counter
-        this.server.listen(BlueBubblesHelperService.port, "localhost", 511, () => {
-            this.restartCounter = 0;
-        });
-    }
-
     stop() {
         Server().log(`Stopping Private API Helper...`);
 
@@ -228,6 +328,15 @@ export class BlueBubblesHelperService {
         } catch (ex: any) {
             Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
         }
+
+        this.dylibFailureCounter = 0;
+        this.restartCounter = 0;
+        this.dylibProcess = null;
+    }
+
+    async restart(): Promise<void> {
+        this.stop();
+        await this.start();
     }
 
     async startTyping(chatGuid: string) {

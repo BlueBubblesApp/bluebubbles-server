@@ -10,6 +10,7 @@ import {
     AlertIcon
 } from '@chakra-ui/react';
 import { PrivateApiField } from '../../../components/fields/PrivateApiField';
+import { PrivateApiModeField } from 'app/components/fields/PrivateApiModeField';
 
 
 export const PrivateApiWalkthrough = (): JSX.Element => {
@@ -51,6 +52,7 @@ export const PrivateApiWalkthrough = (): JSX.Element => {
                 <PrivateApiField
                     helpText={'Note: If the plugins folder is missing, you may need to manually install the helper bundle'}
                 />
+                <PrivateApiModeField />
             </Box>
         </SlideFade>
     );

@@ -57,7 +57,6 @@ export const ProxyServiceField = ({ helpText, showAddress = true }: ProxyService
             <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                 <Select
                     id='proxy_service'
-                    placeholder='Select Proxy Service'
                     maxWidth="15em"
                     mr={3}
                     value={proxyService}

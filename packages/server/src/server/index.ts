@@ -1020,6 +1020,12 @@ class BlueBubblesServer extends EventEmitter {
             } else {
                 Server().privateApiHelper.stop();
             }
+        } else if (prevConfig.enable_private_api && prevConfig.private_api_mode !== nextConfig.private_api_mode) {
+            if (Server().privateApiHelper === null) {
+                Server().privateApiHelper = new BlueBubblesHelperService();
+            }
+
+            await Server().privateApiHelper.restart();
         }
 
         // If the dock style changes
