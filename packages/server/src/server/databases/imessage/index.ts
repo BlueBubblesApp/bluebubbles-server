@@ -101,8 +101,8 @@ export class MessageRepository {
         query.orderBy("chat.ROWID", "DESC");
 
         // Set page params
-        query.skip(offset);
-        if (limit) query.take(limit);
+        if (offset != null) query.skip(offset);
+        if (limit != null) query.take(limit);
 
         // Get results
         return await query.getManyAndCount();

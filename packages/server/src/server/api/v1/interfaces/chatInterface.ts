@@ -48,8 +48,8 @@ export class ChatInterface {
                 withLastMessage: true,
                 withParticipants: false,
                 withArchived,
-                offset,
-                limit
+                offset: null,
+                limit: null
             });
 
             for (const chat of tmpChats) {
