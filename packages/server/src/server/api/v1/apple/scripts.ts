@@ -89,6 +89,13 @@ export const startMessages = () => {
 };
 
 /**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const stopMessages = () => {
+    return stopApp("Messages");
+};
+
+/**
  * The AppleScript used to hide an app
  */
 export const hideApp = (appName: string) => {
@@ -146,7 +153,7 @@ export const hideFindMyFriends = () => {
 };
 
 /**
- * The AppleScript used to send a message with or without an attachment
+ * The AppleScript used to start an application
  */
 export const startApp = (appName: string) => {
     return `set appName to "${appName}"
@@ -154,6 +161,18 @@ export const startApp = (appName: string) => {
             return 0
         else
             tell application appName to reopen
+        end if`;
+};
+
+/**
+ * The AppleScript used to stop an application
+ */
+export const stopApp = (appName: string) => {
+    return `set appName to "${appName}"
+        if application appName is running then
+            tell application appName to quit
+        else
+            return 0
         end if`;
 };
 

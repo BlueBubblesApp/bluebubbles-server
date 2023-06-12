@@ -9,7 +9,7 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
 import { clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty } from "@server/helpers/utils";
-import { restartMessages } from "@server/api/v1/apple/scripts";
+import { restartMessages, stopMessages } from "@server/api/v1/apple/scripts";
 import {
     TransactionPromise,
     TransactionResult,
@@ -98,7 +98,10 @@ export class BlueBubblesHelperService {
     }
 
     async startProcessDylib(): Promise<void> {
+        // Uninstall any previously installed MacForge bundles
         await BlueBubblesHelperService.uninstallBundle();
+
+        // Clear the markers
         this.dylibFailureCounter = 0;
         this.dylibLastErrorTime = 0;
 
@@ -112,10 +115,18 @@ export class BlueBubblesHelperService {
         // If there are 5 failures in a row, we'll stop trying to start it
         while (this.dylibFailureCounter < 5) {
             try {
+                // Stop the running Messages app
+                try {
+                    await FileSystem.executeAppleScript(stopMessages());
+                } catch {
+                    // Ignore. This is most likely due to an osascript error.
+                    // Which we don't want to stop the dylib from starting.
+                }
+
                 // Execute shell command to start the dylib.
                 // eslint-disable-next-line max-len
-                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} /System/Applications/Messages.app/Contents/MacOS/Messages`;
-                await this.dylibProcess;
+                // this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} /System/Applications/Messages.app/Contents/MacOS/Messages`;
+                // await this.dylibProcess;
             } catch (ex: any) {
                 if (this.isStopping) return;
 
@@ -265,7 +276,7 @@ export class BlueBubblesHelperService {
             try {
                 // If the remote bundle doesn't exist, we just need to write it
                 if (fs.existsSync(remotePath)) {
-                    fs.unlinkSync(remotePath);
+                    fs.rmdirSync(remotePath, { recursive: true });
                 }
             } catch (ex: any) {
                 Server().log((
