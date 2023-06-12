@@ -21,6 +21,7 @@ import * as net from "net";
 import { ValidRemoveTapback } from "../../types";
 import { MAX_PORT, MIN_PORT } from "./constants";
 import { TYPING_INDICATOR } from "@server/events";
+import { ProcessPromise } from "zx";
 
 type BundleStatus = {
     success: boolean;
@@ -32,13 +33,15 @@ export class BlueBubblesHelperService {
 
     helper: net.Socket;
 
+    isStopping = false;
+
     restartCounter: number;
 
     transactionManager: TransactionManager;
 
     typingCache: Record<string, Record<string, any>> = {};
 
-    dylibProcess: Promise<any>;
+    dylibProcess: ProcessPromise<any>;
 
     dylibFailureCounter: number;
 
@@ -55,7 +58,7 @@ export class BlueBubblesHelperService {
 
     async start(): Promise<void> {
         // Stop anything going on
-        this.stop();
+        await this.stop();
 
         // Configure & start the listener
         Server().log("Starting Private API Helper...", "debug");
@@ -114,6 +117,8 @@ export class BlueBubblesHelperService {
                 this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} /System/Applications/Messages.app/Contents/MacOS/Messages`;
                 await this.dylibProcess;
             } catch (ex: any) {
+                if (this.isStopping) return;
+
                 // If the last time we errored was more than 15 seconds ago, reset the counter.
                 // This would indicate that the dylib was running, but then crashed.
                 // Rather than an immediate crash.
@@ -305,7 +310,8 @@ export class BlueBubblesHelperService {
         });
     }
 
-    stop() {
+    async stop() {
+        this.isStopping = true;
         Server().log(`Stopping Private API Helper...`);
 
         try {
@@ -314,7 +320,7 @@ export class BlueBubblesHelperService {
                 this.helper = null;
             }
         } catch (ex: any) {
-            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
+            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
         }
 
         try {
@@ -326,16 +332,25 @@ export class BlueBubblesHelperService {
                 this.server = null;
             }
         } catch (ex: any) {
-            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
+            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
         }
 
-        this.dylibFailureCounter = 0;
-        this.restartCounter = 0;
-        this.dylibProcess = null;
+        try {
+            this.dylibFailureCounter = 0;
+            this.restartCounter = 0;
+            if (this.dylibProcess != null && !(this.dylibProcess?.child?.killed ?? false)) {
+                Server().log("Killing BlueBubblesHelper DYLIB...", "debug");
+                await this.dylibProcess.kill(9);
+            }
+        } catch (ex) {
+            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
+        }
+
+        this.isStopping = false;
     }
 
     async restart(): Promise<void> {
-        this.stop();
+        await this.stop();
         await this.start();
     }
 
