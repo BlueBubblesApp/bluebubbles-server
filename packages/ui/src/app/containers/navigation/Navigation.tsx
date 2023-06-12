@@ -248,7 +248,9 @@ interface MobileProps extends FlexProps {
 }
 const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileProps) => {
     const { colorMode, toggleColorMode } = useColorMode();
+    const useOled = useAppSelector(state => state.config.use_oled_dark_mode ?? false);
     const updateAvailable: boolean = (useAppSelector(state => state.config.update_available) ?? false);
+    const bgColor = (colorMode === 'light') ? 'white' : (useOled ? 'black' : 'gray.800');
 
     return (
         <Flex
@@ -259,6 +261,10 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
             borderBottomWidth="1px"
             borderBottomColor={useColorModeValue('gray.200', 'gray.700')}
             justifyContent={{ base: 'space-between', md: 'flex-end' }}
+            backgroundColor={bgColor}
+            position="sticky"
+            top="0"
+            zIndex="sticky"
             {...rest}
         >
             <IconButton
