@@ -8,7 +8,7 @@ import { parse as ParsePlist } from "plist";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ValidTapback } from "@server/types";
-import { clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty } from "@server/helpers/utils";
+import { clamp, isEmpty, isMinBigSur, isMinMonterey, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { restartMessages, stopMessages } from "@server/api/v1/apple/scripts";
 import {
     TransactionPromise,
@@ -124,6 +124,7 @@ export class BlueBubblesHelperService {
                 // Stop the running Messages app
                 try {
                     await FileSystem.executeAppleScript(stopMessages());
+                    await waitMs(1000);
                 } catch {
                     // Ignore. This is most likely due to an osascript error.
                     // Which we don't want to stop the dylib from starting.
