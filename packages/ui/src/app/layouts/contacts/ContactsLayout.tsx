@@ -405,7 +405,7 @@ export const ContactsLayout = (): JSX.Element => {
                         w="full"
                         pt={2}
                     >
-                        <PaginationPrevious minWidth={'75px'}>Previous</PaginationPrevious>
+                        <PaginationPrevious minWidth={'75px'} colorScheme='gray' color='black'>Previous</PaginationPrevious>
                         <Box ml={1}></Box>
                         <PaginationPageGroup flexWrap="wrap" justifyContent="center">
                             {pages.map((page: number) => (
@@ -415,11 +415,13 @@ export const ContactsLayout = (): JSX.Element => {
                                     my={1}
                                     px={3}
                                     fontSize={14}
+                                    colorScheme='gray'
+                                    color='black'
                                 />
                             ))}
                         </PaginationPageGroup>
                         <Box ml={1}></Box>
-                        <PaginationNext minWidth={'50px'}>Next</PaginationNext>
+                        <PaginationNext minWidth={'50px'} colorScheme='gray' color='black'>Next</PaginationNext>
                     </PaginationContainer>
                 </Pagination>
             </Stack>
