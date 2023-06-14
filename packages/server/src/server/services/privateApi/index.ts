@@ -112,6 +112,12 @@ export class BlueBubblesHelperService {
             throw new Error("Unable to locate embedded Private API DYLIB! Falling back to MacForge Bundle.");
         }
 
+        const messagesPath = "/System/Applications/Messages.app/Contents/MacOS/Messages";
+        if (!fs.existsSync(messagesPath)) {
+            await Server().repo.setConfig("private_api_mode", "macforge");
+            throw new Error("Unable to locate Messages.app! Falling back to MacForge Bundle.");
+        }
+
         // If there are 5 failures in a row, we'll stop trying to start it
         while (this.dylibFailureCounter < 5) {
             try {
@@ -125,7 +131,7 @@ export class BlueBubblesHelperService {
 
                 // Execute shell command to start the dylib.
                 // eslint-disable-next-line max-len
-                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} /System/Applications/Messages.app/Contents/MacOS/Messages`;
+                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} ${messagesPath}`;
                 await this.dylibProcess;
             } catch (ex: any) {
                 if (this.isStopping) return;
