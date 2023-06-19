@@ -55,6 +55,17 @@ export const deduplicateObjectArray = (items: any[], key: string): any[] => {
     });
 };
 
+// Parse region from phone number with country code
+export const parsePhoneNumberRegion = (phoneNumber: string, defaultRegion = 'US') => {
+    try {
+        const phoneUtil = PhoneNumberUtil.getInstance();
+        const number = phoneUtil.parse(phoneNumber);
+        return phoneUtil.getRegionCodeForNumber(number);
+    } catch (ex) {
+        return Server().region ?? defaultRegion;
+    }
+};
+
 export const getiMessageAddressFormat = (address: string, preSlugged = false, pretty = false): string => {
     const phoneUtil = PhoneNumberUtil.getInstance();
 
@@ -68,23 +79,31 @@ export const getiMessageAddressFormat = (address: string, preSlugged = false, pr
     const hasRegionCode = addr.startsWith("+");
 
     try {
-        // If we don't have a region code, we need to "infer" it based on the macOS locale.
-        // Server().region is loaded upon app startup. If it's null (which it shouldn't be),
-        // we should default to US as a region.
-        // Using the region, get the proper "code", and format it into the address
-        const region = Server().region ?? "US";
+        const defaultRegion = Server().region ?? "US";
+        let region = defaultRegion;
         if (!hasRegionCode) {
-            // If we don't have a region code, we should try and parse one
+             // If we don't have a region code, we need to "infer" it based on the macOS locale.
+            // Server().region is loaded upon app startup. If it's null (which it shouldn't be),
+            // we should default to US as a region.
             const regionCode = PhoneMetadata.countryToMetadata[region][10];
             addr = `+${regionCode}${addr}`;
+        } else {
+            // If we have a country code, we need to use it to get the region code.
+            // Which we then use to parse the number.
+            region = parsePhoneNumberRegion(addr, region);
         }
 
         // Parse the number
         const number = phoneUtil.parseAndKeepRawInput(addr, region);
 
         if (pretty) {
-            // Format with parenthesis, spaces, dashes, etc.
-            return `+${phoneUtil.formatOutOfCountryCallingNumber(number, region)}`;
+            if (defaultRegion === region) {
+                // If the region matches the server region, format it as a national number.
+                return phoneUtil.format(number, PhoneNumberFormat.NATIONAL);
+            } else {
+                // Otherwise, format it as an international number.
+                return phoneUtil.format(number, PhoneNumberFormat.INTERNATIONAL);
+            }
         } else {
             // Format it without parenthesis, spaces, dashes, etc.
             // But include the region code.
