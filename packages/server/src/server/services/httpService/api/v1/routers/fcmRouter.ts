@@ -18,7 +18,7 @@ export class FcmRouter {
         // As such, we need to manually add it back in so the client doesn't break when reading the file.
         // This is a monkeypatch. The client only requires the first part of the client_id, before the `-`.
         // This value is the same as the project number, so we can just use that.
-        if (isNotEmpty(googleServices.client) && isEmpty(googleServices.client[0].oauth_client)) {
+        if (isNotEmpty(googleServices?.client) && isEmpty(googleServices?.client[0].oauth_client)) {
             googleServices.client[0].oauth_client = [
                 {
                     // The project number exists in multiple fields. Fallback if the project number is not found.
