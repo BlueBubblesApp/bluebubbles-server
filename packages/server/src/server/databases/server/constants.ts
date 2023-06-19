@@ -26,5 +26,5 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     facetime_detection: () => 0,
     start_minimized: () => 0,
     headless: () => 0,
-    private_api_mode: (): 'macforge' | 'process-dylib' | 'global-dylib' => 'macforge'
+    private_api_mode: (): 'macforge' | 'process-dylib' => 'process-dylib'
 };
