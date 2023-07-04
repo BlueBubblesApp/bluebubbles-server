@@ -135,23 +135,25 @@ export class MessageRepository {
 
         if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
 
+        let lookupGuids = [attachmentGuid];
         // Attachment GUIDs may start with a prefix such as p:/ or `at_x_`. For lookups,
         // all we need is the actual GUID, which is the last 36 digits.
         // Original GUIDs can also be prefixed with at_x_ or p:/.
         if (attachmentGuid.length >= 36) {
-            attachmentGuid = attachmentGuid.substring(attachmentGuid.length - 36);
+            lookupGuids.push(attachmentGuid.substring(attachmentGuid.length - 36));
         }
-
-        // El Capitan does not have an original_guid column.
-        if (isMinHighSierra) {
-            query.where("attachment.original_guid LIKE :guid", { guid: `%${attachmentGuid}` });
-            query.orWhere("attachment.guid LIKE :guid", { guid: `%${attachmentGuid}` });
-        } else {
-            query.where("attachment.guid LIKE :guid", { guid: `%${attachmentGuid}` });
+        for (const lookupGuid in lookupGuids) {
+            // El Capitan does not have an original_guid column.
+            if (isMinHighSierra) {
+                query.where("attachment.original_guid LIKE :guid", { guid: `%${lookupGuid}` });
+                query.orWhere("attachment.guid LIKE :guid", { guid: `%${lookupGuid}` });
+            } else {
+                query.where("attachment.guid LIKE :guid", { guid: `%${lookupGuid}` });
+            }
+            const attachment = await query.getOne();
+            if (attachment) return attachment;
         }
-
-        const attachment = await query.getOne();
-        return attachment;
+        return null;
     }
 
     /**
