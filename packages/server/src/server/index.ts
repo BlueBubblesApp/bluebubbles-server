@@ -1015,11 +1015,7 @@ class BlueBubblesServer extends EventEmitter {
                 Server().privateApiHelper = new BlueBubblesHelperService();
             }
 
-            if (nextConfig.enable_private_api) {
-                await Server().privateApiHelper.start();
-            } else {
-                await Server().privateApiHelper.stop();
-            }
+            await Server().privateApiHelper.start();
         } else if (prevConfig.enable_private_api && !nextConfig.enable_private_api) {
             await Server().privateApiHelper?.stop();
         } else if (nextConfig.enable_private_api && prevConfig.private_api_mode !== nextConfig.private_api_mode) {
