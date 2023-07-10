@@ -56,8 +56,9 @@ export class AttachmentSerializer {
         // If the attachment isn't finished downloading, the path will be null
         if (fPath) {
             try {
-                // If we want to resize the image, do so here
-                if (config.convert) {
+                // If we want to convert the attachment, do so here.
+                // So long as we haven't done it yet.
+                if (config.convert && !fPath.includes(FileSystem.convertDir)) {
                     const converters = [convertImage, convertAudio];
                     for (const conversion of converters) {
                         // Try to convert the attachments using available converters
