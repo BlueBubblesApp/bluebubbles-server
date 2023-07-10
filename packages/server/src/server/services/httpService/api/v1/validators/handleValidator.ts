@@ -23,4 +23,13 @@ export class HandleValidator {
         ValidateInput(ctx?.request?.body, HandleValidator.queryBodyRules);
         await next();
     }
+
+    static availabilityParamRules = {
+        address: "string|required"
+    };
+
+    static async validateAvailability(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx.request?.query, HandleValidator.availabilityParamRules);
+        await next();
+    }
 }

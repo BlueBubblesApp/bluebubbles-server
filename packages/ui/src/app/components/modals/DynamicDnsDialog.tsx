@@ -48,11 +48,11 @@ export const DynamicDnsDialog = ({
             <AlertDialogOverlay>
                 <AlertDialogContent>
                     <AlertDialogHeader fontSize='lg' fontWeight='bold'>
-                        Set Dynamic DNS
+                        Set Dynamic DNS / Custom URL
                     </AlertDialogHeader>
 
                     <AlertDialogBody>
-                        <Text>Enter your Dynamic DNS URL, including the schema and port. Here are some examples:</Text>
+                        <Text>Enter your Dynamic DNS or Custom URL, including the schema and port. Here are some examples:</Text>
                         <br />
                         <UnorderedList>
                             <ListItem>http://thequickbrownfox.ddns.net:{port}</ListItem>
@@ -62,7 +62,7 @@ export const DynamicDnsDialog = ({
                         <Text>If you plan to use your own custom certificate, please remember to use <strong>"https://"</strong> as your URL scheme</Text>
                         <br />
                         <FormControl isInvalid={isInvalid}>
-                            <FormLabel htmlFor='address'>Dynamic DNS</FormLabel>
+                            <FormLabel htmlFor='address'>Dynamic DNS / Custom URL</FormLabel>
                             <Input
                                 id='address'
                                 type='text'

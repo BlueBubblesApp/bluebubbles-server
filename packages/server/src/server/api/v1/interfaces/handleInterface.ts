@@ -71,4 +71,26 @@ export class HandleInterface {
         if (focusStatus?.data?.silenced == 1) return "silenced";
         return "none";
     }
+
+    static async getMessagesAvailability(address: string): Promise<boolean> {
+        checkPrivateApiStatus();
+
+        const availability = await Server().privateApiHelper.getMessagesAvailability(address);
+        if (isEmpty(availability?.data)) {
+            throw new Error("Failed to determine iMessage availability!");
+        }
+
+        return !!availability?.data.available;
+    }
+
+    static async getFacetimeAvailability(address: string): Promise<boolean> {
+        checkPrivateApiStatus();
+
+        const availability = await Server().privateApiHelper.getFacetimeAvailability(address);
+        if (isEmpty(availability?.data)) {
+            throw new Error("Failed to determine Facetime availability!");
+        }
+
+        return !!availability?.data.available;
+    }
 }

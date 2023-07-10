@@ -23,7 +23,7 @@ import {  AiOutlineInfoCircle } from 'react-icons/ai';
 import { useAppSelector } from '../../../hooks';
 import { NgrokRegionField } from '../../../components/fields/NgrokRegionField';
 import { NgrokAuthTokenField } from '../../../components/fields/NgrokAuthTokenField';
-import { ProxyServiceField } from '../../../components/fields/ProxyServiceField';
+import { ProxySetupField } from '../../../components/fields/ProxySetupField';
 import { ServerPasswordField } from '../../../components/fields/ServerPasswordField';
 import { LocalPortField } from '../../../components/fields/LocalPortField';
 import { UseHttpsField } from '../../../components/fields/UseHttpsField';
@@ -57,7 +57,7 @@ export const ConnectionSettings = (): JSX.Element => {
             </Flex>
             <Divider orientation='horizontal' />
             <Spacer />
-            <ProxyServiceField />
+            <ProxySetupField />
             <Spacer />
             {(proxyService === 'ngrok') ? (<NgrokRegionField />) : null}
             <Spacer />
@@ -68,7 +68,7 @@ export const ConnectionSettings = (): JSX.Element => {
             <LocalPortField />
 
             <Spacer />
-            {(proxyService === 'dynamic-dns') ? (
+            {(['dynamic-dns', 'lan-url'].includes(proxyService)) ? (
                 <Accordion allowMultiple>
                     <AccordionItem>
                         <AccordionButton>

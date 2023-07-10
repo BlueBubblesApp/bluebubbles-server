@@ -64,4 +64,20 @@ export class HandleRouter {
         const status = await HandleInterface.getFocusStatus(handles[0]);
         return new Success(ctx, { data: { status } }).send();
     }
+
+    static async getMessagesAvailability(ctx: RouterContext, _: Next) {
+        const address = ctx.request.query?.address as string;
+
+        // Get the availability from the private api
+        const available = await HandleInterface.getMessagesAvailability(address);
+        return new Success(ctx, { data: { available } }).send();
+    }
+
+    static async getFacetimeAvailability(ctx: RouterContext, _: Next) {
+        const address = ctx.request.query?.address as string;
+
+        // Get the availability from the private api
+        const available = await HandleInterface.getFacetimeAvailability(address);
+        return new Success(ctx, { data: { available } }).send();
+    }
 }

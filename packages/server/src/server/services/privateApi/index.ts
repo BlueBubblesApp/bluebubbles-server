@@ -57,9 +57,6 @@ export class BlueBubblesHelperService {
     }
 
     async start(): Promise<void> {
-        // Stop anything going on
-        await this.stop();
-
         // Configure & start the listener
         Server().log("Starting Private API Helper...", "debug");
         this.configureServer();
@@ -132,10 +129,12 @@ export class BlueBubblesHelperService {
 
                 // Execute shell command to start the dylib.
                 // eslint-disable-next-line max-len
+                console.trace();
                 this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} ${messagesPath}`;
                 await this.dylibProcess;
             } catch (ex: any) {
                 if (this.isStopping) return;
+                console.log('restarting');
 
                 // If the last time we errored was more than 15 seconds ago, reset the counter.
                 // This would indicate that the dylib was running, but then crashed.
@@ -353,18 +352,33 @@ export class BlueBubblesHelperService {
             Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
         }
 
+        let killedDylib = false;
         try {
             this.dylibFailureCounter = 0;
             this.restartCounter = 0;
             if (this.dylibProcess != null && !(this.dylibProcess?.child?.killed ?? false)) {
                 Server().log("Killing BlueBubblesHelper DYLIB...", "debug");
                 await this.dylibProcess.kill(9);
+                killedDylib = true;
             }
         } catch (ex) {
             Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
         }
 
+        // Wait for the dylib to die
+        if (killedDylib) {
+            await this.waitForDylibDeath();
+        }
+
         this.isStopping = false;
+    }
+
+    async waitForDylibDeath(): Promise<void> {
+        if (this.dylibProcess == null) return;
+
+        return new Promise((resolve, _) => {
+            this.dylibProcess.finally(resolve);
+        });
     }
 
     async restart(): Promise<void> {
@@ -447,13 +461,44 @@ export class BlueBubblesHelperService {
         );
     }
 
-    async createChat(addresses: string[], message: string | null): Promise<TransactionResult> {
-        if (isEmpty(addresses)) {
-            throw new Error("Failed to send reaction. Invalid params!");
+    async createChat({
+        addresses,
+        message,
+        service = 'iMessage',
+        attributedBody = null,
+        effectId = null,
+        subject = null
+    }: {
+        addresses: string[];
+        message: string;
+        service?: 'iMessage' | 'SMS';
+        attributedBody?: Record<string, any> | null;
+        effectId?: string;
+        subject?: string;
+    }): Promise<TransactionResult> {
+        if (isEmpty(addresses) || isEmpty(message)) {
+            throw new Error("Failed to create chat! Invalid params!");
+        }
+
+        // Yes this is correct. The transaction returns a message GUID, not a chat GUID
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.writeData("create-chat", {
+            addresses,
+            message,
+            service,
+            attributedBody,
+            effectId,
+            subject
+        }, request);
+    }
+
+    async deleteMessage(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
+        if (isEmpty(chatGuid) || isEmpty(messageGuid)) {
+            throw new Error("Failed to delete message. Invalid params!");
         }
 
         const request = new TransactionPromise(TransactionType.CHAT);
-        return this.writeData("create-chat", { addresses, message }, request);
+        return this.writeData("delete-message", { chatGuid, messageGuid }, request);
     }
 
     async deleteChat(guid: string): Promise<TransactionResult> {
@@ -699,6 +744,26 @@ export class BlueBubblesHelperService {
         }
 
         return this.writeData("check-typing-status", { chatGuid });
+    }
+
+    async getMessagesAvailability(address: string): Promise<TransactionResult> {
+        if (isEmpty(address)) {
+            throw new Error(`Failed to check iMessage availability. Invalid params!`);
+        }
+
+        const request = new TransactionPromise(TransactionType.HANDLE);
+        const aliasType = address.includes("@") ? "email" : "phone";
+        return this.writeData("check-imessage-availability", { aliasType, address }, request);
+    }
+
+    async getFacetimeAvailability(address: string): Promise<TransactionResult> {
+        if (isEmpty(address)) {
+            throw new Error(`Failed to check Facetime availability. Invalid params!`);
+        }
+
+        const request = new TransactionPromise(TransactionType.HANDLE);
+        const aliasType = address.includes("@") ? "email" : "phone";
+        return this.writeData("check-facetime-availability", { aliasType, address }, request);
     }
 
     async handleTypingIndicator(event: string, guid: string) {
