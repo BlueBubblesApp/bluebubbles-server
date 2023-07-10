@@ -1016,11 +1016,13 @@ class BlueBubblesServer extends EventEmitter {
             }
 
             if (nextConfig.enable_private_api) {
-                Server().privateApiHelper.start();
+                await Server().privateApiHelper.start();
             } else {
-                Server().privateApiHelper.stop();
+                await Server().privateApiHelper.stop();
             }
-        } else if (prevConfig.enable_private_api && prevConfig.private_api_mode !== nextConfig.private_api_mode) {
+        } else if (prevConfig.enable_private_api && !nextConfig.enable_private_api) {
+            await Server().privateApiHelper?.stop();
+        } else if (nextConfig.enable_private_api && prevConfig.private_api_mode !== nextConfig.private_api_mode) {
             if (Server().privateApiHelper === null) {
                 Server().privateApiHelper = new BlueBubblesHelperService();
             }
