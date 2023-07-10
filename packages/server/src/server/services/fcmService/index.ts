@@ -308,7 +308,7 @@ export class FCMService {
             };
 
             Server().log(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`, "debug");
-            const response = await FCMService.getApp().messaging().sendMulticast(payload);
+            const response = await FCMService.getApp().messaging().sendEachForMulticast(payload);
             if (response.failureCount > 0) {
                 response.responses.forEach(resp => {
                     if (!resp.success && resp.error) {
