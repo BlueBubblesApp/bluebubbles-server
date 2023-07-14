@@ -10,6 +10,8 @@ export type ServerMetadataResponse = {
     detected_icloud: string;
     detected_imessage: string;
     macos_time_sync: number | null;
+    local_ipv4s: string[];
+    local_ipv6s: string[];
 };
 
 /**

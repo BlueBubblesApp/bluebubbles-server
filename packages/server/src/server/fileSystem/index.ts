@@ -677,4 +677,19 @@ export class FileSystem {
 
         return null;
     }
+
+    static getLocalIps(type: 'IPv4' | 'IPv6' = 'IPv4'): string[] {
+        const interfaces = os.networkInterfaces();
+        const addresses = [];
+        for (const k in interfaces) {
+            for (const k2 in interfaces[k]) {
+                const address = interfaces[k][k2];
+                if (address.family !== type || address.internal) continue;
+                if (address.mac === '00:00:00:00:00:00') continue;
+                addresses.push(address.address);
+            }
+        }
+
+        return addresses;
+    }
 }

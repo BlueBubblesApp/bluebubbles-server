@@ -20,7 +20,9 @@ export class GeneralInterface {
             helper_connected: !!Server().privateApiHelper?.helper,
             detected_icloud: await FileSystem.getIcloudAccount(),
             detected_imessage: await Server().iMessageRepo.getiMessageAccount(),
-            macos_time_sync: await FileSystem.getTimeSync()
+            macos_time_sync: await FileSystem.getTimeSync(),
+            local_ipv4s: FileSystem.getLocalIps('IPv4'),
+            local_ipv6s: FileSystem.getLocalIps('IPv6')
         };
     }
 
