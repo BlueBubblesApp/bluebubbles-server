@@ -33,7 +33,7 @@ export abstract class MessageChangeListener extends ChangeListener {
     }
 
     async getLastRowId(): Promise<number> {
-        const [messages, _] = await this.repo.getMessages({ limit: 1, sort: "DESC" });
+        const [messages, _] = await this.repo.getMessages({ limit: 1, sort: "DESC", orderBy: "message.ROWID" });
         if (isEmpty(messages)) return 0;
         return messages[0]?.ROWID ?? 0;
     }
