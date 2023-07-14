@@ -994,9 +994,21 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // If the URL is different, emit the change to the listeners
-        if (prevConfig.server_address !== nextConfig.server_address) {
-            if (this.httpService) await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-            if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
+        try {
+            if (prevConfig.server_address !== nextConfig.server_address) {
+                if (this.httpService) await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
+                if (this.fcm) {
+                    // If it's not initialized, we need to initialize it.
+                    // Initializing it will also set the server URL
+                    if (!this.fcm.hasInitialized) {
+                        await this.fcm.start();
+                    } else {
+                        await this.fcm.setServerUrl(nextConfig.server_address as string);
+                    }
+                }
+            }
+        } catch (ex: any) {
+            this.log(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`, "error");
         }
 
         // If the ngrok API key is different, restart the ngrok process
