@@ -230,6 +230,7 @@ export class MessageRepository {
         withChatParticipants = false,
         withAttachments = true,
         sort = "DESC",
+        orderBy = "message.dateCreated",
         where = []
     }: DBMessageParams): Promise<[Message[], number]> {
         // Sanitize some params
@@ -287,7 +288,7 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.orderBy("message.dateCreated", sort);
+        query.orderBy(orderBy, sort);
         query.skip(offset);
         query.take(limit);
 
