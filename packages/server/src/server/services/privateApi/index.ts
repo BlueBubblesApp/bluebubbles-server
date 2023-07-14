@@ -128,13 +128,10 @@ export class BlueBubblesHelperService {
                 }
 
                 // Execute shell command to start the dylib.
-                // eslint-disable-next-line max-len
-                console.trace();
                 this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${localPath} ${messagesPath}`;
                 await this.dylibProcess;
             } catch (ex: any) {
                 if (this.isStopping) return;
-                console.log('restarting');
 
                 // If the last time we errored was more than 15 seconds ago, reset the counter.
                 // This would indicate that the dylib was running, but then crashed.
