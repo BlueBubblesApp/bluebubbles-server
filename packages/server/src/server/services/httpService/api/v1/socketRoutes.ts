@@ -773,7 +773,7 @@ export class SocketRoutes {
                 return response(cb, "error", createBadRequestResponse("No chat identifier provided"));
             if (!params?.newName) return response(cb, "error", createBadRequestResponse("No new group name provided"));
 
-            if (Server().privateApiHelper?.helper) {
+            if (Server().privateApi?.helper) {
                 try {
                     await ActionHandler.privateRenameGroupChat(params.identifier, params.newName);
 
@@ -889,7 +889,7 @@ export class SocketRoutes {
             }
 
             // If the helper is online, use it to send the tapback
-            if (Server().privateApiHelper?.helper) {
+            if (Server().privateApi?.helper) {
                 try {
                     const sentMessage = await MessageInterface.sendReaction({
                         chatGuid: params.chatGuid,
@@ -1058,7 +1058,7 @@ export class SocketRoutes {
          * Tells the server to restart the Private API helper
          */
         socket.on("restart-private-api", async (_, cb): Promise<void> => {
-            Server().privateApiHelper.start();
+            Server().privateApi.start();
             return response(cb, "restart-private-api-success", createSuccessResponse(null));
         });
 

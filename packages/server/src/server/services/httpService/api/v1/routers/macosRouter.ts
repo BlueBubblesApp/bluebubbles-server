@@ -22,9 +22,9 @@ export class MacOsRouter {
 
             // If we're using the private api and process-injected dylib,
             // we need to restart the "managed" Messages process
-            if (usePrivateApi && useDylib && Server().privateApiHelper.dylibProcess) {
+            if (usePrivateApi && useDylib && Server().privateApi.dylibProcess) {
                 // Killing the dylib process will cause it to auto-restart.
-                await Server().privateApiHelper.dylibProcess.kill(9);
+                await Server().privateApi.dylibProcess.kill(9);
             } else {
                 await MacOsInterface.restartMessagesApp();
             }

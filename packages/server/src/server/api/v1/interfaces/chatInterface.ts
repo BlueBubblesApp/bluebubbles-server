@@ -113,7 +113,7 @@ export class ChatInterface {
             throw new Error("Chat is not a group chat!");
         }
 
-        await Server().privateApiHelper.setDisplayName(chat.guid, displayName);
+        await Server().privateApi.chat.setDisplayName(chat.guid, displayName);
 
         const maxWaitMs = 30000;
         const retChat = await resultAwaiter({
@@ -156,7 +156,7 @@ export class ChatInterface {
     }): Promise<Chat> {
         checkPrivateApiStatus();
 
-        const result = await Server().privateApiHelper.createChat({
+        const result = await Server().privateApi.chat.create({
             addresses,
             message,
             service,
@@ -343,7 +343,7 @@ export class ChatInterface {
         }
 
         Server().log(`Toggling Participant [Action: ${action}]: ${address}...`, "debug");
-        await Server().privateApiHelper.toggleParticipant(chat.guid, address, action);
+        await Server().privateApi.chat.toggleParticipant(chat.guid, address, action);
 
         const maxWaitMs = 30000;
         const retChat = await resultAwaiter({
@@ -376,7 +376,7 @@ export class ChatInterface {
         if (!theChat) throw new Error(`Failed to delete chat! Chat not found. (GUID: ${guid})`);
 
         // Tell the private API to delete the chat
-        await Server().privateApiHelper.deleteChat(theChat.guid);
+        await Server().privateApi.chat.delete(theChat.guid);
 
         // Wait for the DB changes to propogate
         const maxWaitMs = 30000;
@@ -418,7 +418,7 @@ export class ChatInterface {
         }
 
         // Change the chat icon
-        await Server().privateApiHelper.setGroupChatIcon(chat.guid, iconPath);
+        await Server().privateApi.chat.setGroupChatIcon(chat.guid, iconPath);
     }
 
     static async getGroupChatIcon(chat: Chat): Promise<Attachment | null> {
@@ -449,11 +449,11 @@ export class ChatInterface {
         if (!theChat) return;
 
         // Tell the private API to delete the chat
-        await Server().privateApiHelper.leaveChat(theChat.guid);
+        await Server().privateApi.chat.leave(theChat.guid);
     }
 
     static async markRead(chatGuid: string): Promise<void> {
-        await Server().privateApiHelper.markChatRead(chatGuid);
+        await Server().privateApi.chat.markRead(chatGuid);
         await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
             chatGuid,
             read: true
@@ -462,7 +462,7 @@ export class ChatInterface {
 
     static async markUnread(chatGuid: string): Promise<void> {
         if (isMinVentura) {
-            await Server().privateApiHelper.markChatUnread(chatGuid);
+            await Server().privateApi.chat.markUnread(chatGuid);
         }
 
         await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
@@ -473,7 +473,7 @@ export class ChatInterface {
 
     static async startTyping(chatGuid: string): Promise<void> {
         checkPrivateApiStatus();
-        await Server().privateApiHelper.startTyping(chatGuid);
+        await Server().privateApi.chat.startTyping(chatGuid);
 
         // Add the chat to the typing cache
         if (!Server().typingCache.includes(chatGuid)) {
@@ -483,7 +483,7 @@ export class ChatInterface {
 
     static async stopTyping(chatGuid: string): Promise<void> {
         checkPrivateApiStatus();
-        await Server().privateApiHelper.stopTyping(chatGuid);
+        await Server().privateApi.chat.stopTyping(chatGuid);
         
         // Remove the chat from the typing cache
         if (Server().typingCache.includes(chatGuid)) {
@@ -492,6 +492,6 @@ export class ChatInterface {
     }
 
     static async deleteChatMessage(chat: Chat, message: Message): Promise<void> {
-        await Server().privateApiHelper.deleteMessage(chat.guid, message.guid);
+        await Server().privateApi.chat.deleteMessage(chat.guid, message.guid);
     }
 }

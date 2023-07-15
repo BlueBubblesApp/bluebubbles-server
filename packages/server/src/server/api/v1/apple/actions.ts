@@ -1,7 +1,6 @@
 /* eslint-disable max-len */
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { ValidTapback } from "@server/types";
 import {
     sendMessage as buildSendMessageScript,
@@ -160,7 +159,7 @@ export class ActionHandler {
         }
 
         Server().log(`Executing Action: Changing chat display name (Chat: ${chatGuid}; NewName: ${newName};)`, "debug");
-        Server().privateApiHelper.setDisplayName(chatGuid, newName);
+        Server().privateApi.chat.setDisplayName(chatGuid, newName);
     };
 
     /**
@@ -302,9 +301,9 @@ export class ActionHandler {
 
         Server().log(`Executing Action: Change Typing Status (Chat: ${chatGuid})`, "debug");
         if (isTyping) {
-            await Server().privateApiHelper.startTyping(chatGuid);
+            await Server().privateApi.chat.startTyping(chatGuid);
         } else {
-            await Server().privateApiHelper.stopTyping(chatGuid);
+            await Server().privateApi.chat.stopTyping(chatGuid);
         }
     };
 
@@ -316,7 +315,7 @@ export class ActionHandler {
         }
 
         Server().log(`Executing Action: Marking chat as read (Chat: ${chatGuid})`, "debug");
-        await Server().privateApiHelper.markChatRead(chatGuid);
+        await Server().privateApi.chat.markRead(chatGuid);
     };
 
     static updateTypingStatus = async (chatGuid: string): Promise<void> => {
@@ -327,7 +326,7 @@ export class ActionHandler {
         }
 
         Server().log(`Executing Action: Update Typing Status (Chat: ${chatGuid})`, "debug");
-        await Server().privateApiHelper.getTypingStatus(chatGuid);
+        await Server().privateApi.chat.getTypingStatus(chatGuid);
     };
 
     static togglePrivateTapback = async (
@@ -345,7 +344,7 @@ export class ActionHandler {
             `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`,
             "debug"
         );
-        await Server().privateApiHelper.sendReaction(chatGuid, actionMessageGuid, reactionType);
+        await Server().privateApi.message.react(chatGuid, actionMessageGuid, reactionType);
     };
 
     /**
