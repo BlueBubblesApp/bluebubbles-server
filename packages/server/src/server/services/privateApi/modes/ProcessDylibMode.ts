@@ -12,20 +12,20 @@ const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
 
 export class ProcessDylibMode extends PrivateApiMode {
 
-    isStopping = false;
-
     dylibProcess: ProcessPromise<any>;
 
     dylibFailureCounter = 0;
 
     dylibLastErrorTime = 0;
 
-    static localPath = path.join(FileSystem.resources, "private-api", macVer, "BlueBubblesHelper.dylib");
+    static get dylbiPath() {
+        return path.join(FileSystem.resources, "private-api", macVer, "BlueBubblesHelper.dylib");
+    }
 
     static messagesPath = "/System/Applications/Messages.app/Contents/MacOS/Messages";
     
     static async install() {
-        if (!fs.existsSync(ProcessDylibMode.localPath)) {
+        if (!fs.existsSync(ProcessDylibMode.dylbiPath)) {
             await Server().repo.setConfig("private_api_mode", "macforge");
             throw new Error("Unable to locate embedded Private API DYLIB! Falling back to MacForge Bundle.");
         }
@@ -44,8 +44,14 @@ export class ProcessDylibMode extends PrivateApiMode {
     }
 
     async start() {
+        // Call a different function so this can properly be awaited/returned.
+        this.manageProcess();
+    }
+
+    async manageProcess() {
         // Clear the markers
-        
+        this.dylibFailureCounter = 0;
+        this.dylibLastErrorTime = 0;
 
         // If there are 5 failures in a row, we'll stop trying to start it
         while (this.dylibFailureCounter < 5) {
@@ -61,7 +67,7 @@ export class ProcessDylibMode extends PrivateApiMode {
 
                 // Execute shell command to start the dylib.
                 // eslint-disable-next-line max-len
-                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${ProcessDylibMode.localPath} ${ProcessDylibMode.messagesPath}`;
+                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${ProcessDylibMode.dylbiPath} ${ProcessDylibMode.messagesPath}`;
                 await this.dylibProcess;
             } catch (ex: any) {
                 if (this.isStopping) return;
@@ -90,11 +96,14 @@ export class ProcessDylibMode extends PrivateApiMode {
         if (this.dylibProcess == null) return;
 
         return new Promise((resolve, _) => {
-            this.dylibProcess.finally(resolve);
+            // Catch the error so the promise doesn't throw a no-catch error.
+            this.dylibProcess.catch(() => { /** Do nothing */}).finally(resolve);
         });
     }
 
     async stop() {
+        this.isStopping = true;
+
         let killedDylib = false;
         try {
             this.dylibFailureCounter = 0;
@@ -111,5 +120,8 @@ export class ProcessDylibMode extends PrivateApiMode {
         if (killedDylib) {
             await this.waitForDylibDeath();
         }
+
+        console.log("KILLED");
+        this.isStopping = false;
     }
 }

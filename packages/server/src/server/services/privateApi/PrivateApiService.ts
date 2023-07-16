@@ -16,10 +16,9 @@ import { PrivateApiMessage } from "./apis/PrivateApiMessage";
 import { PrivateApiChat } from "./apis/PrivateApiChat";
 import { PrivateApiHandle } from "./apis/PrivateApiHandle";
 import { PrivateApiAttachment } from "./apis/PrivateApiAttachment";
-import { PrivateApiMode } from "./modes";
+import { PrivateApiMode, PrivateApiModeConstructor } from "./modes";
 import { MacForgeMode } from "./modes/MacForgeMode";
 import { ProcessDylibMode } from "./modes/ProcessDylibMode";
-
 
 
 export class PrivateApiService {
@@ -34,6 +33,8 @@ export class PrivateApiService {
     eventHandlers: PrivateApiEventHandler[];
 
     mode: PrivateApiMode;
+
+    modeType: PrivateApiModeConstructor;
 
     static get port(): number {
         return clamp(MIN_PORT + os.userInfo().uid - 501, MIN_PORT, MAX_PORT);
@@ -86,16 +87,16 @@ export class PrivateApiService {
         try {
             const mode = (Server().repo.getConfig("private_api_mode") as string) ?? 'macforge';
             if (mode === 'macforge') {
-                await MacForgeMode.install();
-                this.mode = new MacForgeMode();
+                this.modeType = MacForgeMode;
             } else if (mode === 'process-dylib') {
-                ProcessDylibMode.install();
-                this.mode = new ProcessDylibMode();
+                this.modeType = ProcessDylibMode;
             } else {
                 Server().log(`Invalid Private API mode: ${mode}`);
                 return;
             }
 
+            await this.modeType.install();
+            this.mode = new this.modeType();
             await this.mode.start();
         } catch (ex: any) {
             Server().log(`Failed to start Private API: ${ex?.message ?? String(ex)}`, "error");

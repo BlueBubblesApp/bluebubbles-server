@@ -2,6 +2,7 @@ import { FileSystem } from "@server/fileSystem";
 import { lockMacOs, restartMessages } from "@server/api/v1/apple/scripts";
 import { Server } from "@server";
 import { safeTrim } from "@server/helpers/utils";
+import { ProcessDylibMode } from "@server/services/privateApi/modes/ProcessDylibMode";
 
 export class MacOsInterface {
     static async lock() {
@@ -13,7 +14,18 @@ export class MacOsInterface {
     }
 
     static async restartMessagesApp() {
-        await FileSystem.executeAppleScript(restartMessages());
+        const usePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
+        const restartDylib = usePrivateApi &&  Server().privateApi.mode instanceof ProcessDylibMode;
+
+        // If we're using the private api and process-injected dylib,
+        // we need to restart the "managed" Messages process
+        if (restartDylib) {
+            console.log('restarting dylib')
+            // Killing the dylib process will cause it to auto-restart.
+            await Server().privateApi.mode.restart();
+        } else {
+            await FileSystem.executeAppleScript(restartMessages());
+        }
     }
 
     static async getMediaTotals({ only = ["image", "video", "location", "other"] }: { only?: string[] } = {}) {

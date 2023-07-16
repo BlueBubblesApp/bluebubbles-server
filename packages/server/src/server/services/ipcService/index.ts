@@ -107,7 +107,7 @@ export class IPCService {
         });
 
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {
-            return await Server().privateApi.mode.install(true);
+            return await Server().privateApi.modeType.install(true);
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {

@@ -3,7 +3,6 @@ import { RouterContext } from "koa-router";
 import { MacOsInterface } from "@server/api/v1/interfaces/macosInterface";
 import { Success } from "../responses/success";
 import { ServerError } from "../responses/errors";
-import { Server } from "@server";
 
 export class MacOsRouter {
     static async lock(ctx: RouterContext, _: Next) {
@@ -17,18 +16,7 @@ export class MacOsRouter {
 
     static async restartMessagesApp(ctx: RouterContext, _: Next) {
         try {
-            const usePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
-            const useDylib = Server().repo.getConfig("private_api_mode") as string === 'process-dylib';
-
-            // If we're using the private api and process-injected dylib,
-            // we need to restart the "managed" Messages process
-            if (usePrivateApi && useDylib && Server().privateApi.dylibProcess) {
-                // Killing the dylib process will cause it to auto-restart.
-                await Server().privateApi.dylibProcess.kill(9);
-            } else {
-                await MacOsInterface.restartMessagesApp();
-            }
-
+            await MacOsInterface.restartMessagesApp();
             return new Success(ctx, { message: "Successfully restart the Messages App!" }).send();
         } catch (ex: any) {
             throw new ServerError({ message: "Failed to restart Messages App!", error: ex?.message ?? ex.toString() });

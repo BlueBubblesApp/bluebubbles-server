@@ -24,7 +24,6 @@ import { Handle } from "@server/databases/imessage/entity/Handle";
 import { DBMessageParams } from "@server/databases/imessage/types";
 import { ActionHandler } from "@server/api/v1/apple/actions";
 import { QueueItem } from "@server/services/queueService";
-import { restartMessages } from "@server/api/v1/apple/scripts";
 import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
 import { convertAudio } from "@server/databases/imessage/helpers/utils";
@@ -40,6 +39,7 @@ import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 import { ChatSerializer } from "@server/api/v1/serializers/ChatSerializer";
 import { HandleSerializer } from "@server/api/v1/serializers/HandleSerializer";
 import { AttachmentSerializer } from "@server/api/v1/serializers/AttachmentSerializer";
+import { MacOsInterface } from "@server/api/v1/interfaces/macosInterface";
 
 const unknownError = "Unknown Error. Check server logs!";
 
@@ -1050,7 +1050,7 @@ export class SocketRoutes {
          * Tells the server to restart iMessages
          */
         socket.on("restart-messages-app", async (_, cb): Promise<void> => {
-            await FileSystem.executeAppleScript(restartMessages());
+            await MacOsInterface.restartMessagesApp();
             return response(cb, "restart-messages-app", createSuccessResponse(null));
         });
 

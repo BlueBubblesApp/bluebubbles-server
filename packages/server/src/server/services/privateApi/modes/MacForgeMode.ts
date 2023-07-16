@@ -18,6 +18,7 @@ type BundleStatus = {
 export class MacForgeMode extends PrivateApiMode {
     
     static async install(force = false) {
+        console.log("HERERER")
         const status: BundleStatus = { success: false, message: "Unknown status" };
 
         // Make sure the Private API is enabled
