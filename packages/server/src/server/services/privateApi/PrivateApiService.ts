@@ -109,10 +109,8 @@ export class PrivateApiService {
             this.helper = socket;
             this.helper.setDefaultEncoding("utf8");
 
+            Server().log("Private API Helper connected!");
             this.setupListeners();
-            this.helper.on("connect", () => {
-                Server().log("Private API Helper connected!");
-            });
 
             this.helper.on("close", () => {
                 Server().log("Private API Helper disconnected!", "debug");

@@ -97,7 +97,7 @@ export class ProcessDylibMode extends PrivateApiMode {
 
         return new Promise((resolve, _) => {
             // Catch the error so the promise doesn't throw a no-catch error.
-            this.dylibProcess.catch(() => { /** Do nothing */}).finally(resolve);
+            this.dylibProcess.catch(() => { /** Do nothing */ }).finally(resolve);
         });
     }
 
