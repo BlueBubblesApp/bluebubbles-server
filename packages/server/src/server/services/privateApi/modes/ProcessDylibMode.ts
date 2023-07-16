@@ -121,7 +121,6 @@ export class ProcessDylibMode extends PrivateApiMode {
             await this.waitForDylibDeath();
         }
 
-        console.log("KILLED");
         this.isStopping = false;
     }
 }

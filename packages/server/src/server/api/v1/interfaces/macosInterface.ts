@@ -20,8 +20,6 @@ export class MacOsInterface {
         // If we're using the private api and process-injected dylib,
         // we need to restart the "managed" Messages process
         if (restartDylib) {
-            console.log('restarting dylib')
-            // Killing the dylib process will cause it to auto-restart.
             await Server().privateApi.mode.restart();
         } else {
             await FileSystem.executeAppleScript(restartMessages());
