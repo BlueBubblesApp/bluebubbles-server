@@ -149,10 +149,11 @@ export class MessageRepository {
         // all we need is the actual GUID, which is the last 36 digits.
         // Original GUIDs can also be prefixed with at_x_ or p:/.
         const lookupGuids = [attachmentGuid];
-        if (attachmentGuid.length >= 36) {
+        if (attachmentGuid.length > 36) {
             lookupGuids.push(attachmentGuid.substring(attachmentGuid.length - 36));
         }
-        for (const lookupGuid in lookupGuids) {
+
+        for (const lookupGuid of lookupGuids) {
             // El Capitan does not have an original_guid column.
             if (isMinHighSierra) {
                 query.where("attachment.original_guid LIKE :guid", { guid: `%${lookupGuid}` });
