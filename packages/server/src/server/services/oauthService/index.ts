@@ -36,7 +36,7 @@ export class OauthService {
 
     projectName = 'BlueBubbles'
 
-    private clientId = '795335779559-jqfjh4l8v98bmfka7jusbega8j3o6bc4.apps.googleusercontent.com'
+    private clientId = '500464701389-os4g4b8mfoj86vujg4i61dmh9827qbrv.apps.googleusercontent.com'
 
     private _packageName = 'com.bluebubbles.messaging'
 
@@ -124,6 +124,13 @@ export class OauthService {
             // Set the security rules for the project.
             Server().log(`[GCP] Creating Firestore Security Rules...`);
             await this.createSecurityRules(projectId);
+
+            Server().log(`[GCP] Revoking OAuth token, to prevent further use...`);
+            try {
+                await this.oauthClient.revokeToken(this.authToken);
+            } catch {
+                // Do nothing
+            }
 
             // Mark the service as completed
             Server().log((
@@ -446,6 +453,11 @@ export class OauthService {
     }
 
     async createSecurityRules(projectId: string) {
+        // Uninitialize the app if it exists
+        const appName = "BlueBubbles-OAuth";
+        const existingApp = admin.apps.find((app) => app.name === appName);
+        if (existingApp) await existingApp.delete();
+
         // Create a custom SDK app using the auth token we received from
         // the oauth consent flow. We do this here because when this is
         // done using service account credentials, a permission error occurs.
@@ -461,7 +473,7 @@ export class OauthService {
                 },
                 projectId
             },
-            "BlueBubbles-OAuth"
+            appName
         );
 
         await FCMService.setFirestoreRulesForApp(app);

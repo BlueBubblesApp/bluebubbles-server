@@ -145,10 +145,10 @@ export class MessageRepository {
 
         if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
 
-        let lookupGuids = [attachmentGuid];
         // Attachment GUIDs may start with a prefix such as p:/ or `at_x_`. For lookups,
         // all we need is the actual GUID, which is the last 36 digits.
         // Original GUIDs can also be prefixed with at_x_ or p:/.
+        const lookupGuids = [attachmentGuid];
         if (attachmentGuid.length >= 36) {
             lookupGuids.push(attachmentGuid.substring(attachmentGuid.length - 36));
         }

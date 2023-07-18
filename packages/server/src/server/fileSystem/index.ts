@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 
 import * as path from "path";
 import * as child_process from "child_process";
@@ -223,7 +223,7 @@ export class FileSystem {
 
         for (const file of files) {
             if (fs.existsSync(file)) {
-                fs.rmdirSync(file, { recursive: true });
+                fs.rm(file, { recursive: true, force: true });
             }
 
             fs.mkdirSync(file);
@@ -293,7 +293,7 @@ export class FileSystem {
      */
     static deleteChunks(guid: string): void {
         const dir = path.join(FileSystem.attachmentsDir, guid);
-        if (fs.existsSync(dir)) fs.rmdirSync(dir, { recursive: true });
+        if (fs.existsSync(dir)) fs.rm(dir, { recursive: true, force: true });
     }
 
     /**
@@ -619,7 +619,7 @@ export class FileSystem {
     }
 
     static removeDirectory(filePath: string) {
-        fs.rmdirSync(filePath, { recursive: true });
+        fs.rm(filePath, { recursive: true, force: true });
     }
 
     static async getRegion(): Promise<string | null> {

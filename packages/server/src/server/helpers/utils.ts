@@ -392,7 +392,7 @@ export const checkPrivateApiStatus = () => {
         throw new Error("iMessage Private API is not enabled!");
     }
 
-    if (!Server().privateApiHelper.server || !Server().privateApiHelper?.helper) {
+    if (!Server().privateApi.server || !Server().privateApi?.helper) {
         throw new Error("iMessage Private API Helper is not connected!");
     }
 };

@@ -57,7 +57,7 @@ import {
     waitMs
 } from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
-import { BlueBubblesHelperService } from "./services/privateApi";
+import { PrivateApiService } from "./services/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
@@ -131,7 +131,7 @@ class BlueBubblesServer extends EventEmitter {
 
     httpService: HttpService;
 
-    privateApiHelper: BlueBubblesHelperService;
+    privateApi: PrivateApiService;
 
     fcm: FCMService;
 
@@ -230,7 +230,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Services
         this.httpService = null;
-        this.privateApiHelper = null;
+        this.privateApi = null;
         this.fcm = null;
         this.facetime = null;
         this.caffeinate = null;
@@ -462,7 +462,7 @@ class BlueBubblesServer extends EventEmitter {
         if (privateApiEnabled) {
             try {
                 this.log("Initializing helper service...");
-                this.privateApiHelper = new BlueBubblesHelperService();
+                this.privateApi = new PrivateApiService();
             } catch (ex: any) {
                 this.log(`Failed to setup helper service! ${ex.message}`, "error");
             }
@@ -562,7 +562,7 @@ class BlueBubblesServer extends EventEmitter {
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             this.log("Starting Private API Helper listener...");
-            this.privateApiHelper.start();
+            this.privateApi.start();
         }
 
         if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
@@ -604,7 +604,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            await this.privateApiHelper?.stop();
+            await this.privateApi?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop Private API Helper service! ${ex?.message ?? ex}`);
         }
@@ -1023,19 +1023,19 @@ class BlueBubblesServer extends EventEmitter {
 
         // Install the bundle if the Private API is turned on
         if (!prevConfig.enable_private_api && nextConfig.enable_private_api) {
-            if (Server().privateApiHelper === null) {
-                Server().privateApiHelper = new BlueBubblesHelperService();
+            if (Server().privateApi === null) {
+                Server().privateApi = new PrivateApiService();
             }
 
-            await Server().privateApiHelper.start();
+            await Server().privateApi.start();
         } else if (prevConfig.enable_private_api && !nextConfig.enable_private_api) {
-            await Server().privateApiHelper?.stop();
+            await Server().privateApi?.stop();
         } else if (nextConfig.enable_private_api && prevConfig.private_api_mode !== nextConfig.private_api_mode) {
-            if (Server().privateApiHelper === null) {
-                Server().privateApiHelper = new BlueBubblesHelperService();
+            if (Server().privateApi === null) {
+                Server().privateApi = new PrivateApiService();
             }
 
-            await Server().privateApiHelper.restart();
+            await Server().privateApi.restart();
         }
 
         // If the dock style changes

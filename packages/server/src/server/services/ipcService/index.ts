@@ -8,7 +8,7 @@ import { AlertsInterface } from "@server/api/v1/interfaces/alertsInterface";
 import { openLogs, openAppData } from "@server/api/v1/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
-import { BlueBubblesHelperService } from "../privateApi";
+import { PrivateApiService } from "../privateApi/PrivateApiService";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
 import { ScheduledMessagesInterface } from "@server/api/v1/interfaces/scheduledMessagesInterface";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
@@ -101,13 +101,13 @@ export class IPCService {
         ipcMain.handle("get-private-api-status", async (_, __) => {
             return {
                 enabled: Server().repo.getConfig("enable_private_api") as boolean,
-                connected: !!Server().privateApiHelper?.helper,
-                port: BlueBubblesHelperService.port
+                connected: !!Server().privateApi?.helper,
+                port: PrivateApiService.port
             };
         });
 
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {
-            return await BlueBubblesHelperService.installBundle(true);
+            return await Server().privateApi.modeType.install(true);
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {

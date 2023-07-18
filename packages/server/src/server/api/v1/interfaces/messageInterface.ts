@@ -88,7 +88,7 @@ export class MessageInterface {
             Server().typingCache = Server().typingCache.filter(c => c !== chatGuid);
 
             // Try to stop typing for that chat. Don't await so we don't block the message
-            Server().privateApiHelper.stopTyping(chatGuid);
+            Server().privateApi.chat.stopTyping(chatGuid);
         }
 
         // Try to send the iMessage
@@ -229,7 +229,7 @@ export class MessageInterface {
         partIndex = 0
     }: SendMessagePrivateApiParams) {
         checkPrivateApiStatus();
-        const result = await Server().privateApiHelper.sendMessage(
+        const result = await Server().privateApi.message.send(
             chatGuid,
             message,
             attributedBody ?? null,
@@ -281,7 +281,7 @@ export class MessageInterface {
             }
         }
 
-        const result = await Server().privateApiHelper.sendAttachment({
+        const result = await Server().privateApi.attachment.send({
             chatGuid,
             filePath,
             attributedBody,
@@ -320,7 +320,7 @@ export class MessageInterface {
 
         const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
         const currentEditDate = msg?.dateEdited ?? 0;
-        await Server().privateApiHelper.unsendMessage({ chatGuid, messageGuid, partIndex: partIndex ?? 0 });
+        await Server().privateApi.message.unsend({ chatGuid, messageGuid, partIndex: partIndex ?? 0 });
 
         const maxWaitMs = 30000;
         const retMessage = await resultAwaiter({
@@ -354,7 +354,7 @@ export class MessageInterface {
 
         const msg = await Server().iMessageRepo.getMessage(messageGuid, false, false);
         const currentEditDate = msg?.dateEdited ?? 0;
-        await Server().privateApiHelper.editMessage({
+        await Server().privateApi.message.edit({
             chatGuid,
             messageGuid,
             editedMessage,
@@ -451,7 +451,7 @@ export class MessageInterface {
         Server().messageManager.add(awaiter);
 
         // Send the reaction
-        const result = await Server().privateApiHelper.sendReaction(chatGuid, message.guid, reaction, partIndex ?? 0);
+        const result = await Server().privateApi.message.react(chatGuid, message.guid, reaction, partIndex ?? 0);
         if (!result?.identifier) {
             throw new Error("Failed to send reaction! No message GUID returned.");
         } else {
@@ -493,7 +493,7 @@ export class MessageInterface {
         }
 
         // Notify the recipient
-        await Server().privateApiHelper.notifySilencedMessage(chat.guid, message.guid);
+        await Server().privateApi.message.notify(chat.guid, message.guid);
 
         // Wait for the didNotifyRecipient flag to be true
         const maxWaitMs = 30000;
@@ -516,7 +516,7 @@ export class MessageInterface {
         }
 
         // Get the media path via the private api
-        const transaction = await Server().privateApiHelper.getEmbeddedMedia(chat.guid, message.guid);
+        const transaction = await Server().privateApi.message.getEmbeddedMedia(chat.guid, message.guid);
         if (!transaction?.data?.path) return null;
         const mediaPath = transaction.data.path.replace("file://", "");
         return mediaPath;
@@ -549,7 +549,7 @@ export class MessageInterface {
         }
         
         // Send the message
-        const result = await Server().privateApiHelper.sendMultipart(
+        const result = await Server().privateApi.message.sendMultipart(
             chatGuid,
             parts,
             attributedBody ?? null,
