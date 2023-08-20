@@ -155,7 +155,7 @@ export class OauthService {
                     initialWaitMs: 5000,
                     getData: async () => {
                         try {
-                            await Server().fcm.dispatchServerUrlUpdate();
+                            await Server().fcm.setServerUrl();
                             Server().fcm.listen();
                             return true;
                         } catch (ex) {

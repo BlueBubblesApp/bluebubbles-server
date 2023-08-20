@@ -89,7 +89,7 @@ export class FCMService {
                 await this.setRealtimeRules();
             }
 
-            this.dispatchServerUrlUpdate();
+            this.setServerUrl();
             this.listen();
         }
     
@@ -156,14 +156,25 @@ export class FCMService {
         await db.setRules(source);
     }
 
-    async dispatchServerUrlUpdate(): Promise<void> {
-        // Set the current ngrok URL if we are connected
+    getConnectedUrl() {
         for (const service of Server().proxyServices) {
             if (service.isConnected()) {
-                await this.setServerUrl(service.url);
-                break;
+                return service.url;
             }
         }
+
+        return null;
+    }
+
+    /**
+     * Checks to see if the URL has changed since the last time we updated it
+     * 
+     * @returns The new URL if it has changed, null otherwise
+     */
+    shouldUpdateUrl(): string | null {
+        const serverUrl = this.getConnectedUrl();
+        if (!serverUrl) return null;
+        return (this.lastAddr !== serverUrl) ? serverUrl : null;
     }
 
     /**
@@ -171,9 +182,13 @@ export class FCMService {
      *
      * @param serverUrl The new server URL
      */
-    async setServerUrl(serverUrl: string): Promise<void> {
+    async setServerUrl(): Promise<void> {
+        // Make sure we should be setting the URL
+        const serverUrl = this.shouldUpdateUrl();
+        if (!serverUrl) return;
+
+        // Make sure that if we haven't initialized, we do so
         if (!this.hasInitialized || !(await this.start())) return;
-        if (!serverUrl || this.lastAddr === serverUrl) return;
 
         Server().log(`Updating Server Address in ${this.dbType} Database...`);
 

@@ -993,18 +993,20 @@ class BlueBubblesServer extends EventEmitter {
             await this.startChatListeners();
         }
 
-        // If the URL is different, emit the change to the listeners
         try {
-            if (prevConfig.server_address !== nextConfig.server_address) {
-                if (this.httpService) await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-                if (this.fcm) {
-                    // If it's not initialized, we need to initialize it.
-                    // Initializing it will also set the server URL
-                    if (!this.fcm.hasInitialized) {
-                        await this.fcm.start();
-                    } else {
-                        await this.fcm.setServerUrl(nextConfig.server_address as string);
-                    }
+            // Check if we should update the URL
+            const shouldUpdateUrl = this.fcm?.shouldUpdateUrl() ?? null;
+            if (shouldUpdateUrl != null) {
+                await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
+
+                // If it's not initialized, we need to initialize it.
+                // Initializing it will also set the server URL
+                if (!this.fcm.hasInitialized) {
+                    Server().log('Initializing FCM for server URL update from config change', 'debug');
+                    await this.fcm.start();
+                } else {
+                    Server().log('Dispatching server URL update from config change', 'debug');
+                    await this.fcm.setServerUrl();
                 }
             }
         } catch (ex: any) {
@@ -1097,7 +1099,7 @@ class BlueBubblesServer extends EventEmitter {
         sendSocket = true
     ) {
         if (sendSocket) {
-            this.httpService.socketServer.emit(type, data);
+            this.httpService?.socketServer.emit(type, data);
         }
 
         // Send notification to devices
@@ -1106,7 +1108,7 @@ class BlueBubblesServer extends EventEmitter {
                 const devices = await this.repo.devices().find();
                 if (isNotEmpty(devices)) {
                     const notifData = JSON.stringify(data);
-                    await this.fcm.sendNotification(
+                    await this.fcm?.sendNotification(
                         devices.map(device => device.identifier),
                         { type, data: notifData },
                         priority
