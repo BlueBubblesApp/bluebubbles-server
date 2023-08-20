@@ -110,7 +110,7 @@ getWebhooks().then(hooks => {
 ipcRenderer.on('new-log', (_: any, data: any) => {
     store.dispatch(addLog({
         id: String(getRandomInt(999999999)),
-        message: data.message,
+        message: String(data.message),
         type: data.type,
         timestamp: new Date()
     }));

@@ -24,7 +24,7 @@ export const LogsTable = ({ logs, caption }: { logs: Array<LogItem>, caption?: s
             <Tbody>
                 {logs.map(item => (
                     <Tr key={item.id}>
-                        <Td wordBreak="break-word">{String(item.message)}</Td>
+                        <Td wordBreak="break-word">{item.message}</Td>
                         <Td isNumeric>{item.timestamp.toLocaleString()}</Td>
                     </Tr>
                 ))}
