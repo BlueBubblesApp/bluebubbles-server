@@ -431,6 +431,48 @@ export const safeTrim = (value: string) => {
     return (value ?? "").trim();
 };
 
+export const resultRetryer = async ({
+    maxTries = 3,
+    delayMs = 1000,
+    getData,
+    extraLoopCondition = null,
+    dataLoopCondition = null
+}: {
+    maxTries?: number;
+    delayMs?: number;
+    getData: (previousData: any | null) => any;
+    extraLoopCondition?: (data: any | null) => boolean;
+    dataLoopCondition?: (data: any | null) => boolean;
+}): Promise<any | null> => {
+    let attempt = 0;
+
+    // Defaults to false because true means keep looping.
+    // This condition is OR'd with the data loop condition.
+    // If this was true, it would keep looping indefinitely.
+    if (!extraLoopCondition) {
+        extraLoopCondition = _ => false;
+    }
+
+    // Set the default check for the loop condition to be if the data is null.
+    // If it's null, keep looping.
+    if (!dataLoopCondition) {
+        dataLoopCondition = _ => !data;
+    }
+
+    let data = await getData(null);
+    while ((dataLoopCondition(data) || extraLoopCondition(data)) && attempt < maxTries) {
+        // Give it a bit to execute
+        await waitMs(delayMs);
+
+        // Re-fetch the message with the updated information
+        data = await getData(data);
+        attempt += 1;
+    }
+
+    return data;
+};
+
+
 export const resultAwaiter = async ({
     maxWaitMs = 30000,
     initialWaitMs = 250,

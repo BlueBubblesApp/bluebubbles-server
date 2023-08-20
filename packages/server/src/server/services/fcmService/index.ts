@@ -4,6 +4,7 @@ import { FileSystem } from "@server/fileSystem";
 import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 import { App } from "firebase-admin/app";
 import axios from "axios";
+import { resultRetryer } from "@server/helpers/utils";
 
 const AppName = "BlueBubbles";
 
@@ -156,24 +157,13 @@ export class FCMService {
         await db.setRules(source);
     }
 
-    getConnectedUrl() {
-        for (const service of Server().proxyServices) {
-            if (service.isConnected()) {
-                return service.url;
-            }
-        }
-
-        return null;
-    }
-
     /**
      * Checks to see if the URL has changed since the last time we updated it
      * 
      * @returns The new URL if it has changed, null otherwise
      */
     shouldUpdateUrl(): string | null {
-        const serverUrl = this.getConnectedUrl();
-        if (!serverUrl) return null;
+        const serverUrl = Server().repo.getConfig("server_address") as string;
         return (this.lastAddr !== serverUrl) ? serverUrl : null;
     }
 
@@ -192,13 +182,30 @@ export class FCMService {
 
         Server().log(`Updating Server Address in ${this.dbType} Database...`);
 
+        // Update the URL
+        // If we fail, retry 3 times
+        await resultRetryer({
+            maxTries: 3,
+            delayMs: 5000,
+            getData: async () => {
+                try {
+                    await this.saveUrlToDb(serverUrl);
+                    return true;
+                } catch {
+                    return false;
+                }
+            }
+        });
+
+        this.lastAddr = serverUrl;
+    }
+
+    private async saveUrlToDb(serverUrl: string) {
         if (this.dbType === DbType.FIRESTORE) {
             await this.setServerUrlFirestore(serverUrl);
         } else if (this.dbType === DbType.REALTIME) {
             await this.setServerUrlRealtime(serverUrl);
         }
-
-        this.lastAddr = serverUrl;
     }
 
     async setServerUrlFirestore(serverUrl: string): Promise<void> {
