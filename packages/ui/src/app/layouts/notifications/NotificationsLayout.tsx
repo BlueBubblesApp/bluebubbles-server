@@ -237,11 +237,14 @@ export const NotificationsLayout = (): JSX.Element => {
             onDragOver={(e) => onDragOver(e)}
             onDrop={(e) => onDrop(e)}
         >
-            <Text fontSize='2xl'>Android Notifications</Text>
+            <Text fontSize='2xl'>Notifications</Text>
             <Divider orientation='horizontal' />
             <Text fontSize='md' mt={5} mb={5}>
                 BlueBubbles utilizes Google Firebase to deliver notifications to your devices.
-                <b>This is only required for Android Notifications</b>
+                This includes delivering notifications on Android as well as server URL changes to all clients (Android, Desktop, & Web). 
+                <b>
+                    &nbsp;Failing to configure this will mean server URL changes will not sync with BlueBubbles clients.
+                </b>
             </Text>
             {getAlertStatus()}
             <Tabs mt={2}>

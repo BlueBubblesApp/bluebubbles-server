@@ -81,7 +81,7 @@ const LinkItems: Array<LinkItemProps> = [
     { name: 'Home', icon: FiHome, to: '/' },
     { name: 'Contacts', icon: BsPersonCircle, to: '/contacts' },
     { name: 'Android Devices', icon: BsPhone, to: '/devices' },
-    { name: 'Android Notifications', icon: FaGoogle, to: '/notifications' },
+    { name: 'Notifications', icon: FaGoogle, to: '/notifications' },
     { name: 'Scheduled Messages', icon: BsFillCalendarCheckFill, to: '/scheduled-messages' },
     { name: 'API & Webhooks', icon: AiOutlineApi, to: '/webhooks' },
     { name: 'Debug & Logs', icon: AiOutlineBug, to: '/logs' },

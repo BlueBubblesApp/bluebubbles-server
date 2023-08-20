@@ -159,10 +159,10 @@ export const NotificationsWalkthrough = (): JSX.Element => {
             >
                 <Text fontSize='4xl'>Notifications &amp; Firebase</Text>
                 <Text fontSize='md' mt={5}>
-                    BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications to your Android device.
-                    We do this so the client do not need to hold a connection to the server at all times. As a result,
-                    BlueBubbles can deliver notifications even when the app is running in the background. It also means
-                    BlueBubbles will use less battery when running in the background.
+                    BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications and server URL changes to your BlueBubbles clients.
+                    We do this so the clients do not need to hold a connection to the server at all times. As a result,
+                    BlueBubbles can deliver notifications even when the app is running in the background. This is also used to
+                    ensure your current server URL is always synced to your BlueBubbles clients.
                 </Text>
                 <Alert status='info' mt={5}>
                     <AlertIcon />
