@@ -54,6 +54,7 @@ export class FCMService {
                     hasSucceeded = true;
                     return success;
                 } catch {
+                    Server().log(`Failed to initialize FCM App. Retrying...`, "debug");
                     return false;
                 }
             }
