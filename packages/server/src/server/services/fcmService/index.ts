@@ -35,6 +35,8 @@ export class FCMService {
 
     hasInitialized = false;
 
+    startPromise: Promise<boolean> = null;
+
     /**
      * Starts the FCM app service. Implements a retryer to ensure
      * that the service is started correctly.
@@ -44,8 +46,14 @@ export class FCMService {
     }: {
         initializeOnly?: boolean;
     } = {}): Promise<boolean> {
+        // If the startup sequence is already occuring, wait for it to finish
+        if (this.startPromise != null) {
+            return await this.startPromise;
+        }
+
+        // Try starting the service
         let hasSucceeded = false;
-        const result = await resultRetryer({
+        this.startPromise = resultRetryer({
             maxTries: 6,
             delayMs: 5000,
             getData: async () => {
@@ -53,17 +61,19 @@ export class FCMService {
                     const success = await this.startHandler({ initializeOnly });
                     hasSucceeded = true;
                     return success;
-                } catch {
-                    Server().log(`Failed to initialize FCM App. Retrying...`, "debug");
+                } catch (ex: any) {
+                    Server().log(`Failed to initialize FCM App. Error: ${ex?.message}. Retrying...`, "debug");
                     return false;
                 }
             }
         });
 
+        const result = await this.startPromise;
         if (!hasSucceeded) {
-            Server().log("Failed to initialize FCM App after 6 retries!", "error");
+            Server().log("Failed to initialize FCM App after 6 attempts!", "error");
         }
 
+        this.startPromise = null;
         return result;
     }
 
