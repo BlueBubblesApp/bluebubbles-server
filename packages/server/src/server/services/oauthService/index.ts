@@ -146,29 +146,7 @@ export class OauthService {
             // Start the FCM service.
             // Don't await because we don't want to catch the error here.
             FCMService.stop().then(async () => {
-                await Server().fcm.start({ initializeOnly: true });
-
-                // Make sure that the security rules propogate.
-                // We test this by trying to dispatch a server url update.
-                const result = await resultAwaiter({
-                    maxWaitMs: 60000 * 2,
-                    initialWaitMs: 5000,
-                    getData: async () => {
-                        try {
-                            await Server().fcm.setServerUrl();
-                            Server().fcm.listen();
-                            return true;
-                        } catch (ex) {
-                            return false;
-                        }
-                    }
-                });
-
-                if (!result) {
-                    Server().log(`[FCM] Failed to access Firestore after 2 minutes!`, "warn");
-                } else {
-                    Server().log(`[FCM] Successfully accessed Firestore!`, "debug");
-                }
+                await Server().fcm.start();
             });
         } catch (ex: any) {
             Server().log(`[GCP] Failed to create project: ${ex?.message}`, "error");

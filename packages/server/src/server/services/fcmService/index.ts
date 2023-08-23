@@ -31,11 +31,19 @@ export class FCMService {
 
     lastAddr: string = null;
 
+    lastProjectId: string = null;
+
+    lastProjectNumber: string = null;
+
     dbType = DbType.UNKNOWN;
 
     hasInitialized = false;
 
     startPromise: Promise<boolean> = null;
+
+    serverConfig: any = null;
+
+    clientConfig: any = null;
 
     /**
      * Starts the FCM app service. Implements a retryer to ensure
@@ -95,28 +103,28 @@ export class FCMService {
         this.lastRestart = !lastRestart ? 0 : (lastRestart as number);
 
         // Do nothing if the config doesn't exist
-        const serverConfig = FileSystem.getFCMServer();
-        const clientConfig = FileSystem.getFCMClient();
-        if (!serverConfig || !clientConfig) {
+        this.serverConfig = FileSystem.getFCMServer();
+        this.clientConfig = FileSystem.getFCMClient();
+        if (!this.serverConfig || !this.clientConfig) {
             Server().log("FCM is not fully configured. Skipping...");
             return false;
         }
 
-        this.dbType = (clientConfig.project_info?.firebase_url) ? DbType.REALTIME : DbType.FIRESTORE;
+        this.dbType = (this.clientConfig.project_info?.firebase_url) ? DbType.REALTIME : DbType.FIRESTORE;
 
         // Initialize the app
         admin.initializeApp(
             {
-                credential: admin.credential.cert(serverConfig),
-                databaseURL: clientConfig.project_info.firebase_url,
-                projectId: serverConfig.project_id
+                credential: admin.credential.cert(this.serverConfig),
+                databaseURL: this.clientConfig.project_info.firebase_url,
+                projectId: this.serverConfig.project_id
             },
             AppName
         );
 
         try {
             // Validate the project exists
-            await this.validateProject(serverConfig.project_id);
+            await this.validateProject(this.serverConfig.project_id);
         } catch (ex) {
             // Catch an error and stop the service
             await FCMService.stop();
@@ -204,7 +212,11 @@ export class FCMService {
      */
     shouldUpdateUrl(): string | null {
         const serverUrl = Server().repo.getConfig("server_address") as string;
-        return (this.lastAddr !== serverUrl) ? serverUrl : null;
+        return (
+            this.lastAddr !== serverUrl ||
+            this.lastProjectId !== this.serverConfig.project_id ||
+            this.lastProjectNumber !== this.clientConfig?.project_info?.project_number
+        ) ? serverUrl : null;
     }
 
     /**
@@ -238,6 +250,8 @@ export class FCMService {
         });
 
         this.lastAddr = serverUrl;
+        this.lastProjectId = this.serverConfig?.project_id;
+        this.lastProjectNumber = this.clientConfig?.project_info?.project_number;
     }
 
     private async saveUrlToDb(serverUrl: string) {
