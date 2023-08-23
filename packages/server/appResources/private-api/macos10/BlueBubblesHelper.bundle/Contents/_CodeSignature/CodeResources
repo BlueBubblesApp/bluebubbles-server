@@ -27,6 +27,15 @@
 	</dict>
 	<key>files2</key>
 	<dict>
+		<key>Frameworks/IDS.framework</key>
+		<dict>
+			<key>cdhash</key>
+			<data>
+			icRbug7PHUUgNZSibKq/OfGDnXw=
+			</data>
+			<key>requirement</key>
+			<string>identifier "com.apple.ids" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: Tanay Neotia (A8589CW7H8)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
+		</dict>
 		<key>Resources/PrefixHeader.pch</key>
 		<dict>
 			<key>hash2</key>
