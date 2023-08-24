@@ -102,10 +102,8 @@ export class FCMService {
         const lastRestart = Server().repo.getConfig("last_fcm_restart");
         this.lastRestart = !lastRestart ? 0 : (lastRestart as number);
 
-        // Do nothing if the config doesn't exist
-        this.serverConfig = FileSystem.getFCMServer();
-        this.clientConfig = FileSystem.getFCMClient();
-        if (!this.serverConfig || !this.clientConfig) {
+        const hasConfigs = this.loadConfigs();
+        if (!hasConfigs) {
             Server().log("FCM is not fully configured. Skipping...");
             return false;
         }
@@ -143,6 +141,16 @@ export class FCMService {
         }
     
         return true;
+    }
+
+    loadConfigs(): boolean {
+        this.serverConfig = FileSystem.getFCMServer();
+        this.clientConfig = FileSystem.getFCMClient();
+        return this.hasConfigs();
+    }
+
+    hasConfigs(): boolean {
+        return !!this.serverConfig && !!this.clientConfig;
     }
 
     static async setFirestoreRulesForApp(app: App): Promise<void> {
@@ -211,6 +219,10 @@ export class FCMService {
      * @returns The new URL if it has changed, null otherwise
      */
     shouldUpdateUrl(): string | null {
+        // Make sure we have configs in the first place
+        if (!this.hasConfigs()) return null;
+
+        // Make sure that information has changed
         const serverUrl = Server().repo.getConfig("server_address") as string;
         return (
             this.lastAddr !== serverUrl ||
