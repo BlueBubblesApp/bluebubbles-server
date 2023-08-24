@@ -33,7 +33,6 @@ const confirmationActions: ConfirmationItems = {
 
 export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element => {
     const privateApi: boolean = (useAppSelector(state => state.config.enable_private_api) ?? false);
-    const mode: string = (useAppSelector(state => state.config.private_api_mode) ?? '').toLowerCase().replace(' ', '-');
     const alertRef = useRef(null);
     const [requiresConfirmation, confirm] = useState((): string | null => {
         return null;
@@ -54,14 +53,6 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
                     >
                         Private API
                     </Checkbox>
-                    {(mode === 'macforge') ? (
-                        <Button
-                            size='xs'
-                            onClick={() => confirm('reinstall')}
-                        >
-                            Re-install Helper
-                        </Button>
-                    ) : null}
                     <Button size='xs'>
                         <Link target="_blank" href="https://docs.bluebubbles.app/private-api/">
                             Private API Setup Docs

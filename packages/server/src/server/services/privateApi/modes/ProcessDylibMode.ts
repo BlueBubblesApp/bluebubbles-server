@@ -26,14 +26,12 @@ export class ProcessDylibMode extends PrivateApiMode {
     
     static async install() {
         if (!fs.existsSync(ProcessDylibMode.dylbiPath)) {
-            await Server().repo.setConfig("private_api_mode", "macforge");
-            throw new Error("Unable to locate embedded Private API DYLIB! Falling back to MacForge Bundle.");
+            throw new Error("Unable to locate embedded Private API DYLIB! Please reinstall the app.");
         }
 
         const messagesPath = "/System/Applications/Messages.app/Contents/MacOS/Messages";
         if (!fs.existsSync(messagesPath)) {
-            await Server().repo.setConfig("private_api_mode", "macforge");
-            throw new Error("Unable to locate Messages.app! Falling back to MacForge Bundle.");
+            throw new Error("Unable to locate Messages.app! Please give the BlueBubbles Server Full Disk Access.");
         }
 
         await MacForgeMode.uninstall();

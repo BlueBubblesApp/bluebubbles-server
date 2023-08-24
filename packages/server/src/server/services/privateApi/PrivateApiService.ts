@@ -17,7 +17,6 @@ import { PrivateApiChat } from "./apis/PrivateApiChat";
 import { PrivateApiHandle } from "./apis/PrivateApiHandle";
 import { PrivateApiAttachment } from "./apis/PrivateApiAttachment";
 import { PrivateApiMode, PrivateApiModeConstructor } from "./modes";
-import { MacForgeMode } from "./modes/MacForgeMode";
 import { ProcessDylibMode } from "./modes/ProcessDylibMode";
 
 
@@ -85,10 +84,8 @@ export class PrivateApiService {
 
     async startPerMode(): Promise<void> {
         try {
-            const mode = (Server().repo.getConfig("private_api_mode") as string) ?? 'macforge';
-            if (mode === 'macforge') {
-                this.modeType = MacForgeMode;
-            } else if (mode === 'process-dylib') {
+            const mode = 'process-dylib'
+            if (mode === 'process-dylib') {
                 this.modeType = ProcessDylibMode;
             } else {
                 Server().log(`Invalid Private API mode: ${mode}`);

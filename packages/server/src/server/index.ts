@@ -1182,22 +1182,6 @@ class BlueBubblesServer extends EventEmitter {
 
     async checkPrivateApiRequirements(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [];
-
-        // Check if the MySIMBL/MacForge folder exists
-        if (isMinMojave) {
-            output.push({
-                name: "MacForge Plugins Folder",
-                pass: fs.existsSync(FileSystem.libMacForgePlugins),
-                solution: `Manually create this folder: ${FileSystem.libMacForgePlugins}`
-            });
-        } else {
-            output.push({
-                name: "MySIMBL Plugins Folder",
-                pass: fs.existsSync(FileSystem.libMySimblPlugins),
-                solution: `Manually create this folder: ${FileSystem.libMySimblPlugins}`
-            });
-        }
-
         output.push({
             name: "SIP Disabled",
             pass: await FileSystem.isSipDisabled(),

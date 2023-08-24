@@ -20,9 +20,6 @@ export interface PrivateApiModeFieldProps {
 
 export const PrivateApiModeField = ({ helpText }: PrivateApiModeFieldProps): JSX.Element => {
     const mode: string = (useAppSelector(state => state.config.private_api_mode) ?? '').toLowerCase().replace(' ', '-');
-    // const [requiresConfirmation, confirm] = useState((): string | null => {
-    //     return null;
-    // });
     return (
         <FormControl>
             <FormLabel htmlFor='private_api_mode'>Private API Injection Method</FormLabel>

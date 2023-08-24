@@ -6,7 +6,6 @@ import {
     Spacer
 } from '@chakra-ui/react';
 import { PrivateApiField } from '../../../components/fields/PrivateApiField';
-import { PrivateApiModeField } from 'app/components/fields/PrivateApiModeField';
 
 
 export const PrivateApiSettings = (): JSX.Element => {
@@ -17,7 +16,6 @@ export const PrivateApiSettings = (): JSX.Element => {
                 <Divider orientation='horizontal' />
                 <Spacer />
                 <PrivateApiField />
-                <PrivateApiModeField />
             </Stack>
         </section>
     );
