@@ -306,10 +306,10 @@ export const NotificationsLayout = (): JSX.Element => {
                                     size='xs'
                                 >
                                     <Link
-                                        href="https://console.firebase.google.com/u/0/project/_/database"
+                                        href="https://console.firebase.google.com/u/0/project/_/firestore"
                                         target="_blank"
                                     >
-                                        Enable Realtime Database
+                                        Enable Firestore
                                     </Link>
                                 </Button>
                                 <Button
