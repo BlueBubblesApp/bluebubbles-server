@@ -18,7 +18,7 @@ export class PrivateApiAction {
 
     throwForNoMissingFields(action: string, fields: any[]) {
         for (const field of fields) {
-            if (isEmpty(field)) {
+            if (typeof field !== 'number' && isEmpty(field)) {
                 throw new Error(`Failed to invoke Private API action: ${action}! Required fields are missing.`);
             }
         }
