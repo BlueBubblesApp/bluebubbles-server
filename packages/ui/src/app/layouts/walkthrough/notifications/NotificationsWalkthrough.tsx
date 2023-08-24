@@ -45,13 +45,14 @@ export const NotificationsWalkthrough = (): JSX.Element => {
     const serverLoaded = (useAppSelector(state => state.config.fcm_server !== null) ?? false);
     const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
     const [isDragging, setDragging] = useBoolean();
-    const [authStatus, setAuthStatus] = useState(ProgressStatus.NOT_STARTED);
+    const [authStatus, setAuthStatus] = useState((serverLoaded && clientLoaded) ? ProgressStatus.COMPLETED : ProgressStatus.NOT_STARTED);
     let logs = useAppSelector(state => state.logStore.logs);
     const [oauthUrl, setOauthUrl] = useState('');
     const [errors, setErrors] = useState([] as Array<ErrorItem>);
     const alertOpen = errors.length > 0;
 
     useEffect(() => {
+        console.log('HERE');
         ipcRenderer.removeAllListeners('oauth-status');
         getOauthUrl().then(url => setOauthUrl(url));
     }, []);
@@ -148,6 +149,25 @@ export const NotificationsWalkthrough = (): JSX.Element => {
         return null;
     };
 
+    const getAlertStatus = () => {
+        if (authStatus === ProgressStatus.COMPLETED) {
+            return (
+                <Alert status='success'>
+                    <AlertIcon />
+                    Firebase notifications are configured!
+                </Alert>
+            );
+        } else {
+            return (
+                <Alert status='warning'>
+                    <AlertIcon />
+                    Firebase is not configured! Failing to configure Firebase Notifications will
+                    prevent notifications from being delivered to your Android device.
+                </Alert>
+            );
+        }
+    };
+
     return (
         <SlideFade in={true} offsetY='150px'>
             <Box
@@ -158,16 +178,13 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                 onDrop={(e) => onDrop(e)}    
             >
                 <Text fontSize='4xl'>Notifications &amp; Firebase</Text>
-                <Text fontSize='md' mt={5}>
+                <Text fontSize='md' mt={5} mb={5}>
                     BlueBubbles utilizes Google FCM (Firebase Cloud Messaging) to deliver notifications and server URL changes to your BlueBubbles clients.
                     We do this so the clients do not need to hold a connection to the server at all times. As a result,
                     BlueBubbles can deliver notifications even when the app is running in the background. This is also used to
                     ensure your current server URL is always synced to your BlueBubbles clients.
                 </Text>
-                <Alert status='info' mt={5}>
-                    <AlertIcon />
-                    If you do not complete this setup, you will not receive notifications!
-                </Alert>
+                {getAlertStatus()}
                 <Box mt={3} />
                 <Tabs>
                     <TabList>
@@ -222,10 +239,10 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                                     size='xs'
                                 >
                                     <Link
-                                        href="https://console.firebase.google.com/u/0/project/_/database"
+                                        href="https://console.firebase.google.com/u/0/project/_/firestore"
                                         target="_blank"
                                     >
-                                        Enable Realtime Database
+                                        Enable Firestore
                                     </Link>
                                 </Button>
                                 <Button
