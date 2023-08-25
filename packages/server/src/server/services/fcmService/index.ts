@@ -66,14 +66,16 @@ export class FCMService {
             delayMs: 5000,
             getData: async () => {
                 try {
-                    await this.startHandler({ initializeOnly });
+                    const success = await this.startHandler({ initializeOnly });
                     hasSucceeded = true;
-                    return hasSucceeded;
+                    return success;
                 } catch (ex: any) {
                     Server().log(`Failed to initialize FCM App. Error: ${ex?.message}. Retrying...`, "debug");
-                    return false;
+                    return null;
                 }
-            }
+            },
+            // Retry if the data is null (an error happened)
+            dataLoopCondition: (data: boolean) => data === null
         });
 
         const result = await this.startPromise;
