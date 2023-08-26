@@ -3,7 +3,7 @@ import { ChatResponse, HandleResponse } from "@server/types";
 import { HandleSerializer } from "../serializers/HandleSerializer";
 import { ChatInterface } from "./chatInterface";
 import { Handle } from "@server/databases/imessage/entity/Handle";
-import { checkPrivateApiStatus, isEmpty, isMinMonterey } from "@server/helpers/utils";
+import { checkPrivateApiStatus, getiMessageAddressFormat, isEmpty, isMinMonterey } from "@server/helpers/utils";
 
 export class HandleInterface {
     static async get({
@@ -75,7 +75,8 @@ export class HandleInterface {
     static async getMessagesAvailability(address: string): Promise<boolean> {
         checkPrivateApiStatus();
 
-        const availability = await Server().privateApi.handle.getMessagesAvailability(address);
+        const addr = getiMessageAddressFormat(address);
+        const availability = await Server().privateApi.handle.getMessagesAvailability(addr);
         if (isEmpty(availability?.data)) {
             throw new Error("Failed to determine iMessage availability!");
         }
@@ -86,7 +87,8 @@ export class HandleInterface {
     static async getFacetimeAvailability(address: string): Promise<boolean> {
         checkPrivateApiStatus();
 
-        const availability = await Server().privateApi.handle.getFacetimeAvailability(address);
+        const addr = getiMessageAddressFormat(address);
+        const availability = await Server().privateApi.handle.getFacetimeAvailability(addr);
         if (isEmpty(availability?.data)) {
             throw new Error("Failed to determine Facetime availability!");
         }
