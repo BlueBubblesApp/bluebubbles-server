@@ -3,7 +3,7 @@ import { Next } from "koa";
 
 import { Server } from "@server";
 import { HandleInterface } from "@server/api/v1/interfaces/handleInterface";
-import { isEmpty } from "@server/helpers/utils";
+import { getiMessageAddressFormat, isEmpty } from "@server/helpers/utils";
 import { arrayHasOne } from "@server/utils/CollectionUtils";
 import { Success } from "../responses/success";
 import { NotFound } from "../responses/errors";
@@ -57,7 +57,8 @@ export class HandleRouter {
 
     static async getFocusStatus(ctx: RouterContext, _: Next) {
         const address = ctx.params.guid;
-        const [handles, __] = await Server().iMessageRepo.getHandles({ address });
+        const addr = getiMessageAddressFormat(address);
+        const [handles, __] = await Server().iMessageRepo.getHandles({ address: addr });
         if (isEmpty(handles)) throw new NotFound({ error: "Handle not found!" });
 
         // Get the status from the private api
