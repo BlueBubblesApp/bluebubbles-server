@@ -58,6 +58,16 @@ let dragCounter = 0;
 export const NotificationsLayout = (): JSX.Element => {
     const dispatch = useAppDispatch();
     const alertRef = useRef(null);
+    const serverLoaded = (useAppSelector(state => state.config.fcm_server !== null) ?? false);
+    const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
+    const [isDragging, setDragging] = useBoolean();
+    let logs = useAppSelector(state => state.logStore.logs);
+    const [authStatus, setAuthStatus] = useState((serverLoaded && clientLoaded) ? ProgressStatus.COMPLETED : ProgressStatus.NOT_STARTED);
+    const [oauthUrl, setOauthUrl] = useState('');
+    const [errors, setErrors] = useState([] as Array<ErrorItem>);
+    const [requiresConfirmation, setRequiresConfirmation] = useState(null as string | null);
+    const alertOpen = errors.length > 0;
+
     const confirmationActions: NodeJS.Dict<any> = {
         clearConfiguration: {
             message: (
@@ -74,16 +84,6 @@ export const NotificationsLayout = (): JSX.Element => {
             }
         }
     };
-
-    const serverLoaded = (useAppSelector(state => state.config.fcm_server !== null) ?? false);
-    const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
-    const [isDragging, setDragging] = useBoolean();
-    let logs = useAppSelector(state => state.logStore.logs);
-    const [authStatus, setAuthStatus] = useState((serverLoaded && clientLoaded) ? ProgressStatus.COMPLETED : ProgressStatus.NOT_STARTED);
-    const [oauthUrl, setOauthUrl] = useState('');
-    const [errors, setErrors] = useState([] as Array<ErrorItem>);
-    const [requiresConfirmation, setRequiresConfirmation] = useState(null as string | null);
-    const alertOpen = errors.length > 0;
 
     useEffect(() => {
         // Load the FCM config from the server
