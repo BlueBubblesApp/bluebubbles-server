@@ -443,7 +443,7 @@ export class ScheduledMessagesService {
         if (!scheduledMessage.payload.method) {
             const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
             scheduledMessage.payload.method =
-                papiEnabled && !!Server().privateApiHelper.helper ? "private-api" : "apple-script";
+                papiEnabled && !!Server().privateApi.helper ? "private-api" : "apple-script";
         }
 
         // Send the message

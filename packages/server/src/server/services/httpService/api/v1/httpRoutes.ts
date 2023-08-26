@@ -335,6 +335,12 @@ export class HttpRoutes {
                         controller: ChatRouter.getGroupIcon
                     },
                     {
+                        method: HttpMethod.DELETE,
+                        path: ":guid/:messageGuid",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.deleteChatMessage
+                    },
+                    {
                         method: HttpMethod.PUT,
                         path: ":guid",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
@@ -482,6 +488,19 @@ export class HttpRoutes {
                         path: "query",
                         validators: [HandleValidator.validateQuery],
                         controller: HandleRouter.query
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "availability/imessage",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [HandleValidator.validateAvailability],
+                        controller: HandleRouter.getMessagesAvailability
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "availability/facetime",
+                        validators: [HandleValidator.validateAvailability],
+                        controller: HandleRouter.getFacetimeAvailability
                     },
                     {
                         method: HttpMethod.GET,

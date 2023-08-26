@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "fs-extra";
 
 import * as path from "path";
 import * as child_process from "child_process";
@@ -223,7 +223,7 @@ export class FileSystem {
 
         for (const file of files) {
             if (fs.existsSync(file)) {
-                fs.rmdirSync(file, { recursive: true });
+                fs.rm(file, { recursive: true, force: true });
             }
 
             fs.mkdirSync(file);
@@ -293,7 +293,7 @@ export class FileSystem {
      */
     static deleteChunks(guid: string): void {
         const dir = path.join(FileSystem.attachmentsDir, guid);
-        if (fs.existsSync(dir)) fs.rmdirSync(dir, { recursive: true });
+        if (fs.existsSync(dir)) fs.rm(dir, { recursive: true, force: true });
     }
 
     /**
@@ -479,6 +479,12 @@ export class FileSystem {
      * Makes sure that Messages is running
      */
     static async startMessages() {
+        // If we are managing the messages process, we don't need to make sure it's started
+        const papi_enabled = Server().repo.getConfig('enable_private_api') as boolean;
+        const papi_mode = Server().repo.getConfig('private_api_mode') as string;
+        if (papi_enabled && papi_mode === 'process-dylib') return;
+
+        // Start the messages app
         await FileSystem.executeAppleScript(startMessages());
     }
 
@@ -613,7 +619,7 @@ export class FileSystem {
     }
 
     static removeDirectory(filePath: string) {
-        fs.rmdirSync(filePath, { recursive: true });
+        fs.rm(filePath, { recursive: true, force: true });
     }
 
     static async getRegion(): Promise<string | null> {
@@ -670,5 +676,20 @@ export class FileSystem {
         }
 
         return null;
+    }
+
+    static getLocalIps(type: 'IPv4' | 'IPv6' = 'IPv4'): string[] {
+        const interfaces = os.networkInterfaces();
+        const addresses = [];
+        for (const k in interfaces) {
+            for (const k2 in interfaces[k]) {
+                const address = interfaces[k][k2];
+                if (address.family !== type || address.internal) continue;
+                if (address.mac === '00:00:00:00:00:00') continue;
+                addresses.push(address.address);
+            }
+        }
+
+        return addresses;
     }
 }

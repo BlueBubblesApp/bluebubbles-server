@@ -186,17 +186,37 @@ export class ChatRouter {
 
     static async create(ctx: RouterContext, _: Next): Promise<void> {
         const { body } = ctx.request;
-        const addresses = body?.addresses;
-        const message = body?.message;
-        const method = body?.method;
-        const service = body?.service;
-        const tempGuid = body?.tempGuid;
+        const {
+            addresses,
+            message,
+            method,
+            service,
+            tempGuid,
+            subject,
+            effectId,
+            attributedBody
+        } = body;
 
-        const chat = await ChatInterface.create({ addresses, message, method, service, tempGuid });
+        const chat = await ChatInterface.create({
+            addresses,
+            message,
+            method,
+            service,
+            tempGuid,
+            subject,
+            effectId,
+            attributedBody
+        });
         if (!chat) throw new IMessageError({ error: "Failed to create chat!" });
 
         // Convert the data to an API response
-        const data = await ChatSerializer.serialize({ chat });
+        const data = await ChatSerializer.serialize({
+            chat,
+            config: {
+                includeParticipants: true,
+                includeMessages: true
+            }
+         });
 
         // Inject the tempGuid back into the messages (if available)
         if (isNotEmpty(tempGuid)) {
@@ -305,5 +325,18 @@ export class ChatRouter {
         const { guid } = ctx.params;
         await ChatInterface.startTyping(guid);
         return new Success(ctx, { message: `Successfully stopped typing!` }).send();
+    }
+
+    static async deleteChatMessage(ctx: RouterContext, _: Next) {
+        const { guid: chatGuid, messageGuid } = ctx?.params ?? {};
+
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: false });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        const message = await Server().iMessageRepo.getMessage(messageGuid, false, false);
+        if (isEmpty(message)) throw new NotFound({ error: "Message does not exist!" });
+
+        await ChatInterface.deleteChatMessage(chats[0], message);
+        return new Success(ctx, { message: 'Successfully deleted message!' }).send();
     }
 }

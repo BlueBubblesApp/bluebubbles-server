@@ -20,6 +20,7 @@ import { FocusableElement } from '@chakra-ui/utils';
 import { ScheduledMessageItem } from '../tables/ScheduledMessagesTable';
 import { Options, Select } from 'chakra-react-select';
 import { intervalTypeOpts, scheduledMessageTypeOptions, scheduleTypeOptions } from 'app/constants';
+import { useAppSelector } from 'app/hooks';
 
 
 interface ScheduledMessageDialogProps {
@@ -52,6 +53,7 @@ export const ScheduledMessageDialog = ({
     isOpen,
     modalRef,
 }: ScheduledMessageDialogProps): JSX.Element => {
+    const usePrivateApi = useAppSelector(state => state.config.enable_private_api as boolean) ?? false;
     const [type, setType] = useState(scheduledMessageTypeOptions[0] as any | null);
     const [message, setMessage] = useState('');
     const [chatType, setChatType] = useState('dm');
@@ -294,7 +296,8 @@ export const ScheduledMessageDialog = ({
                                         type: type?.value ?? 'send-message',
                                         payload: {
                                             chatGuid: guid,
-                                            message
+                                            message,
+                                            method: usePrivateApi ? 'private-api' : 'apple-script'
                                         },
                                         scheduledFor: scheduledFor.getTime(),
                                         schedule: {

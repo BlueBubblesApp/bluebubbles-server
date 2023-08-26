@@ -12,13 +12,17 @@ const osVersion = macosVersion();
 export class GeneralInterface {
     static async getServerMetadata(): Promise<ServerMetadataResponse> {
         return {
+            computer_id: Server().computerIdentifier,
             os_version: osVersion,
             server_version: app.getVersion(),
             private_api: Server().repo.getConfig("enable_private_api") as boolean,
             proxy_service: Server().repo.getConfig("proxy_service") as string,
-            helper_connected: !!Server().privateApiHelper?.helper,
+            helper_connected: !!Server().privateApi?.helper,
             detected_icloud: await FileSystem.getIcloudAccount(),
-            macos_time_sync: await FileSystem.getTimeSync()
+            detected_imessage: await Server().iMessageRepo.getiMessageAccount(),
+            macos_time_sync: await FileSystem.getTimeSync(),
+            local_ipv4s: FileSystem.getLocalIps('IPv4'),
+            local_ipv6s: FileSystem.getLocalIps('IPv6')
         };
     }
 

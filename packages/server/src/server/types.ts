@@ -1,13 +1,17 @@
 import { NSAttributedString } from "node-typedstream";
 
 export type ServerMetadataResponse = {
+    computer_id: string;
     os_version: string;
     server_version: string;
     private_api: boolean;
     helper_connected: boolean;
     proxy_service: string;
     detected_icloud: string;
+    detected_imessage: string;
     macos_time_sync: number | null;
+    local_ipv4s: string[];
+    local_ipv6s: string[];
 };
 
 /**
@@ -118,3 +122,9 @@ export type AttachmentResponse = {
 
 export type ValidTapback = "love" | "like" | "dislike" | "laugh" | "emphasize" | "question";
 export type ValidRemoveTapback = "-love" | "-like" | "-dislike" | "-laugh" | "-emphasize" | "-question";
+export enum ProgressStatus {
+    NOT_STARTED = 'NOT_STARTED',
+    IN_PROGRESS = 'IN_PROGRESS',
+    COMPLETED = 'COMPLETED',
+    FAILED = 'FAILED',
+};

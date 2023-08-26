@@ -25,7 +25,8 @@ export class IncomingMessageListener extends MessageChangeListener {
         const [entries, _] = await this.repo.getMessages({
             after: this.lastRowId === 0 ? new Date(after.getTime() - 15000) : null,
             withChats: true,
-            where
+            where,
+            orderBy: this.lastRowId === 0 ? "message.dateCreated" : "message.ROWID"
         });
 
         // The 0th entry should be the newest since we sort by DESC

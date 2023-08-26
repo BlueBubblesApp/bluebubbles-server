@@ -26,6 +26,7 @@ export interface ScheduledMessageItem {
     payload: {
         chatGuid: string,
         message: string,
+        method: string,
         selectedMessageGuid?: string,
         effectId?: string,
         subject?: string,

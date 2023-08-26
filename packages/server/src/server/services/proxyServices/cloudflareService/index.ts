@@ -28,11 +28,9 @@ export class CloudflareService extends Proxy {
 
         // When we get a new URL, set the URL and update
         this.manager.on("new-url", async url => {
-            if (url === this.url) return;
-
             this.url = url;
 
-            // 3 second delay to allow DNS records to update
+            // 5 second delay to allow DNS records to update
             setTimeout(() => {
                 this.applyAddress(this.url);
             }, 5000);

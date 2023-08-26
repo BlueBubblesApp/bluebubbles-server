@@ -7,7 +7,7 @@ import {
     Alert,
     AlertIcon
 } from '@chakra-ui/react';
-import { ProxyServiceField } from '../../../components/fields/ProxyServiceField';
+import { ProxySetupField } from '../../../components/fields/ProxySetupField';
 import { useAppSelector } from '../../../hooks';
 import { NgrokAuthTokenField } from '../../../components/fields/NgrokAuthTokenField';
 import { NgrokRegionField } from '../../../components/fields/NgrokRegionField';
@@ -43,8 +43,8 @@ export const ConnectionWalkthrough = (): JSX.Element => {
                 </Alert>
 
                 <Stack direction='column' p={5}>
-                    <ServerPasswordField />
-                    <ProxyServiceField />
+                    <ServerPasswordField errorOnEmpty={true} />
+                    <ProxySetupField />
                     {(proxyService === 'ngrok') ? (
                         <>
                             <NgrokAuthTokenField />

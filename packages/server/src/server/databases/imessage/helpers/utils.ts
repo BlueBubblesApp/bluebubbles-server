@@ -4,19 +4,33 @@ import { nativeImage } from "electron";
 import { basename } from "path";
 
 import { Server } from "@server";
-import { Message } from "@server/databases/imessage/entity/Message";
 import { FileSystem } from "@server/fileSystem";
 import { Metadata } from "@server/fileSystem/types";
-import { isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
 
+
+export const getConversionPath = (attachment: Attachment, extension: string): string => {
+    const guid = attachment.originalGuid ?? attachment.guid;
+    const newDir = `${FileSystem.convertDir}/${guid}`;
+    if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
+    const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
+    return `${newDir}/${newName}.${extension}`;
+}
+
 export const convertAudio = async (
     attachment: Attachment,
-    { originalMimeType = null }: { originalMimeType?: string } = {}
+    {
+        originalMimeType = null,
+        dryRun = false
+    }: {
+        originalMimeType?: string,
+        dryRun?: boolean
+    } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const newPath = `${FileSystem.convertDir}/${attachment.originalGuid ?? attachment.guid}.mp3`;
+    const newPath = getConversionPath(attachment, "mp3");
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
@@ -25,7 +39,7 @@ export const convertAudio = async (
         ext = "caf";
     }
 
-    if (!fs.existsSync(newPath)) {
+    if (!fs.existsSync(newPath) && !dryRun) {
         try {
             if (isNotEmpty(ext)) {
                 Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
@@ -40,7 +54,7 @@ export const convertAudio = async (
         Server().log("Attachment has already been converted! Skipping...", "debug");
     }
 
-    if (!failed && ext && fs.existsSync(newPath)) {
+    if (!failed && ext && (fs.existsSync(newPath) || dryRun)) {
         // If conversion is successful, we need to modify the attachment a bit
         attachment.mimeType = "audio/mp3";
         attachment.filePath = newPath;
@@ -55,10 +69,16 @@ export const convertAudio = async (
 
 export const convertImage = async (
     attachment: Attachment,
-    { originalMimeType = null }: { originalMimeType?: string } = {}
+    {
+        originalMimeType = null,
+        dryRun = false
+    }: {
+        originalMimeType?: string
+        dryRun?: boolean
+    } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const newPath = `${FileSystem.convertDir}/${attachment.originalGuid ?? attachment.guid}.jpeg`;
+    const newPath = getConversionPath(attachment, "jpeg");
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext: string = null;
@@ -72,7 +92,7 @@ export const convertImage = async (
         ext = "tiff";
     }
 
-    if (!fs.existsSync(newPath)) {
+    if (!fs.existsSync(newPath) && !dryRun) {
         try {
             if (isNotEmpty(ext)) {
                 Server().log(`Converting image attachment, ${attachment.transferName}, to an JPEG...`);
@@ -87,7 +107,7 @@ export const convertImage = async (
         Server().log("Attachment has already been converted! Skipping...", "debug");
     }
 
-    if (!failed && ext && fs.existsSync(newPath)) {
+    if (!failed && ext && (fs.existsSync(newPath) || dryRun)) {
         // If conversion is successful, we need to modify the attachment a bit
         attachment.mimeType = "image/jpeg";
         attachment.filePath = newPath;

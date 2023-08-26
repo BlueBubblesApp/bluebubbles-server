@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text, Divider, Stack } from '@chakra-ui/react';
 import { ConnectionSettings } from './connection/ConnectionSettings';
 import { FeatureSettings } from './features/FeatureSettings';
+import { PrivateApiSettings } from './privateApi/PrivateApiSettings';
 import { UpdateSettings } from './update/UpdateSettings';
 import { ResetSettings } from './reset/ResetSettings';
 import { ThemeSettings } from './theme/ThemeSettings';
@@ -15,6 +16,7 @@ export const SettingsLayout = (): JSX.Element => {
         <section>
             <Box p={3} borderRadius={10}>  
                 <ConnectionSettings />
+                <PrivateApiSettings />
                 <FeatureSettings />
                 <DatabaseSettings />
                 <UpdateSettings />

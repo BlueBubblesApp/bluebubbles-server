@@ -6,9 +6,11 @@ import {
     Spacer,
     Button
 } from '@chakra-ui/react';
+import { store } from '../../../store';
 import { toggleTutorialCompleted, resetApp } from '../../../actions/GeneralActions';
 import { ConfirmationDialog } from '../../../components/modals/ConfirmationDialog';
 import { ConfirmationItems } from '../../../utils/ToastUtils';
+import { clear as clearLogs } from '../../../slices/LogsSlice';
 
 const confirmationActions: ConfirmationItems = {
     resetTutorial: {
@@ -19,6 +21,7 @@ const confirmationActions: ConfirmationItems = {
         ),
         func: () => {
             toggleTutorialCompleted(false);
+            store.dispatch(clearLogs());
         }
     },
     resetApp: {

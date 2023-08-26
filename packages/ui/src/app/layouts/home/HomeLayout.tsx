@@ -35,13 +35,15 @@ export const HomeLayout = (): JSX.Element => {
     const password = useAppSelector(state => state.config.password);
     const port = useAppSelector(state => state.config.socket_port);
     const qrCode: any = buildQrData(password, address);
+    const computerId = useAppSelector(state => state.config.computer_id);
+    const iMessageEmail = useAppSelector(state => state.config.detected_imessage);
 
     return (
         <Box p={3} borderRadius={10}>
             <Flex flexDirection="column">
                 <Stack direction='column' p={5}>
                     <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
-                        <Text fontSize='2xl'>Connection Details</Text>
+                        <Text fontSize='2xl'>Server Information</Text>
                         <Popover trigger='hover'>
                             <PopoverTrigger>
                                 <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
@@ -130,11 +132,27 @@ export const HomeLayout = (): JSX.Element => {
                                     <Text fontSize='md'>{port}</Text>
                                 )}
                             </Flex>
+                            <Flex flexDirection="row" pt={2}>
+                                <Text fontSize='md' fontWeight='bold' mr={2}>iMessage Email: </Text>
+                                {(!iMessageEmail) ? (
+                                    <SkeletonText noOfLines={1} />
+                                ) : (
+                                    <Text fontSize='md'>{iMessageEmail.length === 0 ? 'Not Detected!' : iMessageEmail}</Text>
+                                )}
+                            </Flex>
+                            <Flex flexDirection="row" pt={2}>
+                                <Text fontSize='md' fontWeight='bold' mr={2}>Computer ID: </Text>
+                                {(!computerId) ? (
+                                    <SkeletonText noOfLines={1} />
+                                ) : (
+                                    <Text fontSize='md'>{computerId}</Text>
+                                )}
+                            </Flex>
                         </Stack>
                         <Divider orientation="vertical" />
                     </Flex>
                 </Stack>
-                <Stack direction='column' p={5}>
+                <Stack direction='column' pl={5} pr={5} pb={5} pt={2}>
                     <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                         <Text fontSize='2xl'>iMessage Highlights</Text>
                         <Popover trigger='hover'>

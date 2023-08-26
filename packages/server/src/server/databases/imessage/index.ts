@@ -34,6 +34,16 @@ export class MessageRepository {
         return this.db;
     }
 
+    async getiMessageAccount() {
+        const query = this.db.getRepository(Chat)
+            .createQueryBuilder("chat")
+            .where("chat.service_name = 'iMessage'")
+            .limit(1)
+            .orderBy("chat.ROWID", "DESC");
+        const chat = await query.getOne();
+        return chat ? chat.accountLogin.split(':').at(-1) : null;
+    }
+
     /**
      * Get all the chats from the DB
      *
@@ -91,8 +101,8 @@ export class MessageRepository {
         query.orderBy("chat.ROWID", "DESC");
 
         // Set page params
-        query.skip(offset);
-        if (limit) query.take(limit);
+        if (offset != null) query.skip(offset);
+        if (limit != null) query.take(limit);
 
         // Get results
         return await query.getManyAndCount();
@@ -138,20 +148,23 @@ export class MessageRepository {
         // Attachment GUIDs may start with a prefix such as p:/ or `at_x_`. For lookups,
         // all we need is the actual GUID, which is the last 36 digits.
         // Original GUIDs can also be prefixed with at_x_ or p:/.
-        if (attachmentGuid.length >= 36) {
-            attachmentGuid = attachmentGuid.substring(attachmentGuid.length - 36);
+        const lookupGuids = [attachmentGuid];
+        if (attachmentGuid.length > 36) {
+            lookupGuids.push(attachmentGuid.substring(attachmentGuid.length - 36));
         }
 
-        // El Capitan does not have an original_guid column.
-        if (isMinHighSierra) {
-            query.where("attachment.original_guid LIKE :guid", { guid: `%${attachmentGuid}` });
-            query.orWhere("attachment.guid LIKE :guid", { guid: `%${attachmentGuid}` });
-        } else {
-            query.where("attachment.guid LIKE :guid", { guid: `%${attachmentGuid}` });
+        for (const lookupGuid of lookupGuids) {
+            // El Capitan does not have an original_guid column.
+            if (isMinHighSierra) {
+                query.where("attachment.original_guid LIKE :guid", { guid: `%${lookupGuid}` });
+                query.orWhere("attachment.guid LIKE :guid", { guid: `%${lookupGuid}` });
+            } else {
+                query.where("attachment.guid LIKE :guid", { guid: `%${lookupGuid}` });
+            }
+            const attachment = await query.getOne();
+            if (attachment) return attachment;
         }
-
-        const attachment = await query.getOne();
-        return attachment;
+        return null;
     }
 
     /**
@@ -220,6 +233,7 @@ export class MessageRepository {
         withChatParticipants = false,
         withAttachments = true,
         sort = "DESC",
+        orderBy = "message.dateCreated",
         where = []
     }: DBMessageParams): Promise<[Message[], number]> {
         // Sanitize some params
@@ -277,7 +291,7 @@ export class MessageRepository {
         }
 
         // Add pagination params
-        query.orderBy("message.dateCreated", sort);
+        query.orderBy(orderBy, sort);
         query.skip(offset);
         query.take(limit);
 

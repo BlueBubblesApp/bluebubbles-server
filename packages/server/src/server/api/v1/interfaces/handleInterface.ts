@@ -3,7 +3,7 @@ import { ChatResponse, HandleResponse } from "@server/types";
 import { HandleSerializer } from "../serializers/HandleSerializer";
 import { ChatInterface } from "./chatInterface";
 import { Handle } from "@server/databases/imessage/entity/Handle";
-import { checkPrivateApiStatus, isEmpty, isMinMonterey } from "@server/helpers/utils";
+import { checkPrivateApiStatus, getiMessageAddressFormat, isEmpty, isMinMonterey } from "@server/helpers/utils";
 
 export class HandleInterface {
     static async get({
@@ -65,10 +65,34 @@ export class HandleInterface {
         checkPrivateApiStatus();
         if (!isMinMonterey) throw new Error("Focus status is only available on Monterey and newer!");
 
-        const focusStatus = await Server().privateApiHelper.checkFocusStatus(handle.id);
+        const focusStatus = await Server().privateApi.handle.getFocusStatus(handle.id);
         if (isEmpty(focusStatus?.data)) return "unknown";
 
         if (focusStatus?.data?.silenced == 1) return "silenced";
         return "none";
+    }
+
+    static async getMessagesAvailability(address: string): Promise<boolean> {
+        checkPrivateApiStatus();
+
+        const addr = getiMessageAddressFormat(address);
+        const availability = await Server().privateApi.handle.getMessagesAvailability(addr);
+        if (isEmpty(availability?.data)) {
+            throw new Error("Failed to determine iMessage availability!");
+        }
+
+        return !!availability?.data.available;
+    }
+
+    static async getFacetimeAvailability(address: string): Promise<boolean> {
+        checkPrivateApiStatus();
+
+        const addr = getiMessageAddressFormat(address);
+        const availability = await Server().privateApi.handle.getFacetimeAvailability(addr);
+        if (isEmpty(availability?.data)) {
+            throw new Error("Failed to determine Facetime availability!");
+        }
+
+        return !!availability?.data.available;
     }
 }

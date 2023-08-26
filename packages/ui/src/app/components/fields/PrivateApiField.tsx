@@ -53,12 +53,6 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
                     >
                         Private API
                     </Checkbox>
-                    <Button
-                        size='xs'
-                        onClick={() => confirm('reinstall')}
-                    >
-                        Re-install Helper
-                    </Button>
                     <Button size='xs'>
                         <Link target="_blank" href="https://docs.bluebubbles.app/private-api/">
                             Private API Setup Docs
@@ -68,7 +62,7 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
                 <FormHelperText>
                     {helpText ?? (
                         <Text>
-                            If you have set up the Private API features (via MacForge or MySIMBL),
+                            If you have set up the Private API features,
                             enable this option to allow the server to communicate with the iMessage Private API. If you
                             have not done the Private API setup, use the button above to read the documentation.
                         </Text>

@@ -3,7 +3,7 @@ import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
-import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isNotEmpty } from "@server/helpers/utils";
+import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isMinVentura, isNotEmpty } from "@server/helpers/utils";
 
 const osVersion = macosVersion();
 
@@ -14,7 +14,9 @@ const buildServiceScript = (inputService: string) => {
         theService = `"${theService}"`;
     }
 
-    let serviceScript = `set targetService to 1st service whose service type = ${theService}`;
+    const svcClass = isMinVentura ? 'account' : 'service';
+
+    let serviceScript = `set targetService to 1st ${svcClass} whose service type = ${theService}`;
     if (!isMinBigSur && theService !== "iMessage") {
         serviceScript = `set targetService to service ${theService}`;
     }
@@ -89,6 +91,13 @@ export const startMessages = () => {
 };
 
 /**
+ * The AppleScript used to send a message with or without an attachment
+ */
+export const stopMessages = () => {
+    return stopApp("Messages");
+};
+
+/**
  * The AppleScript used to hide an app
  */
 export const hideApp = (appName: string) => {
@@ -146,7 +155,7 @@ export const hideFindMyFriends = () => {
 };
 
 /**
- * The AppleScript used to send a message with or without an attachment
+ * The AppleScript used to start an application
  */
 export const startApp = (appName: string) => {
     return `set appName to "${appName}"
@@ -154,6 +163,18 @@ export const startApp = (appName: string) => {
             return 0
         else
             tell application appName to reopen
+        end if`;
+};
+
+/**
+ * The AppleScript used to stop an application
+ */
+export const stopApp = (appName: string) => {
+    return `set appName to "${appName}"
+        if application appName is running then
+            tell application appName to quit
+        else
+            return 0
         end if`;
 };
 

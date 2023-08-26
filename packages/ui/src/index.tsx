@@ -1,3 +1,4 @@
+import { ipcRenderer } from 'electron';
 import React from 'react';
 import ReactDOM from 'react-dom';
 
@@ -13,7 +14,6 @@ import { DeviceItem } from './app/slices/DevicesSlice';
 import { add as addLog } from './app/slices/LogsSlice';
 import { addAll as addAllWebhooks } from './app/slices/WebhooksSlice';
 import { add as addAlert, addAll as addAllAlerts, NotificationItem, clear as clearAlerts } from './app/slices/NotificationsSlice';
-import { ipcRenderer } from 'electron';
 import { getRandomInt } from './app/utils/GenericUtils';
 
 
@@ -110,7 +110,7 @@ getWebhooks().then(hooks => {
 ipcRenderer.on('new-log', (_: any, data: any) => {
     store.dispatch(addLog({
         id: String(getRandomInt(999999999)),
-        message: data.message,
+        message: String(data.message),
         type: data.type,
         timestamp: new Date()
     }));

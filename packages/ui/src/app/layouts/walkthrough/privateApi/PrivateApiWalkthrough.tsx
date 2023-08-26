@@ -16,11 +16,11 @@ export const PrivateApiWalkthrough = (): JSX.Element => {
     return (
         <SlideFade in={true} offsetY='150px'>
             <Box px={5}>
-                <Text fontSize='4xl'>Private API Setup (Advanced)</Text>
+                <Text fontSize='4xl'>Private API Setup (Advanced | Optional)</Text>
                 <Text fontSize='md' mt={5}>
                     You may already know this, but BlueBubbles is one of the only cross-platform iMessage solution that
                     supports sending reactions, replies, subjects, and effects. This is because we developed an Objective-C
-                    library that allows us to interface with Apple's "private APIs". Normally, this is not possible, however,
+                    library that allows us to interface with Apple's "Private APIs". Normally, this is not possible, however,
                     after disabling your macOS device's SIP controls, these private APIs are made accessible.
                 </Text>
                 <Text fontSize='md' mt={5}>
@@ -44,8 +44,7 @@ export const PrivateApiWalkthrough = (): JSX.Element => {
                 <Alert status='info' mt={2}>
                     <AlertIcon />
                     Unless you know what you're doing, please make sure the following Private API Requirements all pass
-                    before enabling the setting. Enabling this will automatically attempt to install the helper bundle
-                    into MacForge or MySIMBL.
+                    before enabling the setting.
                 </Alert>
                 <Box mt={4} />
                 <PrivateApiField

@@ -38,7 +38,8 @@ import {
     CloudflareService,
     WebhookService,
     FacetimeService,
-    ScheduledMessagesService
+    ScheduledMessagesService,
+    OauthService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
@@ -56,7 +57,7 @@ import {
     waitMs
 } from "./helpers/utils";
 import { Proxy } from "./services/proxyServices/proxy";
-import { BlueBubblesHelperService } from "./services/privateApi";
+import { PrivateApiService } from "./services/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
@@ -130,7 +131,7 @@ class BlueBubblesServer extends EventEmitter {
 
     httpService: HttpService;
 
-    privateApiHelper: BlueBubblesHelperService;
+    privateApi: PrivateApiService;
 
     fcm: FCMService;
 
@@ -151,6 +152,8 @@ class BlueBubblesServer extends EventEmitter {
     proxyServices: Proxy[];
 
     webhookService: WebhookService;
+
+    oauthService: OauthService;
 
     actionHandler: ActionHandler;
 
@@ -199,6 +202,10 @@ class BlueBubblesServer extends EventEmitter {
         return systemPreferences.isTrustedAccessibilityClient(false) === true;
     }
 
+    get computerIdentifier(): string {
+        return `${os.userInfo().username}@${os.hostname()}`;
+    }
+
     /**
      * Constructor to just initialize everything to null pretty much
      *
@@ -223,7 +230,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Services
         this.httpService = null;
-        this.privateApiHelper = null;
+        this.privateApi = null;
         this.fcm = null;
         this.facetime = null;
         this.caffeinate = null;
@@ -234,6 +241,7 @@ class BlueBubblesServer extends EventEmitter {
         this.messageManager = null;
         this.webhookService = null;
         this.scheduledMessages = null;
+        this.oauthService = null;
 
         this.hasSetup = false;
         this.hasStarted = false;
@@ -368,6 +376,9 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting IPC Listeners..");
         IPCService.startIpcListeners();
 
+        // Let listeners know the server is ready
+        this.emit('ready');
+
         // Do some pre-flight checks
         // Make sure settings are correct and all things are a go
         await this.preChecks();
@@ -425,6 +436,15 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
+    initOauthService(): void {
+        try {
+            this.log("Initializing OAuth service...");
+            this.oauthService = new OauthService();
+        } catch (ex: any) {
+            this.log(`Failed to setup OAuth service! ${ex.message}`, "error");
+        }
+    }
+
 
     async initServices(): Promise<void> {
         this.initFcm();
@@ -436,11 +456,13 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to setup socket service! ${ex.message}`, "error");
         }
 
+        this.initOauthService();
+
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             try {
                 this.log("Initializing helper service...");
-                this.privateApiHelper = new BlueBubblesHelperService();
+                this.privateApi = new PrivateApiService();
             } catch (ex: any) {
                 this.log(`Failed to setup helper service! ${ex.message}`, "error");
             }
@@ -495,6 +517,20 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to start HTTP service! ${ex.message}`, "error");
         }
 
+        // Only start the oauth service if the tutorial isn't done
+        const tutorialDone = this.repo.getConfig("tutorial_is_done") as boolean;
+        const oauthToken = this.args['oauth-token'];
+        this.oauthService.initialize();
+
+        // If the user passed an oauth token, use that to setup the project
+        if (isNotEmpty(oauthToken)) {
+            this.oauthService.authToken = oauthToken;
+            await this.oauthService.handleProjectCreation();
+        } else if (!tutorialDone) {
+            // if there isn't a token, and the tutorial isn't done, start the oauth service
+            this.oauthService.start();
+        }
+
         try {
             await this.startProxyServices();
         } catch (ex: any) {
@@ -526,7 +562,7 @@ class BlueBubblesServer extends EventEmitter {
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             this.log("Starting Private API Helper listener...");
-            this.privateApiHelper.start();
+            this.privateApi.start();
         }
 
         if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
@@ -568,7 +604,7 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            await this.privateApiHelper?.stop();
+            await this.privateApi?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop Private API Helper service! ${ex?.message ?? ex}`);
         }
@@ -583,6 +619,12 @@ class BlueBubblesServer extends EventEmitter {
             await this.httpService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
+        }
+
+        try {
+            await this.oauthService?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop OAuth service! ${ex?.message ?? ex}`, "error");
         }
 
         try {
@@ -928,6 +970,11 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
+        // Start the oauth service if the user resets the tutorial
+        if (prevConfig.tutorial_is_done === true && nextConfig.tutorial_is_done === false) {
+            await this.oauthService.restart();
+        }
+
         // If we toggle the custom cert option, restart the http service
         if (prevConfig.use_custom_certificate !== nextConfig.use_custom_certificate && !proxiesRestarted) {
             if (this.httpService) await this.httpService.restart(true);
@@ -946,10 +993,24 @@ class BlueBubblesServer extends EventEmitter {
             await this.startChatListeners();
         }
 
-        // If the URL is different, emit the change to the listeners
-        if (prevConfig.server_address !== nextConfig.server_address) {
-            if (this.httpService) await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-            if (this.fcm) await this.fcm.setServerUrl(nextConfig.server_address as string);
+        try {
+            // Check if we should update the URL
+            const shouldUpdateUrl = this.fcm?.shouldUpdateUrl() ?? null;
+            if (shouldUpdateUrl != null) {
+                await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
+
+                // If it's not initialized, we need to initialize it.
+                // Initializing it will also set the server URL
+                if (!this.fcm.hasInitialized) {
+                    Server().log('Initializing FCM for server URL update from config change', 'debug');
+                    await this.fcm.start();
+                } else {
+                    Server().log('Dispatching server URL update from config change', 'debug');
+                    await this.fcm.setServerUrl();
+                }
+            }
+        } catch (ex: any) {
+            this.log(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`, "error");
         }
 
         // If the ngrok API key is different, restart the ngrok process
@@ -964,15 +1025,19 @@ class BlueBubblesServer extends EventEmitter {
 
         // Install the bundle if the Private API is turned on
         if (!prevConfig.enable_private_api && nextConfig.enable_private_api) {
-            if (Server().privateApiHelper === null) {
-                Server().privateApiHelper = new BlueBubblesHelperService();
+            if (Server().privateApi === null) {
+                Server().privateApi = new PrivateApiService();
             }
 
-            if (nextConfig.enable_private_api) {
-                Server().privateApiHelper.start();
-            } else {
-                Server().privateApiHelper.stop();
+            await Server().privateApi.start();
+        } else if (prevConfig.enable_private_api && !nextConfig.enable_private_api) {
+            await Server().privateApi?.stop();
+        } else if (nextConfig.enable_private_api && prevConfig.private_api_mode !== nextConfig.private_api_mode) {
+            if (Server().privateApi === null) {
+                Server().privateApi = new PrivateApiService();
             }
+
+            await Server().privateApi.restart();
         }
 
         // If the dock style changes
@@ -1034,7 +1099,7 @@ class BlueBubblesServer extends EventEmitter {
         sendSocket = true
     ) {
         if (sendSocket) {
-            this.httpService.socketServer.emit(type, data);
+            this.httpService?.socketServer.emit(type, data);
         }
 
         // Send notification to devices
@@ -1043,7 +1108,7 @@ class BlueBubblesServer extends EventEmitter {
                 const devices = await this.repo.devices().find();
                 if (isNotEmpty(devices)) {
                     const notifData = JSON.stringify(data);
-                    await this.fcm.sendNotification(
+                    await this.fcm?.sendNotification(
                         devices.map(device => device.identifier),
                         { type, data: notifData },
                         priority
@@ -1117,22 +1182,6 @@ class BlueBubblesServer extends EventEmitter {
 
     async checkPrivateApiRequirements(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [];
-
-        // Check if the MySIMBL/MacForge folder exists
-        if (isMinMojave) {
-            output.push({
-                name: "MacForge Plugins Folder",
-                pass: fs.existsSync(FileSystem.libMacForgePlugins),
-                solution: `Manually create this folder: ${FileSystem.libMacForgePlugins}`
-            });
-        } else {
-            output.push({
-                name: "MySIMBL Plugins Folder",
-                pass: fs.existsSync(FileSystem.libMySimblPlugins),
-                solution: `Manually create this folder: ${FileSystem.libMySimblPlugins}`
-            });
-        }
-
         output.push({
             name: "SIP Disabled",
             pass: await FileSystem.isSipDisabled(),
@@ -1147,7 +1196,7 @@ class BlueBubblesServer extends EventEmitter {
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {
         const output = [
             {
-                name: "Accessibility",
+                name: "Accessibility (Optional)",
                 pass: systemPreferences.isTrustedAccessibilityClient(false),
                 solution: "Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles"
             },
@@ -1563,15 +1612,74 @@ class BlueBubblesServer extends EventEmitter {
         await this.startServices();
     }
 
-    async relaunch() {
+    buildRelaunchArgs() {
+        // Relaunch the process
+        const args = process.argv.slice(1);
+
+        const removeArg = (name: string) => {
+            const oauthIndex = args.findIndex(i => i === `--${name}`);
+            if (oauthIndex !== -1) {
+                // Remove the next arg if it's not a flag
+                if (args[oauthIndex + 1] && !args[oauthIndex + 1].startsWith("--")) {
+                    args.splice(oauthIndex, 2);
+                } else {
+                    args.splice(oauthIndex, 1);
+                }
+            }
+        };
+
+        // If we are persisting configs, remove any flags that are stored in the DB
+        const persist = this.args['persist-config'] ?? true;
+        if (persist) {
+            const configKeys = Object.keys(Server().repo.config);
+            for (const key of configKeys) {
+                // Add the underscored or dashed version of the option.
+                const keyOpts = [key];
+                if (key.includes("_")) {
+                    keyOpts.push(key.replace(/_/g, "-"));
+                } else if (key.includes("-")) {
+                    keyOpts.push(key.replace(/-/g, "_"));
+                }
+
+                for (const opt of keyOpts) {
+                    removeArg(opt);
+                }
+            }
+        }
+
+
+        // Remove the oauth-token flag & value if it exists.
+        removeArg("oauth-token");
+
+        return args;
+    }
+
+    async relaunch({
+        headless = null,
+        exit = true,
+        quit = false
+    }: {
+        headless?: boolean | null;
+        exit?: boolean,
+        quit?: boolean
+    } = {}) {
         this.isRestarting = true;
 
         // Close everything gracefully
         await this.stopAll();
 
         // Relaunch the process
-        app.relaunch({ args: process.argv.slice(1).concat(["--relaunch"]) });
-        app.exit(0);
+        let args = this.buildRelaunchArgs();
+        args = args.concat(["--relaunch"]);
+
+        // Relaunch the app
+        app.relaunch({ args });
+
+        if (quit) {
+            app.quit();
+        } else if (exit) {
+            app.exit(0);
+        }
     }
 
     async stopAll() {
@@ -1585,8 +1693,11 @@ class BlueBubblesServer extends EventEmitter {
         // Close everything gracefully
         await this.stopAll();
 
+        let relaunchArgs = this.buildRelaunchArgs();
+        relaunchArgs = [process.execPath, ...relaunchArgs];
+
         // Kick off the restart script
-        FileSystem.executeAppleScript(runTerminalScript(process.execPath));
+        FileSystem.executeAppleScript(runTerminalScript(relaunchArgs.join(' ')));
 
         // Exit the current instance
         app.exit(0);

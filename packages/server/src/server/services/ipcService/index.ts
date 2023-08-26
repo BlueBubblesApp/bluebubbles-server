@@ -8,10 +8,11 @@ import { AlertsInterface } from "@server/api/v1/interfaces/alertsInterface";
 import { openLogs, openAppData } from "@server/api/v1/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
-import { BlueBubblesHelperService } from "../privateApi";
+import { PrivateApiService } from "../privateApi/PrivateApiService";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
 import { ScheduledMessagesInterface } from "@server/api/v1/interfaces/scheduledMessagesInterface";
 import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
+import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
 
 export class IPCService {
     /**
@@ -35,8 +36,8 @@ export class IPCService {
                 args.ngrok_key = args.ngrok_key.trim();
             }
 
-            // If we are changing the proxy service to a non-dyn dns service, we need to make sure "use https" is off
-            if (args.proxy_service && args.proxy_service !== "dynamic-dns") {
+            // If we are changing the proxy service to a non-custom url service, we need to make sure "use https" is off
+            if (args.proxy_service && !['dynamic-dns', 'lan-url'].includes(args.proxy_service)) {
                 const httpsStatus = (args.use_custom_certificate ??
                     Server().repo.getConfig("use_custom_certificate")) as boolean;
                 if (httpsStatus) {
@@ -55,7 +56,9 @@ export class IPCService {
 
         ipcMain.handle("get-config", async (_, __) => {
             if (!Server().repo.db) return {};
-            return Server().repo?.config;
+            const cfg = Server().repo?.config;
+            const serverInfo = await GeneralInterface.getServerMetadata();
+            return { ...cfg, ...serverInfo };
         });
 
         ipcMain.handle("get-alerts", async (_, __) => {
@@ -98,13 +101,13 @@ export class IPCService {
         ipcMain.handle("get-private-api-status", async (_, __) => {
             return {
                 enabled: Server().repo.getConfig("enable_private_api") as boolean,
-                connected: !!Server().privateApiHelper?.helper,
-                port: BlueBubblesHelperService.port
+                connected: !!Server().privateApi?.helper,
+                port: PrivateApiService.port
             };
         });
 
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {
-            return await BlueBubblesHelperService.installBundle(true);
+            return await Server().privateApi.modeType.install(true);
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {
@@ -275,6 +278,13 @@ export class IPCService {
             return await Server().checkPermissions();
         });
 
+        ipcMain.handle("get-current-permissions", async (_, __) => {
+            return {
+                accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+                full_disk_access: Server().hasDiskAccess,
+            }
+        });
+
         ipcMain.handle("prompt_accessibility", async (_, __) => {
             return {
                 abPerms: systemPreferences.isTrustedAccessibilityClient(true) ? "authorized" : "denied"
@@ -389,6 +399,15 @@ export class IPCService {
         ipcMain.handle("get-chats", async (_, msg) => {
             const [chats, __] = await ChatInterface.get({ limit: 10000 });
             return chats;
+        });
+
+        ipcMain.handle("get-oauth-url", async (_, __) => {
+            return await Server().oauthService?.getOauthUrl();
+        });
+
+        ipcMain.handle("restart-oauth-service", async (_, __) => {
+            if (Server().oauthService?.running) return;
+            await Server().oauthService?.restart();
         });
     }
 }
