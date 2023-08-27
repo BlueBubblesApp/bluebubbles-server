@@ -19,6 +19,7 @@ import { setConfig } from '../../slices/ConfigSlice';
 import { copyToClipboard } from '../../utils/GenericUtils';
 import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../modals/ConfirmationDialog';
+import { saveLanUrl } from 'app/utils/IpcUtils';
 
 
 export interface ProxySetupFieldProps {
@@ -45,7 +46,6 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
     const dnsRef = useRef(null);
     const alertRef = useRef(null);
     const proxyService: string = (useAppSelector(state => state.config.proxy_service) ?? '').toLowerCase().replace(' ', '-');
-    const useCustomCertificate: boolean = useAppSelector(state => state.config.use_custom_certificate) ?? false;
     const address: string = useAppSelector(state => state.config.server_address) ?? '';
     const port: number = useAppSelector(state => state.config.socket_port) ?? 1234;
     const [dnsModalOpen, setDnsModalOpen] = useBoolean();
@@ -70,8 +70,7 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                         } else if (e.target.value === 'cloudflare') {
                             confirm('confirmation');
                         } else if (e.target.value === 'lan-url') {
-                            const addr = `${(useCustomCertificate) ? 'https' : 'http'}://localhost:${port}`;
-                            dispatch(setConfig({ name: 'server_address', value: addr }));
+                            saveLanUrl();
                         }
                     }}
                 >

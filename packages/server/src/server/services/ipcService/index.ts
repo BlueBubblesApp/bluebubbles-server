@@ -409,5 +409,14 @@ export class IPCService {
             if (Server().oauthService?.running) return;
             await Server().oauthService?.restart();
         });
+
+        ipcMain.handle("save-lan-url", async (_, __) => {
+            const useCustomCertificate = Server().repo.getConfig("use_custom_certificate") as boolean;
+            const port = Server().repo.getConfig("socket_port") as number;
+            const ips = FileSystem.getLocalIps('IPv4');
+            const host = (ips.length > 0) ? ips[0] : 'localhost';
+            const addr = `${(useCustomCertificate) ? 'https' : 'http'}://${host}:${port}`;
+            await Server().repo.setConfig("server_address", addr);
+        });
     }
 }

@@ -153,3 +153,7 @@ export const restartOauthService = async () => {
 export const getCurrentPermissions = async () => {
     return await ipcRenderer.invoke('get-current-permissions');
 };
+
+export const saveLanUrl = async () => {
+    return await ipcRenderer.invoke('save-lan-url');
+};
