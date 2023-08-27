@@ -18,6 +18,7 @@ import { PrivateApiHandle } from "./apis/PrivateApiHandle";
 import { PrivateApiAttachment } from "./apis/PrivateApiAttachment";
 import { PrivateApiMode, PrivateApiModeConstructor } from "./modes";
 import { ProcessDylibMode } from "./modes/ProcessDylibMode";
+import { PrivateApiPingEventHandler } from "./eventHandlers/PrivateApiPingEventHandler";
 
 
 export class PrivateApiService {
@@ -61,7 +62,8 @@ export class PrivateApiService {
 
         // Register the event handlers
         this.eventHandlers = [
-            new PrivateApiTypingEventHandler()
+            new PrivateApiTypingEventHandler(),
+            new PrivateApiPingEventHandler()
         ];
     }
 

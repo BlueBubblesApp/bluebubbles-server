@@ -7,6 +7,6 @@ export class PrivateApiPingEventHandler implements PrivateApiEventHandler {
     types: string[] = ["ping"];
 
     async handle(_: any) {
-        Server().log("Private API Helper connected!");
+        Server().log("Received Ping from Private API Helper!");
     }
 }

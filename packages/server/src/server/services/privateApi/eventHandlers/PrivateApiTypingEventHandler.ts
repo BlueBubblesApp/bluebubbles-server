@@ -5,7 +5,7 @@ import { PrivateApiEventHandler } from ".";
 
 export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
 
-    types: string[] = ["typing", "stopped-typing"];
+    types: string[] = ["started-typing", "typing", "stopped-typing"];
 
     cache: Record<string, Record<string, any>> = {};
 
