@@ -10840,10 +10840,10 @@ node-int64@^0.4.0:
   resolved "https://registry.yarnpkg.com/node-int64/-/node-int64-0.4.0.tgz#87a9065cdb355d3182d8f94ce11188b825c68a3b"
   integrity sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==
 
-node-mac-contacts@1.5.0:
-  version "1.5.0"
-  resolved "https://registry.yarnpkg.com/node-mac-contacts/-/node-mac-contacts-1.5.0.tgz#a11799f6f60f7c90228a5e4a98371e24f4be57cc"
-  integrity sha512-uDemyO1rr6PTGwTVJmUKSeFICSNWeootWkz2qF84ehlJaQN3uJQ5LMT4hmjRBCbLzYI3OdvWaN11WD4XokCy0g==
+node-mac-contacts@^1.7.2:
+  version "1.7.2"
+  resolved "https://registry.yarnpkg.com/node-mac-contacts/-/node-mac-contacts-1.7.2.tgz#6dfe8199cd8e0671d72109e44a15942966ec62c0"
+  integrity sha512-HWB2Tul9yrAuo/YKGy75NLpUp2sFgP86/Ur+VgPAODnCiPUkotDDK3mY9BrPm3CZ7J1kfp3gFscYlBZPM6Z5ug==
   dependencies:
     bindings "^1.5.0"
     node-addon-api "^3.0.2"
