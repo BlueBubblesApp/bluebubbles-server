@@ -217,7 +217,9 @@ export class OauthService {
         const projectId = `${this.projectName.toLowerCase()}-${generateRandomString(4)}`;
         const data = { name: this.projectName, projectId };
         await this.sendRequest('POST', postUrl, data);
-        const projectData = await this.waitForData('GET', getUrl, null, 'projects');
+
+        // Try for 2 minutes to get the project data
+        const projectData = await this.waitForData('GET', getUrl, null, 'projects', 60);
         return projectData.projects.find((p: any) => p.projectId === projectId);
     }
 
