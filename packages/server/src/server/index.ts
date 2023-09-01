@@ -939,7 +939,14 @@ class BlueBubblesServer extends EventEmitter {
 
         // Check for contact permissions
         const contactStatus = await requestContactPermission();
-        this.log(`Contacts authorization status: ${contactStatus}`, "debug");
+        if (contactStatus === 'Denied') {
+            this.log(
+                "Contacts authorization status is denied! You may need to manually " +
+                "allow BlueBubbles to access your contacts.", "debug");
+        } else {
+            this.log(`Contacts authorization status: ${contactStatus}`, "debug");
+        }
+        
         this.log("Finished post-start checks...");
     }
 

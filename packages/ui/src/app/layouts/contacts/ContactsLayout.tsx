@@ -104,7 +104,7 @@ export const ContactsLayout = (): JSX.Element => {
 
     const requestContactPermission = async (): Promise<void> => {
         setPermission(null);
-        ipcRenderer.invoke('request-contact-permission').then((status: string) => {
+        ipcRenderer.invoke('request-contact-permission', true).then((status: string) => {
             setPermission(status);
         }).catch(() => {
             setPermission('Unknown');

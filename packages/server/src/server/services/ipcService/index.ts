@@ -141,8 +141,8 @@ export class IPCService {
             return await getContactPermissionStatus();
         });
 
-        ipcMain.handle("request-contact-permission", async (event, _) => {
-            return await requestContactPermission();
+        ipcMain.handle("request-contact-permission", async (event, force) => {
+            return await requestContactPermission(force);
         });
 
         ipcMain.handle("get-contacts", async (event, extraProperties) => {
