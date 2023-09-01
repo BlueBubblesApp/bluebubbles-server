@@ -7,7 +7,8 @@ import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
-import { isMinHighSierra, isMinVentura, isNotEmpty } from "@server/helpers/utils";
+import { isNotEmpty } from "@server/helpers/utils";
+import { isMinHighSierra, isMinVentura } from "@server/env";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database

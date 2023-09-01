@@ -2,7 +2,7 @@ import CompareVersions from "compare-versions";
 import cpr from "recursive-copy";
 import { parse as ParsePlist } from "plist";
 
-import { isMinBigSur, isMinMonterey } from "@server/helpers/utils";
+import { isMinBigSur, isMinMonterey } from "@server/env";
 import { PrivateApiMode } from ".";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";

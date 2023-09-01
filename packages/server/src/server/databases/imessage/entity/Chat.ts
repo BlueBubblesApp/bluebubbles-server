@@ -3,7 +3,7 @@ import { BooleanTransformer } from "@server/databases/transformers/BooleanTransf
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
-import { isMinHighSierra } from "@server/helpers/utils";
+import { isMinHighSierra } from "@server/env";
 import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
 import { conditional } from "conditional-decorator";
 

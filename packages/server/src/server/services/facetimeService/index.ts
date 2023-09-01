@@ -5,7 +5,8 @@ import {
 } from "@server/api/v1/apple/scripts";
 import { Server } from "@server/index";
 import { FileSystem } from "@server/fileSystem";
-import { isMinBigSur, isMinVentura, isNotEmpty, waitMs } from "@server/helpers/utils";
+import { isNotEmpty, waitMs } from "@server/helpers/utils";
+import { isMinBigSur, isMinVentura } from "@server/env";
 import { INCOMING_FACETIME } from "@server/events";
 
 export class FacetimeService {

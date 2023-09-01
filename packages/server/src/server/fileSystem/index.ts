@@ -12,9 +12,8 @@ import {
     parseMetadataString,
     isNotEmpty,
     isEmpty,
-    safeTrim,
-    isMinMonterey
-} from "@server/helpers/utils";
+    safeTrim} from "@server/helpers/utils";
+import { isMinMonterey } from "@server/env";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
 import { startMessages } from "../api/v1/apple/scripts";

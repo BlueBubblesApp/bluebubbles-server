@@ -2,7 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "t
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
 import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { isMinSierra, isMinHighSierra, isEmpty } from "@server/helpers/utils";
+import { isEmpty } from "@server/helpers/utils";
+import { isMinSierra, isMinHighSierra } from "@server/env";
 import { conditional } from "conditional-decorator";
 import * as mime from "mime-types";
 import { FileSystem } from "@server/fileSystem";

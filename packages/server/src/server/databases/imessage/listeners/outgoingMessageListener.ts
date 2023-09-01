@@ -1,6 +1,7 @@
 import { Server } from "@server";
 import { DBWhereItem } from "@server/databases/imessage/types";
-import { isMinMonterey, isNotEmpty } from "@server/helpers/utils";
+import { isNotEmpty } from "@server/helpers/utils";
+import { isMinMonterey } from "@server/env";
 import { MessageChangeListener } from "./messageChangeListener";
 import type { Message } from "../entity/Message";
 
