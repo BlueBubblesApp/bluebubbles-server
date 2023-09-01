@@ -10,7 +10,7 @@ import * as admin from "firebase-admin";
 import { OAuth2Client } from "google-auth-library";
 import { google } from "googleapis";
 import { generateRandomString } from "@server/utils/CryptoUtils";
-import { isNotEmpty, resultAwaiter, waitMs } from "@server/helpers/utils";
+import { getObjectAsString, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ProgressStatus } from "@server/types";
 import { FCMService } from "../fcmService";
 
@@ -398,7 +398,11 @@ export class OauthService {
             if (key && isNotEmpty(res.data[key])) return res.data;
 
             attempts += 1;
-            if (attempts > maxAttempts) throw new Error(`Failed to get data from: ${url}`);
+            if (attempts > maxAttempts) {
+                Server().log(`Received data from failed request: ${getObjectAsString(res.data)}`, 'debug');
+                throw new Error(
+                    `Failed to get data from: ${url}. Please gather server logs and contact the developers!`);
+            }
             await waitMs(waitTime);
         }
     }

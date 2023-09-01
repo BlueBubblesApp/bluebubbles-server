@@ -517,3 +517,11 @@ export const resultAwaiter = async ({
 
     return data;
 };
+
+export const getObjectAsString = (value: any): string => {
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+}
