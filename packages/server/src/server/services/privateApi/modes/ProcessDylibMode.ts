@@ -1,6 +1,7 @@
 import "zx/globals";
 import fs from "fs";
-import { isMinBigSur, isMinMonterey, waitMs } from "@server/helpers/utils";
+import { waitMs } from "@server/helpers/utils";
+import { isMinBigSur, isMinMonterey } from "@server/env";
 import { PrivateApiMode } from ".";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
