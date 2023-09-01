@@ -1,3 +1,4 @@
+import { Server } from "@server";
 import { isMinHighSierra } from "@server/env";
 
 // Only import node-mac-contacts if we are on macOS 10.13 or higher
@@ -10,7 +11,23 @@ try {
     contacts = null;
 }
 
+// Var to track if this is the first time we are loading contacts.
+// If it's the first time, we need to load all available info, so it's cached
+let isFirstLoad = true;
+
 export class ContactsLib {
+    static allExtraProps = [
+        'jobTitle',
+        'departmentName',
+        'organizationName',
+        'middleName',
+        'note',
+        'contactImage',
+        'contactThumbnailImage',
+        'instantMessageAddresses',
+        'socialProfiles'
+    ];
+
     static async requestAccess() {
         if (!contacts) return "Unknown";
         return await contacts.requestAccess();
@@ -28,6 +45,25 @@ export class ContactsLib {
 
     static getAllContacts(extraProps: string[] = []) {
         if (!contacts) return [];
+
+        // If it's the first load, we need to load all available info.
+        // And also listen for changes so we can reload all the info again.
+        if (isFirstLoad) {
+            isFirstLoad = false;
+            contacts.getAllContacts(ContactsLib.allExtraProps);
+            ContactsLib.listenForChanges();
+        }
+
         return contacts.getAllContacts(extraProps);
+    }
+
+    static listenForChanges() {
+        if (!contacts) return;
+        contacts.listener.setup();
+        contacts.listener.once('contact-changed', (_: string) => {
+            Server().log("Detected contact change, queueing full reload...", "debug");
+            isFirstLoad = true;
+            contacts.listener.remove();
+        });
     }
 }

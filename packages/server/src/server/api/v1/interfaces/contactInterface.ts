@@ -151,6 +151,12 @@ export class ContactInterface {
             extraProps = extraProps.filter(e => e !== "avatar");
         }
 
+        // Also load the thumbnail if the image is requested.
+        // The regular thumbnail will take precedence over the contactImageThumbnail
+        if (extraProps.includes('contactImage') && !extraProps.includes('contactThumbnailImage')) {
+            extraProps.push('contactThumbnailImage');
+        }
+
         return ContactInterface.mapContacts(ContactsLib.getAllContacts(extraProps), "api", { extraProps });
     }
 
