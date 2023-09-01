@@ -4,12 +4,9 @@ import vcf from "vcf";
 import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
 import { deduplicateObjectArray, isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { ApiContactsCache } from "../caches/apiContactsCache";
 import type { FindOptionsWhere } from "typeorm";
 
 const contacts = require("node-mac-contacts");
-
-const contactsCache = new ApiContactsCache();
 
 type GenericContactParams = {
     contactId?: number;
@@ -17,18 +14,6 @@ type GenericContactParams = {
 };
 
 export class ContactInterface {
-    static apiExtraProperties: string[] = [
-        "jobTitle",
-        "departmentName",
-        "organizationName",
-        "middleName",
-        "note",
-        "contactImage",
-        "contactThumbnailImage",
-        "instantMessageAddresses",
-        "socialProfiles"
-    ];
-
     private static extractEmails = (contact: any) => {
         // Normalize all the email records
         const emails = [...(contact?.emails ?? []), ...(contact?.emailAddresses ?? []), ...(contact?.addresses ?? [])]
@@ -77,40 +62,35 @@ export class ContactInterface {
         } = {}
     ): any {
         return records.map((contact: NodeJS.Dict<any>) => {
-            // We have to make a copy so that when we "delete", we aren't deleting from the master copy.
-            const e = { ...contact };
-
-            // Only include extra properties that are asked for.
-            for (const prop of ContactInterface.apiExtraProperties) {
-                if (!extraProps.includes(prop) && Object.keys(e).includes(prop)) {
-                    delete e[prop];
-                }
+            // Load the avatar based on the selected extra fields
+            let avatar = null;
+            if (extraProps.includes("avatar")) {
+                avatar = contact?.avatar ?? contact?.contactImage ?? contact.contactImageThumbnail;
+            } else if (extraProps.includes("contactImage")) {
+                avatar = contact?.contactImage ?? contact.contactImageThumbnail;
+            } else if (extraProps.includes("contactImageThumbnail")) {
+                avatar = contact?.contactImageThumbnail;
             }
 
-            const useAvatar =
-                extraProps.includes("avatar") ||
-                extraProps.includes("contactImage") ||
-                extraProps.includes("contactImageThumbnail");
-            const avatar = useAvatar ? e?.avatar ?? e?.contactImage ?? e.contactImageThumbnail : null;
-
-            let displayName = e?.displayName;
+            let displayName = contact?.displayName;
             if (isEmpty(displayName)) {
-                if (isNotEmpty(e?.firstName) && isEmpty(e?.lastName)) displayName = e.firstName;
-                if (isNotEmpty(e?.firstName) && isNotEmpty(e?.lastName)) displayName = `${e.firstName} ${e.lastName}`;
-                if (isEmpty(displayName) && isNotEmpty(e?.nickname)) displayName = e.nickname;
+                if (isNotEmpty(contact?.firstName) && isEmpty(contact?.lastName)) displayName = contact.firstName;
+                if (isNotEmpty(contact?.firstName) && isNotEmpty(contact?.lastName))
+                    displayName = `${contact.firstName} ${contact.lastName}`;
+                if (isEmpty(displayName) && isNotEmpty(contact?.nickname)) displayName = contact.nickname;
             }
 
             return {
-                phoneNumbers: ContactInterface.extractPhoneNumbers(e),
-                emails: ContactInterface.extractEmails(e),
-                firstName: e?.firstName,
-                lastName: e?.lastName,
+                phoneNumbers: ContactInterface.extractPhoneNumbers(contact),
+                emails: ContactInterface.extractEmails(contact),
+                firstName: contact?.firstName,
+                lastName: contact?.lastName,
                 displayName,
-                nickname: e?.nickname,
-                birthday: e?.birthday,
+                nickname: contact?.nickname,
+                birthday: contact?.birthday,
                 avatar: isNotEmpty(avatar) ? base64.bytesToBase64(avatar) : "",
                 sourceType,
-                id: e?.identifier ?? e?.id
+                id: contact?.identifier ?? contact?.id
             };
         });
     }
@@ -172,7 +152,7 @@ export class ContactInterface {
             extraProps = extraProps.filter(e => e !== "avatar");
         }
 
-        return ContactInterface.mapContacts(contactsCache.getApiContacts(), "api", { extraProps });
+        return ContactInterface.mapContacts(contacts.getAllContacts(extraProps), "api", { extraProps });
     }
 
     /**
@@ -542,9 +522,5 @@ export class ContactInterface {
     static async deleteAllContacts(): Promise<void> {
         const repo = Server().repo.contacts();
         await repo.clear();
-    }
-
-    static refreshApiContacts() {
-        contactsCache.loadApiContacts(true);
     }
 }
