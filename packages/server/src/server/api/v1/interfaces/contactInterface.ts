@@ -5,8 +5,7 @@ import { Contact, ContactAddress } from "@server/databases/server/entity";
 import * as base64 from "byte-base64";
 import { deduplicateObjectArray, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import type { FindOptionsWhere } from "typeorm";
-
-const contacts = require("node-mac-contacts");
+import { ContactsLib } from "../lib/ContactsLib";
 
 type GenericContactParams = {
     contactId?: number;
@@ -103,7 +102,7 @@ export class ContactInterface {
      * @returns A contact entry dictionary
      */
     static findContact(address: string, { preloadedContacts }: { preloadedContacts?: any[] | null } = {}): any | null {
-        const contactList = preloadedContacts ?? contacts.getAllContacts();
+        const contactList = preloadedContacts ?? ContactsLib.getAllContacts();
         const alphaNumericRegex = /[^a-zA-Z0-9_]/gi;
         const addr = address.replace(alphaNumericRegex, "");
 
@@ -152,7 +151,7 @@ export class ContactInterface {
             extraProps = extraProps.filter(e => e !== "avatar");
         }
 
-        return ContactInterface.mapContacts(contacts.getAllContacts(extraProps), "api", { extraProps });
+        return ContactInterface.mapContacts(ContactsLib.getAllContacts(extraProps), "api", { extraProps });
     }
 
     /**

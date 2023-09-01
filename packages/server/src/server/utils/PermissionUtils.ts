@@ -1,6 +1,5 @@
 import { Server } from "@server";
-
-const contacts = require("node-mac-contacts");
+import { ContactsLib } from "@server/api/v1/lib/ContactsLib";
 
 
 export const getContactPermissionStatus = (): string => {
@@ -8,7 +7,7 @@ export const getContactPermissionStatus = (): string => {
     let contactStatus = "Unknown";
 
     try {
-        contactStatus = contacts.getAuthStatus();
+        contactStatus = ContactsLib.getAuthStatus();
     } catch (ex) {
         Server().log(`Failed to get contact permission status! Error: ${ex}`, "debug");
     }
@@ -24,7 +23,7 @@ export const requestContactPermission = async (force = false): Promise<string> =
         // Only request access if the permission is "Not Determined" or "Unknown".
         // If the permission is denied, then it was explicitly denied and we shouldn't request it.
         if (force || contactStatus === 'Not Determined' || contactStatus === 'Unknown') {
-            contactStatus = await contacts.requestAccess();
+            contactStatus = await ContactsLib.requestAccess();
 
             // Check the new status
             contactStatus = getContactPermissionStatus();
