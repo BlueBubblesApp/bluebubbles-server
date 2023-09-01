@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import "@server/env";
+
 import { app, BrowserWindow, Tray, Menu, nativeTheme, shell, HandlerDetails } from "electron";
 import process from "process";
 import path from "path";

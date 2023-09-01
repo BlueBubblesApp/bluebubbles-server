@@ -3,7 +3,8 @@ import { ChatResponse, HandleResponse } from "@server/types";
 import { HandleSerializer } from "../serializers/HandleSerializer";
 import { ChatInterface } from "./chatInterface";
 import { Handle } from "@server/databases/imessage/entity/Handle";
-import { checkPrivateApiStatus, getiMessageAddressFormat, isEmpty, isMinMonterey } from "@server/helpers/utils";
+import { checkPrivateApiStatus, getiMessageAddressFormat, isEmpty } from "@server/helpers/utils";
+import { isMinMonterey } from "@server/env";
 
 export class HandleInterface {
     static async get({

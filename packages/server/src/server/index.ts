@@ -48,14 +48,16 @@ import { ActionHandler } from "./api/v1/apple/actions";
 import {
     insertChatParticipants,
     isEmpty,
+    isNotEmpty,
+    waitMs
+} from "./helpers/utils";
+import {
     isMinBigSur,
     isMinHighSierra,
     isMinMojave,
     isMinMonterey,
-    isMinSierra,
-    isNotEmpty,
-    waitMs
-} from "./helpers/utils";
+    isMinSierra
+} from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./services/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";

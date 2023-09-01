@@ -1,4 +1,4 @@
-import { isMinHighSierra } from "@server/helpers/utils";
+import { isMinHighSierra } from "@server/env";
 
 // Only import node-mac-contacts if we are on macOS 10.13 or higher
 // This is because node-mac-contacts was compiled for macOS 10.13 or higher

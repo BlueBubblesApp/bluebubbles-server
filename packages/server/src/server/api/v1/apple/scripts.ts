@@ -3,7 +3,8 @@ import macosVersion from "macos-version";
 import CompareVersions from "compare-versions";
 import { transports } from "electron-log";
 import { FileSystem } from "@server/fileSystem";
-import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isMinBigSur, isMinVentura, isNotEmpty } from "@server/helpers/utils";
+import { escapeOsaExp, getiMessageAddressFormat, isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isMinBigSur, isMinVentura } from "@server/env";
 
 const osVersion = macosVersion();
 

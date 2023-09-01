@@ -6,11 +6,13 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import {
     checkPrivateApiStatus,
     isEmpty,
-    isMinMonterey,
-    isMinVentura,
     isNotEmpty,
     resultAwaiter
 } from "@server/helpers/utils";
+import {
+    isMinMonterey,
+    isMinVentura
+} from "@server/env";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/v1/apple/mappings";
 import { invisibleMediaChar } from "@server/services/httpService/constants";
 import { ActionHandler } from "@server/api/v1/apple/actions";

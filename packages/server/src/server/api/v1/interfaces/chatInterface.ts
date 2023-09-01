@@ -4,12 +4,13 @@ import {
     checkPrivateApiStatus,
     getiMessageAddressFormat,
     isEmpty,
-    isMinBigSur,
-    isMinVentura,
     isNotEmpty,
-    resultAwaiter,
-    slugifyAddress
+    resultAwaiter
 } from "@server/helpers/utils";
+import {
+    isMinBigSur,
+    isMinVentura
+} from "@server/env";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { ChatResponse } from "@server/types";

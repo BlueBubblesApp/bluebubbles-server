@@ -1,5 +1,6 @@
 import { Server } from "@server";
-import { isEmpty, isMinHighSierra, isMinMonterey, isMinVentura, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isMinHighSierra, isMinMonterey, isMinVentura } from "@server/env";
 import { HandleResponse, MessageResponse } from "@server/types";
 import { AttachmentSerializer } from "./AttachmentSerializer";
 import { ChatSerializer } from "./ChatSerializer";
