@@ -1,6 +1,6 @@
 import { Server } from "@server";
 import { TYPING_INDICATOR } from "@server/events";
-import { PrivateApiEventHandler } from ".";
+import { PrivateApiEventHandler, EventData } from ".";
 
 
 export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
@@ -9,9 +9,9 @@ export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
 
     cache: Record<string, Record<string, any>> = {};
 
-    async handle(event: any) {
-        const display = event === "started-typing";
-        const guid = event.guid;
+    async handle(data: EventData) {
+        const display = data.event === "started-typing";
+        const guid = data.guid;
         let shouldEmit = false;
 
         // If the guid hasn't been seen before, we should emit the event
