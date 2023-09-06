@@ -46,4 +46,10 @@ export class PrivateApiAttachment extends PrivateApiAction {
             request
         );
     }
+
+    async downloadPurged(guid: string): Promise<TransactionResult> {
+        const action = "download-purged-attachment";
+        this.throwForNoMissingFields(action, [guid]);
+        return this.sendApiMessage(action, { attachmentGuid: guid });
+    }
 }

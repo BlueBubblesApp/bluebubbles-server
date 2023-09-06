@@ -1,6 +1,12 @@
+export type EventData = {
+    event: string;
+    guid?: string;
+    [key: string]: any;
+};
+
 export interface PrivateApiEventHandler {
 
     types: string[];
 
-    handle(event: any): Promise<void>;
+    handle(data: EventData): Promise<void>;
 }

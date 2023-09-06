@@ -19,6 +19,8 @@ import { PrivateApiAttachment } from "./apis/PrivateApiAttachment";
 import { PrivateApiMode, PrivateApiModeConstructor } from "./modes";
 import { ProcessDylibMode } from "./modes/ProcessDylibMode";
 import { PrivateApiPingEventHandler } from "./eventHandlers/PrivateApiPingEventHandler";
+import { PrivateApiFindMy } from "./apis/PrivateApiFindMy";
+import { PrivateApiAddressEventHandler } from "./eventHandlers/PrivateApiAddressEventHandler";
 
 
 export class PrivateApiService {
@@ -56,6 +58,10 @@ export class PrivateApiService {
         return new PrivateApiAttachment(this);
     }
 
+    get findmy(): PrivateApiFindMy {
+        return new PrivateApiFindMy(this);
+    }
+
     constructor() {
         this.restartCounter = 0;
         this.transactionManager = new TransactionManager();
@@ -63,7 +69,8 @@ export class PrivateApiService {
         // Register the event handlers
         this.eventHandlers = [
             new PrivateApiTypingEventHandler(),
-            new PrivateApiPingEventHandler()
+            new PrivateApiPingEventHandler(),
+            new PrivateApiAddressEventHandler(),
         ];
     }
 

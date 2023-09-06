@@ -6,7 +6,9 @@ export enum TransactionType {
     CHAT,
     MESSAGE,
     ATTACHMENT,
-    HANDLE
+    HANDLE,
+    FIND_MY,
+    OTHER
 }
 
 export type TransactionResult = {

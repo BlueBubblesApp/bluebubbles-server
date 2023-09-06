@@ -17,7 +17,8 @@ export class PrivateApiMessage extends PrivateApiAction {
         subject: string = null,
         effectId: string = null,
         selectedMessageGuid: string = null,
-        partIndex = 0
+        partIndex = 0,
+        ddScan = false
     ): Promise<TransactionResult> {
         const action = "send-message";
         this.throwForNoMissingFields(action, [chatGuid, message]);
@@ -31,7 +32,8 @@ export class PrivateApiMessage extends PrivateApiAction {
                 attributedBody,
                 effectId,
                 selectedMessageGuid,
-                partIndex
+                partIndex,
+                ddScan
             },
             request
         );
@@ -44,7 +46,8 @@ export class PrivateApiMessage extends PrivateApiAction {
         subject: string = null,
         effectId: string = null,
         selectedMessageGuid: string = null,
-        partIndex = 0
+        partIndex = 0,
+        ddScan = false
     ): Promise<TransactionResult> {
         const action = "send-multipart";
         this.throwForNoMissingFields(action, [chatGuid, parts]);
@@ -58,7 +61,8 @@ export class PrivateApiMessage extends PrivateApiAction {
                 attributedBody,
                 effectId,
                 selectedMessageGuid,
-                partIndex
+                partIndex,
+                ddScan
             },
             request
         );
