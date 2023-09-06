@@ -64,7 +64,8 @@ export class MessageInterface {
         effectId = null,
         selectedMessageGuid = null,
         tempGuid = null,
-        partIndex = 0
+        partIndex = 0,
+        ddScan = false
     }: SendMessageParams): Promise<Message> {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
@@ -107,7 +108,8 @@ export class MessageInterface {
                 subject,
                 effectId,
                 selectedMessageGuid,
-                partIndex
+                partIndex,
+                ddScan
             });
         } else {
             throw new Error(`Invalid send method: ${method}`);
@@ -228,7 +230,8 @@ export class MessageInterface {
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
-        partIndex = 0
+        partIndex = 0,
+        ddScan = false
     }: SendMessagePrivateApiParams) {
         checkPrivateApiStatus();
         const result = await Server().privateApi.message.send(
@@ -238,7 +241,8 @@ export class MessageInterface {
             subject ?? null,
             effectId ?? null,
             selectedMessageGuid ?? null,
-            partIndex ?? 0
+            partIndex ?? 0,
+            ddScan ?? false
         );
 
         if (!result?.identifier) {
@@ -531,7 +535,8 @@ export class MessageInterface {
         effectId = null,
         selectedMessageGuid = null,
         partIndex = 0,
-        parts = []
+        parts = [],
+        ddScan = false
     }: SendMultipartTextParams): Promise<Message> {
         checkPrivateApiStatus();
         if (!chatGuid) throw new Error("No chat GUID provided");
@@ -558,7 +563,8 @@ export class MessageInterface {
             subject ?? null,
             effectId ?? null,
             selectedMessageGuid ?? null,
-            partIndex ?? 0
+            partIndex ?? 0,
+            ddScan ?? false
         );
 
         if (!result?.identifier) {

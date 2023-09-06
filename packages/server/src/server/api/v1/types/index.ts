@@ -11,6 +11,7 @@ export type SendMessageParams = {
     selectedMessageGuid?: string;
     tempGuid?: string;
     partIndex?: number;
+    ddScan?: boolean;
 };
 
 export type SendMessagePrivateApiParams = {
@@ -21,6 +22,7 @@ export type SendMessagePrivateApiParams = {
     effectId?: string;
     selectedMessageGuid?: string;
     partIndex?: number;
+    ddScan?: boolean;
 };
 
 export type SendAttachmentPrivateApiParams = {
@@ -79,4 +81,5 @@ export type SendMultipartTextParams = {
     selectedMessageGuid?: string;
     partIndex?: number;
     parts: Record<string, any>[];
+    ddScan?: boolean;
 };

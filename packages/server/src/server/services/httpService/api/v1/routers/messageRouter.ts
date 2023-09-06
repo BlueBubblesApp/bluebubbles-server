@@ -180,8 +180,10 @@ export class MessageRouter {
     }
 
     static async sendText(ctx: RouterContext, _: Next) {
-        let { tempGuid, message, attributedBody, method, chatGuid, effectId, subject, selectedMessageGuid, partIndex } =
-            ctx?.request?.body ?? {};
+        let {
+            tempGuid, message, attributedBody, method, chatGuid,
+            effectId, subject, selectedMessageGuid, partIndex, ddScan
+        } = ctx?.request?.body ?? {};
 
         // Add to send cache
         Server().httpService.sendCache.add(tempGuid);
@@ -197,7 +199,8 @@ export class MessageRouter {
                 effectId,
                 selectedMessageGuid,
                 tempGuid,
-                partIndex
+                partIndex,
+                ddScan
             });
 
             // Remove from cache
@@ -341,7 +344,7 @@ export class MessageRouter {
     }
 
     static async sendMultipartMessage(ctx: RouterContext, _: Next) {
-        let { parts, tempGuid, attributedBody, chatGuid, effectId, subject, selectedMessageGuid, partIndex } =
+        let { parts, tempGuid, attributedBody, chatGuid, effectId, subject, selectedMessageGuid, partIndex, ddScan } =
             ctx?.request?.body ?? {};
 
         // Remove from cache
@@ -358,7 +361,8 @@ export class MessageRouter {
                 subject,
                 effectId,
                 selectedMessageGuid,
-                partIndex
+                partIndex,
+                ddScan
             });
 
             // Remove from cache

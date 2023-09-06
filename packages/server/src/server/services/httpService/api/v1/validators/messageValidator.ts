@@ -74,11 +74,12 @@ export class MessageValidator {
         effectId: "string",
         subject: "string",
         selectedMessageGuid: "string",
-        partIndex: "numeric|min:0"
+        partIndex: "numeric|min:0",
+        ddScan: "boolean"
     };
 
     static async validateText(ctx: RouterContext, next: Next) {
-        const { tempGuid, method, effectId, subject, selectedMessageGuid, message } = ValidateInput(
+        const { tempGuid, method, effectId, subject, selectedMessageGuid, message, ddScan } = ValidateInput(
             ctx.request.body,
             MessageValidator.sendTextRules
         );
@@ -89,7 +90,7 @@ export class MessageValidator {
 
         // If we have an effectId, subject, reply, or attributedBody
         // let's imply we want to use the Private API
-        if (effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
+        if (effectId || subject || selectedMessageGuid || ddScan || ctx.request.body.attributedBody) {
             saniMethod = "private-api";
         }
 
@@ -212,6 +213,7 @@ export class MessageValidator {
         selectedMessageGuid: "string",
         partIndex: "numeric|min:0",
         parts: "required|array",
+        ddScan: "boolean"
     };
 
     static async validateMultipart(ctx: RouterContext, next: Next) {
