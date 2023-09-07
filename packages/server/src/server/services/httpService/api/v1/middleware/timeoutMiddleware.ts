@@ -6,7 +6,11 @@ export const TimeoutMiddleware = async (ctx: Context, next: Next) => {
     let timeout = 5 * 60 * 1000;
 
     // If the request is to send a message attachment, increase the timeout to 30 minutes
-    if (ctx.request.path === "/api/v1/message/attachment") {
+    const longTimeoutList = [
+        "/api/v1/message/attachment",
+        "/api/v1/message/attachment/upload",
+    ]
+    if (longTimeoutList.includes(ctx.request.path)) {
         timeout = 30 * 60 * 1000;
     }
 
