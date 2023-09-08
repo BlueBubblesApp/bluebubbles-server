@@ -31,8 +31,8 @@ export class HTTPResponse {
             // Reload the data with conditional keys
             const res = response as ResponseParams;
             this.response = { status, message: res?.message ?? "No Message Response" };
-            if (res?.data) this.response.data = res.data;
-            if (res?.metadata) this.response.metadata = res.metadata;
+            if (res?.data !== undefined) this.response.data = res.data;
+            if (res?.metadata !== undefined) this.response.metadata = res.metadata;
         } else if (responseType === "html") {
             this.response = response as string;
         } else if (responseType === "file") {
@@ -66,8 +66,8 @@ export class HTTPResponse {
 export class Success extends HTTPResponse {
     constructor(ctx: RouterContext, response: ResponseParams) {
         const data: ResponseParams = { message: response?.message ?? ResponseMessages.SUCCESS };
-        if (response?.data) data.data = response.data;
-        if (response?.metadata) data.metadata = response.metadata;
+        if (response?.data !== undefined) data.data = response.data;
+        if (response?.metadata !== undefined) data.metadata = response.metadata;
         super(ctx, 200, data);
     }
 }
@@ -89,8 +89,8 @@ export class HTML extends HTTPResponse {
 export class NoData extends HTTPResponse {
     constructor(ctx: RouterContext, response: ResponseParams) {
         const data: ResponseParams = { message: response?.message ?? ResponseMessages.NO_DATA };
-        if (response?.data) data.data = response.data;
-        if (response?.metadata) data.metadata = response.metadata;
+        if (response?.data !== undefined) data.data = response.data;
+        if (response?.metadata !== undefined) data.metadata = response.metadata;
         super(ctx, 201, data);
     }
 }
