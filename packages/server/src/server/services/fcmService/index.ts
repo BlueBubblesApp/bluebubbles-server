@@ -209,7 +209,7 @@ export class FCMService {
             4
         );
 
-        const db = admin.app(AppName).database();
+        const db = FCMService.getApp().database();
 
         // Set read rules
         await db.setRules(source);
@@ -250,18 +250,28 @@ export class FCMService {
 
         // Update the URL
         // If we fail, retry 3 times
-        await resultRetryer({
+        let error: any = null;
+        const result = await resultRetryer({
             maxTries: 3,
             delayMs: 5000,
             getData: async () => {
                 try {
                     await this.saveUrlToDb(serverUrl);
+                    error = null;
                     return true;
-                } catch {
+                } catch (ex: any) {
+                    error = ex;
                     return false;
                 }
             }
         });
+
+        if (!result) {
+            Server().log(`Failed to update Server Address in ${this.dbType} Database after 3 attempts!`, "error");
+            if (error) Server().log(`DB Update Error: ${error?.message}`, "debug");
+        } else {
+            Server().log('Successfully updated server address');
+        }
 
         this.lastAddr = serverUrl;
         this.lastProjectId = this.serverConfig?.project_id;
@@ -277,14 +287,12 @@ export class FCMService {
     }
 
     async setServerUrlFirestore(serverUrl: string): Promise<void> {
-        const db = admin.app(AppName).firestore();
-
-        // Set the server URL and cache value
+        const db = FCMService.getApp().firestore();
         await db.collection("server").doc('config').set({ serverUrl });
     }
 
     async setServerUrlRealtime(serverUrl: string): Promise<void> {
-        const db = admin.app(AppName).database();
+        const db = FCMService.getApp().database();
 
         // Update the config
         const config = db.ref("config");
