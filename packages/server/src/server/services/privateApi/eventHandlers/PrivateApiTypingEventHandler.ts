@@ -14,6 +14,9 @@ export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
         const guid = data.guid;
         let shouldEmit = false;
 
+        // Ignore typing events from group chats (they aren't "proper")
+        if (guid.includes(';+;')) return;
+
         // If the guid hasn't been seen before, we should emit the event
         const now = new Date().getTime();
         if (!Object.keys(this.cache).includes(guid)) {
