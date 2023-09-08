@@ -388,7 +388,7 @@ export class OauthService {
      */
     async getFirebaseServiceAccountId(projectId: string): Promise<string> {
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`;
-        const response = await this.waitForData('GET', url, null, 'accounts', 60);  // Wait up to 2 minutes
+        const response = await this.waitForData('GET', url, null, 'accounts', 60, 5000);  // Wait up to 2 minutes
         const firebaseServiceAccounts = response.accounts;
         const firebaseServiceAccountId = firebaseServiceAccounts
             .find((element: any) => element.displayName === "firebase-adminsdk")?.uniqueId;
