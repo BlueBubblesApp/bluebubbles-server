@@ -500,7 +500,7 @@ export class ChatInterface {
         checkPrivateApiStatus();
         const result = await Server().privateApi.chat.shouldOfferContactSharing(chatGuid);
         if (result?.data?.share == null) throw new Error("Failed to check if contact sharing is available!");
-        return result.data.share === 1 ? true : false;
+        return result.data.share;
     }
 
     static async shareContactInfo(chatGuid: string): Promise<void> {
