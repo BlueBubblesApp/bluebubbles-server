@@ -109,6 +109,19 @@ export class PrivateApiChat extends PrivateApiAction {
         return this.sendApiMessage(action, { chatGuid });
     }
 
+    async shouldOfferContactSharing(chatGuid: string): Promise<TransactionResult> {
+        const action = "should-offer-nickname-sharing";
+        this.throwForNoMissingFields(action, [chatGuid]);
+        const request = new TransactionPromise(TransactionType.OTHER);
+        return this.sendApiMessage(action, { chatGuid }, request);
+    }
+
+    async shareContactCard(chatGuid: string): Promise<TransactionResult> {
+        const action = "share-nickname";
+        this.throwForNoMissingFields(action, [chatGuid]);
+        return this.sendApiMessage(action, { chatGuid });
+    }
+
     async leave(chatGuid: string): Promise<TransactionResult> {
         const action = "leave-chat";
         this.throwForNoMissingFields(action, [chatGuid]);
