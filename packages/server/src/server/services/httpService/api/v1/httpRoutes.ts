@@ -85,6 +85,16 @@ export class HttpRoutes {
                 routes: [
                     {
                         method: HttpMethod.GET,
+                        path: "account",
+                        controller: iCloudRouter.getAccountInfo  
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "contact",
+                        controller: iCloudRouter.getContactCard
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: "findmy/devices",
                         controller: iCloudRouter.devices
                     },
@@ -211,6 +221,12 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.GET,
+                        path: ":guid/download/force",
+                        validators: [AttachmentValidator.validateDownload],
+                        controller: AttachmentRouter.forceDownload
+                    },
+                    {
+                        method: HttpMethod.GET,
                         path: ":guid/blurhash",
                         validators: [AttachmentValidator.validateDownload],
                         controller: AttachmentRouter.blurhash
@@ -256,6 +272,18 @@ export class HttpRoutes {
                         path: ":guid/message",
                         validators: [ChatValidator.validateGetMessages],
                         controller: ChatRouter.getMessages
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: ":guid/share/contact/status",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.shouldShareContact
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: ":guid/share/contact",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: ChatRouter.shareContact
                     },
                     {
                         method: HttpMethod.POST,

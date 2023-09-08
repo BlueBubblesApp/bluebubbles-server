@@ -495,4 +495,16 @@ export class ChatInterface {
     static async deleteChatMessage(chat: Chat, message: Message): Promise<void> {
         await Server().privateApi.chat.deleteMessage(chat.guid, message.guid);
     }
+
+    static async canShareContactInfo(chatGuid: string): Promise<boolean> {
+        checkPrivateApiStatus();
+        const result = await Server().privateApi.chat.shouldOfferContactSharing(chatGuid);
+        if (result?.data?.share == null) throw new Error("Failed to check if contact sharing is available!");
+        return result.data.share === 1 ? true : false;
+    }
+
+    static async shareContactInfo(chatGuid: string): Promise<void> {
+        checkPrivateApiStatus();
+        await Server().privateApi.chat.shareContactCard(chatGuid);
+    }
 }

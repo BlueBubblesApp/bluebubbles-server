@@ -3,6 +3,8 @@ import { RouterContext } from "koa-router";
 import { Success } from "../responses/success";
 import { ServerError } from "../responses/errors";
 import { FindMyService } from "@server/services/findMyService";
+import { iCloudInterface } from "@server/api/v1/interfaces/iCloudInterface";
+import { findMyInterface } from "@server/api/v1/interfaces/findMyInterface";
 
 export class iCloudRouter {
     static async refreshDevices(ctx: RouterContext, _: Next) {
@@ -37,11 +39,29 @@ export class iCloudRouter {
 
     static async friends(ctx: RouterContext, _: Next) {
         try {
-            const data = await FindMyService.getFriends();
+            const data: any = await findMyInterface.getFriends();
             return new Success(ctx, { message: "Successfully fetched Find My friends locations!", data }).send();
         } catch (ex: any) {
             throw new ServerError(
                 { message: "Failed to fetch Find My friends locations!", error: ex?.message ?? ex.toString() });
+        }
+    }
+
+    static async getAccountInfo(ctx: RouterContext, _: Next) {
+        try {
+            const data: any = await iCloudInterface.getAccountInfo();
+            return new Success(ctx, { message: "Successfully fetched account info!", data }).send();
+        } catch (ex: any) {
+            throw new ServerError({ message: "Failed to fetch account info!", error: ex?.message ?? ex.toString() });
+        }
+    }
+
+    static async getContactCard(ctx: RouterContext, _: Next) {
+        try {
+            const data: any = await iCloudInterface.getContactCard();
+            return new Success(ctx, { message: "Successfully fetched contact card!", data }).send();
+        } catch (ex: any) {
+            throw new ServerError({ message: "Failed to fetch contact card!", error: ex?.message ?? ex.toString() });
         }
     }
 }

@@ -7,11 +7,12 @@ import { Server } from "@server";
 import { generateMd5Hash } from "@server/utils/CryptoUtils";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
-import { isEmpty, isTruthyBool } from "@server/helpers/utils";
+import { isEmpty, isTruthyBool, resultAwaiter } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/v1/interfaces/attachmentInterface";
 import { FileStream, Success } from "../responses/success";
 import { NotFound, ServerError } from "../responses/errors";
 import { AttachmentSerializer } from "@server/api/v1/serializers/AttachmentSerializer";
+import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
 export class AttachmentRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -167,5 +168,30 @@ export class AttachmentRouter {
         // Create a filename using the hash & extension of the attachment
         await AttachmentInterface.upload(attachment.path, hash);
         return new Success(ctx, { data: { hash } }).send();
+    }
+
+    static async forceDownload(ctx: RouterContext, _: Next) {
+        const { guid } = ctx.params;
+        await Server().privateApi.attachment.downloadPurged(guid);
+
+        // Wait a max of 10 minutes
+        const attachment: Attachment = await resultAwaiter({
+            maxWaitMs: 1000 * 60 * 10,
+            initialWaitMs: 1000 * 5,
+            waitMultiplier: 1,
+            getData: (previousData: any) => {
+                return Server().iMessageRepo.getAttachment(guid);
+            },
+            dataLoopCondition: (data: Attachment) => {
+                return !data || data.transferState !== 5;
+            }
+        });
+
+        if (!attachment || attachment.transferState !== 5) {
+            throw new ServerError({
+                error: `Failed to download attachment! Transfer State: ${attachment?.transferState}` });
+        }
+
+        return await AttachmentRouter.download(ctx, _);
     }
 }

@@ -339,4 +339,24 @@ export class ChatRouter {
         await ChatInterface.deleteChatMessage(chats[0], message);
         return new Success(ctx, { message: 'Successfully deleted message!' }).send();
     }
+
+    static async shouldShareContact(ctx: RouterContext, _: Next) {
+        const { guid: chatGuid } = ctx?.params ?? {};
+
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: false });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        const canShare = await ChatInterface.canShareContactInfo(chats[0].guid);
+        return new Success(ctx, { message: 'Successfully got contact sharing status!', data: canShare }).send();
+    }
+
+    static async shareContact(ctx: RouterContext, _: Next) {
+        const { guid: chatGuid } = ctx?.params ?? {};
+
+        const [chats, __] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: false });
+        if (isEmpty(chats)) throw new NotFound({ error: "Chat does not exist!" });
+
+        await ChatInterface.shareContactInfo(chats[0].guid);
+        return new Success(ctx, { message: 'Successfully shared contact info!' }).send();
+    }
 }

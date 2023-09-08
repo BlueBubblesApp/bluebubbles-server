@@ -21,6 +21,7 @@ import { ProcessDylibMode } from "./modes/ProcessDylibMode";
 import { PrivateApiPingEventHandler } from "./eventHandlers/PrivateApiPingEventHandler";
 import { PrivateApiFindMy } from "./apis/PrivateApiFindMy";
 import { PrivateApiAddressEventHandler } from "./eventHandlers/PrivateApiAddressEventHandler";
+import { PrivateApiCloud } from "./apis/PrivateApiCloud";
 
 
 export class PrivateApiService {
@@ -60,6 +61,10 @@ export class PrivateApiService {
 
     get findmy(): PrivateApiFindMy {
         return new PrivateApiFindMy(this);
+    }
+
+    get cloud(): PrivateApiCloud {
+        return new PrivateApiCloud(this);
     }
 
     constructor() {
