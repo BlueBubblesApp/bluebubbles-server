@@ -33,7 +33,7 @@ export class PrivateApiMessage extends PrivateApiAction {
                 effectId,
                 selectedMessageGuid,
                 partIndex,
-                ddScan
+                ddScan: ddScan ? 1 : 0
             },
             request
         );
@@ -62,7 +62,7 @@ export class PrivateApiMessage extends PrivateApiAction {
                 effectId,
                 selectedMessageGuid,
                 partIndex,
-                ddScan
+                ddScan: ddScan ? 1 : 0
             },
             request
         );
