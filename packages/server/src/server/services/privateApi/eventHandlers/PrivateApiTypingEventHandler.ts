@@ -9,7 +9,7 @@ export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
 
     cache: Record<string, Record<string, any>> = {};
 
-    async handle(event: any) {
+    async handle({ event }: any) {
         const display = event === "started-typing";
         const guid = event.guid;
         let shouldEmit = false;
