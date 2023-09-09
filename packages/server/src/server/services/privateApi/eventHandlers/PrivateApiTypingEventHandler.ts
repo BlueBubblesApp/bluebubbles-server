@@ -9,9 +9,8 @@ export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
 
     cache: Record<string, Record<string, any>> = {};
 
-    async handle({ event }: any) {
-        const display = event === "started-typing";
-        const guid = event.guid;
+    async handle({ event, guid }: any) {
+        const display = event === "started-typing"; 
         let shouldEmit = false;
 
         // If the guid hasn't been seen before, we should emit the event
