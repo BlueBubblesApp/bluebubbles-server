@@ -149,7 +149,7 @@ export class MacForgeMode extends PrivateApiMode {
                 Server().log((
                     `Failed to remove MacForge bundle at, "${remotePath}": ` +
                     `Please manually remove it to prevent conflicts`
-                ), 'warn');
+                ), 'debug');
             }
         }
     }

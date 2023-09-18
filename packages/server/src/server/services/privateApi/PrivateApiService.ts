@@ -21,6 +21,7 @@ import { ProcessDylibMode } from "./modes/ProcessDylibMode";
 import { PrivateApiPingEventHandler } from "./eventHandlers/PrivateApiPingEventHandler";
 import { PrivateApiFindMy } from "./apis/PrivateApiFindMy";
 import { PrivateApiAddressEventHandler } from "./eventHandlers/PrivateApiAddressEventHandler";
+import { PrivateApiFaceTimeStatusHandler } from "./eventHandlers/PrivateApiFaceTimeStatusHandler";
 import { PrivateApiCloud } from "./apis/PrivateApiCloud";
 
 
@@ -76,6 +77,7 @@ export class PrivateApiService {
             new PrivateApiTypingEventHandler(),
             new PrivateApiPingEventHandler(),
             new PrivateApiAddressEventHandler(),
+            new PrivateApiFaceTimeStatusHandler()
         ];
     }
 

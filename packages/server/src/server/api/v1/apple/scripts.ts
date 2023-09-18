@@ -92,7 +92,14 @@ export const startMessages = () => {
 };
 
 /**
- * The AppleScript used to send a message with or without an attachment
+ *  AppleScript to stop the Messages app
+ */
+export const stopFaceTime = () => {
+    return stopApp("FaceTime");
+};
+
+/**
+ * AppleScript to stop the FaceTime app
  */
 export const stopMessages = () => {
     return stopApp("Messages");
