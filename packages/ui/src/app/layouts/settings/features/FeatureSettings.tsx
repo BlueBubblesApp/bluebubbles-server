@@ -16,7 +16,6 @@ import { AutoCaffeinateField } from '../../../components/fields/AutoCaffeinateFi
 import { DockBadgeField } from '../../../components/fields/DockBadgeField';
 import { HideDockIconField } from '../../../components/fields/HideDockIconField';
 import { StartViaTerminalField } from '../../../components/fields/StartViaTerminalField';
-import { FacetimeDetectionField } from '../../../components/fields/FacetimeDetectionField';
 import { StartMinimizedField } from '../../../components/fields/StartMinimizedField';
 
 
@@ -26,8 +25,6 @@ export const FeatureSettings = (): JSX.Element => {
             <Stack direction='column' p={5}>
                 <Text fontSize='2xl'>Features</Text>
                 <Divider orientation='horizontal' />
-                <Spacer />
-                <FacetimeDetectionField />
                 <Spacer />
                 <AutoCaffeinateField />
                 <Spacer />

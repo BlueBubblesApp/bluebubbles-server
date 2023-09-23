@@ -37,7 +37,6 @@ import {
     UpdateService,
     CloudflareService,
     WebhookService,
-    FacetimeService,
     ScheduledMessagesService,
     OauthService
 } from "@server/services";
@@ -83,8 +82,6 @@ import { Chat } from "./databases/imessage/entity/Chat";
 const findProcess = require("find-process");
 
 const osVersion = macosVersion();
-
-const facetimeServiceEnabled = true;
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -136,8 +133,6 @@ class BlueBubblesServer extends EventEmitter {
     privateApi: PrivateApiService;
 
     fcm: FCMService;
-
-    facetime: FacetimeService;
 
     networkChecker: NetworkService;
 
@@ -234,7 +229,6 @@ class BlueBubblesServer extends EventEmitter {
         this.httpService = null;
         this.privateApi = null;
         this.fcm = null;
-        this.facetime = null;
         this.caffeinate = null;
         this.networkChecker = null;
         this.queue = null;
@@ -492,13 +486,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Initializing Facetime service...");
-            this.facetime = new FacetimeService();
-        } catch (ex: any) {
-            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
-        }
-
-        try {
             this.log("Initializing Scheduled Messages Service...");
             this.scheduledMessages = new ScheduledMessagesService();
         } catch (ex: any) {
@@ -553,14 +540,6 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to start Scheduled Messages service! ${ex.message}`, "error");
         }
 
-        try {
-            if (facetimeServiceEnabled) {
-                this.startFacetimeListener();
-            }
-        } catch (ex: any) {
-            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
-        }
-
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             this.log("Starting Private API Helper listener...");
@@ -571,21 +550,6 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Starting iMessage Database listeners...");
             await this.startChatListeners();
         }
-    }
-
-    startFacetimeListener() {
-        this.log("Starting Facetime service...");
-        this.facetime.listen().catch(ex => {
-            if (ex.message.includes("assistive access")) {
-                this.log(
-                    "Failed to start Facetime service! Please enable Accessibility permissions " +
-                        "for BlueBubbles in System Preferences > Security & Privacy > Privacy > Accessibility",
-                    "error"
-                );
-            } else {
-                this.log(`Failed to start Facetime service! ${ex.message}`, "error");
-            }
-        });
     }
 
     async stopServices(): Promise<void> {
@@ -627,12 +591,6 @@ class BlueBubblesServer extends EventEmitter {
             await this.oauthService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop OAuth service! ${ex?.message ?? ex}`, "error");
-        }
-
-        try {
-            this.facetime?.stop();
-        } catch (ex: any) {
-            this.log(`Failed to stop Facetime service! ${ex?.message ?? ex}`, "error");
         }
 
         try {
@@ -1074,15 +1032,6 @@ class BlueBubblesServer extends EventEmitter {
                 Server().caffeinate.start();
             } else {
                 Server().caffeinate.stop();
-            }
-        }
-
-        // Handle change in facetime service toggle
-        if (prevConfig.facetime_detection !== nextConfig.facetime_detection) {
-            if (nextConfig.facetime_detection) {
-                this.startFacetimeListener();
-            } else {
-                this.facetime.stop();
             }
         }
 

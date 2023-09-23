@@ -11,7 +11,6 @@ import { IPCService } from "./ipcService";
 import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
 import { FindMyService } from "./findMyService";
-import { FacetimeService } from "./facetimeService";
 import { ScheduledMessagesService } from "./scheduledMessagesService";
 import { OauthService } from "./oauthService";
 
@@ -28,7 +27,6 @@ export {
     CertificateService,
     CloudflareService,
     WebhookService,
-    FacetimeService,
     FindMyService,
     ScheduledMessagesService,
     OauthService
