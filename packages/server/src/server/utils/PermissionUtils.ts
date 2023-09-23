@@ -1,5 +1,5 @@
 import { Server } from "@server";
-import { ContactsLib } from "@server/api/v1/lib/ContactsLib";
+import { ContactsLib } from "@server/api/lib/ContactsLib";
 
 
 export const getContactPermissionStatus = (): string => {
