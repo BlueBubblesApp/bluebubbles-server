@@ -1,7 +1,6 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
-import fs from "fs";
 import ServerLog from "electron-log";
 import process from "process";
 import path from "path";
@@ -26,7 +25,6 @@ import { Message } from "@server/databases/imessage/entity/Message";
 
 // Service Imports
 import {
-    HttpService,
     FCMService,
     CaffeinateService,
     NgrokService,
@@ -41,9 +39,9 @@ import {
     OauthService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
+import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
 
-import { ActionHandler } from "./api/v1/apple/actions";
+import { ActionHandler } from "./api/apple/actions";
 import {
     insertChatParticipants,
     isEmpty,
@@ -58,11 +56,11 @@ import {
     isMinSierra
 } from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
-import { PrivateApiService } from "./services/privateApi/PrivateApiService";
+import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
-import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
-import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
+import { AlertsInterface } from "./api/interfaces/alertsInterface";
+import { MessageSerializer } from "./api/serializers/MessageSerializer";
 import {
     CHAT_READ_STATUS_CHANGED,
     GROUP_ICON_CHANGED,
@@ -78,6 +76,8 @@ import {
 import { ChatUpdateListener } from "./databases/imessage/listeners/chatUpdateListener";
 import { ChangeListener } from "./databases/imessage/listeners/changeListener";
 import { Chat } from "./databases/imessage/entity/Chat";
+import { HttpService } from "./api/http";
+import { Alert } from "./databases/server/entity";
 
 const findProcess = require("find-process");
 
@@ -686,7 +686,7 @@ class BlueBubblesServer extends EventEmitter {
         // Load notification count
         try {
             this.log("Initializing alert service...");
-            const alerts = (await AlertsInterface.find()).filter(item => !item.isRead);
+            const alerts = (await AlertsInterface.find()).filter((item: Alert) => !item.isRead);
             this.notificationCount = alerts.length;
         } catch (ex: any) {
             this.log("Failed to get initial notification count. Skipping.", "warn");

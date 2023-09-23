@@ -6,7 +6,7 @@ import {
     startFindMyFriends,
     showFindMyFriends,
     quitFindMyFriends
-} from "@server/api/v1/apple/scripts";
+} from "@server/api/apple/scripts";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 import { FindMyDevice, FindMyItem } from "@server/services/findMyService/types";

@@ -1,4 +1,3 @@
-import { HttpService } from "./httpService";
 import { FCMService } from "./fcmService";
 import { CaffeinateService } from "./caffeinateService";
 import { UpdateService } from "./updateService";
@@ -15,7 +14,6 @@ import { ScheduledMessagesService } from "./scheduledMessagesService";
 import { OauthService } from "./oauthService";
 
 export {
-    HttpService,
     FCMService,
     CaffeinateService,
     UpdateService,

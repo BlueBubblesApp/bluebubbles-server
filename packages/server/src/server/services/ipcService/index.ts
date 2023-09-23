@@ -4,15 +4,15 @@ import process from "process";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { AlertsInterface } from "@server/api/v1/interfaces/alertsInterface";
-import { openLogs, openAppData } from "@server/api/v1/apple/scripts";
+import { AlertsInterface } from "@server/api/interfaces/alertsInterface";
+import { openLogs, openAppData } from "@server/api/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
-import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
-import { PrivateApiService } from "../privateApi/PrivateApiService";
+import { ContactInterface } from "@server/api/interfaces/contactInterface";
+import { PrivateApiService } from "../../api/privateApi/PrivateApiService";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
-import { ScheduledMessagesInterface } from "@server/api/v1/interfaces/scheduledMessagesInterface";
-import { ChatInterface } from "@server/api/v1/interfaces/chatInterface";
-import { GeneralInterface } from "@server/api/v1/interfaces/generalInterface";
+import { ScheduledMessagesInterface } from "@server/api/interfaces/scheduledMessagesInterface";
+import { ChatInterface } from "@server/api/interfaces/chatInterface";
+import { GeneralInterface } from "@server/api/interfaces/generalInterface";
 
 export class IPCService {
     /**

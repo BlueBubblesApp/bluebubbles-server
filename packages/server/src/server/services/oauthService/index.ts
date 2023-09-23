@@ -95,7 +95,7 @@ export class OauthService {
         try {
             Server().emitToUI("oauth-status", ProgressStatus.IN_PROGRESS);
 
-            Server().log(`[GCP] Creating project, "${this.projectName}"...`);
+            Server().log(`[GCP] Creating GCP project, "${this.projectName}"...`);
             const project = await this.createGoogleCloudProject();
             const projectId = project.projectId;
             const projectNumber = project.projectNumber;
@@ -103,10 +103,10 @@ export class OauthService {
             Server().log(`[GCP] Enabling Firestore...`);
             await this.enableFirestoreApi(projectNumber);
 
-            Server().log(`[GCP] Adding Firebase...`);
+            Server().log(`[GCP] Adding Firebase Management API...`);
             await this.addFirebase(projectId);
 
-            Server().log(`[GCP] Generating Service Account JSON (this may take some time)...`);
+            Server().log(`[GCP] Waiting for Service Account to generate (this may take some time)...`);
             const serviceAccountJson = await this.getServiceAccount(projectId);
 
             Server().log(`[GCP] Creating Firestore...`);
@@ -313,7 +313,8 @@ export class OauthService {
                 );
     
                 await waitMs(10000);
-                await this.openWindow('https://console.cloud.google.com/apis/library/firebase.googleapis.com');
+                await this.openWindow(
+                    `https://console.cloud.google.com/apis/library/firebase.googleapis.com?project=${projectId}`);
                 Server().log(`[GCP] Resuming setup...`);
                 await waitMs(5000);
             } else {
@@ -361,7 +362,7 @@ export class OauthService {
     async createAndroidApp(projectId: string) {
         try {
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
-            const data = { packageName: this.packageName };
+            const data = { displayName: this.projectName, packageName: this.packageName };
             const createRes = await this.sendRequest('POST', url, data);
             
                 // Wait for the app to be created
@@ -381,6 +382,26 @@ export class OauthService {
     }
 
     /**
+     * Creates a Service Account for a given Google Cloud Project.
+     * 
+     * @param projectId The project ID
+     * @param serviceAccountName The name of the service account
+     * @returns The service account data
+     */
+    async createServiceAccount(projectId: string, serviceAccountName: string) {
+        const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`;
+        const data = {
+            accountId: serviceAccountName,
+            serviceAccount: {
+                displayName: serviceAccountName,
+                description: "Firebase Admin SDK Service Agent"
+            }
+        };
+        const res = await this.sendRequest('POST', url, data);
+        return res.data;
+    }
+
+    /**
      * Gets the Service Account ID from the Google Cloud Project
      * 
      * @param projectId The project ID
@@ -388,11 +409,17 @@ export class OauthService {
      */
     async getFirebaseServiceAccountId(projectId: string): Promise<string> {
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`;
-        const response = await this.waitForData('GET', url, null, 'accounts', 60, 5000);  // Wait up to 2 minutes
-        const firebaseServiceAccounts = response.accounts;
-        const firebaseServiceAccountId = firebaseServiceAccounts
-            .find((element: any) => element.displayName === "firebase-adminsdk")?.uniqueId;
-        return firebaseServiceAccountId;
+
+        try {
+            // Max wait time: 30 seconds
+            const response = await this.waitForData('GET', url, null, 'accounts', 15);
+            const firebaseServiceAccounts = response.accounts;
+            const firebaseServiceAccountId = firebaseServiceAccounts
+                .find((element: any) => element.displayName === "firebase-adminsdk")?.uniqueId;
+            return firebaseServiceAccountId;
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -402,8 +429,13 @@ export class OauthService {
      * @returns The service account private key JSON string
      */
     async getServiceAccount(projectId: string) {
-        const accountId: string = await this.getFirebaseServiceAccountId(projectId);
-        if (!accountId) throw new Error(`Failed to get Service Account ID`);
+        let accountId: string = await this.getFirebaseServiceAccountId(projectId);
+        if (!accountId) {
+            Server().log(`[GCP] Service Account not found! Creating new Service Account...`);
+            const serviceAccountName = 'firebase-adminsdk';
+            const newAccount = await this.createServiceAccount(projectId, serviceAccountName);
+            accountId = newAccount.name.split('/').pop();
+        }
     
         // eslint-disable-next-line max-len
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${accountId}/keys`;

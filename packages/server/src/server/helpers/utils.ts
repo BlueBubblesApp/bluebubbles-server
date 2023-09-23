@@ -9,8 +9,8 @@ import { FileSystem } from "@server/fileSystem";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { invisibleMediaChar } from "@server/services/httpService/constants";
-import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
+import { invisibleMediaChar } from "@server/api/http/constants";
+import { ContactInterface } from "@server/api/interfaces/contactInterface";
 
 export const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
 

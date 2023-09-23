@@ -16,7 +16,7 @@ import {
 import { isMinMonterey } from "@server/env";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
-import { startMessages } from "../api/v1/apple/scripts";
+import { startMessages } from "../api/apple/scripts";
 import {
     AudioMetadata,
     AudioMetadataKeys,
