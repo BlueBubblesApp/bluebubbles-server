@@ -25,9 +25,7 @@ import {
 import {
     Pagination,
     usePagination,
-    PaginationNext,
     PaginationPage,
-    PaginationPrevious,
     PaginationContainer,
     PaginationPageGroup,
 } from '@ajna/pagination';
@@ -41,6 +39,8 @@ import { ConfirmationDialog } from 'app/components/modals/ConfirmationDialog';
 import { ScheduledMessageDialog } from 'app/components/modals/ScheduledMessageDialog';
 import { ScheduledMessageItem, ScheduledMessagesTable } from 'app/components/tables/ScheduledMessagesTable';
 import { createScheduledMessage, deleteScheduledMessage, deleteScheduledMessages } from 'app/utils/IpcUtils';
+import { PaginationPreviousButton } from 'app/components/buttons/PaginationPreviousButton';
+import { PaginationNextButton } from 'app/components/buttons/PaginationNextButton';
 
 const perPage = 25;
 
@@ -242,7 +242,7 @@ export const ScheduledMessagesLayout = (): JSX.Element => {
                         w="full"
                         pt={2}
                     >
-                        <PaginationPrevious minWidth={'75px'}>Previous</PaginationPrevious>
+                        <PaginationPreviousButton />
                         <Box ml={1}></Box>
                         <PaginationPageGroup flexWrap="wrap" justifyContent="center">
                             {pages.map((page: number) => (
@@ -256,7 +256,7 @@ export const ScheduledMessagesLayout = (): JSX.Element => {
                             ))}
                         </PaginationPageGroup>
                         <Box ml={1}></Box>
-                        <PaginationNext minWidth={'50px'}>Next</PaginationNext>
+                        <PaginationNextButton />
                     </PaginationContainer>
                 </Pagination>
             </Stack>
