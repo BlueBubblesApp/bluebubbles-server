@@ -14,7 +14,6 @@ type FaceTimeStatusData = {
     address: string;
     handle?: HandleResponse;
     image_url: string;
-    is_international?: boolean;
     is_outgoing: boolean;
     is_audio: boolean;
     is_video: boolean;
@@ -53,7 +52,6 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
             address: data.data.handle.value,
             handle: handle[0] ? await HandleSerializer.serialize({ handle: handle[0] }) : null,
             image_url: data.data.image_url ?? null,
-            is_international: data.data.international ?? false,
             is_outgoing: data.data.is_outgoing ?? false,
             is_audio: data.data.is_sending_audio ?? false,
             is_video: data.data.is_sending_video ?? true,
