@@ -1,6 +1,7 @@
 export type EventData = {
     event: string;
     guid?: string;
+    data?: any;
     [key: string]: any;
 };
 
