@@ -123,6 +123,10 @@ export class FileSystem {
         return fcmServer ?? path.join(FileSystem.fcmDir, "server.json");
     }
 
+    public static async getUserConfDir(): Promise<string> {
+        return (await FileSystem.execShellCommand(`/usr/bin/getconf DARWIN_USER_DIR`)).trim();
+    }
+
     /**
      * Sets up all required directories and then, writes the scripts
      * to the scripts directory

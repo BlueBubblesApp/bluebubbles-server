@@ -78,6 +78,7 @@ import { ChangeListener } from "./databases/imessage/listeners/changeListener";
 import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
+import { NotificationCenterDB } from "./databases/notificationCenter/NotiicationCenterRepository";
 
 const findProcess = require("find-process");
 

@@ -23,6 +23,7 @@ import { PrivateApiFindMy } from "./apis/PrivateApiFindMy";
 import { PrivateApiAddressEventHandler } from "./eventHandlers/PrivateApiAddressEventHandler";
 import { PrivateApiFaceTimeStatusHandler } from "./eventHandlers/PrivateApiFaceTimeStatusHandler";
 import { PrivateApiCloud } from "./apis/PrivateApiCloud";
+import { PrivateApiFaceTime } from "./apis/PrivateApiFaceTime";
 
 
 export class PrivateApiService {
@@ -66,6 +67,10 @@ export class PrivateApiService {
 
     get cloud(): PrivateApiCloud {
         return new PrivateApiCloud(this);
+    }
+
+    get facetime(): PrivateApiFaceTime {
+        return new PrivateApiFaceTime(this);
     }
 
     constructor() {

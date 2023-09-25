@@ -4,6 +4,8 @@ import { EventData, PrivateApiEventHandler } from ".";
 import { HandleResponse } from "@server/types";
 import { slugifyAddress } from "@server/helpers/utils";
 import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
+import { FaceTimeSession } from "@server/api/lib/facetime/FaceTimeSession";
+import { isMinVentura } from "@server/env";
 
 type FaceTimeStatusData = {
     uuid: string;
@@ -17,6 +19,7 @@ type FaceTimeStatusData = {
     is_outgoing: boolean;
     is_audio: boolean;
     is_video: boolean;
+    url?: string | null;
 };
 
 
@@ -35,6 +38,8 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
     };
 
     async handle(data: EventData) {
+        console.log("FaceTime status changed!")
+        console.log(data.data);
         // Don't do anything for an outgoing call or answered call
         if ([1, 3].includes(data.data.call_status)) return;
 
@@ -56,6 +61,16 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
             is_audio: data.data.is_sending_audio ?? false,
             is_video: data.data.is_sending_video ?? true,
         };
+
+        // If the status is 4, it's an incoming call and we should create a FaceTime session for it.
+        if (data.data.call_status === 4 && isMinVentura) {
+            console.log("INCOMING, generating link");
+            // Create a FaceTime session
+            const session = await FaceTimeSession.fromGeneratedLink(data.data.call_uuid);
+            output.url = session.url;
+            console.log("Link generated, admitting self");
+            await session.admitSelf();
+        }
 
         Server().emitMessage(FT_CALL_STATUS_CHANGED, output, "high", true);
     }
