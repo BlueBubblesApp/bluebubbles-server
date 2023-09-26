@@ -6,6 +6,7 @@ import { slugifyAddress } from "@server/helpers/utils";
 import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
 import { FaceTimeSession } from "@server/api/lib/facetime/FaceTimeSession";
 import { isMinVentura } from "@server/env";
+import { FaceTimeSessionManager } from "@server/api/lib/facetime/FacetimeSessionManager";
 
 type FaceTimeStatusData = {
     uuid: string;
@@ -38,10 +39,21 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
     };
 
     async handle(data: EventData) {
-        console.log("FaceTime status changed!")
-        console.log(data.data);
         // Don't do anything for an outgoing call or answered call
         if ([1, 3].includes(data.data.call_status)) return;
+        if (!data.data.handle) return;
+
+        if (data.data.call_status === 4) {
+            Server().log(`Incoming FaceTime call from ${data.data.handle.value}`);
+
+            // Check the cache to see if we've already gotten an this request
+            const id = `ft-${data.data.call_status}-${data.data.call_uuid}`;
+            const wasHandled = Server().eventCache.find(id);
+            if (wasHandled) return;
+            Server().eventCache.add(id);
+        } else if (data.data.call_status === 6) {
+            Server().log(`FaceTime call disconnected with ${data.data.handle.value}`);
+        }
 
         const addr = slugifyAddress(data.data.handle.value);
         const [handle, _] = await Server().iMessageRepo.getHandles({ address: addr, limit: 1 });
@@ -64,14 +76,29 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
 
         // If the status is 4, it's an incoming call and we should create a FaceTime session for it.
         if (data.data.call_status === 4 && isMinVentura) {
-            console.log("INCOMING, generating link");
-            // Create a FaceTime session
-            const session = await FaceTimeSession.fromGeneratedLink(data.data.call_uuid);
-            output.url = session.url;
-            console.log("Link generated, admitting self");
-            await session.admitSelf();
+            try {
+                // We don't want to wait for the entire flow to execute so we just wait for the link
+                const link = await this.answerAndWaitForLink(data.data.call_uuid);
+                output.url = link;
+            } catch (ex: any) {
+                Server().log(`Failed to get FaceTime link for call ${data.data.call_uuid}: ${ex.message}`, "error");
+            }
+        } else if (data.data.call_status === 6 && isMinVentura) {
+            FaceTimeSessionManager().invalidateSession(data.data.call_uuid);
         }
 
         Server().emitMessage(FT_CALL_STATUS_CHANGED, output, "high", true);
+    }
+
+    private async answerAndWaitForLink(callUuid: string): Promise<string> {
+        return await new Promise((resolve, reject) => {
+            try {
+                FaceTimeSession.answerIncomingCall(callUuid, (link: string) => {
+                    resolve(link);
+                });
+            } catch (ex) {
+                reject(ex);
+            }
+        });
     }
 }

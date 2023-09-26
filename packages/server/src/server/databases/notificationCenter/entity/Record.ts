@@ -6,6 +6,27 @@ import { NSAttributedString } from "node-typedstream";
 import { CocoaDateTransformer } from "@server/databases/transformers/CocoaDateTransformer";
 
 
+type RecordData = {
+    styl: number;
+    intl: boolean;
+    app: string;
+    uuid: Buffer;
+    date: number;
+    srce: Buffer;
+    orig: number;
+    req: {
+        body: string;
+        titl: string;
+        cate?: string;
+        thre?: string;
+        smac?: number;
+        durl?: string;
+        subt?: string;
+        iden?: string;
+        [key: string]: any;
+    }
+};
+
 @Entity("record")
 export class Record {
     @PrimaryColumn({ name: "rec_id", type: "integer" })
@@ -31,7 +52,7 @@ export class Record {
         nullable: false,
         transformer: AttributedBodyTransformer
     })
-    data: NSAttributedString[] | null;
+    data: RecordData[] | null;
 
     @Column({
         name: "request_date",

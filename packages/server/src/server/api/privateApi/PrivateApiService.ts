@@ -24,14 +24,15 @@ import { PrivateApiAddressEventHandler } from "./eventHandlers/PrivateApiAddress
 import { PrivateApiFaceTimeStatusHandler } from "./eventHandlers/PrivateApiFaceTimeStatusHandler";
 import { PrivateApiCloud } from "./apis/PrivateApiCloud";
 import { PrivateApiFaceTime } from "./apis/PrivateApiFaceTime";
+import { LogLevel } from "electron-log";
 
 
 export class PrivateApiService {
     server: net.Server;
 
-    helper: net.Socket;
+    clients: net.Socket[] = [];
 
-    restartCounter: number;
+    restartCounter = 0;
 
     transactionManager: TransactionManager;
 
@@ -43,6 +44,12 @@ export class PrivateApiService {
 
     static get port(): number {
         return clamp(MIN_PORT + os.userInfo().uid - 501, MIN_PORT, MAX_PORT);
+    }
+
+    // Backwards compatibility getter.
+    // Eventually, we probably want to remove this alias
+    get helper(): boolean {
+        return this.clients.length > 0;
     }
 
     get message(): PrivateApiMessage {
@@ -86,16 +93,20 @@ export class PrivateApiService {
         ];
     }
 
+    log(message: string, level: LogLevel = 'info') {
+        Server().log(`[PrivateApiService] ${String(message)}`, level);
+    }
+
     async start(): Promise<void> {
         // Configure & start the listener
-        Server().log("Starting Private API Helper...", "debug");
+        this.log("Starting Private API Helper Services...", "debug");
         this.configureServer();
 
         // we need to get the port to open the server on (to allow multiple users to use the bundle)
         // we'll base this off the users uid (a unique id for each user, starting from 501)
         // we'll subtract 501 to get an id starting at 0, incremented for each user
         // then we add this to the base port to get a unique port for the socket
-        Server().log(`Starting Socket server on port ${PrivateApiService.port}`);
+        this.log(`Starting socket server on port ${PrivateApiService.port}`);
         this.server.listen(PrivateApiService.port, "localhost", 511, () => {
             this.restartCounter = 0;
         });
@@ -109,7 +120,7 @@ export class PrivateApiService {
             if (mode === 'process-dylib') {
                 this.modeType = ProcessDylibMode;
             } else {
-                Server().log(`Invalid Private API mode: ${mode}`);
+                this.log(`Invalid Private API mode: ${mode}`);
                 return;
             }
 
@@ -117,39 +128,52 @@ export class PrivateApiService {
             this.mode = new this.modeType();
             await this.mode.start();
         } catch (ex: any) {
-            Server().log(`Failed to start Private API: ${ex?.message ?? String(ex)}`, "error");
+            this.log(`Failed to start Private API: ${ex?.message ?? String(ex)}`, "error");
             return;
+        }
+    }
+
+    addClient(client: net.Socket) {
+        this.clients.push(client);
+        this.log(`Added socket client (Total: ${this.clients.length})`);
+    }
+
+    removeClient(client: net.Socket) {
+        const idx = this.clients.indexOf(client);
+        if (idx !== -1) {
+            this.clients.splice(idx, 1);
+            this.log(`Removed socket client (Total: ${this.clients.length})`);
         }
     }
 
     configureServer() {
         this.server = net.createServer((socket: net.Socket) => {
-            this.helper = socket;
-            this.helper.setDefaultEncoding("utf8");
+            this.addClient(socket);
+            socket.setDefaultEncoding("utf8");
 
-            Server().log("Private API Helper connected!");
-            this.setupListeners();
+            this.log("Private API Helper connected!");
+            this.setupListeners(socket);
 
-            this.helper.on("close", () => {
-                Server().log("Private API Helper disconnected!", "debug");
-                this.helper = null;
+            socket.on("close", () => {
+                this.log("Private API Helper disconnected!", "debug");
+                this.removeClient(socket);
             });
 
-            this.helper.on("error", () => {
-                Server().log("An error occured in the BlueBubblesHelper connection! Closing...", "error");
-                if (this.helper) this.helper.destroy();
+            socket.on("error", () => {
+                this.log("An error occured in the BlueBubblesHelper connection! Closing...", "error");
+                socket.destroy();
             });
         });
 
         this.server.on("error", err => {
-            Server().log("An error occured in the TCP Socket! Restarting", "error");
-            Server().log(err.toString(), "error");
+            this.log("An error occured in the TCP Socket! Restarting", "error");
+            this.log(err.toString(), "error");
 
             if (this.restartCounter <= 5) {
                 this.restartCounter += 1;
                 this.start();
             } else {
-                Server().log("Max restart count reached for Private API listener...");
+                this.log("Max restart count reached for Private API listener...");
             }
         });
     }
@@ -158,7 +182,7 @@ export class PrivateApiService {
 
     async onEvent(eventRaw: string): Promise<void> {
         if (eventRaw == null) {
-            Server().log(`Received null data from BlueBubblesHelper!`);
+            this.log(`Received null data from BlueBubblesHelper!`);
             return;
         }
 
@@ -168,23 +192,23 @@ export class PrivateApiService {
         for (const event of uniqueEvents) {
             if (!event || event.trim().length === 0) continue;
             if (event == null) {
-                Server().log(`Failed to decode null BlueBubblesHelper data!`);
+                this.log(`Failed to decode null BlueBubblesHelper data!`);
                 continue;
             }
 
-            // Server().log(`Received data from BlueBubblesHelper: ${event}`, "debug");
+            // this.log(`Received data from BlueBubblesHelper: ${event}`, "debug");
             let data;
 
             // Handle in a timeout so that we handle each event asyncronously
             try {
                 data = JSON.parse(event);
             } catch (e) {
-                Server().log(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
+                this.log(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
                 return;
             }
 
             if (data == null) {
-                Server().log("BlueBubblesHelper sent null data", "warn");
+                this.log("BlueBubblesHelper sent null data", "warn");
                 return;
             }
 
@@ -209,8 +233,8 @@ export class PrivateApiService {
         }
     }
 
-    setupListeners() {
-        this.helper.on("data", this.onEvent.bind(this));
+    setupListeners(socket: net.Socket) {
+        socket.on("data", this.onEvent.bind(this));
     }
 
     private readTransactionData(response: NodeJS.Dict<any>) {
@@ -244,7 +268,7 @@ export class PrivateApiService {
         }
 
         try {
-            await new Promise((resolve, reject) => {
+            await new Promise<void>((resolve, reject) => {
                 const d: NodeJS.Dict<any> = { action, data };
 
                 // If we have a transaction, set the transaction ID for the request
@@ -252,19 +276,11 @@ export class PrivateApiService {
                     d.transactionId = transaction.transactionId;
                 }
 
-                // Write the request to the socket
-                const res = this.helper.write(`${JSON.stringify(d)}\n`, (err: Error) => {
-                    if (err) {
-                        Server().log(`Socket write error: ${err?.message ?? String(err)}`);
-                        reject(err);
-                    }
+                // For each ocket client, write data
+                this.writeToClients(`${JSON.stringify(d)}\n`).then((success) => {
+                    if (success) return resolve();
+                    reject();
                 });
-
-                if (!res) {
-                    reject(new Error("Unable to write to TCP Socket."));
-                } else {
-                    resolve(res);
-                }
             });
 
             // If we have a transaction, wait until the transaction is fulfilled to return
@@ -272,10 +288,47 @@ export class PrivateApiService {
                 return transaction.promise;
             }
         } catch (ex: any) {
-            Server().log(`${msg} ${ex?.message ?? ex}`, "debug");
+            this.log(`${msg} ${ex?.message ?? ex}`, "debug");
         }
 
         return null;
+    }
+
+    private async writeToClients(data: string): Promise<boolean> {
+        let success = false;
+        for (const client of this.clients) {
+            try {
+                await this.writeToClient(client, data);
+                success = true;
+            } catch {
+                // Do nothing
+            }
+        }
+
+        // We are successful if at least one helper gets the message
+        return success;
+    }
+
+    private async writeToClient(client: net.Socket, data: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            client.write(data, (err: Error) => {
+                if (err) {
+                    this.log(`Socket write error: ${err?.message ?? String(err)}`);
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    destroySocketClients() {
+        for (const client of this.clients) {
+            if (client.destroyed) continue;
+            client.destroy();
+        }
+
+        this.clients = [];
     }
 
     async restart(): Promise<void> {
@@ -284,27 +337,24 @@ export class PrivateApiService {
     }
 
     async stop() {
-        Server().log(`Stopping Private API Helper...`);
+        this.log(`Stopping Private API Helper...`);
 
         try {
-            if (this.helper && !this.helper.destroyed) {
-                this.helper.destroy();
-                this.helper = null;
-            }
+            this.destroySocketClients();
         } catch (ex: any) {
-            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
+            this.log(`Failed to stop Private API Helpers! Error: ${ex.toString()}`, 'debug');
         }
 
         try {
             if (this.server && this.server.listening) {
-                Server().log("Stopping Private API Helper...", "debug");
+                this.log("Stopping Private API Helper...", "debug");
 
                 this.server.removeAllListeners();
                 this.server.close();
                 this.server = null;
             }
         } catch (ex: any) {
-            Server().log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
+            this.log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
         }
 
         await this.mode?.stop();

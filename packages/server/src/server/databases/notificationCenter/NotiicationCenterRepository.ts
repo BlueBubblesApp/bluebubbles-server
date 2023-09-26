@@ -65,8 +65,6 @@ class NotificationCenterDatabase {
 
             return this.db;
         }
-
-        console.log(dbPath);
     
         this.db = new DataSource({
             name: "NotificationCenter",
@@ -76,7 +74,6 @@ class NotificationCenterDatabase {
         });
 
         this.db = await this.db.initialize();
-        console.log('fin init')
         return this.db;
     }
 
