@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
-import ServerLog from "electron-log";
+import ServerLog, { LogLevel } from "electron-log";
 import process from "process";
 import path from "path";
 import os from "os";
@@ -78,7 +78,6 @@ import { ChangeListener } from "./databases/imessage/listeners/changeListener";
 import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
-import { NotificationCenterDB } from "./databases/notificationCenter/NotiicationCenterRepository";
 
 const findProcess = require("find-process");
 
@@ -268,7 +267,7 @@ class BlueBubblesServer extends EventEmitter {
      * @param message The message to print
      * @param type The log type
      */
-    log(message: any, type?: "log" | "error" | "warn" | "debug") {
+    log(message: any, type?: LogLevel) {
         switch (type) {
             case "error":
                 ServerLog.error(message);
@@ -283,7 +282,7 @@ class BlueBubblesServer extends EventEmitter {
                 AlertsInterface.create("warn", message);
                 this.notificationCount += 1;
                 break;
-            case "log":
+            case "info":
             default:
                 ServerLog.log(message);
         }
