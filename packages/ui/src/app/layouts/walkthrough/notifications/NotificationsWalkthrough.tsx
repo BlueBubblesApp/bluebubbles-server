@@ -52,7 +52,6 @@ export const NotificationsWalkthrough = (): JSX.Element => {
     const alertOpen = errors.length > 0;
 
     useEffect(() => {
-        console.log('HERE');
         ipcRenderer.removeAllListeners('oauth-status');
         getOauthUrl().then(url => setOauthUrl(url));
     }, []);
