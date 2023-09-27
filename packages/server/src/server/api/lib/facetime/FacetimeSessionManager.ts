@@ -24,17 +24,16 @@ class FaceTimeSessionManagerSingleton {
         // If the session exists, invalidate the old one and replace it with the new one.
         if (existingSession) {
             existingSession.invalidate();
-            this.sessions.splice(this.sessions.indexOf(existingSession), 1);
         }
 
         this.sessions.push(session);
+        this.purgeOldSessions();
     }
 
     invalidateSession(callUuid: string) {
         const session = this.findSession(callUuid);
         if (session) {
             session.invalidate();
-            this.sessions.splice(this.sessions.indexOf(session), 1);
         }
     }
 
@@ -44,5 +43,13 @@ class FaceTimeSessionManagerSingleton {
         }
 
         this.sessions = [];
+    }
+
+    purgeOldSessions() {
+        // Purge sessions older than 3 hours & invalidated
+        const now = new Date().getTime();
+        this.sessions = this.sessions.filter(session => {
+            return session.isInvalidated && now - session.createdAt.getTime() < 1000 * 60 * 60 * 3;
+        });
     }
 }

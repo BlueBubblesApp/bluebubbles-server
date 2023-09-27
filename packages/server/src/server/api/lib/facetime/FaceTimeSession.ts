@@ -16,6 +16,10 @@ export class FaceTimeSession extends EventEmitter {
 
     selfAdmissionAwaiter: NodeJS.Timeout = null;
 
+    createdAt: Date;
+
+    isInvalidated = false;
+
     constructor({
         conversationUuid = null,
         callUuid = null,
@@ -25,6 +29,7 @@ export class FaceTimeSession extends EventEmitter {
     } = {}) {
         super();
 
+        this.createdAt = new Date();
         this.conversationUuid = conversationUuid;
         this.callUuid = callUuid;
 
@@ -32,7 +37,7 @@ export class FaceTimeSession extends EventEmitter {
 
         // After 3 hours, invalidate the FaceTime session
         setTimeout(() => {
-            FaceTimeSessionManager().invalidateSession(this.callUuid);
+            this.invalidate();
         }, 1000 * 60 * 60 * 3);
     }
 
@@ -46,6 +51,8 @@ export class FaceTimeSession extends EventEmitter {
             clearInterval(this.selfAdmissionAwaiter);
             this.selfAdmissionAwaiter = null;
         }
+
+        this.isInvalidated = true;
     }
 
     private async admitSelfHandler(since: Date): Promise<boolean> {
@@ -185,6 +192,9 @@ export class FaceTimeSession extends EventEmitter {
 
         // Wait for the user, and admit them into the call
         await session.admitSelf();
+
+        // Wait 15 seconds for the person to join
+        await waitMs(15000);
 
         // Once the user has been admitted, we can leave the call.
         await session.leaveCall();

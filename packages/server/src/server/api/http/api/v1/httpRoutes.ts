@@ -23,6 +23,7 @@ import { LogMiddleware } from "./middleware/logMiddleware";
 import { ErrorMiddleware } from "./middleware/errorMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
 import { iCloudRouter } from "./routers/icloudRouter";
+import { FaceTimeRouter } from "./routers/facetimeRouter";
 import { PrivateApiMiddleware } from "./middleware/privateApiMiddleware";
 import { HttpDefinition, HttpMethod, HttpRoute, HttpRouteGroup, KoaMiddleware } from "../../types";
 import { SettingsValidator } from "./validators/settingsValidator";
@@ -542,6 +543,23 @@ export class HttpRoutes {
                         validators: [HandleValidator.validateFind],
                         controller: HandleRouter.getFocusStatus
                     }
+                ]
+            },
+            {
+                name: "FaceTime",
+                middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                prefix: "facetime",
+                routes: [
+                    {
+                        method: HttpMethod.POST,
+                        path: "answer/:call_uuid",
+                        controller: FaceTimeRouter.answer
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "leave/:call_uuid",
+                        controller: FaceTimeRouter.leave
+                    },
                 ]
             },
             {

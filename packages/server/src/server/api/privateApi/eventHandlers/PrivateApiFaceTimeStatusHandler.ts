@@ -4,8 +4,7 @@ import { EventData, PrivateApiEventHandler } from ".";
 import { HandleResponse } from "@server/types";
 import { slugifyAddress } from "@server/helpers/utils";
 import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
-import { FaceTimeSession } from "@server/api/lib/facetime/FaceTimeSession";
-import { isMinVentura } from "@server/env";
+import { isMinMonterey } from "@server/env";
 import { FaceTimeSessionManager } from "@server/api/lib/facetime/FacetimeSessionManager";
 
 type FaceTimeStatusData = {
@@ -44,7 +43,7 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
         if (!data.data.handle) return;
 
         if (data.data.call_status === 4) {
-            Server().log(`Incoming FaceTime call from ${data.data.handle.value}`);
+            Server().log(`Incoming FaceTime call from ${data.data.handle.value} (Call UUID: ${data.data.call_uuid})`);
 
             // Check the cache to see if we've already gotten an this request
             const id = `ft-${data.data.call_status}-${data.data.call_uuid}`;
@@ -74,31 +73,10 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
             is_video: data.data.is_sending_video ?? true,
         };
 
-        // If the status is 4, it's an incoming call and we should create a FaceTime session for it.
-        if (data.data.call_status === 4 && isMinVentura) {
-            try {
-                // We don't want to wait for the entire flow to execute so we just wait for the link
-                const link = await this.answerAndWaitForLink(data.data.call_uuid);
-                output.url = link;
-            } catch (ex: any) {
-                Server().log(`Failed to get FaceTime link for call ${data.data.call_uuid}: ${ex.message}`, "error");
-            }
-        } else if (data.data.call_status === 6 && isMinVentura) {
+       if (data.data.call_status === 6 && isMinMonterey) {
             FaceTimeSessionManager().invalidateSession(data.data.call_uuid);
         }
 
         Server().emitMessage(FT_CALL_STATUS_CHANGED, output, "high", true);
-    }
-
-    private async answerAndWaitForLink(callUuid: string): Promise<string> {
-        return await new Promise((resolve, reject) => {
-            try {
-                FaceTimeSession.answerIncomingCall(callUuid, (link: string) => {
-                    resolve(link);
-                });
-            } catch (ex) {
-                reject(ex);
-            }
-        });
     }
 }
