@@ -89,8 +89,6 @@ export class HTML extends HTTPResponse {
 export class NoData extends HTTPResponse {
     constructor(ctx: RouterContext, response: ResponseParams) {
         const data: ResponseParams = { message: response?.message ?? ResponseMessages.NO_DATA };
-        if (response?.data !== undefined) data.data = response.data;
-        if (response?.metadata !== undefined) data.metadata = response.metadata;
         super(ctx, 201, data);
     }
 }
