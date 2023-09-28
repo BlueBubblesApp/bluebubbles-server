@@ -85,16 +85,14 @@ export class ChatInterface {
         }
 
         // If we have a sort parameter, handle the cases
-        if (sort) {
-            if (sort === "lastmessage" && withLastMessage) {
-                results.sort((a: ChatResponse, b: ChatResponse) => {
-                    const d1 = a.lastMessage?.dateCreated ?? 0;
-                    const d2 = b.lastMessage?.dateCreated ?? 0;
-                    if (d1 > d2) return -1;
-                    if (d1 < d2) return 1;
-                    return 0;
-                });
-            }
+        if (sort && sort === "lastmessage" && withLastMessage) {
+            results.sort((a: ChatResponse, b: ChatResponse) => {
+                const d1 = a.lastMessage?.dateCreated ?? a.lastMessage?.dateDelivered ?? 0;
+                const d2 = b.lastMessage?.dateCreated ?? b.lastMessage?.dateDelivered ?? 0;
+                if (d1 > d2) return -1;
+                if (d1 < d2) return 1;
+                return 0;
+            });
         }
 
         return [results, totalChats];

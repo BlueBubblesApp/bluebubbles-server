@@ -123,7 +123,13 @@ export class ChatRouter {
 
         const withLastMessage = arrayHasOne(withQuery, ["lastmessage", "last-message"]);
         const guid = body?.guid;
-        const { sort, offset, limit } = body;
+        let sort = body?.sort;
+        const { offset, limit } = body;
+
+        // Default to sorting by last message if with last message
+        if (withLastMessage && isEmpty(sort)) {
+            sort = "lastmessage"
+        }
 
         // Fetch the chats
         const [results, total] = await ChatInterface.get({
