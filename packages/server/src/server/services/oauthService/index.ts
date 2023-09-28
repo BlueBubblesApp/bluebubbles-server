@@ -114,7 +114,7 @@ export class OauthService {
             await this.enableFirestoreApi(projectId);
 
             Server().log(`[GCP] Adding Firebase to Google Cloud Project`)
-            await this.addFirebaseManual();
+            await this.addFirebase(projectId);
 
             Server().log(`[GCP] Waiting for Service Account to generate (this may take some time)...`);
             const serviceAccountJson = await this.getServiceAccount(projectId);
@@ -440,8 +440,8 @@ export class OauthService {
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`;
 
         try {
-            // Max wait time: 30 seconds
-            const response = await this.waitForData('GET', url, null, 'accounts', 15);
+            // Max wait time: 5 minutes (60 attempts with 5 second delay)
+            const response = await this.waitForData('GET', url, null, 'accounts',  60, 5000);
             const firebaseServiceAccounts = response.accounts;
             const firebaseServiceAccountId = firebaseServiceAccounts
                 .find((element: any) => element.displayName === "firebase-adminsdk")?.uniqueId;
