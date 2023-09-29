@@ -80,6 +80,7 @@ export const NotificationsLayout = (): JSX.Element => {
                 if (success) {
                     dispatch(setConfig({ name: 'fcm_client', 'value': null }));
                     dispatch(setConfig({ name: 'fcm_server', 'value': null }));
+                    setAuthStatus(ProgressStatus.NOT_STARTED);
                 }
             }
         }
