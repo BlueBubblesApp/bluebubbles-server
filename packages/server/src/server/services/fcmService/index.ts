@@ -4,7 +4,7 @@ import { FileSystem } from "@server/fileSystem";
 import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 import { App } from "firebase-admin/app";
 import axios from "axios";
-import { resultRetryer } from "@server/helpers/utils";
+import { resultRetryer, waitMs } from "@server/helpers/utils";
 
 const AppName = "BlueBubbles";
 
@@ -215,6 +215,13 @@ export class FCMService {
         await db.setRules(source);
     }
 
+    clearLastValues() {
+        this.lastRestart = 0;
+        this.lastAddr = null;
+        this.lastProjectId = null;
+        this.lastProjectNumber = null;
+    }
+
     /**
      * Checks to see if the URL has changed since the last time we updated it
      * 
@@ -238,10 +245,10 @@ export class FCMService {
      *
      * @param serverUrl The new server URL
      */
-    async setServerUrl(): Promise<void> {
+    async setServerUrl(force = false): Promise<void> {
         // Make sure we should be setting the URL
         const serverUrl = this.shouldUpdateUrl();
-        if (!serverUrl) return;
+        if (!serverUrl && !force) return;
 
         // Make sure that if we haven't initialized, we do so
         if (!this.hasInitialized || !(await this.start())) return;
@@ -249,13 +256,14 @@ export class FCMService {
         Server().log(`Updating Server Address in ${this.dbType} Database...`);
 
         // Update the URL
-        // If we fail, retry 3 times
+        // If we fail, retry 12 times (for 1 minute)
         let error: any = null;
         const result = await resultRetryer({
-            maxTries: 3,
+            maxTries: 12,
             delayMs: 5000,
             getData: async () => {
                 try {
+                    Server().log(`Attempting to write server URL to database...`, 'debug');
                     await this.saveUrlToDb(serverUrl);
                     error = null;
                     return true;
@@ -345,21 +353,81 @@ export class FCMService {
         }
     }
 
-    private listenFirestoreDb() {
+    private async listenFirestoreDb() {
         const app = FCMService.getApp();
         const db = app.firestore();
-        db.collection("server")
-            .doc("config")
-            .onSnapshot((snapshot: admin.firestore.DocumentSnapshot)=> this.nextRestartHandler(
-                snapshot.data()?.nextRestart));
+        
+        const startListening = () => new Promise<void>((resolve, reject) => {
+            db.collection("server")
+                .doc("config")
+                .onSnapshot(
+                    (snapshot: admin.firestore.DocumentSnapshot) => {
+                        this.nextRestartHandler(snapshot.data()?.nextRestart);
+                        resolve();
+                    }, async (error: any) => {
+                        reject(error);
+                    }
+                );
+        });
+    
+        // Try for 12 times (1 minute)
+        let success = false;
+        for (let i = 0; i < 12; i++) {
+            try {
+                await startListening();
+                success = true;
+                break;
+            } catch (ex: any) {
+                Server().log(`An error occurred when listening for DB changes! Retrying in 5 seconds...`, "debug");
+                Server().log(ex?.message ?? String(ex));
+                await waitMs(5000);
+            }
+        }
+
+        if (!success) {
+            Server().log(`Failed to listen for DB changes after 12 attempts!`, "error");
+        } else {
+            Server().log('Successfully listening for DB changes');
+        }
     }
 
-    private listenRealtimeDb() {
+    private async listenRealtimeDb() {
         const app = FCMService.getApp();
         const db = app.database();
-        db.ref("config")
-            .child("nextRestart")
-            .on("value", (snapshot: admin.database.DataSnapshot) => this.nextRestartHandler(snapshot.val()));
+
+        const startListening = () => new Promise<void>((resolve, reject) => {
+            db.ref("config")
+                .child("nextRestart")
+                .on(
+                    "value",
+                    async (snapshot: admin.database.DataSnapshot) => {
+                        this.nextRestartHandler(snapshot.val());
+                        resolve();
+                    }, (error: any) => {
+                        reject(error);
+                    }
+                );
+        });
+
+        // Try for 12 times (1 minute)
+        let success = false;
+        for (let i = 0; i < 12; i++) {
+            try {
+                await startListening();
+                success = true;
+                break;
+            } catch (ex: any) {
+                Server().log(`An error occurred when listening for DB changes! Retrying in 5 seconds...`, "debug");
+                Server().log(ex?.message ?? String(ex));
+                await waitMs(5000);
+            }
+        }
+
+        if (!success) {
+            Server().log(`Failed to listen for DB changes after 12 attempts!`, "error");
+        } else {
+            Server().log('Successfully listening for DB changes');
+        }
     }
 
     private async nextRestartHandler(value: any) {

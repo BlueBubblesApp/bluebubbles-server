@@ -161,7 +161,12 @@ export class OauthService {
             // Start the FCM service.
             // Don't await because we don't want to catch the error here.
             FCMService.stop().then(async () => {
+                // Clear our markers & start the service
+                Server().fcm.clearLastValues();
                 await Server().fcm.start();
+            }).catch(async (err) => {
+                Server().log('An issue occurred when stopping the FCM service after OAuth completion!', 'debug');
+                Server().log(err?.message ?? String(err), 'debug');
             });
         } catch (ex: any) {
             Server().log(`[GCP] Failed to create project: ${ex?.message}`, "error");
