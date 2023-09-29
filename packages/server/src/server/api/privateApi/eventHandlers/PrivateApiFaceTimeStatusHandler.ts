@@ -6,6 +6,7 @@ import { slugifyAddress } from "@server/helpers/utils";
 import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
 import { isMinMonterey } from "@server/env";
 import { FaceTimeSessionManager } from "@server/api/lib/facetime/FacetimeSessionManager";
+import { FaceTimeSession, FaceTimeSessionStatus, callStatusMap } from "@server/api/lib/facetime/FaceTimeSession";
 
 type FaceTimeStatusData = {
     uuid: string;
@@ -27,30 +28,28 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
 
     types: string[] = ["ft-call-status-changed"];
 
-    callStatusMap: Record<number, string> = {
-        1: "answered",
-        3: "outgoing",
-        4: "incoming",
-        // Ended
-        // Unanswered
-        // Declined
-        6: "disconnected",
-    };
-
     async handle(data: EventData) {
-        // Don't do anything for an outgoing call or answered call
-        if ([1, 3].includes(data.data.call_status)) return;
-        if (!data.data.handle) return;
+        const session = FaceTimeSession.fromEvent(data.data);
+        const isNew = FaceTimeSessionManager().addSession(session)
 
-        if (data.data.call_status === 4) {
+        // Don't do anything for outgoing calls
+        if ([3].includes(data.data.call_status)) return;
+
+        // When a call is answered, we don't need to emit an event
+        if (data.data.call_status === FaceTimeSessionStatus.ANSWERED) {
+            Server().log(`FaceTime call answered (Call UUID: ${data.data.call_uuid})`);
+            return;
+        }
+        
+        // When a call is incoming, update the session
+        // Don't emit an event if it was an existing session
+        if (data.data.call_status === FaceTimeSessionStatus.INCOMING) {
             Server().log(`Incoming FaceTime call from ${data.data.handle.value} (Call UUID: ${data.data.call_uuid})`);
-
-            // Check the cache to see if we've already gotten an this request
-            const id = `ft-${data.data.call_status}-${data.data.call_uuid}`;
-            const wasHandled = Server().eventCache.find(id);
-            if (wasHandled) return;
-            Server().eventCache.add(id);
-        } else if (data.data.call_status === 6) {
+            if (!isNew) return;
+        }
+        
+        // If the call was disonnected, update the session, but still emit an event
+        if (data.data.call_status === FaceTimeSessionStatus.DISCONNECTED && data.data.handle) {
             Server().log(`FaceTime call disconnected with ${data.data.handle.value}`);
         }
 
@@ -61,7 +60,7 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
         // We just alias some of the data to make it easier to work with.
         const output: FaceTimeStatusData = {
             uuid: data.data.call_uuid,
-            status: this.callStatusMap[data.data.call_status] ?? "unknown",
+            status: callStatusMap[data.data.call_status] ?? "unknown",
             status_id: data.data.call_status,
             ended_error: data.data.ended_error,
             ended_reason: data.data.ended_reason,
@@ -72,10 +71,6 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
             is_audio: data.data.is_sending_audio ?? false,
             is_video: data.data.is_sending_video ?? true,
         };
-
-       if (data.data.call_status === 6 && isMinMonterey) {
-            FaceTimeSessionManager().invalidateSession(data.data.call_uuid);
-        }
 
         Server().emitMessage(FT_CALL_STATUS_CHANGED, output, "high", true);
     }

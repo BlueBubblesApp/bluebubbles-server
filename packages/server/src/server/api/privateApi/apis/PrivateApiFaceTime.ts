@@ -23,9 +23,7 @@ export class PrivateApiFaceTime extends PrivateApiAction {
         const request = new TransactionPromise(TransactionType.OTHER);
 
         const args: Record<string, any> = {};
-        if (uuid) {
-            args["callUUID"] = uuid;
-        }
+        args["callUUID"] = uuid ?? null;
 
         return this.sendApiMessage(action, args, request);
     }

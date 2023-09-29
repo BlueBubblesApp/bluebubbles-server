@@ -1,10 +1,17 @@
 import { Server } from "@server";
 import { FaceTimeSession } from "../lib/facetime/FaceTimeSession";
+import { FaceTimeSessionManager } from "../lib/facetime/FacetimeSessionManager";
 
 /**
  * An interface to interact with Facetime
  */
 export class FaceTimeInterface {
+    static async create(): Promise<string> {
+        const session = await FaceTimeSession.fromGeneratedLink(null);
+        session.admitAndLeave();
+        return session.url;
+    }
+
     static async answer(callUuid: string): Promise<string> {
         return await FaceTimeInterface.answerAndWaitForLink(callUuid);
     }

@@ -552,6 +552,11 @@ export class HttpRoutes {
                 routes: [
                     {
                         method: HttpMethod.POST,
+                        path: "session",
+                        controller: FaceTimeRouter.newSession
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: "answer/:call_uuid",
                         controller: FaceTimeRouter.answer
                     },

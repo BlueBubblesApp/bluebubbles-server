@@ -13,4 +13,9 @@ export class FaceTimeRouter {
         await FaceTimeInterface.leave(ctx.params.call_uuid);
         return new NoData(ctx, {}).send();
     }
+
+    static async newSession(ctx: RouterContext, _: Next) {
+        const link = await FaceTimeInterface.create();
+        return new Success(ctx, { data: { link }}).send();
+    }
 }
