@@ -59,7 +59,7 @@
         "@typescript-eslint/parser": "^5.18.0",
         "babel-loader": "^8.1.0",
         "css-loader": "^3.5.2",
-        "electron": "17.4.11",
+        "electron": "18.3.7",
         "electron-builder": "^22.9.1",
         "electron-notarize": "^1.2.1",
         "electron-rebuild": "^3.2.9",
