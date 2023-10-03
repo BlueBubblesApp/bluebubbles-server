@@ -4,18 +4,21 @@ import { MacForgeMode } from "./MacForgeMode";
 import { DylibPlugin } from "./dylibPlugins";
 import { MessagesDylibPlugin } from "./dylibPlugins/MessagesDylibPlugin";
 import { FaceTimeDylibPlugin } from "./dylibPlugins/FaceTimeDylibPlugin";
-
+import { Server } from "@server";
 
 export class ProcessDylibMode extends PrivateApiMode {
-
     static plugins: DylibPlugin[] = [
         new MessagesDylibPlugin("Messages Helper"),
         new FaceTimeDylibPlugin("FaceTime Helper")
-    ]
-    
+    ];
+
     static async install() {
         for (const plugin of ProcessDylibMode.plugins) {
-            plugin.locateDependencies();
+            try {
+                plugin.locateDependencies();
+            } catch (e: any) {
+                Server().log(`Failed to locate dependencies for ${plugin.name}: ${e?.message ?? String(e)}`);
+            }
         }
 
         await MacForgeMode.uninstall();
@@ -30,8 +33,12 @@ export class ProcessDylibMode extends PrivateApiMode {
 
         // Start the dylib process
         for (const plugin of ProcessDylibMode.plugins) {
-            // Don't await this. This is a blocking call.
-            plugin.injectPlugin();
+            try {
+                // Don't await this. This is a blocking call.
+                plugin.injectPlugin();
+            } catch (e: any) {
+                Server().log(`Failed to inject ${plugin.name} DYLIB: ${e?.message ?? String(e)}`);
+            }
         }
     }
 

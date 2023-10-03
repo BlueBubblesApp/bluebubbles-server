@@ -6,14 +6,13 @@ import { waitMs } from "@server/helpers/utils";
 import { EventEmitter } from "events";
 import { uuidv4 } from "@firebase/util";
 
-
 export enum FaceTimeSessionStatus {
     UNKNOWN = 0,
     ANSWERED = 1,
     OUTGOING = 3,
     INCOMING = 4,
     DISCONNECTED = 6
-};
+}
 
 export const callStatusMap: Record<number, string> = {
     [FaceTimeSessionStatus.UNKNOWN]: "unknown",
@@ -45,9 +44,9 @@ export class FaceTimeSession extends EventEmitter {
         conversationUuid = null,
         addToManager = true
     }: {
-        callUuid?: string,
-        conversationUuid?: string,
-        addToManager?: boolean
+        callUuid?: string;
+        conversationUuid?: string;
+        addToManager?: boolean;
     } = {}) {
         super();
 
@@ -79,7 +78,7 @@ export class FaceTimeSession extends EventEmitter {
             this.selfAdmissionAwaiter = null;
         }
 
-        this.emit('disconnected');
+        this.emit("disconnected");
     }
 
     update(session: FaceTimeSession) {
@@ -88,7 +87,7 @@ export class FaceTimeSession extends EventEmitter {
         } else if (this.status === FaceTimeSessionStatus.INCOMING) {
             if ([FaceTimeSessionStatus.INCOMING, FaceTimeSessionStatus.ANSWERED].includes(session.status)) {
                 this.status = FaceTimeSessionStatus.ANSWERED;
-                this.emit('answered', true);
+                this.emit("answered", true);
             }
         }
     }
@@ -96,7 +95,7 @@ export class FaceTimeSession extends EventEmitter {
     private async admitSelfHandler(since: Date): Promise<boolean> {
         // Check the notification center database for a waiting room notification
         const [notifications, _] = await NotificationCenterDB().getRecords({
-            sort: "ASC",  // ascending so we can process the oldest first
+            sort: "ASC", // ascending so we can process the oldest first
             where: [
                 {
                     statement: `app.identifier = :identifier`,
@@ -116,24 +115,24 @@ export class FaceTimeSession extends EventEmitter {
         for (const notification of notifications) {
             // If the notification is for this conversation, admit the participant
             for (const d of notification.data) {
-                if (!d.req?.body.includes('join')) continue;
+                if (!d.req?.body.includes("join")) continue;
 
                 // Extract the user data
-                const userData = d.req?.usda['$objects'] ?? [];
+                const userData = d.req?.usda["$objects"] ?? [];
 
                 // If our data is incomplete, skip
                 if (userData.length < 10) continue;
-                
+
                 const userId = userData[6];
                 const conversationId = userData[9];
 
                 // If we'ave already admitted the user, skip
                 if (this.admittedParticipants.includes(userId)) continue;
 
-                Server().log(`Admitting ${userId}, into Call: ${conversationId}`, 'debug');
+                Server().log(`Admitting ${userId}, into Call: ${conversationId}`, "debug");
                 await Server().privateApi.facetime.admitParticipant(conversationId, userId);
                 this.admittedParticipants.push(userId);
-                Server().log(`Admitted ${userId}!`, 'debug');
+                Server().log(`Admitted ${userId}!`, "debug");
 
                 // Exit if we have admitted a user
                 clearInterval(this.selfAdmissionAwaiter);
@@ -141,17 +140,17 @@ export class FaceTimeSession extends EventEmitter {
             }
         }
 
-        return false
+        return false;
     }
 
     async admitSelf(): Promise<void> {
         return await new Promise<void>((resolve, reject) => {
             // Set with ana offset of 5 seconds
-            const startDate = new Date((new Date()).getTime() - 5000);
+            const startDate = new Date(new Date().getTime() - 5000);
             this.selfAdmissionAwaiter = setInterval(async () => {
                 const admitted = await this.admitSelfHandler(startDate);
                 if (admitted) {
-                    resolve()
+                    resolve();
                 }
 
                 // If the current time is more than 2 minutes, throw an error and leave the call.
@@ -163,7 +162,7 @@ export class FaceTimeSession extends EventEmitter {
                 }
             }, 1000);
         });
-    } 
+    }
 
     async generateLink(): Promise<string> {
         if (this.callUuid) {
@@ -171,7 +170,7 @@ export class FaceTimeSession extends EventEmitter {
         } else {
             Server().log(`Generating FaceTime Link For New Call`);
         }
-        
+
         // Invoke the private API
         const result = await Server().privateApi.facetime.generateLink(this.callUuid);
         if (!result?.data?.url) {
@@ -182,7 +181,7 @@ export class FaceTimeSession extends EventEmitter {
         this.url = result.data.url;
 
         // Emit URL to listeners
-        this.emit('link', this.url);
+        this.emit("link", this.url);
         Server().log(`New FaceTime Link Generated: ${this.url}`);
         return this.url;
     }
@@ -213,16 +212,19 @@ export class FaceTimeSession extends EventEmitter {
     }
 
     private async waitForAnswer(): Promise<void> {
-        return await new Promise((resolve, reject) => {
-            this.on('answered', () => {
+        await new Promise<void>((resolve, reject) => {
+            this.on("answered", () => {
                 resolve();
             });
 
             // If the call is not answered in 30 seconds, reject
             setTimeout(() => {
-                reject(new Error("Timed out waiting for FaceTime call to connect!"))
+                reject(new Error("Timed out waiting for FaceTime call to connect!"));
             }, 1000 * 30);
         });
+
+        // Wait 1 second to prevent crashing on Sonoma (and potentially other environments)
+        await waitMs(3000);
     }
 
     async leaveCall(): Promise<void> {
@@ -248,14 +250,19 @@ export class FaceTimeSession extends EventEmitter {
     ): Promise<FaceTimeSession> {
         let session = FaceTimeSessionManager().findSession(callUuid);
         session ??= new FaceTimeSession({ callUuid });
+
+        if (session.status === FaceTimeSessionStatus.DISCONNECTED) {
+            throw new Error("Unable to answer call! The call has already ended.");
+        }
+
         session.status = FaceTimeSessionStatus.INCOMING;
 
-        session.on('link', (link: string) => {
+        session.on("link", (link: string) => {
             if (onLinkGenerated) {
                 onLinkGenerated(link);
             }
-        })
-        
+        });
+
         // Answer the call and generate a link for it.
         await session.answerWithServer();
         await session.generateLink();
@@ -267,6 +274,10 @@ export class FaceTimeSession extends EventEmitter {
         const session = new FaceTimeSession({ callUuid });
 
         if (callUuid) {
+            if (session.status === FaceTimeSessionStatus.DISCONNECTED) {
+                throw new Error("Unable to generate link for call! The call has already ended.");
+            }
+
             session.status = FaceTimeSessionStatus.INCOMING;
             await session.answerWithServer();
         } else {

@@ -5,7 +5,6 @@ import { Server } from "@server";
 import { ProcessPromise } from "zx";
 
 export abstract class DylibPlugin {
-
     name: string = null;
 
     isStopping = false;
@@ -33,7 +32,8 @@ export abstract class DylibPlugin {
 
         if (!fs.existsSync(this.parentProcessPath)) {
             throw new Error(
-                `Unable to locate ${this.name} parent process! Please give the BlueBubbles Server Full Disk Access.`);
+                `Unable to locate ${this.name} parent process! Please give the BlueBubbles Server Full Disk Access.`
+            );
         }
     }
 
@@ -45,6 +45,11 @@ export abstract class DylibPlugin {
         this.dylibLastErrorTime = 0;
 
         // If there are 5 failures in a row, we'll stop trying to start it
+        const parentPath = this.parentProcessPath;
+        if (!parentPath) {
+            throw new Error(`Unable to locate ${this.name} parent process!`);
+        }
+
         while (this.dylibFailureCounter < 5) {
             try {
                 // Stop the running Messages app
@@ -74,7 +79,9 @@ export abstract class DylibPlugin {
                 this.dylibLastErrorTime = Date.now();
                 if (this.dylibFailureCounter >= 5) {
                     Server().log(
-                        `Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`, "error");
+                        `Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`,
+                        "error"
+                    );
                 }
             }
         }
@@ -89,7 +96,11 @@ export abstract class DylibPlugin {
 
         return new Promise((resolve, _) => {
             // Catch the error so the promise doesn't throw a no-catch error.
-            this.dylibProcess.catch(() => { /** Do nothing */ }).finally(resolve);
+            this.dylibProcess
+                .catch(() => {
+                    /** Do nothing */
+                })
+                .finally(resolve);
         });
     }
 
@@ -105,7 +116,7 @@ export abstract class DylibPlugin {
                 killedDylib = true;
             }
         } catch (ex) {
-            Server().log(`Failed to stop ${this.name} DYLIB! Error: ${ex.toString()}`, 'debug');
+            Server().log(`Failed to stop ${this.name} DYLIB! Error: ${ex.toString()}`, "debug");
         }
 
         // Wait for the dylib to die
