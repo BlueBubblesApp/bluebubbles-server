@@ -156,7 +156,7 @@ export class PrivateApiService {
             });
 
             socket.on("error", err => {
-                this.log("An error occured in the BlueBubblesHelper connection! Closing...", "warn");
+                this.log("An error occured in a BlueBubbles Private API Helper connection! Closing...", "debug");
                 this.log(String(err), "debug");
                 socket.destroy();
             });
