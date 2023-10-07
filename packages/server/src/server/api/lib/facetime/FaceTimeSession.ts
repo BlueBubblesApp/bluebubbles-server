@@ -223,8 +223,10 @@ export class FaceTimeSession extends EventEmitter {
             }, 1000 * 30);
         });
 
-        // Wait 1 second to prevent crashing on Sonoma (and potentially other environments)
-        await waitMs(3000);
+        // Wait 4 seconds to prevent crashing on Sonoma (and potentially other environments).
+        // 1 second is too short. 3 seconds will work 75% of the time. 4 seconds for good measure.
+        // Unfortunately, there isn't a good wait to detect when the call is ready to be used.
+        await waitMs(4000);
     }
 
     async leaveCall(): Promise<void> {
