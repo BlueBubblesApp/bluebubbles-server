@@ -90,11 +90,10 @@ export class AttachmentSerializer {
                     }
                 }
             } catch (ex: any) {
-                console.log(ex);
-                Server().log(`Could not read file [${fPath}]: ${ex.message}`, "error");
+                Server().log(`Could not read file [${fPath}]: ${ex?.message ?? String(ex)}`, "error");
             }
         } else {
-            console.warn("Attachment hasn't been downloaded yet!");
+            Server().log("Attachment hasn't been downloaded yet!", "debug");
         }
 
         let output: AttachmentResponse = {
