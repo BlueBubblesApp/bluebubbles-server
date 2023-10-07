@@ -3,9 +3,13 @@ import fs from "fs";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 import { ProcessPromise } from "zx";
+import { FileSystem } from "@server/fileSystem";
+import { hideApp } from "@server/api/apple/scripts";
 
 export abstract class DylibPlugin {
     name: string = null;
+
+    parentApp: string = null;
 
     isStopping = false;
 
@@ -17,12 +21,27 @@ export abstract class DylibPlugin {
 
     abstract get dylibPath(): string;
 
-    abstract get parentProcessPath(): string;
-
     abstract stopParentProcess(): Promise<void>;
 
     constructor(name: string) {
         this.name = name;
+    }
+
+    get parentProcessPath(): string | null {
+        // Paths are different on Pre/Post Catalina.
+        // We are gonna test for both just in case an app was installed prior to the OS upgrade.
+        const possiblePaths = [
+            `/System/Applications/${this.parentApp}.app/Contents/MacOS/${this.parentApp}`,
+            `/Applications/${this.parentApp}.app/Contents/MacOS/${this.parentApp}`
+        ];
+
+        // Return the first path that exists
+        for (const path of possiblePaths) {
+            const exists = fs.existsSync(path);
+            if (exists) return path;
+        }
+
+        return null;
     }
 
     locateDependencies() {
@@ -64,6 +83,12 @@ export abstract class DylibPlugin {
                 // Execute shell command to start the dylib.
                 // eslint-disable-next-line max-len
                 this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
+
+                // HIde the app after 5 seconds
+                setTimeout(() => {
+                    this.hideApp();
+                }, 4000);
+
                 await this.dylibProcess;
             } catch (ex: any) {
                 if (this.isStopping) return;
@@ -88,6 +113,15 @@ export abstract class DylibPlugin {
 
         if (this.dylibFailureCounter >= 5) {
             Server().log(`Failed to start ${this.name} DYLIB 3 times in a row, giving up...`, "error");
+        }
+    }
+
+    async hideApp() {
+        try {
+            await FileSystem.executeAppleScript(hideApp(this.parentApp));
+        } catch (ex) {
+            console.log(ex);
+            // Don't do anything
         }
     }
 
