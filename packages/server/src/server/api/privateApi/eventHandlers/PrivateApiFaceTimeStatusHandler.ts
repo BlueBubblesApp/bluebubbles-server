@@ -1,5 +1,5 @@
 import { Server } from "@server";
-import { FT_CALL_STATUS_CHANGED } from "@server/events";
+import { FT_CALL_STATUS_CHANGED, INCOMING_FACETIME } from "@server/events";
 import { EventData, PrivateApiEventHandler } from ".";
 import { HandleResponse } from "@server/types";
 import { slugifyAddress } from "@server/helpers/utils";
@@ -23,55 +23,68 @@ type FaceTimeStatusData = {
     url?: string | null;
 };
 
-
 export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
-
     types: string[] = ["ft-call-status-changed"];
 
+    // The commeneted out handler at the bottom should be used in 1.9.0
     async handle(data: EventData) {
-        const session = FaceTimeSession.fromEvent(data.data);
-        const isNew = FaceTimeSessionManager().addSession(session)
+        // Ignore calls that are not incoming
+        if (data.data.call_status !== FaceTimeSessionStatus.INCOMING) return;
 
-        // Don't do anything for outgoing calls
-        if ([3].includes(data.data.call_status)) return;
+        // stringify to maintain backwards compat
+        const output = JSON.stringify({
+            caller: data.data.handle.value,
+            timestamp: new Date().getTime()
+        });
 
-        // When a call is answered, we don't need to emit an event
-        if (data.data.call_status === FaceTimeSessionStatus.ANSWERED) {
-            Server().log(`FaceTime call answered (Call UUID: ${data.data.call_uuid})`);
-            return;
-        }
-        
-        // When a call is incoming, update the session
-        // Don't emit an event if it was an existing session
-        if (data.data.call_status === FaceTimeSessionStatus.INCOMING) {
-            Server().log(`Incoming FaceTime call from ${data.data.handle.value} (Call UUID: ${data.data.call_uuid})`);
-            if (!isNew) return;
-        }
-        
-        // If the call was disonnected, update the session, but still emit an event
-        if (data.data.call_status === FaceTimeSessionStatus.DISCONNECTED && data.data.handle) {
-            Server().log(`FaceTime call disconnected with ${data.data.handle.value}`);
-        }
-
-        const addr = slugifyAddress(data.data.handle.value);
-        const [handle, _] = await Server().iMessageRepo.getHandles({ address: addr, limit: 1 });
-
-        // Build a payload to be sent out to clients.
-        // We just alias some of the data to make it easier to work with.
-        const output: FaceTimeStatusData = {
-            uuid: data.data.call_uuid,
-            status: callStatusMap[data.data.call_status] ?? "unknown",
-            status_id: data.data.call_status,
-            ended_error: data.data.ended_error,
-            ended_reason: data.data.ended_reason,
-            address: data.data.handle.value,
-            handle: handle[0] ? await HandleSerializer.serialize({ handle: handle[0] }) : null,
-            image_url: data.data.image_url ?? null,
-            is_outgoing: data.data.is_outgoing ?? false,
-            is_audio: data.data.is_sending_audio ?? false,
-            is_video: data.data.is_sending_video ?? true,
-        };
-
-        Server().emitMessage(FT_CALL_STATUS_CHANGED, output, "high", true);
+        Server().emitMessage(INCOMING_FACETIME, output, "high", true, true);
     }
+
+    // async handle(data: EventData) {
+    //     const session = FaceTimeSession.fromEvent(data.data);
+    //     const isNew = FaceTimeSessionManager().addSession(session)
+
+    //     // Don't do anything for outgoing calls
+    //     if ([3].includes(data.data.call_status)) return;
+
+    //     // When a call is answered, we don't need to emit an event
+    //     if (data.data.call_status === FaceTimeSessionStatus.ANSWERED) {
+    //         Server().log(`FaceTime call answered (Call UUID: ${data.data.call_uuid})`);
+    //         return;
+    //     }
+
+    //     // When a call is incoming, update the session
+    //     // Don't emit an event if it was an existing session
+    //     if (data.data.call_status === FaceTimeSessionStatus.INCOMING) {
+    //         Server().log(
+    //             `Incoming FaceTime call from ${data.data.handle.value} (Call UUID: ${data.data.call_uuid})`);
+    //         if (!isNew) return;
+    //     }
+
+    //     // If the call was disonnected, update the session, but still emit an event
+    //     if (data.data.call_status === FaceTimeSessionStatus.DISCONNECTED && data.data.handle) {
+    //         Server().log(`FaceTime call disconnected with ${data.data.handle.value}`);
+    //     }
+
+    //     const addr = slugifyAddress(data.data.handle.value);
+    //     const [handle, _] = await Server().iMessageRepo.getHandles({ address: addr, limit: 1 });
+
+    //     // Build a payload to be sent out to clients.
+    //     // We just alias some of the data to make it easier to work with.
+    //     const output: FaceTimeStatusData = {
+    //         uuid: data.data.call_uuid,
+    //         status: callStatusMap[data.data.call_status] ?? "unknown",
+    //         status_id: data.data.call_status,
+    //         ended_error: data.data.ended_error,
+    //         ended_reason: data.data.ended_reason,
+    //         address: data.data.handle.value,
+    //         handle: handle[0] ? await HandleSerializer.serialize({ handle: handle[0] }) : null,
+    //         image_url: data.data.image_url ?? null,
+    //         is_outgoing: data.data.is_outgoing ?? false,
+    //         is_audio: data.data.is_sending_audio ?? false,
+    //         is_video: data.data.is_sending_video ?? true,
+    //     };
+
+    //     Server().emitMessage(FT_CALL_STATUS_CHANGED, output, "high", true);
+    // }
 }
