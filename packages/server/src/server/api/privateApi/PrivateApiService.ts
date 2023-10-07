@@ -3,10 +3,7 @@ import * as os from "os";
 import * as net from "net";
 import { Server } from "@server";
 import { clamp, isEmpty, isNotEmpty } from "@server/helpers/utils";
-import {
-    TransactionPromise,
-    TransactionResult,
-} from "@server/managers/transactionManager/transactionPromise";
+import { TransactionPromise, TransactionResult } from "@server/managers/transactionManager/transactionPromise";
 import { TransactionManager } from "@server/managers/transactionManager";
 
 import { MAX_PORT, MIN_PORT } from "./Constants";
@@ -25,7 +22,6 @@ import { PrivateApiFaceTimeStatusHandler } from "./eventHandlers/PrivateApiFaceT
 import { PrivateApiCloud } from "./apis/PrivateApiCloud";
 import { PrivateApiFaceTime } from "./apis/PrivateApiFaceTime";
 import { LogLevel } from "electron-log";
-
 
 export class PrivateApiService {
     server: net.Server;
@@ -93,7 +89,7 @@ export class PrivateApiService {
         ];
     }
 
-    log(message: string, level: LogLevel = 'info') {
+    log(message: string, level: LogLevel = "info") {
         Server().log(`[PrivateApiService] ${String(message)}`, level);
     }
 
@@ -116,8 +112,8 @@ export class PrivateApiService {
 
     async startPerMode(): Promise<void> {
         try {
-            const mode = 'process-dylib'
-            if (mode === 'process-dylib') {
+            const mode = "process-dylib";
+            if (mode === "process-dylib") {
                 this.modeType = ProcessDylibMode;
             } else {
                 this.log(`Invalid Private API mode: ${mode}`);
@@ -159,8 +155,9 @@ export class PrivateApiService {
                 this.removeClient(socket);
             });
 
-            socket.on("error", () => {
-                this.log("An error occured in the BlueBubblesHelper connection! Closing...", "error");
+            socket.on("error", err => {
+                this.log("An error occured in the BlueBubblesHelper connection! Closing...", "warn");
+                this.log(String(err), "debug");
                 socket.destroy();
             });
         });
@@ -177,8 +174,6 @@ export class PrivateApiService {
             }
         });
     }
-
-    
 
     async onEvent(eventRaw: string): Promise<void> {
         if (eventRaw == null) {
@@ -277,7 +272,7 @@ export class PrivateApiService {
                 }
 
                 // For each ocket client, write data
-                this.writeToClients(`${JSON.stringify(d)}\n`).then((success) => {
+                this.writeToClients(`${JSON.stringify(d)}\n`).then(success => {
                     if (success) return resolve();
                     reject();
                 });
@@ -342,7 +337,7 @@ export class PrivateApiService {
         try {
             this.destroySocketClients();
         } catch (ex: any) {
-            this.log(`Failed to stop Private API Helpers! Error: ${ex.toString()}`, 'debug');
+            this.log(`Failed to stop Private API Helpers! Error: ${ex.toString()}`, "debug");
         }
 
         try {
@@ -354,7 +349,7 @@ export class PrivateApiService {
                 this.server = null;
             }
         } catch (ex: any) {
-            this.log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, 'debug');
+            this.log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, "debug");
         }
 
         await this.mode?.stop();
