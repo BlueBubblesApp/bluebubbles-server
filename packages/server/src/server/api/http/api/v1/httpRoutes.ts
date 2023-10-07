@@ -87,7 +87,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "account",
-                        controller: iCloudRouter.getAccountInfo  
+                        controller: iCloudRouter.getAccountInfo
                     },
                     {
                         method: HttpMethod.GET,
@@ -545,28 +545,28 @@ export class HttpRoutes {
                     }
                 ]
             },
-            {
-                name: "FaceTime",
-                middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
-                prefix: "facetime",
-                routes: [
-                    {
-                        method: HttpMethod.POST,
-                        path: "session",
-                        controller: FaceTimeRouter.newSession
-                    },
-                    {
-                        method: HttpMethod.POST,
-                        path: "answer/:call_uuid",
-                        controller: FaceTimeRouter.answer
-                    },
-                    {
-                        method: HttpMethod.POST,
-                        path: "leave/:call_uuid",
-                        controller: FaceTimeRouter.leave
-                    },
-                ]
-            },
+            // {
+            //     name: "FaceTime",
+            //     middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+            //     prefix: "facetime",
+            //     routes: [
+            //         {
+            //             method: HttpMethod.POST,
+            //             path: "session",
+            //             controller: FaceTimeRouter.newSession
+            //         },
+            //         {
+            //             method: HttpMethod.POST,
+            //             path: "answer/:call_uuid",
+            //             controller: FaceTimeRouter.answer
+            //         },
+            //         {
+            //             method: HttpMethod.POST,
+            //             path: "leave/:call_uuid",
+            //             controller: FaceTimeRouter.leave
+            //         },
+            //     ]
+            // },
             {
                 name: "Contact",
                 middleware: HttpRoutes.protected,
