@@ -93,7 +93,7 @@ export class AppTray extends Tray {
                 label: "Open",
                 type: "normal",
                 click: () => {
-                    if (Server().window) {
+                    if (Server().window && !Server().window.isDestroyed) {
                         Server().window.show();
                     } else {
                         AppWindow.getInstance().setArguments(this.arguments).build();
