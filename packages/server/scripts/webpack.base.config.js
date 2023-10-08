@@ -13,7 +13,9 @@ module.exports = {
     resolve: {
         extensions: [".tsx", ".ts", ".js", ".json"],
         alias: {
-            "@server": path.resolve(__dirname, "../src/server")
+            "@server": path.resolve(__dirname, "../src/server"),
+            "@windows": path.resolve(__dirname, "../src/windows"),
+            "@trays": path.resolve(__dirname, "../src/trays")
         }
     },
     devtool: "source-map",

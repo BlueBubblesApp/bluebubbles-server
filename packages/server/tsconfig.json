@@ -5,6 +5,8 @@
         "paths": {
             "@server": ["server/index"],
             "@server/*": ["server/*"],
+            "@windows/*": ["windows/*"],
+            "@trays/*": ["trays/*"],
         },
         "outDir": "./dist",
         "strictNullChecks": false,
