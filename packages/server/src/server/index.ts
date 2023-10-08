@@ -42,19 +42,8 @@ import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
 
 import { ActionHandler } from "./api/apple/actions";
-import {
-    insertChatParticipants,
-    isEmpty,
-    isNotEmpty,
-    waitMs
-} from "./helpers/utils";
-import {
-    isMinBigSur,
-    isMinHighSierra,
-    isMinMojave,
-    isMinMonterey,
-    isMinSierra
-} from "./env";
+import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
+import { isMinBigSur, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -313,7 +302,7 @@ class BlueBubblesServer extends EventEmitter {
     loadSettingsFromArgs() {
         // This flag is true by default. If it's set to false, all
         // config values will not be stored in teh DB.
-        const persist = this.args['persist-config'] ?? true;
+        const persist = this.args["persist-config"] ?? true;
         this.loadSettingsFromDict(this.args, persist);
     }
 
@@ -334,15 +323,16 @@ class BlueBubblesServer extends EventEmitter {
             // Make sure the value matches the type of the config value
             const configValue = this.repo.config[normalizedKey];
             if (configValue != null && typeof configValue !== typeof value) {
-                Server().log((
+                Server().log(
                     `[ENV] Invalid type for config value "${normalizedKey}"! ` +
-                    `Expected ${typeof configValue}, got ${typeof value}`
-                ), "warn");
+                        `Expected ${typeof configValue}, got ${typeof value}`,
+                    "warn"
+                );
                 continue;
             }
 
             // Set the value
-            Server().log(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug")
+            Server().log(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug");
             this.repo.setConfig(normalizedKey, value, persist);
         }
     }
@@ -373,7 +363,7 @@ class BlueBubblesServer extends EventEmitter {
         IPCService.startIpcListeners();
 
         // Let listeners know the server is ready
-        this.emit('ready');
+        this.emit("ready");
 
         // Do some pre-flight checks
         // Make sure settings are correct and all things are a go
@@ -441,7 +431,6 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
-
     async initServices(): Promise<void> {
         this.initFcm();
 
@@ -508,7 +497,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Only start the oauth service if the tutorial isn't done
         const tutorialDone = this.repo.getConfig("tutorial_is_done") as boolean;
-        const oauthToken = this.args['oauth-token'];
+        const oauthToken = this.args["oauth-token"];
         this.oauthService.initialize();
 
         // If the user passed an oauth token, use that to setup the project
@@ -758,6 +747,11 @@ class BlueBubblesServer extends EventEmitter {
         // Set the dock icon according to the config
         this.setDockIcon();
 
+        const noGpu = Server().repo.getConfig("disable_gpu") ?? false;
+        if (noGpu && !this.args["disable-gpu"]) {
+            this.relaunch();
+        }
+
         // Start minimized if enabled
         const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
         if (startMinimized) {
@@ -899,14 +893,16 @@ class BlueBubblesServer extends EventEmitter {
 
         // Check for contact permissions
         const contactStatus = await requestContactPermission();
-        if (contactStatus === 'Denied') {
+        if (contactStatus === "Denied") {
             this.log(
                 "Contacts authorization status is denied! You may need to manually " +
-                "allow BlueBubbles to access your contacts.", "debug");
+                    "allow BlueBubbles to access your contacts.",
+                "debug"
+            );
         } else {
             this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         }
-        
+
         this.log("Finished post-start checks...");
     }
 
@@ -969,10 +965,10 @@ class BlueBubblesServer extends EventEmitter {
                 // If it's not initialized, we need to initialize it.
                 // Initializing it will also set the server URL
                 if (!this.fcm.hasInitialized) {
-                    Server().log('Initializing FCM for server URL update from config change', 'debug');
+                    Server().log("Initializing FCM for server URL update from config change", "debug");
                     await this.fcm.start();
                 } else {
-                    Server().log('Dispatching server URL update from config change', 'debug');
+                    Server().log("Dispatching server URL update from config change", "debug");
                     await this.fcm.setServerUrl();
                 }
             }
@@ -1587,7 +1583,7 @@ class BlueBubblesServer extends EventEmitter {
         };
 
         // If we are persisting configs, remove any flags that are stored in the DB
-        const persist = this.args['persist-config'] ?? true;
+        const persist = this.args["persist-config"] ?? true;
         if (persist) {
             const configKeys = Object.keys(Server().repo.config);
             for (const key of configKeys) {
@@ -1605,21 +1601,25 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
-
         // Remove the oauth-token flag & value if it exists.
         removeArg("oauth-token");
+
+        // Remove the disable-gpu flag and re-add it if enabled
+        removeArg("disable-gpu");
+        const noGpu = Server().repo.getConfig("disable_gpu") ?? false;
+        if (noGpu) {
+            args.push("--disable-gpu");
+        }
 
         return args;
     }
 
     async relaunch({
-        headless = null,
         exit = true,
         quit = false
     }: {
-        headless?: boolean | null;
-        exit?: boolean,
-        quit?: boolean
+        exit?: boolean;
+        quit?: boolean;
     } = {}) {
         this.isRestarting = true;
 
@@ -1655,7 +1655,7 @@ class BlueBubblesServer extends EventEmitter {
         relaunchArgs = [process.execPath, ...relaunchArgs];
 
         // Kick off the restart script
-        FileSystem.executeAppleScript(runTerminalScript(relaunchArgs.join(' ')));
+        FileSystem.executeAppleScript(runTerminalScript(relaunchArgs.join(" ")));
 
         // Exit the current instance
         app.exit(0);

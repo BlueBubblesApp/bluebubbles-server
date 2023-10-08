@@ -63,6 +63,7 @@ export class AppTray extends Tray {
 
     buildMenu(): Menu {
         const headless = (Server().repo?.getConfig("headless") as boolean) ?? false;
+        const noGpu = (Server().repo?.getConfig("disable_gpu") as boolean) ?? false;
         let updateOpt: any = {
             label: "Check for Updates",
             type: "normal",
@@ -103,7 +104,7 @@ export class AppTray extends Tray {
             updateOpt,
             {
                 // The checkmark will cover when this is enabled
-                label: `Headless Mode${headless ? "" : " (Disabled)"}`,
+                label: `Headless Mode${headless ? " (Click to Disable)" : " (Click to Enable)"}`,
                 type: "checkbox",
                 checked: headless,
                 click: async () => {
@@ -114,6 +115,14 @@ export class AppTray extends Tray {
                     } else if (toggled && Server().window) {
                         Server().window.destroy();
                     }
+                }
+            },
+            {
+                // The checkmark will cover when this is enabled
+                label: noGpu ? "Enable GPU Rendering" : "Disable GPU Rendering",
+                click: async () => {
+                    await Server().repo.setConfig("disable_gpu", !noGpu);
+                    Server().relaunch();
                 }
             },
             {

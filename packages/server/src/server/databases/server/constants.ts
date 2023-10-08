@@ -25,5 +25,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     dock_badge: () => 1,
     start_minimized: () => 0,
     headless: () => 0,
-    private_api_mode: (): 'process-dylib' => 'process-dylib'
+    disable_gpu: () => 0,
+    private_api_mode: (): "process-dylib" => "process-dylib"
 };
