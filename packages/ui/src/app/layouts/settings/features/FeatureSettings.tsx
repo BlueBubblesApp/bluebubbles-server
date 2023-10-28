@@ -17,6 +17,7 @@ import { DockBadgeField } from '../../../components/fields/DockBadgeField';
 import { HideDockIconField } from '../../../components/fields/HideDockIconField';
 import { StartViaTerminalField } from '../../../components/fields/StartViaTerminalField';
 import { StartMinimizedField } from '../../../components/fields/StartMinimizedField';
+import { StartDelayField } from 'app/components/fields/StartDelayField';
 
 
 export const FeatureSettings = (): JSX.Element => {
@@ -35,6 +36,8 @@ export const FeatureSettings = (): JSX.Element => {
                 <DockBadgeField />
                 <Spacer />
                 <HideDockIconField />
+                <Spacer />
+                <StartDelayField />
                 <Spacer />
                 <Accordion allowMultiple>
                     <AccordionItem>

@@ -26,5 +26,9 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     start_minimized: () => 0,
     headless: () => 0,
     disable_gpu: () => 0,
-    private_api_mode: (): "process-dylib" => "process-dylib"
+    private_api_mode: (): "process-dylib" => "process-dylib",
+    // String because we don't handle actual integers well.
+    // That needs to change... at another time.
+    // 0.0 to prevent parsing as a boolean
+    start_delay: () => '0.0',
 };
