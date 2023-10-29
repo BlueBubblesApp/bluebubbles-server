@@ -67,6 +67,7 @@ import { ChangeListener } from "./databases/imessage/listeners/changeListener";
 import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
+import { getStartDelay } from "./utils/ConfigUtils";
 
 const findProcess = require("find-process");
 
@@ -362,16 +363,7 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting IPC Listeners..");
         IPCService.startIpcListeners();
 
-        const startDelayVal: any = (this.repo.getConfig('start_delay') ?? '0');
-        let startDelay = 0;
-        if (typeof startDelayVal === 'boolean' && startDelayVal === true) {
-            startDelay = 1;
-        } else if (typeof startDelayVal === 'boolean' && startDelayVal === false) {
-            startDelay = 0;
-        } else {
-            startDelay = Number.parseInt(startDelayVal);
-        }
-
+        const startDelay: number = getStartDelay();
         if (startDelay > 0) {
             this.log(`Delaying server startup by ${startDelay} seconds`);
             await waitMs(startDelay * 1000);
