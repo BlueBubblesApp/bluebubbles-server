@@ -87,11 +87,19 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "account",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: iCloudRouter.getAccountInfo
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "account/alias",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        controller: iCloudRouter.changeAlias
                     },
                     {
                         method: HttpMethod.GET,
                         path: "contact",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: iCloudRouter.getContactCard
                     },
                     {
@@ -107,6 +115,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "findmy/friends",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: iCloudRouter.friends
                     },
                     {
@@ -223,6 +232,7 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: ":guid/download/force",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [AttachmentValidator.validateDownload],
                         controller: AttachmentRouter.forceDownload
                     },

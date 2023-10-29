@@ -19,4 +19,10 @@ export class PrivateApiCloud extends PrivateApiAction {
         const request = new TransactionPromise(TransactionType.OTHER);
         return this.sendApiMessage(action, null, request);
     }
+
+    async modifyActiveAlias(alias: string): Promise<TransactionResult> {
+        const action = "modify-active-alias";
+        const request = new TransactionPromise(TransactionType.OTHER);
+        return this.sendApiMessage(action, { alias }, request);
+    }
 }

@@ -18,4 +18,14 @@ export class iCloudInterface {
 
         return data.data;
     }
+
+    static async modifyActiveAlias(alias: string) {
+        const accountInfo = await this.getAccountInfo();
+        const aliases = (accountInfo.vetted_aliases ?? []).map((e: any) => e.Alias);
+        if (!aliases.includes(alias)) {
+            throw new Error(`Alias, "${alias}" is not assigned/enabled for your iCloud account!`);
+        }
+
+        await Server().privateApi.cloud.modifyActiveAlias(alias);
+    }
 }

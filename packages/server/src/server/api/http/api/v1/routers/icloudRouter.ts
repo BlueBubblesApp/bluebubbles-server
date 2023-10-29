@@ -64,4 +64,14 @@ export class iCloudRouter {
             throw new ServerError({ message: "Failed to fetch contact card!", error: ex?.message ?? ex.toString() });
         }
     }
+
+    static async changeAlias(ctx: RouterContext, _: Next) {
+        try {
+            const { alias } = ctx?.request?.body ?? {};
+            const data: any = await iCloudInterface.modifyActiveAlias(alias);
+            return new Success(ctx, { message: "Successfully changed iMessage Alias!", data }).send();
+        } catch (ex: any) {
+            throw new ServerError({ message: "Failed to change iMessage Alias", error: ex?.message ?? ex.toString() });
+        }
+    }
 }
