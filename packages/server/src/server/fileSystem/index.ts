@@ -695,4 +695,8 @@ export class FileSystem {
 
         return addresses;
     }
+
+    static async killProcess(name: string): Promise<void> {
+        await FileSystem.execShellCommand(`killall "${name}"`);
+    }
 }

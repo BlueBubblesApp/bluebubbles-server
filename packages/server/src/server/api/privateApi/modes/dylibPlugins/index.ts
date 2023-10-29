@@ -21,10 +21,13 @@ export abstract class DylibPlugin {
 
     abstract get dylibPath(): string;
 
-    abstract stopParentProcess(): Promise<void>;
-
     constructor(name: string) {
         this.name = name;
+    }
+
+    async stopParentProcess(): Promise<void> {
+        Server().log(`Killing process: ${this.parentApp}`, "debug");
+        await FileSystem.killProcess(this.parentApp);
     }
 
     get parentProcessPath(): string | null {

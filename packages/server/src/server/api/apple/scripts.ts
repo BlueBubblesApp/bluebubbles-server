@@ -92,20 +92,6 @@ export const startMessages = () => {
 };
 
 /**
- *  AppleScript to stop the Messages app
- */
-export const stopFaceTime = () => {
-    return stopApp("FaceTime");
-};
-
-/**
- * AppleScript to stop the FaceTime app
- */
-export const stopMessages = () => {
-    return stopApp("Messages");
-};
-
-/**
  * The AppleScript used to hide an app
  */
 export const hideApp = (appName: string) => {
