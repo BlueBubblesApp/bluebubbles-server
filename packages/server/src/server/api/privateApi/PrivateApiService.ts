@@ -171,6 +171,7 @@ export class PrivateApiService {
                 this.start();
             } else {
                 this.log("Max restart count reached for Private API listener...");
+                this.stop();
             }
         });
     }

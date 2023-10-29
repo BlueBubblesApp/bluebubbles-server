@@ -142,7 +142,7 @@ export const Navigation = (): JSX.Element => {
 
             <Drawer onClose={() => closeNotification(onNotificationClose, dispatch)} isOpen={isNotificationsOpen} size="lg">
                 <DrawerOverlay />
-                <DrawerContent>
+                <DrawerContent  maxW={'min-content'}>
                     <DrawerHeader>Notifications / Alerts ({unreadCount})</DrawerHeader>
                     <DrawerBody>
                         <Menu>
