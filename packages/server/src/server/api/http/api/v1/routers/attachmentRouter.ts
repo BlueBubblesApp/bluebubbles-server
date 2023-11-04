@@ -10,7 +10,7 @@ import { convertAudio, convertImage } from "@server/databases/imessage/helpers/u
 import { isEmpty, isTruthyBool, resultAwaiter } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/interfaces/attachmentInterface";
 import { FileStream, Success } from "../responses/success";
-import { NotFound, ServerError } from "../responses/errors";
+import { BadRequest, NotFound, ServerError } from "../responses/errors";
 import { AttachmentSerializer } from "@server/api/serializers/AttachmentSerializer";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
@@ -172,10 +172,15 @@ export class AttachmentRouter {
 
     static async forceDownload(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
+        let attachment = await Server().iMessageRepo.getAttachment(guid);
+        if (!attachment) {
+            throw new BadRequest({ message: `An attachment with the GUID, "${guid}" does not exist!` })
+        }
+
         await Server().privateApi.attachment.downloadPurged(guid);
 
         // Wait a max of 10 minutes
-        const attachment: Attachment = await resultAwaiter({
+        attachment = await resultAwaiter({
             maxWaitMs: 1000 * 60 * 10,
             initialWaitMs: 1000 * 5,
             waitMultiplier: 1,
