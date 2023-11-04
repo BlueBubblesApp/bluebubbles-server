@@ -134,7 +134,6 @@ export class HttpRoutes {
                 name: "Server",
                 middleware: HttpRoutes.protected,
                 prefix: "server",
-                responseTimeoutMs: 30 * 1000,
                 routes: [
                     {
                         method: HttpMethod.GET,
