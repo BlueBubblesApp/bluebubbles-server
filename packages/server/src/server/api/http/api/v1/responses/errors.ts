@@ -86,6 +86,20 @@ export class ServerError extends HTTPError {
     }
 }
 
+export class GatewayTimeout extends HTTPError {
+    constructor(response?: ResponseParams) {
+        super({
+            status: 504,
+            message: response?.message ?? `The server took too long to response!`,
+            error: {
+                type: ErrorTypes.GATEWAY_TIMEOUT,
+                message: response?.error ?? ResponseMessages.GATEWAY_TIMEOUT
+            },
+            data: response?.data
+        });
+    }
+}
+
 export class IMessageError extends HTTPError {
     constructor(response?: ResponseParams) {
         super({

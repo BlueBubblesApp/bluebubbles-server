@@ -22,6 +22,8 @@ export type HttpRoute = {
     middleware?: KoaMiddleware[];
     validators?: KoaMiddleware[];
     controller: KoaMiddleware;
+    requestTimeoutMs?: number;
+    responseTimeoutMs?: number;
 };
 
 export type HttpRouteGroup = {
@@ -29,6 +31,8 @@ export type HttpRouteGroup = {
     prefix?: string | null;
     middleware?: KoaMiddleware[];
     routes: HttpRoute[];
+    requestTimeoutMs?: number;
+    responseTimeoutMs?: number;
 };
 
 export type KoaNext = () => Promise<any>;

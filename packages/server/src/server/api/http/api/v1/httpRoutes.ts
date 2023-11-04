@@ -18,7 +18,6 @@ import { UiRouter } from "./routers/uiRouter";
 import { SettingsRouter } from "./routers/settingsRouter";
 import { ContactRouter } from "./routers/contactRouter";
 import { MetricsMiddleware } from "./middleware/metricsMiddleware";
-import { TimeoutMiddleware } from "./middleware/timeoutMiddleware";
 import { LogMiddleware } from "./middleware/logMiddleware";
 import { ErrorMiddleware } from "./middleware/errorMiddleware";
 import { MacOsRouter } from "./routers/macosRouter";
@@ -36,16 +35,21 @@ import { AlertsValidator } from "./validators/alertsValidator";
 import { ScheduledMessageValidator } from "./validators/scheduledMessageValidator";
 import { ScheduledMessageRouter } from "./routers/scheduledMessageRouter";
 import { ThemeValidator } from "./validators/themeValidator";
+import type { Context, Next } from "koa";
 
 export class HttpRoutes {
     static version = 1;
+
+    static defaultRequestTimeout = 60 * 1000;  // 1 minute
+
+    static defaultResponseTimeout = 5 * 60 * 1000; // 5 minutes
 
     private static get protected() {
         return [...HttpRoutes.unprotected, AuthMiddleware];
     }
 
     private static get unprotected() {
-        return [MetricsMiddleware, ErrorMiddleware, LogMiddleware, TimeoutMiddleware];
+        return [MetricsMiddleware, ErrorMiddleware, LogMiddleware];
     }
 
     static api: HttpDefinition = {
@@ -66,6 +70,7 @@ export class HttpRoutes {
                 name: "macOS",
                 middleware: HttpRoutes.protected,
                 prefix: "mac",
+                responseTimeoutMs: 30 * 1000,
                 routes: [
                     {
                         method: HttpMethod.POST,
@@ -88,7 +93,7 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: "account",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
-                        controller: iCloudRouter.getAccountInfo
+                        controller: iCloudRouter.getAccountInfo,
                     },
                     {
                         method: HttpMethod.POST,
@@ -129,6 +134,7 @@ export class HttpRoutes {
                 name: "Server",
                 middleware: HttpRoutes.protected,
                 prefix: "server",
+                responseTimeoutMs: 30 * 1000,
                 routes: [
                     {
                         method: HttpMethod.GET,
@@ -158,7 +164,9 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: "update/install",
-                        controller: ServerRouter.installUpdate
+                        controller: ServerRouter.installUpdate,
+                        // 30 minute timeout in the case that they want to wait for the install to complete
+                        responseTimeoutMs: 30 * 60 * 1000,
                     },
                     {
                         method: HttpMethod.GET,
@@ -221,20 +229,28 @@ export class HttpRoutes {
                         path: "upload",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [AttachmentValidator.validateUpload],
-                        controller: AttachmentRouter.uploadAttachment
+                        controller: AttachmentRouter.uploadAttachment,
+                        // 30 minute timeout for uploads
+                        requestTimeoutMs: 30 * 60 * 1000,
                     },
                     {
                         method: HttpMethod.GET,
                         path: ":guid/download",
                         validators: [AttachmentValidator.validateDownload],
-                        controller: AttachmentRouter.download
+                        controller: AttachmentRouter.download,
+                        // 30 minute timeout for this to account for people on slow connections
+                        responseTimeoutMs: 30 * 60 * 1000,
                     },
                     {
                         method: HttpMethod.GET,
                         path: ":guid/download/force",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [AttachmentValidator.validateDownload],
-                        controller: AttachmentRouter.forceDownload
+                        controller: AttachmentRouter.forceDownload,
+                        // 60 minute timeout for this to account for people on slow connections.
+                        // Since a "force" means the attachment isnt already downloaded, give it
+                        // double the time. The client can timeout if it pleases.
+                        responseTimeoutMs: 60 * 60 * 1000,
                     },
                     {
                         method: HttpMethod.GET,
@@ -245,7 +261,9 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: ":guid/live",
-                        controller: AttachmentRouter.downloadLive
+                        controller: AttachmentRouter.downloadLive,
+                        // 30 minute timeout for this to account for people on slow connections
+                        responseTimeoutMs: 30 * 60 * 1000,
                     },
                     {
                         method: HttpMethod.GET,
@@ -359,7 +377,7 @@ export class HttpRoutes {
                         path: ":guid/icon",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateGroupChatIcon],
-                        controller: ChatRouter.setGroupChatIcon
+                        controller: ChatRouter.setGroupChatIcon,
                     },
                     {
                         method: HttpMethod.DELETE,
@@ -590,7 +608,9 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.POST,
                         path: "",
-                        controller: ContactRouter.create
+                        controller: ContactRouter.create,
+                        // Increase the timeout to 5 minutes for requests in case there are avatars
+                        requestTimeoutMs: 5 * 60 * 1000,
                     },
                     {
                         method: HttpMethod.POST,
@@ -686,8 +706,62 @@ export class HttpRoutes {
         }
     }
 
+    private static TimeoutMiddleware(requestTimeoutMs: number, responseTimeoutMs: number) {
+        return async (ctx: Context, next: Next) => {
+
+            ctx.req.setTimeout(requestTimeoutMs, () => {
+                ctx.status = 504;
+                ctx.set("Content-Type", "application/json");
+                ctx.res.end(JSON.stringify({
+                    status: 504,
+                    message: `The request timed-out after ${requestTimeoutMs} ms!`,
+                    error: {
+                        type: "Gateway Timeout",
+                        message: "The data in your request took too long to get to the server!"
+                    }
+                }));
+            });
+
+            ctx.res.setTimeout(responseTimeoutMs, () => {
+                ctx.status = 504;
+                ctx.set("Content-Type", "application/json");
+                ctx.res.end(JSON.stringify({
+                    status: 504,
+                    message: `The request timed-out after ${responseTimeoutMs}!`,
+                    error: {
+                        type: "Gateway Timeout",
+                        message: "The server took too long to respond and has timed-out!"
+                    }
+                }));
+            });
+
+            await next();
+        }
+    };
+
     private static buildMiddleware(group: HttpRouteGroup, route: HttpRoute) {
-        return [...(route?.middleware ?? group.middleware ?? []), ...(route.validators ?? []), route.controller];
+        let reqTimeout = this.defaultRequestTimeout;
+        let resTimeout = this.defaultResponseTimeout;
+
+        // Prioritize the route timeout over the group timeout
+        if (route.requestTimeoutMs && route.requestTimeoutMs > 0) {
+            reqTimeout = route.requestTimeoutMs;
+        } else if (group.requestTimeoutMs && group.requestTimeoutMs > 0) {
+            reqTimeout = group.requestTimeoutMs;
+        }
+
+         // Prioritize the route timeout over the group timeout
+         if (route.responseTimeoutMs && route.responseTimeoutMs > 0) {
+            resTimeout = route.responseTimeoutMs;
+        } else if (group.responseTimeoutMs && group.responseTimeoutMs > 0) {
+            resTimeout = group.responseTimeoutMs;
+        }
+
+        return [
+            ...(route?.middleware ?? group.middleware ?? []),
+            this.TimeoutMiddleware(reqTimeout, resTimeout),
+            ...(route.validators ?? []), route.controller
+        ];
     }
 
     private static registerRoute(
