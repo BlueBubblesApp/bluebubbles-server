@@ -5,6 +5,7 @@ import { ServerError } from "../responses/errors";
 import { FindMyService } from "@server/services/findMyService";
 import { iCloudInterface } from "@server/api/interfaces/iCloudInterface";
 import { findMyInterface } from "@server/api/interfaces/findMyInterface";
+import { isMinBigSur } from "@server/env";
 
 export class iCloudRouter {
     static async refreshDevices(ctx: RouterContext, _: Next) {
@@ -48,6 +49,10 @@ export class iCloudRouter {
     }
 
     static async getAccountInfo(ctx: RouterContext, _: Next) {
+        if (!isMinBigSur) {
+            throw new Error("This API is only available on macOS Big Sur and newer!");
+        }
+
         try {
             const data: any = await iCloudInterface.getAccountInfo();
             return new Success(ctx, { message: "Successfully fetched account info!", data }).send();
