@@ -5,11 +5,12 @@ import { DylibPlugin } from "./dylibPlugins";
 import { MessagesDylibPlugin } from "./dylibPlugins/MessagesDylibPlugin";
 import { FaceTimeDylibPlugin } from "./dylibPlugins/FaceTimeDylibPlugin";
 import { Server } from "@server";
+import { isMinBigSur } from "@server/env";
 
 export class ProcessDylibMode extends PrivateApiMode {
     static plugins: DylibPlugin[] = [
         new MessagesDylibPlugin("Messages Helper"),
-        new FaceTimeDylibPlugin("FaceTime Helper")
+        ...isMinBigSur ? [new FaceTimeDylibPlugin("FaceTime Helper")] : []
     ];
 
     static async install() {
