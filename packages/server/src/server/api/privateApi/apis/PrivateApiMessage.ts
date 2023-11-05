@@ -1,4 +1,3 @@
-import { Server } from "@server";
 import {
     TransactionPromise,
     TransactionResult,
@@ -6,6 +5,7 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 import type { ValidTapback, ValidRemoveTapback } from "@server/types";
+import { isMinCatalina } from "@server/env";
 
 
 export class PrivateApiMessage extends PrivateApiAction {
@@ -23,20 +23,22 @@ export class PrivateApiMessage extends PrivateApiAction {
         const action = "send-message";
         this.throwForNoMissingFields(action, [chatGuid, message]);
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.sendApiMessage(
-            "send-message",
-            {
-                chatGuid,
-                subject,
-                message,
-                attributedBody,
-                effectId,
-                selectedMessageGuid,
-                partIndex,
-                ddScan: ddScan ? 1 : 0
-            },
-            request
-        );
+
+        const data: any = {
+            chatGuid,
+            subject,
+            message,
+            attributedBody,
+            effectId,
+            selectedMessageGuid,
+            partIndex
+        };
+
+        if (isMinCatalina) {
+            data.ddScan = ddScan ? 1 : 0
+        }
+
+        return this.sendApiMessage("send-message", data, request);
     }
 
     async sendMultipart(
@@ -52,20 +54,22 @@ export class PrivateApiMessage extends PrivateApiAction {
         const action = "send-multipart";
         this.throwForNoMissingFields(action, [chatGuid, parts]);
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.sendApiMessage(
-            action,
-            {
-                chatGuid,
-                subject,
-                parts,
-                attributedBody,
-                effectId,
-                selectedMessageGuid,
-                partIndex,
-                ddScan: ddScan ? 1 : 0
-            },
-            request
-        );
+
+        const data: any = {
+            chatGuid,
+            subject,
+            parts,
+            attributedBody,
+            effectId,
+            selectedMessageGuid,
+            partIndex
+        };
+
+        if (isMinCatalina) {
+            data.ddScan = ddScan ? 1 : 0
+        }
+
+        return this.sendApiMessage(action, data, request);
     }
 
     async react(
