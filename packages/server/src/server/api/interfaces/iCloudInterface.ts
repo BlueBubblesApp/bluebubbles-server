@@ -1,14 +1,23 @@
 import { Server } from "@server";
+import { isMinBigSur, isMinHighSierra } from "@server/env";
 import { isNotEmpty } from "@server/helpers/utils";
 import { bytesToBase64 } from "byte-base64";
 
 export class iCloudInterface {
     static async getAccountInfo() {
+        if (!isMinHighSierra) {
+            throw new Error("This API is only available on macOS Big Sur and newer!");
+        }
+
         const data = await Server().privateApi.cloud.getAccountInfo();
         return data.data;
     }
 
     static async getContactCard(loadAvatar = true) {
+        if (!isMinBigSur) {
+            throw new Error("This API is only available on macOS Monterey and newer!");
+        }
+
         const data = await Server().privateApi.cloud.getContactCard();
         const avatarPath = data?.data?.avatar_path;
         if (isNotEmpty(avatarPath) && loadAvatar) {
