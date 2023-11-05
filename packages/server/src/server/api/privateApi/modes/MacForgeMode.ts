@@ -136,14 +136,21 @@ export class MacForgeMode extends PrivateApiMode {
         ];
 
         for (const pluginPath of opts) {
-            if (!fs.existsSync(pluginPath)) continue;
+            if (!fs.existsSync(pluginPath)) {
+                Server().log(`Plugin directory not found: ${pluginPath}`, 'debug');
+                continue;
+            }
 
             const remotePath = path.join(pluginPath, "BlueBubblesHelper.bundle");
 
             try {
                 // If the remote bundle doesn't exist, we just need to write it
+                Server().log(`Looking for deprecated Helper Bundle at: ${remotePath}`, 'debug');
                 if (fs.existsSync(remotePath)) {
-                    fs.rm(remotePath, { recursive: true, force: true });
+                    await fs.rm(remotePath, { recursive: true, force: true });
+                    Server().log(`  -> Removed deprecated Helper`, 'debug');
+                } else {
+                    Server().log('  -> Helper Bundle not found', 'debug');
                 }
             } catch (ex: any) {
                 Server().log((
