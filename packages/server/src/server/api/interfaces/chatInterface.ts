@@ -348,7 +348,8 @@ export class ChatInterface {
         const retChat = await resultAwaiter({
             maxWaitMs,
             getData: async (previousData: any | null) => {
-                const chats = await Server().iMessageRepo.getChats({ chatGuid: chat.guid, withParticipants: true });
+                const [chats, _] = await Server().iMessageRepo.getChats(
+                    { chatGuid: chat.guid, withParticipants: true });
                 return chats[0] ?? previousData;
             },
             // Keep looping if the participant count is the same as before
