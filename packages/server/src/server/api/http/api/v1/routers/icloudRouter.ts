@@ -58,7 +58,8 @@ export class iCloudRouter {
 
     static async getContactCard(ctx: RouterContext, _: Next) {
         try {
-            const data: any = await iCloudInterface.getContactCard();
+            const { address } = ctx.request.query;
+            const data: any = await iCloudInterface.getContactCard(address as string);
             return new Success(ctx, { message: "Successfully fetched contact card!", data }).send();
         } catch (ex: any) {
             throw new ServerError({ message: "Failed to fetch contact card!", error: ex?.message ?? ex.toString() });

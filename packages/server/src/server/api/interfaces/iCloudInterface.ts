@@ -13,12 +13,12 @@ export class iCloudInterface {
         return data.data;
     }
 
-    static async getContactCard(loadAvatar = true) {
+    static async getContactCard(address: string = null, loadAvatar = true) {
         if (!isMinBigSur) {
             throw new Error("This API is only available on macOS Monterey and newer!");
         }
 
-        const data = await Server().privateApi.cloud.getContactCard();
+        const data = await Server().privateApi.cloud.getContactCard(address);
         const avatarPath = data?.data?.avatar_path;
         if (isNotEmpty(avatarPath) && loadAvatar) {
             data.data.avatar = bytesToBase64(fs.readFileSync(avatarPath));

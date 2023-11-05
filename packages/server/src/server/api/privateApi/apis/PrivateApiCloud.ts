@@ -14,10 +14,10 @@ export class PrivateApiCloud extends PrivateApiAction {
         return this.sendApiMessage(action, null, request);
     }
 
-    async getContactCard(): Promise<TransactionResult> {
+    async getContactCard(address: string = null): Promise<TransactionResult> {
         const action = "get-nickname-info";
         const request = new TransactionPromise(TransactionType.OTHER);
-        return this.sendApiMessage(action, null, request);
+        return this.sendApiMessage(action, { address }, request);
     }
 
     async modifyActiveAlias(alias: string): Promise<TransactionResult> {
