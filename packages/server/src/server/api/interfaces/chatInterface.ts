@@ -497,6 +497,7 @@ export class ChatInterface {
 
     static async canShareContactInfo(chatGuid: string): Promise<boolean> {
         checkPrivateApiStatus();
+        if (!isMinBigSur) throw new Error("Contact sharing is only supported on macOS Big Sur or newer!");
         const result = await Server().privateApi.chat.shouldOfferContactSharing(chatGuid);
         if (result?.data?.share == null) throw new Error("Failed to check if contact sharing is available!");
         return result.data.share;
@@ -504,6 +505,7 @@ export class ChatInterface {
 
     static async shareContactInfo(chatGuid: string): Promise<void> {
         checkPrivateApiStatus();
+        if (!isMinBigSur) throw new Error("Contact sharing is only supported on macOS Big Sur or newer!");
         await Server().privateApi.chat.shareContactCard(chatGuid);
     }
 }
