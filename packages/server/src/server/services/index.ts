@@ -12,6 +12,7 @@ import { WebhookService } from "./webhookService";
 import { FindMyService } from "./findMyService";
 import { ScheduledMessagesService } from "./scheduledMessagesService";
 import { OauthService } from "./oauthService";
+import { RemoteConfigService } from "./remoteConfigService";
 
 export {
     FCMService,
@@ -27,5 +28,6 @@ export {
     WebhookService,
     FindMyService,
     ScheduledMessagesService,
-    OauthService
+    OauthService,
+    RemoteConfigService
 };
