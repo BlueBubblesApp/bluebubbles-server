@@ -12,12 +12,11 @@ import {
     parseMetadataString,
     isNotEmpty,
     isEmpty,
-    safeTrim,
-    isMinMonterey
-} from "@server/helpers/utils";
+    safeTrim} from "@server/helpers/utils";
+import { isMinMonterey } from "@server/env";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
-import { startMessages } from "../api/v1/apple/scripts";
+import { startMessages } from "../api/apple/scripts";
 import {
     AudioMetadata,
     AudioMetadataKeys,
@@ -122,6 +121,10 @@ export class FileSystem {
     public static get fcmServerPath(): string {
         const fcmServer = Server().args['fcm-server'];
         return fcmServer ?? path.join(FileSystem.fcmDir, "server.json");
+    }
+
+    public static async getUserConfDir(): Promise<string> {
+        return (await FileSystem.execShellCommand(`/usr/bin/getconf DARWIN_USER_DIR`)).trim();
     }
 
     /**
@@ -691,5 +694,9 @@ export class FileSystem {
         }
 
         return addresses;
+    }
+
+    static async killProcess(name: string): Promise<void> {
+        await FileSystem.execShellCommand(`killall "${name}"`);
     }
 }

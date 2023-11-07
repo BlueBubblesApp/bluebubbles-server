@@ -28,9 +28,7 @@ import {
 import {
     Pagination,
     usePagination,
-    PaginationNext,
     PaginationPage,
-    PaginationPrevious,
     PaginationContainer,
     PaginationPageGroup,
 } from '@ajna/pagination';
@@ -44,6 +42,8 @@ import { FiTrash } from 'react-icons/fi';
 import { ConfirmationItems, showSuccessToast } from 'app/utils/ToastUtils';
 import { ConfirmationDialog } from 'app/components/modals/ConfirmationDialog';
 import { waitMs } from 'app/utils/GenericUtils';
+import { PaginationPreviousButton } from 'app/components/buttons/PaginationPreviousButton';
+import { PaginationNextButton } from 'app/components/buttons/PaginationNextButton';
 
 const perPage = 25;
 
@@ -104,7 +104,7 @@ export const ContactsLayout = (): JSX.Element => {
 
     const requestContactPermission = async (): Promise<void> => {
         setPermission(null);
-        ipcRenderer.invoke('request-contact-permission').then((status: string) => {
+        ipcRenderer.invoke('request-contact-permission', true).then((status: string) => {
             setPermission(status);
         }).catch(() => {
             setPermission('Unknown');
@@ -405,7 +405,7 @@ export const ContactsLayout = (): JSX.Element => {
                         w="full"
                         pt={2}
                     >
-                        <PaginationPrevious minWidth={'75px'} colorScheme='gray' color='black'>Previous</PaginationPrevious>
+                        <PaginationPreviousButton />
                         <Box ml={1}></Box>
                         <PaginationPageGroup flexWrap="wrap" justifyContent="center">
                             {pages.map((page: number) => (
@@ -421,7 +421,7 @@ export const ContactsLayout = (): JSX.Element => {
                             ))}
                         </PaginationPageGroup>
                         <Box ml={1}></Box>
-                        <PaginationNext minWidth={'50px'} colorScheme='gray' color='black'>Next</PaginationNext>
+                        <PaginationNextButton />
                     </PaginationContainer>
                 </Pagination>
             </Stack>

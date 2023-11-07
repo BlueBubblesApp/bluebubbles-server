@@ -1,8 +1,9 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 import { BooleanTransformer } from "@server/databases/transformers/BooleanTransformer";
-import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
+import { MessagesDateTransformer } from "@server/databases/transformers/MessagesDateTransformer";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { isMinSierra, isMinHighSierra, isEmpty } from "@server/helpers/utils";
+import { isEmpty } from "@server/helpers/utils";
+import { isMinSierra, isMinHighSierra } from "@server/env";
 import { conditional } from "conditional-decorator";
 import * as mime from "mime-types";
 import { FileSystem } from "@server/fileSystem";
@@ -28,7 +29,7 @@ export class Attachment {
         type: "integer",
         name: "created_date",
         default: 0,
-        transformer: AppleDateTransformer
+        transformer: MessagesDateTransformer
     })
     createdDate: Date;
 
@@ -36,7 +37,7 @@ export class Attachment {
         type: "integer",
         name: "start_date",
         default: 0,
-        transformer: AppleDateTransformer
+        transformer: MessagesDateTransformer
     })
     startDate: Date;
 

@@ -1,8 +1,7 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
 import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
-import fs from "fs";
-import ServerLog from "electron-log";
+import ServerLog, { LogLevel } from "electron-log";
 import process from "process";
 import path from "path";
 import os from "os";
@@ -26,7 +25,6 @@ import { Message } from "@server/databases/imessage/entity/Message";
 
 // Service Imports
 import {
-    HttpService,
     FCMService,
     CaffeinateService,
     NgrokService,
@@ -37,31 +35,21 @@ import {
     UpdateService,
     CloudflareService,
     WebhookService,
-    FacetimeService,
     ScheduledMessagesService,
     OauthService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { runTerminalScript, openSystemPreferences } from "@server/api/v1/apple/scripts";
+import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
 
-import { ActionHandler } from "./api/v1/apple/actions";
-import {
-    insertChatParticipants,
-    isEmpty,
-    isMinBigSur,
-    isMinHighSierra,
-    isMinMojave,
-    isMinMonterey,
-    isMinSierra,
-    isNotEmpty,
-    waitMs
-} from "./helpers/utils";
+import { ActionHandler } from "./api/apple/actions";
+import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
+import { isMinBigSur, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
-import { PrivateApiService } from "./services/privateApi/PrivateApiService";
+import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
 import { requestContactPermission } from "./utils/PermissionUtils";
-import { AlertsInterface } from "./api/v1/interfaces/alertsInterface";
-import { MessageSerializer } from "./api/v1/serializers/MessageSerializer";
+import { AlertsInterface } from "./api/interfaces/alertsInterface";
+import { MessageSerializer } from "./api/serializers/MessageSerializer";
 import {
     CHAT_READ_STATUS_CHANGED,
     GROUP_ICON_CHANGED,
@@ -77,12 +65,13 @@ import {
 import { ChatUpdateListener } from "./databases/imessage/listeners/chatUpdateListener";
 import { ChangeListener } from "./databases/imessage/listeners/changeListener";
 import { Chat } from "./databases/imessage/entity/Chat";
+import { HttpService } from "./api/http";
+import { Alert } from "./databases/server/entity";
+import { getStartDelay } from "./utils/ConfigUtils";
 
 const findProcess = require("find-process");
 
 const osVersion = macosVersion();
-
-const facetimeServiceEnabled = true;
 
 // Set the log format
 const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
@@ -134,8 +123,6 @@ class BlueBubblesServer extends EventEmitter {
     privateApi: PrivateApiService;
 
     fcm: FCMService;
-
-    facetime: FacetimeService;
 
     networkChecker: NetworkService;
 
@@ -232,7 +219,6 @@ class BlueBubblesServer extends EventEmitter {
         this.httpService = null;
         this.privateApi = null;
         this.fcm = null;
-        this.facetime = null;
         this.caffeinate = null;
         this.networkChecker = null;
         this.queue = null;
@@ -271,7 +257,7 @@ class BlueBubblesServer extends EventEmitter {
      * @param message The message to print
      * @param type The log type
      */
-    log(message: any, type?: "log" | "error" | "warn" | "debug") {
+    log(message: any, type?: LogLevel) {
         switch (type) {
             case "error":
                 ServerLog.error(message);
@@ -286,7 +272,7 @@ class BlueBubblesServer extends EventEmitter {
                 AlertsInterface.create("warn", message);
                 this.notificationCount += 1;
                 break;
-            case "log":
+            case "info":
             default:
                 ServerLog.log(message);
         }
@@ -317,7 +303,7 @@ class BlueBubblesServer extends EventEmitter {
     loadSettingsFromArgs() {
         // This flag is true by default. If it's set to false, all
         // config values will not be stored in teh DB.
-        const persist = this.args['persist-config'] ?? true;
+        const persist = this.args["persist-config"] ?? true;
         this.loadSettingsFromDict(this.args, persist);
     }
 
@@ -338,15 +324,16 @@ class BlueBubblesServer extends EventEmitter {
             // Make sure the value matches the type of the config value
             const configValue = this.repo.config[normalizedKey];
             if (configValue != null && typeof configValue !== typeof value) {
-                Server().log((
+                Server().log(
                     `[ENV] Invalid type for config value "${normalizedKey}"! ` +
-                    `Expected ${typeof configValue}, got ${typeof value}`
-                ), "warn");
+                        `Expected ${typeof configValue}, got ${typeof value}`,
+                    "warn"
+                );
                 continue;
             }
 
             // Set the value
-            Server().log(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug")
+            Server().log(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug");
             this.repo.setConfig(normalizedKey, value, persist);
         }
     }
@@ -376,8 +363,14 @@ class BlueBubblesServer extends EventEmitter {
         this.log("Starting IPC Listeners..");
         IPCService.startIpcListeners();
 
+        const startDelay: number = getStartDelay();
+        if (startDelay > 0) {
+            this.log(`Delaying server startup by ${startDelay} seconds`);
+            await waitMs(startDelay * 1000);
+        }
+
         // Let listeners know the server is ready
-        this.emit('ready');
+        this.emit("ready");
 
         // Do some pre-flight checks
         // Make sure settings are correct and all things are a go
@@ -445,7 +438,6 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
-
     async initServices(): Promise<void> {
         this.initFcm();
 
@@ -490,13 +482,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Initializing Facetime service...");
-            this.facetime = new FacetimeService();
-        } catch (ex: any) {
-            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
-        }
-
-        try {
             this.log("Initializing Scheduled Messages Service...");
             this.scheduledMessages = new ScheduledMessagesService();
         } catch (ex: any) {
@@ -519,7 +504,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Only start the oauth service if the tutorial isn't done
         const tutorialDone = this.repo.getConfig("tutorial_is_done") as boolean;
-        const oauthToken = this.args['oauth-token'];
+        const oauthToken = this.args["oauth-token"];
         this.oauthService.initialize();
 
         // If the user passed an oauth token, use that to setup the project
@@ -551,14 +536,6 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Failed to start Scheduled Messages service! ${ex.message}`, "error");
         }
 
-        try {
-            if (facetimeServiceEnabled) {
-                this.startFacetimeListener();
-            }
-        } catch (ex: any) {
-            this.log(`Failed to start Facetime service! ${ex.message}`, "error");
-        }
-
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         if (privateApiEnabled) {
             this.log("Starting Private API Helper listener...");
@@ -569,21 +546,6 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Starting iMessage Database listeners...");
             await this.startChatListeners();
         }
-    }
-
-    startFacetimeListener() {
-        this.log("Starting Facetime service...");
-        this.facetime.listen().catch(ex => {
-            if (ex.message.includes("assistive access")) {
-                this.log(
-                    "Failed to start Facetime service! Please enable Accessibility permissions " +
-                        "for BlueBubbles in System Preferences > Security & Privacy > Privacy > Accessibility",
-                    "error"
-                );
-            } else {
-                this.log(`Failed to start Facetime service! ${ex.message}`, "error");
-            }
-        });
     }
 
     async stopServices(): Promise<void> {
@@ -625,12 +587,6 @@ class BlueBubblesServer extends EventEmitter {
             await this.oauthService?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop OAuth service! ${ex?.message ?? ex}`, "error");
-        }
-
-        try {
-            this.facetime?.stop();
-        } catch (ex: any) {
-            this.log(`Failed to stop Facetime service! ${ex?.message ?? ex}`, "error");
         }
 
         try {
@@ -726,7 +682,7 @@ class BlueBubblesServer extends EventEmitter {
         // Load notification count
         try {
             this.log("Initializing alert service...");
-            const alerts = (await AlertsInterface.find()).filter(item => !item.isRead);
+            const alerts = (await AlertsInterface.find()).filter((item: Alert) => !item.isRead);
             this.notificationCount = alerts.length;
         } catch (ex: any) {
             this.log("Failed to get initial notification count. Skipping.", "warn");
@@ -797,6 +753,11 @@ class BlueBubblesServer extends EventEmitter {
 
         // Set the dock icon according to the config
         this.setDockIcon();
+
+        const noGpu = Server().repo.getConfig("disable_gpu") ?? false;
+        if (noGpu && !this.args["disable-gpu"]) {
+            this.relaunch();
+        }
 
         // Start minimized if enabled
         const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
@@ -939,7 +900,16 @@ class BlueBubblesServer extends EventEmitter {
 
         // Check for contact permissions
         const contactStatus = await requestContactPermission();
-        this.log(`Contacts authorization status: ${contactStatus}`, "debug");
+        if (contactStatus === "Denied") {
+            this.log(
+                "Contacts authorization status is denied! You may need to manually " +
+                    "allow BlueBubbles to access your contacts.",
+                "debug"
+            );
+        } else {
+            this.log(`Contacts authorization status: ${contactStatus}`, "debug");
+        }
+
         this.log("Finished post-start checks...");
     }
 
@@ -1002,10 +972,10 @@ class BlueBubblesServer extends EventEmitter {
                 // If it's not initialized, we need to initialize it.
                 // Initializing it will also set the server URL
                 if (!this.fcm.hasInitialized) {
-                    Server().log('Initializing FCM for server URL update from config change', 'debug');
+                    Server().log("Initializing FCM for server URL update from config change", "debug");
                     await this.fcm.start();
                 } else {
-                    Server().log('Dispatching server URL update from config change', 'debug');
+                    Server().log("Dispatching server URL update from config change", "debug");
                     await this.fcm.setServerUrl();
                 }
             }
@@ -1065,15 +1035,6 @@ class BlueBubblesServer extends EventEmitter {
                 Server().caffeinate.start();
             } else {
                 Server().caffeinate.stop();
-            }
-        }
-
-        // Handle change in facetime service toggle
-        if (prevConfig.facetime_detection !== nextConfig.facetime_detection) {
-            if (nextConfig.facetime_detection) {
-                this.startFacetimeListener();
-            } else {
-                this.facetime.stop();
             }
         }
 
@@ -1629,7 +1590,7 @@ class BlueBubblesServer extends EventEmitter {
         };
 
         // If we are persisting configs, remove any flags that are stored in the DB
-        const persist = this.args['persist-config'] ?? true;
+        const persist = this.args["persist-config"] ?? true;
         if (persist) {
             const configKeys = Object.keys(Server().repo.config);
             for (const key of configKeys) {
@@ -1647,21 +1608,25 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
-
         // Remove the oauth-token flag & value if it exists.
         removeArg("oauth-token");
+
+        // Remove the disable-gpu flag and re-add it if enabled
+        removeArg("disable-gpu");
+        const noGpu = Server().repo.getConfig("disable_gpu") ?? false;
+        if (noGpu) {
+            args.push("--disable-gpu");
+        }
 
         return args;
     }
 
     async relaunch({
-        headless = null,
         exit = true,
         quit = false
     }: {
-        headless?: boolean | null;
-        exit?: boolean,
-        quit?: boolean
+        exit?: boolean;
+        quit?: boolean;
     } = {}) {
         this.isRestarting = true;
 
@@ -1697,7 +1662,7 @@ class BlueBubblesServer extends EventEmitter {
         relaunchArgs = [process.execPath, ...relaunchArgs];
 
         // Kick off the restart script
-        FileSystem.executeAppleScript(runTerminalScript(relaunchArgs.join(' ')));
+        FileSystem.executeAppleScript(runTerminalScript(relaunchArgs.join(" ")));
 
         // Exit the current instance
         app.exit(0);

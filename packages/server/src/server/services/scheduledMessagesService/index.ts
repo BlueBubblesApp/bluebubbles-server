@@ -1,7 +1,7 @@
 import { Server } from "@server";
 import { ScheduledMessage } from "@server/databases/server/entity";
-import { MessageInterface } from "@server/api/v1/interfaces/messageInterface";
-import { SendMessageParams } from "@server/api/v1/types";
+import { MessageInterface } from "@server/api/interfaces/messageInterface";
+import { SendMessageParams } from "@server/api/types";
 import { FindOneOptions } from "typeorm";
 import {
     SCHEDULED_MESSAGE_CREATED,

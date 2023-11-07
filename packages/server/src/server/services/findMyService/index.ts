@@ -6,7 +6,7 @@ import {
     startFindMyFriends,
     showFindMyFriends,
     quitFindMyFriends
-} from "@server/api/v1/apple/scripts";
+} from "@server/api/apple/scripts";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 import { FindMyDevice, FindMyItem } from "@server/services/findMyService/types";
@@ -54,9 +54,8 @@ export class FindMyService {
         return FindMyService.readCacheFile(guid);
     }
 
-    static async refreshFriends(): Promise<NodeJS.Dict<any> | null> {
+    static async refreshFriends(): Promise<void> {
         await FindMyService.refresh();
-        return await FindMyService.getFriends();
     }
 
     private static readDataFile<T extends "Devices" | "Items">(
@@ -111,7 +110,7 @@ export class FindMyService {
         // Make sure the Find My app is open.
         // Give it 3 seconds to open
         await FileSystem.executeAppleScript(startFindMyFriends());
-        await waitMs(3000);
+        await waitMs(5000);
 
         // Bring the Find My app to the foreground so it refreshes the devices
         // Give it 5 seconods to refresh

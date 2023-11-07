@@ -8,11 +8,12 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import * as admin from "firebase-admin";
 import { OAuth2Client } from "google-auth-library";
-import { google } from "googleapis";
+import { Auth, google } from "googleapis";
 import { generateRandomString } from "@server/utils/CryptoUtils";
-import { isNotEmpty, resultAwaiter, waitMs } from "@server/helpers/utils";
+import { getObjectAsString, isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ProgressStatus } from "@server/types";
 import { FCMService } from "../fcmService";
+import { BrowserWindow, HandlerDetails } from "electron";
 
 /**
  * This service class hhandles the initial oauth workflows
@@ -41,6 +42,14 @@ export class OauthService {
     private _packageName = 'com.bluebubbles.messaging'
 
     completed = false;
+
+    private scopes = [
+        "https://www.googleapis.com/auth/cloudplatformprojects",
+        "https://www.googleapis.com/auth/service.management",
+        "https://www.googleapis.com/auth/firebase",
+        "https://www.googleapis.com/auth/datastore",
+        "https://www.googleapis.com/auth/iam"
+    ];
 
     get callbackUrl(): string {
         return `http://localhost:${this.port}/oauth/callback`;
@@ -94,25 +103,27 @@ export class OauthService {
         try {
             Server().emitToUI("oauth-status", ProgressStatus.IN_PROGRESS);
 
-            Server().log(`[GCP] Creating project, "${this.projectName}"...`);
+            Server().log(`[GCP] Creating Google Cloud project, "${this.projectName}"...`);
             const project = await this.createGoogleCloudProject();
             const projectId = project.projectId;
-            const projectNumber = project.projectNumber;
 
-            Server().log(`[GCP] Enabling Firestore...`);
-            await this.enableFirestoreApi(projectNumber);
+            // Enable the required APIs
+            await this.enableCloudApis(projectId);
+            await this.enableCloudResourceManager(projectId);
+            await this.enableFirebaseManagementApi(projectId);
+            await this.enableFirestoreApi(projectId);
 
-            Server().log(`[GCP] Adding Firebase...`);
+            Server().log(`[GCP] Adding Firebase to Google Cloud Project`)
             await this.addFirebase(projectId);
+
+            Server().log(`[GCP] Waiting for Service Account to generate (this may take some time)...`);
+            const serviceAccountJson = await this.getServiceAccount(projectId);
 
             Server().log(`[GCP] Creating Firestore...`);
             await this.createDatabase(projectId);
 
             Server().log(`[GCP] Creating Android Configuration...`);
             await this.createAndroidApp(projectId);
-
-            Server().log(`[GCP] Generating Service Account JSON (this may take some time)...`);
-            const serviceAccountJson = await this.getServiceAccount(projectId);
 
             Server().log(`[GCP] Generating Google Services JSON (this may take some time)...`);
             const servicesJson = await this.getGoogleServicesJson(projectId);
@@ -132,6 +143,10 @@ export class OauthService {
                 // Do nothing
             }
 
+            // Wait 10 seconds to ensure credentials propogate
+            Server().log(`[GCP] Ensuring credentials are propogated..`);
+            await waitMs(10000);
+
             // Mark the service as completed
             Server().log((
                 `[GCP] Successfully created and configured your Google Project! ` +
@@ -146,7 +161,12 @@ export class OauthService {
             // Start the FCM service.
             // Don't await because we don't want to catch the error here.
             FCMService.stop().then(async () => {
+                // Clear our markers & start the service
+                Server().fcm.clearLastValues();
                 await Server().fcm.start();
+            }).catch(async (err) => {
+                Server().log('An issue occurred when stopping the FCM service after OAuth completion!', 'debug');
+                Server().log(err?.message ?? String(err), 'debug');
             });
         } catch (ex: any) {
             Server().log(`[GCP] Failed to create project: ${ex?.message}`, "error");
@@ -165,16 +185,8 @@ export class OauthService {
      * @returns The OAuth URL
      */
     async getOauthUrl() {
-        const scopes = [
-            "https://www.googleapis.com/auth/cloudplatformprojects",
-            "https://www.googleapis.com/auth/service.management",
-            "https://www.googleapis.com/auth/firebase",
-            "https://www.googleapis.com/auth/datastore",
-            "https://www.googleapis.com/auth/iam"
-        ];
-
         const url = await this.oauthClient.generateAuthUrl({
-            scope: scopes,
+            scope: this.scopes,
             response_type: 'token'
         });
     
@@ -194,13 +206,7 @@ export class OauthService {
         });
     }
 
-    /**
-     * Creates the Google Cloud Project
-     * If the project already exists & is active, it returns the existing one
-     * 
-     * @returns The project object
-     */
-    async createGoogleCloudProject() {
+    async checkIfProjectExists() {
         // eslint-disable-next-line max-len
         const getUrl = `https://cloudresourcemanager.googleapis.com/v1/projects?filter=name%3A${this.projectName}%20AND%20lifecycleState%3AACTIVE`;
         const getRes = await this.sendRequest('GET', getUrl);
@@ -212,26 +218,107 @@ export class OauthService {
             return getRes.data.projects[0];
         }
 
-        // Create the new project
-        const postUrl = `https://cloudresourcemanager.googleapis.com/v1/projects`;
-        const projectId = `${this.projectName.toLowerCase()}-${generateRandomString(4)}`;
-        const data = { name: this.projectName, projectId };
-        await this.sendRequest('POST', postUrl, data);
-        const projectData = await this.waitForData('GET', getUrl, null, 'projects');
-        return projectData.projects.find((p: any) => p.projectId === projectId);
+        return null;
     }
 
     /**
-     * Enables Firestore in the Google Cloud Project
+     * Creates the Google Cloud Project
+     * If the project already exists & is active, it returns the existing one
      * 
-     * @param projectNumber The project number
-     * @returns The response data
-    */
-    async enableFirestoreApi(projectNumber: string) {
+     * @returns The project object
+     */
+    async createGoogleCloudProject() {
+        let projectId: string = null;
+
+        // First check if the project exists
+        const projectExists = await this.checkIfProjectExists();
+        if (projectExists) return projectExists;
+
+        // Helper function to create a new project
+        const createProj = async () => {
+            const postUrl = `https://cloudresourcemanager.googleapis.com/v1/projects`;
+            projectId = `${this.projectName.toLowerCase()}-${generateRandomString(4)}`;
+            const data = { name: this.projectName, projectId };
+            Server().log(`[GCP] Creating project with name, "${this.projectName}", under project ID, "${projectId}"`);
+            const createRes = await this.sendRequest('POST', postUrl, data);
+
+            // Wait for the operation to complete (try for 2 minutes)
+            const operationName = createRes.data.name;
+            const operationUrl = `https://cloudresourcemanager.googleapis.com/v1/${operationName}`;
+            return await this.waitForData('GET', operationUrl, null, 'done', 60, 5000);
+        };
+        
+        let operationData = await createProj();
+
+        // If there is an error, throw it
+        if (isNotEmpty(operationData?.error)) {
+            const isTosError = operationData.error.message.includes('Terms of Service');
+            if (isTosError) {
+                Server().log(
+                    `[GCP] You must accept the Google Cloud Terms of Service before continuing! ` +
+                    `A window will open in 10 seconds for you to accept the TOS. ` +
+                    `Once you accept the TOS, you can close the window and setup will continue.`
+                );
+    
+                await waitMs(10000);
+                await this.openWindow('https://console.cloud.google.com/projectcreate');
+            } else {
+                throw new Error(`Error: ${getObjectAsString(operationData.error)}`);
+            }
+
+            // Try again
+            Server().log(`[GCP] Retrying project creation...`);
+            operationData = await createProj();
+        }
+
+        // Throw an error if a project ID isn't returned
+        if (isEmpty(operationData?.response?.projectId)) {
+            throw new Error(`No Project ID was returned!`);
+        }
+
+        // Fetch the project data
         // eslint-disable-next-line max-len
-        const projectUrl = `https://serviceusage.googleapis.com/v1/projects/${projectNumber}/services/firestore.googleapis.com:enable`;
-        const postRes = await this.sendRequest('POST', projectUrl);
-        return postRes.data;
+        const getUrl = `https://cloudresourcemanager.googleapis.com/v1/projects?filter=name%3A${this.projectName}%20AND%20lifecycleState%3AACTIVE`;
+        const projectData = await this.sendRequest('GET', getUrl);
+        return projectData.data.projects.find((p: any) => p.projectId === projectId);
+    }
+
+    async enableCloudApis(projectId: string) {
+        Server().log(`[GCP] Enabling Cloud APIs`);
+        await this.enableService(projectId, 'cloudapis.googleapis.com');
+    }
+
+    async enableFirebaseManagementApi(projectId: string) {
+        Server().log(`[GCP] Enabling Firebase Management APIs`);
+        await this.enableService(projectId, 'firebase.googleapis.com');
+    }
+
+    async enableFirestoreApi(projectId: string) {
+        Server().log(`[GCP] Enabling Firestore APIs`);
+        await this.enableService(projectId, 'firestore.googleapis.com');
+    }
+
+    async enableCloudResourceManager(projectId: string) {
+        Server().log(`[GCP] Enabling Cloud Resource Manager APIs`);
+        await this.enableService(projectId, 'cloudresourcemanager.googleapis.com');
+    }
+
+    async enableIdentityApi(projectId: string) {
+        Server().log(`[GCP] Enabling IAM APIs`);
+        await this.enableService(projectId, 'iam.googleapis.com');
+    }
+
+    async enableService(projectId: string, service: string) {
+        const postUrl = `https://serviceusage.googleapis.com/v1/projects/${projectId}/services/${service}:enable`;
+        const createRes = await this.sendRequest('POST', postUrl, {});
+
+        // If the operation is already done, return
+        const operationName = createRes.data.name;
+        if (operationName.endsWith('DONE_OPERATION')) return;
+
+        // Wait for the operation to complete
+        const operationUrl = `https://serviceusage.googleapis.com/v1/${operationName}`;
+        return await this.waitForData('GET', operationUrl, null, 'done', 30, 5000);
     }
 
     /**
@@ -243,16 +330,35 @@ export class OauthService {
     async addFirebase(projectId: string) {
         try {
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}:addFirebase`;
-            const res = await this.sendRequest('POST', url);
+            const res = await this.sendRequest('POST', url, {});
             await this.waitForData('GET', `https://firebase.googleapis.com/v1beta1/${res.data.name}`, null, 'name');
-            await waitMs(5000);  // Wait an addition 5 seconds to ensure Firebase is ready
+            await waitMs(5000);  // Wait 5 seconds to ensure Firebase is ready
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
                 Server().log(`[GCP] Firebase already exists!`);
+            } else if (ex.response?.data?.error?.code === 403) {
+                await this.addFirebaseManual();
             } else {
-                throw ex;
+                Server().log(
+                    `Failed to add Firebase to project: Data: ${getObjectAsString(ex.response?.data)}`, 'debug');
+                throw new Error(
+                    `Failed to add Firebase to project: ${
+                        getObjectAsString(ex.response?.data?.error?.message ?? ex.message)}}`);
             }
         }
+    }
+
+    async addFirebaseManual() {
+        Server().log(
+            `[GCP] You must manually create the Firebase project! In 10 seconds, ` +
+            `a window will open where you can create a new project. ` +
+            `Select your existing BlueBubbles Resource and add Firebase to the project. ` + 
+            `Once the project is created, you can close the window and setup will continue.`
+        );
+
+        await waitMs(10000);
+        await this.openWindow(`https://console.firebase.google.com/`);
+        Server().log(`[GCP] Resuming setup...`);
     }
 
     /**
@@ -290,9 +396,16 @@ export class OauthService {
     async createAndroidApp(projectId: string) {
         try {
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
-            const data = { packageName: this.packageName };
-            await this.tryUntilNoError('POST', url, data);
-            await this.waitForData('GET', `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`);
+            const data = { displayName: this.projectName, packageName: this.packageName };
+            const createRes = await this.sendRequest('POST', url, data);
+            
+                // Wait for the app to be created
+            const operationName = createRes.data.name;
+            const operationUrl = `https://firebase.googleapis.com/v1beta1/${operationName}`;
+            const operationResult = await this.waitForData('GET', operationUrl, null, 'done', 60, 5000);
+            if (operationResult.error) {
+                throw new Error(`Failed to create Android App: ${getObjectAsString(operationResult.error)}`);
+            }
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
                 Server().log(`[GCP] Android Configuration already exists!`);
@@ -303,6 +416,26 @@ export class OauthService {
     }
 
     /**
+     * Creates a Service Account for a given Google Cloud Project.
+     * 
+     * @param projectId The project ID
+     * @param serviceAccountName The name of the service account
+     * @returns The service account data
+     */
+    async createServiceAccount(projectId: string, serviceAccountName: string) {
+        const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`;
+        const data = {
+            accountId: serviceAccountName,
+            serviceAccount: {
+                displayName: serviceAccountName,
+                description: "Firebase Admin SDK Service Agent"
+            }
+        };
+        const res = await this.sendRequest('POST', url, data);
+        return res.data;
+    }
+
+    /**
      * Gets the Service Account ID from the Google Cloud Project
      * 
      * @param projectId The project ID
@@ -310,11 +443,17 @@ export class OauthService {
      */
     async getFirebaseServiceAccountId(projectId: string): Promise<string> {
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts`;
-        const response = await this.waitForData('GET', url, null, 'accounts', 60);  // Wait up to 2 minutes
-        const firebaseServiceAccounts = response.accounts;
-        const firebaseServiceAccountId = firebaseServiceAccounts
-            .find((element: any) => element.displayName === "firebase-adminsdk").uniqueId;
-        return firebaseServiceAccountId;
+
+        try {
+            // Max wait time: 5 minutes (60 attempts with 5 second delay)
+            const response = await this.waitForData('GET', url, null, 'accounts',  60, 5000);
+            const firebaseServiceAccounts = response.accounts;
+            const firebaseServiceAccountId = firebaseServiceAccounts
+                .find((element: any) => element.displayName === "firebase-adminsdk")?.uniqueId;
+            return firebaseServiceAccountId;
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -325,6 +464,9 @@ export class OauthService {
      */
     async getServiceAccount(projectId: string) {
         const accountId: string = await this.getFirebaseServiceAccountId(projectId);
+        if (!accountId) {
+            throw new Error('Failed to get Firebase Service Account! Please ensure that the project was created!');
+        }
     
         // eslint-disable-next-line max-len
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${accountId}/keys`;
@@ -386,10 +528,10 @@ export class OauthService {
         url: string,
         data: Record<string, any> = null,
         key: string = null,
-        maxAttempts = 30
+        maxAttempts = 30,
+        waitTime = 2000
     ) {
         let attempts = 0;
-        const waitTime = 2000;
 
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -398,7 +540,12 @@ export class OauthService {
             if (key && isNotEmpty(res.data[key])) return res.data;
 
             attempts += 1;
-            if (attempts > maxAttempts) throw new Error(`Failed to get data from: ${url}`);
+            if (attempts > maxAttempts) {
+                Server().log(`Received data from failed request: ${getObjectAsString(res.data)}`, 'debug');
+                throw new Error(
+                    `Failed to get data from: ${url}. Please gather server logs and contact the developers!`);
+            }
+
             await waitMs(waitTime);
         }
     }
@@ -486,6 +633,34 @@ export class OauthService {
             url,
             headers,
             data
+        });
+    }
+
+    private async openWindow(url: string, waitForClose = true) {
+        return new Promise<void>((resolve, _) => {
+            const window = new BrowserWindow({
+                width: 800,
+                height: 600,
+                webPreferences: {
+                    nodeIntegration: true,
+                }
+            });
+
+            window.loadURL(url);
+
+            // Open links in the same window
+            window.webContents.setWindowOpenHandler((details: HandlerDetails) => {
+                window.loadURL(details.url);
+                return { action: "deny" };
+            });
+
+            if (waitForClose) {
+                window.on('closed', () => {
+                    resolve();
+                });
+            } else {
+                resolve();
+            }
         });
     }
 

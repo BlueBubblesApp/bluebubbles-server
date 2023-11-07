@@ -3,8 +3,8 @@ import { BooleanTransformer } from "@server/databases/transformers/BooleanTransf
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
-import { isMinHighSierra } from "@server/helpers/utils";
-import { AppleDateTransformer } from "@server/databases/transformers/AppleDateTransformer";
+import { isMinHighSierra } from "@server/env";
+import { MessagesDateTransformer } from "@server/databases/transformers/MessagesDateTransformer";
 import { conditional } from "conditional-decorator";
 
 @Entity("chat")
@@ -72,7 +72,7 @@ export class Chat {
         Column({
             name: "last_read_message_timestamp",
             type: "date",
-            transformer: AppleDateTransformer,
+            transformer: MessagesDateTransformer,
             default: 0
         })
     )

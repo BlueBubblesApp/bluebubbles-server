@@ -1,6 +1,5 @@
 /* eslint-disable no-bitwise */
 import { NativeImage } from "electron";
-import * as macosVersion from "macos-version";
 import { encode as blurhashEncode } from "blurhash";
 import { Server } from "@server";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -10,16 +9,8 @@ import { FileSystem } from "@server/fileSystem";
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { invisibleMediaChar } from "@server/services/httpService/constants";
-import { ContactInterface } from "@server/api/v1/interfaces/contactInterface";
-
-export const isMinVentura = macosVersion.isGreaterThanOrEqualTo("13.0");
-export const isMinMonterey = macosVersion.isGreaterThanOrEqualTo("12.0");
-export const isMinBigSur = macosVersion.isGreaterThanOrEqualTo("11.0");
-export const isMinCatalina = macosVersion.isGreaterThanOrEqualTo("10.15");
-export const isMinMojave = macosVersion.isGreaterThanOrEqualTo("10.14");
-export const isMinHighSierra = macosVersion.isGreaterThanOrEqualTo("10.13");
-export const isMinSierra = macosVersion.isGreaterThanOrEqualTo("10.12");
+import { invisibleMediaChar } from "@server/api/http/constants";
+import { ContactInterface } from "@server/api/interfaces/contactInterface";
 
 export const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
 
@@ -517,3 +508,11 @@ export const resultAwaiter = async ({
 
     return data;
 };
+
+export const getObjectAsString = (value: any): string => {
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+}

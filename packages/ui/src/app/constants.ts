@@ -66,6 +66,34 @@ export const webhookEventOptions = [
     {
         label: 'Incoming Facetime Call',
         value: 'incoming-facetime'
+    },
+    {
+        label: 'iMessage Alias Removed',
+        value: 'imessage-alias-removed'
+    },
+    {
+        label: 'Theme Backup Created',
+        value: 'theme-backup-created'
+    },
+    {
+        label: 'Theme Backup Updated',
+        value: 'theme-backup-updated'
+    },
+    {
+        label: 'Theme Backup Deleted',
+        value: 'theme-backup-deleted'
+    },
+    {
+        label: 'Settings Backup Created',
+        value: 'settings-backup-created'
+    },
+    {
+        label: 'Settings Backup Updated',
+        value: 'settings-backup-updated'
+    },
+    {
+        label: 'Settings Backup Deleted',
+        value: 'settings-backup-deleted'
     }
 ];
 
