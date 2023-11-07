@@ -19,7 +19,8 @@ export class iCloudRouter {
 
     static async refreshFriends(ctx: RouterContext, _: Next) {
         try {
-            const data = await FindMyService.refreshFriends();
+            await FindMyService.refreshFriends();
+            const data = findMyInterface.getFriends();
             return new Success(ctx, { message: "Successfully refreshed Find My friends locations!", data }).send();
         } catch (ex: any) {
             throw new ServerError(
