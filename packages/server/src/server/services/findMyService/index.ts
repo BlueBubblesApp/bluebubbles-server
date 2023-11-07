@@ -54,9 +54,8 @@ export class FindMyService {
         return FindMyService.readCacheFile(guid);
     }
 
-    static async refreshFriends(): Promise<NodeJS.Dict<any> | null> {
+    static async refreshFriends(): Promise<void> {
         await FindMyService.refresh();
-        return await FindMyService.getFriends();
     }
 
     private static readDataFile<T extends "Devices" | "Items">(
