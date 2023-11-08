@@ -450,14 +450,11 @@ class BlueBubblesServer extends EventEmitter {
 
         this.initOauthService();
 
-        const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
-        if (privateApiEnabled) {
-            try {
-                this.log("Initializing helper service...");
-                this.privateApi = new PrivateApiService();
-            } catch (ex: any) {
-                this.log(`Failed to setup helper service! ${ex.message}`, "error");
-            }
+        try {
+            this.log("Initializing helper service...");
+            this.privateApi = new PrivateApiService();
+        } catch (ex: any) {
+            this.log(`Failed to setup helper service! ${ex.message}`, "error");
         }
 
         try {
@@ -537,7 +534,8 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
-        if (privateApiEnabled) {
+        const ftPrivateApiEnabled = this.repo.getConfig("enable_ft_private_api") as boolean;
+        if (privateApiEnabled || ftPrivateApiEnabled) {
             this.log("Starting Private API Helper listener...");
             this.privateApi.start();
         }
@@ -994,19 +992,14 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Install the bundle if the Private API is turned on
-        if (!prevConfig.enable_private_api && nextConfig.enable_private_api) {
-            if (Server().privateApi === null) {
-                Server().privateApi = new PrivateApiService();
-            }
-
-            await Server().privateApi.start();
-        } else if (prevConfig.enable_private_api && !nextConfig.enable_private_api) {
-            await Server().privateApi?.stop();
-        } else if (nextConfig.enable_private_api && prevConfig.private_api_mode !== nextConfig.private_api_mode) {
-            if (Server().privateApi === null) {
-                Server().privateApi = new PrivateApiService();
-            }
-
+        if (
+            (prevConfig.enable_private_api !== nextConfig.enable_private_api) ||
+            (prevConfig.enable_ft_private_api !== nextConfig.enable_ft_private_api)
+        ) {
+            this.log("Detected Private API selection change", 'debug');
+            await Server().privateApi.restart();
+        } else if (prevConfig.private_api_mode !== nextConfig.private_api_mode) {
+            this.log("Detected Private API Mode change", 'debug');
             await Server().privateApi.restart();
         }
 
