@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ipcRenderer } from 'electron';
 import {
     Spacer,
@@ -57,7 +57,8 @@ export const UpdatableStatBox = (
         dispatchOverride = null,
         autoUpdate = true,
         updateInterval = 60000,
-        delay = 0
+        delay = 0,
+        pastDays = 0
     }:
     {
         title: string,
@@ -70,7 +71,8 @@ export const UpdatableStatBox = (
         dispatchOverride?: null | ((value: any) => void),
         autoUpdate?: boolean,
         updateInterval?: number,
-        delay?: number
+        delay?: number,
+        pastDays?: number
     }
 ): JSX.Element => {
     const dispatch = useAppDispatch();
@@ -80,14 +82,21 @@ export const UpdatableStatBox = (
      * Function called to update the the statistic via an IPC call,
      * then update the stat in the redux slice.
      */
-    const updateStat = () => {
-        if (!shouldUpdate(statName, updateInterval)) return;
+    const updateStat = (force = false) => {
+        if (!force && !shouldUpdate(statName, updateInterval)) return;
 
         // Update the cache with the last time we've checked
         updateCache[statName] = new Date().getTime();
 
         // Fetch the stat and dispatch the results to listeners
-        ipcRenderer.invoke(ipcEvent, args ? args() : null).then(async (value) => {
+        let finalArgs = args ? args() : null;
+        if (pastDays) {
+            if (!finalArgs) finalArgs = {};
+            finalArgs.after = new Date(new Date().getTime() - (pastDays * 86_400_000));
+            console.log(finalArgs);
+        }
+
+        ipcRenderer.invoke(ipcEvent, finalArgs).then(async (value) => {
             // If we want to transform the value in any way, do it
             if (transform) {
                 const result = transform(value);
@@ -112,6 +121,10 @@ export const UpdatableStatBox = (
     if (autoUpdate) {
         useInterval(updateStat, updateInterval);
     }
+
+    useEffect(() => {
+        updateStat(true);
+    }, [pastDays]);
 
     return <StatBox title={title} text={stat} color={color} />;
 };

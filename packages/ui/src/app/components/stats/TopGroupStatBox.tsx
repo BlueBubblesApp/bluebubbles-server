@@ -5,12 +5,14 @@ export const TopGroupStatBox = (
     {
         autoUpdate = true,
         updateInterval = 60000,
-        delay = 0
+        delay = 0,
+        pastDays = 0
     }:
     {
         autoUpdate?: boolean,
         updateInterval?: number,
-        delay?: number
+        delay?: number,
+        pastDays?: number
     }
 ): JSX.Element => {
     const transform = (value: any): string | number | null => {
@@ -36,6 +38,7 @@ export const TopGroupStatBox = (
             autoUpdate={autoUpdate}
             updateInterval={updateInterval}
             delay={delay}
+            pastDays={pastDays}
         />
     );
 };
