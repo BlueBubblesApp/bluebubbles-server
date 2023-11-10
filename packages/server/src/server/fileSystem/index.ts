@@ -12,7 +12,8 @@ import {
     parseMetadataString,
     isNotEmpty,
     isEmpty,
-    safeTrim} from "@server/helpers/utils";
+    safeTrim
+} from "@server/helpers/utils";
 import { isMinMonterey } from "@server/env";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
@@ -27,6 +28,8 @@ import {
     ImageMetadata,
     ImageMetadataKeys
 } from "./types";
+
+const FindProcess = require("find-process");
 
 // Patch in original user data directory
 app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
@@ -52,7 +55,7 @@ export const userHomeDir = () => {
 export class FileSystem {
     public static baseDir = path.join(app.getPath("userData"), subdir);
 
-    public static cfgFile = path.join(userHomeDir(), 'bluebubbles.yml');
+    public static cfgFile = path.join(userHomeDir(), "bluebubbles.yml");
 
     public static attachmentsDir = path.join(FileSystem.baseDir, "Attachments");
 
@@ -108,18 +111,18 @@ export class FileSystem {
     public static findMyFriendsDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.icloud.fmfd");
 
     public static get usingCustomFcm(): boolean {
-        const fcmClient = Server().args['fcm-client'];
-        const fcmServer = Server().args['fcm-server'];
+        const fcmClient = Server().args["fcm-client"];
+        const fcmServer = Server().args["fcm-server"];
         return !!(fcmClient && fcmServer);
     }
 
     public static get fcmClientPath(): string {
-        const fcmClient = Server().args['fcm-client'];
+        const fcmClient = Server().args["fcm-client"];
         return fcmClient ?? path.join(FileSystem.fcmDir, "client.json");
     }
 
     public static get fcmServerPath(): string {
-        const fcmServer = Server().args['fcm-server'];
+        const fcmServer = Server().args["fcm-server"];
         return fcmServer ?? path.join(FileSystem.fcmDir, "server.json");
     }
 
@@ -192,9 +195,9 @@ export class FileSystem {
      * @param name Name for the attachment
      * @param buffer The attachment bytes (buffer)
      */
-    static copyAttachment(originalPath: string, name: string, method = 'apple-script'): string {
+    static copyAttachment(originalPath: string, name: string, method = "apple-script"): string {
         let newPath = path.join(FileSystem.attachmentsDir, name);
-        if (isMinMonterey || method === 'private-api') {
+        if (isMinMonterey || method === "private-api") {
             if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) fs.mkdirSync(FileSystem.messagesAttachmentsDir);
             newPath = path.join(FileSystem.messagesAttachmentsDir, name);
         } else {
@@ -483,9 +486,9 @@ export class FileSystem {
      */
     static async startMessages() {
         // If we are managing the messages process, we don't need to make sure it's started
-        const papi_enabled = Server().repo.getConfig('enable_private_api') as boolean;
-        const papi_mode = Server().repo.getConfig('private_api_mode') as string;
-        if (papi_enabled && papi_mode === 'process-dylib') return;
+        const papi_enabled = Server().repo.getConfig("enable_private_api") as boolean;
+        const papi_mode = Server().repo.getConfig("private_api_mode") as string;
+        if (papi_enabled && papi_mode === "process-dylib") return;
 
         // Start the messages app
         await FileSystem.executeAppleScript(startMessages());
@@ -681,14 +684,14 @@ export class FileSystem {
         return null;
     }
 
-    static getLocalIps(type: 'IPv4' | 'IPv6' = 'IPv4'): string[] {
+    static getLocalIps(type: "IPv4" | "IPv6" = "IPv4"): string[] {
         const interfaces = os.networkInterfaces();
         const addresses = [];
         for (const k in interfaces) {
             for (const k2 in interfaces[k]) {
                 const address = interfaces[k][k2];
                 if (address.family !== type || address.internal) continue;
-                if (address.mac === '00:00:00:00:00:00') continue;
+                if (address.mac === "00:00:00:00:00:00") continue;
                 addresses.push(address.address);
             }
         }
@@ -698,5 +701,10 @@ export class FileSystem {
 
     static async killProcess(name: string): Promise<void> {
         await FileSystem.execShellCommand(`killall "${name}"`);
+    }
+
+    static async processIsRunning(name: string): Promise<boolean> {
+        const processes = await FindProcess("name", name);
+        return processes.length > 0;
     }
 }

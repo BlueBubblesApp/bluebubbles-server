@@ -3564,6 +3564,13 @@
     "@types/qs" "*"
     "@types/serve-static" "*"
 
+"@types/find-process@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@types/find-process/-/find-process-1.2.0.tgz#559b2fa9762e72e35e451777a4ac5c15f055fbc5"
+  integrity sha512-EoTtyVb4Za92vl993dzDg4vGkwMlOijEC2jXNzmmaNhnm7BxS/qvKDiWnNEEzK+P9yM1YFKOHjL0+UfK2YLaow==
+  dependencies:
+    find-process "*"
+
 "@types/formidable@^1.0.31":
   version "1.2.5"
   resolved "https://registry.yarnpkg.com/@types/formidable/-/formidable-1.2.5.tgz#561d026e5f09179e5c8ef7b31e8f4652e11abe4c"
@@ -7614,7 +7621,7 @@ find-cache-dir@^3.3.1:
     make-dir "^3.0.2"
     pkg-dir "^4.1.0"
 
-find-process@^1.4.4:
+find-process@*, find-process@^1.4.7:
   version "1.4.7"
   resolved "https://registry.yarnpkg.com/find-process/-/find-process-1.4.7.tgz#8c76962259216c381ef1099371465b5b439ea121"
   integrity sha512-/U4CYp1214Xrp3u3Fqr9yNynUrr5Le4y0SsJh2lMDDSbpwYSz3M2SMWQC+wqcx79cN8PQtHQIL8KnuY9M66fdg==

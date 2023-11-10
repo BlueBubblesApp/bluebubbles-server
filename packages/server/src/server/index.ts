@@ -43,7 +43,7 @@ import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scri
 
 import { ActionHandler } from "./api/apple/actions";
 import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
-import { isMinBigSur, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
+import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -908,6 +908,20 @@ class BlueBubblesServer extends EventEmitter {
             this.log(`Contacts authorization status: ${contactStatus}`, "debug");
         }
 
+        // Check if MacForge is running
+        if (isMinCatalina && this.repo.getConfig("enable_private_api")) {
+            const mfExists = await FileSystem.processIsRunning("MacForge");
+            const mfHelperExists = await FileSystem.processIsRunning("MacForgeHelper");
+            if (mfExists || mfHelperExists) {
+                Server().log(
+                    "MacForge detected! BlueBubbles no longer requires MacForge, " +
+                        "and it may cause issues running it alongside BlueBubbles. We " +
+                        "recommend uninstalling MacForge and then rebooting your Mac.",
+                    "warn"
+                );
+            }
+        }
+
         this.log("Finished post-start checks...");
     }
 
@@ -993,13 +1007,13 @@ class BlueBubblesServer extends EventEmitter {
 
         // Install the bundle if the Private API is turned on
         if (
-            (prevConfig.enable_private_api !== nextConfig.enable_private_api) ||
-            (prevConfig.enable_ft_private_api !== nextConfig.enable_ft_private_api)
+            prevConfig.enable_private_api !== nextConfig.enable_private_api ||
+            prevConfig.enable_ft_private_api !== nextConfig.enable_ft_private_api
         ) {
-            this.log("Detected Private API selection change", 'debug');
+            this.log("Detected Private API selection change", "debug");
             await Server().privateApi.restart();
         } else if (prevConfig.private_api_mode !== nextConfig.private_api_mode) {
-            this.log("Detected Private API Mode change", 'debug');
+            this.log("Detected Private API Mode change", "debug");
             await Server().privateApi.restart();
         }
 
