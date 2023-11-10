@@ -58,7 +58,7 @@ export const UpdatableStatBox = (
         autoUpdate = true,
         updateInterval = 60000,
         delay = 0,
-        pastDays = 0
+        pastDays = null
     }:
     {
         title: string,
@@ -72,7 +72,7 @@ export const UpdatableStatBox = (
         autoUpdate?: boolean,
         updateInterval?: number,
         delay?: number,
-        pastDays?: number
+        pastDays?: number | null
     }
 ): JSX.Element => {
     const dispatch = useAppDispatch();
@@ -90,7 +90,7 @@ export const UpdatableStatBox = (
 
         // Fetch the stat and dispatch the results to listeners
         let finalArgs = args ? args() : null;
-        if (pastDays) {
+        if (pastDays && pastDays > 0) {
             if (!finalArgs) finalArgs = {};
             finalArgs.after = new Date(new Date().getTime() - (pastDays * 86_400_000));
         }
