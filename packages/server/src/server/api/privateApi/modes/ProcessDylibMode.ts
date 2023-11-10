@@ -1,16 +1,14 @@
 import "zx/globals";
 import { PrivateApiMode } from ".";
 import { MacForgeMode } from "./MacForgeMode";
-import { DylibPlugin } from "./dylibPlugins";
 import { MessagesDylibPlugin } from "./dylibPlugins/MessagesDylibPlugin";
 import { FaceTimeDylibPlugin } from "./dylibPlugins/FaceTimeDylibPlugin";
 import { Server } from "@server";
-import { isMinBigSur } from "@server/env";
 
 export class ProcessDylibMode extends PrivateApiMode {
-    static plugins: DylibPlugin[] = [
+    static plugins = [
         new MessagesDylibPlugin("Messages Helper"),
-        ...isMinBigSur ? [new FaceTimeDylibPlugin("FaceTime Helper")] : []
+        new FaceTimeDylibPlugin("FaceTime Helper")
     ];
 
     static async install() {
@@ -26,7 +24,7 @@ export class ProcessDylibMode extends PrivateApiMode {
     }
 
     static async uninstall() {
-        // Nothing to do here
+        // Do nothing here
     }
 
     async start() {
@@ -46,9 +44,13 @@ export class ProcessDylibMode extends PrivateApiMode {
     async stop() {
         this.isStopping = true;
 
-        // Stop the dylib process
+        // Stop the dylib processes
         for (const plugin of ProcessDylibMode.plugins) {
-            await plugin.stop();
+            try {
+                await plugin.stop();
+            } catch (ex) {
+                Server().log(`Error stopping DYLIB for ${plugin.parentApp}! Error: ${ex}`, 'debug');
+            }
         }
 
         this.isStopping = false;

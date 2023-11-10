@@ -460,20 +460,40 @@ export class MessageRepository {
      *
      * @param chatStyle Whether you are fetching the count for a group or individual chat
      */
-    async getChatMessageCounts(chatStyle: "group" | "individual") {
+    async getChatMessageCounts(chatStyle: "group" | "individual", after: Date = null) {
+        let result = null;
+
         // Get messages with sender and the chat it's from
-        const result = await this.db.getRepository(Chat).query(
-            `SELECT
-                chat.guid AS chat_guid,
-                chat.display_name AS group_name,
-                COUNT(message.ROWID) AS message_count
-            FROM chat
-            JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
-            JOIN message ON message.ROWID = cmj.message_id
-            WHERE chat.style = ?
-            GROUP BY chat.guid;`,
-            [chatStyle === "group" ? 43 : 45]
-        );
+        if (!after) {
+            result = await this.db.getRepository(Chat).query(
+                `SELECT
+                    chat.guid AS chat_guid,
+                    chat.display_name AS group_name,
+                    COUNT(message.ROWID) AS message_count
+                FROM chat
+                JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
+                JOIN message ON message.ROWID = cmj.message_id
+                WHERE chat.style = ?
+                GROUP BY chat.guid;`,
+                [chatStyle === "group" ? 43 : 45]
+            );
+        } else {
+            result = await this.db.getRepository(Chat).query(
+                `SELECT
+                    chat.guid AS chat_guid,
+                    chat.display_name AS group_name,
+                    COUNT(message.ROWID) AS message_count
+                FROM chat
+                JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
+                JOIN message ON message.ROWID = cmj.message_id
+                WHERE message.date >= ? AND chat.style = ?
+                GROUP BY chat.guid;`,
+                [
+                    convertDateTo2001Time(after),
+                    chatStyle === "group" ? 43 : 45
+                ]
+            );
+        }
 
         return result;
     }
@@ -484,44 +504,82 @@ export class MessageRepository {
      * @param chatStyle Whether you are fetching the count for a group or individual chat
      */
     async getMediaCountsByChat({
-        mediaType = "image"
+        mediaType = "image",
+        after = null
     }: {
         mediaType?: "image" | "video" | "location" | "other";
+        after?: Date;
     } = {}) {
+        let result = null;
+
         // Get messages with sender and the chat it's from
-        const result = await this.db.getRepository(Chat).query(
-            `SELECT
-                chat.guid AS chat_guid,
-                chat.display_name AS group_name,
-                COUNT(attachment.ROWID) AS media_count
-            FROM chat
-            JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
-            JOIN message ON message.ROWID = cmj.message_id
-            JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
-            JOIN attachment ON attachment.ROWID = maj.attachment_id
-            WHERE attachment.mime_type LIKE '${mediaType}%'
-            GROUP BY chat.guid;`
-        );
+        if (!after) {
+            result = await this.db.getRepository(Chat).query(
+                `SELECT
+                    chat.guid AS chat_guid,
+                    chat.display_name AS group_name,
+                    COUNT(attachment.ROWID) AS media_count
+                FROM chat
+                JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
+                JOIN message ON message.ROWID = cmj.message_id
+                JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
+                JOIN attachment ON attachment.ROWID = maj.attachment_id
+                WHERE attachment.mime_type LIKE '${mediaType}%'
+                GROUP BY chat.guid;`
+            );
+        } else {
+            result = await this.db.getRepository(Chat).query(
+                `SELECT
+                    chat.guid AS chat_guid,
+                    chat.display_name AS group_name,
+                    COUNT(attachment.ROWID) AS media_count
+                FROM chat
+                JOIN chat_message_join AS cmj ON chat.ROWID = cmj.chat_id
+                JOIN message ON message.ROWID = cmj.message_id
+                JOIN message_attachment_join AS maj ON message.ROWID = maj.message_id
+                JOIN attachment ON attachment.ROWID = maj.attachment_id
+                WHERE message.date >= ? AND attachment.mime_type LIKE '${mediaType}%'
+                GROUP BY chat.guid;`,
+                [
+                    convertDateTo2001Time(after)
+                ]
+            );
+        }
 
         return result;
     }
 
     async getMediaCounts({
-        mediaType = "image"
+        mediaType = "image",
+        after = null
     }: {
         mediaType?: "image" | "video" | "location";
+        after?: Date
     } = {}) {
         let mType: string = mediaType;
         if (mType === "location") {
             mType = "text/x-vlocation";
         }
 
+        let result = null;
+
         // Get messages with sender and the chat it's from
-        const result = await this.db.getRepository(Chat).query(
-            `SELECT COUNT(attachment.ROWID) AS media_count
-            FROM attachment
-            WHERE attachment.mime_type LIKE '${mType}%';`
-        );
+        if (!after) {
+            result = await this.db.getRepository(Chat).query(
+                `SELECT COUNT(attachment.ROWID) AS media_count
+                FROM attachment
+                WHERE attachment.mime_type LIKE '${mType}%';`
+            );
+        } else {
+            result = await this.db.getRepository(Chat).query(
+                `SELECT COUNT(attachment.ROWID) AS media_count
+                FROM attachment
+                WHERE attachment.date >= ? AND attachment.mime_type LIKE '${mType}%';`,
+                [
+                    convertDateTo2001Time(after)
+                ]
+            );
+        }
 
         return result;
     }

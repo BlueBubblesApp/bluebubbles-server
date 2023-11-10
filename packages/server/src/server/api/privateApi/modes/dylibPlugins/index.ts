@@ -13,11 +13,15 @@ export abstract class DylibPlugin {
 
     isStopping = false;
 
+    isInjecting = false;
+
     dylibProcess: ProcessPromise<any>;
 
     dylibFailureCounter = 0;
 
     dylibLastErrorTime = 0;
+
+    abstract get isEnabled(): boolean;
 
     abstract get dylibPath(): string;
 
@@ -26,8 +30,12 @@ export abstract class DylibPlugin {
     }
 
     async stopParentProcess(): Promise<void> {
-        Server().log(`Killing process: ${this.parentApp}`, "debug");
-        await FileSystem.killProcess(this.parentApp);
+        try {
+            Server().log(`Killing process: ${this.parentApp}`, "debug");
+            await FileSystem.killProcess(this.parentApp);
+        } catch (ex) {
+            Server().log(`Failed to kill parent process (${this.parentApp})! Error: ${ex}`);
+        }
     }
 
     get parentProcessPath(): string | null {
@@ -48,6 +56,7 @@ export abstract class DylibPlugin {
     }
 
     locateDependencies() {
+        if (!this.isEnabled) return;
         if (!fs.existsSync(this.dylibPath)) {
             throw new Error(`Unable to locate embedded ${this.name} DYLIB! Please reinstall the app.`);
         }
@@ -60,6 +69,9 @@ export abstract class DylibPlugin {
     }
 
     async injectPlugin() {
+        if (!this.isEnabled) return;
+        if (this.isInjecting) return;
+        this.isInjecting = true;
         Server().log(`Injecting ${this.name} DYLIB...`, "debug");
 
         // Clear the markers
@@ -75,16 +87,16 @@ export abstract class DylibPlugin {
         while (this.dylibFailureCounter < 5) {
             try {
                 // Stop the running Messages app
-                try {
-                    await this.stopParentProcess();
-                    await waitMs(1000);
-                } catch {
-                    // Ignore. This is most likely due to an osascript error.
-                    // Which we don't want to stop the dylib from starting.
-                }
+                await this.stopParentProcess();
+                await waitMs(1000);
 
                 // Execute shell command to start the dylib.
                 // eslint-disable-next-line max-len
+                if (!this.isEnabled || this.isStopping) {
+                    this.isInjecting = false;
+                    return;
+                }
+
                 this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
 
                 // HIde the app after 5 seconds
@@ -94,7 +106,11 @@ export abstract class DylibPlugin {
 
                 await this.dylibProcess;
             } catch (ex: any) {
-                if (this.isStopping) return;
+                Server().log(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex}`, 'debug');
+                if (this.isStopping) {
+                    this.isInjecting = false;
+                    return;
+                }
 
                 // If the last time we errored was more than 15 seconds ago, reset the counter.
                 // This would indicate that the dylib was running, but then crashed.
@@ -117,6 +133,8 @@ export abstract class DylibPlugin {
         if (this.dylibFailureCounter >= 5) {
             Server().log(`Failed to start ${this.name} DYLIB 3 times in a row, giving up...`, "error");
         }
+
+        this.isInjecting = false;
     }
 
     async hideApp() {
@@ -128,39 +146,9 @@ export abstract class DylibPlugin {
         }
     }
 
-    async waitForDylibDeath(): Promise<void> {
-        if (this.dylibProcess == null) return;
-
-        return new Promise((resolve, _) => {
-            // Catch the error so the promise doesn't throw a no-catch error.
-            this.dylibProcess
-                .catch(() => {
-                    /** Do nothing */
-                })
-                .finally(resolve);
-        });
-    }
-
     async stop() {
         this.isStopping = true;
-
-        let killedDylib = false;
-        try {
-            this.dylibFailureCounter = 0;
-            if (this.dylibProcess != null && !(this.dylibProcess?.child?.killed ?? false)) {
-                Server().log(`Killing ${this.name} DYLIB...`, "debug");
-                await this.dylibProcess.kill(9);
-                killedDylib = true;
-            }
-        } catch (ex) {
-            Server().log(`Failed to stop ${this.name} DYLIB! Error: ${ex.toString()}`, "debug");
-        }
-
-        // Wait for the dylib to die
-        if (killedDylib) {
-            await this.waitForDylibDeath();
-        }
-
+        await this.stopParentProcess();
         this.isStopping = false;
     }
 }

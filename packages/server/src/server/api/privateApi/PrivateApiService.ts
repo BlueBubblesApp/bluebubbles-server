@@ -168,7 +168,7 @@ export class PrivateApiService {
 
             if (this.restartCounter <= 5) {
                 this.restartCounter += 1;
-                this.start();
+                this.restart();
             } else {
                 this.log("Max restart count reached for Private API listener...");
                 this.stop();
@@ -343,8 +343,6 @@ export class PrivateApiService {
 
         try {
             if (this.server && this.server.listening) {
-                this.log("Stopping Private API Helper...", "debug");
-
                 this.server.removeAllListeners();
                 this.server.close();
                 this.server = null;
@@ -354,5 +352,6 @@ export class PrivateApiService {
         }
 
         await this.mode?.stop();
+        this.log(`Private API Helper Stopped...`);
     }
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Spacer,
     Box,
@@ -28,6 +28,7 @@ import { useAppSelector } from '../../hooks';
 import { buildQrData, copyToClipboard } from '../../utils/GenericUtils';
 import { BiCopy } from 'react-icons/bi';
 import { TotalMessagesStatBox, TopGroupStatBox, BestFriendStatBox, DailyMessagesStatBox, TotalPicturesStatBox, TotalVideosStatBox } from 'app/components/stats';
+import { TimeframeDropdownField } from 'app/components/fields/TimeframeDropdownField';
 
 
 export const HomeLayout = (): JSX.Element => {
@@ -37,6 +38,7 @@ export const HomeLayout = (): JSX.Element => {
     const qrCode: any = buildQrData(password, address);
     const computerId = useAppSelector(state => state.config.computer_id);
     const iMessageEmail = useAppSelector(state => state.config.detected_imessage);
+    const [statDays, setStatDays] = useState(180);
 
     return (
         <Box p={3} borderRadius={10}>
@@ -153,38 +155,46 @@ export const HomeLayout = (): JSX.Element => {
                     </Flex>
                 </Stack>
                 <Stack direction='column' pl={5} pr={5} pb={5} pt={2}>
-                    <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
-                        <Text fontSize='2xl'>iMessage Highlights</Text>
-                        <Popover trigger='hover'>
-                            <PopoverTrigger>
-                                <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
-                                    <AiOutlineInfoCircle />
-                                </Box>
-                            </PopoverTrigger>
-                            <PopoverContent>
-                                <PopoverArrow />
-                                <PopoverCloseButton />
-                                <PopoverHeader>Information</PopoverHeader>
-                                <PopoverBody>
-                                    <Text>
-                                        These are just some fun stats that I included to give you a quick "snapshot"
-                                        of your iMessage history on the Mac Device. This does not include messages that
-                                        are on Apple's servers, only what is local to this device.
-                                    </Text>
-                                </PopoverBody>
-                            </PopoverContent>
-                        </Popover>
+                    <Flex flexDirection='row' justifyContent='space-between' alignItems='center'>
+                        <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
+                            <Text fontSize='2xl' minW="fit-content">iMessage Highlights</Text>
+                            <Popover trigger='hover'>
+                                <PopoverTrigger>
+                                    <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
+                                        <AiOutlineInfoCircle />
+                                    </Box>
+                                </PopoverTrigger>
+                                <PopoverContent>
+                                    <PopoverArrow />
+                                    <PopoverCloseButton />
+                                    <PopoverHeader>Information</PopoverHeader>
+                                    <PopoverBody>
+                                        <Text>
+                                            These are just some fun stats that I included to give you a quick "snapshot"
+                                            of your iMessage history on the Mac Device. This does not include messages that
+                                            are on Apple's servers, only what is local to this device.
+                                        </Text>
+                                    </PopoverBody>
+                                </PopoverContent>
+                            </Popover>
+                        </Flex>
+                        <TimeframeDropdownField
+                            onChange={(value: number) => {
+                                setStatDays(value);
+                            }}
+                            selectedDays={statDays}
+                        />
                     </Flex>
                     <Divider orientation='horizontal' />
                     <Spacer />
                     { /* Delays are so older systems do not freeze when requesting data from the databases */ }
                     <SimpleGrid columns={3} spacing={5}>
-                        <TotalMessagesStatBox />
-                        <TopGroupStatBox delay={200} />
-                        <BestFriendStatBox delay={400} />
+                        <TotalMessagesStatBox pastDays={statDays} />
+                        <TopGroupStatBox delay={200} pastDays={statDays} />
+                        <BestFriendStatBox delay={400} pastDays={statDays} />
                         <DailyMessagesStatBox delay={600} />
-                        <TotalPicturesStatBox delay={800} />
-                        <TotalVideosStatBox delay={1000} />
+                        <TotalPicturesStatBox delay={800} pastDays={statDays} />
+                        <TotalVideosStatBox delay={1000} pastDays={statDays} />
                     </SimpleGrid>
                 </Stack>
             </Flex>

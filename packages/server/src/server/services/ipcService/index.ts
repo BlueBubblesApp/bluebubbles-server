@@ -211,31 +211,31 @@ export class IPCService {
 
         ipcMain.handle("get-chat-image-count", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "image" });
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "image", after: args?.after });
             return count;
         });
 
         ipcMain.handle("get-chat-video-count", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "video" });
+            const count = await Server().iMessageRepo.getMediaCountsByChat({ mediaType: "video", after: args?.after });
             return count;
         });
 
         ipcMain.handle("get-group-message-counts", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatMessageCounts("group");
+            const count = await Server().iMessageRepo.getChatMessageCounts("group", args?.after);
             return count;
         });
 
         ipcMain.handle("get-individual-message-counts", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const count = await Server().iMessageRepo.getChatMessageCounts("individual");
+            const count = await Server().iMessageRepo.getChatMessageCounts("individual", args?.after);
             return count;
         });
 
         ipcMain.handle("get-best-friend", async (event, args) => {
             if (!Server().iMessageRepo?.db) return 0;
-            const counts = await Server().iMessageRepo.getChatMessageCounts("individual");
+            const counts = await Server().iMessageRepo.getChatMessageCounts("individual", args?.after);
 
             let currentTopCount = 0;
             let currentTop: string | null = null;

@@ -47,9 +47,7 @@ export const PrivateApiWalkthrough = (): JSX.Element => {
                     before enabling the setting.
                 </Alert>
                 <Box mt={4} />
-                <PrivateApiField
-                    helpText={'Note: If the plugins folder is missing, you may need to manually install the helper bundle'}
-                />
+                <PrivateApiField />
             </Box>
         </SlideFade>
     );

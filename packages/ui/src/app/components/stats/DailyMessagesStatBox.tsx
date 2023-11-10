@@ -29,6 +29,7 @@ export const DailyMessagesStatBox = (
             autoUpdate={autoUpdate}
             updateInterval={updateInterval}
             delay={delay}
+            pastDays={0}
         />
     );
 };

@@ -18,7 +18,8 @@ import { reinstallHelperBundle } from '../../utils/IpcUtils';
 import { PrivateApiStatus } from '../PrivateApiStatus';
 
 export interface PrivateApiFieldProps {
-    helpText?: string;
+    helpTextMessages?: string;
+    helpTextFaceTime?: string;
 }
 
 const confirmationActions: ConfirmationItems = {
@@ -31,8 +32,9 @@ const confirmationActions: ConfirmationItems = {
     }
 };
 
-export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element => {
+export const PrivateApiField = ({ helpTextMessages, helpTextFaceTime }: PrivateApiFieldProps): JSX.Element => {
     const privateApi: boolean = (useAppSelector(state => state.config.enable_private_api) ?? false);
+    const ftPrivateApi: boolean = (useAppSelector(state => state.config.enable_ft_private_api) ?? false);
     const alertRef = useRef(null);
     const [requiresConfirmation, confirm] = useState((): string | null => {
         return null;
@@ -45,29 +47,47 @@ export const PrivateApiField = ({ helpText }: PrivateApiFieldProps): JSX.Element
                 <PrivateApiStatus />
             </Stack>
             <FormControl mt={5}>
-                <Stack direction='row'>
+                <Stack direction='column'>
+                    <Button size='xs' width="150px" mb={2}>
+                        <Link target="_blank" href="https://docs.bluebubbles.app/private-api/">
+                            Private API Setup Docs
+                        </Link>
+                    </Button>
                     <Checkbox
                         id='enable_private_api'
                         isChecked={privateApi}
                         onChange={onCheckboxToggle}
                     >
-                        Private API
+                        Messages Private API
                     </Checkbox>
-                    <Button size='xs'>
-                        <Link target="_blank" href="https://docs.bluebubbles.app/private-api/">
-                            Private API Setup Docs
-                        </Link>
-                    </Button>
+                    <FormHelperText>
+                        {helpTextMessages ?? (
+                            <Text>
+                                If you have set up the Private API features,
+                                enable this option to allow the server to communicate with the iMessage Private APIs.
+                                This will run an instance of the Messages app with our helper dylib injected into it.
+                                Enabling this will allow you to send reactions, replies, editing, effects, use FindMy, etc.
+                            </Text>
+                        )}
+                    </FormHelperText>
+                    <Checkbox
+                        id='enable_ft_private_api'
+                        isChecked={ftPrivateApi}
+                        onChange={onCheckboxToggle}
+                    >
+                        FaceTime Private API
+                    </Checkbox>
+                    <FormHelperText>
+                        {helpTextFaceTime ?? (
+                            <Text>
+                                If you have set up the Private API features,
+                                enable this option to allow the server to communicate with the FaceTime Private APIs.
+                                This will run an instance of the FaceTime app with our helper dylib injected into it.
+                                Enabling this will allow the server to detect incoming FaceTime calls.
+                            </Text>
+                        )}
+                    </FormHelperText>
                 </Stack>
-                <FormHelperText>
-                    {helpText ?? (
-                        <Text>
-                            If you have set up the Private API features,
-                            enable this option to allow the server to communicate with the iMessage Private API. If you
-                            have not done the Private API setup, use the button above to read the documentation.
-                        </Text>
-                    )}
-                </FormHelperText>
             </FormControl>
 
             <ConfirmationDialog

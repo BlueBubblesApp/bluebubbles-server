@@ -20,6 +20,7 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     check_for_updates: () => 1,
     auto_install_updates: () => 0,
     enable_private_api: () => 0,
+    enable_ft_private_api: () => 0,
     use_oled_dark_mode: () => 0,
     db_poll_interval: () => 1000,
     dock_badge: () => 1,
