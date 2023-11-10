@@ -93,7 +93,6 @@ export const UpdatableStatBox = (
         if (pastDays) {
             if (!finalArgs) finalArgs = {};
             finalArgs.after = new Date(new Date().getTime() - (pastDays * 86_400_000));
-            console.log(finalArgs);
         }
 
         ipcRenderer.invoke(ipcEvent, finalArgs).then(async (value) => {
