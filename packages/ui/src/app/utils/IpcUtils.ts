@@ -81,15 +81,15 @@ export const updateWebhook = async ({ id, url, events }: { id: number, url?: str
     return await ipcRenderer.invoke('update-webhook', { id, url, events });
 };
 
-export const createToken = async (payload: { name: string, password: string, events: Array<MultiSelectValue> }) => {
+export const createToken = async (payload: { name: string, password: string, expireAt: number }) => {
     return await ipcRenderer.invoke('create-token', payload);
 };
 
-export const updateToken = async (payload: { name: string, password: string, events: Array<MultiSelectValue> }) => {
+export const updateToken = async (payload: { name: string, password: string, expireAt: number }) => {
     return await ipcRenderer.invoke('update-token', payload);
 };
 
-export const deleteToken = async (payload: { name: string, events: Array<MultiSelectValue> }) => {
+export const deleteToken = async (payload: { name: string }) => {
     return await ipcRenderer.invoke('delete-token', payload);
 };
 

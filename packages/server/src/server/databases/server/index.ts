@@ -297,16 +297,19 @@ export class ServerRepository extends EventEmitter {
     public async updateToken({
         name,
         password,
+        expireAt
     }: {
         name: string;
         password: string;
+        expireAt: number;
     }): Promise<Token> {
-        const hashedPass = await crypto.createHash('sha1').update(password).digest('hex');
         const repo = this.tokens();
         const item = await repo.findOneBy({ name });
         if (!item) throw new Error("Failed to update token! Existing token does not exist!");
         
         if (name) item.name = name;
+        item.password = password
+        item.expireAt = expireAt
 
         repo.update(name, item)
         return item
@@ -315,12 +318,14 @@ export class ServerRepository extends EventEmitter {
     public async createToken({
         name,
         password,
+        expireAt
     }: {
         name: string;
         password: string;
+        expireAt: number;
     }): Promise<Token> {
         const repo = this.tokens();
-        const token = repo.create({ name: name, password: password });
+        const token = repo.create({ name: name, password: password, expireAt: expireAt, createdAt: Date.now() });
         return await repo.save(token);
     }
 

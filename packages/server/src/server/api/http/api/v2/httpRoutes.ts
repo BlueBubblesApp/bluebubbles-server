@@ -633,6 +633,11 @@ export class HttpRoutes {
                         method: HttpMethod.POST,
                         path: "delete",
                         controller: TokenRouter.delete
+                    }, 
+                    {
+                        method: HttpMethod.POST,
+                        path: "refresh",
+                        controller: TokenRouter.refresh
                     }
                 ]
             },

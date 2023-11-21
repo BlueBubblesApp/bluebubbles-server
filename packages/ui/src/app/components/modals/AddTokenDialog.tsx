@@ -11,8 +11,6 @@ import {
     Input,
     Text
 } from '@chakra-ui/react';
-import { tokenEventOptions } from '../../constants';
-import { MultiSelectValue } from '../../types';
 import { useAppDispatch } from '../../hooks';
 import { create, update } from '../../slices/TokenSlice';
 
@@ -33,8 +31,8 @@ export const AddTokenDialog = ({
 }: AddTokenDialogProps): JSX.Element => {
     const [tokenName, setTokenName] = useState('');
     const [tokenPass, setTokenPass] = useState('');
+    const [tokenExpireAt, setTokenExpireAt] = useState('');
     const dispatch = useAppDispatch();
-    const [selectedEvents] = useState(tokenEventOptions.filter((option: any) => option.label === 'All Events') as Array<MultiSelectValue>);
     
     return(
         <AlertDialog
@@ -67,6 +65,14 @@ export const AddTokenDialog = ({
                                 setTokenPass(e.target.value);
                             }}
                         />
+                        <Input 
+                            id="tokenExpireAt"
+                            type="date"
+                            value={tokenExpireAt}
+                            onChange={(e) => {
+                                setTokenExpireAt(e.target.value);
+                            }}
+                        />
                     </AlertDialogBody>
                     <AlertDialogFooter>
                         <Button
@@ -90,10 +96,11 @@ export const AddTokenDialog = ({
                                 if (tokenPass.length == 0) {
                                     return;
                                 }
+                                const date = new Date(tokenExpireAt).getTime();
                                 if (existingId) {
-                                    dispatch(update({ name: tokenName, password: tokenPass, events: selectedEvents }));
+                                    dispatch(update({ name: tokenName, password: tokenPass, expireAt: date }));
                                 } else {
-                                    dispatch(create({ name: tokenName, password: tokenPass, events: selectedEvents }));
+                                    dispatch(create({ name: tokenName, password: tokenPass, expireAt: date }));
                                 }
 
                                 setTokenName('');

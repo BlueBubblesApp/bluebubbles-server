@@ -416,11 +416,11 @@ export class IPCService {
         });
 
         ipcMain.handle("create-token", async(event, args) => {
-            return await Server().repo.createToken({ name: args.name, password: args.password });
+            return await Server().repo.createToken({ name: args.name, password: args.password, expireAt: args.expireAt });
         });
 
         ipcMain.handle("update-token", async(event, args) => {
-            return await Server().repo.updateToken({ name: args.name, password: args.password });
+            return await Server().repo.updateToken({ name: args.name, password: args.password, expireAt: args.expireAt });
         });
 
         ipcMain.handle("delete-token", async(event, args) => {

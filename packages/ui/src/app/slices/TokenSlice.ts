@@ -2,13 +2,13 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { clearDevices, deleteToken, updateToken } from '../utils/IpcUtils';
 import { showErrorToast, showSuccessToast } from '../utils/ToastUtils';
 import { createToken } from '../utils/IpcUtils';
-import { MultiSelectValue } from 'app/types';
 import { store } from 'app/store';
 
 
 export interface TokenItem {
     name: string,
     password: string,
+    expireAt: number,
 }
 
 interface TokenState {
@@ -31,7 +31,7 @@ export const TokenSlice = createSlice({
                 if (!exists) state.tokens.push(i);
             }
         },
-        create: (state, action: PayloadAction<{ name: string, password: string, events: Array<MultiSelectValue> }>) => {
+        create: (state, action: PayloadAction<{ name: string, password: string, expireAt: number }>) => {
             const exists = state.tokens.find(e => e.name === action.payload.name);
             if (exists) {
                 return showErrorToast({
@@ -64,7 +64,9 @@ export const TokenSlice = createSlice({
                 });
             });
         },
-        update: (state, action: PayloadAction<{ name: string, password: string, events: Array<MultiSelectValue> }>) => {
+        update: (state, action: PayloadAction<{
+            expireAt: number; name: string, password: string 
+        }>) => {
             const existingIndex = state.tokens.findIndex(e => e.name === action.payload.name);
             if (existingIndex === -1) {
                 return showErrorToast({
@@ -76,15 +78,13 @@ export const TokenSlice = createSlice({
 
             // Update it in the state
             state.tokens = state.tokens.map(e => (e.name === action.payload.name) ?
-                { ...e, url: action.payload.name, events: JSON.stringify(action.payload.events.map(i => {
-                    return i.value;
-                })) } : e);
+                { ...e, name: action.payload.name, expireAt: action.payload.expireAt } : e);
 
             // Send the update to the backend
             updateToken({
                 name: action.payload.name,
                 password: action.payload.password,
-                events: action.payload.events
+                expireAt: action.payload.expireAt,
             }).then(() => {
                 showSuccessToast({
                     id: 'tokens',
@@ -110,8 +110,7 @@ export const TokenSlice = createSlice({
     
             state.tokens.splice(existingIndex, 1);
             deleteToken({
-                name: action.payload,
-                events: []
+                name: action.payload
             }).then(() => {
                 showSuccessToast({
                     id: 'tokens',

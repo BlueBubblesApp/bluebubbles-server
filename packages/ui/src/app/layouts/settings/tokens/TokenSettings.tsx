@@ -32,12 +32,14 @@ export const TokensTable = ({ tokens }: { tokens: Array<TokenItem> }): JSX.Eleme
             <Thead>
                 <Tr>
                     <Th>Name</Th>
+                    <Th>Expire At</Th>
                 </Tr>
             </Thead>
             <Tbody>
                 {tokens.map(item => (
                     <Tr key={item.name}>
                         <Td wordBreak='break-all'>{item.name}</Td>
+                        <Td wordBreak='break-all'>{item.expireAt}</Td>
                         <Tooltip label='Delete' placement='bottom'>
                             <GridItem _hover={{ cursor: 'pointer' }} onClick={() => dispatch(remove(item.name))}>
                                 <Icon as={FiTrash} />
