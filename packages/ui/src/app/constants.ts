@@ -97,6 +97,9 @@ export const webhookEventOptions = [
     }
 ];
 
+export const tokenEventOptions = [
+];
+
 export const scheduledMessageTypeOptions = [
     {
         label: 'Send Message',

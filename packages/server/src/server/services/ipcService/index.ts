@@ -414,5 +414,22 @@ export class IPCService {
             const addr = `${(useCustomCertificate) ? 'https' : 'http'}://${host}:${port}`;
             await Server().repo.setConfig("server_address", addr);
         });
+
+        ipcMain.handle("create-token", async(event, args) => {
+            return await Server().repo.createToken({ name: args.name, password: args.password });
+        });
+
+        ipcMain.handle("update-token", async(event, args) => {
+            return await Server().repo.updateToken({ name: args.name, password: args.password });
+        });
+
+        ipcMain.handle("delete-token", async(event, args) => {
+            return await Server().repo.deleteToken({ name: args.name });
+        });
+
+        ipcMain.handle("get-tokens", async (event, args) => {
+            const res = await Server().repo.getTokens();
+            return res.map(e => ({ name: e.name, password: e.password }));
+        });
     }
 }
