@@ -33,7 +33,7 @@ import {
     createServerErrorResponse,
     createBadRequestResponse,
     createNoDataResponse
-} from "./responses";
+} from "../v1/responses";
 import { MessageSerializer } from "@server/api/serializers/MessageSerializer";
 import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 import { ChatSerializer } from "@server/api/serializers/ChatSerializer";

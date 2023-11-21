@@ -1,7 +1,7 @@
 import { Context, Next } from "koa";
 import { Server } from "@server";
 import { safeTrim } from "@server/helpers/utils";
-import { ServerError, Unauthorized } from "../responses/errors";
+import { ServerError, Unauthorized } from "../../v1/responses/errors";
 
 export const AuthMiddleware = async (ctx: Context, next: Next) => {
     // Make sure we have a token
