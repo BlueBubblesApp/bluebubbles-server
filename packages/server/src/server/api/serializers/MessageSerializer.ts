@@ -163,6 +163,7 @@ export class MessageSerializer {
             hasPayloadData: !!message.payloadData
         };
 
+        // Non-essentials
         if (!isForNotification) {
             output = {
                 ...output,
@@ -183,7 +184,9 @@ export class MessageSerializer {
                         ? message.timeExpressiveSendStyleId.getTime()
                         : null,
                     isAudioMessage: message.isAudioMessage,
-                    replyToGuid: message.replyToGuid
+                    replyToGuid: message.replyToGuid,
+                    shareStatus: message.shareStatus,
+                    shareDirecation: message.shareDirection
                 }
             };
 
