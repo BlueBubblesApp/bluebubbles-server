@@ -18,6 +18,7 @@ export class AttachmentValidator {
         height: "numeric|min:1",
         width: "numeric|min:1",
         quality: "string|in:good,better,best",
+        force: "boolean",
         original: "boolean"
     };
 

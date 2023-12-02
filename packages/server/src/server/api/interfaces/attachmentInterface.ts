@@ -1,11 +1,11 @@
 import { nativeImage } from "electron";
 import fs from "fs";
-import { getBlurHash, isEmpty } from "@server/helpers/utils";
+import { getBlurHash, isEmpty, resultAwaiter } from "@server/helpers/utils";
 import { FileSystem } from "@server/fileSystem";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import { Server } from "@server";
 
 export class AttachmentInterface {
-
     static livePhotoExts = ["png", "jpeg", "jpg", "heic", "tiff"];
 
     static async getBlurhash({
@@ -45,7 +45,7 @@ export class AttachmentInterface {
         if (isEmpty(fPath)) return null;
 
         // Get the extension
-        const ext = fPath.split(".").pop() ?? '';
+        const ext = fPath.split(".").pop() ?? "";
 
         // If the extension is not an image extension, return null
         if (!AttachmentInterface.livePhotoExts.includes(ext.toLowerCase())) return null;
@@ -54,11 +54,33 @@ export class AttachmentInterface {
         // fs.existsSync is case-insensitive on macOS
         const livePath = ext !== fPath ? fPath.replace(`.${ext}`, ".mov") : `${fPath}.mov`;
         const realPath = FileSystem.getRealPath(livePath);
-        
+
         // If the live photo doesn't exist, return null
         if (!fs.existsSync(realPath)) return null;
 
         // If the .mov file exists, return the path
         return realPath;
+    }
+
+    static async forceDownload(attachment: Attachment): Promise<Attachment> {
+        await Server().privateApi.attachment.downloadPurged(attachment.guid);
+
+        attachment = await resultAwaiter({
+            maxWaitMs: 1000 * 60 * 10,
+            initialWaitMs: 1000 * 5,
+            waitMultiplier: 1,
+            getData: (_: any) => {
+                return Server().iMessageRepo.getAttachment(attachment.guid);
+            },
+            dataLoopCondition: (data: Attachment) => {
+                return !data || data.transferState !== 5;
+            }
+        });
+
+        if (!attachment || attachment.transferState !== 5) {
+            throw new Error(`Failed to download attachment! Transfer State: ${attachment?.transferState}`);
+        }
+
+        return attachment;
     }
 }
