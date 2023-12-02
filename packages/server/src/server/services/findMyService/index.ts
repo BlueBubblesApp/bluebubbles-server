@@ -1,12 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import {
-    hideFindMyFriends,
-    startFindMyFriends,
-    showFindMyFriends,
-    quitFindMyFriends
-} from "@server/api/apple/scripts";
+import { hideFindMyFriends, startFindMyFriends, showFindMyFriends, quitFindMyFriends } from "@server/api/apple/scripts";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 import { FindMyDevice, FindMyItem } from "@server/services/findMyService/types";
@@ -96,9 +91,6 @@ export class FindMyService {
     }
 
     static async refresh(): Promise<void> {
-        const devicesPath = path.join(FileSystem.findMyDir, "Devices.data");
-        if (!fs.existsSync(devicesPath)) return null;
-
         // Quit the FindMy app if it's been more than 2 minutes since the last refresh
         const now = new Date().getTime();
         if (now - FindMyService.quitAppTime > 120_000) {
@@ -108,9 +100,9 @@ export class FindMyService {
         }
 
         // Make sure the Find My app is open.
-        // Give it 3 seconds to open
+        // Give it 10 seconds to open
         await FileSystem.executeAppleScript(startFindMyFriends());
-        await waitMs(5000);
+        await waitMs(10000);
 
         // Bring the Find My app to the foreground so it refreshes the devices
         // Give it 5 seconods to refresh
