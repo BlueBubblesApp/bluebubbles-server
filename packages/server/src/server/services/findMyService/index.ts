@@ -105,9 +105,9 @@ export class FindMyService {
         await waitMs(5000);
 
         // Bring the Find My app to the foreground so it refreshes the devices
-        // Give it 10 seconods to refresh
+        // Give it 15 seconods to refresh
         await FileSystem.executeAppleScript(showFindMyFriends());
-        await waitMs(10000);
+        await waitMs(15000);
 
         // Re-hide the Find My App
         await FileSystem.executeAppleScript(hideFindMyFriends());
