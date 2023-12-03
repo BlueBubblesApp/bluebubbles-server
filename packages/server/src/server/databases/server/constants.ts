@@ -31,5 +31,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     // String because we don't handle actual integers well.
     // That needs to change... at another time.
     // 0.0 to prevent parsing as a boolean
-    start_delay: () => '0.0',
+    start_delay: () => "0.0",
+    facetime_calling: () => 0
 };

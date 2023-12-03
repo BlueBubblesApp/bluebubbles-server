@@ -16,6 +16,7 @@ import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../modals/ConfirmationDialog';
 import { reinstallHelperBundle } from '../../utils/IpcUtils';
 import { PrivateApiStatus } from '../PrivateApiStatus';
+import { FaceTimeCallingField } from './FaceTimeCallingField';
 
 export interface PrivateApiFieldProps {
     helpTextMessages?: string;
@@ -87,6 +88,9 @@ export const PrivateApiField = ({ helpTextMessages, helpTextFaceTime }: PrivateA
                             </Text>
                         )}
                     </FormHelperText>
+                    {(ftPrivateApi) ? (
+                        <FaceTimeCallingField />
+                    ) : null}
                 </Stack>
             </FormControl>
 
