@@ -44,7 +44,11 @@ export class AttachmentRouter {
             }
 
             // Try to force download the attachment
-            await AttachmentInterface.forceDownload(attachment);
+            try {
+                await AttachmentInterface.forceDownload(attachment);
+            } catch (ex) {
+                Server().log(`Failed for force download attachment (GUID: ${attachment.guid}): ${String(ex)}`);
+            }
         }
 
         let aPath = FileSystem.getRealPath(attachment.filePath);
