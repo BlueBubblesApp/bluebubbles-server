@@ -186,7 +186,7 @@ export class MessageSerializer {
                     isAudioMessage: message.isAudioMessage,
                     replyToGuid: message.replyToGuid,
                     shareStatus: message.shareStatus,
-                    shareDirecation: message.shareDirection
+                    shareDirection: message.shareDirection
                 }
             };
 
