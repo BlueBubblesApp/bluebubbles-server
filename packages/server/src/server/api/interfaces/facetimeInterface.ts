@@ -1,6 +1,6 @@
 import { Server } from "@server";
 import { FaceTimeSession } from "../lib/facetime/FaceTimeSession";
-import { isMinBigSur } from "@server/env";
+import { isMinMonterey } from "@server/env";
 import { checkPrivateApiStatus } from "@server/helpers/utils";
 
 /**
@@ -9,7 +9,7 @@ import { checkPrivateApiStatus } from "@server/helpers/utils";
 export class FaceTimeInterface {
     static async create(): Promise<string> {
         checkPrivateApiStatus();
-        if (!isMinBigSur) throw new Error("Creating FaceTime calls is only available on macOS Big Sur and newer!");
+        if (!isMinMonterey) throw new Error("Creating FaceTime calls is only available on macOS Big Sur and newer!");
         const session = await FaceTimeSession.fromGeneratedLink(null);
         session.admitAndLeave();
         return session.url;
@@ -17,13 +17,13 @@ export class FaceTimeInterface {
 
     static async answer(callUuid: string): Promise<string> {
         checkPrivateApiStatus();
-        if (!isMinBigSur) throw new Error("Answering FaceTime calls is only available on macOS Big Sur and newer!");
+        if (!isMinMonterey) throw new Error("Answering FaceTime calls is only available on macOS Big Sur and newer!");
         return await FaceTimeInterface.answerAndWaitForLink(callUuid);
     }
 
     static async leave(callUuid: string): Promise<void> {
         checkPrivateApiStatus();
-        if (!isMinBigSur) throw new Error("Leaving FaceTime calls is only available on macOS Big Sur and newer!");
+        if (!isMinMonterey) throw new Error("Leaving FaceTime calls is only available on macOS Big Sur and newer!");
         await Server().privateApi.facetime.leaveCall(callUuid);
     }
 
