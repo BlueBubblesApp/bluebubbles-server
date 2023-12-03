@@ -1308,7 +1308,7 @@ class BlueBubblesServer extends EventEmitter {
             // Since this is a message update, we do not need to include the participants or chats
             await this.emitMessage(
                 MESSAGE_UPDATED,
-                MessageSerializer.serialize({
+                await MessageSerializer.serialize({
                     message: newMessage,
                     config: {
                         loadChatParticipants: false,
