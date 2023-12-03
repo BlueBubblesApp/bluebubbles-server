@@ -42,7 +42,7 @@ import { isValidServerConfig, isValidClientConfig, isValidFirebaseUrl } from '..
 import { ErrorDialog, ErrorItem } from '../../components/modals/ErrorDialog';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 import { hasKey, readFile } from '../../utils/GenericUtils';
-import { getFcmConfig, getOauthUrl, restartOauthService } from '../../utils/IpcUtils';
+import { clearDevices, getFcmConfig, getOauthUrl, restartOauthService } from '../../utils/IpcUtils';
 import { clearFcmConfiguration, saveFcmClient, saveFcmServer } from '../../actions/FcmActions';
 import { ConfigItem, setConfig, setConfigBulk } from '../../slices/ConfigSlice';
 import { ProgressStatus } from '../../types';
@@ -58,6 +58,7 @@ let dragCounter = 0;
 export const NotificationsLayout = (): JSX.Element => {
     const dispatch = useAppDispatch();
     const alertRef = useRef(null);
+    const serverFcm = useAppSelector(state => state.config.fcm_server as Record<string, any>);
     const serverLoaded = (useAppSelector(state => state.config.fcm_server !== null) ?? false);
     const clientLoaded = (useAppSelector(state => state.config.fcm_client !== null) ?? false);
     const [isDragging, setDragging] = useBoolean();
@@ -66,6 +67,7 @@ export const NotificationsLayout = (): JSX.Element => {
     const [oauthUrl, setOauthUrl] = useState('');
     const [errors, setErrors] = useState([] as Array<ErrorItem>);
     const [requiresConfirmation, setRequiresConfirmation] = useState(null as string | null);
+    const [confirmParams, setConfirmParams] = useState({} as Record<string, any>);
     const alertOpen = errors.length > 0;
 
     const confirmationActions: NodeJS.Dict<any> = {
@@ -82,6 +84,20 @@ export const NotificationsLayout = (): JSX.Element => {
                     dispatch(setConfig({ name: 'fcm_server', 'value': null }));
                     setAuthStatus(ProgressStatus.NOT_STARTED);
                 }
+            }
+        },
+        overwriteFirebase: {
+            message: (
+                'It looks like your Firebase project has changed!<br /><br />' +
+                'Continuing will automatically clear your registered devices. ' +
+                'This is to make sure that your devices are connected to the correct ' +
+                'Firebase project. You may need to re-register your devices!'
+            ),
+            func: async () => {
+                // Clear devices if they continue
+                await clearDevices();
+                dispatch(setConfig({ name: 'fcm_server', 'value': confirmParams.jsonData }));
+                await saveFcmServer(confirmParams.jsonData);
             }
         }
     };
@@ -122,6 +138,30 @@ export const NotificationsLayout = (): JSX.Element => {
 
     logs = logs.filter(log => log.message.startsWith('[GCP]'));
 
+    const needsConfirmation = async (files: Blob[]): Promise<boolean> => {
+        if (serverFcm?.project_id == null) return false;
+
+        // Only return true if one of the files is a server config,
+        // and the project ID does not match the original.
+        for (let i = 0; i < files.length; i++) {
+            try {
+                const fileStr = await readFile(files[i]);
+                const validServer = isValidServerConfig(fileStr);
+                const jsonData = JSON.parse(fileStr);
+
+                if (!validServer) continue;
+
+                if (serverFcm.project_id !== jsonData.project_id) {
+                    return true;
+                }
+            } catch (ex: any) {
+                errors.push({ id: String(i), message: ex?.message ?? String(ex) });
+            }
+        }
+
+        return false;
+    };
+
     const onDrop = async (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
 
@@ -135,6 +175,9 @@ export const NotificationsLayout = (): JSX.Element => {
             listCopy.push(e.dataTransfer.files.item(i) as Blob);
         }
 
+        // Check if the project ID has changed
+        const mustConfirm = await needsConfirmation(listCopy);
+
         // Actually read the files
         const errors: Array<ErrorItem> = [];
         for (let i = 0; i < listCopy.length; i++) {
@@ -147,17 +190,22 @@ export const NotificationsLayout = (): JSX.Element => {
                 if (validClient) {
                     const test = isValidFirebaseUrl(jsonData);
                     if (test) {
-                        await saveFcmClient(jsonData);
                         dispatch(setConfig({ name: 'fcm_client', 'value': jsonData }));
+                        await saveFcmClient(jsonData);
                     } else {
                         throw new Error(
                             'Your Firebase setup does not have a real-time database enabled. ' +
                             'Please enable the real-time database in your Firebase Console.'
                         );
                     }
-                } else if (validServer) {
-                    await saveFcmServer(jsonData);
+                } else if (validServer && !mustConfirm) {
+                    // If we don't need to confirm, invoke save FCM normally
                     dispatch(setConfig({ name: 'fcm_server', 'value': jsonData }));
+                    await saveFcmServer(jsonData);
+                } else if (validServer && mustConfirm) {
+                    // Invoke the confirmation dialog
+                    setConfirmParams({ jsonData });
+                    confirm('overwriteFirebase');
                 } else {
                     throw new Error('Invalid Google FCM File!');
                 }
