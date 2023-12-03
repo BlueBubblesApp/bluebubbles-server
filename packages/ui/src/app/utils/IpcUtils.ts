@@ -21,6 +21,10 @@ export const getFcmConfig = async (): Promise<FcmConfig> => {
     };
 };
 
+export const getEnv = async () => {
+    return await ipcRenderer.invoke('get-env');
+};
+
 export const getDevices = async () => {
     return await ipcRenderer.invoke('get-devices');
 };
