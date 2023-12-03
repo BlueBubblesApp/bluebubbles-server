@@ -7,18 +7,8 @@ import { MessageTypeTransformer } from "@server/databases/transformers/MessageTy
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
-import {
-    isEmpty,
-    sanitizeStr
-} from "@server/helpers/utils";
-import {
-    isMinBigSur,
-    isMinCatalina,
-    isMinHighSierra,
-    isMinMonterey,
-    isMinSierra,
-    isMinVentura
-} from "@server/env";
+import { isEmpty, sanitizeStr } from "@server/helpers/utils";
+import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMonterey, isMinSierra, isMinVentura } from "@server/env";
 import { NSAttributedString } from "node-typedstream";
 import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
 import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
@@ -372,13 +362,8 @@ export class Message {
     @Column({ name: "group_action_type", type: "integer", default: 0 })
     groupActionType: number;
 
-    @Column({
-        name: "share_status",
-        type: "integer",
-        transformer: BooleanTransformer,
-        default: 0
-    })
-    shareStatus: boolean;
+    @Column({ name: "share_status", type: "integer", default: 0 })
+    shareStatus: number;
 
     @Column({ name: "share_direction", type: "integer", default: 0 })
     shareDirection: number;

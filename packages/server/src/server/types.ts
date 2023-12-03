@@ -72,8 +72,8 @@ export type MessageResponse = {
     hasPayloadData?: boolean;
     wasDeliveredQuietly?: boolean;
     didNotifyRecipient?: boolean;
-    shareStatus?: boolean;
-    shareDirection?: boolean;
+    shareStatus?: number | null;
+    shareDirection?: number | null;
 };
 
 export type HandleResponse = {
