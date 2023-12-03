@@ -21,9 +21,10 @@ export const FaceTimeCallingField = ({ helpText }: ExperimentalFaceTimeFeaturesF
             <FormHelperText>
                 {helpText ?? (
                     <Text>
-                        When enabled, the server will detect incoming FaceTime calls and attempt
-                        to generate a link for it. It'll then send a notification to connected
-                        devices, allowing you to join remotely.
+                        When enabled, the server will detect incoming FaceTime calls and forward
+                        a notification to your device. If you choose to answer the the call
+                        from the notification, the server will attempt to generate a link
+                        for you to join with.
                     </Text>
                 )}
             </FormHelperText>
