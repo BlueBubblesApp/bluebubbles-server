@@ -5,11 +5,9 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 import type { ValidTapback, ValidRemoveTapback } from "@server/types";
-import { isMinCatalina } from "@server/env";
-
+import { isMinCatalina, isMinMonterey } from "@server/env";
 
 export class PrivateApiMessage extends PrivateApiAction {
-
     async send(
         chatGuid: string,
         message: string,
@@ -35,7 +33,7 @@ export class PrivateApiMessage extends PrivateApiAction {
         };
 
         if (isMinCatalina) {
-            data.ddScan = ddScan ? 1 : 0
+            data.ddScan = ddScan ? 1 : 0;
         }
 
         return this.sendApiMessage("send-message", data, request);
@@ -65,8 +63,8 @@ export class PrivateApiMessage extends PrivateApiAction {
             partIndex
         };
 
-        if (isMinCatalina) {
-            data.ddScan = ddScan ? 1 : 0
+        if (isMinMonterey) {
+            data.ddScan = ddScan ? 1 : 0;
         }
 
         return this.sendApiMessage(action, data, request);
@@ -78,7 +76,7 @@ export class PrivateApiMessage extends PrivateApiAction {
         reactionType: ValidTapback | ValidRemoveTapback,
         partIndex?: number
     ): Promise<TransactionResult> {
-        const action = 'send-reaction';
+        const action = "send-reaction";
         this.throwForNoMissingFields(action, [chatGuid, selectedMessageGuid, reactionType]);
 
         const request = new TransactionPromise(TransactionType.MESSAGE);

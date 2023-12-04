@@ -13,12 +13,35 @@ import { getContactPermissionStatus, requestContactPermission } from "@server/ut
 import { ScheduledMessagesInterface } from "@server/api/interfaces/scheduledMessagesInterface";
 import { ChatInterface } from "@server/api/interfaces/chatInterface";
 import { GeneralInterface } from "@server/api/interfaces/generalInterface";
+import {
+    isMinBigSur,
+    isMinCatalina,
+    isMinHighSierra,
+    isMinMojave,
+    isMinMonterey,
+    isMinSierra,
+    isMinVentura,
+    isMinSonoma
+} from "@server/env";
 
 export class IPCService {
     /**
      * Starts configuration related inter-process-communication handlers.
      */
     static startIpcListeners() {
+        ipcMain.handle("get-env", async (_, __) => {
+            return {
+                isMinSierra: isMinSierra,
+                isMinHighSierra: isMinHighSierra,
+                isMinMojave: isMinMojave,
+                isMinCatalina: isMinCatalina,
+                isMinBigSur: isMinBigSur,
+                isMinMonterey: isMinMonterey,
+                isMinVentura: isMinVentura,
+                isMinSonoma: isMinSonoma
+            };
+        });
+
         ipcMain.handle("set-config", async (_, args) => {
             // Make sure that the server address being sent is using https (if enabled)
             if (args.server_address) {
@@ -37,7 +60,7 @@ export class IPCService {
             }
 
             // If we are changing the proxy service to a non-custom url service, we need to make sure "use https" is off
-            if (args.proxy_service && !['dynamic-dns', 'lan-url'].includes(args.proxy_service)) {
+            if (args.proxy_service && !["dynamic-dns", "lan-url"].includes(args.proxy_service)) {
                 const httpsStatus = (args.use_custom_certificate ??
                     Server().repo.getConfig("use_custom_certificate")) as boolean;
                 if (httpsStatus) {
@@ -277,8 +300,8 @@ export class IPCService {
         ipcMain.handle("get-current-permissions", async (_, __) => {
             return {
                 accessibility: systemPreferences.isTrustedAccessibilityClient(false),
-                full_disk_access: Server().hasDiskAccess,
-            }
+                full_disk_access: Server().hasDiskAccess
+            };
         });
 
         ipcMain.handle("prompt_accessibility", async (_, __) => {
@@ -409,9 +432,9 @@ export class IPCService {
         ipcMain.handle("save-lan-url", async (_, __) => {
             const useCustomCertificate = Server().repo.getConfig("use_custom_certificate") as boolean;
             const port = Server().repo.getConfig("socket_port") as number;
-            const ips = FileSystem.getLocalIps('IPv4');
-            const host = (ips.length > 0) ? ips[0] : 'localhost';
-            const addr = `${(useCustomCertificate) ? 'https' : 'http'}://${host}:${port}`;
+            const ips = FileSystem.getLocalIps("IPv4");
+            const host = ips.length > 0 ? ips[0] : "localhost";
+            const addr = `${useCustomCertificate ? "https" : "http"}://${host}:${port}`;
             await Server().repo.setConfig("server_address", addr);
         });
     }

@@ -360,7 +360,7 @@ export class FileSystem {
      *
      * @param contents The object data for the FCM client
      */
-    static saveFCMClient(contents: any): void {
+    static saveFCMClient(contents: Record<string, any>): void {
         if (FileSystem.usingCustomFcm) {
             Server().log("Not saving FCM client file because custom FCM path is set", "debug");
         }
@@ -379,7 +379,7 @@ export class FileSystem {
      *
      * @param contents The object data for the FCM server
      */
-    static saveFCMServer(contents: any): void {
+    static saveFCMServer(contents: Record<string, any>): void {
         if (FileSystem.usingCustomFcm) {
             Server().log("Not saving FCM server file because custom FCM path is set", "debug");
         }

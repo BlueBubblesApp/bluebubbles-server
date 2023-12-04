@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     FormControl,
     FormHelperText,
@@ -14,8 +14,9 @@ import { onCheckboxToggle } from '../../actions/ConfigActions';
 import { PrivateApiRequirements } from '../PrivateApiRequirements';
 import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../modals/ConfirmationDialog';
-import { reinstallHelperBundle } from '../../utils/IpcUtils';
+import { getEnv, reinstallHelperBundle } from '../../utils/IpcUtils';
 import { PrivateApiStatus } from '../PrivateApiStatus';
+import { FaceTimeCallingField } from './FaceTimeCallingField';
 
 export interface PrivateApiFieldProps {
     helpTextMessages?: string;
@@ -35,10 +36,17 @@ const confirmationActions: ConfirmationItems = {
 export const PrivateApiField = ({ helpTextMessages, helpTextFaceTime }: PrivateApiFieldProps): JSX.Element => {
     const privateApi: boolean = (useAppSelector(state => state.config.enable_private_api) ?? false);
     const ftPrivateApi: boolean = (useAppSelector(state => state.config.enable_ft_private_api) ?? false);
+    const [env, setEnv] = useState({} as Record<string, any>);
     const alertRef = useRef(null);
     const [requiresConfirmation, confirm] = useState((): string | null => {
         return null;
     });
+
+    useEffect(() => {
+        getEnv().then((env) => {
+            setEnv(env);
+        });
+    }, []);
 
     return (
         <Box mt={1}>
@@ -87,6 +95,9 @@ export const PrivateApiField = ({ helpTextMessages, helpTextFaceTime }: PrivateA
                             </Text>
                         )}
                     </FormHelperText>
+                    {(ftPrivateApi && !!env?.isMinMonterey) ? (
+                        <FaceTimeCallingField />
+                    ) : null}
                 </Stack>
             </FormControl>
 

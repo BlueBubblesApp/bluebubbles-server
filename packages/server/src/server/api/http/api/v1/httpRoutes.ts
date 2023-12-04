@@ -40,7 +40,7 @@ import type { Context, Next } from "koa";
 export class HttpRoutes {
     static version = 1;
 
-    static defaultRequestTimeout = 60 * 1000;  // 1 minute
+    static defaultRequestTimeout = 60 * 1000; // 1 minute
 
     static defaultResponseTimeout = 5 * 60 * 1000; // 5 minutes
 
@@ -93,7 +93,7 @@ export class HttpRoutes {
                         method: HttpMethod.GET,
                         path: "account",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
-                        controller: iCloudRouter.getAccountInfo,
+                        controller: iCloudRouter.getAccountInfo
                     },
                     {
                         method: HttpMethod.POST,
@@ -165,7 +165,7 @@ export class HttpRoutes {
                         path: "update/install",
                         controller: ServerRouter.installUpdate,
                         // 30 minute timeout in the case that they want to wait for the install to complete
-                        responseTimeoutMs: 30 * 60 * 1000,
+                        responseTimeoutMs: 30 * 60 * 1000
                     },
                     {
                         method: HttpMethod.GET,
@@ -230,7 +230,7 @@ export class HttpRoutes {
                         validators: [AttachmentValidator.validateUpload],
                         controller: AttachmentRouter.uploadAttachment,
                         // 30 minute timeout for uploads
-                        requestTimeoutMs: 30 * 60 * 1000,
+                        requestTimeoutMs: 30 * 60 * 1000
                     },
                     {
                         method: HttpMethod.GET,
@@ -238,7 +238,7 @@ export class HttpRoutes {
                         validators: [AttachmentValidator.validateDownload],
                         controller: AttachmentRouter.download,
                         // 30 minute timeout for this to account for people on slow connections
-                        responseTimeoutMs: 30 * 60 * 1000,
+                        responseTimeoutMs: 30 * 60 * 1000
                     },
                     {
                         method: HttpMethod.GET,
@@ -249,7 +249,7 @@ export class HttpRoutes {
                         // 60 minute timeout for this to account for people on slow connections.
                         // Since a "force" means the attachment isnt already downloaded, give it
                         // double the time. The client can timeout if it pleases.
-                        responseTimeoutMs: 60 * 60 * 1000,
+                        responseTimeoutMs: 60 * 60 * 1000
                     },
                     {
                         method: HttpMethod.GET,
@@ -262,7 +262,7 @@ export class HttpRoutes {
                         path: ":guid/live",
                         controller: AttachmentRouter.downloadLive,
                         // 30 minute timeout for this to account for people on slow connections
-                        responseTimeoutMs: 30 * 60 * 1000,
+                        responseTimeoutMs: 30 * 60 * 1000
                     },
                     {
                         method: HttpMethod.GET,
@@ -376,7 +376,7 @@ export class HttpRoutes {
                         path: ":guid/icon",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [ChatValidator.validateGroupChatIcon],
-                        controller: ChatRouter.setGroupChatIcon,
+                        controller: ChatRouter.setGroupChatIcon
                     },
                     {
                         method: HttpMethod.DELETE,
@@ -572,28 +572,28 @@ export class HttpRoutes {
                     }
                 ]
             },
-            // {
-            //     name: "FaceTime",
-            //     middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
-            //     prefix: "facetime",
-            //     routes: [
-            //         {
-            //             method: HttpMethod.POST,
-            //             path: "session",
-            //             controller: FaceTimeRouter.newSession
-            //         },
-            //         {
-            //             method: HttpMethod.POST,
-            //             path: "answer/:call_uuid",
-            //             controller: FaceTimeRouter.answer
-            //         },
-            //         {
-            //             method: HttpMethod.POST,
-            //             path: "leave/:call_uuid",
-            //             controller: FaceTimeRouter.leave
-            //         },
-            //     ]
-            // },
+            {
+                name: "FaceTime",
+                middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                prefix: "facetime",
+                routes: [
+                    {
+                        method: HttpMethod.POST,
+                        path: "session",
+                        controller: FaceTimeRouter.newSession
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "answer/:call_uuid",
+                        controller: FaceTimeRouter.answer
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "leave/:call_uuid",
+                        controller: FaceTimeRouter.leave
+                    }
+                ]
+            },
             {
                 name: "Contact",
                 middleware: HttpRoutes.protected,
@@ -609,7 +609,7 @@ export class HttpRoutes {
                         path: "",
                         controller: ContactRouter.create,
                         // Increase the timeout to 5 minutes for requests in case there are avatars
-                        requestTimeoutMs: 5 * 60 * 1000,
+                        requestTimeoutMs: 5 * 60 * 1000
                     },
                     {
                         method: HttpMethod.POST,
@@ -707,36 +707,39 @@ export class HttpRoutes {
 
     private static TimeoutMiddleware(requestTimeoutMs: number, responseTimeoutMs: number) {
         return async (ctx: Context, next: Next) => {
-
             ctx.req.setTimeout(requestTimeoutMs, () => {
                 ctx.status = 504;
                 ctx.set("Content-Type", "application/json");
-                ctx.res.end(JSON.stringify({
-                    status: 504,
-                    message: `The request timed-out after ${requestTimeoutMs} ms!`,
-                    error: {
-                        type: "Gateway Timeout",
-                        message: "The data in your request took too long to get to the server!"
-                    }
-                }));
+                ctx.res.end(
+                    JSON.stringify({
+                        status: 504,
+                        message: `The request timed-out after ${requestTimeoutMs} ms!`,
+                        error: {
+                            type: "Gateway Timeout",
+                            message: "The data in your request took too long to get to the server!"
+                        }
+                    })
+                );
             });
 
             ctx.res.setTimeout(responseTimeoutMs, () => {
                 ctx.status = 504;
                 ctx.set("Content-Type", "application/json");
-                ctx.res.end(JSON.stringify({
-                    status: 504,
-                    message: `The request timed-out after ${responseTimeoutMs}!`,
-                    error: {
-                        type: "Gateway Timeout",
-                        message: "The server took too long to respond and has timed-out!"
-                    }
-                }));
+                ctx.res.end(
+                    JSON.stringify({
+                        status: 504,
+                        message: `The request timed-out after ${responseTimeoutMs}!`,
+                        error: {
+                            type: "Gateway Timeout",
+                            message: "The server took too long to respond and has timed-out!"
+                        }
+                    })
+                );
             });
 
             await next();
-        }
-    };
+        };
+    }
 
     private static buildMiddleware(group: HttpRouteGroup, route: HttpRoute) {
         let reqTimeout = this.defaultRequestTimeout;
@@ -749,8 +752,8 @@ export class HttpRoutes {
             reqTimeout = group.requestTimeoutMs;
         }
 
-         // Prioritize the route timeout over the group timeout
-         if (route.responseTimeoutMs && route.responseTimeoutMs > 0) {
+        // Prioritize the route timeout over the group timeout
+        if (route.responseTimeoutMs && route.responseTimeoutMs > 0) {
             resTimeout = route.responseTimeoutMs;
         } else if (group.responseTimeoutMs && group.responseTimeoutMs > 0) {
             resTimeout = group.responseTimeoutMs;
@@ -759,7 +762,8 @@ export class HttpRoutes {
         return [
             ...(route?.middleware ?? group.middleware ?? []),
             this.TimeoutMiddleware(reqTimeout, resTimeout),
-            ...(route.validators ?? []), route.controller
+            ...(route.validators ?? []),
+            route.controller
         ];
     }
 

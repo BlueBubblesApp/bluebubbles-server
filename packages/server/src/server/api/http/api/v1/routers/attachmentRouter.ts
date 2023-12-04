@@ -31,12 +31,25 @@ export class AttachmentRouter {
 
     static async download(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
-        const { height, width, quality, original } = ctx.request.query;
+        const { height, width, quality, original, force } = ctx.request.query;
         const useOriginal = isTruthyBool(original as string);
+        const forceDownload = isTruthyBool((force as string) ?? "true");
 
         // Fetch the info for the attachment by GUID
         const attachment = await Server().iMessageRepo.getAttachment(guid);
-        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
+        if (!attachment) {
+            const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
+            if (!forceDownload || !papiEnabled) {
+                throw new NotFound({ error: "Attachment does not exist!" });
+            }
+
+            // Try to force download the attachment
+            try {
+                await AttachmentInterface.forceDownload(attachment);
+            } catch (ex) {
+                Server().log(`Failed for force download attachment (GUID: ${attachment.guid}): ${String(ex)}`);
+            }
+        }
 
         let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
@@ -172,31 +185,15 @@ export class AttachmentRouter {
 
     static async forceDownload(ctx: RouterContext, _: Next) {
         const { guid } = ctx.params;
-        let attachment = await Server().iMessageRepo.getAttachment(guid);
+        const attachment = await Server().iMessageRepo.getAttachment(guid);
         if (!attachment) {
-            throw new BadRequest({ message: `An attachment with the GUID, "${guid}" does not exist!` })
+            throw new BadRequest({ message: `An attachment with the GUID, "${guid}" does not exist!` });
         }
 
         await Server().privateApi.attachment.downloadPurged(guid);
 
         // Wait a max of 10 minutes
-        attachment = await resultAwaiter({
-            maxWaitMs: 1000 * 60 * 10,
-            initialWaitMs: 1000 * 5,
-            waitMultiplier: 1,
-            getData: (previousData: any) => {
-                return Server().iMessageRepo.getAttachment(guid);
-            },
-            dataLoopCondition: (data: Attachment) => {
-                return !data || data.transferState !== 5;
-            }
-        });
-
-        if (!attachment || attachment.transferState !== 5) {
-            throw new ServerError({
-                error: `Failed to download attachment! Transfer State: ${attachment?.transferState}` });
-        }
-
+        await AttachmentInterface.forceDownload(attachment);
         return await AttachmentRouter.download(ctx, _);
     }
 }

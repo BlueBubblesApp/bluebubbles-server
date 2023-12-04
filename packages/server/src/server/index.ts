@@ -976,11 +976,12 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
+            // Emit the new server event no matter what
+            await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
+
             // Check if we should update the URL
             const shouldUpdateUrl = this.fcm?.shouldUpdateUrl() ?? null;
             if (shouldUpdateUrl != null) {
-                await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-
                 // If it's not initialized, we need to initialize it.
                 // Initializing it will also set the server URL
                 if (!this.fcm.hasInitialized) {
@@ -1307,7 +1308,7 @@ class BlueBubblesServer extends EventEmitter {
             // Since this is a message update, we do not need to include the participants or chats
             await this.emitMessage(
                 MESSAGE_UPDATED,
-                MessageSerializer.serialize({
+                await MessageSerializer.serialize({
                     message: newMessage,
                     config: {
                         loadChatParticipants: false,
