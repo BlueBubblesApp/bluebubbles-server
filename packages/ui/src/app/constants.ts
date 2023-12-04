@@ -68,7 +68,7 @@ export const webhookEventOptions = [
         value: 'incoming-facetime'
     },
     {
-        label: 'FaceTime Call Status Changed',
+        label: 'FaceTime Call Status Changed (Experimental)',
         value: 'ft-call-status-changed'
     },
     {
