@@ -68,6 +68,9 @@ import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
 import { getStartDelay } from "./utils/ConfigUtils";
+import { CallHistoryRepository } from "./databases/callHistory";
+import { Encrypter } from "./utils/Encryptor";
+import { CallHistoryService } from "./services/callHistoryService";
 
 const findProcess = require("find-process");
 
@@ -118,6 +121,8 @@ class BlueBubblesServer extends EventEmitter {
 
     findMyRepo: FindMyRepository;
 
+    callHistoryRepo: CallHistoryRepository;
+
     httpService: HttpService;
 
     privateApi: PrivateApiService;
@@ -141,6 +146,8 @@ class BlueBubblesServer extends EventEmitter {
     webhookService: WebhookService;
 
     oauthService: OauthService;
+    
+    callHistoryService: CallHistoryService;
 
     actionHandler: ActionHandler;
 
@@ -163,6 +170,8 @@ class BlueBubblesServer extends EventEmitter {
     region: string | null;
 
     typingCache: string[];
+
+    encryptor: Encrypter;
 
     get hasDiskAccess(): boolean {
         // As long as we've tried to initialize the DB, we know if we do/do not have access.
@@ -209,6 +218,7 @@ class BlueBubblesServer extends EventEmitter {
         this.repo = null;
         this.iMessageRepo = null;
         this.findMyRepo = null;
+        this.callHistoryRepo = null;
 
         // Other helpers
         this.eventCache = null;
@@ -228,6 +238,7 @@ class BlueBubblesServer extends EventEmitter {
         this.webhookService = null;
         this.scheduledMessages = null;
         this.oauthService = null;
+        this.callHistoryService = null;
 
         this.hasSetup = false;
         this.hasStarted = false;
@@ -237,6 +248,7 @@ class BlueBubblesServer extends EventEmitter {
 
         this.region = null;
         this.typingCache = [];
+        this.encryptor = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -372,6 +384,9 @@ class BlueBubblesServer extends EventEmitter {
         // Let listeners know the server is ready
         this.emit("ready");
 
+        const pw = this.repo.getConfig('password') as string;
+        this.encryptor = new Encrypter(pw);
+
         // Do some pre-flight checks
         // Make sure settings are correct and all things are a go
         await this.preChecks();
@@ -418,6 +433,11 @@ class BlueBubblesServer extends EventEmitter {
 
         this.log("Initializing FindMy Repository...");
         this.findMyRepo = new FindMyRepository();
+        await this.findMyRepo.initialize();
+
+        this.log("Initializing Call History Repository...");
+        this.callHistoryRepo = new CallHistoryRepository();
+        await this.callHistoryRepo.initialize();
     }
 
     initFcm(): void {
@@ -483,6 +503,13 @@ class BlueBubblesServer extends EventEmitter {
             this.scheduledMessages = new ScheduledMessagesService();
         } catch (ex: any) {
             this.log(`Failed to start Scheduled Message service! ${ex.message}`, "error");
+        }
+
+        try {
+            this.log("Initializing Call History Service...");
+            this.callHistoryService = new CallHistoryService();
+        } catch (ex: any) {
+            this.log(`Failed to start Call History service! ${ex.message}`, "error");
         }
     }
 
@@ -923,6 +950,11 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         this.log("Finished post-start checks...");
+
+        // const test = await this.callHistoryRepo.history().find();
+        // console.dir(test, { depth: 10 });
+        await this.callHistoryService.init();
+        await this.callHistoryService.getCallHistory();
     }
 
     private setDockIcon() {

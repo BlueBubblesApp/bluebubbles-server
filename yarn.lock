@@ -3721,6 +3721,11 @@
   dependencies:
     "@types/node" "*"
 
+"@types/keychain@^1.4.4":
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/@types/keychain/-/keychain-1.4.4.tgz#0773d392910c79b2a6a044214259dfaae20c3593"
+  integrity sha512-YV2kEhGaEjZaNzbmXmr5Y0IbO7yjEi52O1VIOMDMtkYyqvzKv9EQNjXfj8ykOuCuu0JBVnich1tF5xy1kD+8MA==
+
 "@types/keygrip@*":
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/@types/keygrip/-/keygrip-1.0.2.tgz#513abfd256d7ad0bf1ee1873606317b33b1b2a72"
@@ -9831,6 +9836,11 @@ jws@^4.0.0:
   dependencies:
     jwa "^2.0.0"
     safe-buffer "^5.0.1"
+
+keychain@^1.5.0:
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/keychain/-/keychain-1.5.0.tgz#cf5f19b023bad27a63f87fb26a428d8e362a7b27"
+  integrity sha512-liyp4r+93RI7EB2jhwaRd4MWfdgHH6shuldkaPMkELCJjMFvOOVXuTvw1pGqFfhsrgA6OqfykWWPQgBjQakVag==
 
 keygrip@~1.1.0:
   version "1.1.0"

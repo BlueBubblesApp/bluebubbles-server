@@ -32,5 +32,7 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     // That needs to change... at another time.
     // 0.0 to prevent parsing as a boolean
     start_delay: () => "0.0",
-    facetime_calling: () => 0
+    facetime_calling: () => 0,
+    access_call_history: () => 0,
+    call_history_db_key: () => ""
 };
