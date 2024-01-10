@@ -24,6 +24,10 @@ export class NgrokService extends Proxy {
         const ngrokKey = Server().repo.getConfig("ngrok_key") as string;
         let ngrokProtocol = (Server().repo.getConfig("ngrok_protocol") as Ngrok.Protocol) ?? "http";
 
+        if (isEmpty(ngrokKey)) {
+            throw new Error('You must provide an Auth Token to use the Ngrok Proxy Service!');
+        }
+
         const opts: Ngrok.Options = {
             port: Server().repo.getConfig("socket_port") ?? 1234,
             region: (Server().repo.getConfig("ngrok_region") as Ngrok.Region) ?? "us",
@@ -65,14 +69,12 @@ export class NgrokService extends Proxy {
             }
         };
 
-        // If we have a key, use it
-        if (ngrokKey !== null && ngrokKey !== undefined) {
-            opts.authtoken = safeTrim(ngrokKey);
-            await authtoken({
-                authtoken: safeTrim(ngrokKey),
-                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
-            });
-        }
+        // Apply the Ngrok auth token
+        opts.authtoken = safeTrim(ngrokKey);
+        await authtoken({
+            authtoken: safeTrim(ngrokKey),
+            binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
+        });
 
         // If there is no key, force http
         if (isEmpty(ngrokKey)) {
