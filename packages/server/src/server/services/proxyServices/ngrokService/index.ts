@@ -1,7 +1,11 @@
 import { isEmpty, safeTrim } from "@server/helpers/utils";
+import path from "path";
+import fs from "fs";
 import { Server } from "@server";
 import { connect, disconnect, kill, authtoken, Ngrok, upgradeConfig } from "ngrok";
 import { Proxy } from "../proxy";
+import { app } from "electron";
+import { userHomeDir } from "@server/fileSystem";
 
 // const sevenHours = 1000 * 60 * 60 * 7;  // This is the old ngrok timeout
 const oneHour45 = 1000 * 60 * (60 + 45); // This is the new ngrok timeout
@@ -28,15 +32,7 @@ export class NgrokService extends Proxy {
             throw new Error('You must provide an Auth Token to use the Ngrok Proxy Service!');
         }
 
-        // Upgrade the config so that we don't get any Ngrok config errors.
-        try {
-            await upgradeConfig({
-                relocate: false,
-                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
-            });
-        } catch (ex) {
-            Server().log('An error occurred while upgrading the Ngrok config file!', 'debug');
-        }
+        await this.migrateConfigFile();
 
         const opts: Ngrok.Options = {
             port: Server().repo.getConfig("socket_port") ?? 1234,
@@ -95,6 +91,38 @@ export class NgrokService extends Proxy {
 
         // Connect to ngrok
         return connect(opts);
+    }
+
+    async migrateConfigFile(): Promise<void> {
+        const newConfig = path.join(app.getPath("userData"), 'ngrok', 'ngrok.yml');
+        const oldConfig = path.join(userHomeDir(), '.ngrok2', '/ngrok.yml');
+
+        // If the new config file already exists, don't do anything
+        if (fs.existsSync(newConfig)) return;
+
+        // If the old config file doesn't exist, don't do anything
+        if (!fs.existsSync(oldConfig)) return;
+
+        // If the old config file exists and is empty, we can delete it
+        // so that it's recreated in the proper location
+        const contents = fs.readFileSync(oldConfig).toString('utf-8');
+        if (!contents || isEmpty(contents.trim())) {
+            Server().log('Detected old & empty Ngrok config file. Removing file...', 'debug');
+            fs.unlinkSync(oldConfig);
+            return;
+        }
+
+        // Upgrade the old config if the new config doesn't exist
+        // and the old config is not empty.
+        try {
+            Server().log('Ngrok config file needs upgrading. Upgrading...', 'debug');
+            await upgradeConfig({
+                relocate: true,
+                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
+            });
+        } catch (ex) {
+            Server().log('An error occurred while upgrading the Ngrok config file!', 'debug');
+        }
     }
 
     /**
