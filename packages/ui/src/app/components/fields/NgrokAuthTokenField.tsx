@@ -60,7 +60,7 @@ export const NgrokAuthTokenField = ({ helpText }: NgrokAuthTokenFieldProps): JSX
 
     return (
         <FormControl isInvalid={hasNgrokTokenError}>
-            <FormLabel htmlFor='ngrok_key'>Ngrok Auth Token (Highly Recommended)</FormLabel>
+            <FormLabel htmlFor='ngrok_key'>Ngrok Auth Token (Required)</FormLabel>
             <Input
                 id='password'
                 type={showNgrokToken ? 'text' : 'password'}
