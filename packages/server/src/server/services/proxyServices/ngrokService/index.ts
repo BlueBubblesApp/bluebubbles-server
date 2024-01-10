@@ -40,7 +40,6 @@ export class NgrokService extends Proxy {
 
         const opts: Ngrok.Options = {
             port: Server().repo.getConfig("socket_port") ?? 1234,
-            region: (Server().repo.getConfig("ngrok_region") as Ngrok.Region) ?? "us",
             binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked"),
             onStatusChange: async (status: string) => {
                 Server().log(`Ngrok status: ${status}`);

@@ -21,7 +21,6 @@ import {
 } from '@chakra-ui/react';
 import {  AiOutlineInfoCircle } from 'react-icons/ai';
 import { useAppSelector } from '../../../hooks';
-import { NgrokRegionField } from '../../../components/fields/NgrokRegionField';
 import { NgrokAuthTokenField } from '../../../components/fields/NgrokAuthTokenField';
 import { ProxySetupField } from '../../../components/fields/ProxySetupField';
 import { ServerPasswordField } from '../../../components/fields/ServerPasswordField';
@@ -58,8 +57,6 @@ export const ConnectionSettings = (): JSX.Element => {
             <Divider orientation='horizontal' />
             <Spacer />
             <ProxySetupField />
-            <Spacer />
-            {(proxyService === 'ngrok') ? (<NgrokRegionField />) : null}
             <Spacer />
             {(proxyService === 'ngrok') ? (<NgrokAuthTokenField />) : null}
             <Spacer />
