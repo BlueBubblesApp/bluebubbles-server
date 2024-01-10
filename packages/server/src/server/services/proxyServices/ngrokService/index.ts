@@ -1,6 +1,6 @@
 import { isEmpty, safeTrim } from "@server/helpers/utils";
 import { Server } from "@server";
-import { connect, disconnect, kill, authtoken, Ngrok } from "ngrok";
+import { connect, disconnect, kill, authtoken, Ngrok, upgradeConfig } from "ngrok";
 import { Proxy } from "../proxy";
 
 // const sevenHours = 1000 * 60 * 60 * 7;  // This is the old ngrok timeout
@@ -26,6 +26,16 @@ export class NgrokService extends Proxy {
 
         if (isEmpty(ngrokKey)) {
             throw new Error('You must provide an Auth Token to use the Ngrok Proxy Service!');
+        }
+
+        // Upgrade the config so that we don't get any Ngrok config errors.
+        try {
+            await upgradeConfig({
+                relocate: false,
+                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
+            });
+        } catch (ex) {
+            Server().log('An error occurred while upgrading the Ngrok config file!', 'debug');
         }
 
         const opts: Ngrok.Options = {
