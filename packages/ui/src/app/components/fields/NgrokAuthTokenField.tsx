@@ -47,6 +47,9 @@ export const NgrokAuthTokenField = ({ helpText }: NgrokAuthTokenFieldProps): JSX
         } else if (theNewNgrokToken.includes(' ')) {
             setNgrokTokenError('Invalid Ngrok Auth Token! Please check that you have copied it correctly.');
             return;
+        } else if (theNewNgrokToken.length === 0) {
+            setNgrokTokenError('An Ngrok Auth Token is required to use the Ngrok proxy service!');
+            return;
         }
 
         dispatch(setConfig({ name: 'ngrok_key', value: theNewNgrokToken }));
