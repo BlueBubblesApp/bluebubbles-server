@@ -56,6 +56,9 @@ module.exports = {
         "gatekeeperAssess": false,
         "minimumSystemVersion": "10.11.0"
     },
+    "signIgnore": [
+        "ngrok"
+    ],
     "dmg": {
         "sign": false
     },
