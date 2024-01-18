@@ -10,7 +10,6 @@ import {
 import { ProxySetupField } from '../../../components/fields/ProxySetupField';
 import { useAppSelector } from '../../../hooks';
 import { NgrokAuthTokenField } from '../../../components/fields/NgrokAuthTokenField';
-import { NgrokRegionField } from '../../../components/fields/NgrokRegionField';
 import { ServerPasswordField } from '../../../components/fields/ServerPasswordField';
 
 export const ConnectionWalkthrough = (): JSX.Element => {
@@ -48,7 +47,6 @@ export const ConnectionWalkthrough = (): JSX.Element => {
                     {(proxyService === 'ngrok') ? (
                         <>
                             <NgrokAuthTokenField />
-                            <NgrokRegionField />
                         </>
                     ): null}
                 </Stack>

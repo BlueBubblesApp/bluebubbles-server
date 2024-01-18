@@ -33,8 +33,11 @@ export abstract class DylibPlugin {
         try {
             Server().log(`Killing process: ${this.parentApp}`, "debug");
             await FileSystem.killProcess(this.parentApp);
-        } catch (ex) {
-            Server().log(`Failed to kill parent process (${this.parentApp})! Error: ${ex}`);
+        } catch (ex: any) {
+            const errStr = ((typeof ex === 'object') ? ex?.message ?? String(ex) : String(ex)).trim();
+            if (!errStr.includes('No matching processes belonging to you were found')) {
+                Server().log(`Failed to kill parent process (${this.parentApp})! Error: ${errStr}`, 'debug');
+            }
         }
     }
 
