@@ -5,12 +5,12 @@ import { EventData, PrivateApiEventHandler } from ".";
 
 export class PrivateApiAddressEventHandler implements PrivateApiEventHandler {
 
-    types: string[] = ["alias-removed"];
+    types: string[] = ["aliases-removed"];
 
     cache: Record<string, Record<string, any>> = {};
 
     async handle(data: EventData) {
-        if (data.event === 'alias-removed') {
+        if (data.event === 'aliases-removed') {
             await this.handleDeregistration(data);
         }
     }
