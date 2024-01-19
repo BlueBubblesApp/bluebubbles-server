@@ -198,10 +198,15 @@ export class FileSystem {
     static copyAttachment(originalPath: string, name: string, method = "apple-script"): string {
         let newPath = path.join(FileSystem.attachmentsDir, name);
         if (isMinMonterey || method === "private-api") {
-            if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) fs.mkdirSync(FileSystem.messagesAttachmentsDir);
+            if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) {
+                fs.mkdirSync(FileSystem.messagesAttachmentsDir, { recursive: true });
+            }
+
             newPath = path.join(FileSystem.messagesAttachmentsDir, name);
         } else {
-            if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
+            if (!fs.existsSync(FileSystem.attachmentsDir)) {
+                fs.mkdirSync(FileSystem.attachmentsDir, { recursive: true });
+            }
         }
 
         if (newPath !== originalPath) {
