@@ -26,5 +26,5 @@ export const SETTINGS_BACKUP_UPDATED = "settings-backup-updated";
 export const THEME_BACKUP_CREATED = "theme-backup-created";
 export const THEME_BACKUP_DELETED = "theme-backup-deleted";
 export const THEME_BACKUP_UPDATED = "theme-backup-updated";
-export const IMESSAGE_ALIAS_REMOVED = "imessage-alias-removed";
+export const IMESSAGE_ALIASES_REMOVED = "imessage-aliases-removed";
 export const FT_CALL_STATUS_CHANGED = "ft-call-status-changed";
