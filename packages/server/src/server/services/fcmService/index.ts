@@ -29,8 +29,6 @@ export class FCMService {
 
     lastRestart = 0;
 
-    lastAddr: string = null;
-
     lastProjectId: string = null;
 
     lastProjectNumber: string = null;
@@ -44,6 +42,8 @@ export class FCMService {
     serverConfig: any = null;
 
     clientConfig: any = null;
+
+    addressUpdateLoop: NodeJS.Timeout = null;
 
     /**
      * Starts the FCM app service. Implements a retryer to ensure
@@ -81,10 +81,29 @@ export class FCMService {
         const result = await this.startPromise;
         if (!hasSucceeded) {
             Server().log("Failed to initialize FCM App after 6 attempts!", "error");
+        } else {
+            this.initAddressUpdateLoop();
         }
 
         this.startPromise = null;
         return result;
+    }
+
+    private async initAddressUpdateLoop() {
+        if (this.addressUpdateLoop) {
+            clearInterval(this.addressUpdateLoop);
+        }
+
+        // Every 10 minutes, update the server address if it hasn't changed
+        this.addressUpdateLoop = setInterval(() => {
+            // If the app has been deleted (service stopped), clear the interval
+            if (!FCMService.getApp()) {
+                return clearInterval(this.addressUpdateLoop);
+            }
+    
+            Server().log(`Attempting to update server URL (every 10 minute loop)...`, "debug");
+            this.setServerUrl(true);
+        }, 600000);
     }
 
 
@@ -217,7 +236,6 @@ export class FCMService {
 
     clearLastValues() {
         this.lastRestart = 0;
-        this.lastAddr = null;
         this.lastProjectId = null;
         this.lastProjectNumber = null;
     }
@@ -234,7 +252,6 @@ export class FCMService {
         // Make sure that information has changed
         const serverUrl = Server().repo.getConfig("server_address") as string;
         return (
-            this.lastAddr !== serverUrl ||
             this.lastProjectId !== this.serverConfig.project_id ||
             this.lastProjectNumber !== this.clientConfig?.project_info?.project_number
         ) ? serverUrl : null;
@@ -281,7 +298,6 @@ export class FCMService {
             Server().log('Successfully updated server address');
         }
 
-        this.lastAddr = serverUrl;
         this.lastProjectId = this.serverConfig?.project_id;
         this.lastProjectNumber = this.clientConfig?.project_info?.project_number;
     }
@@ -294,18 +310,38 @@ export class FCMService {
         }
     }
 
+    /**
+     * Set the server URL in the Firestore.
+     * If the current value is already the latest URL,
+     * do not update it.
+     *
+     * @param serverUrl The new server URL
+     */
     async setServerUrlFirestore(serverUrl: string): Promise<void> {
         const db = FCMService.getApp().firestore();
-        await db.collection("server").doc('config').set({ serverUrl });
+        const currentValue = (await db.collection("server").doc('config').get())?.data()?.serverUrl;
+        if (currentValue !== serverUrl) {
+            await db.collection("server").doc('config').set({ serverUrl });
+        }
     }
 
+     /**
+     * Set the server URL in the Realtime DB.
+     * If the current value is already the latest URL,
+     * do not update it.
+     *
+     * @param serverUrl The new server URL
+     */
     async setServerUrlRealtime(serverUrl: string): Promise<void> {
         const db = FCMService.getApp().database();
 
         // Update the config
-        const config = db.ref("config");
-        config.once("value", _ => {
-            config.update({ serverUrl });
+        const config = db.ref("config/serverUrl");
+        config.once("value", data => {
+            const currentValue = data.val();
+            if (currentValue !== serverUrl) {
+                config.update({ serverUrl });
+            }
         });
     }
 

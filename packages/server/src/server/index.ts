@@ -976,22 +976,10 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
+            Server().log("Dispatching server URL update from config change", "debug");
             // Emit the new server event no matter what
             await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-
-            // Check if we should update the URL
-            const shouldUpdateUrl = this.fcm?.shouldUpdateUrl() ?? null;
-            if (shouldUpdateUrl != null) {
-                // If it's not initialized, we need to initialize it.
-                // Initializing it will also set the server URL
-                if (!this.fcm.hasInitialized) {
-                    Server().log("Initializing FCM for server URL update from config change", "debug");
-                    await this.fcm.start();
-                } else {
-                    Server().log("Dispatching server URL update from config change", "debug");
-                    await this.fcm.setServerUrl();
-                }
-            }
+            await this.fcm?.setServerUrl(true);
         } catch (ex: any) {
             this.log(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`, "error");
         }
