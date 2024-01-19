@@ -164,15 +164,16 @@ export class ServerRepository extends EventEmitter {
     }
 
     async purgeOldDevices() {
-        // Get devices that have a null last_active or older than 7 days
-        const sevenDaysAgo = new Date().getTime() - 86400 * 1000 * 7; // Now - 7 days
+        // Get devices that have a null last_active or older than 31 days
+        const sevenDaysAgo = new Date().getTime() - 86400 * 1000 * 31;  // Now - 31 days
         const devicesToDelete = (await this.devices().find()).filter(
             (item: Device) => !item.last_active || (item.last_active && item.last_active <= sevenDaysAgo)
         );
 
         // Delete the devices
         if (isNotEmpty(devicesToDelete)) {
-            Server().log(`Automatically purging ${devicesToDelete.length} devices from your server`);
+            Server().log(
+                `Automatically purging ${devicesToDelete.length} devices from your server (inactive for 31 days)`);
             for (const item of devicesToDelete) {
                 const dateStr = item.last_active ? new Date(item.last_active).toLocaleDateString() : "N/A";
                 Server().log(`    -> Device: ${item.name} (Last Active: ${dateStr})`);
