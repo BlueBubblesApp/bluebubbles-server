@@ -1084,8 +1084,8 @@ class BlueBubblesServer extends EventEmitter {
             this.log(ex, "debug");
         }
 
-        // Dispatch the webhook
-        this.webhookService.dispatch({ type, data });
+        // Dispatch the webhook (sometimes it's not initialized)
+        this.webhookService?.dispatch({ type, data });
     }
 
     private getTheme() {
