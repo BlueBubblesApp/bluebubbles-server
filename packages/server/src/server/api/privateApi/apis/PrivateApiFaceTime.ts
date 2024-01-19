@@ -5,12 +5,11 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 
-
 export class PrivateApiFaceTime extends PrivateApiAction {
-
     async answerCall(uuid: string): Promise<TransactionResult> {
         const action = "answer-call";
-        return this.sendApiMessage(action, { callUUID: uuid });
+        const request = new TransactionPromise(TransactionType.OTHER);
+        return this.sendApiMessage(action, { callUUID: uuid }, request);
     }
 
     async leaveCall(uuid: string): Promise<TransactionResult> {
@@ -30,9 +29,14 @@ export class PrivateApiFaceTime extends PrivateApiAction {
 
     async admitParticipant(conversationUuid: string, handleUuid: string): Promise<TransactionResult> {
         const action = "admit-pending-member";
-        return this.sendApiMessage(action, {
-            conversationUUID: conversationUuid,
-            handleUUID: handleUuid
-        });
+        const request = new TransactionPromise(TransactionType.OTHER);
+        return this.sendApiMessage(
+            action,
+            {
+                conversationUUID: conversationUuid,
+                handleUUID: handleUuid
+            },
+            request
+        );
     }
 }

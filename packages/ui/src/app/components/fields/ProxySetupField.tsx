@@ -20,6 +20,7 @@ import { copyToClipboard } from '../../utils/GenericUtils';
 import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../modals/ConfirmationDialog';
 import { saveLanUrl } from 'app/utils/IpcUtils';
+import { NgrokAuthTokenDialog } from '../modals/NgrokAuthTokenDialog';
 
 
 export interface ProxySetupFieldProps {
@@ -44,11 +45,13 @@ const confirmationActions: ConfirmationItems = {
 export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFieldProps): JSX.Element => {
     const dispatch = useAppDispatch();
     const dnsRef = useRef(null);
+    const ngrokRef = useRef(null);
     const alertRef = useRef(null);
     const proxyService: string = (useAppSelector(state => state.config.proxy_service) ?? '').toLowerCase().replace(' ', '-');
     const address: string = useAppSelector(state => state.config.server_address) ?? '';
     const port: number = useAppSelector(state => state.config.socket_port) ?? 1234;
     const [dnsModalOpen, setDnsModalOpen] = useBoolean();
+    const [ngrokModalOpen, setNgrokModalOpen] = useBoolean();
     const [requiresConfirmation, confirm] = useState((): string | null => {
         return null;
     });
@@ -64,13 +67,22 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                     value={proxyService}
                     onChange={(e) => {
                         if (!e.target.value || e.target.value.length === 0) return;
-                        onSelectChange(e);
+
+                        let shouldSave = true;
                         if (e.target.value === 'dynamic-dns') {
+                            shouldSave = false;
                             setDnsModalOpen.on();
+                        } else if (e.target.value === 'ngrok') {
+                            shouldSave = false;
+                            setNgrokModalOpen.on();
                         } else if (e.target.value === 'cloudflare') {
                             confirm('confirmation');
                         } else if (e.target.value === 'lan-url') {
                             saveLanUrl();
+                        }
+
+                        if (shouldSave) {
+                            onSelectChange(e);
                         }
                     }}
                 >
@@ -106,10 +118,23 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
 
             <DynamicDnsDialog
                 modalRef={dnsRef}
-                onConfirm={(address) => dispatch(setConfig({ name: 'server_address', value: address }))}
+                onConfirm={(address) => {
+                    dispatch(setConfig({ name: 'proxy_service', value: 'Dynamic DNS' }));
+                    dispatch(setConfig({ name: 'server_address', value: address }));
+                }}
                 isOpen={dnsModalOpen}
                 port={port as number}
                 onClose={() => setDnsModalOpen.off()}
+            />
+
+            <NgrokAuthTokenDialog
+                modalRef={ngrokRef}
+                onConfirm={(token) => {
+                    dispatch(setConfig({ name: 'proxy_service', value: 'Ngrok' }));
+                    dispatch(setConfig({ name: 'ngrok_key', value: token }));
+                }}
+                isOpen={ngrokModalOpen}
+                onClose={() => setNgrokModalOpen.off()}
             />
 
             <ConfirmationDialog
