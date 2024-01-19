@@ -270,7 +270,7 @@ export class FCMService {
         // Make sure that if we haven't initialized, we do so
         if (!this.hasInitialized || !(await this.start())) return;
 
-        Server().log(`Updating Server Address in ${this.dbType} Database...`);
+        Server().log(`Updating Server Address in ${this.dbType} database...`);
 
         // Update the URL
         // If we fail, retry 12 times (for 1 minute)
