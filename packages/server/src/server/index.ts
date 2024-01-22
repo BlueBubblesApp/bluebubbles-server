@@ -36,7 +36,8 @@ import {
     CloudflareService,
     WebhookService,
     ScheduledMessagesService,
-    OauthService
+    OauthService,
+    RemoteConfigService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
@@ -125,6 +126,8 @@ class BlueBubblesServer extends EventEmitter {
     fcm: FCMService;
 
     networkChecker: NetworkService;
+
+    remoteConfigService: RemoteConfigService;
 
     caffeinate: CaffeinateService;
 
@@ -484,6 +487,13 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.log(`Failed to start Scheduled Message service! ${ex.message}`, "error");
         }
+
+        try {
+            this.log("Initializing Remote Config Service...");
+            this.remoteConfigService = new RemoteConfigService();
+        } catch (ex: any) {
+            this.log(`Failed to initialize Remote Config Service! ${ex.message}`, "error");
+        }
     }
 
     /**
@@ -544,6 +554,13 @@ class BlueBubblesServer extends EventEmitter {
             this.log("Starting iMessage Database listeners...");
             await this.startChatListeners();
         }
+
+        try {
+            this.log("Starting Remote Config Service...");
+            await this.remoteConfigService.start();
+        } catch (ex: any) {
+            this.log(`Failed to start Remote Config Service! ${ex.message}`, "error");
+        }
     }
 
     async stopServices(): Promise<void> {
@@ -591,6 +608,12 @@ class BlueBubblesServer extends EventEmitter {
             this.scheduledMessages?.stop();
         } catch (ex: any) {
             this.log(`Failed to stop Scheduled Messages service! ${ex?.message ?? ex}`, "error");
+        }
+
+        try {
+            this.remoteConfigService?.stop();
+        } catch (ex: any) {
+            this.log(`Failed to stop Remote Config Service! ${ex.message}`, "error");
         }
 
         this.log("Finished stopping services...");
