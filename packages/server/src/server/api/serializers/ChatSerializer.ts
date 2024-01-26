@@ -90,7 +90,8 @@ export class ChatSerializer {
                 ...{
                     isFiltered: chat.isFiltered,
                     groupId: chat.groupId,
-                    properties: chat.properties
+                    properties: chat.properties,
+                    lastAddressedHandle: chat.lastAddressedHandle
                 }
             };
         }
