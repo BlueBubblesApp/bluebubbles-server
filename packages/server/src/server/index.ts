@@ -520,13 +520,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Starting FCM service...");
-            await this.fcm.start();
-        } catch (ex: any) {
-            this.log(`Failed to start FCM service! ${ex.message}`, "error");
-        }
-
-        try {
             this.log("Starting Scheduled Messages service...");
             await this.scheduledMessages.start();
         } catch (ex: any) {
@@ -543,6 +536,13 @@ class BlueBubblesServer extends EventEmitter {
         if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
             this.log("Starting iMessage Database listeners...");
             await this.startChatListeners();
+        }
+
+        try {
+            this.log("Starting FCM service...");
+            await this.fcm.start();
+        } catch (ex: any) {
+            this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
     }
 
