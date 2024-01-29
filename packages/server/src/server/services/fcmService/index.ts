@@ -4,7 +4,7 @@ import { FileSystem } from "@server/fileSystem";
 import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 import { App } from "firebase-admin/app";
 import axios from "axios";
-import { resultRetryer, waitMs } from "@server/helpers/utils";
+import { isEmpty, resultRetryer, waitMs } from "@server/helpers/utils";
 
 const AppName = "BlueBubbles";
 
@@ -245,16 +245,15 @@ export class FCMService {
      * 
      * @returns The new URL if it has changed, null otherwise
      */
-    shouldUpdateUrl(): string | null {
+    shouldUpdateUrl(): boolean{
         // Make sure we have configs in the first place
         if (!this.hasConfigs()) return null;
 
         // Make sure that information has changed
-        const serverUrl = Server().repo.getConfig("server_address") as string;
         return (
             this.lastProjectId !== this.serverConfig.project_id ||
             this.lastProjectNumber !== this.clientConfig?.project_info?.project_number
-        ) ? serverUrl : null;
+        );
     }
 
     /**
@@ -264,8 +263,12 @@ export class FCMService {
      */
     async setServerUrl(force = false): Promise<void> {
         // Make sure we should be setting the URL
-        const serverUrl = this.shouldUpdateUrl();
-        if (!serverUrl && !force) return;
+        const shouldUpdate = this.shouldUpdateUrl();
+        if (!shouldUpdate && !force) return;
+
+        // Make sure we have a server address
+        const serverUrl = Server().repo.getConfig("server_address") as string;
+        if (isEmpty(serverUrl)) return;
 
         // Make sure that if we haven't initialized, we do so
         if (!this.hasInitialized || !(await this.start())) return;
