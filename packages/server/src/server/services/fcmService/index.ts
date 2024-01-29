@@ -129,6 +129,8 @@ export class FCMService {
             return false;
         }
 
+        console.log(this.clientConfig.project_info)
+
         this.dbType = (this.clientConfig.project_info?.firebase_url) ? DbType.REALTIME : DbType.FIRESTORE;
 
         // Initialize the app
@@ -339,7 +341,7 @@ export class FCMService {
         const db = FCMService.getApp().database();
 
         // Update the config
-        const config = db.ref("config/serverUrl");
+        const config = db.ref("config");
         config.once("value", data => {
             const currentValue = data.val();
             if (currentValue !== serverUrl) {
