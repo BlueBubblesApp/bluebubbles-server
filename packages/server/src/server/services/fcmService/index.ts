@@ -129,8 +129,6 @@ export class FCMService {
             return false;
         }
 
-        console.log(this.clientConfig.project_info)
-
         this.dbType = (this.clientConfig.project_info?.firebase_url) ? DbType.REALTIME : DbType.FIRESTORE;
 
         // Initialize the app
