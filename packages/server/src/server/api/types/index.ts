@@ -1,5 +1,6 @@
 import type { Message } from "@server/databases/imessage/entity/Message";
 import type { ValidRemoveTapback, ValidTapback } from "@server/types";
+import * as net from "net";
 
 export type SendMessageParams = {
     chatGuid: string;
@@ -83,3 +84,7 @@ export type SendMultipartTextParams = {
     parts: Record<string, any>[];
     ddScan?: boolean;
 };
+
+export class Socket extends net.Socket {
+    id: string;
+}

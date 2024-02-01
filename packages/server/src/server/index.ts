@@ -68,6 +68,7 @@ import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
 import { getStartDelay } from "./utils/ConfigUtils";
+import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
 
 const findProcess = require("find-process");
 
@@ -147,6 +148,8 @@ class BlueBubblesServer extends EventEmitter {
     chatListeners: ChangeListener[];
 
     eventCache: EventCache;
+
+    findMyCache: FindMyFriendsCache;
 
     hasSetup: boolean;
 
@@ -237,6 +240,7 @@ class BlueBubblesServer extends EventEmitter {
 
         this.region = null;
         this.typingCache = [];
+        this.findMyCache = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -689,6 +693,9 @@ class BlueBubblesServer extends EventEmitter {
         // Setup lightweight message cache
         this.log("Initializing event cache...");
         this.eventCache = new EventCache();
+
+        this.log("Initializing FindMy Location cache...");
+        this.findMyCache = new FindMyFriendsCache();
 
         try {
             this.log("Initializing caffeinate service...");

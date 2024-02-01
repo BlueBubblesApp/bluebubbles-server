@@ -1,10 +1,10 @@
 import { Server } from "@server";
+import * as net from "net";
 import { FT_CALL_STATUS_CHANGED, INCOMING_FACETIME } from "@server/events";
 import { EventData, PrivateApiEventHandler } from ".";
 import { HandleResponse } from "@server/types";
 import { slugifyAddress } from "@server/helpers/utils";
 import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
-import { isMinMonterey } from "@server/env";
 import { FaceTimeSessionManager } from "@server/api/lib/facetime/FacetimeSessionManager";
 import { FaceTimeSession, FaceTimeSessionStatus, callStatusMap } from "@server/api/lib/facetime/FaceTimeSession";
 
@@ -26,7 +26,7 @@ type FaceTimeStatusData = {
 export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
     types: string[] = ["ft-call-status-changed"];
 
-    async handle(data: EventData) {
+    async handle(data: EventData, _: net.Socket) {
         const ft_calling = Server().repo.getConfig("facetime_calling") as boolean;
         if (ft_calling) {
             await this.handleCalling(data);

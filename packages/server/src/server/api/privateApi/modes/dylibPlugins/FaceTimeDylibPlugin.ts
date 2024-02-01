@@ -8,6 +8,8 @@ const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
 export class FaceTimeDylibPlugin extends DylibPlugin {
     parentApp = "FaceTime";
 
+    bundleIdentifier = "com.apple.FaceTime";
+
     get isEnabled() {
         return (Server().repo.getConfig("enable_ft_private_api") as boolean) && isMinBigSur;
     }

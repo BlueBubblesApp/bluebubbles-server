@@ -4,7 +4,7 @@ import { NotificationCenterDB } from "@server/databases/notificationCenter/Notii
 import { convertDateToCocoaTime } from "@server/databases/imessage/helpers/dateUtil";
 import { waitMs } from "@server/helpers/utils";
 import { EventEmitter } from "events";
-import { uuidv4 } from "@firebase/util";
+import { v4 } from "uuid";
 
 export enum FaceTimeSessionStatus {
     UNKNOWN = 0,
@@ -50,7 +50,7 @@ export class FaceTimeSession extends EventEmitter {
     } = {}) {
         super();
 
-        this.uuid = uuidv4();
+        this.uuid = v4();
 
         this.createdAt = new Date();
         this.callUuid = callUuid;

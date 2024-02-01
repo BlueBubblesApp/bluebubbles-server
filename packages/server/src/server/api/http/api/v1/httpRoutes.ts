@@ -36,6 +36,7 @@ import { ScheduledMessageValidator } from "./validators/scheduledMessageValidato
 import { ScheduledMessageRouter } from "./routers/scheduledMessageRouter";
 import { ThemeValidator } from "./validators/themeValidator";
 import type { Context, Next } from "koa";
+import { FindMyRouter } from "./routers/findmyRouter";
 
 export class HttpRoutes {
     static version = 1;
@@ -110,23 +111,23 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "findmy/devices",
-                        controller: iCloudRouter.devices
+                        controller: FindMyRouter.devices
                     },
                     {
                         method: HttpMethod.POST,
                         path: "findmy/devices/refresh",
-                        controller: iCloudRouter.refreshDevices
+                        controller: FindMyRouter.refreshDevices
                     },
                     {
                         method: HttpMethod.GET,
                         path: "findmy/friends",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
-                        controller: iCloudRouter.friends
+                        controller: FindMyRouter.friends
                     },
                     {
                         method: HttpMethod.POST,
                         path: "findmy/friends/refresh",
-                        controller: iCloudRouter.refreshFriends
+                        controller: FindMyRouter.refreshFriends
                     }
                 ]
             },
