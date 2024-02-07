@@ -2,7 +2,8 @@ import "zx/globals";
 import * as os from "os";
 import * as net from "net";
 import { Server } from "@server";
-import { clamp, isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
+import { Sema } from "async-sema";
+import { clamp, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { TransactionPromise, TransactionResult } from "@server/managers/transactionManager/transactionPromise";
 import { TransactionManager } from "@server/managers/transactionManager";
 
@@ -26,6 +27,9 @@ import { PrivateApiFindMyEventHandler } from "./eventHandlers/PrivateApiFindMyEv
 import { Socket } from "../types";
 import EventEmitter from "events";
 import { v4 } from "uuid";
+
+// We only want to allow one write at a time
+const writeLock = new Sema(1);
 
 export class PrivateApiService extends EventEmitter {
     server: net.Server;
@@ -307,13 +311,14 @@ export class PrivateApiService extends EventEmitter {
         transaction?: TransactionPromise
     ): Promise<TransactionResult> {
         const msg = "Failed to send request to Private API!";
-
-        // If we have a transaction, add it to the manager
-        if (transaction) {
-            this.transactionManager.add(transaction);
-        }
+        await writeLock.acquire();
 
         try {
+            // If we have a transaction, add it to the manager
+            if (transaction) {
+                this.transactionManager.add(transaction);
+            }
+
             await new Promise<void>((resolve, reject) => {
                 const d: NodeJS.Dict<any> = { action, data };
 
@@ -335,6 +340,10 @@ export class PrivateApiService extends EventEmitter {
             }
         } catch (ex: any) {
             this.log(`${msg} ${ex?.message ?? ex}`, "debug");
+        } finally {
+            // Release the lock after a short delay.
+            // This gives the other side a chance to process the data.
+            setTimeout(() => writeLock.release(), 200);
         }
 
         return null;

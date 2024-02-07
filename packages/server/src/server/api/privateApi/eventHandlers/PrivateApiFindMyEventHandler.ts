@@ -8,9 +8,7 @@ import { isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
 export class PrivateApiFindMyEventHandler implements PrivateApiEventHandler {
     types: string[] = ["new-findmy-location"];
 
-    async handle(event: EventData, socket: net.Socket) {
-        Server().log("Received FindMy Location Update...", "debug");
-
+    async handle(event: EventData, _: net.Socket) {
         try {
             if (event.event === "new-findmy-location") {
                 await this.handleNewLocation(event.data);
@@ -29,6 +27,7 @@ export class PrivateApiFindMyEventHandler implements PrivateApiEventHandler {
         // If there were items updated in the cache, emit them
         let count = 0;
         for (const item of added) {
+            Server().log(`Received FindMy Location Update for Handle: ${item?.handle}`, "debug");
             await Server().emitMessage(NEW_FINDMY_LOCATION, item, "normal", false, true);
             count++;
 

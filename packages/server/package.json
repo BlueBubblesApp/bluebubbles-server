@@ -84,6 +84,7 @@
         "@firebase/app-types": "^0.9.0",
         "@firebase/util": "^1.9.3",
         "@peculiar/x509": "^1.6.1",
+        "async-sema": "^3.1.1",
         "axios": "^0.25.0",
         "better-sqlite3": "^8.0.1",
         "blurhash": "^1.1.3",
