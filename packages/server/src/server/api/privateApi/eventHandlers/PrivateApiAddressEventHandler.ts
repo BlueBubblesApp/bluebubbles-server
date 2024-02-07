@@ -16,11 +16,11 @@ export class PrivateApiAddressEventHandler implements PrivateApiEventHandler {
     }
 
     async handleDeregistration(data: EventData) {
-        const addresses = data.data?.__kIMAccountAliasesRemovedKey ?? [];
-        if (isEmpty(addresses)) {
+        const aliases = data.data?.__kIMAccountAliasesRemovedKey ?? [];
+        if (isEmpty(aliases)) {
             return Server().log("iMessage address deregistration event received, but no address was found!", "warn");
         }
 
-        Server().emitMessage(IMESSAGE_ALIASES_REMOVED, { addresses }, "high", true);
+        Server().emitMessage(IMESSAGE_ALIASES_REMOVED, { aliases }, "high", true);
     }
 }
