@@ -85,6 +85,22 @@ export const updateWebhook = async ({ id, url, events }: { id: number, url?: str
     return await ipcRenderer.invoke('update-webhook', { id, url, events });
 };
 
+export const createToken = async (payload: { name: string, password: string, expireAt: number }) => {
+    return await ipcRenderer.invoke('create-token', payload);
+};
+
+export const updateToken = async (payload: { name: string, password: string, expireAt: number }) => {
+    return await ipcRenderer.invoke('update-token', payload);
+};
+
+export const deleteToken = async (payload: { name: string }) => {
+    return await ipcRenderer.invoke('delete-token', payload);
+};
+
+export const getTokens = async () => {
+    return await ipcRenderer.invoke('get-tokens');
+};
+
 export const reinstallHelperBundle = async () => {
     const res = await ipcRenderer.invoke('reinstall-helper-bundle');
     if (res.success) {

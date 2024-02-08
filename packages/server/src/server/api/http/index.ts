@@ -22,6 +22,8 @@ import { HttpRoutes as HttpRoutesV1 } from "./api/v1/httpRoutes";
 import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
 import { ErrorMiddleware } from "./api/v1/middleware/errorMiddleware";
 import { createServerErrorResponse } from "./api/v1/responses";
+import { HttpRoutes as HttpRoutesV2 } from "./api/v2/httpRoutes";
+import { SocketRoutes as SocketRoutesV2 } from "./api/v2/socketRoutes";
 import { HELLO_WORLD } from "@server/events";
 
 /**
@@ -133,6 +135,7 @@ export class HttpService {
         // Configure the routing
         const router = new KoaRouter();
         HttpRoutesV1.createRoutes(router);
+        HttpRoutesV2.createRoutes(router);
 
         // Use the router
         this.koaApp.use(router.routes()).use(router.allowedMethods());
@@ -211,6 +214,7 @@ export class HttpService {
 
             // Pass to method to handle the socket events
             SocketRoutesV1.createRoutes(socket);
+            SocketRoutesV2.createRoutes(socket);
         });
 
         // Start the server

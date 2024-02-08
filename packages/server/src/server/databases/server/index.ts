@@ -4,10 +4,11 @@ import { EventEmitter } from "events";
 import { DataSource } from "typeorm";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
-import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage } from "./entity";
+import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage, Token } from "./entity";
 import { DEFAULT_DB_ITEMS } from "./constants";
 import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
 import { ScheduledMessageTable1665083072000 } from "./migrations/1665083072000-ScheduledMessageTable";
+import * as crypto from 'crypto';
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
@@ -43,7 +44,7 @@ export class ServerRepository extends EventEmitter {
             name: "config",
             type: "better-sqlite3",
             database: dbPath,
-            entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage],
+            entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage, Token],
             migrations: [ContactTables1654432080899, ScheduledMessageTable1665083072000],
             migrationsRun: !shouldSync,
             migrationsTableName: "migrations",
@@ -91,6 +92,13 @@ export class ServerRepository extends EventEmitter {
      */
     webhooks() {
         return this.db.getRepository(Webhook);
+    }
+
+    /**
+     * Get the tokens repo
+     */
+    tokens() {
+        return this.db.getRepository(Token);
     }
 
     /**
@@ -285,5 +293,52 @@ export class ServerRepository extends EventEmitter {
         if (typeof input === "boolean") return input ? "1" : "0";
         if (input instanceof Date) return String(input.getTime());
         return String(input);
+    }
+
+    public async updateToken({
+        name,
+        password,
+        expireAt
+    }: {
+        name: string;
+        password: string;
+        expireAt: number;
+    }): Promise<Token> {
+        const repo = this.tokens();
+        const item = await repo.findOneBy({ name });
+        if (!item) throw new Error("Failed to update token! Existing token does not exist!");
+        
+        if (name) item.name = name;
+        item.password = password
+        item.expireAt = expireAt
+
+        repo.update(name, item)
+        return item
+    }
+
+    public async createToken({
+        name,
+        password,
+        expireAt
+    }: {
+        name: string;
+        password: string;
+        expireAt: number;
+    }): Promise<Token> {
+        const repo = this.tokens();
+        const token = repo.create({ name: name, password: password, expireAt: expireAt, createdAt: Date.now() });
+        return await repo.save(token);
+    }
+
+    public async deleteToken({ name }: { name: string }): Promise<void> {
+        const repo = this.tokens();
+        const item = await repo.findOneBy({ name });
+        if (!item) return;
+        await repo.delete(item.name);
+    }
+
+    public async getTokens(): Promise<Array<Token>> {
+        const repo = this.tokens();
+        return await repo.find();
     }
 }

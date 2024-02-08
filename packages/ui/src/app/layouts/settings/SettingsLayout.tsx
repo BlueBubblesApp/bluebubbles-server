@@ -9,6 +9,7 @@ import { ThemeSettings } from './theme/ThemeSettings';
 import { DatabaseSettings } from './database/DatabaseSettings';
 import { PermissionRequirements } from '../../components/PermissionRequirements';
 import { AttachmentCacheBox } from 'app/components/AttachmentCacheBox';
+import { TokenSettings } from './tokens/TokenSettings';
 
 
 export const SettingsLayout = (): JSX.Element => {
@@ -16,6 +17,7 @@ export const SettingsLayout = (): JSX.Element => {
         <section>
             <Box p={3} borderRadius={10}>  
                 <ConnectionSettings />
+                <TokenSettings />
                 <PrivateApiSettings />
                 <FeatureSettings />
                 <DatabaseSettings />
