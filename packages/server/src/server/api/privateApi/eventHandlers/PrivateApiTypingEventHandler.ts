@@ -1,21 +1,20 @@
 import { Server } from "@server";
+import * as net from "net";
 import { TYPING_INDICATOR } from "@server/events";
 import { PrivateApiEventHandler, EventData } from ".";
 
-
 export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
-
     types: string[] = ["started-typing", "typing", "stopped-typing"];
 
     cache: Record<string, Record<string, any>> = {};
 
-    async handle(data: EventData) {
+    async handle(data: EventData, _: net.Socket) {
         const display = data.event === "started-typing";
         const guid = data.guid;
         let shouldEmit = false;
 
         // Ignore typing events from group chats (they aren't "proper")
-        if (guid.includes(';+;')) return;
+        if (guid.includes(";+;")) return;
 
         // If the guid hasn't been seen before, we should emit the event
         const now = new Date().getTime();

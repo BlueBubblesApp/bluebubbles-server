@@ -61,8 +61,8 @@ export class CloudflareManager extends EventEmitter {
             });
 
             setTimeout(() => {
-                reject(new Error("Failed to connect to Cloudflare after 30 seconds..."));
-            }, 1000 * 30); // 30 seconds
+                reject(new Error("Failed to connect to Cloudflare after 2 minutes..."));
+            }, 1000 * 60 * 2); // 2 minutes
         });
     }
 

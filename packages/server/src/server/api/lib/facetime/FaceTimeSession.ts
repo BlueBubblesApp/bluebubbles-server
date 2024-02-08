@@ -4,7 +4,7 @@ import { NotificationCenterDB } from "@server/databases/notificationCenter/Notii
 import { convertDateToCocoaTime } from "@server/databases/imessage/helpers/dateUtil";
 import { waitMs } from "@server/helpers/utils";
 import { EventEmitter } from "events";
-import { uuidv4 } from "@firebase/util";
+import { v4 } from "uuid";
 
 export enum FaceTimeSessionStatus {
     UNKNOWN = 0,
@@ -50,7 +50,7 @@ export class FaceTimeSession extends EventEmitter {
     } = {}) {
         super();
 
-        this.uuid = uuidv4();
+        this.uuid = v4();
 
         this.createdAt = new Date();
         this.callUuid = callUuid;
@@ -94,6 +94,7 @@ export class FaceTimeSession extends EventEmitter {
 
     private async admitSelfHandler(since: Date): Promise<boolean> {
         // Check the notification center database for a waiting room notification
+        Server().log(`Checking for FaceTime admission notifications since: ${since}`, "debug");
         const [notifications, _] = await NotificationCenterDB().getRecords({
             sort: "ASC", // ascending so we can process the oldest first
             where: [
@@ -112,22 +113,32 @@ export class FaceTimeSession extends EventEmitter {
             ]
         });
 
+        Server().log(`Found ${notifications.length} notification(s)...`, "debug");
         for (const notification of notifications) {
             // If the notification is for this conversation, admit the participant
             for (const d of notification.data) {
-                if (!d.req?.body.includes("join")) continue;
+                if (!d.req?.body.includes("join")) {
+                    Server().log(`Notification body does not contain a join request: ${String(d.req?.body)}`, "debug");
+                    continue;
+                }
 
                 // Extract the user data
                 const userData = d.req?.usda["$objects"] ?? [];
 
                 // If our data is incomplete, skip
-                if (userData.length < 10) continue;
+                if (userData.length < 10) {
+                    Server().log("User data did not contain enough parts!", "debug");
+                    continue;
+                }
 
                 const userId = userData[6];
                 const conversationId = userData[9];
 
                 // If we'ave already admitted the user, skip
-                if (this.admittedParticipants.includes(userId)) continue;
+                if (this.admittedParticipants.includes(userId)) {
+                    Server().log(`User already admitted! (ID: ${userId})`, "debug");
+                    continue;
+                }
 
                 Server().log(`Admitting ${userId}, into Call: ${conversationId}`, "debug");
                 await Server().privateApi.facetime.admitParticipant(conversationId, userId);
@@ -145,7 +156,7 @@ export class FaceTimeSession extends EventEmitter {
 
     async admitSelf(): Promise<void> {
         return await new Promise<void>((resolve, reject) => {
-            // Set with ana offset of 5 seconds
+            // Set with an offset of 5 seconds
             const startDate = new Date(new Date().getTime() - 5000);
             this.selfAdmissionAwaiter = setInterval(async () => {
                 const admitted = await this.admitSelfHandler(startDate);
@@ -236,13 +247,17 @@ export class FaceTimeSession extends EventEmitter {
     }
 
     async admitAndLeave(): Promise<void> {
+        Server().log("Waiting to admit self...", "debug");
+
         // Wait for the user, and admit them into the call
         await this.admitSelf();
 
         // Wait 15 seconds for the person to join
+        Server().log("Waiting 15 seconds for you to connect...", "debug");
         await waitMs(15000);
 
         // Once the user has been admitted, we can leave the call.
+        Server().log("Leaving the call...", "debug");
         await this.leaveCall();
     }
 

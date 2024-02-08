@@ -2,6 +2,7 @@ import "zx/globals";
 import * as os from "os";
 import * as net from "net";
 import { Server } from "@server";
+import { Sema } from "async-sema";
 import { clamp, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { TransactionPromise, TransactionResult } from "@server/managers/transactionManager/transactionPromise";
 import { TransactionManager } from "@server/managers/transactionManager";
@@ -22,11 +23,20 @@ import { PrivateApiFaceTimeStatusHandler } from "./eventHandlers/PrivateApiFaceT
 import { PrivateApiCloud } from "./apis/PrivateApiCloud";
 import { PrivateApiFaceTime } from "./apis/PrivateApiFaceTime";
 import { LogLevel } from "electron-log";
+import { PrivateApiFindMyEventHandler } from "./eventHandlers/PrivateApiFindMyEventHandler";
+import { Socket } from "../types";
+import EventEmitter from "events";
+import { v4 } from "uuid";
 
-export class PrivateApiService {
+// We only want to allow one write at a time
+const writeLock = new Sema(1);
+
+export class PrivateApiService extends EventEmitter {
     server: net.Server;
 
-    clients: net.Socket[] = [];
+    clients: Socket[] = [];
+
+    activeClients: Record<string, Socket> = {};
 
     restartCounter = 0;
 
@@ -77,6 +87,7 @@ export class PrivateApiService {
     }
 
     constructor() {
+        super();
         this.restartCounter = 0;
         this.transactionManager = new TransactionManager();
 
@@ -85,7 +96,8 @@ export class PrivateApiService {
             new PrivateApiTypingEventHandler(),
             new PrivateApiPingEventHandler(),
             new PrivateApiAddressEventHandler(),
-            new PrivateApiFaceTimeStatusHandler()
+            new PrivateApiFaceTimeStatusHandler(),
+            new PrivateApiFindMyEventHandler()
         ];
     }
 
@@ -96,7 +108,7 @@ export class PrivateApiService {
     async start(): Promise<void> {
         // Configure & start the listener
         this.log("Starting Private API Helper Services...", "debug");
-        this.configureServer();
+        await this.configureServer();
 
         // we need to get the port to open the server on (to allow multiple users to use the bundle)
         // we'll base this off the users uid (a unique id for each user, starting from 501)
@@ -107,7 +119,7 @@ export class PrivateApiService {
             this.restartCounter = 0;
         });
 
-        this.startPerMode();
+        await this.startPerMode();
     }
 
     async startPerMode(): Promise<void> {
@@ -129,54 +141,88 @@ export class PrivateApiService {
         }
     }
 
-    addClient(client: net.Socket) {
+    private getProcessByClientId(socketId: string): string | null {
+        for (const key of Object.keys(this.activeClients)) {
+            if (this.activeClients[key].id === socketId) {
+                return key;
+            }
+        }
+
+        return null;
+    }
+
+    registerClient(process: string, socket: Socket) {
+        this.activeClients[process] = socket;
+        this.emit("client-registered", { process, socket });
+    }
+
+    addClient(client: Socket) {
         this.clients.push(client);
         this.log(`Added socket client (Total: ${this.clients.length})`);
     }
 
-    removeClient(client: net.Socket) {
+    removeClient(client: Socket) {
+        const proc = this.getProcessByClientId(client.id);
+        this.log(`Private API Helper (${proc ?? "Anonymous"}) disconnected!`, "debug");
+
         const idx = this.clients.indexOf(client);
         if (idx !== -1) {
             this.clients.splice(idx, 1);
             this.log(`Removed socket client (Total: ${this.clients.length})`);
         }
+
+        if (proc) {
+            delete this.activeClients[proc];
+        }
     }
 
-    configureServer() {
-        this.server = net.createServer((socket: net.Socket) => {
-            this.addClient(socket);
-            socket.setDefaultEncoding("utf8");
+    async configureServer(): Promise<void> {
+        return new Promise<void>((resolve, _) => {
+            this.server = net.createServer((client: net.Socket) => {
+                // Apply a UUID to the connection
+                const socketId = v4();
+                const socket = client as Socket;
+                socket.setDefaultEncoding("utf8");
+                socket.id = socketId;
 
-            this.log("Private API Helper connected!");
-            this.setupListeners(socket);
+                this.addClient(socket);
+                this.log(`Private API Helper connected (UUID: ${socketId})!`);
+                this.setupListeners(socket);
 
-            socket.on("close", () => {
-                this.log("Private API Helper disconnected!", "debug");
-                this.removeClient(socket);
+                socket.on("close", hadError => {
+                    Server().log(`Socket Closed (${socketId}). Had Error: ${hadError}`, "debug");
+                    this.removeClient(socket);
+                });
+
+                socket.on("end", () => {
+                    Server().log(`Socket Ended by Client (${socketId})`, "debug");
+                });
+
+                socket.on("error", err => {
+                    this.log("An error occured in a BlueBubbles Private API Helper connection! Closing...", "debug");
+                    this.log(String(err), "debug");
+                    socket.destroy();
+                });
             });
 
-            socket.on("error", err => {
-                this.log("An error occured in a BlueBubbles Private API Helper connection! Closing...", "debug");
-                this.log(String(err), "debug");
-                socket.destroy();
+            this.server.on("error", err => {
+                this.log("An error occured in the TCP Socket! Restarting", "error");
+                this.log(err.toString(), "error");
+
+                if (this.restartCounter <= 5) {
+                    this.restartCounter += 1;
+                    this.restart();
+                } else {
+                    this.log("Max restart count reached for Private API listener...");
+                    this.stop();
+                }
             });
-        });
 
-        this.server.on("error", err => {
-            this.log("An error occured in the TCP Socket! Restarting", "error");
-            this.log(err.toString(), "error");
-
-            if (this.restartCounter <= 5) {
-                this.restartCounter += 1;
-                this.restart();
-            } else {
-                this.log("Max restart count reached for Private API listener...");
-                this.stop();
-            }
+            resolve();
         });
     }
 
-    async onEvent(eventRaw: string): Promise<void> {
+    async onEvent(eventRaw: string, socket: net.Socket): Promise<void> {
         if (eventRaw == null) {
             this.log(`Received null data from BlueBubblesHelper!`);
             return;
@@ -209,20 +255,28 @@ export class PrivateApiService {
             }
 
             if (data.transactionId) {
-                // Resolve the promise from the transaction manager
-                const idx = this.transactionManager.findIndex(data.transactionId);
-                if (idx >= 0) {
-                    if (isNotEmpty(data?.error ?? "")) {
-                        this.transactionManager.promises[idx].reject(data.error);
-                    } else {
-                        const result = this.readTransactionData(data);
-                        this.transactionManager.promises[idx].resolve(data.identifier, result);
+                try {
+                    // Resolve the promise from the transaction manager
+                    const idx = this.transactionManager.findIndex(data.transactionId);
+                    if (idx >= 0) {
+                        if (isNotEmpty(data?.error ?? "")) {
+                            this.transactionManager.promises[idx].reject(data.error);
+                        } else {
+                            const result = this.readTransactionData(data);
+                            this.transactionManager.promises[idx].resolve(data.identifier, result);
+                        }
                     }
+                } catch (ex: any) {
+                    Server().log(`Failed to handle transaction! Error: ${ex?.message ?? String(ex)}`);
                 }
             } else if (data.event) {
                 for (const eventHandler of this.eventHandlers) {
-                    if (eventHandler.types.includes(data.event)) {
-                        await eventHandler.handle(data);
+                    try {
+                        if (eventHandler.types.includes(data.event)) {
+                            await eventHandler.handle(data, socket);
+                        }
+                    } catch (ex: any) {
+                        Server().log(`Failed to handle event, '${data.event}'! Error: ${ex?.message ?? String(ex)}`);
                     }
                 }
             }
@@ -230,7 +284,7 @@ export class PrivateApiService {
     }
 
     setupListeners(socket: net.Socket) {
-        socket.on("data", this.onEvent.bind(this));
+        socket.on("data", (event: string) => this.onEvent(event, socket));
     }
 
     private readTransactionData(response: NodeJS.Dict<any>) {
@@ -257,13 +311,14 @@ export class PrivateApiService {
         transaction?: TransactionPromise
     ): Promise<TransactionResult> {
         const msg = "Failed to send request to Private API!";
-
-        // If we have a transaction, add it to the manager
-        if (transaction) {
-            this.transactionManager.add(transaction);
-        }
+        await writeLock.acquire();
 
         try {
+            // If we have a transaction, add it to the manager
+            if (transaction) {
+                this.transactionManager.add(transaction);
+            }
+
             await new Promise<void>((resolve, reject) => {
                 const d: NodeJS.Dict<any> = { action, data };
 
@@ -285,6 +340,10 @@ export class PrivateApiService {
             }
         } catch (ex: any) {
             this.log(`${msg} ${ex?.message ?? ex}`, "debug");
+        } finally {
+            // Release the lock after a short delay.
+            // This gives the other side a chance to process the data.
+            setTimeout(() => writeLock.release(), 200);
         }
 
         return null;

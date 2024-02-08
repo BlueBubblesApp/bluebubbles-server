@@ -99,6 +99,7 @@ export type ChatResponse = {
     isFiltered?: boolean;
     displayName: string;
     groupId?: string;
+    lastAddressedHandle?: string | null;
 };
 
 export type AttachmentResponse = {

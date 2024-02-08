@@ -68,6 +68,7 @@ import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
 import { getStartDelay } from "./utils/ConfigUtils";
+import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
 
 const findProcess = require("find-process");
 
@@ -147,6 +148,8 @@ class BlueBubblesServer extends EventEmitter {
     chatListeners: ChangeListener[];
 
     eventCache: EventCache;
+
+    findMyCache: FindMyFriendsCache;
 
     hasSetup: boolean;
 
@@ -237,6 +240,7 @@ class BlueBubblesServer extends EventEmitter {
 
         this.region = null;
         this.typingCache = [];
+        this.findMyCache = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -520,13 +524,6 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.log("Starting FCM service...");
-            await this.fcm.start();
-        } catch (ex: any) {
-            this.log(`Failed to start FCM service! ${ex.message}`, "error");
-        }
-
-        try {
             this.log("Starting Scheduled Messages service...");
             await this.scheduledMessages.start();
         } catch (ex: any) {
@@ -543,6 +540,13 @@ class BlueBubblesServer extends EventEmitter {
         if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
             this.log("Starting iMessage Database listeners...");
             await this.startChatListeners();
+        }
+
+        try {
+            this.log("Starting FCM service...");
+            await this.fcm.start();
+        } catch (ex: any) {
+            this.log(`Failed to start FCM service! ${ex.message}`, "error");
         }
     }
 
@@ -689,6 +693,9 @@ class BlueBubblesServer extends EventEmitter {
         // Setup lightweight message cache
         this.log("Initializing event cache...");
         this.eventCache = new EventCache();
+
+        this.log("Initializing FindMy Location cache...");
+        this.findMyCache = new FindMyFriendsCache();
 
         try {
             this.log("Initializing caffeinate service...");
@@ -976,22 +983,10 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
+            Server().log("Dispatching server URL update from config change", "debug");
             // Emit the new server event no matter what
             await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-
-            // Check if we should update the URL
-            const shouldUpdateUrl = this.fcm?.shouldUpdateUrl() ?? null;
-            if (shouldUpdateUrl != null) {
-                // If it's not initialized, we need to initialize it.
-                // Initializing it will also set the server URL
-                if (!this.fcm.hasInitialized) {
-                    Server().log("Initializing FCM for server URL update from config change", "debug");
-                    await this.fcm.start();
-                } else {
-                    Server().log("Dispatching server URL update from config change", "debug");
-                    await this.fcm.setServerUrl();
-                }
-            }
+            await this.fcm?.setServerUrl(true);
         } catch (ex: any) {
             this.log(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`, "error");
         }
@@ -1084,8 +1079,8 @@ class BlueBubblesServer extends EventEmitter {
             this.log(ex, "debug");
         }
 
-        // Dispatch the webhook
-        this.webhookService.dispatch({ type, data });
+        // Dispatch the webhook (sometimes it's not initialized)
+        this.webhookService?.dispatch({ type, data });
     }
 
     private getTheme() {

@@ -3,16 +3,8 @@ import * as fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
-import {
-    checkPrivateApiStatus,
-    isEmpty,
-    isNotEmpty,
-    resultAwaiter
-} from "@server/helpers/utils";
-import {
-    isMinMonterey,
-    isMinVentura
-} from "@server/env";
+import { checkPrivateApiStatus, isEmpty, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
+import { isMinMonterey, isMinVentura } from "@server/env";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/apple/mappings";
 import { invisibleMediaChar } from "@server/api/http/constants";
 import { ActionHandler } from "@server/api/apple/actions";
@@ -90,8 +82,12 @@ export class MessageInterface {
         if (Server().typingCache.includes(chatGuid)) {
             Server().typingCache = Server().typingCache.filter(c => c !== chatGuid);
 
-            // Try to stop typing for that chat. Don't await so we don't block the message
-            Server().privateApi.chat.stopTyping(chatGuid);
+            try {
+                // Try to stop typing for that chat. Don't await so we don't block the message
+                await Server().privateApi.chat.stopTyping(chatGuid);
+            } catch {
+                // Do nothing
+            }
         }
 
         // Try to send the iMessage
@@ -257,7 +253,6 @@ export class MessageInterface {
             }
         });
 
-        // Check if the name changed
         if (!retMessage) {
             throw new Error(`Failed to send message! Message not found in database after ${maxWaitMs / 1000} seconds!`);
         }
@@ -554,7 +549,7 @@ export class MessageInterface {
                 fs.unlinkSync(currentPath);
             }
         }
-        
+
         // Send the message
         const result = await Server().privateApi.message.sendMultipart(
             chatGuid,

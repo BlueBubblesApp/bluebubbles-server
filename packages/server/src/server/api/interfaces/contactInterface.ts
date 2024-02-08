@@ -153,8 +153,8 @@ export class ContactInterface {
 
         // Also load the thumbnail if the image is requested.
         // The regular thumbnail will take precedence over the contactImageThumbnail
-        if (extraProps.includes('contactImage') && !extraProps.includes('contactThumbnailImage')) {
-            extraProps.push('contactThumbnailImage');
+        if (extraProps.includes("contactImage") && !extraProps.includes("contactThumbnailImage")) {
+            extraProps.push("contactThumbnailImage");
         }
 
         return ContactInterface.mapContacts(ContactsLib.getAllContacts(extraProps), "api", { extraProps });
@@ -471,18 +471,13 @@ export class ContactInterface {
         const parsed = vcf.parse(content);
         const output: Contact[] = [];
         for (const contact of parsed) {
-            const nameParts = contact
-                .get("n")
-                .valueOf()
-                .toString()
-                .split(";")
-                .reverse()
-                .filter(e => e && e.length > 0);
+            const nameParts = contact.get("n").valueOf().toString().split(";");
             if (nameParts.length === 0) continue;
 
             const params: any = {
-                firstName: nameParts[0],
-                lastName: nameParts.length > 1 ? nameParts.slice(1).join(" ") : ""
+                // If a first name isn't provided, use the middle name
+                firstName: nameParts[1] ?? nameParts[2] ?? "",
+                lastName: nameParts[0] ?? ""
             };
 
             if (contact.get("tel")) {

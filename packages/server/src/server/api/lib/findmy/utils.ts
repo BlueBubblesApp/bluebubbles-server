@@ -1,4 +1,4 @@
-import { FindMyItem, FindMyDevice } from "@server/services/findMyService/types";
+import { FindMyItem, FindMyDevice } from "@server/api/lib/findmy/types";
 
 export const getFindMyItemModelDisplayName = (item: FindMyItem): string => {
     if (item.productType.type === "b389") return "AirTag";

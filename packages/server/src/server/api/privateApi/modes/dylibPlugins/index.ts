@@ -11,6 +11,8 @@ export abstract class DylibPlugin {
 
     parentApp: string = null;
 
+    bundleIdentifier: string = null;
+
     isStopping = false;
 
     isInjecting = false;
@@ -34,9 +36,9 @@ export abstract class DylibPlugin {
             Server().log(`Killing process: ${this.parentApp}`, "debug");
             await FileSystem.killProcess(this.parentApp);
         } catch (ex: any) {
-            const errStr = ((typeof ex === 'object') ? ex?.message ?? String(ex) : String(ex)).trim();
-            if (!errStr.includes('No matching processes belonging to you were found')) {
-                Server().log(`Failed to kill parent process (${this.parentApp})! Error: ${errStr}`, 'debug');
+            const errStr = (typeof ex === "object" ? ex?.message ?? String(ex) : String(ex)).trim();
+            if (!errStr.includes("No matching processes belonging to you were found")) {
+                Server().log(`Failed to kill parent process (${this.parentApp})! Error: ${errStr}`, "debug");
             }
         }
     }
@@ -71,7 +73,7 @@ export abstract class DylibPlugin {
         }
     }
 
-    async injectPlugin() {
+    async injectPlugin(onSuccessfulStart: () => void = null) {
         if (!this.isEnabled) return;
         if (this.isInjecting) return;
         this.isInjecting = true;
@@ -102,14 +104,19 @@ export abstract class DylibPlugin {
 
                 this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
 
-                // HIde the app after 5 seconds
+                // Hide the app after 5 seconds
                 setTimeout(() => {
                     this.hideApp();
-                }, 4000);
+                }, 5000);
+
+                Server().privateApi.on("client-registered", info => {
+                    if (info?.process !== this.bundleIdentifier) return;
+                    onSuccessfulStart();
+                });
 
                 await this.dylibProcess;
             } catch (ex: any) {
-                Server().log(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex}`, 'debug');
+                Server().log(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex}`, "debug");
                 if (this.isStopping) {
                     this.isInjecting = false;
                     return;

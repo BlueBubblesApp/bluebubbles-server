@@ -49,7 +49,7 @@ export interface FindMyDevice {
     // Extra properties from FindMyItem
     role?: FindMyItem["role"];
     serialNumber?: string;
-    lostModeMetadata?: FindMyItem["lostModeMetadata"]
+    lostModeMetadata?: FindMyItem["lostModeMetadata"];
 }
 
 export interface FindMyItem {
@@ -121,3 +121,15 @@ interface FindMyLocation {
     altitude?: number;
     locationFinished?: boolean;
 }
+
+export type FindMyLocationItem = {
+    handle: string | null;
+    coordinates: [number, number];
+    long_address: string | null;
+    short_address: string | null;
+    subtitle: string | null;
+    title: string | null;
+    last_updated: number;
+    is_locating_in_progress: 0 | 1;
+    status: "legacy" | "live" | "shallow";
+};

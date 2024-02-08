@@ -289,6 +289,8 @@ export class OauthService {
             throw new Error(`No Project ID was returned!`);
         }
 
+        await waitMs(2000);
+
         // Fetch the project data
         // eslint-disable-next-line max-len
         const getUrl = `https://cloudresourcemanager.googleapis.com/v1/projects?filter=name%3A${this.projectName}%20AND%20lifecycleState%3AACTIVE`;

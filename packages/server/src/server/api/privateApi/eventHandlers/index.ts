@@ -1,3 +1,5 @@
+import * as net from "net";
+
 export type EventData = {
     event: string;
     guid?: string;
@@ -6,8 +8,7 @@ export type EventData = {
 };
 
 export interface PrivateApiEventHandler {
-
     types: string[];
 
-    handle(data: EventData): Promise<void>;
+    handle(data: EventData, socket: net.Socket): Promise<void>;
 }
