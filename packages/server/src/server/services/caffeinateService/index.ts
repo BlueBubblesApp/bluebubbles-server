@@ -1,13 +1,13 @@
 import * as process from "process";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
-import { Server } from "@server";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 /**
  * Service that spawns the caffeinate process so that
  * the macOS operating system does not sleep until the server
  * exits.
  */
-export class CaffeinateService {
+export class CaffeinateService extends Loggable {
     isCaffeinated = false;
 
     childProc: ChildProcessWithoutNullStreams;
@@ -25,7 +25,7 @@ export class CaffeinateService {
         // -s: Create an assertion to prevent the system from sleeping
         // -w: Waits for the process with the specified pid to exit.
         this.childProc = spawn("caffeinate", ["-i", "-m", "-s", "-w", myPid.toString()], { detached: true });
-        Server().log(`Spawned Caffeinate with PID: ${this.childProc.pid}`);
+        this.log.info(`Spawned Caffeinate with PID: ${this.childProc.pid}`);
         this.isCaffeinated = true;
 
         // Setup listeners
@@ -45,10 +45,9 @@ export class CaffeinateService {
             try {
                 const killed = this.childProc.kill();
                 if (!killed) process.kill(-this.childProc.pid);
-                Server().log("Killed caffeinate process");
+                this.log.debug("Killed caffeinate process");
             } catch (ex: any) {
-                console.error(ex);
-                Server().log(`Failed to kill caffeinate process! ${ex.message}`, "error");
+                this.log.error(`Failed to kill caffeinate process! ${ex.message}`);
             } finally {
                 this.isCaffeinated = false;
             }

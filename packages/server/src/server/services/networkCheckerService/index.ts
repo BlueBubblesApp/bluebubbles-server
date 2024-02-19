@@ -1,7 +1,7 @@
+import { Loggable } from "@server/lib/logging/Loggable";
 import * as dns from "dns";
-import { EventEmitter } from "events";
 
-export class NetworkCheckerService extends EventEmitter {
+export class NetworkCheckerService extends Loggable {
     online = true;
 
     isStopped = false;

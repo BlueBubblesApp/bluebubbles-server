@@ -5,6 +5,8 @@ import { Proxy } from "../proxy";
 const threeHours = 1000 * 60 * 60 * 3;
 
 export class LocalTunnelService extends Proxy {
+    tag = "LocalTunnelService";
+
     tunnel: any;
 
     constructor() {

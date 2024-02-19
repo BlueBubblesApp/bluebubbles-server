@@ -47,7 +47,7 @@ export const deduplicateObjectArray = (items: any[], key: string): any[] => {
 };
 
 // Parse region from phone number with country code
-export const parsePhoneNumberRegion = (phoneNumber: string, defaultRegion = 'US') => {
+export const parsePhoneNumberRegion = (phoneNumber: string, defaultRegion = "US") => {
     try {
         const phoneUtil = PhoneNumberUtil.getInstance();
         const number = phoneUtil.parse(phoneNumber);
@@ -73,7 +73,7 @@ export const getiMessageAddressFormat = (address: string, preSlugged = false, pr
         const defaultRegion = Server().region ?? "US";
         let region = defaultRegion;
         if (!hasRegionCode) {
-             // If we don't have a region code, we need to "infer" it based on the macOS locale.
+            // If we don't have a region code, we need to "infer" it based on the macOS locale.
             // Server().region is loaded upon app startup. If it's null (which it shouldn't be),
             // we should default to US as a region.
             const regionCode = PhoneMetadata.countryToMetadata[region][10];
@@ -426,24 +426,13 @@ export const resultRetryer = async ({
     maxTries = 3,
     delayMs = 1000,
     getData,
-    extraLoopCondition = null,
     dataLoopCondition = null
 }: {
     maxTries?: number;
     delayMs?: number;
     getData: (previousData: any | null) => any;
-    extraLoopCondition?: (data: any | null) => boolean;
     dataLoopCondition?: (data: any | null) => boolean;
 }): Promise<any | null> => {
-    let attempt = 0;
-
-    // Defaults to false because true means keep looping.
-    // This condition is OR'd with the data loop condition.
-    // If this was true, it would keep looping indefinitely.
-    if (!extraLoopCondition) {
-        extraLoopCondition = _ => false;
-    }
-
     // Set the default check for the loop condition to be if the data is null.
     // If it's null, keep looping.
     if (!dataLoopCondition) {
@@ -451,7 +440,8 @@ export const resultRetryer = async ({
     }
 
     let data = await getData(null);
-    while ((dataLoopCondition(data) || extraLoopCondition(data)) && attempt < maxTries) {
+    let attempt = 1;
+    while (dataLoopCondition(data) && attempt < maxTries) {
         // Give it a bit to execute
         await waitMs(delayMs);
 
@@ -462,7 +452,6 @@ export const resultRetryer = async ({
 
     return data;
 };
-
 
 export const resultAwaiter = async ({
     maxWaitMs = 30000,
@@ -515,4 +504,4 @@ export const getObjectAsString = (value: any): string => {
     } catch {
         return String(value);
     }
-}
+};

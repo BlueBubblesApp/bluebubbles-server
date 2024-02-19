@@ -56,7 +56,7 @@ export const NotificationsWalkthrough = (): JSX.Element => {
         getOauthUrl().then(url => setOauthUrl(url));
     }, []);
 
-    logs = logs.filter(log => log.message.startsWith('[GCP]'));
+    logs = logs.filter(log => log.message.startsWith('[OauthService]'));
 
     ipcRenderer.on('oauth-status', (_: any, data: ProgressStatus) => {
         setAuthStatus(data);
@@ -209,7 +209,7 @@ export const NotificationsWalkthrough = (): JSX.Element => {
                                         mt={3}
                                         leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
                                         variant='outline'
-                                        onClick={() => store.dispatch(filterLogs((item) => !item.message.startsWith('[GCP]')))}
+                                        onClick={() => store.dispatch(filterLogs((item) => !item.message.startsWith('[OauthService]')))}
                                     >
                                         Continue with Google
                                     </Button>

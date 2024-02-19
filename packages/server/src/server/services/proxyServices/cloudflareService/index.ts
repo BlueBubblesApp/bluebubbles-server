@@ -2,6 +2,8 @@ import { CloudflareManager } from "@server/managers/cloudflareManager";
 import { Proxy } from "../proxy";
 
 export class CloudflareService extends Proxy {
+    tag = "CloudflareService";
+
     manager: CloudflareManager;
 
     constructor() {

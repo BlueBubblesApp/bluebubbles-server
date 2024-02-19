@@ -11,6 +11,8 @@ import { userHomeDir } from "@server/fileSystem";
 const oneHour45 = 1000 * 60 * (60 + 45); // This is the new ngrok timeout
 
 export class NgrokService extends Proxy {
+    tag = "NgrokService";
+
     constructor() {
         super({
             name: "Ngrok",
@@ -29,7 +31,7 @@ export class NgrokService extends Proxy {
         let ngrokProtocol = (Server().repo.getConfig("ngrok_protocol") as Ngrok.Protocol) ?? "http";
 
         if (isEmpty(ngrokKey)) {
-            throw new Error('You must provide an Auth Token to use the Ngrok Proxy Service!');
+            throw new Error("You must provide an Auth Token to use the Ngrok Proxy Service!");
         }
 
         await this.migrateConfigFile();
@@ -38,13 +40,13 @@ export class NgrokService extends Proxy {
             port: Server().repo.getConfig("socket_port") ?? 1234,
             binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked"),
             onStatusChange: async (status: string) => {
-                Server().log(`Ngrok status: ${status}`);
+                this.log.info(`Ngrok status: ${status}`);
 
                 // If the status is closed, restart the server
                 if (status === "closed") await this.restart();
             },
             onLogEvent: (log: string) => {
-                Server().log(log, "debug");
+                this.log.debug(log);
 
                 // Sanitize the log a bit (remove quotes and standardize)
                 const cmp_log = log.replace(/"/g, "").replace(/eror/g, "error");
@@ -57,18 +59,18 @@ export class NgrokService extends Proxy {
                         ) ||
                         cmp_log.includes("The authtoken you specified is properly formed, but it is invalid")
                     ) {
-                        Server().log(`Ngrok Auth Token is invalid, removing...!`, "error");
+                        this.log.error(`Ngrok Auth Token is invalid, removing...!`);
                         Server().repo.setConfig("ngrok_key", "");
                     } else if (cmp_log.includes("TCP tunnels are only available after you sign up")) {
-                        Server().log(`In order to use Ngrok with TCP, you must enter an Auth Token!`, "error");
+                        this.log.error(`In order to use Ngrok with TCP, you must enter an Auth Token!`);
                     } else {
-                        Server().log(`Ngrok status: Error Detected!`);
+                        this.log.info(`Ngrok status: Error Detected!`);
                     }
                 } else if (log.includes("remote gone away")) {
-                    Server().log(`Ngrok status: "Remote gone away" -> Restarting...`);
+                    this.log.info(`Ngrok status: "Remote gone away" -> Restarting...`);
                     this.restart();
                 } else if (log.includes("command failed")) {
-                    Server().log(`Ngrok status: "Command failed" -> Restarting...`);
+                    this.log.info(`Ngrok status: "Command failed" -> Restarting...`);
                     this.restart();
                 }
             }
@@ -94,8 +96,8 @@ export class NgrokService extends Proxy {
     }
 
     async migrateConfigFile(): Promise<void> {
-        const newConfig = path.join(app.getPath("userData"), 'ngrok', 'ngrok.yml');
-        const oldConfig = path.join(userHomeDir(), '.ngrok2', '/ngrok.yml');
+        const newConfig = path.join(app.getPath("userData"), "ngrok", "ngrok.yml");
+        const oldConfig = path.join(userHomeDir(), ".ngrok2", "/ngrok.yml");
 
         // If the new config file already exists, don't do anything
         if (fs.existsSync(newConfig)) return;
@@ -105,9 +107,9 @@ export class NgrokService extends Proxy {
 
         // If the old config file exists and is empty, we can delete it
         // so that it's recreated in the proper location
-        const contents = fs.readFileSync(oldConfig).toString('utf-8');
+        const contents = fs.readFileSync(oldConfig).toString("utf-8");
         if (!contents || isEmpty(contents.trim())) {
-            Server().log('Detected old & empty Ngrok config file. Removing file...', 'debug');
+            this.log.debug("Detected old & empty Ngrok config file. Removing file...");
             fs.unlinkSync(oldConfig);
             return;
         }
@@ -115,13 +117,13 @@ export class NgrokService extends Proxy {
         // Upgrade the old config if the new config doesn't exist
         // and the old config is not empty.
         try {
-            Server().log('Ngrok config file needs upgrading. Upgrading...', 'debug');
+            this.log.debug("Ngrok config file needs upgrading. Upgrading...");
             await upgradeConfig({
                 relocate: true,
                 binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
             });
         } catch (ex) {
-            Server().log('An error occurred while upgrading the Ngrok config file!', 'debug');
+            this.log.debug("An error occurred while upgrading the Ngrok config file!");
         }
     }
 
@@ -133,7 +135,7 @@ export class NgrokService extends Proxy {
             await disconnect();
             await kill();
         } catch (ex: any) {
-            Server().log("Failed to disconnect from Ngrok!", "debug");
+            this.log.debug("Failed to disconnect from Ngrok!");
         } finally {
             this.url = null;
         }

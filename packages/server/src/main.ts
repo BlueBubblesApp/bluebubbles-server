@@ -12,6 +12,7 @@ import { Server } from "@server";
 import { isEmpty, safeTrim } from "@server/helpers/utils";
 import { AppWindow } from "@windows/AppWindow";
 import { AppTray } from "@trays/AppTray";
+import { getLogger } from "@server/lib/logging/Loggable";
 
 app.commandLine.appendSwitch("in-process-gpu");
 
@@ -31,6 +32,7 @@ let isHandlingExit = false;
 
 // Initialize the server
 Server(parsedArgs, null);
+const log = getLogger("Main");
 
 // Only 1 instance is allowed
 const gotTheLock = app.requestSingleInstanceLock();
@@ -53,8 +55,8 @@ if (!gotTheLock) {
 
 process.on("uncaughtException", error => {
     // Print the exception
-    Server().log(`Uncaught Exception: ${error.message}`, "error");
-    if (error?.stack) Server().log(`Uncaught Exception StackTrace: ${error?.stack}`, "debug");
+    log.error(`Uncaught Exception: ${error.message}`);
+    if (error?.stack) log.debug(`Uncaught Exception StackTrace: ${error?.stack}`);
 });
 
 const handleExit = async (event: any = null, { exit = true } = {}) => {
@@ -125,40 +127,40 @@ const handleSet = async (parts: string[]): Promise<void> => {
     const configKey = parts.length > 1 ? parts[1] : null;
     const configValue = parts.length > 2 ? parts[2] : null;
     if (!configKey || !configValue) {
-        Server().log("Empty config key/value. Ignoring...");
+        log.info("Empty config key/value. Ignoring...");
         return;
     }
 
     if (!Server().repo.hasConfig(configKey)) {
-        Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
+        log.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
         return;
     }
 
     try {
         await Server().repo.setConfig(configKey, quickStrConvert(configValue));
-        Server().log(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
+        log.info(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
     } catch (ex: any) {
-        Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
+        log.error(`Failed set config item, '${configKey}'\n${ex}`);
     }
 };
 
 const handleShow = async (parts: string[]): Promise<void> => {
     const configKey = parts.length > 1 ? parts[1] : null;
     if (!configKey) {
-        Server().log("Empty config key. Ignoring...");
+        log.info("Empty config key. Ignoring...");
         return;
     }
 
     if (!Server().repo.hasConfig(configKey)) {
-        Server().log(`Configuration, '${configKey}' does not exist. Ignoring...`);
+        log.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
         return;
     }
 
     try {
         const value = await Server().repo.getConfig(configKey);
-        Server().log(`${configKey} -> ${value}`);
+        log.info(`${configKey} -> ${value}`);
     } catch (ex: any) {
-        Server().log(`Failed set config item, '${configKey}'\n${ex}`, "error");
+        log.error(`Failed set config item, '${configKey}'\n${ex}`);
     }
 };
 
@@ -190,12 +192,12 @@ Available Commands:
 process.stdin.on("data", chunk => {
     const line = safeTrim(chunk.toString());
     if (!Server() || isEmpty(line)) return;
-    Server().log(`Handling STDIN: ${line}`, "debug");
+    log.debug(`Handling STDIN: ${line}`);
 
     // Handle the standard input
     const parts = chunk ? line.split(" ") : [];
     if (isEmpty(parts)) {
-        Server().log("Invalid command", "debug");
+        log.debug("Invalid command");
         return;
     }
 
@@ -214,6 +216,6 @@ process.stdin.on("data", chunk => {
             Server().relaunch();
             break;
         default:
-            Server().log(`Unhandled command, '${parts[0]}'`, "debug");
+            log.debug(`Unhandled command, '${parts[0]}'`);
     }
 });

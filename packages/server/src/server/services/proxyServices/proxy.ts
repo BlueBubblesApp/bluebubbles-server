@@ -1,5 +1,6 @@
 import { onlyAlphaNumeric, waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 export type ProxyOptions = {
     name: string;
@@ -9,7 +10,7 @@ export type ProxyOptions = {
 
 const sevenHours = 1000 * 60 * 60 * 7;
 
-export abstract class Proxy {
+export abstract class Proxy extends Loggable {
     opts: ProxyOptions;
 
     url: string;
@@ -32,6 +33,8 @@ export abstract class Proxy {
     }
 
     constructor(opts: ProxyOptions) {
+        super();
+
         this.opts = opts;
         this.url = null;
         this.refreshTimer = null;
@@ -67,7 +70,7 @@ export abstract class Proxy {
      */
     async start(): Promise<void> {
         if (!this.canStart()) {
-            Server().log(`${this.opts.name} proxy is disabled. Not restarting.`);
+            this.log.info(`${this.opts.name} proxy is disabled. Not restarting.`);
             return;
         }
 
@@ -79,19 +82,19 @@ export abstract class Proxy {
             this.url = await this.connect();
             this.applyAddress(this.url);
         } catch (ex: any) {
-            Server().log(`Failed to connect to ${this.opts.name}! Error: ${ex.toString()}`);
+            this.log.info(`Failed to connect to ${this.opts.name}! Error: ${ex.toString()}`);
             throw ex;
         }
 
         // Start the new refresh timer (if available)
         if (this.opts.autoRefresh ?? false) {
-            Server().log(`Starting ${this.opts.name} refresh timer. Waiting ${this.opts.refreshTimerMs} ms`, "debug");
+            this.log.debug(`Starting ${this.opts.name} refresh timer. Waiting ${this.opts.refreshTimerMs} ms`);
             this.refreshTimer = setTimeout(async () => {
                 const success = await Proxy.waitForIdle();
                 if (!success) {
-                    Server().log(`Restarting ${this.opts.name} process due to session & idle timeout...`, "debug");
+                    this.log.debug(`Restarting ${this.opts.name} process due to session & idle timeout...`);
                 } else {
-                    Server().log(`Restarting ${this.opts.name} process due to session timeout...`, "debug");
+                    this.log.debug(`Restarting ${this.opts.name} process due to session timeout...`);
                 }
 
                 await this.restart();
@@ -134,7 +137,7 @@ export abstract class Proxy {
      */
     async restart(): Promise<boolean> {
         if (!this.canStart()) {
-            Server().log(`${this.opts.name} proxy is diabled. Not restarting.`);
+            this.log.info(`${this.opts.name} proxy is diabled. Not restarting.`);
             return false;
         }
 
@@ -148,19 +151,21 @@ export abstract class Proxy {
 
             // Set the wait time based on which try we are attempting
             const wait = tries > 1 ? 2000 * tries : 1000;
-            Server().log(`Attempting to restart ${this.opts.name} (attempt ${tries}; ${wait} ms delay)`);
+            this.log.info(`Attempting to restart ${this.opts.name} (attempt ${tries}; ${wait} ms delay)`);
             connected = await this.restartHandler(wait);
         }
 
         // Log some nice things (hopefully)
         if (connected) {
-            Server().log(`Successfully connected to ${this.opts.name} after ${tries} ${tries === 1 ? "try" : "tries"}`);
+            this.log.info(
+                `Successfully connected to ${this.opts.name} after ${tries} ${tries === 1 ? "try" : "tries"}`
+            );
         } else {
-            Server().log(`Failed to connect to ${this.opts.name} after ${maxTries} tries`);
+            this.log.info(`Failed to connect to ${this.opts.name} after ${maxTries} tries`);
         }
 
         if (tries >= maxTries) {
-            Server().log(`Reached maximum retry attempts for ${this.opts.name}. Force restarting app...`);
+            this.log.info(`Reached maximum retry attempts for ${this.opts.name}. Force restarting app...`);
             Server().relaunch();
         }
 
@@ -176,11 +181,11 @@ export abstract class Proxy {
             await new Promise((resolve, _) => setTimeout(resolve, wait));
             await this.start();
         } catch (ex: any) {
-            Server().log(`Failed to restart ${this.opts.name}!\n${ex}`, "error");
+            this.log.error(`Failed to restart ${this.opts.name}!\n${ex}`);
 
             const errString = ex?.toString() ?? "";
             if (errString.includes("socket hang up") || errString.includes("[object Object]")) {
-                Server().log("Socket hang up detected. Performing full server restart...");
+                this.log.info("Socket hang up detected. Performing full server restart...");
                 Server().relaunch();
             }
 

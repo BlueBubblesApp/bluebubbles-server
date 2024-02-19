@@ -29,6 +29,9 @@ import {
 } from "../../helpers/utils";
 import { tapbackUIMap } from "./mappings";
 import { MessageInterface } from "../interfaces/messageInterface";
+import { getLogger } from "../../lib/logging/Loggable";
+
+const log = getLogger("ActionHandler");
 
 /**
  * This class handles all actions that require an AppleScript execution.
@@ -46,7 +49,7 @@ export class ActionHandler {
                 await FileSystem.convertMp3ToCaf(theAttachment, newPath);
                 theAttachment = newPath;
             } catch (ex) {
-                Server().log("Failed to convert MP3 to CAF!", "warn");
+                log.warn("Failed to convert MP3 to CAF!");
             }
         }
 
@@ -63,7 +66,7 @@ export class ActionHandler {
             await FileSystem.executeAppleScript(messageScript);
         } catch (ex: any) {
             error = ex;
-            Server().log(`Failed to send text via main AppleScript: ${error?.message ?? error}`, "debug");
+            log.debug(`Failed to send text via main AppleScript: ${error?.message ?? error}`);
 
             const errMsg = (ex?.message ?? "") as string;
             const retry = errMsg.toLowerCase().includes("timed out") || errMsg.includes("1002");
@@ -71,7 +74,7 @@ export class ActionHandler {
             // If we hit specific errors, we should retry after restarting the Messages App
             if (retry) {
                 try {
-                    Server().log(`[Retry] Sending AppleScript text after Messages restart...`, "debug");
+                    log.debug(`[Retry] Sending AppleScript text after Messages restart...`);
                     await FileSystem.executeAppleScript(restartMessages());
                     await FileSystem.executeAppleScript(messageScript);
                 } catch (ex2: any) {
@@ -87,7 +90,7 @@ export class ActionHandler {
 
             try {
                 // Generate the new send script
-                Server().log(`Sending AppleScript text using fallback script...`, "debug");
+                log.debug(`Sending AppleScript text using fallback script...`);
                 messageScript = sendMessageFallback(chatGuid, message ?? "", theAttachment);
                 await FileSystem.executeAppleScript(messageScript);
             } catch (ex: any) {
@@ -105,7 +108,7 @@ export class ActionHandler {
                 [msg] = msg.split(". (");
             }
 
-            Server().log(msg, "warn");
+            log.warn(msg);
             throw new Error(msg);
         }
     };
@@ -119,7 +122,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static renameGroupChat = async (chatGuid: string, newName: string): Promise<string> => {
-        Server().log(`Executing Action: Rename Group (Chat: ${chatGuid}; Name: ${newName})`, "debug");
+        log.debug(`Executing Action: Rename Group (Chat: ${chatGuid}; Name: ${newName})`);
 
         const names = await generateChatNameList(chatGuid);
 
@@ -136,13 +139,13 @@ export class ActionHandler {
 
         let err = null;
         for (const oldName of names) {
-            console.info(`Attempting rename group from [${oldName}] to [${newName}]`);
+            log.info(`Attempting rename group from [${oldName}] to [${newName}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(renameGroupChat(oldName, newName));
             } catch (ex: any) {
                 err = ex;
-                Server().log(`Failed to rename group from [${oldName}] to [${newName}]. Trying again.`, "warn");
+                log.warn(`Failed to rename group from [${oldName}] to [${newName}]. Trying again.`);
                 continue;
             }
         }
@@ -154,11 +157,11 @@ export class ActionHandler {
     static privateRenameGroupChat = async (chatGuid: string, newName: string): Promise<void> => {
         const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
         if (!enablePrivateApi) {
-            Server().log("Private API disabled! Not executing group rename...");
+            log.info("Private API disabled! Not executing group rename...");
             return;
         }
 
-        Server().log(`Executing Action: Changing chat display name (Chat: ${chatGuid}; NewName: ${newName};)`, "debug");
+        log.debug(`Executing Action: Changing chat display name (Chat: ${chatGuid}; NewName: ${newName};)`);
         Server().privateApi.chat.setDisplayName(chatGuid, newName);
     };
 
@@ -171,7 +174,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static addParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        Server().log(`Executing Action: Add Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
+        log.debug(`Executing Action: Add Participant (Chat: ${chatGuid}; Participant: ${participant})`);
 
         const names = await generateChatNameList(chatGuid);
 
@@ -188,13 +191,13 @@ export class ActionHandler {
 
         let err = null;
         for (const name of names) {
-            console.info(`Attempting to add participant to group [${name}]`);
+            log.info(`Attempting to add participant to group [${name}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(addParticipant(name, participant));
             } catch (ex: any) {
                 err = ex;
-                Server().log(`Failed to add participant to group, [${name}]. Trying again.`, "warn");
+                log.warn(`Failed to add participant to group, [${name}]. Trying again.`);
                 continue;
             }
         }
@@ -212,7 +215,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static removeParticipant = async (chatGuid: string, participant: string): Promise<string> => {
-        Server().log(`Executing Action: Remove Participant (Chat: ${chatGuid}; Participant: ${participant})`, "debug");
+        log.debug(`Executing Action: Remove Participant (Chat: ${chatGuid}; Participant: ${participant})`);
 
         const names = await generateChatNameList(chatGuid);
         let address = participant;
@@ -233,13 +236,13 @@ export class ActionHandler {
 
         let err = null;
         for (const name of names) {
-            console.info(`Attempting to remove participant from group [${name}]`);
+            log.info(`Attempting to remove participant from group [${name}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(removeParticipant(name, participant));
             } catch (ex: any) {
                 err = ex;
-                Server().log(`Failed to remove participant to group, [${name}]. Trying again.`, "warn");
+                log.warn(`Failed to remove participant to group, [${name}]. Trying again.`);
                 continue;
             }
         }
@@ -256,7 +259,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static openChat = async (chatGuid: string): Promise<string> => {
-        Server().log(`Executing Action: Open Chat (Chat: ${chatGuid})`, "debug");
+        log.debug(`Executing Action: Open Chat (Chat: ${chatGuid})`);
 
         const [chats, _] = await Server().iMessageRepo.getChats({ chatGuid, withParticipants: true });
         if (isEmpty(chats)) throw new Error("Chat does not exist");
@@ -277,13 +280,13 @@ export class ActionHandler {
 
         let err = null;
         for (const name of names) {
-            console.info(`Attempting to open chat, [${name}]`);
+            log.info(`Attempting to open chat, [${name}]`);
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(openChat(name));
             } catch (ex: any) {
                 err = ex;
-                Server().log(`Failed to open chat, [${name}]. Trying again.`, "warn");
+                log.warn(`Failed to open chat, [${name}]. Trying again.`);
                 continue;
             }
         }
@@ -295,11 +298,11 @@ export class ActionHandler {
     static startOrStopTypingInChat = async (chatGuid: string, isTyping: boolean): Promise<void> => {
         const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
         if (!enablePrivateApi) {
-            Server().log("Private API disabled! Not executing typing status change...");
+            log.info("Private API disabled! Not executing typing status change...");
             return;
         }
 
-        Server().log(`Executing Action: Change Typing Status (Chat: ${chatGuid})`, "debug");
+        log.debug(`Executing Action: Change Typing Status (Chat: ${chatGuid})`);
         if (isTyping) {
             await Server().privateApi.chat.startTyping(chatGuid);
         } else {
@@ -310,22 +313,22 @@ export class ActionHandler {
     static markChatRead = async (chatGuid: string): Promise<void> => {
         const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
         if (!enablePrivateApi) {
-            Server().log("Private API disabled! Not executing mark chat as read...");
+            log.info("Private API disabled! Not executing mark chat as read...");
             return;
         }
 
-        Server().log(`Executing Action: Marking chat as read (Chat: ${chatGuid})`, "debug");
+        log.debug(`Executing Action: Marking chat as read (Chat: ${chatGuid})`);
         await Server().privateApi.chat.markRead(chatGuid);
     };
 
     static updateTypingStatus = async (chatGuid: string): Promise<void> => {
         const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
         if (!enablePrivateApi) {
-            Server().log("Private API disabled! Not executing update typing status...");
+            log.info("Private API disabled! Not executing update typing status...");
             return;
         }
 
-        Server().log(`Executing Action: Update Typing Status (Chat: ${chatGuid})`, "debug");
+        log.debug(`Executing Action: Update Typing Status (Chat: ${chatGuid})`);
         await Server().privateApi.chat.getTypingStatus(chatGuid);
     };
 
@@ -336,13 +339,12 @@ export class ActionHandler {
     ): Promise<void> => {
         const enablePrivateApi = Server().repo.getConfig("enable_private_api") as boolean;
         if (!enablePrivateApi) {
-            Server().log("Private API disabled! Not executing tapback...");
+            log.info("Private API disabled! Not executing tapback...");
             return;
         }
 
-        Server().log(
-            `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`,
-            "debug"
+        log.debug(
+            `Executing Action: Toggle Private Tapback (Chat: ${chatGuid}; Text: ${actionMessageGuid}; Tapback: ${reactionType})`
         );
         await Server().privateApi.message.react(chatGuid, actionMessageGuid, reactionType);
     };
@@ -357,10 +359,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static toggleTapback = async (chatGuid: string, text: string, tapback: ValidTapback): Promise<string> => {
-        Server().log(
-            `Executing Action: Toggle Tapback (Chat: ${chatGuid}; Text: ${text}; Tapback: ${tapback})`,
-            "debug"
-        );
+        log.debug(`Executing Action: Toggle Tapback (Chat: ${chatGuid}; Text: ${text}; Tapback: ${tapback})`);
 
         const names = await generateChatNameList(chatGuid);
 
@@ -380,14 +379,14 @@ export class ActionHandler {
 
         let err = null;
         for (const name of names) {
-            console.info(`Attempting to toggle tapback for message [${friendlyMsg}]`);
+            log.info(`Attempting to toggle tapback for message [${friendlyMsg}]`);
 
             try {
                 // This needs await here, or else it will fail
                 return await safeExecuteAppleScript(toggleTapback(name, text, tapbackId));
             } catch (ex: any) {
                 err = ex;
-                Server().log(`Failed to toggle tapback on message, [${friendlyMsg}]. Trying again.`, "warn");
+                log.warn(`Failed to toggle tapback on message, [${friendlyMsg}]. Trying again.`);
                 continue;
             }
         }
@@ -404,7 +403,7 @@ export class ActionHandler {
      * @returns Boolean on whether a typing indicator was present
      */
     static checkTypingIndicator = async (chatGuid: string): Promise<boolean> => {
-        Server().log(`Executing Action: Check Typing Indicators (Chat: ${chatGuid})`, "debug");
+        log.debug(`Executing Action: Check Typing Indicators (Chat: ${chatGuid})`);
 
         const names = await generateChatNameList(chatGuid);
 
@@ -421,7 +420,7 @@ export class ActionHandler {
 
         let err = null;
         for (const name of names) {
-            console.info(`Attempting to check for a typing indicator for chat, [${name}]`);
+            log.info(`Attempting to check for a typing indicator for chat, [${name}]`);
             try {
                 // This needs await here, or else it will fail
                 const output = await safeExecuteAppleScript(checkTypingIndicator(name));
@@ -429,7 +428,7 @@ export class ActionHandler {
                 return toBoolean(safeTrim(output));
             } catch (ex: any) {
                 err = ex;
-                Server().log(`Failed to check for typing indicators for chat, [${name}]. Trying again.`, "warn");
+                log.warn(`Failed to check for typing indicators for chat, [${name}]. Trying again.`);
                 continue;
             }
         }
@@ -451,7 +450,7 @@ export class ActionHandler {
         message?: string,
         tempGuid?: string
     ): Promise<string> => {
-        Server().log(`Executing Action: Create Chat Universal (Participants: ${participants.join(", ")})`, "debug");
+        log.debug(`Executing Action: Create Chat Universal (Participants: ${participants.join(", ")})`);
 
         if (isEmpty(participants)) throw new Error("No participants specified!");
 
@@ -520,7 +519,7 @@ export class ActionHandler {
         message: string,
         tempGuid: string
     ): Promise<string> => {
-        Server().log(`Executing Action: Create Single Chat (Participant: ${participant})`, "debug");
+        log.debug(`Executing Action: Create Single Chat (Participant: ${participant})`);
 
         // Slugify the address
         const buddy = getiMessageAddressFormat(participant);
@@ -549,7 +548,7 @@ export class ActionHandler {
      * @returns The command line response
      */
     static exportContacts = async (): Promise<void> => {
-        Server().log("Executing Action: Export Contacts", "debug");
+        log.debug("Executing Action: Export Contacts");
 
         try {
             FileSystem.deleteAddressBook();

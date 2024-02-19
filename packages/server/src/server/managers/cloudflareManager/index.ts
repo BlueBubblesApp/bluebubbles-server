@@ -1,11 +1,11 @@
 import { $, ProcessOutput, ProcessPromise } from "zx";
 import * as path from "path";
-import { EventEmitter } from "events";
 import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { Loggable } from "@server/lib/logging/Loggable";
 
-export class CloudflareManager extends EventEmitter {
+export class CloudflareManager extends Loggable {
     daemonPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflared");
 
     // Use a default (empty) config file so we don't interfere with the default CF install (if any)
@@ -26,7 +26,7 @@ export class CloudflareManager extends EventEmitter {
             this.emit("started");
             return this.connectHandler();
         } catch (ex) {
-            Server().log(`Failed to run Cloudflare daemon! ${ex.toString()}`, "error");
+            this.log.error(`Failed to run Cloudflare daemon! ${ex.toString()}`);
             this.emit("error", ex);
         }
 
@@ -54,10 +54,10 @@ export class CloudflareManager extends EventEmitter {
             this.on("error", err => {
                 // Ignore certain errors
                 if (typeof err === "string") {
-                    if (err.includes('Thank you for trying Cloudflare Tunnel.')) return;
+                    if (err.includes("Thank you for trying Cloudflare Tunnel.")) return;
                 }
 
-                reject(err)
+                reject(err);
             });
 
             setTimeout(() => {
@@ -74,7 +74,7 @@ export class CloudflareManager extends EventEmitter {
 
     setProxyUrl(url: string) {
         if (isEmpty(url) || !url.startsWith("https://") || url === this.currentProxyUrl) return;
-        Server().log(`Setting Cloudflare Proxy URL: ${url}`);
+        this.log.info(`Setting Cloudflare Proxy URL: ${url}`);
         this.currentProxyUrl = url;
         this.emit("new-url", this.currentProxyUrl);
     }
@@ -82,7 +82,7 @@ export class CloudflareManager extends EventEmitter {
     async handleData(chunk: any) {
         const data: string = chunk.toString();
         if (data.includes("connect: bad file descriptor")) {
-            Server().log("Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date", "debug");
+            this.log.debug("Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date");
             return;
         }
 
@@ -106,14 +106,11 @@ export class CloudflareManager extends EventEmitter {
                 // The retry count is set to 6, so it goes: 1, 2, 4, 8, 16, 32
                 const retrySec = Number.parseInt(secSplit, 10);
                 if (!isNaN(retrySec)) {
-                    Server().log(`Detected Cloudflare retry in ${retrySec} seconds...`, "debug");
+                    this.log.debug(`Detected Cloudflare retry in ${retrySec} seconds...`);
                     if (retrySec >= 32) {
                         this.isRestarting = true;
 
-                        Server().log(
-                            "Cloudflare reached its max connection retries. Restarting proxy service...",
-                            "debug"
-                        );
+                        this.log.debug("Cloudflare reached its max connection retries. Restarting proxy service...");
                         this.emit("needs-restart", true);
                     }
                 }
