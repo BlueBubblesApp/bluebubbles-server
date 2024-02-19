@@ -6,20 +6,20 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 
-
 export class PrivateApiChat extends PrivateApiAction {
+    tag = "PrivateApiChat";
 
     async create({
         addresses,
         message,
-        service = 'iMessage',
+        service = "iMessage",
         attributedBody = null,
         effectId = null,
         subject = null
     }: {
         addresses: string[];
         message: string;
-        service?: 'iMessage' | 'SMS';
+        service?: "iMessage" | "SMS";
         attributedBody?: Record<string, any> | null;
         effectId?: string;
         subject?: string;
@@ -29,14 +29,18 @@ export class PrivateApiChat extends PrivateApiAction {
 
         // Yes this is correct. The transaction returns a message GUID, not a chat GUID
         const request = new TransactionPromise(TransactionType.MESSAGE);
-        return this.sendApiMessage("create-chat", {
-            addresses,
-            message,
-            service,
-            attributedBody,
-            effectId,
-            subject
-        }, request);
+        return this.sendApiMessage(
+            "create-chat",
+            {
+                addresses,
+                message,
+                service,
+                attributedBody,
+                effectId,
+                subject
+            },
+            request
+        );
     }
 
     async deleteMessage(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
@@ -70,11 +74,7 @@ export class PrivateApiChat extends PrivateApiAction {
         return this.sendApiMessage(action, { chatGuid });
     }
 
-    async toggleParticipant(
-        chatGuid: string,
-        address: string,
-        pAction: "add" | "remove"
-    ): Promise<TransactionResult> {
+    async toggleParticipant(chatGuid: string, address: string, pAction: "add" | "remove"): Promise<TransactionResult> {
         const action = `${pAction}-participant`;
         this.throwForNoMissingFields(action, [chatGuid, address, pAction]);
         const request = new TransactionPromise(TransactionType.CHAT);

@@ -26,6 +26,8 @@ import {
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 
 export class IPCService extends Loggable {
+    tag = "IPCService";
+
     /**
      * Starts configuration related inter-process-communication handlers.
      */

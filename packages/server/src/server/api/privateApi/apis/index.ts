@@ -4,6 +4,8 @@ import type { TransactionPromise, TransactionResult } from "@server/managers/tra
 import { Loggable } from "@server/lib/logging/Loggable";
 
 export class PrivateApiAction extends Loggable {
+    tag = "PrivateApiAction";
+
     api: PrivateApiService;
 
     constructor(api: PrivateApiService) {

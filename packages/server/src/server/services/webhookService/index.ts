@@ -11,6 +11,8 @@ export type WebhookEvent = {
  * Handles dispatching webhooks
  */
 export class WebhookService extends Loggable {
+    tag = "WebhookService";
+
     async dispatch(event: WebhookEvent) {
         const webhooks = await Server().repo.getWebhooks();
         for (const i of webhooks) {

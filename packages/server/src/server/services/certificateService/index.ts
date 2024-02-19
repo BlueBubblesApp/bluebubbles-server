@@ -11,6 +11,8 @@ import { onlyAlphaNumeric } from "@server/helpers/utils";
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 
 export class CertificateService extends Loggable {
+    tag = "CertificateService";
+
     static get usingCustomPaths(): boolean {
         const cliCert = Server().args["cert-path"];
         const cliKey = Server().args["key-path"];

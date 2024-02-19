@@ -6,6 +6,8 @@ import { isEmpty } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
 
 export class PrivateApiAddressEventHandler extends Loggable implements PrivateApiEventHandler {
+    tag = "PrivateApiAddressEventHandler";
+
     types: string[] = ["aliases-removed"];
 
     cache: Record<string, Record<string, any>> = {};

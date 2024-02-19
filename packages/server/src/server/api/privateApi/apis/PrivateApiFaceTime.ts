@@ -6,6 +6,8 @@ import {
 import { PrivateApiAction } from ".";
 
 export class PrivateApiFaceTime extends PrivateApiAction {
+    tag = "PrivateApiFaceTime";
+
     async answerCall(uuid: string): Promise<TransactionResult> {
         const action = "answer-call";
         const request = new TransactionPromise(TransactionType.OTHER);

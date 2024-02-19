@@ -3,10 +3,12 @@ import * as net from "net";
 import { PrivateApiEventHandler, EventData } from ".";
 import { FindMyLocationItem } from "@server/api/lib/findmy/types";
 import { NEW_FINDMY_LOCATION } from "@server/events";
-import { isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
+import { isEmpty, waitMs } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
 
 export class PrivateApiFindMyEventHandler extends Loggable implements PrivateApiEventHandler {
+    tag = "PrivateApiFindMyEventHandler";
+
     types: string[] = ["new-findmy-location"];
 
     async handle(event: EventData, _: net.Socket) {

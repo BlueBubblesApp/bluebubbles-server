@@ -7,6 +7,8 @@ import { ScheduledService } from "@server/lib/ScheduledService";
 import { Loggable } from "@server/lib/logging/Loggable";
 
 export class UpdateService extends Loggable {
+    tag = "UpdateService";
+
     window: BrowserWindow;
 
     timer: ScheduledService;

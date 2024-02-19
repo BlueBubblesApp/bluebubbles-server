@@ -11,6 +11,8 @@ export type ProxyOptions = {
 const sevenHours = 1000 * 60 * 60 * 7;
 
 export abstract class Proxy extends Loggable {
+    tag = "Proxy";
+
     opts: ProxyOptions;
 
     url: string;

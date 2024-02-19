@@ -31,6 +31,8 @@ import { Loggable } from "../../lib/logging/Loggable";
  * connections and requests.
  */
 export class HttpService extends Loggable {
+    tag = "HttpService";
+
     koaApp: KoaApp;
 
     httpServer: https.Server | http.Server;

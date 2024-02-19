@@ -54,6 +54,8 @@ export enum ScheduledMessageScheduleRecurringType {
  * Service that manages scheduled messages
  */
 export class ScheduledMessagesService extends Loggable {
+    tag = "ScheduledMessagesService";
+
     /**
      * A cache of all active timers & scheduled messages.
      */

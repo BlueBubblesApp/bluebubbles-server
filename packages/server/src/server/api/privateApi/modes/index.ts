@@ -7,6 +7,8 @@ export interface PrivateApiModeConstructor {
 }
 
 export abstract class PrivateApiMode extends Loggable {
+    tag = "PrivateApiMode";
+
     isStopping = false;
 
     static install(...args: any): Promise<any | void> {

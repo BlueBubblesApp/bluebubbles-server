@@ -5,6 +5,8 @@ import { isNotEmpty } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
 
 export class PrivateApiPingEventHandler extends Loggable implements PrivateApiEventHandler {
+    tag = "PrivateApiPingEventHandler";
+
     types: string[] = ["ping"];
 
     async handle(event: EventData, socket: Socket) {

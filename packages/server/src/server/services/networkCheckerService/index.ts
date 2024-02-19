@@ -2,6 +2,8 @@ import { Loggable } from "@server/lib/logging/Loggable";
 import * as dns from "dns";
 
 export class NetworkCheckerService extends Loggable {
+    tag = "NetworkCheckerService";
+
     online = true;
 
     isStopped = false;

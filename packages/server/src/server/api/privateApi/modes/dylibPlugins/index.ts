@@ -8,6 +8,8 @@ import { hideApp } from "@server/api/apple/scripts";
 import { Loggable } from "@server/lib/logging/Loggable";
 
 export abstract class DylibPlugin extends Loggable {
+    tag = "DylibPlugin";
+
     name: string = null;
 
     parentApp: string = null;

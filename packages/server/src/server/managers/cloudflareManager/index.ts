@@ -6,6 +6,8 @@ import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
 
 export class CloudflareManager extends Loggable {
+    tag = "CloudflareManager";
+
     daemonPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflared");
 
     // Use a default (empty) config file so we don't interfere with the default CF install (if any)

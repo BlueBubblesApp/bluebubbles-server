@@ -20,6 +20,8 @@ import { Loggable } from "@server/lib/logging/Loggable";
  * This service class hhandles the initial oauth workflows
  */
 export class OauthService extends Loggable {
+    tag = "OauthService";
+
     running = false;
 
     koaApp: KoaApp;

@@ -25,6 +25,8 @@ type FaceTimeStatusData = {
 };
 
 export class PrivateApiFaceTimeStatusHandler extends Loggable implements PrivateApiEventHandler {
+    tag = "PrivateApiFaceTimeStatusHandler";
+
     types: string[] = ["ft-call-status-changed"];
 
     async handle(data: EventData, _: net.Socket) {

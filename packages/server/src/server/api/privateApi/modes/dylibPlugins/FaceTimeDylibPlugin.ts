@@ -6,6 +6,8 @@ import { Server } from "@server";
 const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
 
 export class FaceTimeDylibPlugin extends DylibPlugin {
+    tag = "FaceTimeDylibPlugin";
+
     parentApp = "FaceTime";
 
     bundleIdentifier = "com.apple.FaceTime";

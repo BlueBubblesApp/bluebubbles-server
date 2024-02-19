@@ -31,6 +31,8 @@ import { Loggable } from "../../lib/logging/Loggable";
 const writeLock = new Sema(1);
 
 export class PrivateApiService extends Loggable {
+    tag = "PrivateApiService";
+
     server: net.Server;
 
     clients: Socket[] = [];

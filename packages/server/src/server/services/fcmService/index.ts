@@ -23,6 +23,8 @@ enum DbType {
  * Google FCM server. This is used to handle/manage notifications
  */
 export class FCMService extends Loggable {
+    tag = "FCMService";
+
     static getApp(): admin.app.App {
         try {
             return admin.app(AppName);

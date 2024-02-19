@@ -11,6 +11,8 @@ export type QueueItem = {
 };
 
 export class QueueService extends Loggable {
+    tag = "QueueService";
+
     items: QueueItem[] = [];
 
     isProcessing = false;

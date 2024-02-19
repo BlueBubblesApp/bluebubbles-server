@@ -8,6 +8,8 @@ import { Loggable } from "@server/lib/logging/Loggable";
  * exits.
  */
 export class CaffeinateService extends Loggable {
+    tag = "CaffeinateService";
+
     isCaffeinated = false;
 
     childProc: ChildProcessWithoutNullStreams;

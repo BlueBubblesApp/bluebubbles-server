@@ -24,6 +24,8 @@ export const callStatusMap: Record<number, string> = {
 };
 
 export class FaceTimeSession extends Loggable {
+    tag = "FaceTimeSession";
+
     uuid: string;
 
     conversationUuid: string;

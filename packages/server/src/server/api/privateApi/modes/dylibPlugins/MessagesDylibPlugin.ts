@@ -8,6 +8,8 @@ import { FindMyInterface } from "@server/api/interfaces/findMyInterface";
 const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
 
 export class MessagesDylibPlugin extends DylibPlugin {
+    tag = "MessagesDylibPlugin";
+
     parentApp = "Messages";
 
     bundleIdentifier = "com.apple.MobileSMS";
