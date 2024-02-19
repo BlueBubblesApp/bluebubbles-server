@@ -77,7 +77,7 @@ const findProcess = require("find-process");
 const osVersion = macosVersion();
 
 // Set the log format
-const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
+const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}][{level}]{text}";
 ServerLog.transports.console.format = logFormat;
 ServerLog.transports.file.format = logFormat;
 
