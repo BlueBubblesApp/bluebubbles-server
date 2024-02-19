@@ -394,7 +394,7 @@ export class FCMService extends Loggable {
         const startListening = () =>
             new Promise<void>((resolve, reject) => {
                 db.collection("server")
-                    .doc("config")
+                    .doc("commands")
                     .onSnapshot(
                         (snapshot: admin.firestore.DocumentSnapshot) => {
                             this.nextRestartHandler(snapshot.data()?.nextRestart);
