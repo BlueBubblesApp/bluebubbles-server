@@ -45,9 +45,12 @@ export class FindMyInterface {
             // Save the data to the cache
             // The cache will handle properly updating the data.
             Server().findMyCache.addAll(refreshLocations);
-        } else {
-            await this.refreshLocationsAccessibility();
         }
+
+        // No matter what, open the Find My app.
+        // Don't await because it should update in the background.
+        // Location updates get emitted as an event as they come in.
+        this.refreshLocationsAccessibility();
 
         return Server().findMyCache.getAll();
     }
