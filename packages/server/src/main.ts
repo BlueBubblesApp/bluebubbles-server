@@ -13,209 +13,213 @@ import { isEmpty, safeTrim } from "@server/helpers/utils";
 import { AppWindow } from "@windows/AppWindow";
 import { AppTray } from "@trays/AppTray";
 import { getLogger } from "@server/lib/logging/Loggable";
+import { BlueBubblesServerTest } from "@server/BlueBubblesServer";
 
-app.commandLine.appendSwitch("in-process-gpu");
+const ss = new BlueBubblesServerTest();
+ss.test();
 
-// Patch in original user data directory
-app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
+// app.commandLine.appendSwitch("in-process-gpu");
 
-// Load the config file
-let cfg = {};
-if (fs.existsSync(FileSystem.cfgFile)) {
-    cfg = yaml.load(fs.readFileSync(FileSystem.cfgFile, "utf8"));
-}
+// // Patch in original user data directory
+// app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
 
-// Parse the CLI args and marge with config args
-const args = ParseArguments(process.argv);
-const parsedArgs: Record<string, any> = { ...cfg, ...args };
-let isHandlingExit = false;
+// // Load the config file
+// let cfg = {};
+// if (fs.existsSync(FileSystem.cfgFile)) {
+//     cfg = yaml.load(fs.readFileSync(FileSystem.cfgFile, "utf8"));
+// }
 
-// Initialize the server
-Server(parsedArgs, null);
-const log = getLogger("Main");
+// // Parse the CLI args and marge with config args
+// const args = ParseArguments(process.argv);
+// const parsedArgs: Record<string, any> = { ...cfg, ...args };
+// let isHandlingExit = false;
 
-// Only 1 instance is allowed
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-    console.error("BlueBubbles is already running! Quiting...");
-    app.exit(0);
-} else {
-    app.on("second-instance", (_, __, ___) => {
-        if (Server().window) {
-            if (Server().window.isMinimized()) Server().window.restore();
-            Server().window.focus();
-        }
-    });
+// // Initialize the server
+// Server(parsedArgs, null);
+// const log = getLogger("Main");
 
-    // Start the Server() when the app is ready
-    app.whenReady().then(() => {
-        Server().start();
-    });
-}
+// // Only 1 instance is allowed
+// const gotTheLock = app.requestSingleInstanceLock();
+// if (!gotTheLock) {
+//     console.error("BlueBubbles is already running! Quiting...");
+//     app.exit(0);
+// } else {
+//     app.on("second-instance", (_, __, ___) => {
+//         if (Server().window) {
+//             if (Server().window.isMinimized()) Server().window.restore();
+//             Server().window.focus();
+//         }
+//     });
 
-process.on("uncaughtException", error => {
-    // Print the exception
-    log.error(`Uncaught Exception: ${error.message}`);
-    if (error?.stack) log.debug(`Uncaught Exception StackTrace: ${error?.stack}`);
-});
+//     // Start the Server() when the app is ready
+//     app.whenReady().then(() => {
+//         Server().start();
+//     });
+// }
 
-const handleExit = async (event: any = null, { exit = true } = {}) => {
-    if (event) event.preventDefault();
-    console.trace("handleExit");
-    if (isHandlingExit) return;
-    isHandlingExit = true;
+// process.on("uncaughtException", error => {
+//     // Print the exception
+//     log.error(`Uncaught Exception: ${error.message}`);
+//     if (error?.stack) log.debug(`Uncaught Exception StackTrace: ${error?.stack}`);
+// });
 
-    // Safely close the services
-    if (Server() && !Server().isStopping) {
-        await Server().stopServices();
-    }
+// const handleExit = async (event: any = null, { exit = true } = {}) => {
+//     if (event) event.preventDefault();
+//     console.trace("handleExit");
+//     if (isHandlingExit) return;
+//     isHandlingExit = true;
 
-    if (exit) {
-        app.exit(0);
-    }
-};
+//     // Safely close the services
+//     if (Server() && !Server().isStopping) {
+//         await Server().stopServices();
+//     }
 
-const createApp = () => {
-    AppWindow.getInstance().setArguments(parsedArgs).build();
-    AppTray.getInstance().setArguments(parsedArgs).setExitHandler(handleExit).build();
-};
+//     if (exit) {
+//         app.exit(0);
+//     }
+// };
 
-Server().on("update-available", _ => {
-    AppTray.getInstance().build();
-});
+// const createApp = () => {
+//     AppWindow.getInstance().setArguments(parsedArgs).build();
+//     AppTray.getInstance().setArguments(parsedArgs).setExitHandler(handleExit).build();
+// };
 
-Server().on("ready", () => {
-    createApp();
-});
+// Server().on("update-available", _ => {
+//     AppTray.getInstance().build();
+// });
 
-app.on("ready", () => {
-    nativeTheme.on("updated", () => {
-        AppTray.getInstance().build();
-    });
-});
+// Server().on("ready", () => {
+//     createApp();
+// });
 
-app.on("activate", () => {
-    if (Server().window == null && Server().repo) {
-        AppWindow.getInstance().build();
-    }
-});
+// app.on("ready", () => {
+//     nativeTheme.on("updated", () => {
+//         AppTray.getInstance().build();
+//     });
+// });
 
-app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-        handleExit();
-    }
-});
+// app.on("activate", () => {
+//     if (Server().window == null && Server().repo) {
+//         AppWindow.getInstance().build();
+//     }
+// });
 
-/**
- * Basically, we want to gracefully exist whenever there is a Ctrl + C or other exit command
- */
-app.on("before-quit", event => handleExit(event));
+// app.on("window-all-closed", () => {
+//     if (process.platform !== "darwin") {
+//         handleExit();
+//     }
+// });
 
-/**
- * All code below this point has to do with the command-line functionality.
- * This is when you run the app via terminal, we want to give users the ability
- * to still be able to interact with the app.
- */
+// /**
+//  * Basically, we want to gracefully exist whenever there is a Ctrl + C or other exit command
+//  */
+// app.on("before-quit", event => handleExit(event));
 
-const quickStrConvert = (val: string): string | number | boolean => {
-    if (val.toLowerCase() === "true") return true;
-    if (val.toLowerCase() === "false") return false;
-    return val;
-};
+// /**
+//  * All code below this point has to do with the command-line functionality.
+//  * This is when you run the app via terminal, we want to give users the ability
+//  * to still be able to interact with the app.
+//  */
 
-const handleSet = async (parts: string[]): Promise<void> => {
-    const configKey = parts.length > 1 ? parts[1] : null;
-    const configValue = parts.length > 2 ? parts[2] : null;
-    if (!configKey || !configValue) {
-        log.info("Empty config key/value. Ignoring...");
-        return;
-    }
+// const quickStrConvert = (val: string): string | number | boolean => {
+//     if (val.toLowerCase() === "true") return true;
+//     if (val.toLowerCase() === "false") return false;
+//     return val;
+// };
 
-    if (!Server().repo.hasConfig(configKey)) {
-        log.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
-        return;
-    }
+// const handleSet = async (parts: string[]): Promise<void> => {
+//     const configKey = parts.length > 1 ? parts[1] : null;
+//     const configValue = parts.length > 2 ? parts[2] : null;
+//     if (!configKey || !configValue) {
+//         log.info("Empty config key/value. Ignoring...");
+//         return;
+//     }
 
-    try {
-        await Server().repo.setConfig(configKey, quickStrConvert(configValue));
-        log.info(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
-    } catch (ex: any) {
-        log.error(`Failed set config item, '${configKey}'\n${ex}`);
-    }
-};
+//     if (!Server().repo.hasConfig(configKey)) {
+//         log.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
+//         return;
+//     }
 
-const handleShow = async (parts: string[]): Promise<void> => {
-    const configKey = parts.length > 1 ? parts[1] : null;
-    if (!configKey) {
-        log.info("Empty config key. Ignoring...");
-        return;
-    }
+//     try {
+//         await Server().repo.setConfig(configKey, quickStrConvert(configValue));
+//         log.info(`Successfully set config item, '${configKey}' to, '${quickStrConvert(configValue)}'`);
+//     } catch (ex: any) {
+//         log.error(`Failed set config item, '${configKey}'\n${ex}`);
+//     }
+// };
 
-    if (!Server().repo.hasConfig(configKey)) {
-        log.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
-        return;
-    }
+// const handleShow = async (parts: string[]): Promise<void> => {
+//     const configKey = parts.length > 1 ? parts[1] : null;
+//     if (!configKey) {
+//         log.info("Empty config key. Ignoring...");
+//         return;
+//     }
 
-    try {
-        const value = await Server().repo.getConfig(configKey);
-        log.info(`${configKey} -> ${value}`);
-    } catch (ex: any) {
-        log.error(`Failed set config item, '${configKey}'\n${ex}`);
-    }
-};
+//     if (!Server().repo.hasConfig(configKey)) {
+//         log.info(`Configuration, '${configKey}' does not exist. Ignoring...`);
+//         return;
+//     }
 
-const showHelp = () => {
-    const help = `[================================== Help Menu ==================================]\n
-Available Commands:
-    - help:             Show the help menu
-    - restart:          Relaunch/Restart the app
-    - set:              Set configuration item -> \`set <config item> <value>\`
-                        Available configuration items:
-                            -> tutorial_is_done: boolean
-                            -> socket_port: number
-                            -> server_address: string
-                            -> ngrok_key: string
-                            -> password: string
-                            -> auto_caffeinate: boolean
-                            -> auto_start: boolean
-                            -> enable_ngrok: boolean
-                            -> encrypt_coms: boolean
-                            -> hide_dock_icon: boolean
-                            -> last_fcm_restart: number
-                            -> start_via_terminal: boolean
-    - show:             Show the current configuration for an item -> \`show <config item>\`
-\n[===============================================================================]`;
+//     try {
+//         const value = await Server().repo.getConfig(configKey);
+//         log.info(`${configKey} -> ${value}`);
+//     } catch (ex: any) {
+//         log.error(`Failed set config item, '${configKey}'\n${ex}`);
+//     }
+// };
 
-    console.log(help);
-};
+// const showHelp = () => {
+//     const help = `[================================== Help Menu ==================================]\n
+// Available Commands:
+//     - help:             Show the help menu
+//     - restart:          Relaunch/Restart the app
+//     - set:              Set configuration item -> \`set <config item> <value>\`
+//                         Available configuration items:
+//                             -> tutorial_is_done: boolean
+//                             -> socket_port: number
+//                             -> server_address: string
+//                             -> ngrok_key: string
+//                             -> password: string
+//                             -> auto_caffeinate: boolean
+//                             -> auto_start: boolean
+//                             -> enable_ngrok: boolean
+//                             -> encrypt_coms: boolean
+//                             -> hide_dock_icon: boolean
+//                             -> last_fcm_restart: number
+//                             -> start_via_terminal: boolean
+//     - show:             Show the current configuration for an item -> \`show <config item>\`
+// \n[===============================================================================]`;
 
-process.stdin.on("data", chunk => {
-    const line = safeTrim(chunk.toString());
-    if (!Server() || isEmpty(line)) return;
-    log.debug(`Handling STDIN: ${line}`);
+//     console.log(help);
+// };
 
-    // Handle the standard input
-    const parts = chunk ? line.split(" ") : [];
-    if (isEmpty(parts)) {
-        log.debug("Invalid command");
-        return;
-    }
+// process.stdin.on("data", chunk => {
+//     const line = safeTrim(chunk.toString());
+//     if (!Server() || isEmpty(line)) return;
+//     log.debug(`Handling STDIN: ${line}`);
 
-    switch (parts[0].toLowerCase()) {
-        case "help":
-            showHelp();
-            break;
-        case "set":
-            handleSet(parts);
-            break;
-        case "show":
-            handleShow(parts);
-            break;
-        case "restart":
-        case "relaunch":
-            Server().relaunch();
-            break;
-        default:
-            log.debug(`Unhandled command, '${parts[0]}'`);
-    }
-});
+//     // Handle the standard input
+//     const parts = chunk ? line.split(" ") : [];
+//     if (isEmpty(parts)) {
+//         log.debug("Invalid command");
+//         return;
+//     }
+
+//     switch (parts[0].toLowerCase()) {
+//         case "help":
+//             showHelp();
+//             break;
+//         case "set":
+//             handleSet(parts);
+//             break;
+//         case "show":
+//             handleShow(parts);
+//             break;
+//         case "restart":
+//         case "relaunch":
+//             Server().relaunch();
+//             break;
+//         default:
+//             log.debug(`Unhandled command, '${parts[0]}'`);
+//     }
+// });
