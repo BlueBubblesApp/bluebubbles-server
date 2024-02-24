@@ -138,6 +138,12 @@ export abstract class Proxy extends Loggable {
      * Helper for restarting the ngrok connection
      */
     async restart(): Promise<boolean> {
+        try {
+            await this.disconnect();
+        } catch (ex: any) {
+            // Don't do anything
+        }
+
         if (!this.canStart()) {
             this.log.info(`${this.opts.name} proxy is diabled. Not restarting.`);
             return false;

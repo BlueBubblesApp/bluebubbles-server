@@ -24,6 +24,7 @@ import {
     isMinSonoma
 } from "@server/env";
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
+import { ZrokManager } from "@server/managers/zrokManager";
 
 export class IPCService extends Loggable {
     tag = "IPCService";
@@ -441,6 +442,14 @@ export class IPCService extends Loggable {
             const host = ips.length > 0 ? ips[0] : "localhost";
             const addr = `${useCustomCertificate ? "https" : "http"}://${host}:${port}`;
             await Server().repo.setConfig("server_address", addr);
+        });
+
+        ipcMain.handle("register-zrok-email", async (_, email) => {
+            return await ZrokManager.getInvite(email);
+        });
+
+        ipcMain.handle("set-zrok-token", async (_, token) => {
+            return await ZrokManager.setToken(token);
         });
     }
 }

@@ -26,6 +26,7 @@ import { ProxySetupField } from '../../../components/fields/ProxySetupField';
 import { ServerPasswordField } from '../../../components/fields/ServerPasswordField';
 import { LocalPortField } from '../../../components/fields/LocalPortField';
 import { UseHttpsField } from '../../../components/fields/UseHttpsField';
+import { ZrokTokenField } from 'app/components/fields/ZrokTokenField';
 // import { EncryptCommunicationsField } from '../../../components/fields/EncryptCommunicationsField';
 
 
@@ -59,6 +60,8 @@ export const ConnectionSettings = (): JSX.Element => {
             <ProxySetupField />
             <Spacer />
             {(proxyService === 'ngrok') ? (<NgrokAuthTokenField />) : null}
+            <Spacer />
+            {(proxyService === 'zrok') ? (<ZrokTokenField />) : null}
             <Spacer />
             <Divider orientation='horizontal' />
             <ServerPasswordField />

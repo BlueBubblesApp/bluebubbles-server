@@ -8,12 +8,12 @@ import { Loggable } from "@server/lib/logging/Loggable";
 export class CloudflareManager extends Loggable {
     tag = "CloudflareManager";
 
-    daemonPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflared");
+    daemonPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare", "cloudflared");
 
     // Use a default (empty) config file so we don't interfere with the default CF install (if any)
-    cfgPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflared-config.yml");
+    cfgPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare", "cloudflared-config.yml");
 
-    pidPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare.pid");
+    pidPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare", "cloudflare.pid");
 
     proc: ProcessPromise<ProcessOutput>;
 

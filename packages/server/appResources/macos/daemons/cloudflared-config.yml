@@ -1,3 +1,0 @@
-protocol: quic
-no-autoupdate: true
-retries: 6

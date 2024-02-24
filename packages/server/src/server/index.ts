@@ -36,7 +36,8 @@ import {
     CloudflareService,
     WebhookService,
     ScheduledMessagesService,
-    OauthService
+    OauthService,
+    ZrokService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
@@ -466,7 +467,12 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             this.logger.info("Initializing proxy services...");
-            this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
+            this.proxyServices = [
+                new NgrokService(),
+                new LocalTunnelService(),
+                new CloudflareService(),
+                new ZrokService()
+            ];
         } catch (ex: any) {
             this.logger.error(`Failed to initialize proxy services! ${ex.message}`);
         }
