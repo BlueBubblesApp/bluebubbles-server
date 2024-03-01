@@ -983,6 +983,18 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
+        // If the zrok proxy config has changed, we need to restart the zrok service
+        if (prevConfig.zrok_reserve_tunnel !== nextConfig.zrok_reserve_tunnel && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
+        // If the zrok proxy config has changed, we need to restart the zrok service
+        if (prevConfig.zrok_reserved_name !== nextConfig.zrok_reserved_name && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
         // If the poll interval changed, we need to restart the listeners
         if (prevConfig.db_poll_interval !== nextConfig.db_poll_interval) {
             this.removeChatListeners();
@@ -990,10 +1002,15 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            this.logger.debug("Dispatching server URL update from config change");
-            // Emit the new server event no matter what
-            await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-            await this.fcm?.setServerUrl(true);
+            if (
+                prevConfig?.server_address !== nextConfig?.server_address &&
+                isNotEmpty(nextConfig?.server_address as string)
+            ) {
+                this.logger.debug("Dispatching server URL update from config change");
+                // Emit the new server event no matter what
+                await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
+                await this.fcm?.setServerUrl(true);
+            }
         } catch (ex: any) {
             this.logger.error(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`);
         }

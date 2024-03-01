@@ -1,8 +1,8 @@
-import "zx/globals";
 import fs from "fs";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
-import { ProcessPromise } from "zx";
+import * as zx from "zx";
+import { ProcessPromise, $ } from "zx";
 import { FileSystem } from "@server/fileSystem";
 import { hideApp } from "@server/api/apple/scripts";
 import { Loggable } from "@server/lib/logging/Loggable";
@@ -106,7 +106,7 @@ export abstract class DylibPlugin extends Loggable {
                     return;
                 }
 
-                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
+                this.dylibProcess = zx.$`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
                 this.dylibProcess.stdout.on("data", (data: string) => {
                     this.log.debug(`DYLIB: ${data}`);
                 });

@@ -1,4 +1,3 @@
-import "zx/globals";
 import { PrivateApiMode } from ".";
 import { MacForgeMode } from "./MacForgeMode";
 import { MessagesDylibPlugin } from "./dylibPlugins/MessagesDylibPlugin";

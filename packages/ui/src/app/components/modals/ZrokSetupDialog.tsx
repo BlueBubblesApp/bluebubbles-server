@@ -21,7 +21,7 @@ import { registerZrokEmail, setZrokToken } from 'app/utils/IpcUtils';
 import { AiFillEye, AiFillEyeInvisible } from 'react-icons/ai';
 
 
-interface ZrokAuthTokenDialogProps {
+interface ZrokSetupDialogProps {
     onCancel?: () => void;
     onConfirm?: (token: string) => void;
     isOpen: boolean;
@@ -29,13 +29,13 @@ interface ZrokAuthTokenDialogProps {
     onClose: () => void;
 }
 
-export const ZrokAuthTokenDialog = ({
+export const ZrokSetupDialog = ({
     onCancel,
     onConfirm,
     isOpen,
     modalRef,
     onClose,
-}: ZrokAuthTokenDialogProps): JSX.Element => {
+}: ZrokSetupDialogProps): JSX.Element => {
     const zrokToken: string = (useAppSelector(state => state.config.zrok_token) ?? '');
     const [email, setEmail] = useState('');
     const [token, setToken] = useState(zrokToken);
@@ -54,7 +54,7 @@ export const ZrokAuthTokenDialog = ({
             <AlertDialogOverlay>
                 <AlertDialogContent>
                     <AlertDialogHeader fontSize='lg' fontWeight='bold'>
-                        Register your Zrok Account
+                        Register Your Zrok Account
                     </AlertDialogHeader>
 
                     <AlertDialogBody>
@@ -65,16 +65,13 @@ export const ZrokAuthTokenDialog = ({
                             giving you a link to register your account.</b> Use it to create an account and get your token.
                         </Text>
                         <br />
-                        <Text>
-                            Once you have your token, enter it below.
-                        </Text>
-                        <br />
                         <FormControl  isInvalid={isEmailInvalid}>
                             <FormLabel htmlFor='address'>Email Address</FormLabel>
                             
                             <Input
                                 id='zrok_email'
                                 type='email'
+                                placeholder="tim.apple@gmail.com"
                                 maxWidth="16em"
                                 mr={3}
                                 value={email}
@@ -109,6 +106,8 @@ export const ZrokAuthTokenDialog = ({
                                 <FormErrorMessage>{emailError}</FormErrorMessage>
                             ) : null}
                         </FormControl>
+                        <br />
+                        <Text>Save your token somewhere safe, then paste it into the field below.</Text>
                         <br />
                         <FormControl  isInvalid={isTokenInvalid}>
                             <FormLabel htmlFor='address'>Token</FormLabel>

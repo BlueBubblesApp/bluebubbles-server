@@ -2,6 +2,7 @@ import { isMinBigSur, isMinMonterey } from "@server/env";
 import { DylibPlugin } from ".";
 import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
+import path from "path";
 
 const macVer = isMinMonterey ? "macos11" : isMinBigSur ? "macos11" : "macos10";
 

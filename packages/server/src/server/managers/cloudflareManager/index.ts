@@ -1,4 +1,5 @@
-import { $, ProcessOutput, ProcessPromise } from "zx";
+import { ProcessOutput, ProcessPromise } from "zx";
+import * as zx from "zx";
 import * as path from "path";
 import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
@@ -39,7 +40,7 @@ export class CloudflareManager extends Loggable {
         return new Promise((resolve, reject) => {
             const port = Server().repo.getConfig("socket_port") as string;
             // eslint-disable-next-line max-len
-            this.proc = $`${this.daemonPath} tunnel --url localhost:${port} --config ${this.cfgPath} --pidfile ${this.pidPath}`;
+            this.proc = zx.$`${this.daemonPath} tunnel --url localhost:${port} --config ${this.cfgPath} --pidfile ${this.pidPath}`;
 
             // If there is an error with the command, throw the error
             this.proc.catch(reason => {

@@ -21,7 +21,7 @@ import { ConfirmationItems } from '../../utils/ToastUtils';
 import { ConfirmationDialog } from '../modals/ConfirmationDialog';
 import { saveLanUrl } from 'app/utils/IpcUtils';
 import { NgrokAuthTokenDialog } from '../modals/NgrokAuthTokenDialog';
-import { ZrokAuthTokenDialog } from '../modals/ZrokAuthTokenDialog';
+import { ZrokSetupDialog } from '../modals/ZrokSetupDialog';
 
 
 export interface ProxySetupFieldProps {
@@ -94,7 +94,7 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                 >
                     <option value='cloudflare'>Cloudflare (Recommended)</option>
                     <option value='ngrok'>Ngrok</option>
-                    <option value='zrok'>Zrok</option>
+                    <option value='zrok'>Zrok (Beta)</option>
                     <option value='dynamic-dns'>Dynamic DNS / Custom URL</option>
                     <option value='lan-url'>LAN URL</option>
                 </Select>
@@ -144,7 +144,7 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                 onClose={() => setNgrokModalOpen.off()}
             />
 
-            <ZrokAuthTokenDialog
+            <ZrokSetupDialog
                 modalRef={zrokRef}
                 onConfirm={(token: string) => {
                     dispatch(setConfig({ name: 'proxy_service', value: 'Zrok' }));

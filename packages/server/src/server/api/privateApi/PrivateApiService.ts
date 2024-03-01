@@ -1,4 +1,3 @@
-import "zx/globals";
 import * as os from "os";
 import * as net from "net";
 import { Sema } from "async-sema";

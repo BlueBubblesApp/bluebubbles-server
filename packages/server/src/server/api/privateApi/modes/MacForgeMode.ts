@@ -8,6 +8,9 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { restartMessages } from "@server/api/apple/scripts";
 import { getLogger } from "@server/lib/logging/Loggable";
+import path from "path";
+import fs from "fs";
+import { rimrafSync } from "rimraf";
 
 type BundleStatus = {
     success: boolean;
@@ -147,7 +150,7 @@ export class MacForgeMode extends PrivateApiMode {
                 // If the remote bundle doesn't exist, we just need to write it
                 log.debug(`Looking for deprecated Helper Bundle at: ${remotePath}`);
                 if (fs.existsSync(remotePath)) {
-                    await fs.rm(remotePath, { recursive: true, force: true });
+                    rimrafSync(remotePath);
                     log.debug(`  -> Removed deprecated Helper`);
                 } else {
                     log.debug("  -> Helper Bundle not found");

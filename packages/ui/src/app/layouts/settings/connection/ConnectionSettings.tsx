@@ -27,11 +27,14 @@ import { ServerPasswordField } from '../../../components/fields/ServerPasswordFi
 import { LocalPortField } from '../../../components/fields/LocalPortField';
 import { UseHttpsField } from '../../../components/fields/UseHttpsField';
 import { ZrokTokenField } from 'app/components/fields/ZrokTokenField';
+import { ZrokReserveTunnelField } from 'app/components/fields/ZrokReserveTunnelField';
+import { ZrokReservedNameField } from 'app/components/fields/ZrokReservedNameField';
 // import { EncryptCommunicationsField } from '../../../components/fields/EncryptCommunicationsField';
 
 
 export const ConnectionSettings = (): JSX.Element => {
     const proxyService: string = (useAppSelector(state => state.config.proxy_service) ?? '').toLowerCase().replace(' ', '-');
+    const zrokReserved: boolean = (useAppSelector(state => state.config.zrok_reserve_tunnel) ?? false);
 
     return (
         <Stack direction='column' p={5}>
@@ -58,10 +61,27 @@ export const ConnectionSettings = (): JSX.Element => {
             <Divider orientation='horizontal' />
             <Spacer />
             <ProxySetupField />
-            <Spacer />
-            {(proxyService === 'ngrok') ? (<NgrokAuthTokenField />) : null}
-            <Spacer />
-            {(proxyService === 'zrok') ? (<ZrokTokenField />) : null}
+            {(proxyService === 'ngrok') ? (
+                <>
+                    <Spacer />
+                    <NgrokAuthTokenField />
+                </>
+            ) : null}
+            
+            {(proxyService === 'zrok') ? (
+                <>
+                    <Spacer />
+                    <ZrokTokenField />
+                    <Spacer />
+                    <ZrokReserveTunnelField />
+                    {zrokReserved ? (
+                        <>
+                            <Spacer />
+                            <ZrokReservedNameField />
+                        </>
+                    ) : null}
+                </>
+            ) : null}
             <Spacer />
             <Divider orientation='horizontal' />
             <ServerPasswordField />

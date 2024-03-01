@@ -1,4 +1,5 @@
 import { Server } from "@server";
+import fs from "fs";
 import { isMinBigSur, isMinHighSierra } from "@server/env";
 import { checkPrivateApiStatus, isNotEmpty } from "@server/helpers/utils";
 import { bytesToBase64 } from "byte-base64";
