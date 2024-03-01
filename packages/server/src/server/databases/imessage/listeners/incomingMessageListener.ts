@@ -82,6 +82,11 @@ export class IncomingMessageListener extends MessageChangeListener {
 
         // Emit the new message
         entries.forEach(async (entry: Message) => {
+            // If there is no edited/retracted date, it's not an updated message.
+            // We only care about edited/retracted messages.
+            // The other dates are delivered, read, and played.
+            if (!entry.dateEdited && !entry.dateRetracted) return;
+
             const event = this.processMessageEvent(entry);
             if (!event) return;
 
