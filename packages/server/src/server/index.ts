@@ -726,9 +726,16 @@ class BlueBubblesServer extends EventEmitter {
         try {
             this.logger.info("Initializing network service...");
             this.networkChecker = new NetworkService();
-            this.networkChecker.on("status-change", connected => {
+            this.networkChecker.on("status-change", async connected => {
                 if (connected) {
                     this.logger.info("Re-connected to network!");
+                    if (!this.fcm) {
+                        this.initFcm();
+                    }
+
+                    // Restart the FCM service and the proxy services
+                    // after reconnection to a network.
+                    await this.fcm.start();
                     this.restartProxyServices();
                 } else {
                     this.logger.info("Disconnected from network!");
