@@ -49,38 +49,6 @@ export class FCMService extends Loggable {
 
     addressUpdateService: ScheduledService = null;
 
-    /**
-     * Starts the FCM app service. Implements a retryer to ensure
-     * that the service is started correctly.
-     */
-    // @AsyncSingleton("FCMService.start")
-    // async start({
-    //     initializeOnly = false
-    // }: {
-    //     initializeOnly?: boolean;
-    // } = {}): Promise<boolean> {
-    //     // Try starting the service
-    //     let hasSucceeded = false;
-    //     const retryer: Promise<boolean> = resultRetryer({
-    //         maxTries: 6,
-    //         delayMs: 5000,
-    //         getData: async () => {
-    //             try {
-    //                 const success = await this.startHandler({ initializeOnly });
-    //                 hasSucceeded = true;
-    //                 return success;
-    //             } catch (ex: any) {
-    //                 this.log.debug(`Failed to initialize FCM App. Error: ${ex?.message}. Retrying...`);
-    //                 return null;
-    //             }
-    //         },
-    //         // Retry if the data is null (an error happened)
-    //         dataLoopCondition: (data: boolean) => data === null
-    //     });
-
-    //     return await retryer;
-    // }
-
     @AsyncSingleton("FCMService.initAddressUpdateLoop")
     private async initAddressUpdateLoop() {
         // If the service is already running, don't start another one
