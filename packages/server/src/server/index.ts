@@ -735,6 +735,7 @@ class BlueBubblesServer extends EventEmitter {
 
                     // Restart the FCM service and the proxy services
                     // after reconnection to a network.
+                    this.logger.info("Restarting FCM and Proxy Services...");
                     await this.fcm.start();
                     this.restartProxyServices();
                 } else {
