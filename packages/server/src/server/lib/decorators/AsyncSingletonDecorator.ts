@@ -10,9 +10,15 @@ export const AsyncSingleton = <T extends (...args: any[]) => any>(name: string):
 
             const promise = originalMethod.apply(this, args);
             singletons.set(name, promise);
-            const result = await promise;
-            singletons.delete(name);
-            return result;
+
+            try {
+                const result = await promise;
+                singletons.delete(name);
+                return result;
+            } catch (ex) {
+                singletons.delete(name);
+                throw ex;
+            }
         };
 
         return descriptor;
