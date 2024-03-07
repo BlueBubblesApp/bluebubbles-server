@@ -38,10 +38,7 @@ export const ZrokTokenField = ({ helpText }: ZrokTokenFieldProps): JSX.Element =
         theNewZrokToken = theNewZrokToken.trim();
 
         // Validate the port
-        if (theNewZrokToken === zrokToken) {
-            setZrokTokenError('You have not changed the token since your last save!');
-            return;
-        } else if (theNewZrokToken.includes(' ')) {
+        if (theNewZrokToken.includes(' ')) {
             setZrokTokenError('Invalid Zrok Token! Please check that you have copied it correctly.');
             return;
         } else if (theNewZrokToken.length === 0) {
