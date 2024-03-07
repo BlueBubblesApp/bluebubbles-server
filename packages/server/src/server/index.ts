@@ -1249,100 +1249,14 @@ class BlueBubblesServer extends EventEmitter {
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        outgoingMsgListener.on("new-entry", async (item: Message) => {
-            const newMessage = await insertChatParticipants(item);
-            this.logger.info(`New Message from You, ${newMessage.contentString()}`);
-
-            // Manually send the message to the socket so we can serialize it with
-            // all the extra data
-            this.httpService.socketServer.emit(
-                NEW_MESSAGE,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        parseAttributedBody: true,
-                        parseMessageSummary: true,
-                        parsePayloadData: true,
-                        loadChatParticipants: false,
-                        includeChats: true
-                    }
-                })
-            );
-
-            // Emit it to the FCM devices, but not socket
-            await this.emitMessage(
-                NEW_MESSAGE,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        enforceMaxSize: true
-                    },
-                    isForNotification: true
-                }),
-                "normal",
-                true,
-                false
-            );
-        });
+        outgoingMsgListener.on("new-entry", this.handleNewMessage);
 
         /**
          * Message listener checking for updated messages. This means either the message's
          * delivered date or read date have changed since the last time we checked the database.
          */
-        outgoingMsgListener.on("updated-entry", async (item: Message) => {
-            const newMessage = await insertChatParticipants(item);
-
-            // ATTENTION: If "from" is null, it means you sent the message from a group chat
-            // Check the isFromMe key prior to checking the "from" key
-            const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
-            const time =
-                newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted;
-            const updateType = newMessage.dateRetracted
-                ? "Text Unsent"
-                : newMessage.dateEdited
-                ? "Text Edited"
-                : newMessage.dateRead
-                ? "Text Read"
-                : "Text Delivered";
-
-            // Husky pre-commit validator was complaining, so I created vars
-            const content = newMessage.contentString();
-            const localeTime = time?.toLocaleString();
-            this.logger.info(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
-
-            // Manually send the message to the socket so we can serialize it with
-            // all the extra data
-            this.httpService.socketServer.emit(
-                MESSAGE_UPDATED,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        parseAttributedBody: true,
-                        parseMessageSummary: true,
-                        parsePayloadData: true,
-                        loadChatParticipants: false,
-                        includeChats: true
-                    }
-                })
-            );
-
-            // Emit it to the FCM devices only
-            // Since this is a message update, we do not need to include the participants or chats
-            await this.emitMessage(
-                MESSAGE_UPDATED,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        loadChatParticipants: false,
-                        includeChats: false
-                    },
-                    isForNotification: true
-                }),
-                "normal",
-                true,
-                false
-            );
-        });
+        outgoingMsgListener.on("updated-entry", this.handleUpdatedMessage);
+        incomingMsgListener.on("updated-entry", this.handleUpdatedMessage);
 
         /**
          * Message listener for messages that have errored out
@@ -1577,6 +1491,97 @@ class BlueBubblesServer extends EventEmitter {
             await waitMs(500);
             i.start();
         }
+    }
+
+    private async handleNewMessage(item: Message) {
+        const newMessage = await insertChatParticipants(item);
+        this.logger.info(`New Message from You, ${newMessage.contentString()}`);
+
+        // Manually send the message to the socket so we can serialize it with
+        // all the extra data
+        this.httpService.socketServer.emit(
+            NEW_MESSAGE,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true,
+                    loadChatParticipants: false,
+                    includeChats: true
+                }
+            })
+        );
+
+        // Emit it to the FCM devices, but not socket
+        await this.emitMessage(
+            NEW_MESSAGE,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    enforceMaxSize: true
+                },
+                isForNotification: true
+            }),
+            "normal",
+            true,
+            false
+        );
+    }
+
+    private async handleUpdatedMessage(item: Message) {
+        const newMessage = await insertChatParticipants(item);
+
+        // ATTENTION: If "from" is null, it means you sent the message from a group chat
+        // Check the isFromMe key prior to checking the "from" key
+        const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
+        const time =
+            newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted;
+        const updateType = newMessage.dateRetracted
+            ? "Text Unsent"
+            : newMessage.dateEdited
+            ? "Text Edited"
+            : newMessage.dateRead
+            ? "Text Read"
+            : "Text Delivered";
+
+        // Husky pre-commit validator was complaining, so I created vars
+        const content = newMessage.contentString();
+        const localeTime = time?.toLocaleString();
+        this.logger.info(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
+
+        // Manually send the message to the socket so we can serialize it with
+        // all the extra data
+        this.httpService.socketServer.emit(
+            MESSAGE_UPDATED,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true,
+                    loadChatParticipants: false,
+                    includeChats: true
+                }
+            })
+        );
+
+        // Emit it to the FCM devices only
+        // Since this is a message update, we do not need to include the participants or chats
+        await this.emitMessage(
+            MESSAGE_UPDATED,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    loadChatParticipants: false,
+                    includeChats: false
+                },
+                isForNotification: true
+            }),
+            "normal",
+            true,
+            false
+        );
     }
 
     private removeChatListeners() {
