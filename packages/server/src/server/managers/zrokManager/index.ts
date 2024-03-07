@@ -61,7 +61,7 @@ export class ZrokManager extends Loggable {
             // Conditionally change the command based on if we are reserving a tunnel or not
             const commndFlags = [
                 "share",
-                ...(reservedTunnel ? ["reserved"] : ["public", "--backend-mode", "proxy"]),
+                ...(reservedTunnel ? ["reserved", "--headless"] : ["public", "--backend-mode", "proxy", "--headless"]),
                 ...(reservedTunnel ? [reservedNameToken] : [`0.0.0.0:${port}`])
             ];
 
