@@ -63,18 +63,10 @@ export class IncomingMessageListener extends MessageChangeListener {
             }
         ];
 
-        // If we have a last row id, only get messages after that
-        if (this.lastRowId !== 0) {
-            where.push({
-                statement: "message.ROWID > :rowId",
-                args: { rowId: this.lastRowId }
-            });
-        }
-
         // Do not use the "after" parameter if we have a last row id
         // Offset 15 seconds to account for the "Apple" delay
         const entries = await this.repo.getUpdatedMessages({
-            after: this.lastRowId === 0 ? new Date(after.getTime() - 15000) : null,
+            after,
             withChats: true,
             where,
             orderBy: this.lastRowId === 0 ? "message.dateCreated" : "message.ROWID"
@@ -85,7 +77,8 @@ export class IncomingMessageListener extends MessageChangeListener {
             // If there is no edited/retracted date, it's not an updated message.
             // We only care about edited/retracted messages.
             // The other dates are delivered, read, and played.
-            if (!entry.dateEdited && !entry.dateRetracted) return;
+            // isEmpty is what is used instead of dateRetracted... Just Apple things...
+            if (!entry.dateEdited && !entry.dateRetracted && !entry.isEmpty) return;
 
             const event = this.processMessageEvent(entry);
             if (!event) return;
