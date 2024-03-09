@@ -18,6 +18,7 @@ import { HideDockIconField } from '../../../components/fields/HideDockIconField'
 import { StartViaTerminalField } from '../../../components/fields/StartViaTerminalField';
 import { StartMinimizedField } from '../../../components/fields/StartMinimizedField';
 import { StartDelayField } from 'app/components/fields/StartDelayField';
+import { LandingPageField } from 'app/components/fields/LandingPageField';
 
 
 export const FeatureSettings = (): JSX.Element => {
@@ -48,7 +49,11 @@ export const FeatureSettings = (): JSX.Element => {
                             <AccordionIcon />
                         </AccordionButton>
                         <AccordionPanel pb={4}>
-                            <StartViaTerminalField />
+                            <Stack direction='column'>
+                                <StartViaTerminalField />
+                                <Spacer />
+                                <LandingPageField />
+                            </Stack>
                         </AccordionPanel>
                     </AccordionItem>
                 </Accordion>

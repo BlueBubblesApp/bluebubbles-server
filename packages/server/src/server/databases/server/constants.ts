@@ -36,5 +36,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     zrok_token: () => "",
     zrok_reserve_tunnel: () => 0,
     zrok_reserved_name: () => "",
-    zrok_reserved_token: () => ""
+    zrok_reserved_token: () => "",
+    landing_page_path: () => "",
 };
