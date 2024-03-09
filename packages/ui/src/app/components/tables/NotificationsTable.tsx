@@ -25,7 +25,7 @@ const AlertTypeIcon: NodeJS.Dict<IconType> = {
 
 export const NotificationsTable = ({ notifications }: { notifications: Array<NotificationItem> }): JSX.Element => {
     return (
-        <Table variant="striped" colorScheme="blue">
+        <Table variant="striped" colorScheme="blue" size="md">
             <TableCaption>
                 Alerts are normal to have. As long as the server recovers,
                 you have nothing to worry about. Alerts are mostly helpful when you
@@ -41,15 +41,15 @@ export const NotificationsTable = ({ notifications }: { notifications: Array<Not
             <Tbody>
                 {notifications.map(item => (
                     <Tr key={item.id} color={(item?.read ?? false) ? 'gray.400' : 'current'}>
-                        <Td>
+                        <Td verticalAlign='baseline'>
                             <Icon
                                 ml={2}
                                 fontSize="24"
                                 as={AlertTypeIcon[item.type] ?? AiOutlineWarning}
                             />
                         </Td>
-                        <Td>{item.message}</Td>
-                        <Td isNumeric>
+                        <Td verticalAlign='baseline'>{item.message}</Td>
+                        <Td isNumeric verticalAlign='baseline'>
                             <Flex flexDirection="row" justifyContent='flex-end' alignItems='center'>
                                 <Text mr={1}>{item.timestamp.toLocaleString()}</Text>
                                 {(item?.read ?? false) ? <BsCheckAll fontSize={24} /> : null}
