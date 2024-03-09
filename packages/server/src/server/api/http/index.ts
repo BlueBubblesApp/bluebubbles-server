@@ -10,10 +10,10 @@ import koaCors from "koa-cors";
 import * as https from "https";
 import * as http from "http";
 import * as fs from "fs";
+import * as zx from "zx";
 
 // Internal libraries
 import { Server } from "@server";
-import { FileSystem } from "@server/fileSystem";
 import { isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";
 import { CertificateService } from "@server/services/certificateService";
@@ -95,7 +95,6 @@ export class HttpService extends Loggable {
         // Create the socket server and link the http context
         this.socketServer = new SocketServer(this.httpServer, this.socketOpts);
         this.sendCache = new EventCache();
-        this.startStatusListener();
 
         // Every 6 hours, clear the send cache
         this.clearCacheService = new ScheduledService(() => {
@@ -147,35 +146,33 @@ export class HttpService extends Loggable {
     }
 
     /**
-     * Checks to see if we are currently listening
+     * Checks to see if another process is listening on the socket port.
      */
-    startStatusListener() {
-        this.portCheckerService = new ScheduledService(async () => {
-            const port = Server().repo.getConfig("socket_port");
+    async checkIfPortInUse(port: number) {
+        try {
+            // Check if there are any listening services
+            const output = await zx.$`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`;
+            if (output.toString().includes(`:${port} (LISTEN)`)) return true;
+        } catch {
+            // Don't show an error, I believe this throws a "false error".
+            // For instance, if the proxy service doesn't start, and the command returns
+            // nothing, it thinks it's an actual error, which it isn't
+        }
 
-            try {
-                // Check if there are any listening services
-                let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
-                res = safeTrim(res);
-
-                // If the result doesn't show anything listening,
-                if (!res.includes(port.toString())) {
-                    this.log.error("Socket not listening! Restarting...");
-                    this.restart();
-                }
-            } catch {
-                // Don't show an error, I believe this throws a "false error".
-                // For instance, if the proxy service doesn't start, and the command returns
-                // nothing, it thinks it's an actual error, which it isn't
-            }
-        }, 1000 * 60); // Check every minute
+        return false;
     }
 
     /**
      * Creates the initial connection handler for Socket.IO
      */
-    start() {
+    async start() {
         if (!this.socketServer) return;
+
+        const port = Server().repo.getConfig("socket_port") as number;
+        const portInUse = await this.checkIfPortInUse(port);
+        if (portInUse) {
+            throw new Error(`Unable to start HTTP service! Port ${port} is already in use!`);
+        }
 
         /**
          * Handle all other data requests
@@ -222,7 +219,7 @@ export class HttpService extends Loggable {
         });
 
         // Start the server
-        this.httpServer.listen(Server().repo.getConfig("socket_port") as number, () => {
+        this.httpServer.listen(port, () => {
             this.log.info(`Successfully started HTTP${isNotEmpty(this.httpOpts) ? "S" : ""} server`);
 
             // Once we start, let's send a hello-world to all the clients
