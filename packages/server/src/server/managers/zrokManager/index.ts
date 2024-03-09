@@ -195,7 +195,7 @@ export class ZrokManager extends Loggable {
             }
 
             const result = await zx.$`${this.daemonPath} reserve public ${flags}`;
-            const output = (isEmpty(result.stdout) ? result.stderr : "").trim();
+            const output = result.toString().trim();
             const urlMatches = output.match(ZrokManager.proxyUrlRegex);
             if (isEmpty(urlMatches)) {
                 logger.debug(`Failed to reserve Zrok tunnel! Unable to find URL in output. Output: ${output}`);
@@ -244,7 +244,7 @@ export class ZrokManager extends Loggable {
     static async getExistingReservedShareToken(name?: string): Promise<string | null> {
         // Run the overview command and parse the output
         const result = await zx.$`${this.daemonPath} overview`;
-        const output = (isEmpty(result.stdout) ? result.stderr : result.stdout).trim();
+        const output = result.toString().trim();
         const json = JSON.parse(output);
         const host = Server().computerIdentifier;
 
