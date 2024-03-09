@@ -18,6 +18,7 @@ import {
 import { useAppSelector } from '../../hooks';
 import { FocusableElement } from '@chakra-ui/utils';
 import { registerZrokEmail, setZrokToken } from 'app/utils/IpcUtils';
+import { showSuccessToast } from 'app/utils/ToastUtils';
 import { AiFillEye, AiFillEyeInvisible } from 'react-icons/ai';
 
 
@@ -42,14 +43,20 @@ export const ZrokSetupDialog = ({
     const [emailError, setEmailError] = useState('');
     const [tokenError, setTokenError] = useState('');
     const [showToken, setShowToken] = useBoolean();
+    const [registerDisabled, setRegisterDisabled] = useState(false);
     const isEmailInvalid = (emailError ?? '').length > 0;
     const isTokenInvalid = (tokenError ?? '').length > 0;
+
+    const closeProxy = () => {
+        setRegisterDisabled(false);
+        onClose();
+    };
 
     return (
         <AlertDialog
             isOpen={isOpen}
             leastDestructiveRef={modalRef}
-            onClose={() => onClose()}
+            onClose={() => closeProxy()}
         >
             <AlertDialogOverlay>
                 <AlertDialogContent>
@@ -82,6 +89,7 @@ export const ZrokSetupDialog = ({
                             />
                             <Button
                                 mt={'-2px'}
+                                isDisabled={registerDisabled}
                                 onClick={async () => {
                                     setEmailError('');
                                     if (email.trim().length === 0) {
@@ -96,6 +104,11 @@ export const ZrokSetupDialog = ({
         
                                     try {
                                         await registerZrokEmail(email);
+                                        showSuccessToast({
+                                            title: 'Success',
+                                            description: 'Successully registered your email! Check your inbox for the registration link.'
+                                        });
+                                        setRegisterDisabled(true);
                                     } catch (ex: any) {
                                         const err = ex?.message ?? String(ex);
                                         setEmailError(err.substring(err.indexOf(':') + 1).trim());
@@ -141,7 +154,7 @@ export const ZrokSetupDialog = ({
                             ref={modalRef as React.LegacyRef<HTMLButtonElement> | undefined}
                             onClick={() => {
                                 if (onCancel) onCancel();
-                                onClose();
+                                closeProxy();
                             }}
                         >
                             Cancel
@@ -160,7 +173,7 @@ export const ZrokSetupDialog = ({
                                 try {
                                     await setZrokToken(token);
                                     if (onConfirm) onConfirm(token);
-                                    onClose();
+                                    closeProxy();
                                 } catch (ex: any) {
                                     const err = ex?.message ?? String(ex);
                                     setTokenError(err.substring(err.indexOf(':') + 1).trim());
