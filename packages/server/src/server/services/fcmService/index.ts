@@ -135,7 +135,7 @@ export class FCMService extends Loggable {
             });
         }
 
-        this.initAddressUpdateLoop();
+        // this.initAddressUpdateLoop();
 
         return true;
     }
