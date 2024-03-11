@@ -1256,14 +1256,14 @@ class BlueBubblesServer extends EventEmitter {
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        outgoingMsgListener.on("new-entry", () => this.handleNewMessage);
+        outgoingMsgListener.on("new-entry", (item) => this.handleNewMessage(item));
 
         /**
          * Message listener checking for updated messages. This means either the message's
          * delivered date or read date have changed since the last time we checked the database.
          */
-        outgoingMsgListener.on("updated-entry", () => this.handleUpdatedMessage);
-        incomingMsgListener.on("updated-entry", () => this.handleUpdatedMessage);
+        outgoingMsgListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
+        incomingMsgListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
 
         /**
          * Message listener for messages that have errored out
