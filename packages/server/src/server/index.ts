@@ -1262,8 +1262,9 @@ class BlueBubblesServer extends EventEmitter {
          * Message listener checking for updated messages. This means either the message's
          * delivered date or read date have changed since the last time we checked the database.
          */
-        outgoingMsgListener.on("updated-entry", () => this.handleUpdatedMessage);
-        incomingMsgListener.on("updated-entry", () => this.handleUpdatedMessage);
+        this.handleUpdatedMessage = this.handleUpdatedMessage.bind(this);
+        outgoingMsgListener.on("updated-entry", this.handleUpdatedMessage);
+        incomingMsgListener.on("updated-entry", this.handleUpdatedMessage);
 
         /**
          * Message listener for messages that have errored out
