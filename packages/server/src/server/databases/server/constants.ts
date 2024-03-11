@@ -8,6 +8,7 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     ngrok_key: () => "",
     ngrok_protocol: () => "http",
     ngrok_region: () => "us",
+    ngrok_custom_domain: () => "",
     use_custom_certificate: () => 0,
     password: () => "",
     auto_caffeinate: () => 0,

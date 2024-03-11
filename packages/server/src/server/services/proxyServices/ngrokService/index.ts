@@ -21,6 +21,48 @@ export class NgrokService extends Proxy {
         });
     }
 
+    async checkForError(log: string, err: any = null) {
+        let handled = true;
+        // Check for any errors or other restart cases
+        if (log.includes("lvl=error") || log.includes("lvl=crit")) {
+            if (
+                log.includes(
+                    "The authtoken you specified does not look like a proper ngrok tunnel authtoken"
+                ) ||
+                log.includes("The authtoken you specified is properly formed, but it is invalid")
+            ) {
+                this.log.error(`Ngrok Auth Token is invalid, removing...!`);
+                await Server().repo.setConfig("ngrok_key", "");
+            } else if (log.includes("TCP tunnels are only available after you sign up")) {
+                this.log.error(`In order to use Ngrok with TCP, you must enter an Auth Token!`);
+            } else {
+                this.log.info(`Ngrok status: Error Detected!`);
+            }
+        } else if (log.includes("remote gone away")) {
+            this.log.info(`Ngrok status: "Remote gone away" -> Restarting...`);
+            this.restart();
+        } else if (log.includes("command failed")) {
+            this.log.info(`Ngrok status: "Command failed" -> Restarting...`);
+            this.restart();
+        } else if (log.includes("ERR_NGROK_313")) {
+            await Server().repo.setConfig("ngrok_custom_domain", "");
+            this.log.error(
+                "Failed to use custom Ngrok subdomain. " +
+                "You must reserve a subdomain on the Ngrok website! " +
+                "Removing custom subdomain...");
+        } else if (log.includes("socket hang up") || log.includes("[object Object]")) {
+            this.log.info(
+                `Failed to restart ${this.opts.name}! Socket hang up detected. Performing full server restart...`);
+            Server().relaunch();
+        } else if (err?.body?.details?.err) {
+            this.log.error(`Failed to restart ${this.opts.name}! Error: ${err?.body?.details?.err}`);
+        } else {
+            handled = false;
+        }
+
+        return handled;
+    }
+
     /**
      * Sets up a connection to the Ngrok servers, opening a secure
      * tunnel between the internet and your Mac (iMessage server)
@@ -36,8 +78,10 @@ export class NgrokService extends Proxy {
 
         await this.migrateConfigFile();
 
+        const ngrokDomain = (Server().repo.getConfig("ngrok_custom_domain") as string).trim();
         const opts: Ngrok.Options = {
             port: Server().repo.getConfig("socket_port") ?? 1234,
+            hostname: isEmpty(ngrokDomain) ? null : ngrokDomain,
             binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked"),
             onStatusChange: async (status: string) => {
                 this.log.info(`Ngrok status: ${status}`);
@@ -49,30 +93,8 @@ export class NgrokService extends Proxy {
                 this.log.debug(log);
 
                 // Sanitize the log a bit (remove quotes and standardize)
-                const cmp_log = log.replace(/"/g, "").replace(/eror/g, "error");
-
-                // Check for any errors or other restart cases
-                if (cmp_log.includes("lvl=error") || cmp_log.includes("lvl=crit")) {
-                    if (
-                        cmp_log.includes(
-                            "The authtoken you specified does not look like a proper ngrok tunnel authtoken"
-                        ) ||
-                        cmp_log.includes("The authtoken you specified is properly formed, but it is invalid")
-                    ) {
-                        this.log.error(`Ngrok Auth Token is invalid, removing...!`);
-                        Server().repo.setConfig("ngrok_key", "");
-                    } else if (cmp_log.includes("TCP tunnels are only available after you sign up")) {
-                        this.log.error(`In order to use Ngrok with TCP, you must enter an Auth Token!`);
-                    } else {
-                        this.log.info(`Ngrok status: Error Detected!`);
-                    }
-                } else if (log.includes("remote gone away")) {
-                    this.log.info(`Ngrok status: "Remote gone away" -> Restarting...`);
-                    this.restart();
-                } else if (log.includes("command failed")) {
-                    this.log.info(`Ngrok status: "Command failed" -> Restarting...`);
-                    this.restart();
-                }
+                const saniLog = log.replace(/"/g, "").replace(/eror/g, "error");
+                this.checkForError(saniLog);
             }
         };
 

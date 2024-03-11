@@ -15,9 +15,10 @@ import {
 } from '@chakra-ui/react';
 import { useAppSelector } from '../../hooks';
 import { FocusableElement } from '@chakra-ui/utils';
+import { NgrokSubdomainField } from '../fields/NgrokSubdomainField';
 
 
-interface NgrokAuthTokenDialogProps {
+interface NgrokSetupDialogProps {
     onCancel?: () => void;
     onConfirm?: (address: string) => void;
     isOpen: boolean;
@@ -25,13 +26,13 @@ interface NgrokAuthTokenDialogProps {
     onClose: () => void;
 }
 
-export const NgrokAuthTokenDialog = ({
+export const NgrokSetupDialog = ({
     onCancel,
     onConfirm,
     isOpen,
     modalRef,
     onClose,
-}: NgrokAuthTokenDialogProps): JSX.Element => {
+}: NgrokSetupDialogProps): JSX.Element => {
     const ngrokToken: string = (useAppSelector(state => state.config.ngrok_key) ?? '');
     const [authToken, setAuthToken] = useState(ngrokToken);
     const [error, setError] = useState('');
@@ -46,7 +47,7 @@ export const NgrokAuthTokenDialog = ({
             <AlertDialogOverlay>
                 <AlertDialogContent>
                     <AlertDialogHeader fontSize='lg' fontWeight='bold'>
-                        Set Your Ngrok Auth Token
+                        Setup Ngrok
                     </AlertDialogHeader>
 
                     <AlertDialogBody>
@@ -77,7 +78,12 @@ export const NgrokAuthTokenDialog = ({
                                 <FormErrorMessage>{error}</FormErrorMessage>
                             ) : null}
                         </FormControl>
-                        
+                        <br />
+                        <Text>
+                            If you have reserved a custom subdomain, enter it below.
+                        </Text>
+                        <br />
+                        <NgrokSubdomainField />
                     </AlertDialogBody>
 
                     <AlertDialogFooter>

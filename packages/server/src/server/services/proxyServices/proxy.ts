@@ -134,6 +134,10 @@ export abstract class Proxy extends Loggable {
      */
     abstract disconnect(): Promise<void>;
 
+    async checkForError(log: string, err: any = null): Promise<boolean> {
+        return false;
+    }
+
     /**
      * Helper for restarting the ngrok connection
      */
@@ -189,12 +193,10 @@ export abstract class Proxy extends Loggable {
             await new Promise((resolve, _) => setTimeout(resolve, wait));
             await this.start();
         } catch (ex: any) {
-            this.log.error(`Failed to restart ${this.opts.name}!\n${ex}`);
-
-            const errString = ex?.toString() ?? "";
-            if (errString.includes("socket hang up") || errString.includes("[object Object]")) {
-                this.log.info("Socket hang up detected. Performing full server restart...");
-                Server().relaunch();
+            const output = ex?.toString() ?? "";
+            const wasHandled = await this.checkForError(output, ex);
+            if (!wasHandled) {
+                this.log.error(`Failed to restart ${this.opts.name}! Error: ${ex}`);
             }
 
             return false;

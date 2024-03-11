@@ -29,6 +29,7 @@ import { UseHttpsField } from '../../../components/fields/UseHttpsField';
 import { ZrokTokenField } from 'app/components/fields/ZrokTokenField';
 import { ZrokReserveTunnelField } from 'app/components/fields/ZrokReserveTunnelField';
 import { ZrokReservedNameField } from 'app/components/fields/ZrokReservedNameField';
+import { NgrokSubdomainField } from 'app/components/fields/NgrokSubdomainField';
 // import { EncryptCommunicationsField } from '../../../components/fields/EncryptCommunicationsField';
 
 
@@ -65,6 +66,8 @@ export const ConnectionSettings = (): JSX.Element => {
                 <>
                     <Spacer />
                     <NgrokAuthTokenField />
+                    <Spacer />
+                    <NgrokSubdomainField />
                 </>
             ) : null}
             
