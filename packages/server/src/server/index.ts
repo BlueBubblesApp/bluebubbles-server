@@ -1003,6 +1003,18 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
+        // If the ngrok API key is different, restart the ngrok process
+        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
+        // If the ngrok subdomain key is different, restart the ngrok process
+        if (prevConfig.ngrok_custom_domain !== nextConfig.ngrok_custom_domain && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
         // If the poll interval changed, we need to restart the listeners
         if (prevConfig.db_poll_interval !== nextConfig.db_poll_interval) {
             this.removeChatListeners();
@@ -1021,11 +1033,6 @@ class BlueBubblesServer extends EventEmitter {
             }
         } catch (ex: any) {
             this.logger.error(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`);
-        }
-
-        // If the ngrok API key is different, restart the ngrok process
-        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !proxiesRestarted) {
-            await this.restartProxyServices();
         }
 
         // Install the bundle if the Private API is turned on
@@ -1249,14 +1256,14 @@ class BlueBubblesServer extends EventEmitter {
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        outgoingMsgListener.on("new-entry", this.handleNewMessage);
+        outgoingMsgListener.on("new-entry", () => this.handleNewMessage);
 
         /**
          * Message listener checking for updated messages. This means either the message's
          * delivered date or read date have changed since the last time we checked the database.
          */
-        outgoingMsgListener.on("updated-entry", this.handleUpdatedMessage);
-        incomingMsgListener.on("updated-entry", this.handleUpdatedMessage);
+        outgoingMsgListener.on("updated-entry", () => this.handleUpdatedMessage);
+        incomingMsgListener.on("updated-entry", () => this.handleUpdatedMessage);
 
         /**
          * Message listener for messages that have errored out
