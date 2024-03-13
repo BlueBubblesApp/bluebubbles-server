@@ -1,12 +1,15 @@
-import "zx/globals";
 import fs from "fs";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
-import { ProcessPromise } from "zx";
+import * as zx from "zx";
+import { ProcessPromise, $ } from "zx";
 import { FileSystem } from "@server/fileSystem";
 import { hideApp } from "@server/api/apple/scripts";
+import { Loggable } from "@server/lib/logging/Loggable";
 
-export abstract class DylibPlugin {
+export abstract class DylibPlugin extends Loggable {
+    tag = "DylibPlugin";
+
     name: string = null;
 
     parentApp: string = null;
@@ -28,17 +31,18 @@ export abstract class DylibPlugin {
     abstract get dylibPath(): string;
 
     constructor(name: string) {
+        super();
         this.name = name;
     }
 
     async stopParentProcess(): Promise<void> {
         try {
-            Server().log(`Killing process: ${this.parentApp}`, "debug");
+            this.log.debug(`Killing process: ${this.parentApp}`);
             await FileSystem.killProcess(this.parentApp);
         } catch (ex: any) {
             const errStr = (typeof ex === "object" ? ex?.message ?? String(ex) : String(ex)).trim();
             if (!errStr.includes("No matching processes belonging to you were found")) {
-                Server().log(`Failed to kill parent process (${this.parentApp})! Error: ${errStr}`, "debug");
+                this.log.debug(`Failed to kill parent process (${this.parentApp})! Error: ${errStr}`);
             }
         }
     }
@@ -77,7 +81,7 @@ export abstract class DylibPlugin {
         if (!this.isEnabled) return;
         if (this.isInjecting) return;
         this.isInjecting = true;
-        Server().log(`Injecting ${this.name} DYLIB...`, "debug");
+        this.log.debug(`Injecting ${this.name} DYLIB...`);
 
         // Clear the markers
         this.dylibFailureCounter = 0;
@@ -102,7 +106,14 @@ export abstract class DylibPlugin {
                     return;
                 }
 
-                this.dylibProcess = $`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
+                this.dylibProcess = zx.$`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
+                this.dylibProcess.stdout.on("data", (data: string) => {
+                    this.log.debug(`DYLIB: ${data}`);
+                });
+
+                this.dylibProcess.stderr.on("data", (data: string) => {
+                    this.log.debug(`DYLIB: ${data}`);
+                });
 
                 // Hide the app after 5 seconds
                 setTimeout(() => {
@@ -116,7 +127,7 @@ export abstract class DylibPlugin {
 
                 await this.dylibProcess;
             } catch (ex: any) {
-                Server().log(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex}`, "debug");
+                this.log.debug(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex}`);
                 if (this.isStopping) {
                     this.isInjecting = false;
                     return;
@@ -132,16 +143,13 @@ export abstract class DylibPlugin {
                 this.dylibFailureCounter += 1;
                 this.dylibLastErrorTime = Date.now();
                 if (this.dylibFailureCounter >= 5) {
-                    Server().log(
-                        `Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`,
-                        "error"
-                    );
+                    this.log.error(`Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`);
                 }
             }
         }
 
         if (this.dylibFailureCounter >= 5) {
-            Server().log(`Failed to start ${this.name} DYLIB 3 times in a row, giving up...`, "error");
+            this.log.error(`Failed to start ${this.name} DYLIB 3 times in a row, giving up...`);
         }
 
         this.isInjecting = false;

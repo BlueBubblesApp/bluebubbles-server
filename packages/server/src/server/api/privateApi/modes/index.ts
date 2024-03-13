@@ -1,10 +1,13 @@
+import { Loggable } from "@server/lib/logging/Loggable";
+
 export interface PrivateApiModeConstructor {
     install(...args: any): Promise<any | void>;
     uninstall(...args: any): Promise<any | void>;
-    new(): PrivateApiMode;
+    new (): PrivateApiMode;
 }
 
-export abstract class PrivateApiMode {
+export abstract class PrivateApiMode extends Loggable {
+    tag = "PrivateApiMode";
 
     isStopping = false;
 

@@ -4,7 +4,11 @@ import { FileSystem } from "@server/fileSystem";
 import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 import { App } from "firebase-admin/app";
 import axios from "axios";
-import { isEmpty, resultRetryer, waitMs } from "@server/helpers/utils";
+import { isEmpty, waitMs } from "@server/helpers/utils";
+import { ScheduledService } from "@server/lib/ScheduledService";
+import { Loggable } from "@server/lib/logging/Loggable";
+import { AsyncSingleton } from "@server/lib/decorators/AsyncSingletonDecorator";
+import { AsyncRetryer } from "@server/lib/decorators/AsyncRetryerDecorator";
 
 const AppName = "BlueBubbles";
 
@@ -18,7 +22,9 @@ enum DbType {
  * This services manages the connection to the connected
  * Google FCM server. This is used to handle/manage notifications
  */
-export class FCMService {
+export class FCMService extends Loggable {
+    tag = "FCMService";
+
     static getApp(): admin.app.App {
         try {
             return admin.app(AppName);
@@ -37,77 +43,40 @@ export class FCMService {
 
     hasInitialized = false;
 
-    startPromise: Promise<boolean> = null;
-
     serverConfig: any = null;
 
     clientConfig: any = null;
 
-    addressUpdateLoop: NodeJS.Timeout = null;
+    addressUpdateService: ScheduledService = null;
 
-    /**
-     * Starts the FCM app service. Implements a retryer to ensure
-     * that the service is started correctly.
-     */
-    async start({
-        initializeOnly = false
-    }: {
-        initializeOnly?: boolean;
-    } = {}): Promise<boolean> {
-        // If the startup sequence is already occuring, wait for it to finish
-        if (this.startPromise != null) {
-            return await this.startPromise;
-        }
-
-        // Try starting the service
-        let hasSucceeded = false;
-        this.startPromise = resultRetryer({
-            maxTries: 6,
-            delayMs: 5000,
-            getData: async () => {
-                try {
-                    const success = await this.startHandler({ initializeOnly });
-                    hasSucceeded = true;
-                    return success;
-                } catch (ex: any) {
-                    Server().log(`Failed to initialize FCM App. Error: ${ex?.message}. Retrying...`, "debug");
-                    return null;
-                }
-            },
-            // Retry if the data is null (an error happened)
-            dataLoopCondition: (data: boolean) => data === null
-        });
-
-        const result = await this.startPromise;
-        if (!hasSucceeded) {
-            Server().log("Failed to initialize FCM App after 6 attempts!", "error");
-        } else {
-            this.initAddressUpdateLoop();
-        }
-
-        this.startPromise = null;
-        return result;
-    }
-
+    @AsyncSingleton("FCMService.initAddressUpdateLoop")
     private async initAddressUpdateLoop() {
-        if (this.addressUpdateLoop) {
-            clearInterval(this.addressUpdateLoop);
-        }
+        // If the service is already running, don't start another one
+        if (this.addressUpdateService != null && !this.addressUpdateService.stopped) return;
 
-        // Every 10 minutes, update the server address if it hasn't changed
-        this.addressUpdateLoop = setInterval(() => {
+        // If the proxy service is lan-url or dynamic-dns, we don't need to start this service
+        const proxyService = Server().repo.getConfig("proxy_service") as string;
+        if (proxyService === "lan-url" || proxyService === "dynamic-dns") return;
+
+        this.addressUpdateService = new ScheduledService(() => {
             // If the app has been deleted (service stopped), clear the interval
             if (!FCMService.getApp()) {
-                return clearInterval(this.addressUpdateLoop);
+                return this.addressUpdateService.stop();
             }
-    
-            Server().log(`Attempting to update server URL (every 10 minute loop)...`, "debug");
+
+            this.log.debug(`Attempting to update server URL (20 minute loop)...`);
             this.setServerUrl(true);
-        }, 600000);
+        }, 600000 * 2);
     }
 
-
-    private async startHandler({
+    @AsyncSingleton("FCMService.start")
+    @AsyncRetryer({
+        name: "FCMService.start",
+        maxTries: 6,
+        retryDelay: 5000,
+        retryCondition: (data: boolean) => data == null
+    })
+    async start({
         initializeOnly = false
     }: {
         initializeOnly?: boolean;
@@ -116,7 +85,6 @@ export class FCMService {
         const app = FCMService.getApp();
         if (app) return true;
 
-        Server().log("Initializing new FCM App");
         this.hasInitialized = false;
 
         // Load in the last restart date
@@ -125,11 +93,12 @@ export class FCMService {
 
         const hasConfigs = this.loadConfigs();
         if (!hasConfigs) {
-            Server().log("FCM is not fully configured. Skipping...");
+            this.log.info("FCM is not fully configured. Skipping...");
             return false;
         }
 
-        this.dbType = (this.clientConfig.project_info?.firebase_url) ? DbType.REALTIME : DbType.FIRESTORE;
+        this.dbType = this.clientConfig.project_info?.firebase_url ? DbType.REALTIME : DbType.FIRESTORE;
+        this.log.info(`Initializing new FCM App (${this.dbType})`);
 
         // Initialize the app
         admin.initializeApp(
@@ -157,10 +126,17 @@ export class FCMService {
                 await this.setRealtimeRules();
             }
 
-            this.setServerUrl();
-            this.listen();
+            this.setServerUrl().catch(ex => {
+                this.log.warn(`Failed to set server URL after initializing FCM App. Error: ${ex?.message}`);
+            });
+
+            this.listen().catch(ex => {
+                this.log.warn(`Failed to listen for DB changes after initializing FCM App. Error: ${ex?.message}`);
+            });
         }
-    
+
+        // this.initAddressUpdateLoop();
+
         return true;
     }
 
@@ -177,7 +153,7 @@ export class FCMService {
     static async setFirestoreRulesForApp(app: App): Promise<void> {
         const source: RulesFile = {
             name: "firestore.rules",
-            content: (
+            content:
                 "rules_version = '2';\n" +
                 "service cloud.firestore {\n" +
                 "  match /databases/{database}/documents {\n" +
@@ -190,16 +166,15 @@ export class FCMService {
                 "    }\n" +
                 "  }\n" +
                 "}"
-            )
         };
 
         const rules = admin.securityRules(app);
         let shouldRefresh = true;
-        
+
         try {
             // Get the current ruleset and only set the rules if they are different
             const currentRuleset = await rules.getFirestoreRuleset();
-            const firestoreRules = currentRuleset?.source?.find((rule) => rule.name === source.name);
+            const firestoreRules = currentRuleset?.source?.find(rule => rule.name === source.name);
             if (firestoreRules?.content === source.content) shouldRefresh = false;
         } catch (ex: any) {
             // Do nothing
@@ -242,10 +217,10 @@ export class FCMService {
 
     /**
      * Checks to see if the URL has changed since the last time we updated it
-     * 
+     *
      * @returns The new URL if it has changed, null otherwise
      */
-    shouldUpdateUrl(): boolean{
+    shouldUpdateUrl(): boolean {
         // Make sure we have configs in the first place
         if (!this.hasConfigs()) return null;
 
@@ -261,6 +236,13 @@ export class FCMService {
      *
      * @param serverUrl The new server URL
      */
+    @AsyncSingleton("FCMService.setServerUrl")
+    @AsyncRetryer({
+        name: "FCMService.setServerUrl",
+        maxTries: 3,
+        retryDelay: 5000,
+        onSuccess: (_data: any) => true
+    })
     async setServerUrl(force = false): Promise<void> {
         // Make sure we should be setting the URL
         const shouldUpdate = this.shouldUpdateUrl();
@@ -273,33 +255,9 @@ export class FCMService {
         // Make sure that if we haven't initialized, we do so
         if (!this.hasInitialized || !(await this.start())) return;
 
-        Server().log(`Updating Server Address in ${this.dbType} database...`);
-
-        // Update the URL
-        // If we fail, retry 12 times (for 1 minute)
-        let error: any = null;
-        const result = await resultRetryer({
-            maxTries: 12,
-            delayMs: 5000,
-            getData: async () => {
-                try {
-                    Server().log(`Attempting to write server URL to database...`, 'debug');
-                    await this.saveUrlToDb(serverUrl);
-                    error = null;
-                    return true;
-                } catch (ex: any) {
-                    error = ex;
-                    return false;
-                }
-            }
-        });
-
-        if (!result) {
-            Server().log(`Failed to update Server Address in ${this.dbType} Database after 3 attempts!`, "error");
-            if (error) Server().log(`DB Update Error: ${error?.message}`, "debug");
-        } else {
-            Server().log('Successfully updated server address');
-        }
+        this.log.debug(`Attempting to write server URL to database...`);
+        await this.saveUrlToDb(serverUrl);
+        this.log.info("Successfully updated server address");
 
         this.lastProjectId = this.serverConfig?.project_id;
         this.lastProjectNumber = this.clientConfig?.project_info?.project_number;
@@ -322,13 +280,13 @@ export class FCMService {
      */
     async setServerUrlFirestore(serverUrl: string): Promise<void> {
         const db = FCMService.getApp().firestore();
-        const currentValue = (await db.collection("server").doc('config').get())?.data()?.serverUrl;
+        const currentValue = (await db.collection("server").doc("config").get())?.data()?.serverUrl;
         if (currentValue !== serverUrl) {
-            await db.collection("server").doc('config').set({ serverUrl });
+            await db.collection("server").doc("config").set({ serverUrl }, { merge: true });
         }
     }
 
-     /**
+    /**
      * Set the server URL in the Realtime DB.
      * If the current value is already the latest URL,
      * do not update it.
@@ -353,12 +311,12 @@ export class FCMService {
         const auth = await app.options.credential.getAccessToken();
         const headers: Record<string, string> = {
             Authorization: `Bearer ${auth.access_token}`,
-            Accept: 'application/json'
+            Accept: "application/json"
         };
 
         try {
             await axios.request({
-                method: 'GET',
+                method: "GET",
                 url: `https://firebase.googleapis.com/v1beta1/projects/${projectId}`,
                 headers
             });
@@ -367,8 +325,8 @@ export class FCMService {
             if (errorResponse?.error?.message) {
                 // If the project has been deleted, we should unload the FCM configs.
                 // And stop the service.
-                if (errorResponse.error.message.includes('has been deleted')) {
-                    Server().log(`Firebase Project ${projectId} has been deleted. Unloading FCM configs...`);
+                if (errorResponse.error.message.includes("has been deleted")) {
+                    this.log.info(`Firebase Project ${projectId} has been deleted. Unloading FCM configs...`);
                     FileSystem.saveFCMClient(null);
                     FileSystem.saveFCMServer(null);
                 }
@@ -380,101 +338,88 @@ export class FCMService {
         }
     }
 
-    listen() {
+    @AsyncSingleton("FCMService.listen")
+    async listen() {
         const app = FCMService.getApp();
         if (!app) return;
 
-        Server().log('Listening for changes in Firebase...');
+        this.log.info(`Listening for changes in Firebase (${this.dbType})...`);
         if (this.dbType === DbType.FIRESTORE) {
-            this.listenFirestoreDb();
+            await this.listenFirestoreDb();
         } else if (this.dbType === DbType.REALTIME) {
-            this.listenRealtimeDb();
+            await this.listenRealtimeDb();
         }
     }
 
+    @AsyncRetryer({
+        name: "FCMService.listenFirestoreDb",
+        maxTries: 12,
+        retryDelay: 5000,
+        onSuccess: (_data: any) => true
+    })
     private async listenFirestoreDb() {
         const app = FCMService.getApp();
         const db = app.firestore();
-        
-        const startListening = () => new Promise<void>((resolve, reject) => {
-            db.collection("server")
-                .doc("config")
-                .onSnapshot(
-                    (snapshot: admin.firestore.DocumentSnapshot) => {
-                        this.nextRestartHandler(snapshot.data()?.nextRestart);
-                        resolve();
-                    }, async (error: any) => {
-                        reject(error);
-                    }
-                );
-        });
-    
-        // Try for 12 times (1 minute)
-        let success = false;
-        for (let i = 0; i < 12; i++) {
-            try {
-                await startListening();
-                success = true;
-                break;
-            } catch (ex: any) {
-                Server().log(`An error occurred when listening for DB changes! Retrying in 5 seconds...`, "debug");
-                Server().log(ex?.message ?? String(ex));
-                await waitMs(5000);
-            }
-        }
 
-        if (!success) {
-            Server().log(`Failed to listen for DB changes after 12 attempts!`, "error");
-        } else {
-            Server().log('Successfully listening for DB changes');
-        }
+        const startListening = () =>
+            new Promise<void>((resolve, reject) => {
+                db.collection("server")
+                    .doc("commands")
+                    .onSnapshot(
+                        (snapshot: admin.firestore.DocumentSnapshot) => {
+                            this.nextRestartHandler(snapshot.data()?.nextRestart);
+                            resolve();
+                        },
+                        async (error: any) => {
+                            reject(error);
+                        }
+                    );
+            });
+
+        await startListening();
+        this.log.info("Successfully listening for DB changes");
     }
 
+    @AsyncRetryer({
+        name: "FCMService.listenRealtimeDb",
+        maxTries: 12,
+        retryDelay: 5000,
+        onSuccess: (_data: any) => true
+    })
     private async listenRealtimeDb() {
         const app = FCMService.getApp();
         const db = app.database();
 
-        const startListening = () => new Promise<void>((resolve, reject) => {
-            db.ref("config")
-                .child("nextRestart")
-                .on(
-                    "value",
-                    async (snapshot: admin.database.DataSnapshot) => {
-                        this.nextRestartHandler(snapshot.val());
-                        resolve();
-                    }, (error: any) => {
-                        reject(error);
-                    }
-                );
-        });
+        const startListening = () =>
+            new Promise<void>((resolve, reject) => {
+                db.ref("config")
+                    .child("nextRestart")
+                    .on(
+                        "value",
+                        async (snapshot: admin.database.DataSnapshot) => {
+                            this.nextRestartHandler(snapshot.val());
+                            resolve();
+                        },
+                        (error: any) => {
+                            reject(error);
+                        }
+                    );
+            });
 
-        // Try for 12 times (1 minute)
-        let success = false;
-        for (let i = 0; i < 12; i++) {
-            try {
-                await startListening();
-                success = true;
-                break;
-            } catch (ex: any) {
-                Server().log(`An error occurred when listening for DB changes! Retrying in 5 seconds...`, "debug");
-                Server().log(ex?.message ?? String(ex));
-                await waitMs(5000);
-            }
-        }
-
-        if (!success) {
-            Server().log(`Failed to listen for DB changes after 12 attempts!`, "error");
-        } else {
-            Server().log('Successfully listening for DB changes');
-        }
+        await startListening();
+        this.log.info("Successfully listening for DB changes");
     }
 
     private async nextRestartHandler(value: any) {
         if (!value) return;
 
+        if (typeof value === "string") {
+            value = parseInt(value);
+        }
+
         try {
             if (value > this.lastRestart) {
-                Server().log("Received request to restart via FCM! Restarting...");
+                this.log.info("Received request to restart via FCM! Restarting...");
 
                 // Update the last restart values
                 await Server().repo.setConfig("last_fcm_restart", value);
@@ -484,7 +429,7 @@ export class FCMService {
                 await Server().relaunch();
             }
         } catch (ex: any) {
-            Server().log(`Failed to restart after FCM request!\n${ex}`, "error");
+            this.log.error(`Failed to restart after FCM request!\n${ex}`);
         }
     }
 
@@ -512,7 +457,7 @@ export class FCMService {
                 }
             };
 
-            Server().log(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`, "debug");
+            this.log.debug(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`);
             const response = await FCMService.getApp().messaging().sendEachForMulticast(payload);
             if (response.failureCount > 0) {
                 response.responses.forEach(resp => {
@@ -521,17 +466,14 @@ export class FCMService {
                         const msg = resp.error?.message;
                         if (code === "messaging/payload-size-limit-exceeded") {
                             // Manually handle the size limit error
-                            Server().log(
-                                "Could not send Firebase Notification due to payload exceeding size limits!",
-                                "warn"
-                            );
-                            Server().log(`Failed notification Payload: ${JSON.stringify(data)}`, "debug");
+                            this.log.warn("Could not send Firebase Notification due to payload exceeding size limits!");
+                            this.log.debug(`Failed notification Payload: ${JSON.stringify(data)}`);
                         } else if (code !== "messaging/registration-token-not-registered") {
                             // Ignore token not registered errors
-                            Server().log(`Firebase returned the following error (Code: ${code}): ${msg}`, "error");
+                            this.log.error(`Firebase returned the following error (Code: ${code}): ${msg}`);
 
                             if (resp.error?.stack) {
-                                Server().log(`Firebase Stacktrace: ${resp.error.stack}`, "debug");
+                                this.log.debug(`Firebase Stacktrace: ${resp.error.stack}`);
                             }
                         }
                     }
@@ -540,7 +482,7 @@ export class FCMService {
 
             return response;
         } catch (ex: any) {
-            Server().log(`Failed to send notification! ${ex.message}`);
+            this.log.debug(`Failed to send notification! ${ex.message}`);
         }
 
         return { responses: [], successCount: 0, failureCount: 0 };

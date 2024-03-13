@@ -7,6 +7,7 @@ import { slugifyAddress } from "@server/helpers/utils";
 import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
 import { FaceTimeSessionManager } from "@server/api/lib/facetime/FacetimeSessionManager";
 import { FaceTimeSession, FaceTimeSessionStatus, callStatusMap } from "@server/api/lib/facetime/FaceTimeSession";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 type FaceTimeStatusData = {
     uuid: string;
@@ -23,7 +24,9 @@ type FaceTimeStatusData = {
     url?: string | null;
 };
 
-export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
+export class PrivateApiFaceTimeStatusHandler extends Loggable implements PrivateApiEventHandler {
+    tag = "PrivateApiFaceTimeStatusHandler";
+
     types: string[] = ["ft-call-status-changed"];
 
     async handle(data: EventData, _: net.Socket) {
@@ -40,7 +43,7 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
         // Ignore calls that are not incoming
         if (data.data.call_status !== FaceTimeSessionStatus.INCOMING) return;
 
-        Server().log(`Incoming FaceTime call from ${data.data?.handle?.value}`);
+        this.log.info(`Incoming FaceTime call from ${data.data?.handle?.value}`);
 
         // stringify to maintain backwards compat
         const output = JSON.stringify({
@@ -60,20 +63,20 @@ export class PrivateApiFaceTimeStatusHandler implements PrivateApiEventHandler {
 
         // When a call is answered, we don't need to emit an event
         if (data.data.call_status === FaceTimeSessionStatus.ANSWERED) {
-            Server().log(`FaceTime call answered (Call UUID: ${data.data.call_uuid})`);
+            this.log.info(`FaceTime call answered (Call UUID: ${data.data.call_uuid})`);
             return;
         }
 
         // When a call is incoming, update the session
         // Don't emit an event if it was an existing session
         if (data.data.call_status === FaceTimeSessionStatus.INCOMING) {
-            Server().log(`Incoming FaceTime call from ${data.data.handle.value} (Call UUID: ${data.data.call_uuid})`);
+            this.log.info(`Incoming FaceTime call from ${data.data.handle.value} (Call UUID: ${data.data.call_uuid})`);
             if (!isNew) return;
         }
 
         // If the call was disonnected, update the session, but still emit an event
         if (data.data.call_status === FaceTimeSessionStatus.DISCONNECTED && data.data.handle) {
-            Server().log(`FaceTime call disconnected with ${data.data.handle.value}`);
+            this.log.info(`FaceTime call disconnected with ${data.data.handle.value}`);
         }
 
         const addr = slugifyAddress(data.data.handle.value);

@@ -1,34 +1,38 @@
+import { ScheduledService } from "@server/lib/ScheduledService";
+import { Loggable } from "@server/lib/logging/Loggable";
 import * as dns from "dns";
-import { EventEmitter } from "events";
 
-export class NetworkCheckerService extends EventEmitter {
+export class NetworkCheckerService extends Loggable {
+    tag = "NetworkCheckerService";
+
     online = true;
 
     isStopped = false;
+
+    serviceLoop: ScheduledService;
 
     async start() {
         // Let's get the initial network connection
         this.online = await NetworkCheckerService.checkNetwork();
 
-        const serviceLoop = async () => {
-            if (this.isStopped) return;
-
-            // Check the network connection
-            const online = await NetworkCheckerService.checkNetwork();
-            if (!this.online && online) {
-                this.emit("status-change", true);
-            } else if (this.online && !online) {
-                this.emit("status-change", false);
+        // Start the service loop
+        this.serviceLoop = new ScheduledService(() => {
+            if (this.isStopped) {
+                this.serviceLoop.stop();
+                return;
             }
 
-            this.online = online;
+            // Check the network connection
+            NetworkCheckerService.checkNetwork().then(online => {
+                if (!this.online && online) {
+                    this.emit("status-change", true);
+                } else if (this.online && !online) {
+                    this.emit("status-change", false);
+                }
 
-            // Keep going every 60 seconds!
-            setTimeout(serviceLoop, 60000);
-        };
-
-        // Initial loop start
-        setTimeout(serviceLoop, 0);
+                this.online = online;
+            });
+        }, 60000);
     }
 
     static async checkNetwork(): Promise<boolean> {
@@ -45,5 +49,6 @@ export class NetworkCheckerService extends EventEmitter {
 
     stop() {
         this.isStopped = true;
+        this.serviceLoop?.stop();
     }
 }

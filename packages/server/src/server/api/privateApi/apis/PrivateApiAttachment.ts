@@ -6,8 +6,8 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 
-
 export class PrivateApiAttachment extends PrivateApiAction {
+    tag = "PrivateApiAttachment";
 
     async send({
         chatGuid,

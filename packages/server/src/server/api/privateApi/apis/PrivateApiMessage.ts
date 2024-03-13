@@ -8,6 +8,8 @@ import type { ValidTapback, ValidRemoveTapback } from "@server/types";
 import { isMinCatalina, isMinMonterey } from "@server/env";
 
 export class PrivateApiMessage extends PrivateApiAction {
+    tag = "PrivateApiMessage";
+
     async send(
         chatGuid: string,
         message: string,

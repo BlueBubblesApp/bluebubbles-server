@@ -1,3 +1,4 @@
+import path from "path";
 import { BrowserWindow, HandlerDetails, shell } from "electron";
 import { Window } from ".";
 import { Server } from "@server";

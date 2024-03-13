@@ -10,6 +10,7 @@ import {
     SCHEDULED_MESSAGE_SENT,
     SCHEDULED_MESSAGE_UPDATED
 } from "@server/events";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 /**
  * The possible states of a scheduled message
@@ -52,7 +53,9 @@ export enum ScheduledMessageScheduleRecurringType {
 /**
  * Service that manages scheduled messages
  */
-export class ScheduledMessagesService {
+export class ScheduledMessagesService extends Loggable {
+    tag = "ScheduledMessagesService";
+
     /**
      * A cache of all active timers & scheduled messages.
      */
@@ -155,7 +158,7 @@ export class ScheduledMessagesService {
      * @returns The created scheduled message
      */
     async createScheduledMessage(scheduledMessage: ScheduledMessage): Promise<ScheduledMessage> {
-        Server().log(`Creating new scheduled message: ${scheduledMessage.toString()}`);
+        this.log.info(`Creating new scheduled message: ${scheduledMessage.toString()}`);
 
         const repo = Server().repo.scheduledMessages();
         const newScheduledMessage = repo.create(scheduledMessage);
@@ -178,7 +181,7 @@ export class ScheduledMessagesService {
             throw new Error("Scheduled message not found");
         }
 
-        Server().log(`Updating scheduled message: ${existingMessage.toString()}`);
+        this.log.info(`Updating scheduled message: ${existingMessage.toString()}`);
         const updateRes = await repo.update(id, scheduledMessage);
         scheduledMessage.id = existingMessage.id;
 
@@ -202,7 +205,7 @@ export class ScheduledMessagesService {
         const findOptions: FindOneOptions<ScheduledMessage> = { where: { id } } as FindOneOptions<ScheduledMessage>;
         const scheduledMessage = await repo.findOne(findOptions);
         if (scheduledMessage) {
-            Server().log(`Deleting scheduled message: ${scheduledMessage.toString()}`);
+            this.log.info(`Deleting scheduled message: ${scheduledMessage.toString()}`);
             await repo.remove(scheduledMessage);
         } else {
             throw new Error("Scheduled message not found");
@@ -255,7 +258,7 @@ export class ScheduledMessagesService {
     async scheduleMessage(scheduledMessage: ScheduledMessage): Promise<void> {
         // If it's in progress, mark it as failed
         if (scheduledMessage.status === ScheduledMessageStatus.IN_PROGRESS) {
-            Server().log(`Cancelled: ${scheduledMessage.toString()}`);
+            this.log.info(`Cancelled: ${scheduledMessage.toString()}`);
             return this.handleInterruptedMessage(scheduledMessage);
         }
 
@@ -274,11 +277,11 @@ export class ScheduledMessagesService {
 
         // If the schedule has passed, do not schedule it.
         if (diff <= 0) {
-            Server().log(`Expiring: ${scheduledMessage.toString()}`);
-            Server().log(`Scheduled message was ${diff} ms late`, "debug");
+            this.log.info(`Expiring: ${scheduledMessage.toString()}`);
+            this.log.debug(`Scheduled message was ${diff} ms late`);
             await this.handleExpiredMessage(scheduledMessage);
         } else {
-            Server().log(`Scheduling (in ${diff} ms): ${scheduledMessage.toString()}`);
+            this.log.info(`Scheduling (in ${diff} ms): ${scheduledMessage.toString()}`);
             this.timers[String(scheduledMessage.id)] = setTimeout(() => {
                 this.sendScheduledMessage(scheduledMessage);
             }, diff);
@@ -323,7 +326,7 @@ export class ScheduledMessagesService {
         scheduledMessage.status = ScheduledMessageStatus.ERROR;
         scheduledMessage.error = error;
 
-        Server().log(`Scheduled Message Error: ${error}`);
+        this.log.info(`Scheduled Message Error: ${error}`);
 
         // Reschedule the message
         await this.tryReschedule(scheduledMessage);
@@ -351,7 +354,7 @@ export class ScheduledMessagesService {
                 scheduledMessage.scheduledFor = this.getNextRecurringDate(scheduledMessage);
             }
 
-            Server().log(`Rescheduling: ${scheduledMessage.toString()}`);
+            this.log.info(`Rescheduling: ${scheduledMessage.toString()}`);
             scheduledMessage.status = ScheduledMessageStatus.PENDING;
             await this.scheduleMessage(scheduledMessage);
             return true;
@@ -425,7 +428,7 @@ export class ScheduledMessagesService {
      * @param scheduledMessage The message to send
      */
     async sendScheduledMessage(scheduledMessage: ScheduledMessage): Promise<void> {
-        Server().log(`Sending: ${scheduledMessage.toString()}`);
+        this.log.info(`Sending: ${scheduledMessage.toString()}`);
 
         // Set the status to in-progress
         scheduledMessage.status = ScheduledMessageStatus.IN_PROGRESS;
@@ -455,7 +458,7 @@ export class ScheduledMessagesService {
             scheduledMessage.sentAt = new Date();
             this.notifySuccess(scheduledMessage);
         } catch (ex: any) {
-            Server().log(`Failed to send scheduled message: ${ex?.message ?? String(ex)}`);
+            this.log.info(`Failed to send scheduled message: ${ex?.message ?? String(ex)}`);
             scheduledMessage.status = ScheduledMessageStatus.ERROR;
             scheduledMessage.error = String(ex);
 

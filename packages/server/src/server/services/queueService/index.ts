@@ -3,13 +3,16 @@ import { FileSystem } from "@server/fileSystem";
 import { ActionHandler } from "@server/api/apple/actions";
 import { isNotEmpty } from "@server/helpers/utils";
 import { Server } from "@server";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 export type QueueItem = {
     type: string;
     data: any;
 };
 
-export class QueueService {
+export class QueueService extends Loggable {
+    tag = "QueueService";
+
     items: QueueItem[] = [];
 
     isProcessing = false;
@@ -17,7 +20,7 @@ export class QueueService {
     async add(item: QueueItem) {
         if (this.isProcessing) {
             // If we are already processing, add item to the queue
-            Server().log("QueueService is already working. Adding item to queue.", "debug");
+            this.log.debug("QueueService is already working. Adding item to queue.");
             this.items.push(item);
         } else {
             // If we aren't processing, process the next item
@@ -29,11 +32,11 @@ export class QueueService {
     private async process(item: QueueItem): Promise<void> {
         // Tell everyone we are currently processing
         this.isProcessing = true;
-        Server().log(`Processing next item in the queue; Item type: ${item.type}`);
+        this.log.info(`Processing next item in the queue; Item type: ${item.type}`);
 
         // Handle the event
         try {
-            Server().log(`Handling queue item, '${item.type}'`);
+            this.log.info(`Handling queue item, '${item.type}'`);
             switch (item.type) {
                 case "open-chat":
                     await ActionHandler.openChat(item.data);
@@ -75,11 +78,11 @@ export class QueueService {
                     }, 1000 * 60 * 30);
                     break;
                 default:
-                    Server().log(`Unhandled queue item type: ${item.type}`, "warn");
+                    this.log.debug(`Unhandled queue item type: ${item.type}`);
             }
         } catch (ex: any) {
-            Server().log(`Failed to process queued item; Item type: ${item.type}`, "error");
-            Server().log(ex?.message ?? ex, "debug");
+            this.log.debug(`Failed to process queued item; Item type: ${item.type}`);
+            this.log.debug(ex?.message ?? ex);
         }
 
         // Check and see if there are any other items to process

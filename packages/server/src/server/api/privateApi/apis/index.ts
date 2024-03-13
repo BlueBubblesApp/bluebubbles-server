@@ -1,12 +1,15 @@
 import { isEmpty } from "@server/helpers/utils";
 import type { PrivateApiService } from "../PrivateApiService";
 import type { TransactionPromise, TransactionResult } from "@server/managers/transactionManager/transactionPromise";
+import { Loggable } from "@server/lib/logging/Loggable";
 
-export class PrivateApiAction {
+export class PrivateApiAction extends Loggable {
+    tag = "PrivateApiAction";
 
     api: PrivateApiService;
 
     constructor(api: PrivateApiService) {
+        super();
         this.api = api;
     }
 

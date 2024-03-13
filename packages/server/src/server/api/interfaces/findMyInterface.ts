@@ -1,7 +1,9 @@
 import { Server } from "@server";
+import path from "path";
+import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { isMinBigSur, isMinSonoma } from "@server/env";
-import { checkPrivateApiStatus, isEmpty, waitMs } from "@server/helpers/utils";
+import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
 import { transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
@@ -45,9 +47,12 @@ export class FindMyInterface {
             // Save the data to the cache
             // The cache will handle properly updating the data.
             Server().findMyCache.addAll(refreshLocations);
-        } else {
-            await this.refreshLocationsAccessibility();
         }
+
+        // No matter what, open the Find My app.
+        // Don't await because it should update in the background.
+        // Location updates get emitted as an event as they come in.
+        this.refreshLocationsAccessibility();
 
         return Server().findMyCache.getAll();
     }
@@ -80,7 +85,7 @@ export class FindMyInterface {
                 if (err) return resolve(null);
 
                 try {
-                    return resolve(JSON.parse(data.toString("utf-8")));
+                    return resolve(JSON.parse(data.toString()));
                 } catch {
                     reject(new Error(`Failed to read FindMy ${type} cache file! It is not in the correct format!`));
                 }

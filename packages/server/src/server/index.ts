@@ -36,7 +36,8 @@ import {
     CloudflareService,
     WebhookService,
     ScheduledMessagesService,
-    OauthService
+    OauthService,
+    ZrokService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
@@ -69,13 +70,15 @@ import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
 import { getStartDelay } from "./utils/ConfigUtils";
 import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
+import { ScheduledService } from "./lib/ScheduledService";
+import { getLogger } from "./lib/logging/Loggable";
 
 const findProcess = require("find-process");
 
 const osVersion = macosVersion();
 
 // Set the log format
-const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}";
+const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}][{level}]{text}";
 ServerLog.transports.console.format = logFormat;
 ServerLog.transports.file.format = logFormat;
 
@@ -107,6 +110,8 @@ export const Server = (args: Record<string, any> = {}, win: BrowserWindow = null
  * up when running the application.
  */
 class BlueBubblesServer extends EventEmitter {
+    logger = getLogger("BlueBubblesServer");
+
     args: Record<string, any>;
 
     window: BrowserWindow;
@@ -181,7 +186,7 @@ class BlueBubblesServer extends EventEmitter {
             if (authStatus === "authorized") {
                 status = true;
             } else {
-                this.log(`FullDiskAccess Permission Status: ${authStatus}`, "debug");
+                this.logger.debug(`FullDiskAccess Permission Status: ${authStatus}`);
             }
         }
 
@@ -281,7 +286,7 @@ class BlueBubblesServer extends EventEmitter {
                 ServerLog.log(message);
         }
 
-        if (["error", "warn"].includes(type)) {
+        if (["error"].includes(type)) {
             this.setNotificationCount(this.notificationCount);
         }
 
@@ -328,16 +333,15 @@ class BlueBubblesServer extends EventEmitter {
             // Make sure the value matches the type of the config value
             const configValue = this.repo.config[normalizedKey];
             if (configValue != null && typeof configValue !== typeof value) {
-                Server().log(
+                this.logger.warn(
                     `[ENV] Invalid type for config value "${normalizedKey}"! ` +
-                        `Expected ${typeof configValue}, got ${typeof value}`,
-                    "warn"
+                        `Expected ${typeof configValue}, got ${typeof value}`
                 );
                 continue;
             }
 
             // Set the value
-            Server().log(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`, "debug");
+            this.logger.info(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`);
             this.repo.setConfig(normalizedKey, value, persist);
         }
     }
@@ -346,16 +350,16 @@ class BlueBubblesServer extends EventEmitter {
         // If we've already started up, don't do anything
         if (this.hasStarted) return;
 
-        this.log("Performing initial setup...");
+        this.logger.info("Performing initial setup...");
 
         // Get the current macOS theme
         this.getTheme();
 
         try {
-            this.log("Initializing filesystem...");
+            this.logger.info("Initializing filesystem...");
             FileSystem.setup();
         } catch (ex: any) {
-            this.log(`Failed to setup Filesystem! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup Filesystem! ${ex.message}`);
         }
 
         // Initialize and connect to the server database
@@ -364,12 +368,12 @@ class BlueBubblesServer extends EventEmitter {
         // Load settings from args
         this.loadSettingsFromArgs();
 
-        this.log("Starting IPC Listeners..");
+        this.logger.info("Starting IPC Listeners..");
         IPCService.startIpcListeners();
 
         const startDelay: number = getStartDelay();
         if (startDelay > 0) {
-            this.log(`Delaying server startup by ${startDelay} seconds`);
+            this.logger.info(`Delaying server startup by ${startDelay} seconds`);
             await waitMs(startDelay * 1000);
         }
 
@@ -386,7 +390,7 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async initDatabase(): Promise<void> {
-        this.log("Initializing server database...");
+        this.logger.info("Initializing server database...");
         this.repo = new ServerRepository();
         await this.repo.initialize();
 
@@ -394,11 +398,11 @@ class BlueBubblesServer extends EventEmitter {
         this.repo.on("config-update", (args: ServerConfigChange) => this.handleConfigUpdate(args));
 
         try {
-            this.log("Connecting to iMessage database...");
+            this.logger.info("Connecting to iMessage database...");
             this.iMessageRepo = new MessageRepository();
             await this.iMessageRepo.initialize();
         } catch (ex: any) {
-            this.log(ex, "error");
+            this.logger.error(ex);
 
             const dialogOpts = {
                 type: "error",
@@ -420,25 +424,25 @@ class BlueBubblesServer extends EventEmitter {
             });
         }
 
-        this.log("Initializing FindMy Repository...");
+        this.logger.info("Initializing FindMy Repository...");
         this.findMyRepo = new FindMyRepository();
     }
 
     initFcm(): void {
         try {
-            this.log("Initializing connection to Google FCM...");
+            this.logger.info("Initializing connection to Google FCM...");
             this.fcm = new FCMService();
         } catch (ex: any) {
-            this.log(`Failed to setup Google FCM service! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup Google FCM service! ${ex.message}`);
         }
     }
 
     initOauthService(): void {
         try {
-            this.log("Initializing OAuth service...");
+            this.logger.info("Initializing OAuth service...");
             this.oauthService = new OauthService();
         } catch (ex: any) {
-            this.log(`Failed to setup OAuth service! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup OAuth service! ${ex.message}`);
         }
     }
 
@@ -446,47 +450,52 @@ class BlueBubblesServer extends EventEmitter {
         this.initFcm();
 
         try {
-            this.log("Initializing up sockets...");
+            this.logger.info("Initializing up sockets...");
             this.httpService = new HttpService();
         } catch (ex: any) {
-            this.log(`Failed to setup socket service! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup socket service! ${ex.message}`);
         }
 
         this.initOauthService();
 
         try {
-            this.log("Initializing helper service...");
+            this.logger.info("Initializing helper service...");
             this.privateApi = new PrivateApiService();
         } catch (ex: any) {
-            this.log(`Failed to setup helper service! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup helper service! ${ex.message}`);
         }
 
         try {
-            this.log("Initializing proxy services...");
-            this.proxyServices = [new NgrokService(), new LocalTunnelService(), new CloudflareService()];
+            this.logger.info("Initializing proxy services...");
+            this.proxyServices = [
+                new NgrokService(),
+                new LocalTunnelService(),
+                new CloudflareService(),
+                new ZrokService()
+            ];
         } catch (ex: any) {
-            this.log(`Failed to initialize proxy services! ${ex.message}`, "error");
+            this.logger.error(`Failed to initialize proxy services! ${ex.message}`);
         }
 
         try {
-            this.log("Initializing Message Manager...");
+            this.logger.info("Initializing Message Manager...");
             this.messageManager = new OutgoingMessageManager();
         } catch (ex: any) {
-            this.log(`Failed to start Message Manager service! ${ex.message}`, "error");
+            this.logger.error(`Failed to start Message Manager service! ${ex.message}`);
         }
 
         try {
-            this.log("Initializing Webhook Service...");
+            this.logger.info("Initializing Webhook Service...");
             this.webhookService = new WebhookService();
         } catch (ex: any) {
-            this.log(`Failed to start Webhook service! ${ex.message}`, "error");
+            this.logger.error(`Failed to start Webhook service! ${ex.message}`);
         }
 
         try {
-            this.log("Initializing Scheduled Messages Service...");
+            this.logger.info("Initializing Scheduled Messages Service...");
             this.scheduledMessages = new ScheduledMessagesService();
         } catch (ex: any) {
-            this.log(`Failed to start Scheduled Message service! ${ex.message}`, "error");
+            this.logger.error(`Failed to start Scheduled Message service! ${ex.message}`);
         }
     }
 
@@ -496,11 +505,11 @@ class BlueBubblesServer extends EventEmitter {
      */
     async startServices(): Promise<void> {
         try {
-            this.log("Starting HTTP service...");
+            this.logger.info("Starting HTTP service...");
             this.httpService.initialize();
             this.httpService.start();
         } catch (ex: any) {
-            this.log(`Failed to start HTTP service! ${ex.message}`, "error");
+            this.logger.error(`Failed to start HTTP service! ${ex.message}`);
         }
 
         // Only start the oauth service if the tutorial isn't done
@@ -520,106 +529,106 @@ class BlueBubblesServer extends EventEmitter {
         try {
             await this.startProxyServices();
         } catch (ex: any) {
-            this.log(`Failed to connect to proxy service! ${ex.message}`, "error");
+            this.logger.error(`Failed to connect to proxy service! ${ex.message}`);
         }
 
         try {
-            this.log("Starting Scheduled Messages service...");
+            this.logger.info("Starting Scheduled Messages service...");
             await this.scheduledMessages.start();
         } catch (ex: any) {
-            this.log(`Failed to start Scheduled Messages service! ${ex.message}`, "error");
+            this.logger.error(`Failed to start Scheduled Messages service! ${ex.message}`);
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         const ftPrivateApiEnabled = this.repo.getConfig("enable_ft_private_api") as boolean;
         if (privateApiEnabled || ftPrivateApiEnabled) {
-            this.log("Starting Private API Helper listener...");
+            this.logger.info("Starting Private API Helper listener...");
             this.privateApi.start();
         }
 
         if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
-            this.log("Starting iMessage Database listeners...");
+            this.logger.info("Starting iMessage Database listeners...");
             await this.startChatListeners();
         }
 
         try {
-            this.log("Starting FCM service...");
+            this.logger.info("Starting FCM service...");
             await this.fcm.start();
         } catch (ex: any) {
-            this.log(`Failed to start FCM service! ${ex.message}`, "error");
+            this.logger.error(`Failed to start FCM service! ${ex.message}`);
         }
     }
 
     async stopServices(): Promise<void> {
         this.isStopping = true;
-        this.log("Stopping services...");
+        this.logger.info("Stopping services...");
 
         try {
             FCMService.stop();
         } catch (ex: any) {
-            this.log(`Failed to stop FCM service! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to stop FCM service! ${ex?.message ?? ex}`);
         }
 
         try {
             this.removeChatListeners();
             this.removeAllListeners();
         } catch (ex: any) {
-            this.log(`Failed to stop iMessage database listeners! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to stop iMessage database listeners! ${ex?.message ?? ex}`);
         }
 
         try {
             await this.privateApi?.stop();
         } catch (ex: any) {
-            this.log(`Failed to stop Private API Helper service! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to stop Private API Helper service! ${ex?.message ?? ex}`);
         }
 
         try {
             await this.stopProxyServices();
         } catch (ex: any) {
-            this.log(`Failed to stop Proxy services! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to stop Proxy services! ${ex?.message ?? ex}`);
         }
 
         try {
             await this.httpService?.stop();
         } catch (ex: any) {
-            this.log(`Failed to stop HTTP service! ${ex?.message ?? ex}`, "error");
+            this.logger.error(`Failed to stop HTTP service! ${ex?.message ?? ex}`);
         }
 
         try {
             await this.oauthService?.stop();
         } catch (ex: any) {
-            this.log(`Failed to stop OAuth service! ${ex?.message ?? ex}`, "error");
+            this.logger.error(`Failed to stop OAuth service! ${ex?.message ?? ex}`);
         }
 
         try {
             this.scheduledMessages?.stop();
         } catch (ex: any) {
-            this.log(`Failed to stop Scheduled Messages service! ${ex?.message ?? ex}`, "error");
+            this.logger.error(`Failed to stop Scheduled Messages service! ${ex?.message ?? ex}`);
         }
 
-        this.log("Finished stopping services...");
+        this.logger.info("Finished stopping services...");
     }
 
     async stopServerComponents() {
         this.isStopping = true;
-        this.log("Stopping all server components...");
+        this.logger.info("Stopping all server components...");
 
         try {
             if (this.networkChecker) this.networkChecker.stop();
         } catch (ex: any) {
-            this.log(`Failed to stop Network Checker service! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to stop Network Checker service! ${ex?.message ?? ex}`);
         }
 
         try {
             if (this.caffeinate) this.caffeinate.stop();
         } catch (ex: any) {
-            this.log(`Failed to stop Caffeinate service! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to stop Caffeinate service! ${ex?.message ?? ex}`);
         }
 
         try {
             await this.iMessageRepo?.db?.destroy();
         } catch (ex: any) {
-            this.log(`Failed to close iMessage Database connection! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to close iMessage Database connection! ${ex?.message ?? ex}`);
         }
 
         try {
@@ -627,10 +636,10 @@ class BlueBubblesServer extends EventEmitter {
                 await this.repo?.db?.destroy();
             }
         } catch (ex: any) {
-            this.log(`Failed to close Server Database connection! ${ex?.message ?? ex}`);
+            this.logger.info(`Failed to close Server Database connection! ${ex?.message ?? ex}`);
         }
 
-        this.log("Finished stopping all server components...");
+        this.logger.info("Finished stopping all server components...");
     }
 
     /**
@@ -643,11 +652,11 @@ class BlueBubblesServer extends EventEmitter {
         if (this.isRestarting) return;
 
         // Initialize the services (FCM, HTTP, Proxy, etc.)
-        this.log("Initializing Services...");
+        this.logger.info("Initializing Services...");
         await this.initServices();
 
         // Start the services
-        this.log("Starting Services...");
+        this.logger.info("Starting Services...");
         await this.startServices();
 
         // Perform any post-setup tasks/checks
@@ -661,16 +670,16 @@ class BlueBubblesServer extends EventEmitter {
             // Wait 5 seconds before starting the update checker.
             // This is just to not use up too much CPU on startup
             await waitMs(5000);
-            this.log("Initializing Update Service..");
+            this.logger.info("Initializing Update Service..");
             this.updater = new UpdateService(this.window);
 
             const check = Server().repo.getConfig("check_for_updates") as boolean;
             if (check) {
-                this.updater.start();
-                this.updater.checkForUpdate();
+                this.updater?.start();
+                this.updater?.checkForUpdate();
             }
         } catch (ex: any) {
-            this.log("There was a problem initializing the update service.", "error");
+            this.logger.error("There was a problem initializing the update service.");
         }
     }
 
@@ -679,82 +688,90 @@ class BlueBubblesServer extends EventEmitter {
      * Mainly, instantiation of a bunch of classes/handlers
      */
     private async initServerComponents(): Promise<void> {
-        this.log("Initializing Server Components...");
+        this.logger.info("Initializing Server Components...");
 
         // Load notification count
         try {
-            this.log("Initializing alert service...");
+            this.logger.info("Initializing alert service...");
             const alerts = (await AlertsInterface.find()).filter((item: Alert) => !item.isRead);
             this.notificationCount = alerts.length;
         } catch (ex: any) {
-            this.log("Failed to get initial notification count. Skipping.", "warn");
+            this.logger.warn("Failed to get initial notification count. Skipping.");
         }
 
         // Setup lightweight message cache
-        this.log("Initializing event cache...");
+        this.logger.info("Initializing event cache...");
         this.eventCache = new EventCache();
 
-        this.log("Initializing FindMy Location cache...");
+        this.logger.info("Initializing FindMy Location cache...");
         this.findMyCache = new FindMyFriendsCache();
 
         try {
-            this.log("Initializing caffeinate service...");
+            this.logger.info("Initializing caffeinate service...");
             this.caffeinate = new CaffeinateService();
             if (this.repo.getConfig("auto_caffeinate")) {
                 this.caffeinate.start();
             }
         } catch (ex: any) {
-            this.log(`Failed to setup caffeinate service! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup caffeinate service! ${ex.message}`);
         }
 
         try {
-            this.log("Initializing queue service...");
+            this.logger.info("Initializing queue service...");
             this.queue = new QueueService();
         } catch (ex: any) {
-            this.log(`Failed to setup queue service! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup queue service! ${ex.message}`);
         }
 
         try {
-            this.log("Initializing network service...");
+            this.logger.info("Initializing network service...");
             this.networkChecker = new NetworkService();
-            this.networkChecker.on("status-change", connected => {
+            this.networkChecker.on("status-change", async connected => {
                 if (connected) {
-                    this.log("Re-connected to network!");
+                    this.logger.info("Re-connected to network!");
+                    if (!this.fcm) {
+                        this.initFcm();
+                    }
+
+                    // Restart the FCM service and the proxy services
+                    // after reconnection to a network.
+                    this.logger.info("Restarting FCM and Proxy Services...");
+                    await this.fcm.start();
                     this.restartProxyServices();
                 } else {
-                    this.log("Disconnected from network!");
+                    this.logger.info("Disconnected from network!");
                 }
             });
 
             this.networkChecker.start();
         } catch (ex: any) {
-            this.log(`Failed to setup network service! ${ex.message}`, "error");
+            this.logger.error(`Failed to setup network service! ${ex.message}`);
         }
     }
 
     async startProxyServices() {
-        this.log("Starting Proxy Services...");
+        this.logger.info("Starting Proxy Services...");
         for (const i of this.proxyServices) {
             await i.start();
         }
     }
 
     async restartProxyServices() {
-        this.log("Restarting Proxy Services...");
+        this.logger.info("Restarting Proxy Services...");
         for (const i of this.proxyServices) {
             await i.restart();
         }
     }
 
     async stopProxyServices() {
-        this.log("Stopping Proxy Services...");
+        this.logger.info("Stopping Proxy Services...");
         for (const i of this.proxyServices) {
             await i.disconnect();
         }
     }
 
     private async preChecks(): Promise<void> {
-        this.log("Running pre-start checks...");
+        this.logger.info("Running pre-start checks...");
 
         // Set the dock icon according to the config
         this.setDockIcon();
@@ -774,7 +791,7 @@ class BlueBubblesServer extends EventEmitter {
         // This is a temporary fix until the android client supports it again.
         const encryptComs = Server().repo.getConfig("encrypt_coms") as boolean;
         if (encryptComs) {
-            this.log("Disabling encrypt coms setting...");
+            this.logger.info("Disabling encrypt coms setting...");
             Server().repo.setConfig("encrypt_coms", false);
         }
 
@@ -787,80 +804,80 @@ class BlueBubblesServer extends EventEmitter {
             // Restart if enabled and the parent process is the app being launched
             if (restartViaTerminal && (!parentProc[0].name || parentName === "launchd")) {
                 this.isRestarting = true;
-                this.log("Restarting via terminal after post-check (configured)");
+                this.logger.info("Restarting via terminal after post-check (configured)");
                 await this.restartViaTerminal();
             }
         } catch (ex: any) {
-            this.log(`Failed to restart via terminal!\n${ex}`);
+            this.logger.info(`Failed to restart via terminal!\n${ex}`);
         }
 
         // Get the current region
         this.region = await FileSystem.getRegion();
 
         // Log some server metadata
-        this.log(`Server Metadata -> Server Version: v${app.getVersion()}`, "debug");
-        this.log(`Server Metadata -> macOS Version: v${osVersion}`, "debug");
-        this.log(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, "debug");
-        this.log(`Server Metadata -> Time Synchronization: ${(await FileSystem.getTimeSync()) ?? "N/A"}`, "debug");
-        this.log(`Server Metadata -> Detected Region: ${this.region}`, "debug");
+        this.logger.debug(`Server Metadata -> Server Version: v${app.getVersion()}`);
+        this.logger.debug(`Server Metadata -> macOS Version: v${osVersion}`);
+        this.logger.debug(`Server Metadata -> Local Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+        this.logger.debug(`Server Metadata -> Time Synchronization: ${(await FileSystem.getTimeSync()) ?? "N/A"}`);
+        this.logger.debug(`Server Metadata -> Detected Region: ${this.region}`);
 
         if (!this.region) {
-            this.log("No region detected, defaulting to US...", "debug");
+            this.logger.debug("No region detected, defaulting to US...");
             this.region = "US";
         }
 
         // If the user is on el capitan, we need to force cloudflare
         const proxyService = this.repo.getConfig("proxy_service") as string;
         if (!isMinSierra && proxyService === "Ngrok") {
-            this.log("El Capitan detected. Forcing Cloudflare Proxy");
+            this.logger.info("El Capitan detected. Forcing Cloudflare Proxy");
             await this.repo.setConfig("proxy_service", "Cloudflare");
         }
 
         // If the user is using tcp, force back to http
         const ngrokProtocol = this.repo.getConfig("ngrok_protocol") as string;
         if (ngrokProtocol === "tcp") {
-            this.log("TCP protocol detected. Forcing HTTP protocol");
+            this.logger.info("TCP protocol detected. Forcing HTTP protocol");
             await this.repo.setConfig("ngrok_protocol", "http");
         }
 
-        this.log("Checking Permissions...");
+        this.logger.info("Checking Permissions...");
 
         // Log if we dont have accessibility access
         if (this.hasAccessibilityAccess) {
-            this.log("Accessibility permissions are enabled");
+            this.logger.info("Accessibility permissions are enabled");
         } else {
-            this.log("Accessibility permissions are required for certain actions!", "debug");
+            this.logger.debug("Accessibility permissions are required for certain actions!");
         }
 
         // Log if we dont have accessibility access
         if (this.hasDiskAccess) {
-            this.log("Full-disk access permissions are enabled");
+            this.logger.info("Full-disk access permissions are enabled");
         } else {
-            this.log("Full-disk access permissions are required!", "error");
+            this.logger.error("Full-disk access permissions are required!");
         }
 
         // Make sure Messages is running
         try {
             await FileSystem.startMessages();
         } catch (ex: any) {
-            this.log(`Unable to start Messages.app! CLI Error: ${ex?.message ?? String(ex)}`, "warn");
+            this.logger.warn(`Unable to start Messages.app! CLI Error: ${ex?.message ?? String(ex)}`);
         }
 
-        const msgCheckInterval = setInterval(async () => {
+        const msgCheckInterval = new ScheduledService(async () => {
             try {
                 // This won't start it if it's already open
                 await FileSystem.startMessages();
             } catch (ex: any) {
-                Server().log(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
-                clearInterval(msgCheckInterval);
+                this.logger.info(`Unable to check if Messages.app is running! CLI Error: ${ex?.message ?? String(ex)}`);
+                msgCheckInterval.stop();
             }
         }, 150000); // Make sure messages is open every 2.5 minutes
 
-        this.log("Finished pre-start checks...");
+        this.logger.info("Finished pre-start checks...");
     }
 
     private async postChecks(): Promise<void> {
-        this.log("Running post-start checks...");
+        this.logger.info("Running post-start checks...");
 
         // Make sure a password is set
         const password = this.repo.getConfig("password") as string;
@@ -883,36 +900,35 @@ class BlueBubblesServer extends EventEmitter {
             if (syncOffset !== null) {
                 try {
                     if (Math.abs(syncOffset) >= 5) {
-                        this.log(`Your macOS time is not synchronized! Offset: ${syncOffset}`, "warn");
-                        this.log(`To fix your time, open terminal and run: "sudo sntp -sS time.apple.com"`, "debug");
+                        this.logger.warn(`Your macOS time is not synchronized! Offset: ${syncOffset}`);
+                        this.logger.debug(`To fix your time, open terminal and run: "sudo sntp -sS time.apple.com"`);
                     }
                 } catch (ex) {
-                    this.log("Unable to parse time synchronization offset!", "debug");
+                    this.logger.debug("Unable to parse time synchronization offset!");
                 }
             }
         } catch (ex) {
-            this.log(`Failed to get time sychronization status! Error: ${ex}`, "debug");
+            this.logger.debug(`Failed to get time sychronization status! Error: ${ex}`);
         }
 
         this.setDockIcon();
 
         // Check if on Big Sur+. If we are, then create a log/alert saying that
         if (isMinMonterey) {
-            this.log("Warning: macOS Monterey does NOT support creating group chats due to API limitations!", "debug");
+            this.logger.debug("Warning: macOS Monterey does NOT support creating group chats due to API limitations!");
         } else if (isMinBigSur) {
-            this.log("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!", "debug");
+            this.logger.debug("Warning: macOS Big Sur does NOT support creating group chats due to API limitations!");
         }
 
         // Check for contact permissions
         const contactStatus = await requestContactPermission();
         if (contactStatus === "Denied") {
-            this.log(
+            this.logger.debug(
                 "Contacts authorization status is denied! You may need to manually " +
-                    "allow BlueBubbles to access your contacts.",
-                "debug"
+                    "allow BlueBubbles to access your contacts."
             );
         } else {
-            this.log(`Contacts authorization status: ${contactStatus}`, "debug");
+            this.logger.debug(`Contacts authorization status: ${contactStatus}`);
         }
 
         // Check if MacForge is running
@@ -920,16 +936,15 @@ class BlueBubblesServer extends EventEmitter {
             const mfExists = await FileSystem.processIsRunning("MacForge");
             const mfHelperExists = await FileSystem.processIsRunning("MacForgeHelper");
             if (mfExists || mfHelperExists) {
-                Server().log(
+                this.logger.warn(
                     "MacForge detected! BlueBubbles no longer requires MacForge, " +
                         "and it may cause issues running it alongside BlueBubbles. We " +
-                        "recommend uninstalling MacForge and then rebooting your Mac.",
-                    "warn"
+                        "recommend uninstalling MacForge and then rebooting your Mac."
                 );
             }
         }
 
-        this.log("Finished post-start checks...");
+        this.logger.info("Finished post-start checks...");
     }
 
     private setDockIcon() {
@@ -976,6 +991,30 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
+        // If the zrok proxy config has changed, we need to restart the zrok service
+        if (prevConfig.zrok_reserve_tunnel !== nextConfig.zrok_reserve_tunnel && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
+        // If the zrok proxy config has changed, we need to restart the zrok service
+        if (prevConfig.zrok_reserved_name !== nextConfig.zrok_reserved_name && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
+        // If the ngrok API key is different, restart the ngrok process
+        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
+        // If the ngrok subdomain key is different, restart the ngrok process
+        if (prevConfig.ngrok_custom_domain !== nextConfig.ngrok_custom_domain && !proxiesRestarted) {
+            await this.restartProxyServices();
+            proxiesRestarted = true;
+        }
+
         // If the poll interval changed, we need to restart the listeners
         if (prevConfig.db_poll_interval !== nextConfig.db_poll_interval) {
             this.removeChatListeners();
@@ -983,17 +1022,17 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            Server().log("Dispatching server URL update from config change", "debug");
-            // Emit the new server event no matter what
-            await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
-            await this.fcm?.setServerUrl(true);
+            if (
+                prevConfig?.server_address !== nextConfig?.server_address &&
+                isNotEmpty(nextConfig?.server_address as string)
+            ) {
+                this.logger.debug("Dispatching server URL update from config change");
+                // Emit the new server event no matter what
+                await this.emitMessage(NEW_SERVER, nextConfig.server_address, "high");
+                await this.fcm?.setServerUrl(true);
+            }
         } catch (ex: any) {
-            this.log(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`, "error");
-        }
-
-        // If the ngrok API key is different, restart the ngrok process
-        if (prevConfig.ngrok_key !== nextConfig.ngrok_key && !proxiesRestarted) {
-            await this.restartProxyServices();
+            this.logger.error(`Failed to handle server address change! Error: ${ex?.message ?? String(ex)}`);
         }
 
         // Install the bundle if the Private API is turned on
@@ -1001,10 +1040,10 @@ class BlueBubblesServer extends EventEmitter {
             prevConfig.enable_private_api !== nextConfig.enable_private_api ||
             prevConfig.enable_ft_private_api !== nextConfig.enable_ft_private_api
         ) {
-            this.log("Detected Private API selection change", "debug");
+            this.logger.debug("Detected Private API selection change");
             await Server().privateApi.restart();
         } else if (prevConfig.private_api_mode !== nextConfig.private_api_mode) {
-            this.log("Detected Private API Mode change", "debug");
+            this.logger.debug("Detected Private API Mode change");
             await Server().privateApi.restart();
         }
 
@@ -1075,8 +1114,8 @@ class BlueBubblesServer extends EventEmitter {
                 }
             }
         } catch (ex: any) {
-            this.log("Failed to send FCM messages!", "debug");
-            this.log(ex, "debug");
+            this.logger.debug("Failed to send FCM messages!");
+            this.logger.debug(ex);
         }
 
         // Dispatch the webhook (sometimes it's not initialized)
@@ -1100,7 +1139,7 @@ class BlueBubblesServer extends EventEmitter {
     async emitMessageMatch(message: Message, tempGuid: string) {
         // Insert chat & participants
         const newMessage = await insertChatParticipants(message);
-        this.log(`Message match found for text, [${newMessage.contentString()}]`);
+        this.logger.info(`Message match found for text, [${newMessage.contentString()}]`);
 
         // Convert to a response JSON
         // Since we sent the message, we don't need to include the participants
@@ -1118,7 +1157,7 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async emitMessageError(message: Message, tempGuid: string = null) {
-        this.log(`Failed to send message: [${message.contentString()}] (Temp GUID: ${tempGuid ?? "N/A"})`);
+        this.logger.info(`Failed to send message: [${message.contentString()}] (Temp GUID: ${tempGuid ?? "N/A"})`);
 
         /**
          * ERROR CODES:
@@ -1185,7 +1224,7 @@ class BlueBubblesServer extends EventEmitter {
             return;
         }
 
-        this.log("Starting chat listeners...");
+        this.logger.info("Starting chat listeners...");
         const pollInterval = (this.repo.getConfig("db_poll_interval") as number) ?? 1000;
 
         // Create DB listeners.
@@ -1204,7 +1243,7 @@ class BlueBubblesServer extends EventEmitter {
             this.chatListeners.push(chatUpdateListener);
 
             chatUpdateListener.on(CHAT_READ_STATUS_CHANGED, async (item: Chat) => {
-                Server().log(`Chat read [${item.guid}]`);
+                this.logger.info(`Chat read [${item.guid}]`);
                 await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
                     chatGuid: item.guid,
                     read: true
@@ -1217,100 +1256,14 @@ class BlueBubblesServer extends EventEmitter {
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        outgoingMsgListener.on("new-entry", async (item: Message) => {
-            const newMessage = await insertChatParticipants(item);
-            this.log(`New Message from You, ${newMessage.contentString()}`);
-
-            // Manually send the message to the socket so we can serialize it with
-            // all the extra data
-            this.httpService.socketServer.emit(
-                NEW_MESSAGE,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        parseAttributedBody: true,
-                        parseMessageSummary: true,
-                        parsePayloadData: true,
-                        loadChatParticipants: false,
-                        includeChats: true
-                    }
-                })
-            );
-
-            // Emit it to the FCM devices, but not socket
-            await this.emitMessage(
-                NEW_MESSAGE,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        enforceMaxSize: true
-                    },
-                    isForNotification: true
-                }),
-                "normal",
-                true,
-                false
-            );
-        });
+        outgoingMsgListener.on("new-entry", (item) => this.handleNewMessage(item));
 
         /**
          * Message listener checking for updated messages. This means either the message's
          * delivered date or read date have changed since the last time we checked the database.
          */
-        outgoingMsgListener.on("updated-entry", async (item: Message) => {
-            const newMessage = await insertChatParticipants(item);
-
-            // ATTENTION: If "from" is null, it means you sent the message from a group chat
-            // Check the isFromMe key prior to checking the "from" key
-            const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
-            const time =
-                newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted;
-            const updateType = newMessage.dateRetracted
-                ? "Text Unsent"
-                : newMessage.dateEdited
-                ? "Text Edited"
-                : newMessage.dateRead
-                ? "Text Read"
-                : "Text Delivered";
-
-            // Husky pre-commit validator was complaining, so I created vars
-            const content = newMessage.contentString();
-            const localeTime = time?.toLocaleString();
-            this.log(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
-
-            // Manually send the message to the socket so we can serialize it with
-            // all the extra data
-            this.httpService.socketServer.emit(
-                MESSAGE_UPDATED,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        parseAttributedBody: true,
-                        parseMessageSummary: true,
-                        parsePayloadData: true,
-                        loadChatParticipants: false,
-                        includeChats: true
-                    }
-                })
-            );
-
-            // Emit it to the FCM devices only
-            // Since this is a message update, we do not need to include the participants or chats
-            await this.emitMessage(
-                MESSAGE_UPDATED,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        loadChatParticipants: false,
-                        includeChats: false
-                    },
-                    isForNotification: true
-                }),
-                "normal",
-                true,
-                false
-            );
-        });
+        outgoingMsgListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
+        incomingMsgListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
 
         /**
          * Message listener for messages that have errored out
@@ -1325,7 +1278,7 @@ class BlueBubblesServer extends EventEmitter {
          */
         incomingMsgListener.on("new-entry", async (item: Message) => {
             const newMessage = await insertChatParticipants(item);
-            this.log(`New message from [${newMessage.handle?.id ?? "You"}]: [${newMessage.contentString()}]`);
+            this.logger.info(`New message from [${newMessage.handle?.id ?? "You"}]: [${newMessage.contentString()}]`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1360,7 +1313,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         groupEventListener.on("name-change", async (item: Message) => {
-            this.log(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
+            this.logger.info(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1393,7 +1346,7 @@ class BlueBubblesServer extends EventEmitter {
 
         groupEventListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
-            this.log(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
+            this.logger.info(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1422,7 +1375,7 @@ class BlueBubblesServer extends EventEmitter {
 
         groupEventListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
-            this.log(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
+            this.logger.info(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1451,7 +1404,7 @@ class BlueBubblesServer extends EventEmitter {
 
         groupEventListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
-            this.log(`[${from}] left [${item.cacheRoomnames}]`);
+            this.logger.info(`[${from}] left [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1480,7 +1433,7 @@ class BlueBubblesServer extends EventEmitter {
 
         groupEventListener.on("group-icon-changed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
-            this.log(`[${from}] changed a group photo`);
+            this.logger.info(`[${from}] changed a group photo`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1509,7 +1462,7 @@ class BlueBubblesServer extends EventEmitter {
 
         groupEventListener.on("group-icon-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
-            this.log(`[${from}] removed a group photo`);
+            this.logger.info(`[${from}] removed a group photo`);
 
             // Manually send the message to the socket so we can serialize it with
             // all the extra data
@@ -1536,9 +1489,9 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
-        outgoingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
-        incomingMsgListener.on("error", (error: Error) => this.log(error.message, "error"));
-        groupEventListener.on("error", (error: Error) => this.log(error.message, "error"));
+        outgoingMsgListener.on("error", (error: Error) => this.logger.error(error.message));
+        incomingMsgListener.on("error", (error: Error) => this.logger.error(error.message));
+        groupEventListener.on("error", (error: Error) => this.logger.error(error.message));
 
         // Start the listeners with a 500ms delay between each to prevent locks.
         for (const i of this.chatListeners) {
@@ -1547,9 +1500,100 @@ class BlueBubblesServer extends EventEmitter {
         }
     }
 
+    private async handleNewMessage(item: Message) {
+        const newMessage = await insertChatParticipants(item);
+        this.logger.info(`New Message from You, ${newMessage.contentString()}`);
+
+        // Manually send the message to the socket so we can serialize it with
+        // all the extra data
+        this.httpService.socketServer.emit(
+            NEW_MESSAGE,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true,
+                    loadChatParticipants: false,
+                    includeChats: true
+                }
+            })
+        );
+
+        // Emit it to the FCM devices, but not socket
+        await this.emitMessage(
+            NEW_MESSAGE,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    enforceMaxSize: true
+                },
+                isForNotification: true
+            }),
+            "normal",
+            true,
+            false
+        );
+    }
+
+    private async handleUpdatedMessage(item: Message) {
+        const newMessage = await insertChatParticipants(item);
+
+        // ATTENTION: If "from" is null, it means you sent the message from a group chat
+        // Check the isFromMe key prior to checking the "from" key
+        const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
+        const time =
+            newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted;
+        const updateType = newMessage.dateRetracted
+            ? "Text Unsent"
+            : newMessage.dateEdited
+            ? "Text Edited"
+            : newMessage.dateRead
+            ? "Text Read"
+            : "Text Delivered";
+
+        // Husky pre-commit validator was complaining, so I created vars
+        const content = newMessage.contentString();
+        const localeTime = time?.toLocaleString();
+        this.logger.info(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
+
+        // Manually send the message to the socket so we can serialize it with
+        // all the extra data
+        this.httpService.socketServer.emit(
+            MESSAGE_UPDATED,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true,
+                    loadChatParticipants: false,
+                    includeChats: true
+                }
+            })
+        );
+
+        // Emit it to the FCM devices only
+        // Since this is a message update, we do not need to include the participants or chats
+        await this.emitMessage(
+            MESSAGE_UPDATED,
+            await MessageSerializer.serialize({
+                message: newMessage,
+                config: {
+                    loadChatParticipants: false,
+                    includeChats: false
+                },
+                isForNotification: true
+            }),
+            "normal",
+            true,
+            false
+        );
+    }
+
     private removeChatListeners() {
         // Remove all listeners
-        this.log("Removing chat listeners...");
+        this.logger.info("Removing chat listeners...");
         for (const i of this.chatListeners) i.stop();
         this.chatListeners = [];
     }
@@ -1558,11 +1602,11 @@ class BlueBubblesServer extends EventEmitter {
      * Restarts the server
      */
     async hotRestart() {
-        this.log("Restarting the server...");
+        this.logger.info("Restarting the server...");
 
         // Disconnect & reconnect to the iMessage DB
         if (this.iMessageRepo.db.isInitialized) {
-            this.log("Reconnecting to iMessage database...");
+            this.logger.info("Reconnecting to iMessage database...");
             await this.iMessageRepo.db.destroy();
             await this.iMessageRepo.db.initialize();
         }

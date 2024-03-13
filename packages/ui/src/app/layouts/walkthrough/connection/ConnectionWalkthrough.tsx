@@ -5,15 +5,22 @@ import {
     SlideFade,
     Stack,
     Alert,
-    AlertIcon
+    AlertIcon,
+    Spacer
 } from '@chakra-ui/react';
 import { ProxySetupField } from '../../../components/fields/ProxySetupField';
 import { useAppSelector } from '../../../hooks';
 import { NgrokAuthTokenField } from '../../../components/fields/NgrokAuthTokenField';
 import { ServerPasswordField } from '../../../components/fields/ServerPasswordField';
+import { ZrokTokenField } from 'app/components/fields/ZrokTokenField';
+import { ZrokReservedNameField } from 'app/components/fields/ZrokReservedNameField';
+import { ZrokReserveTunnelField } from 'app/components/fields/ZrokReserveTunnelField';
+import { NgrokSubdomainField } from 'app/components/fields/NgrokSubdomainField';
 
 export const ConnectionWalkthrough = (): JSX.Element => {
     const proxyService: string = (useAppSelector(state => state.config.proxy_service) ?? '').toLowerCase().replace(' ', '-');
+    const zrokReserved: boolean = (useAppSelector(state => state.config.zrok_reserve_tunnel) ?? false);
+
     return (
         <SlideFade in={true} offsetY='150px'>
             <Box px={5}>
@@ -47,8 +54,24 @@ export const ConnectionWalkthrough = (): JSX.Element => {
                     {(proxyService === 'ngrok') ? (
                         <>
                             <NgrokAuthTokenField />
+                            <Spacer />
+                            <NgrokSubdomainField />
                         </>
                     ): null}
+                    {(proxyService === 'zrok') ? (
+                        <>
+                            <Spacer />
+                            <ZrokTokenField />
+                            <Spacer />
+                            <ZrokReserveTunnelField />
+                            {zrokReserved ? (
+                                <>
+                                    <Spacer />
+                                    <ZrokReservedNameField />
+                                </>
+                            ) : null}
+                        </>
+                    ) : null}
                 </Stack>
             </Box>
         </SlideFade>

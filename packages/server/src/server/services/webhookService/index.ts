@@ -1,32 +1,34 @@
 import axios from "axios";
 import { Server } from "@server";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 export type WebhookEvent = {
     type: string;
     data: any;
-}
+};
 
 /**
  * Handles dispatching webhooks
  */
-export class WebhookService {
-    
+export class WebhookService extends Loggable {
+    tag = "WebhookService";
+
     async dispatch(event: WebhookEvent) {
         const webhooks = await Server().repo.getWebhooks();
         for (const i of webhooks) {
             const eventTypes = JSON.parse(i.events) as Array<string>;
-            if (!eventTypes.includes('*') && !eventTypes.includes(event.type)) continue;
-            Server().log(`Dispatching event to webhook: ${i.url}`, 'debug');
+            if (!eventTypes.includes("*") && !eventTypes.includes(event.type)) continue;
+            this.log.debug(`Dispatching event to webhook: ${i.url}`);
 
             // We don't need to await this
-            this.sendPost(i.url, event).catch((ex) => {
-                Server().log(`Failed to dispatch event to webhook: ${i.url}`, 'warn');
-                Server().log(ex?.message ?? String(ex), 'debug');
+            this.sendPost(i.url, event).catch(ex => {
+                this.log.warn(`Failed to dispatch event to webhook: ${i.url}`);
+                this.log.debug(ex?.message ?? String(ex));
             });
         }
     }
 
     private async sendPost(url: string, event: WebhookEvent) {
-        return await axios.post(url, event, { headers: { 'Content-Type': 'application/json' } });
+        return await axios.post(url, event, { headers: { "Content-Type": "application/json" } });
     }
 }

@@ -23,12 +23,18 @@ import {
     isMinVentura,
     isMinSonoma
 } from "@server/env";
+import { Loggable, getLogger } from "@server/lib/logging/Loggable";
+import { ZrokManager } from "@server/managers/zrokManager";
 
-export class IPCService {
+export class IPCService extends Loggable {
+    tag = "IPCService";
+
     /**
      * Starts configuration related inter-process-communication handlers.
      */
     static startIpcListeners() {
+        const log = getLogger("IPCService");
+
         ipcMain.handle("get-env", async (_, __) => {
             return {
                 isMinSierra: isMinSierra,
@@ -325,9 +331,9 @@ export class IPCService {
 
         ipcMain.handle("purge-event-cache", (_, __) => {
             if (Server().eventCache.size() === 0) {
-                Server().log("No events to purge from event cache!");
+                log.info("No events to purge from event cache!");
             } else {
-                Server().log(`Purging ${Server().eventCache.size()} items from the event cache!`);
+                log.info(`Purging ${Server().eventCache.size()} items from the event cache!`);
                 Server().eventCache.purge();
             }
         });
@@ -436,6 +442,14 @@ export class IPCService {
             const host = ips.length > 0 ? ips[0] : "localhost";
             const addr = `${useCustomCertificate ? "https" : "http"}://${host}:${port}`;
             await Server().repo.setConfig("server_address", addr);
+        });
+
+        ipcMain.handle("register-zrok-email", async (_, email) => {
+            return await ZrokManager.getInvite(email);
+        });
+
+        ipcMain.handle("set-zrok-token", async (_, token) => {
+            return await ZrokManager.setToken(token);
         });
     }
 }

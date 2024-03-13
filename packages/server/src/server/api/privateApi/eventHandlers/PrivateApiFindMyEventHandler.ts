@@ -3,9 +3,12 @@ import * as net from "net";
 import { PrivateApiEventHandler, EventData } from ".";
 import { FindMyLocationItem } from "@server/api/lib/findmy/types";
 import { NEW_FINDMY_LOCATION } from "@server/events";
-import { isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
+import { isEmpty, waitMs } from "@server/helpers/utils";
+import { Loggable } from "@server/lib/logging/Loggable";
 
-export class PrivateApiFindMyEventHandler implements PrivateApiEventHandler {
+export class PrivateApiFindMyEventHandler extends Loggable implements PrivateApiEventHandler {
+    tag = "PrivateApiFindMyEventHandler";
+
     types: string[] = ["new-findmy-location"];
 
     async handle(event: EventData, _: net.Socket) {
@@ -14,7 +17,7 @@ export class PrivateApiFindMyEventHandler implements PrivateApiEventHandler {
                 await this.handleNewLocation(event.data);
             }
         } catch (ex: any) {
-            Server().log(`Failed to handle event type ${event.event}. Error: ${ex}`, "debug");
+            this.log.debug(`Failed to handle event type ${event.event}. Error: ${ex}`);
         }
     }
 
@@ -27,7 +30,7 @@ export class PrivateApiFindMyEventHandler implements PrivateApiEventHandler {
         // If there were items updated in the cache, emit them
         let count = 0;
         for (const item of added) {
-            Server().log(`Received FindMy Location Update for Handle: ${item?.handle}`, "debug");
+            this.log.debug(`Received FindMy Location Update for Handle: ${item?.handle}`);
             await Server().emitMessage(NEW_FINDMY_LOCATION, item, "normal", false, true);
             count++;
 

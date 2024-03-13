@@ -161,3 +161,11 @@ export const getCurrentPermissions = async () => {
 export const saveLanUrl = async () => {
     return await ipcRenderer.invoke('save-lan-url');
 };
+
+export const registerZrokEmail = async (email: string) => {
+    return await ipcRenderer.invoke('register-zrok-email', email);
+};
+
+export const setZrokToken = async (token: string) => {
+    return await ipcRenderer.invoke('set-zrok-token', token);
+};

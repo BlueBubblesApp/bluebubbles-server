@@ -7,17 +7,19 @@ import { PrivateApiMode } from ".";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { restartMessages } from "@server/api/apple/scripts";
-
+import { getLogger } from "@server/lib/logging/Loggable";
+import path from "path";
+import fs from "fs";
+import { rimrafSync } from "rimraf";
 
 type BundleStatus = {
     success: boolean;
     message: string;
 };
 
-
 export class MacForgeMode extends PrivateApiMode {
-    
     static async install(force = false) {
+        const log = getLogger("MacForgeMode");
         const status: BundleStatus = { success: false, message: "Unknown status" };
 
         // Make sure the Private API is enabled
@@ -38,7 +40,7 @@ export class MacForgeMode extends PrivateApiMode {
             return status;
         }
 
-        Server().log("Attempting to install Private API Helper Bundle...", "debug");
+        log.info("Attempting to install Private API Helper Bundle...");
 
         // Write to all paths. For MySIMBL & MacEnhance, as well as their user/library variants
         // Technically, MacEnhance is only for Mojave+, however, users may have older versions installed
@@ -55,11 +57,11 @@ export class MacForgeMode extends PrivateApiMode {
         for (const pluginPath of opts) {
             // If the MacForge/MySIMBL path exists, but the plugin path doesn't, create it.
             if (fs.existsSync(path.dirname(pluginPath)) && !fs.existsSync(pluginPath)) {
-                Server().log("Plugins path does not exist, creating it...", "debug");
+                log.info("Plugins path does not exist, creating it...");
                 try {
                     fs.mkdirSync(pluginPath, { recursive: true });
                 } catch (ex: any) {
-                    Server().log(`Failed to create Plugins path: ${ex?.message ?? String(ex)}`, "debug");
+                    log.warn(`Failed to create Plugins path: ${ex?.message ?? String(ex)}`);
                 }
             }
 
@@ -72,9 +74,9 @@ export class MacForgeMode extends PrivateApiMode {
                 // If the remote bundle doesn't exist, we just need to write it
                 if (force || !fs.existsSync(remotePath)) {
                     if (force) {
-                        Server().log(`Private API Bundle force install. Writing to ${remotePath}`, "debug");
+                        log.info(`Private API Bundle force install. Writing to ${remotePath}`);
                     } else {
-                        Server().log(`Private API Bundle does not exist. Writing to ${remotePath}`, "debug");
+                        log.info(`Private API Bundle does not exist. Writing to ${remotePath}`);
                     }
 
                     await cpr(localPath, remotePath, { overwrite: true, dot: true });
@@ -91,16 +93,16 @@ export class MacForgeMode extends PrivateApiMode {
 
                     // Compare the local version to the remote version and overwrite if newer
                     if (CompareVersions(localVersion, remoteVersion) === 1) {
-                        Server().log(`Private API Bundle has an update. Writing to ${remotePath}`, "debug");
+                        log.debug(`Private API Bundle has an update. Writing to ${remotePath}`);
                         await cpr(localPath, remotePath, { overwrite: true, dot: true });
                     } else {
-                        Server().log(`Private API Bundle does not need to be updated`, "debug");
+                        log.info(`Private API Bundle does not need to be updated`);
                     }
                 }
 
                 writeCount += 1;
             } catch (ex: any) {
-                Server().log(`Failed to write to ${remotePath}: ${ex?.message ?? ex}`);
+                log.debug(`Failed to write to ${remotePath}: ${ex?.message ?? ex}`);
             }
         }
 
@@ -108,22 +110,23 @@ export class MacForgeMode extends PrivateApiMode {
         if (writeCount === 0) {
             status.message =
                 "Attempted to install helper bundle, but neither MySIMBL nor MacForge (MacEnhance) was found!";
-            Server().log(status.message, "warn");
+            log.warn(status.message);
         } else {
             // Restart iMessage to "apply" the changes
-            Server().log("Restarting iMessage to apply Helper updates...");
+            log.info("Restarting iMessage to apply Helper updates...");
             await FileSystem.executeAppleScript(restartMessages());
 
             status.success = true;
             status.message = "Successfully installed latest Private API Helper Bundle!";
-            Server().log(status.message);
+            log.info(status.message);
         }
 
         return status;
     }
 
     static async uninstall() {
-        Server().log("Attempting to uninstall Private API Helper Bundle...", "debug");
+        const log = getLogger("MacForgeMode");
+        log.debug("Attempting to uninstall Private API Helper Bundle...");
 
         // Remove from all paths. For MySIMBL & MacEnhance, as well as their user/library variants
         // Technically, MacEnhance is only for Mojave+, however, users may have older versions installed
@@ -137,7 +140,7 @@ export class MacForgeMode extends PrivateApiMode {
 
         for (const pluginPath of opts) {
             if (!fs.existsSync(pluginPath)) {
-                Server().log(`Plugin directory not found: ${pluginPath}`, 'debug');
+                log.debug(`Plugin directory not found: ${pluginPath}`);
                 continue;
             }
 
@@ -145,18 +148,18 @@ export class MacForgeMode extends PrivateApiMode {
 
             try {
                 // If the remote bundle doesn't exist, we just need to write it
-                Server().log(`Looking for deprecated Helper Bundle at: ${remotePath}`, 'debug');
+                log.debug(`Looking for deprecated Helper Bundle at: ${remotePath}`);
                 if (fs.existsSync(remotePath)) {
-                    await fs.rm(remotePath, { recursive: true, force: true });
-                    Server().log(`  -> Removed deprecated Helper`, 'debug');
+                    rimrafSync(remotePath);
+                    log.debug(`  -> Removed deprecated Helper`);
                 } else {
-                    Server().log('  -> Helper Bundle not found', 'debug');
+                    log.debug("  -> Helper Bundle not found");
                 }
             } catch (ex: any) {
-                Server().log((
+                log.warn(
                     `Failed to remove MacForge bundle at, "${remotePath}": ` +
-                    `Please manually remove it to prevent conflicts with the Helpers!`
-                ), 'warn');
+                        `Please manually remove it to prevent conflicts with the Helpers!`
+                );
             }
         }
     }

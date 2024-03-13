@@ -21,8 +21,8 @@ export class GeneralInterface {
             detected_icloud: await FileSystem.getIcloudAccount(),
             detected_imessage: await Server().iMessageRepo.getiMessageAccount(),
             macos_time_sync: await FileSystem.getTimeSync(),
-            local_ipv4s: FileSystem.getLocalIps('IPv4'),
-            local_ipv6s: FileSystem.getLocalIps('IPv6')
+            local_ipv4s: FileSystem.getLocalIps("IPv4"),
+            local_ipv6s: FileSystem.getLocalIps("IPv6")
         };
     }
 
@@ -48,7 +48,7 @@ export class GeneralInterface {
 
     static async checkForUpdate(): Promise<UpdateResult> {
         // Check for the update
-        const hasUpdate = await Server().updater.checkForUpdate({ showUpdateDialog: false });
+        const hasUpdate = (await Server().updater?.checkForUpdate({ showUpdateDialog: false })) ?? false;
 
         // Return the update info if there is an update, return false
         if (hasUpdate)

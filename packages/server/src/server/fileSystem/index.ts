@@ -1,6 +1,7 @@
 import * as fs from "fs-extra";
 
 import * as path from "path";
+import * as os from "os";
 import * as child_process from "child_process";
 import { transports } from "electron-log";
 import { app } from "electron";
@@ -28,6 +29,7 @@ import {
     ImageMetadata,
     ImageMetadataKeys
 } from "./types";
+import { rimrafSync } from "rimraf";
 
 const FindProcess = require("find-process");
 
@@ -234,7 +236,7 @@ export class FileSystem {
 
         for (const file of files) {
             if (fs.existsSync(file)) {
-                fs.rm(file, { recursive: true, force: true });
+                rimrafSync(file);
             }
 
             fs.mkdirSync(file);
@@ -304,7 +306,7 @@ export class FileSystem {
      */
     static deleteChunks(guid: string): void {
         const dir = path.join(FileSystem.attachmentsDir, guid);
-        if (fs.existsSync(dir)) fs.rm(dir, { recursive: true, force: true });
+        if (fs.existsSync(dir)) rimrafSync(dir);
     }
 
     /**
@@ -630,7 +632,7 @@ export class FileSystem {
     }
 
     static removeDirectory(filePath: string) {
-        fs.rm(filePath, { recursive: true, force: true });
+        rimrafSync(filePath);
     }
 
     static async getRegion(): Promise<string | null> {

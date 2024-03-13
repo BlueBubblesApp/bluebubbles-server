@@ -8,21 +8,24 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { certSubject, validForDays, millisADay } from "./constants";
 import { onlyAlphaNumeric } from "@server/helpers/utils";
+import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 
-export class CertificateService {
+export class CertificateService extends Loggable {
+    tag = "CertificateService";
+
     static get usingCustomPaths(): boolean {
-        const cliCert = Server().args['cert-path'];
-        const cliKey = Server().args['key-path'];
+        const cliCert = Server().args["cert-path"];
+        const cliKey = Server().args["key-path"];
         return !!(cliCert && cliKey);
     }
 
     static get certPath(): string {
-        const cliPath = Server().args['cert-path'];
+        const cliPath = Server().args["cert-path"];
         return cliPath ?? path.join(FileSystem.certsDir, "server.pem");
     }
 
     static get keyPath(): string {
-        const cliPath = Server().args['key-path'];
+        const cliPath = Server().args["key-path"];
         return cliPath ?? path.join(FileSystem.certsDir, "server.key");
     }
 
@@ -39,6 +42,8 @@ export class CertificateService {
     }
 
     private static refreshCertificate() {
+        const log = getLogger("CertificateService");
+
         // Don't refresh the certificate if the user specified a custom path
         if (CertificateService.usingCustomPaths) return;
 
@@ -54,7 +59,7 @@ export class CertificateService {
             try {
                 const pem = fs.readFileSync(CertificateService.certPath, { encoding: "utf-8" });
                 const now = new Date().getTime();
-                if (pem.includes('BEGIN EC PRIVATE KEY')) {
+                if (pem.includes("BEGIN EC PRIVATE KEY")) {
                     const cert = new x509.X509Certificate(pem);
                     if (now > cert.notAfter.getTime()) {
                         shouldRefresh = true;
@@ -65,17 +70,16 @@ export class CertificateService {
                         shouldRefresh = true;
                     }
                 }
-                
             } catch (ex: any) {
-                Server().log("Failed to read certificate expiration! It may have been modified.", "warn");
-                Server().log(`Error: ${ex?.message ?? ex ?? 'Unknown Error'}`, "warn");
+                log.warn("Failed to read certificate expiration! It may have been modified.");
+                log.warn(`Error: ${ex?.message ?? ex ?? "Unknown Error"}`);
                 shouldRefresh = true;
             }
         }
 
         // If the certificate doesn't exist, create it
         if (shouldRefresh) {
-            Server().log("Certificate doesn't exist or is expired! Regenerating...");
+            log.info("Certificate doesn't exist or is expired! Regenerating...");
             CertificateService.generateCertificate();
             Server().httpService.restart();
         }
@@ -98,24 +102,26 @@ export class CertificateService {
     }
 
     static handleConfigUpdate({ prevConfig, nextConfig }: ServerConfigChange): Promise<void> {
+        const log = getLogger("CertificateService");
+
         if (
             prevConfig.password === nextConfig.password &&
             onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !== "dynamicdns" &&
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase()
+                onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase()
         )
             return;
 
         if (prevConfig.password !== nextConfig.password) {
-            Server().log("Password changed, generating new certificate");
+            log.info("Password changed, generating new certificate");
             CertificateService.generateCertificate();
             Server().httpService.restart();
         } else if (
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() &&
+                onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() &&
             onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() === "dynamicdns"
         ) {
-            Server().log("Proxy service changed to Dynamic DNS. Refreshing certificate");
+            log.info("Proxy service changed to Dynamic DNS. Refreshing certificate");
             CertificateService.refreshCertificate();
             Server().httpService.restart();
         }

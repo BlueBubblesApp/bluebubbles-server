@@ -136,7 +136,7 @@ export const NotificationsLayout = (): JSX.Element => {
         });
     }, []);
 
-    logs = logs.filter(log => log.message.startsWith('[GCP]'));
+    logs = logs.filter(log => log.message.startsWith('[OauthService]'));
 
     const needsConfirmation = async (files: Blob[]): Promise<boolean> => {
         if (serverFcm?.project_id == null) return false;
@@ -321,7 +321,7 @@ export const NotificationsLayout = (): JSX.Element => {
                                     leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
                                     variant='outline'
                                     onClick={() => {
-                                        dispatch(filterLogs((item) => !item.message.startsWith('[GCP]')));
+                                        dispatch(filterLogs((item) => !item.message.startsWith('[OauthService]')));
                                         restartOauthService();
                                     }}
                                 >

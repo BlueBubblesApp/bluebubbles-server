@@ -5,6 +5,7 @@ import { Tray } from ".";
 import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
 import { Menu, nativeTheme, Tray as ElectronTray, app } from "electron";
 import { AppWindow } from "@windows/AppWindow";
+import path from "path";
 
 export class AppTray extends Tray {
     private static self: AppTray;

@@ -3,11 +3,15 @@ import { autoUpdater, UpdateCheckResult } from "electron-updater";
 import * as semver from "semver";
 import { Server } from "@server";
 import { SERVER_UPDATE, SERVER_UPDATE_DOWNLOADING, SERVER_UPDATE_INSTALLING } from "@server/events";
+import { ScheduledService } from "@server/lib/ScheduledService";
+import { Loggable } from "@server/lib/logging/Loggable";
 
-export class UpdateService {
+export class UpdateService extends Loggable {
+    tag = "UpdateService";
+
     window: BrowserWindow;
 
-    timer: NodeJS.Timeout;
+    timer: ScheduledService;
 
     currentVersion: string;
 
@@ -18,6 +22,8 @@ export class UpdateService {
     updateInfo: UpdateCheckResult;
 
     constructor(window: BrowserWindow) {
+        super();
+
         // This won't work in dev-mode because it checks Electron's Version
         this.currentVersion = app.getVersion();
         this.isOpen = false;
@@ -37,43 +43,46 @@ export class UpdateService {
             autoUpdater.autoInstallOnAppQuit = false;
         }
 
-        autoUpdater.on("update-downloaded", async (_) => {
-            Server().log("Installing update...");
+        autoUpdater.on("update-downloaded", async _ => {
+            this.log.info("Installing update...");
             await Server().emitMessage(SERVER_UPDATE_INSTALLING, null);
             autoUpdater.quitAndInstall();
         });
 
         ipcMain.handle("install-update", async (_, __) => {
-            Server().log("Downloading update...");
+            this.log.info("Downloading update...");
             await Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
             autoUpdater.downloadUpdate().then(() => {
-                Server().log("Finished downloading update...");    
+                this.log.info("Finished downloading update...");
             });
         });
     }
 
     start() {
         if (this.timer) return;
-        this.timer = setInterval(async () => {
+        this.timer = new ScheduledService(async () => {
             if (this.hasUpdate) return;
 
-            await this.checkForUpdate();
+            await this?.checkForUpdate();
         }, 1000 * 60 * 60 * 12); // Default 12 hours
     }
 
     stop() {
-        if (this.timer) clearInterval(this.timer);
+        if (this.timer) {
+            this.timer.stop();
+            this.timer = null;
+        }
     }
 
     async checkForUpdate({ showNoUpdateDialog = false, showUpdateDialog = true } = {}): Promise<boolean> {
-        const res = await autoUpdater.checkForUpdates();
+        const res = (await autoUpdater?.checkForUpdates()) ?? null;
         this.hasUpdate = !!res?.updateInfo && semver.lt(this.currentVersion, res.updateInfo.version);
         this.updateInfo = res;
 
         if (this.hasUpdate) {
             Server().emitMessage(SERVER_UPDATE, res.updateInfo.version);
             Server().emitToUI("update-available", res.updateInfo.version);
-            Server().emit("update-available", res.updateInfo.version)
+            Server().emit("update-available", res.updateInfo.version);
 
             if (showUpdateDialog) {
                 const notification = {

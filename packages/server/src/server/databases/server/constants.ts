@@ -8,6 +8,7 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     ngrok_key: () => "",
     ngrok_protocol: () => "http",
     ngrok_region: () => "us",
+    ngrok_custom_domain: () => "",
     use_custom_certificate: () => 0,
     password: () => "",
     auto_caffeinate: () => 0,
@@ -32,5 +33,10 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     // That needs to change... at another time.
     // 0.0 to prevent parsing as a boolean
     start_delay: () => "0.0",
-    facetime_calling: () => 0
+    facetime_calling: () => 0,
+    zrok_token: () => "",
+    zrok_reserve_tunnel: () => 0,
+    zrok_reserved_name: () => "",
+    zrok_reserved_token: () => "",
+    landing_page_path: () => "",
 };

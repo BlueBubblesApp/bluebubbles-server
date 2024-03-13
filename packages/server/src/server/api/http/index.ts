@@ -10,10 +10,10 @@ import koaCors from "koa-cors";
 import * as https from "https";
 import * as http from "http";
 import * as fs from "fs";
+import * as zx from "zx";
 
 // Internal libraries
 import { Server } from "@server";
-import { FileSystem } from "@server/fileSystem";
 import { isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
 import { EventCache } from "@server/eventCache";
 import { CertificateService } from "@server/services/certificateService";
@@ -23,12 +23,16 @@ import { SocketRoutes as SocketRoutesV1 } from "./api/v1/socketRoutes";
 import { ErrorMiddleware } from "./api/v1/middleware/errorMiddleware";
 import { createServerErrorResponse } from "./api/v1/responses";
 import { HELLO_WORLD } from "@server/events";
+import { ScheduledService } from "../../lib/ScheduledService";
+import { Loggable } from "../../lib/logging/Loggable";
 
 /**
  * This service class handles all routing for incoming socket
  * connections and requests.
  */
-export class HttpService {
+export class HttpService extends Loggable {
+    tag = "HttpService";
+
     koaApp: KoaApp;
 
     httpServer: https.Server | http.Server;
@@ -50,6 +54,10 @@ export class HttpService {
 
     sendCache: EventCache;
 
+    clearCacheService: ScheduledService;
+
+    portCheckerService: ScheduledService;
+
     initialize() {
         this.httpOpts = {};
 
@@ -60,7 +68,7 @@ export class HttpService {
             if (onlyAlphaNumeric(proxy_service).toLowerCase() === "dynamicdns") {
                 if (use_custom_cert) {
                     // Only setup certs if the proxy service is
-                    Server().log("Starting Certificate service...");
+                    this.log.info("Starting Certificate service...");
                     CertificateService.start();
 
                     // Add the SSL/TLS PEMs to the opts
@@ -69,7 +77,7 @@ export class HttpService {
                 }
             }
         } catch (ex: any) {
-            Server().log(`Failed to start Certificate service! ${ex.message}`, "error");
+            this.log.error(`Failed to start Certificate service! ${ex.message}`);
         }
 
         // Create the HTTP server
@@ -77,20 +85,19 @@ export class HttpService {
         this.configureKoa();
 
         if (this.httpOpts.cert && this.httpOpts.key) {
-            Server().log("Starting up HTTPS Server...");
+            this.log.info("Starting up HTTPS Server...");
             this.httpServer = https.createServer(this.httpOpts, this.koaApp.callback());
         } else {
-            Server().log("Starting up HTTP Server...");
+            this.log.info("Starting up HTTP Server...");
             this.httpServer = http.createServer(this.koaApp.callback());
         }
 
         // Create the socket server and link the http context
         this.socketServer = new SocketServer(this.httpServer, this.socketOpts);
         this.sendCache = new EventCache();
-        this.startStatusListener();
 
         // Every 6 hours, clear the send cache
-        setInterval(() => {
+        this.clearCacheService = new ScheduledService(() => {
             this.sendCache.purge();
         }, 1000 * 60 * 60 * 6);
     }
@@ -114,10 +121,10 @@ export class HttpService {
                 textLimit: "100mb",
                 formLimit: "1024mb",
                 multipart: true,
-                parsedMethods: ['POST', 'PUT', 'PATCH', 'DELETE'],
+                parsedMethods: ["POST", "PUT", "PATCH", "DELETE"],
                 formidable: {
                     // 1GB (1024 b * 1024 kb * 1024 mb)
-                    maxFileSize: 1024 * 1024 * 1024  // Defaults to 200mb
+                    maxFileSize: 1024 * 1024 * 1024 // Defaults to 200mb
                 }
             })
         );
@@ -139,42 +146,40 @@ export class HttpService {
     }
 
     /**
-     * Checks to see if we are currently listening
+     * Checks to see if another process is listening on the socket port.
      */
-    startStatusListener() {
-        setInterval(async () => {
-            const port = Server().repo.getConfig("socket_port");
+    async checkIfPortInUse(port: number) {
+        try {
+            // Check if there are any listening services
+            const output = await zx.$`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`;
+            if (output.toString().includes(`:${port} (LISTEN)`)) return true;
+        } catch {
+            // Don't show an error, I believe this throws a "false error".
+            // For instance, if the proxy service doesn't start, and the command returns
+            // nothing, it thinks it's an actual error, which it isn't
+        }
 
-            try {
-                // Check if there are any listening services
-                let res = (await FileSystem.execShellCommand(`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`)) as string;
-                res = safeTrim(res);
-
-                // If the result doesn't show anything listening,
-                if (!res.includes(port.toString())) {
-                    Server().log("Socket not listening! Restarting...", "error");
-                    this.restart();
-                }
-            } catch {
-                // Don't show an error, I believe this throws a "false error".
-                // For instance, if the proxy service doesn't start, and the command returns
-                // nothing, it thinks it's an actual error, which it isn't
-            }
-        }, 1000 * 60); // Check every minute
+        return false;
     }
 
     /**
      * Creates the initial connection handler for Socket.IO
      */
-    start() {
+    async start() {
         if (!this.socketServer) return;
+
+        const port = Server().repo.getConfig("socket_port") as number;
+        const portInUse = await this.checkIfPortInUse(port);
+        if (portInUse) {
+            throw new Error(`Unable to start HTTP service! Port ${port} is already in use!`);
+        }
 
         /**
          * Handle all other data requests
          */
         this.socketServer.on("connection", async socket => {
             socket.on("disconnect", (_: any) => {
-                Server().log(`Client disconnected (Total Clients: ${this.socketServer.sockets.sockets.size})`);
+                this.log.info(`Client disconnected (Total Clients: ${this.socketServer.sockets.sockets.size})`);
             });
 
             let pass = socket.handshake.query?.password ?? socket.handshake.query?.guid;
@@ -185,12 +190,12 @@ export class HttpService {
 
             // Basic authentication
             if (safeTrim(pass) === safeTrim(cfgPass)) {
-                Server().log(
+                this.log.info(
                     `Client Authenticated Successfully (Total Clients: ${this.socketServer.sockets.sockets.size})`
                 );
             } else {
                 socket.disconnect();
-                Server().log(`Closing client connection. Authentication failed.`);
+                this.log.info(`Closing client connection. Authentication failed.`);
             }
 
             /**
@@ -203,7 +208,7 @@ export class HttpService {
                 try {
                     await next();
                 } catch (ex: any) {
-                    Server().log(`Socket server error! ${ex.message}`, "error");
+                    this.log.error(`Socket server error! ${ex.message}`);
                     socket.emit("exception", createServerErrorResponse(ex?.message ?? ex));
                     next(ex);
                 }
@@ -214,8 +219,8 @@ export class HttpService {
         });
 
         // Start the server
-        this.httpServer.listen(Server().repo.getConfig("socket_port") as number, () => {
-            Server().log(`Successfully started HTTP${isNotEmpty(this.httpOpts) ? "S" : ""} server`);
+        this.httpServer.listen(port, () => {
+            this.log.info(`Successfully started HTTP${isNotEmpty(this.httpOpts) ? "S" : ""} server`);
 
             // Once we start, let's send a hello-world to all the clients
             Server().emitMessage(HELLO_WORLD, null);
@@ -264,13 +269,13 @@ export class HttpService {
     }
 
     async stop(): Promise<void> {
-        Server().log("Stopping HTTP Service...");
+        this.log.info("Stopping HTTP Service...");
 
         try {
             await this.closeSocket();
         } catch (ex: any) {
             if (ex.message !== "Server is not running.") {
-                Server().log(`Failed to close Socket server: ${ex.message}`);
+                this.log.info(`Failed to close Socket server: ${ex.message}`);
             }
         }
 
@@ -278,7 +283,7 @@ export class HttpService {
             await this.closeHttp();
         } catch (ex: any) {
             if (ex.message !== "Server is not running.") {
-                Server().log(`Failed to close HTTP server: ${ex.message}`);
+                this.log.info(`Failed to close HTTP server: ${ex.message}`);
             }
         }
     }

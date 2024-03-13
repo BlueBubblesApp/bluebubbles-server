@@ -5,8 +5,8 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 
-
 export class PrivateApiCloud extends PrivateApiAction {
+    tag = "PrivateApiCloud";
 
     async getAccountInfo(): Promise<TransactionResult> {
         const action = "get-account-info";

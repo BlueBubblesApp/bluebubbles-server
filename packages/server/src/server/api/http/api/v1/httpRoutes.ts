@@ -37,6 +37,7 @@ import { ScheduledMessageRouter } from "./routers/scheduledMessageRouter";
 import { ThemeValidator } from "./validators/themeValidator";
 import type { Context, Next } from "koa";
 import { FindMyRouter } from "./routers/findmyRouter";
+import { getLogger } from "@server/lib/logging/Loggable";
 
 export class HttpRoutes {
     static version = 1;
@@ -774,12 +775,14 @@ export class HttpRoutes {
         pathParts: string[],
         middleware: KoaMiddleware[]
     ) {
+        const log = getLogger("HttpRoutes");
+
         // Sanitize the path parts so we can accurately build them
         const parts = pathParts.map(i => (i ?? "").replace(/(^\/)|(\/$)/g, "")).filter(i => isNotEmpty(i));
 
         // Build the path
         const path = `/${parts.join("/")}`;
-        Server().log(`Registering route: [${method}] -> ${path}`, "debug");
+        log.debug(`Registering route: [${method}] -> ${path}`);
 
         // Create the routes based on type
         if (method === HttpMethod.GET) router.get(path, ...middleware);

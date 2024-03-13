@@ -1,7 +1,5 @@
-import "zx/globals";
 import * as os from "os";
 import * as net from "net";
-import { Server } from "@server";
 import { Sema } from "async-sema";
 import { clamp, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { TransactionPromise, TransactionResult } from "@server/managers/transactionManager/transactionPromise";
@@ -25,13 +23,15 @@ import { PrivateApiFaceTime } from "./apis/PrivateApiFaceTime";
 import { LogLevel } from "electron-log";
 import { PrivateApiFindMyEventHandler } from "./eventHandlers/PrivateApiFindMyEventHandler";
 import { Socket } from "../types";
-import EventEmitter from "events";
 import { v4 } from "uuid";
+import { Loggable } from "../../lib/logging/Loggable";
 
 // We only want to allow one write at a time
 const writeLock = new Sema(1);
 
-export class PrivateApiService extends EventEmitter {
+export class PrivateApiService extends Loggable {
+    tag = "PrivateApiService";
+
     server: net.Server;
 
     clients: Socket[] = [];
@@ -101,20 +101,16 @@ export class PrivateApiService extends EventEmitter {
         ];
     }
 
-    log(message: string, level: LogLevel = "info") {
-        Server().log(`[PrivateApiService] ${String(message)}`, level);
-    }
-
     async start(): Promise<void> {
         // Configure & start the listener
-        this.log("Starting Private API Helper Services...", "debug");
+        this.log.debug("Starting Private API Helper Services...");
         await this.configureServer();
 
         // we need to get the port to open the server on (to allow multiple users to use the bundle)
         // we'll base this off the users uid (a unique id for each user, starting from 501)
         // we'll subtract 501 to get an id starting at 0, incremented for each user
         // then we add this to the base port to get a unique port for the socket
-        this.log(`Starting socket server on port ${PrivateApiService.port}`);
+        this.log.info(`Starting socket server on port ${PrivateApiService.port}`);
         this.server.listen(PrivateApiService.port, "localhost", 511, () => {
             this.restartCounter = 0;
         });
@@ -128,7 +124,7 @@ export class PrivateApiService extends EventEmitter {
             if (mode === "process-dylib") {
                 this.modeType = ProcessDylibMode;
             } else {
-                this.log(`Invalid Private API mode: ${mode}`);
+                this.log.info(`Invalid Private API mode: ${mode}`);
                 return;
             }
 
@@ -136,7 +132,7 @@ export class PrivateApiService extends EventEmitter {
             this.mode = new this.modeType();
             await this.mode.start();
         } catch (ex: any) {
-            this.log(`Failed to start Private API: ${ex?.message ?? String(ex)}`, "error");
+            this.log.error(`Failed to start Private API: ${ex?.message ?? String(ex)}`);
             return;
         }
     }
@@ -158,17 +154,17 @@ export class PrivateApiService extends EventEmitter {
 
     addClient(client: Socket) {
         this.clients.push(client);
-        this.log(`Added socket client (Total: ${this.clients.length})`);
+        this.log.info(`Added socket client (Total: ${this.clients.length})`);
     }
 
     removeClient(client: Socket) {
         const proc = this.getProcessByClientId(client.id);
-        this.log(`Private API Helper (${proc ?? "Anonymous"}) disconnected!`, "debug");
+        this.log.debug(`Private API Helper (${proc ?? "Anonymous"}) disconnected!`);
 
         const idx = this.clients.indexOf(client);
         if (idx !== -1) {
             this.clients.splice(idx, 1);
-            this.log(`Removed socket client (Total: ${this.clients.length})`);
+            this.log.info(`Removed socket client (Total: ${this.clients.length})`);
         }
 
         if (proc) {
@@ -186,34 +182,34 @@ export class PrivateApiService extends EventEmitter {
                 socket.id = socketId;
 
                 this.addClient(socket);
-                this.log(`Private API Helper connected (UUID: ${socketId})!`);
+                this.log.info(`Private API Helper connected (UUID: ${socketId})!`);
                 this.setupListeners(socket);
 
                 socket.on("close", hadError => {
-                    Server().log(`Socket Closed (${socketId}). Had Error: ${hadError}`, "debug");
+                    this.log.debug(`Socket Closed (${socketId}). Had Error: ${hadError}`);
                     this.removeClient(socket);
                 });
 
                 socket.on("end", () => {
-                    Server().log(`Socket Ended by Client (${socketId})`, "debug");
+                    this.log.debug(`Socket Ended by Client (${socketId})`);
                 });
 
                 socket.on("error", err => {
-                    this.log("An error occured in a BlueBubbles Private API Helper connection! Closing...", "debug");
-                    this.log(String(err), "debug");
+                    this.log.debug("An error occured in a BlueBubbles Private API Helper connection! Closing...");
+                    this.log.debug(String(err));
                     socket.destroy();
                 });
             });
 
             this.server.on("error", err => {
-                this.log("An error occured in the TCP Socket! Restarting", "error");
-                this.log(err.toString(), "error");
+                this.log.warn("An error occured in the TCP Socket! Restarting");
+                this.log.warn(err.toString());
 
                 if (this.restartCounter <= 5) {
                     this.restartCounter += 1;
                     this.restart();
                 } else {
-                    this.log("Max restart count reached for Private API listener...");
+                    this.log.info("Max restart count reached for Private API listener...");
                     this.stop();
                 }
             });
@@ -224,7 +220,7 @@ export class PrivateApiService extends EventEmitter {
 
     async onEvent(eventRaw: string, socket: net.Socket): Promise<void> {
         if (eventRaw == null) {
-            this.log(`Received null data from BlueBubblesHelper!`);
+            this.log.info(`Received null data from BlueBubblesHelper!`);
             return;
         }
 
@@ -234,23 +230,23 @@ export class PrivateApiService extends EventEmitter {
         for (const event of uniqueEvents) {
             if (!event || event.trim().length === 0) continue;
             if (event == null) {
-                this.log(`Failed to decode null BlueBubblesHelper data!`);
+                this.log.info(`Failed to decode null BlueBubblesHelper data!`);
                 continue;
             }
 
-            // this.log(`Received data from BlueBubblesHelper: ${event}`, "debug");
+            // this.log.info(`Received data from BlueBubblesHelper: ${event}`, "debug");
             let data;
 
             // Handle in a timeout so that we handle each event asyncronously
             try {
                 data = JSON.parse(event);
             } catch (e) {
-                this.log(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
+                this.log.info(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
                 return;
             }
 
             if (data == null) {
-                this.log("BlueBubblesHelper sent null data", "warn");
+                this.log.warn("BlueBubblesHelper sent null data");
                 return;
             }
 
@@ -267,7 +263,7 @@ export class PrivateApiService extends EventEmitter {
                         }
                     }
                 } catch (ex: any) {
-                    Server().log(`Failed to handle transaction! Error: ${ex?.message ?? String(ex)}`);
+                    this.log.info(`Failed to handle transaction! Error: ${ex?.message ?? String(ex)}`);
                 }
             } else if (data.event) {
                 for (const eventHandler of this.eventHandlers) {
@@ -276,7 +272,7 @@ export class PrivateApiService extends EventEmitter {
                             await eventHandler.handle(data, socket);
                         }
                     } catch (ex: any) {
-                        Server().log(`Failed to handle event, '${data.event}'! Error: ${ex?.message ?? String(ex)}`);
+                        this.log.info(`Failed to handle event, '${data.event}'! Error: ${ex?.message ?? String(ex)}`);
                     }
                 }
             }
@@ -339,7 +335,7 @@ export class PrivateApiService extends EventEmitter {
                 return transaction.promise;
             }
         } catch (ex: any) {
-            this.log(`${msg} ${ex?.message ?? ex}`, "debug");
+            this.log.debug(`${msg} ${ex?.message ?? ex}`);
         } finally {
             // Release the lock after a short delay.
             // This gives the other side a chance to process the data.
@@ -368,7 +364,7 @@ export class PrivateApiService extends EventEmitter {
         return new Promise((resolve, reject) => {
             client.write(data, (err: Error) => {
                 if (err) {
-                    this.log(`Socket write error: ${err?.message ?? String(err)}`);
+                    this.log.info(`Socket write error: ${err?.message ?? String(err)}`);
                     reject(err);
                 } else {
                     resolve();
@@ -392,12 +388,12 @@ export class PrivateApiService extends EventEmitter {
     }
 
     async stop() {
-        this.log(`Stopping Private API Helper...`);
+        this.log.info(`Stopping Private API Helper...`);
 
         try {
             this.destroySocketClients();
         } catch (ex: any) {
-            this.log(`Failed to stop Private API Helpers! Error: ${ex.toString()}`, "debug");
+            this.log.debug(`Failed to stop Private API Helpers! Error: ${ex.toString()}`);
         }
 
         try {
@@ -407,10 +403,10 @@ export class PrivateApiService extends EventEmitter {
                 this.server = null;
             }
         } catch (ex: any) {
-            this.log(`Failed to stop Private API Helper! Error: ${ex.toString()}`, "debug");
+            this.log.debug(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
         }
 
         await this.mode?.stop();
-        this.log(`Private API Helper Stopped...`);
+        this.log.info(`Private API Helper Stopped...`);
     }
 }

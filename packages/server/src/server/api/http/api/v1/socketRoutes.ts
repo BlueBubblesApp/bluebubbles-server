@@ -40,8 +40,10 @@ import { ChatSerializer } from "@server/api/serializers/ChatSerializer";
 import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
 import { AttachmentSerializer } from "@server/api/serializers/AttachmentSerializer";
 import { MacOsInterface } from "@server/api/interfaces/macosInterface";
+import { getLogger } from "@server/lib/logging/Loggable";
 
 const unknownError = "Unknown Error. Check server logs!";
+const log = getLogger("SocketRoutes");
 
 export class SocketRoutes {
     static createRoutes(socket: Socket) {
@@ -71,7 +73,7 @@ export class SocketRoutes {
             if (callback) callback(resData);
             else socket.emit(channel, resData);
 
-            if (resData.error) Server().log(resData.error.message, "debug");
+            if (resData.error) log.debug(resData.error.message);
         };
 
         /**
@@ -519,7 +521,7 @@ export class SocketRoutes {
 
             // Debug logging
             if (isNotEmpty(tempGuid)) {
-                Server().log(`Attempting to send message using Temp GUID: ${tempGuid}`, "debug");
+                log.debug(`Attempting to send message using Temp GUID: ${tempGuid}`);
             }
 
             // Make sure the message isn't already in the queue
@@ -720,7 +722,7 @@ export class SocketRoutes {
             } catch (ex: any) {
                 // If there was a failure, and there is only 1 participant, and we have a message, try to fallback
                 if (participants.length === 1 && isNotEmpty(params?.message) && isNotEmpty(params?.tempGuid)) {
-                    Server().log("Universal create chat failed. Attempting single chat creation.", "debug");
+                    log.debug("Universal create chat failed. Attempting single chat creation.");
 
                     try {
                         chatGuid = await ActionHandler.createSingleChat(
@@ -1063,14 +1065,14 @@ export class SocketRoutes {
         });
 
         /**
-         * Checks for a serer update
+         * Checks for a server update
          */
         socket.on("check-for-server-update", async (_, cb): Promise<void> => {
             return response(cb, "save-vcf", createSuccessResponse(await GeneralInterface.checkForUpdate()));
         });
 
         socket.on("disconnect", reason => {
-            Server().log(`Client ${socket.id} disconnected! Reason: ${reason}`);
+            log.info(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
     }
 }

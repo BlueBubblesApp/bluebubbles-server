@@ -6,8 +6,8 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 
-
 export class PrivateApiHandle extends PrivateApiAction {
+    tag = "PrivateApiHandle";
 
     async getFocusStatus(address: string): Promise<TransactionResult> {
         const action = "check-focus-status";
