@@ -1,7 +1,7 @@
 import { EventCache } from "@server/eventCache";
 import EventEmitter from "events";
 
-export abstract class ChangeListener extends EventEmitter {
+export abstract class PollingListener extends EventEmitter {
     stopped: boolean;
 
     cache: EventCache;

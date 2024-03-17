@@ -1,20 +1,24 @@
 import { MessageRepository } from "@server/databases/imessage";
 import { Message } from "@server/databases/imessage/entity/Message";
-import { ChangeListener } from "./changeListener";
+import { PollingListener } from "./pollingListener";
+import { WatcherListener } from "./watcherListener";
+import { EventCache } from "@server/eventCache";
 
-export class GroupChangeListener extends ChangeListener {
+export class GroupChangeListener extends WatcherListener {
     repo: MessageRepository;
 
     frequencyMs: number;
 
-    constructor(repo: MessageRepository, pollFrequency: number) {
-        super({ pollFrequency });
+    constructor(repo: MessageRepository) {
+        super({
+            filePath: repo.dbPathWal,
+            cache: new EventCache()
+        });
 
         this.repo = repo;
-        this.frequencyMs = pollFrequency;
     }
 
-    async getEntries(after: Date, before: Date): Promise<void> {
+    async getEntries(after: Date, before: Date | null): Promise<void> {
         const offsetDate = new Date(after.getTime() - 5000);
         const [entries, _] = await this.repo.getMessages({
             after: offsetDate,

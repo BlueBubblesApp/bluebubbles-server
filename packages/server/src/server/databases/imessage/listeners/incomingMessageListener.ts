@@ -5,9 +5,10 @@ import { isNotEmpty } from "@server/helpers/utils";
 import { isMinVentura } from "@server/env";
 
 export class IncomingMessageListener extends MessageChangeListener {
-    async getEntries(after: Date, before: Date): Promise<void> {
-        await this.emitNewMessages(after);
-        await this.emitUpdatedMessages(after);
+    async getEntries(after: Date, before: Date | null): Promise<void> {
+        const afterOffsetDate = new Date(after.getTime() - 15000);
+        await this.emitNewMessages(afterOffsetDate);
+        await this.emitUpdatedMessages(afterOffsetDate);
     }
 
     async emitNewMessages(after: Date) {
@@ -18,27 +19,15 @@ export class IncomingMessageListener extends MessageChangeListener {
             }
         ];
 
-        // If we have a last row id, only get messages after that
-        if (this.lastRowId !== 0) {
-            where.push({
-                statement: "message.ROWID > :rowId",
-                args: { rowId: this.lastRowId }
-            });
-        }
 
         // Do not use the "after" parameter if we have a last row id
         // Offset 15 seconds to account for the "Apple" delay
         const [entries, _] = await this.repo.getMessages({
-            after: this.lastRowId === 0 ? new Date(after.getTime() - 15000) : null,
+            after,
             withChats: true,
             where,
-            orderBy: this.lastRowId === 0 ? "message.dateCreated" : "message.ROWID"
+            orderBy: "message.dateCreated"
         });
-
-        // The 0th entry should be the newest since we sort by DESC
-        if (isNotEmpty(entries)) {
-            this.lastRowId = entries[0].ROWID;
-        }
 
         // Emit the new message
         entries.forEach(async (entry: Message) => {
@@ -69,7 +58,7 @@ export class IncomingMessageListener extends MessageChangeListener {
             after,
             withChats: true,
             where,
-            orderBy: this.lastRowId === 0 ? "message.dateCreated" : "message.ROWID"
+            orderBy: "message.dateCreated"
         });
 
         // Emit the new message

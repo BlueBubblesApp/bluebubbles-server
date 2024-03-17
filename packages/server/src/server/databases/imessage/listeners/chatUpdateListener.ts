@@ -6,8 +6,11 @@ import { convertDateTo2001Time } from "../helpers/dateUtil";
 export class ChatUpdateListener extends ChatChangeListener {
     repo: MessageRepository;
 
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
-        super({ cache, pollFrequency });
+    constructor(repo: MessageRepository, cache: EventCache) {
+        super({
+            filePath: repo.dbPathWal,
+            cache
+        });
 
         this.repo = repo;
     }
@@ -30,7 +33,7 @@ export class ChatUpdateListener extends ChatChangeListener {
      */
     async getEntries(after: Date, before: Date): Promise<void> {
         // Emit when a chat's read status changes
-        const afterOffsetDate = new Date(after.getTime());
+        const afterOffsetDate = new Date(after.getTime() - 15000);
         await this.emitChatReadUpdates(afterOffsetDate);
     }
 

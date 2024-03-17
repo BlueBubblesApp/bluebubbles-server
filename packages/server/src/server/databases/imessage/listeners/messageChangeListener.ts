@@ -1,8 +1,7 @@
 import { EventCache } from "@server/eventCache";
 import { MessageRepository } from "..";
 import { Message } from "../entity/Message";
-import { ChangeListener } from "./changeListener";
-import { isEmpty } from "@server/helpers/utils";
+import { WatcherListener } from "./watcherListener";
 
 type MessageState = {
     dateCreated: number;
@@ -13,48 +12,19 @@ type MessageState = {
     didNotifyRecipient: boolean;
 };
 
-export abstract class MessageChangeListener extends ChangeListener {
+export abstract class MessageChangeListener extends WatcherListener {
     // Cache of the last state of the message that has been seen by a listener
     cacheState: Record<string, MessageState> = {};
 
-    lastRowId = 0;
-
     repo: MessageRepository;
 
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
-        super({ cache, pollFrequency });
+    constructor(repo: MessageRepository, cache: EventCache) {
+        super({
+            filePath: repo.dbPathWal,
+            cache
+        });
 
         this.repo = repo;
-        this.getLastRowId().then((rowId: number) => {
-            // Don't set it if we've already got a last row ID or the return was already 0
-            if (this.lastRowId > 0 || !rowId || rowId === 0) return;
-            this.lastRowId = rowId;
-        });
-    }
-
-    async getLastRowId(): Promise<number> {
-        const [messages, _] = await this.repo.getMessages({ limit: 1, sort: "DESC", orderBy: "message.ROWID" });
-        if (isEmpty(messages)) return 0;
-        return messages[0]?.ROWID ?? 0;
-    }
-
-    checkCache() {
-        // Purge emitted messages if it gets above 250 items
-        // 250 is pretty arbitrary at this point...
-        if (this.cache.size() > 250) {
-            if (this.cache.size() > 0) {
-                this.cache.purge();
-            }
-        }
-
-        // Purge anything from the cache where the date created is > 5 minutes old
-        const now = new Date().getTime();
-        const fiveMinutesAgo = now - 5 * 60 * 1000;
-        for (const key in this.cacheState) {
-            if (this.cacheState[key].dateCreated < fiveMinutesAgo) {
-                delete this.cacheState[key];
-            }
-        }
     }
 
     getMessageEvent(message: Message): string | null {

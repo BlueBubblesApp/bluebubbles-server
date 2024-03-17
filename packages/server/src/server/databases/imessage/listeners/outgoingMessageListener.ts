@@ -24,13 +24,13 @@ export class OutgoingMessageListener extends MessageChangeListener {
      * @param after
      * @param before The time right before get Entries run
      */
-    async getEntries(after: Date, before: Date): Promise<void> {
+    async getEntries(after: Date, before: Date | null): Promise<void> {
         // First, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
         const afterOffsetDate = new Date(after.getTime() - 15000);
         await this.emitOutgoingMessages(afterOffsetDate);
 
         // Second, check for updated messages
-        const afterUpdateOffsetDate = new Date(after.getTime() - this.pollFrequency - 15000);
+        const afterUpdateOffsetDate = new Date(after.getTime() - 15000);
         await this.emitUpdatedMessages(afterUpdateOffsetDate);
     }
 
@@ -42,27 +42,14 @@ export class OutgoingMessageListener extends MessageChangeListener {
             }
         ];
 
-        // If we have a last row id, only get messages after that
-        if (this.lastRowId !== 0) {
-            baseQuery.push({
-                statement: "message.ROWID > :rowId",
-                args: { rowId: this.lastRowId }
-            });
-        }
-
         // 1: Check for new messages
         // Do not use the "after" parameter if we have a last row id
         const [newMessages, _] = await this.repo.getMessages({
-            after: this.lastRowId === 0 ? after : null,
+            after,
             withChats: true,
             where: baseQuery,
-            orderBy: this.lastRowId === 0 ? "message.dateCreated" : "message.ROWID"
+            orderBy: "message.dateCreated"
         });
-
-        // The 0th entry should be the newest since we sort by DESC
-        if (isNotEmpty(newMessages)) {
-            this.lastRowId = newMessages[0].ROWID;
-        }
 
         // 2: Divide the new messages into sent/unsent buckets
         const newUnsent = newMessages.filter(e => !e.isSent);

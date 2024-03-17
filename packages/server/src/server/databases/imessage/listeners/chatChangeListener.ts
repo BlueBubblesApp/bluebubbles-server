@@ -1,34 +1,16 @@
 import { Chat } from "../entity/Chat";
 import { CHAT_READ_STATUS_CHANGED } from "@server/events";
-import { ChangeListener } from "./changeListener";
+import { PollingListener } from "./pollingListener";
+import { WatcherListener } from "./watcherListener";
 
 type ChatState = {
     cacheTime: number;
     lastReadMessageTimestamp: number;
 };
 
-export abstract class ChatChangeListener extends ChangeListener {
+export abstract class ChatChangeListener extends WatcherListener {
     // Cache of the last state of the chats that has been seen by a listener
     cacheState: Record<string, ChatState> = {};
-
-    checkCache() {
-        // Purge emitted chats if it gets above 250 items
-        // 250 is pretty arbitrary at this point...
-        if (this.cache.size() > 250) {
-            if (this.cache.size() > 0) {
-                this.cache.purge();
-            }
-        }
-
-        // Purge anything from the cache where the date created is > 5 minutes old
-        const now = new Date().getTime();
-        const fiveMinutesAgo = now - 5 * 60 * 1000;
-        for (const key in this.cacheState) {
-            if (this.cacheState[key].cacheTime < fiveMinutesAgo) {
-                delete this.cacheState[key];
-            }
-        }
-    }
 
     getChatEvent(chat: Chat, defaultEvent = CHAT_READ_STATUS_CHANGED): string | null {
         // If the GUID doesn't exist, it's a new chat

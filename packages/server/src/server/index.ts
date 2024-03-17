@@ -64,7 +64,7 @@ import {
     PARTICIPANT_REMOVED
 } from "./events";
 import { ChatUpdateListener } from "./databases/imessage/listeners/chatUpdateListener";
-import { ChangeListener } from "./databases/imessage/listeners/changeListener";
+import { PollingListener } from "./databases/imessage/listeners/pollingListener";
 import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
@@ -72,6 +72,7 @@ import { getStartDelay } from "./utils/ConfigUtils";
 import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
 import { ScheduledService } from "./lib/ScheduledService";
 import { getLogger } from "./lib/logging/Loggable";
+import { WatcherListener } from "./databases/imessage/listeners/watcherListener";
 
 const findProcess = require("find-process");
 
@@ -150,7 +151,7 @@ class BlueBubblesServer extends EventEmitter {
 
     actionHandler: ActionHandler;
 
-    chatListeners: ChangeListener[];
+    chatListeners: WatcherListener[];
 
     eventCache: EventCache;
 
@@ -1229,9 +1230,9 @@ class BlueBubblesServer extends EventEmitter {
 
         // Create DB listeners.
         // Poll intervals are based on "listener priority"
-        const incomingMsgListener = new IncomingMessageListener(this.iMessageRepo, this.eventCache, pollInterval);
-        const outgoingMsgListener = new OutgoingMessageListener(this.iMessageRepo, this.eventCache, pollInterval * 1.5);
-        const groupEventListener = new GroupChangeListener(this.iMessageRepo, 5000);
+        const incomingMsgListener = new IncomingMessageListener(this.iMessageRepo, this.eventCache);
+        const outgoingMsgListener = new OutgoingMessageListener(this.iMessageRepo, this.eventCache);
+        const groupEventListener = new GroupChangeListener(this.iMessageRepo);
 
         // Add to listeners
         this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
@@ -1239,7 +1240,7 @@ class BlueBubblesServer extends EventEmitter {
         if (isMinHighSierra) {
             // Add listener for chat updates
             // Multiply by 2 because this really doesn't need to be as frequent
-            const chatUpdateListener = new ChatUpdateListener(this.iMessageRepo, this.eventCache, 5000);
+            const chatUpdateListener = new ChatUpdateListener(this.iMessageRepo, this.eventCache);
             this.chatListeners.push(chatUpdateListener);
 
             chatUpdateListener.on(CHAT_READ_STATUS_CHANGED, async (item: Chat) => {

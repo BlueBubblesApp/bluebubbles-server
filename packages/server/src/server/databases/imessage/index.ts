@@ -16,7 +16,13 @@ import { isMinHighSierra, isMinVentura } from "@server/env";
 export class MessageRepository {
     db: DataSource = null;
 
+    dbPath: string;
+
+    dbPathWal: string;
+
     constructor() {
+        this.dbPath = `${process.env.HOME}/Library/Messages/chat.db`;
+        this.dbPathWal = `${process.env.HOME}/Library/Messages/chat.db-wal`;
         this.db = null;
     }
 
@@ -27,7 +33,7 @@ export class MessageRepository {
         this.db = new DataSource({
             name: "iMessage",
             type: "better-sqlite3",
-            database: `${process.env.HOME}/Library/Messages/chat.db`,
+            database: this.dbPath,
             entities: [Chat, Handle, Message, Attachment]
         });
 
