@@ -41,7 +41,7 @@ export class MultiFileWatcher extends Loggable {
             this.handleFileEvent({ type, nextStat, prevStat, filePath });
         });
 
-        this.watchers.push({ filePath, watcher });
+        this.watchers.push(watcher);
     }
   
     private async handleFileEvent(event: FileChangeEvent) {
