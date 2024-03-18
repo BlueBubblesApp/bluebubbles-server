@@ -1,11 +1,11 @@
-import fs from "fs";
-import EventEmitter from "events";
-
 import { EventCache } from "@server/eventCache";
 import { MultiFileWatcher } from "@server/lib/MultiFileWatcher";
+import { Loggable } from "@server/lib/logging/Loggable";
+import { Sema } from "async-sema";
 
+export abstract class WatcherListener extends Loggable {
+    tag = "WatcherListener";
 
-export abstract class WatcherListener extends EventEmitter {
     stopped: boolean;
 
     filePaths: string[];
@@ -14,7 +14,7 @@ export abstract class WatcherListener extends EventEmitter {
 
     watcher: MultiFileWatcher;
 
-    constructor({ filePaths, cache = new EventCache() }: { filePaths: string[], cache?: EventCache; }) {
+    constructor({ filePaths, cache = new EventCache() }: { filePaths: string[]; cache?: EventCache }) {
         super();
 
         this.filePaths = filePaths;
@@ -40,11 +40,33 @@ export abstract class WatcherListener extends EventEmitter {
     start() {
         this.cache.purge();
 
-        const now = new Date();
-        this.watcher = new MultiFileWatcher(this.filePaths, async (event) => {
-            await this.getEntries(event.prevStat?.mtime ?? now, null);
-            this.checkCache();
-        })
+        let lastCheck: number = new Date().getTime();
+        this.watcher = new MultiFileWatcher(this.filePaths);
+
+        const lock = new Sema(1);
+        this.watcher.on("change", async event => {
+            await lock.acquire();
+
+            // If we don't have a prevStat, it's a new file, and we still need to get entries.
+            // If the prevStat is newer than the last check, we need to check.
+            this.log.debug(`Comparing ${event.prevStat?.mtimeMs} to ${lastCheck}`);
+            if (!event.prevStat || event.prevStat.mtimeMs > lastCheck) {
+                const after = event.prevStat?.mtimeMs ?? lastCheck;
+                this.log.debug(`Checking for new entries after ${after}`);
+                await this.getEntries(new Date(after), null);
+                this.checkCache();
+
+                this.log.debug(`Setting last check to ${after}`);
+                lastCheck = after;
+            } else {
+                this.log.debug(`Event already handled!`);
+            }
+
+            // Release the lock
+            lock.release();
+        });
+
+        this.watcher.start();
     }
 
     abstract getEntries(after: Date, before: Date | null): Promise<void>;
