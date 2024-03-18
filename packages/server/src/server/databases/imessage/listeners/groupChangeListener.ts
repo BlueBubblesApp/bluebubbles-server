@@ -11,7 +11,7 @@ export class GroupChangeListener extends WatcherListener {
 
     constructor(repo: MessageRepository) {
         super({
-            filePath: repo.dbPathWal,
+            filePaths: [repo.dbPathWal, repo.dbPath],
             cache: new EventCache()
         });
 

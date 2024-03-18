@@ -8,7 +8,7 @@ export class ChatUpdateListener extends ChatChangeListener {
 
     constructor(repo: MessageRepository, cache: EventCache) {
         super({
-            filePath: repo.dbPathWal,
+            filePaths: [repo.dbPathWal, repo.dbPath],
             cache
         });
 

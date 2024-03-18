@@ -1,18 +1,23 @@
 import fs from "fs";
-import { EventCache } from "@server/eventCache";
 import EventEmitter from "events";
+
+import { EventCache } from "@server/eventCache";
+import { MultiFileWatcher } from "@server/lib/MultiFileWatcher";
+
 
 export abstract class WatcherListener extends EventEmitter {
     stopped: boolean;
 
-    filePath: string;
+    filePaths: string[];
 
     cache: EventCache;
 
-    constructor({ filePath, cache = new EventCache() }: { filePath: string, cache?: EventCache; }) {
+    watcher: MultiFileWatcher;
+
+    constructor({ filePaths, cache = new EventCache() }: { filePaths: string[], cache?: EventCache; }) {
         super();
 
-        this.filePath = filePath;
+        this.filePaths = filePaths;
         this.cache = cache;
         this.stopped = false;
     }
@@ -35,19 +40,11 @@ export abstract class WatcherListener extends EventEmitter {
     start() {
         this.cache.purge();
 
-        // Start checking
-        this.checkForNewEntries();
-    }
-
-    async checkForNewEntries(): Promise<void> {
-        if (this.stopped) return;
-
-        fs.watchFile(this.filePath, async (_, prev) => {
-            await this.getEntries(prev.mtime, null);
-        });
-
-        // Check the cache and see if it needs to be purged
-        this.checkCache();
+        const now = new Date();
+        this.watcher = new MultiFileWatcher(this.filePaths, async (event) => {
+            await this.getEntries(event.prevStat?.mtime ?? now, null);
+            this.checkCache();
+        })
     }
 
     abstract getEntries(after: Date, before: Date | null): Promise<void>;
