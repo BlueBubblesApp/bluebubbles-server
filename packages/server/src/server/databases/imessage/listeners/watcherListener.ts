@@ -14,12 +14,15 @@ export abstract class WatcherListener extends Loggable {
 
     watcher: MultiFileWatcher;
 
+    processLock: Sema;
+
     constructor({ filePaths, cache = new EventCache() }: { filePaths: string[]; cache?: EventCache }) {
         super();
 
         this.filePaths = filePaths;
         this.cache = cache;
         this.stopped = false;
+        this.processLock = new Sema(1);
     }
 
     checkCache() {
@@ -40,30 +43,27 @@ export abstract class WatcherListener extends Loggable {
     start() {
         this.cache.purge();
 
-        let lastCheck: number = new Date().getTime();
+        let lastCheck = 0;
         this.watcher = new MultiFileWatcher(this.filePaths);
-
-        const lock = new Sema(1);
         this.watcher.on("change", async event => {
-            await lock.acquire();
+            await this.processLock.acquire();
 
             // If we don't have a prevStat, it's a new file, and we still need to get entries.
             // If the prevStat is newer than the last check, we need to check.
-            this.log.debug(`Comparing ${event.prevStat?.mtimeMs} to ${lastCheck}`);
             if (!event.prevStat || event.prevStat.mtimeMs > lastCheck) {
-                const after = event.prevStat?.mtimeMs ?? lastCheck;
-                this.log.debug(`Checking for new entries after ${after}`);
+                // If we don't have a prevStat, we should use the currentStat's mtimeMs - 1 minute
+                const after = event.prevStat?.mtimeMs ?? event.currentStat.mtimeMs - 60000;
                 await this.getEntries(new Date(after), null);
                 this.checkCache();
-
-                this.log.debug(`Setting last check to ${after}`);
                 lastCheck = after;
-            } else {
-                this.log.debug(`Event already handled!`);
             }
 
-            // Release the lock
-            lock.release();
+            this.processLock.release();
+        });
+
+        this.watcher.on("error", (error) => {
+            this.log.error(`Failed to watch database files: ${this.filePaths.join(", ")}`);
+            this.log.debug(`Error: ${error}`);
         });
 
         this.watcher.start();
