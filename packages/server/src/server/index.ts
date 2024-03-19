@@ -1016,12 +1016,6 @@ class BlueBubblesServer extends EventEmitter {
             proxiesRestarted = true;
         }
 
-        // If the poll interval changed, we need to restart the listeners
-        if (prevConfig.db_poll_interval !== nextConfig.db_poll_interval) {
-            this.removeChatListeners();
-            await this.startChatListeners();
-        }
-
         try {
             if (
                 prevConfig?.server_address !== nextConfig?.server_address &&
@@ -1226,10 +1220,8 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         this.logger.info("Starting chat listeners...");
-        const pollInterval = (this.repo.getConfig("db_poll_interval") as number) ?? 1000;
 
         // Create DB listeners.
-        // Poll intervals are based on "listener priority"
         const incomingMsgListener = new IncomingMessageListener(this.iMessageRepo, this.eventCache);
         const outgoingMsgListener = new OutgoingMessageListener(this.iMessageRepo, this.eventCache);
         const groupEventListener = new GroupChangeListener(this.iMessageRepo);
