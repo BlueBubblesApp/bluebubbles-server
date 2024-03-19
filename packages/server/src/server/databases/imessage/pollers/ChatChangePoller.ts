@@ -1,20 +1,7 @@
-import { MessageRepository } from "@server/databases/imessage";
-import { EventCache } from "@server/eventCache";
-import { ChatChangeListener } from "./chatChangeListener";
 import { convertDateTo2001Time } from "../helpers/dateUtil";
+import { IMessagePollResult, IMessagePoller } from ".";
 
-export class ChatUpdateListener extends ChatChangeListener {
-    repo: MessageRepository;
-
-    constructor(repo: MessageRepository, cache: EventCache) {
-        super({
-            filePaths: [repo.dbPathWal, repo.dbPath],
-            cache
-        });
-
-        this.repo = repo;
-    }
-
+export class ChatUpdatePoller extends IMessagePoller {
     /**
      * Gets sent entries from yourself. This method has a very different flow
      * from the other listeners. It needs to do a good amount more to be accurate.
@@ -31,13 +18,15 @@ export class ChatUpdateListener extends ChatChangeListener {
      * @param after
      * @param before The time right before get Entries run
      */
-    async getEntries(after: Date, before: Date): Promise<void> {
+    async poll(after: Date, before: Date): Promise<IMessagePollResult[]> {
         // Emit when a chat's read status changes
         const afterOffsetDate = new Date(after.getTime() - 15000);
-        await this.emitChatReadUpdates(afterOffsetDate);
+        return await this.emitChatReadUpdates(afterOffsetDate);
     }
 
-    async emitChatReadUpdates(after: Date) {
+    async emitChatReadUpdates(after: Date): Promise<IMessagePollResult[]> {
+        const results: IMessagePollResult[] = [];
+
         // 1: Check for updated chats
         const [updatedChats, _] = await this.repo.getChats({
             where: [
@@ -51,10 +40,12 @@ export class ChatUpdateListener extends ChatChangeListener {
         // Emit all the chats that had a last message update
         for (const entry of updatedChats) {
             const event = this.processChatEvent(entry);
-            if (!event) return;
+            if (!event) continue;
 
             // Emit it as normal entry
-            super.emit(event, entry);
+            results.push({ eventType: event, data: entry });
         }
+
+        return results;
     }
 }

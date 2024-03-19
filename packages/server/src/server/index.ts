@@ -16,11 +16,6 @@ import { FileSystem } from "@server/fileSystem";
 import { ServerRepository, ServerConfigChange } from "@server/databases/server";
 import { MessageRepository } from "@server/databases/imessage";
 import { FindMyRepository } from "@server/databases/findmy";
-import {
-    IncomingMessageListener,
-    OutgoingMessageListener,
-    GroupChangeListener
-} from "@server/databases/imessage/listeners";
 import { Message } from "@server/databases/imessage/entity/Message";
 
 // Service Imports
@@ -63,8 +58,6 @@ import {
     PARTICIPANT_LEFT,
     PARTICIPANT_REMOVED
 } from "./events";
-import { ChatUpdateListener } from "./databases/imessage/listeners/chatUpdateListener";
-import { PollingListener } from "./databases/imessage/listeners/pollingListener";
 import { Chat } from "./databases/imessage/entity/Chat";
 import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
@@ -72,7 +65,14 @@ import { getStartDelay } from "./utils/ConfigUtils";
 import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
 import { ScheduledService } from "./lib/ScheduledService";
 import { getLogger } from "./lib/logging/Loggable";
-import { WatcherListener } from "./databases/imessage/listeners/watcherListener";
+import { IMessageListener } from "./databases/imessage/listeners/IMessageListener";
+import { OutgoingNewMessagePoller } from "./databases/imessage/pollers/OutgoingNewMessagePoller";
+import { IncomingNewMessagePoller } from "./databases/imessage/pollers/IncomingNewMessagePoller";
+import { GroupChangePoller } from "./databases/imessage/pollers/GroupChangePoller";
+import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
+import { OutgoingUpdatedMessagePoller } from "./databases/imessage/pollers/OutgoingUpdatedMessagePoller";
+import { IncomingUpdatedMessagPoller } from "./databases/imessage/pollers/IncomingUpdatedMessagePoller";
+import { IMessageCache } from "./databases/imessage/pollers";
 
 const findProcess = require("find-process");
 
@@ -151,11 +151,11 @@ class BlueBubblesServer extends EventEmitter {
 
     actionHandler: ActionHandler;
 
-    chatListeners: WatcherListener[];
-
     eventCache: EventCache;
 
     findMyCache: FindMyFriendsCache;
+
+    iMessageListener: IMessageListener;
 
     hasSetup: boolean;
 
@@ -221,7 +221,6 @@ class BlueBubblesServer extends EventEmitter {
 
         // Other helpers
         this.eventCache = null;
-        this.chatListeners = [];
         this.actionHandler = null;
 
         // Services
@@ -237,6 +236,7 @@ class BlueBubblesServer extends EventEmitter {
         this.webhookService = null;
         this.scheduledMessages = null;
         this.oauthService = null;
+        this.iMessageListener = null;
 
         this.hasSetup = false;
         this.hasStarted = false;
@@ -547,7 +547,7 @@ class BlueBubblesServer extends EventEmitter {
             this.privateApi.start();
         }
 
-        if (this.hasDiskAccess && isEmpty(this.chatListeners)) {
+        if (this.hasDiskAccess) {
             this.logger.info("Starting iMessage Database listeners...");
             await this.startChatListeners();
         }
@@ -1221,91 +1221,54 @@ class BlueBubblesServer extends EventEmitter {
 
         this.logger.info("Starting chat listeners...");
 
-        // Create DB listeners.
-        const incomingMsgListener = new IncomingMessageListener(this.iMessageRepo, this.eventCache);
-        const outgoingMsgListener = new OutgoingMessageListener(this.iMessageRepo, this.eventCache);
-        const groupEventListener = new GroupChangeListener(this.iMessageRepo);
+        const cache = new IMessageCache();
+        this.iMessageListener = new IMessageListener({
+            filePaths: [
+                this.iMessageRepo.dbPath,
+                this.iMessageRepo.dbPathWal
+            ],
+            cache
+        });
 
-        // Add to listeners
-        this.chatListeners = [outgoingMsgListener, incomingMsgListener, groupEventListener];
+        this.iMessageListener.addPoller(new OutgoingNewMessagePoller(this.iMessageRepo, cache));
+        this.iMessageListener.addPoller(new OutgoingUpdatedMessagePoller(this.iMessageRepo, cache));
+        this.iMessageListener.addPoller(new IncomingNewMessagePoller(this.iMessageRepo, cache));
+        this.iMessageListener.addPoller(new IncomingUpdatedMessagPoller(this.iMessageRepo, cache));
+        this.iMessageListener.addPoller(new GroupChangePoller(this.iMessageRepo, cache));
 
         if (isMinHighSierra) {
-            // Add listener for chat updates
-            // Multiply by 2 because this really doesn't need to be as frequent
-            const chatUpdateListener = new ChatUpdateListener(this.iMessageRepo, this.eventCache);
-            this.chatListeners.push(chatUpdateListener);
-
-            chatUpdateListener.on(CHAT_READ_STATUS_CHANGED, async (item: Chat) => {
-                this.logger.info(`Chat read [${item.guid}]`);
-                await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
-                    chatGuid: item.guid,
-                    read: true
-                });
-            });
+            this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));
         }
+
+        this.iMessageListener.on(CHAT_READ_STATUS_CHANGED, async (item: Chat) => {
+            this.logger.info(`Chat read [${item.guid}]`);
+            await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
+                chatGuid: item.guid,
+                read: true
+            });
+        });
 
         /**
          * Message listener for my messages only. We need this because messages from ourselves
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        outgoingMsgListener.on("new-entry", (item) => this.handleNewMessage(item));
+        this.iMessageListener.on("new-entry", (item) => this.handleNewMessage(item));
 
         /**
          * Message listener checking for updated messages. This means either the message's
          * delivered date or read date have changed since the last time we checked the database.
          */
-        outgoingMsgListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
-        incomingMsgListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
+        this.iMessageListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
 
         /**
          * Message listener for messages that have errored out
          */
-        outgoingMsgListener.on("message-send-error", async (item: Message) => {
+        this.iMessageListener.on("message-send-error", async (item: Message) => {
             await this.emitMessageError(item);
         });
 
-        /**
-         * Message listener for new messages not from yourself. See 'myMsgListener' comment
-         * for why we separate them out into two separate listeners.
-         */
-        incomingMsgListener.on("new-entry", async (item: Message) => {
-            const newMessage = await insertChatParticipants(item);
-            this.logger.info(`New message from [${newMessage.handle?.id ?? "You"}]: [${newMessage.contentString()}]`);
-
-            // Manually send the message to the socket so we can serialize it with
-            // all the extra data
-            this.httpService.socketServer.emit(
-                NEW_MESSAGE,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        parseAttributedBody: true,
-                        parseMessageSummary: true,
-                        parsePayloadData: true,
-                        loadChatParticipants: false,
-                        includeChats: true
-                    }
-                })
-            );
-
-            // Emit it to the FCM devices only
-            await this.emitMessage(
-                NEW_MESSAGE,
-                await MessageSerializer.serialize({
-                    message: newMessage,
-                    config: {
-                        enforceMaxSize: true
-                    },
-                    isForNotification: true
-                }),
-                "high",
-                true,
-                false
-            );
-        });
-
-        groupEventListener.on("name-change", async (item: Message) => {
+        this.iMessageListener.on("name-change", async (item: Message) => {
             this.logger.info(`Group name for [${item.cacheRoomnames}] changed to [${item.groupTitle}]`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1337,7 +1300,7 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
-        groupEventListener.on("participant-removed", async (item: Message) => {
+        this.iMessageListener.on("participant-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.logger.info(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
 
@@ -1366,7 +1329,7 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
-        groupEventListener.on("participant-added", async (item: Message) => {
+        this.iMessageListener.on("participant-added", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.logger.info(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
 
@@ -1395,7 +1358,7 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
-        groupEventListener.on("participant-left", async (item: Message) => {
+        this.iMessageListener.on("participant-left", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.logger.info(`[${from}] left [${item.cacheRoomnames}]`);
 
@@ -1424,7 +1387,7 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
-        groupEventListener.on("group-icon-changed", async (item: Message) => {
+        this.iMessageListener.on("group-icon-changed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.logger.info(`[${from}] changed a group photo`);
 
@@ -1453,7 +1416,7 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
-        groupEventListener.on("group-icon-removed", async (item: Message) => {
+        this.iMessageListener.on("group-icon-removed", async (item: Message) => {
             const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
             this.logger.info(`[${from}] removed a group photo`);
 
@@ -1482,20 +1445,16 @@ class BlueBubblesServer extends EventEmitter {
             );
         });
 
-        outgoingMsgListener.on("error", (error: Error) => this.logger.error(error.message));
-        incomingMsgListener.on("error", (error: Error) => this.logger.error(error.message));
-        groupEventListener.on("error", (error: Error) => this.logger.error(error.message));
+        this.iMessageListener.on("error", (error: Error) => this.logger.error(error.message));
 
         // Start the listeners with a 500ms delay between each to prevent locks.
-        for (const i of this.chatListeners) {
-            await waitMs(500);
-            i.start();
-        }
+        this.iMessageListener.start();
     }
 
     private async handleNewMessage(item: Message) {
         const newMessage = await insertChatParticipants(item);
-        this.logger.info(`New Message from You, ${newMessage.contentString()}`);
+        this.logger.info(
+            `New Message from ${newMessage.isFromMe ? 'You' : newMessage.handle?.id}, ${newMessage.contentString()}`);
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data
@@ -1523,7 +1482,7 @@ class BlueBubblesServer extends EventEmitter {
                 },
                 isForNotification: true
             }),
-            "normal",
+            newMessage.isFromMe ? "normal" : "high",
             true,
             false
         );
@@ -1587,8 +1546,8 @@ class BlueBubblesServer extends EventEmitter {
     private removeChatListeners() {
         // Remove all listeners
         this.logger.info("Removing chat listeners...");
-        for (const i of this.chatListeners) i.stop();
-        this.chatListeners = [];
+        this.iMessageListener?.stop();
+        this.iMessageListener = null;
     }
 
     /**

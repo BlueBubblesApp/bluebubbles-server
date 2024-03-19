@@ -1,11 +1,9 @@
 import { Server } from "@server";
 import { DBWhereItem } from "@server/databases/imessage/types";
 import { isNotEmpty } from "@server/helpers/utils";
-import { isMinMonterey } from "@server/env";
-import { MessageChangeListener } from "./messageChangeListener";
-import type { Message } from "../entity/Message";
+import { IMessagePollResult, IMessagePoller } from ".";
 
-export class OutgoingMessageListener extends MessageChangeListener {
+export class OutgoingNewMessagePoller extends IMessagePoller {
     notSent: number[] = [];
 
     /**
@@ -24,17 +22,13 @@ export class OutgoingMessageListener extends MessageChangeListener {
      * @param after
      * @param before The time right before get Entries run
      */
-    async getEntries(after: Date, before: Date | null): Promise<void> {
-        // First, emit the outgoing messages (lookback 15 seconds to make up for the "Apple" delay)
+    async poll(after: Date, before: Date | null): Promise<IMessagePollResult[]> {
         const afterOffsetDate = new Date(after.getTime() - 15000);
-        await this.emitOutgoingMessages(afterOffsetDate);
-
-        // Second, check for updated messages
-        const afterUpdateOffsetDate = new Date(after.getTime() - 15000);
-        await this.emitUpdatedMessages(afterUpdateOffsetDate);
+        return await this.getOutgoingMessages(afterOffsetDate);
     }
 
-    async emitOutgoingMessages(after: Date) {
+    async getOutgoingMessages(after: Date): Promise<IMessagePollResult[]> {
+        const results: IMessagePollResult[] = [];
         const baseQuery: DBWhereItem[] = [
             {
                 statement: "message.is_from_me = :fromMe",
@@ -94,19 +88,19 @@ export class OutgoingMessageListener extends MessageChangeListener {
         // 6: Emit all the messages that were successfully sent
         for (const entry of [...newSent, ...lookbackSent]) {
             const event = this.processMessageEvent(entry);
-            if (!event) return;
+            if (!event) continue;
 
             // Resolve the promise for sent messages from a client
             Server().messageManager.resolve(entry);
 
             // Emit it as normal entry
-            super.emit(event, entry);
+            results.push({ eventType: event, data: entry });
         }
 
         // 6: Emit all the messages that failed sent
         for (const entry of lookbackErrored) {
             const event = this.processMessageEvent(entry);
-            if (!event) return;
+            if (!event) continue;
 
             // Reject the corresponding promise.
             // This will emit a message send error
@@ -122,53 +116,10 @@ export class OutgoingMessageListener extends MessageChangeListener {
                     `Message Manager Match Failed -> Promises: ${Server().messageManager.promises.length}`,
                     "debug"
                 );
-                super.emit("message-send-error", entry);
+                results.push({ eventType: "message-send-error", data: entry });
             }
         }
-    }
 
-    async emitUpdatedMessages(after: Date) {
-        // Get updated entries from myself only
-        const entries = await this.repo.getUpdatedMessages({
-            after,
-            withChats: true,
-            where: [
-                {
-                    statement: "message.is_from_me = :isFromMe",
-                    args: { isFromMe: 1 }
-                }
-            ]
-        });
-
-        // Get entries that have an updated "didNotifyRecipient" value (true), only for Monterey+
-        let notifiedEntries: Message[] = [];
-        if (isMinMonterey) {
-            [notifiedEntries] = await this.repo.getMessages({
-                after,
-                withChats: true,
-                where: [
-                    {
-                        statement: "message.is_from_me = :isFromMe",
-                        args: { isFromMe: 1 }
-                    },
-                    {
-                        statement: "message.did_notify_recipient = :didNotifyRecipient",
-                        args: { didNotifyRecipient: 1 }
-                    }
-                ]
-            });
-        }
-
-        // Emit the new message
-        for (const entry of [...entries, ...notifiedEntries]) {
-            const event = this.processMessageEvent(entry);
-            if (!event) return;
-
-            // Resolve the promise
-            Server().messageManager.resolve(entry);
-
-            // Emit it as a normal update
-            super.emit(event, entry);
-        }
+        return results;
     }
 }
