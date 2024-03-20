@@ -1,7 +1,11 @@
 import { convertDateTo2001Time } from "../helpers/dateUtil";
-import { IMessagePollResult, IMessagePoller } from ".";
+import { IMessagePollResult, IMessagePollType, IMessagePoller } from ".";
 
 export class ChatUpdatePoller extends IMessagePoller {
+    tag = "ChatUpdatePoller";
+
+    type = IMessagePollType.CHAT;
+
     /**
      * Gets sent entries from yourself. This method has a very different flow
      * from the other listeners. It needs to do a good amount more to be accurate.
@@ -18,13 +22,7 @@ export class ChatUpdatePoller extends IMessagePoller {
      * @param after
      * @param before The time right before get Entries run
      */
-    async poll(after: Date, before: Date): Promise<IMessagePollResult[]> {
-        // Emit when a chat's read status changes
-        const afterOffsetDate = new Date(after.getTime() - 15000);
-        return await this.emitChatReadUpdates(afterOffsetDate);
-    }
-
-    async emitChatReadUpdates(after: Date): Promise<IMessagePollResult[]> {
+    async poll(after: Date): Promise<IMessagePollResult[]> {
         const results: IMessagePollResult[] = [];
 
         // 1: Check for updated chats

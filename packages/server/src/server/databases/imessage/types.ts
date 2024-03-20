@@ -7,6 +7,7 @@ export type DBMessageParams = {
     withChats?: boolean;
     withChatParticipants?: boolean;
     withAttachments?: boolean;
+    includeCreated?: boolean;
     sort?: "ASC" | "DESC";
     orderBy?: string;
     where?: DBWhereItem[];

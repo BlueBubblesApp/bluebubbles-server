@@ -2,7 +2,9 @@ import { EventCache } from "@server/eventCache";
 import { MultiFileWatcher } from "@server/lib/MultiFileWatcher";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { Sema } from "async-sema";
-import { IMessageCache, IMessagePoller } from "../pollers";
+import { IMessageCache, IMessagePollResult, IMessagePoller } from "../pollers";
+import { MessageRepository } from "..";
+import { waitMs } from "@server/helpers/utils";
 
 export class IMessageListener extends Loggable {
     tag = "IMessageListener";
@@ -13,16 +15,19 @@ export class IMessageListener extends Loggable {
 
     watcher: MultiFileWatcher;
 
+    repo: MessageRepository;
+
     processLock: Sema;
 
     pollers: IMessagePoller[];
 
     cache: IMessageCache;
 
-    constructor({ filePaths, cache }: { filePaths: string[], cache: IMessageCache }) {
+    constructor({ filePaths, repo, cache }: { filePaths: string[], repo: MessageRepository, cache: IMessageCache }) {
         super();
 
         this.filePaths = filePaths;
+        this.repo = repo;
         this.pollers = [];
         this.cache = cache;
         this.stopped = false;
@@ -44,23 +49,28 @@ export class IMessageListener extends Loggable {
         this.watcher.on("change", async event => {
             await this.processLock.acquire();
 
-            // If we don't have a prevStat, it's a new file, and we still need to get entries.
-            // If the prevStat is newer than the last check, we need to check.
-            if (!event.prevStat || event.prevStat.mtimeMs > lastCheck) {
-                // If we don't have a prevStat, we should use the currentStat's mtimeMs - 1 minute
-                const after = event.prevStat?.mtimeMs ?? (event.currentStat.mtimeMs - 60000);
+            if (event.currentStat.mtimeMs > lastCheck) {
+                // Use the currentStat's mtimeMs - 10 seconds to account for any time drift.
+                // due to the time it takes to write to the disk.
+                const after = event.currentStat.mtimeMs - 10000;
 
                 // Invoke the different pollers
                 for (const poller of this.pollers) {
-                    const results = await poller.poll(new Date(after), null);
+                    this.log.debug(`Polling ${poller.tag} for new entries after ${new Date(after).toISOString()}`);
+                    const results = await poller.poll(new Date(after));
                     for (const result of results) {
                         this.emit(result.eventType, result.data);
                     }
+                    this.log.debug(`Finished polling ${poller.tag}`);
                 }
 
                 // Trim the cache and save the last check
                 this.cache.trimCaches();
-                lastCheck = after;
+                lastCheck = event.currentStat.mtimeMs;
+            }
+
+            if (this.processLock.nrWaiting() > 0) {
+                await waitMs(10);
             }
 
             this.processLock.release();

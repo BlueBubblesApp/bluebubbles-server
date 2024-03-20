@@ -322,6 +322,7 @@ export class MessageRepository {
         before = null,
         withChats = false,
         withAttachments = true,
+        includeCreated = false,
         sort = "DESC",
         where = []
     }: DBMessageParams) {
@@ -373,7 +374,7 @@ export class MessageRepository {
 
         // Add date_delivered constraints
         if (after || before) {
-            this.applyMessageUpdateDateQuery(query, after as Date, before as Date);
+            this.applyMessageUpdateDateQuery(query, after as Date, before as Date, includeCreated);
         }
 
         // Add pagination params
@@ -605,9 +606,29 @@ export class MessageRepository {
         );
     }
 
-    applyMessageUpdateDateQuery(query: SelectQueryBuilder<Message>, after?: Date, before?: Date) {
+    applyMessageUpdateDateQuery(
+        query: SelectQueryBuilder<Message>,
+        after?: Date,
+        before?: Date,
+        includeCreated = false
+    ) {
         query.andWhere(
             new Brackets(qb => {
+                if (includeCreated) {
+                    qb.orWhere(
+                        new Brackets(qb2 => {
+                            if (after)
+                                qb2.andWhere("message.date >= :after", {
+                                    after: convertDateTo2001Time(after)
+                                });
+                            if (before)
+                                qb2.andWhere("message.date <= :before", {
+                                    before: convertDateTo2001Time(before)
+                                });
+                        })
+                    );
+                }
+
                 qb.orWhere(
                     new Brackets(qb2 => {
                         if (after)

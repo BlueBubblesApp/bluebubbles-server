@@ -66,13 +66,9 @@ import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
 import { ScheduledService } from "./lib/ScheduledService";
 import { getLogger } from "./lib/logging/Loggable";
 import { IMessageListener } from "./databases/imessage/listeners/IMessageListener";
-import { OutgoingNewMessagePoller } from "./databases/imessage/pollers/OutgoingNewMessagePoller";
-import { IncomingNewMessagePoller } from "./databases/imessage/pollers/IncomingNewMessagePoller";
-import { GroupChangePoller } from "./databases/imessage/pollers/GroupChangePoller";
 import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
-import { OutgoingUpdatedMessagePoller } from "./databases/imessage/pollers/OutgoingUpdatedMessagePoller";
-import { IncomingUpdatedMessagPoller } from "./databases/imessage/pollers/IncomingUpdatedMessagePoller";
 import { IMessageCache } from "./databases/imessage/pollers";
+import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 
 const findProcess = require("find-process");
 
@@ -1227,14 +1223,11 @@ class BlueBubblesServer extends EventEmitter {
                 this.iMessageRepo.dbPath,
                 this.iMessageRepo.dbPathWal
             ],
-            cache
+            cache,
+            repo: this.iMessageRepo
         });
 
-        this.iMessageListener.addPoller(new OutgoingNewMessagePoller(this.iMessageRepo, cache));
-        this.iMessageListener.addPoller(new OutgoingUpdatedMessagePoller(this.iMessageRepo, cache));
-        this.iMessageListener.addPoller(new IncomingNewMessagePoller(this.iMessageRepo, cache));
-        this.iMessageListener.addPoller(new IncomingUpdatedMessagPoller(this.iMessageRepo, cache));
-        this.iMessageListener.addPoller(new GroupChangePoller(this.iMessageRepo, cache));
+        this.iMessageListener.addPoller(new MessagePoller(this.iMessageRepo, cache));
 
         if (isMinHighSierra) {
             this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));

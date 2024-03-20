@@ -3,11 +3,17 @@ import { MessageRepository } from "..";
 import { Message } from "../entity/Message";
 import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 import { Chat } from "../entity/Chat";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 export type IMessagePollResult = {
     eventType: string;
     data: any;
 };
+
+export enum IMessagePollType {
+    MESSAGE = "message",
+    CHAT = "chat"
+}
 
 type MessageState = {
     dateCreated: number;
@@ -66,7 +72,11 @@ export class IMessageCache {
     }
 }
 
-export abstract class IMessagePoller {
+export abstract class IMessagePoller extends Loggable {
+    tag = "IMessagePoller";
+
+    type: IMessagePollType;
+
     repo: MessageRepository;
 
     cache: IMessageCache;
@@ -77,11 +87,13 @@ export abstract class IMessagePoller {
     chatStates: Record<string, ChatState> = {};
 
     constructor(repo: MessageRepository, cache: IMessageCache) {
+        super();
+
         this.repo = repo;
         this.cache = cache;
     }
 
-    abstract poll(after: Date, before: Date | null): Promise<IMessagePollResult[]>;
+    abstract poll(after: Date): Promise<IMessagePollResult[]>;
 
     getMessageEvent(message: Message): string | null {
         // If the GUID doesn't exist, it's a new message
