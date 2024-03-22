@@ -52,16 +52,17 @@ export class IMessageListener extends Loggable {
             if (event.currentStat.mtimeMs > lastCheck) {
                 // Use the currentStat's mtimeMs - 10 seconds to account for any time drift.
                 // due to the time it takes to write to the disk.
-                const after = event.currentStat.mtimeMs - 10000;
+                const after = new Date(event.currentStat.mtimeMs - 10000);
 
                 // Invoke the different pollers
                 for (const poller of this.pollers) {
-                    this.log.debug(`Polling ${poller.tag} for new entries after ${new Date(after).toISOString()}`);
-                    const results = await poller.poll(new Date(after));
+                    const startMs = new Date().getTime();
+                    const results = await poller.poll(after);
                     for (const result of results) {
                         this.emit(result.eventType, result.data);
                     }
-                    this.log.debug(`Finished polling ${poller.tag}`);
+                    const endMs = new Date().getTime();
+                    this.log.debug(`${poller.tag} took ${endMs - startMs}ms`);
                 }
 
                 // Trim the cache and save the last check

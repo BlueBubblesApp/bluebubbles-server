@@ -18,7 +18,8 @@ export class MessagePoller extends IMessagePoller {
         // has a SQLite index on it, while the other dates don't.
         // Because of this, searching is much faster. We can do the filtering
         // after the query.
-        const oneWeekMs = 1000 * 60 * 60 * 24 * 7 * 52;
+        // The incremental sync should pick up on anything changed outside of this range.
+        const oneWeekMs = 1000 * 60 * 60 * 24 * 7;
         const afterLookback = new Date(after.getTime() - oneWeekMs);
         const [search, __] = await this.repo.getMessages({
             after: afterLookback,
@@ -31,8 +32,11 @@ export class MessagePoller extends IMessagePoller {
         const afterTime = after.getTime();
         const entries = search.filter(e => (
             (e.dateCreated?.getTime() ?? 0) >= afterTime ||
-            (e.dateDelivered?.getTime() ?? 0) >= afterTime ||
-            (e.dateRead?.getTime() ?? 0) >= afterTime ||
+            // Date delivered only matters if it's from you
+            (e.isFromMe && (e.dateDelivered?.getTime() ?? 0)) >= afterTime ||
+            // Date read only matters if it's from you
+            (e.isFromMe && (e.dateRead?.getTime() ?? 0)) >= afterTime ||
+            // Date edited can be from anyone
             (e.dateEdited?.getTime() ?? 0) >= afterTime
         ));
 
