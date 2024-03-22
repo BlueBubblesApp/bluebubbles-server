@@ -36,8 +36,16 @@ export class MessagePoller extends IMessagePoller {
             (e.isFromMe && (e.dateDelivered?.getTime() ?? 0)) >= afterTime ||
             // Date read only matters if it's from you
             (e.isFromMe && (e.dateRead?.getTime() ?? 0)) >= afterTime ||
-            // Date edited can be from anyone
-            (e.dateEdited?.getTime() ?? 0) >= afterTime
+            // Date edited can be from anyone (should include edits & unsends)
+            (e.dateEdited?.getTime() ?? 0) >= afterTime || 
+            // Date retracted can be from anyone, but Apple doesn't even use this field.
+            // We still want to be thorough and check it.
+            // isEmpty is what's actually used by Apple to determine if it's retracted.
+            // (in addition to dateEdited)
+            (e.dateRetracted?.getTime() ?? 0) >= afterTime ||
+            (e.isEmpty ?? false) ||
+            // If didNotifyRecipient changed (from false to true)
+            (e.didNotifyRecipient ?? false)
         ));
 
         // Handle group changes
