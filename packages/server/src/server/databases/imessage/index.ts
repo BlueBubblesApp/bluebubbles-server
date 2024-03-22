@@ -65,7 +65,8 @@ export class MessageRepository {
         withLastMessage = false,
         offset = 0,
         limit = null,
-        where = []
+        where = [],
+        orderBy = "chat.ROWID",
     }: ChatParams = {}): Promise<[Chat[], number]> {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
@@ -105,7 +106,7 @@ export class MessageRepository {
             query.having("message.ROWID = MAX(message.ROWID)");
         }
 
-        query.orderBy("chat.ROWID", "DESC");
+        query.orderBy(orderBy, "DESC");
 
         // Set page params
         if (offset != null) query.skip(offset);

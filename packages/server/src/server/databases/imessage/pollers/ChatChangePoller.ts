@@ -32,7 +32,8 @@ export class ChatUpdatePoller extends IMessagePoller {
                     statement: "chat.last_read_message_timestamp >= :after",
                     args: { after: convertDateTo2001Time(after) }
                 }
-            ]
+            ],
+            orderBy: "chat.lastReadMessageTimestamp"
         });
 
         // Emit all the chats that had a last message update

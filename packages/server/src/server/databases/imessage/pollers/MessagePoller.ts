@@ -14,12 +14,27 @@ export class MessagePoller extends IMessagePoller {
     async poll(after: Date): Promise<IMessagePollResult[]> {
         let results: IMessagePollResult[] = [];
 
-        const entries = await this.repo.getUpdatedMessages({
-            after,
+        // Lookback 1 week only using date created because date created
+        // has a SQLite index on it, while the other dates don't.
+        // Because of this, searching is much faster. We can do the filtering
+        // after the query.
+        const oneWeekMs = 1000 * 60 * 60 * 24 * 7 * 52;
+        const afterLookback = new Date(after.getTime() - oneWeekMs);
+        const [search, __] = await this.repo.getMessages({
+            after: afterLookback,
             withChats: true,
-            includeCreated: true,
             orderBy: "message.dateCreated"
         });
+
+        // Filter out messages that aren't within our actual range.
+        // Do this here instead of in SQLite to save on performance
+        const afterTime = after.getTime();
+        const entries = search.filter(e => (
+            (e.dateCreated?.getTime() ?? 0) >= afterTime ||
+            (e.dateDelivered?.getTime() ?? 0) >= afterTime ||
+            (e.dateRead?.getTime() ?? 0) >= afterTime ||
+            (e.dateEdited?.getTime() ?? 0) >= afterTime
+        ));
 
         // Handle group changes
         const groupChangeEntries = entries.filter(e => isEmpty(e.text) && [1, 2, 3].includes(e.itemType));

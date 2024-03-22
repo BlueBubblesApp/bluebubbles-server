@@ -27,6 +27,7 @@ export type ChatParams = {
     offset?: number;
     limit?: number;
     where?: DBWhereItem[];
+    orderBy?: string;
 };
 
 export type HandleParams = {
