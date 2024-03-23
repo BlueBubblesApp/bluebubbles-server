@@ -53,16 +53,18 @@ export class MessagePoller extends IMessagePoller {
         results = results.concat(this.handleGroupChanges(groupChangeEntries));
 
         // Fetch previously unsent messages
-        const [previouslyUnsentEntries, _] = await this.repo.getMessages({
-            withChats: true,
-            where: [
-                {
-                    statement: `message.ROWID in (${this.unsentIds.join(", ")})`,
-                    args: null
-                }
-            ]
-        });
-        results = results.concat(await this.handlePreviouslyUnsent(previouslyUnsentEntries));
+        if (this.unsentIds.length > 0) {
+            const [previouslyUnsentEntries, _] = await this.repo.getMessages({
+                withChats: true,
+                where: [
+                    {
+                        statement: `message.ROWID in (${this.unsentIds.join(", ")})`,
+                        args: null
+                    }
+                ]
+            });
+            results = results.concat(await this.handlePreviouslyUnsent(previouslyUnsentEntries));
+        }
 
         // Handle new unsent messages
         const unsent = entries.filter(e => !e.isSent);
