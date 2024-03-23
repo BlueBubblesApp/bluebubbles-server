@@ -257,9 +257,7 @@ export class MessageRepository {
         if (withAttachments)
             query.leftJoinAndSelect(
                 "message.attachments",
-                "attachment",
-                "message.ROWID = message_attachment.message_id AND " +
-                    "attachment.ROWID = message_attachment.attachment_id"
+                "attachment"
             );
 
         // Inner-join because all messages will have a chat
@@ -267,15 +265,13 @@ export class MessageRepository {
             query
                 .innerJoinAndSelect(
                     "message.chats",
-                    "chat",
-                    "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
+                    "chat"
                 )
                 .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
             query.innerJoinAndSelect(
                 "message.chats",
-                "chat",
-                "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
+                "chat"
             );
         }
 
@@ -302,6 +298,8 @@ export class MessageRepository {
         query.orderBy(orderBy, sort);
         query.skip(offset);
         query.take(limit);
+
+        console.log(query.getSql());
 
         return await query.getManyAndCount();
     }
@@ -340,9 +338,7 @@ export class MessageRepository {
         if (withAttachments)
             query.leftJoinAndSelect(
                 "message.attachments",
-                "attachment",
-                "message.ROWID = message_attachment.message_id AND " +
-                    "attachment.ROWID = message_attachment.attachment_id"
+                "attachment"
             );
 
         // Inner-join because all messages will have a chat
@@ -350,15 +346,13 @@ export class MessageRepository {
             query
                 .innerJoinAndSelect(
                     "message.chats",
-                    "chat",
-                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                    "chat"
                 )
                 .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
             query.innerJoinAndSelect(
                 "message.chats",
-                "chat",
-                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                "chat"
             );
         }
 
