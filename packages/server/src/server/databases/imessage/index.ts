@@ -9,11 +9,14 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import { isNotEmpty } from "@server/helpers/utils";
 import { isMinHighSierra, isMinVentura } from "@server/env";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
  */
-export class MessageRepository {
+export class MessageRepository extends Loggable {
+    tag = "MessageRepository";
+
     db: DataSource = null;
 
     dbPath: string;
@@ -21,6 +24,7 @@ export class MessageRepository {
     dbPathWal: string;
 
     constructor() {
+        super();
         this.dbPath = `${process.env.HOME}/Library/Messages/chat.db`;
         this.dbPathWal = `${process.env.HOME}/Library/Messages/chat.db-wal`;
         this.db = null;
@@ -299,8 +303,7 @@ export class MessageRepository {
         query.skip(offset);
         query.take(limit);
 
-        console.log(query.getSql());
-
+        this.log.debug(`Executing SQL query: ${query.getQuery()}`);
         return await query.getManyAndCount();
     }
 
