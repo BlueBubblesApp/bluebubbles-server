@@ -21,11 +21,24 @@ export class MessagePoller extends IMessagePoller {
         // The incremental sync should pick up on anything changed outside of this range.
         const oneWeekMs = 1000 * 60 * 60 * 24 * 7;
         const afterLookback = new Date(after.getTime() - oneWeekMs);
+
+        this.log.debug('Polling for raw messages...');
+        let start = new Date().getTime();
+        await await this.repo.getMessagesRaw({
+            after: afterLookback,
+            withChats: true,
+            orderBy: "message.dateCreated"
+        });
+        this.log.debug(`Raw message query took ${new Date().getTime() - start}ms`);
+
+        this.log.debug('Polling for messages...');
+        start = new Date().getTime();
         const [search, __] = await this.repo.getMessages({
             after: afterLookback,
             withChats: true,
             orderBy: "message.dateCreated"
         });
+        this.log.debug(`Message query took ${new Date().getTime() - start}ms`);
 
         // Filter out messages that aren't within our actual range.
         // Do this here instead of in SQLite to save on performance

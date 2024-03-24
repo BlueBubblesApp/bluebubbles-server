@@ -227,9 +227,8 @@ export class MessageRepository extends Loggable {
     }
 
     /**
-     * Gets all messages associated with a chat
+     * Query the messages table
      *
-     * @param chat The chat to get the messages from
      * @param offset The offset to start getting the messages from
      * @param limit The max number of messages to return
      * @param after The earliest date to get messages from
@@ -303,8 +302,86 @@ export class MessageRepository extends Loggable {
         query.skip(offset);
         query.take(limit);
 
-        this.log.debug(`Executing SQL query: ${query.getQuery()}`);
         return await query.getManyAndCount();
+    }
+
+    /**
+     * Query the messages table
+     *
+     * @param offset The offset to start getting the messages from
+     * @param limit The max number of messages to return
+     * @param after The earliest date to get messages from
+     * @param before The latest date to get messages from
+     */
+    async getMessagesRaw({
+        chatGuid = null,
+        offset = 0,
+        limit = 100,
+        after = null,
+        before = null,
+        withChats = false,
+        withChatParticipants = false,
+        withAttachments = true,
+        sort = "DESC",
+        orderBy = "message.dateCreated",
+        where = []
+    }: DBMessageParams): Promise<Message[]> {
+        // Sanitize some params
+        if (after && typeof after === "number") after = new Date(after);
+        if (before && typeof before === "number") before = new Date(before);
+
+        // Get messages with sender and the chat it's from
+        const query = this.db
+            .getRepository(Message)
+            .createQueryBuilder("message")
+            .leftJoinAndSelect("message.handle", "handle");
+
+        if (withAttachments)
+            query.leftJoinAndSelect(
+                "message.attachments",
+                "attachment"
+            );
+
+        // Inner-join because all messages will have a chat
+        if (chatGuid) {
+            query
+                .innerJoinAndSelect(
+                    "message.chats",
+                    "chat"
+                )
+                .andWhere("chat.guid = :guid", { guid: chatGuid });
+        } else if (withChats) {
+            query.innerJoinAndSelect(
+                "message.chats",
+                "chat"
+            );
+        }
+
+        if (withChatParticipants) {
+            query.innerJoinAndSelect("chat.participants", "chandle");
+        }
+
+        // Add any custom WHERE clauses
+        if (isNotEmpty(where)) {
+            query.andWhere(
+                new Brackets(qb => {
+                    for (const item of where) {
+                        qb.andWhere(item.statement, item.args);
+                    }
+                })
+            );
+        }
+
+        if (after || before) {
+            this.applyMessageDateQuery(query, after as Date, before as Date);
+        }
+
+        // Add pagination params
+        query.orderBy(orderBy, sort);
+        query.skip(offset);
+        query.take(limit);
+
+        return await query.getRawMany();
     }
 
     /**
