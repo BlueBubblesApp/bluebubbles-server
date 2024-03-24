@@ -21,17 +21,14 @@ export class MessagePoller extends IMessagePoller {
         // The incremental sync should pick up on anything changed outside of this range.
         const oneWeekMs = 1000 * 60 * 60 * 24 * 7;
         const afterLookback = new Date(after.getTime() - oneWeekMs);
-        this.log.debug(`Polling for messages after ${afterLookback.toISOString()}`);
         const [search, __] = await this.repo.getMessages({
             after: afterLookback,
             withChats: true,
             orderBy: "message.dateCreated"
         });
-        this.log.debug(`SQL call completed and found ${search.length} message(s)`);
 
         // Filter out messages that aren't within our actual range.
         // Do this here instead of in SQLite to save on performance
-        this.log.debug(`Filtering SQL results down to messages after ${after.toISOString()}`);
         const afterTime = after.getTime();
         const entries = search.filter(e => (
             (e.dateCreated?.getTime() ?? 0) >= afterTime ||
@@ -50,17 +47,13 @@ export class MessagePoller extends IMessagePoller {
             // If didNotifyRecipient changed (from false to true)
             (e.didNotifyRecipient ?? false)
         ));
-        this.log.debug(`Filtered down to ${entries.length} message(s) after ${after.toISOString()}`);
 
         // Handle group changes
-        this.log.debug(`Checking for group changes in ${entries.length} message(s)`);
         const groupChangeEntries = entries.filter(e => isEmpty(e.text) && [1, 2, 3].includes(e.itemType));
         results = results.concat(this.handleGroupChanges(groupChangeEntries));
-        this.log.debug(`Completed group change checks`);
 
         // Fetch previously unsent messages
         if (this.unsentIds.length > 0) {
-            this.log.debug(`Handling previously unsent messages`);
             const [previouslyUnsentEntries, _] = await this.repo.getMessages({
                 withChats: true,
                 where: [
@@ -71,21 +64,17 @@ export class MessagePoller extends IMessagePoller {
                 ]
             });
             results = results.concat(await this.handlePreviouslyUnsent(previouslyUnsentEntries));
-            this.log.debug(`Completed handling previously unsent messages`);
         }
 
         // Handle new unsent messages
-        this.log.debug(`Looking for new unsent messages`);
         const unsent = entries.filter(e => !e.isSent);
         for (const entry of unsent) {
             if (!this.unsentIds.includes(entry.ROWID)) {
                 this.unsentIds.push(entry.ROWID);
             }
         }
-        this.log.debug(`Completed looking for new unsent messages`);
 
         // Handle the new/updated message
-        this.log.debug(`Processing new/updated messages`);
         for (const entry of entries) {
             const event = this.processMessageEvent(entry);
             if (!event) continue;
@@ -99,7 +88,6 @@ export class MessagePoller extends IMessagePoller {
             results.push({ eventType: event, data: entry });
         }
 
-        this.log.debug(`Returning new message results`);
         return results;
     }
 
