@@ -38,7 +38,7 @@ module.exports = {
                 "target": "default",
                 "arch": [
                     'x64',
-                    // 'arm64'
+                    'arm64'
                 ]
             }
         ],
