@@ -1,10 +1,12 @@
-import { EventCache } from "@server/eventCache";
+import fs from "fs";
 import { MultiFileWatcher } from "@server/lib/MultiFileWatcher";
+import type { FileChangeEvent } from "@server/lib/MultiFileWatcher";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { Sema } from "async-sema";
-import { IMessageCache, IMessagePollResult, IMessagePoller } from "../pollers";
+import { IMessageCache, IMessagePoller } from "../pollers";
 import { MessageRepository } from "..";
 import { waitMs } from "@server/helpers/utils";
+import { DebounceSubsequentWithWait } from "@server/lib/decorators/DebounceDecorator";
 
 export class IMessageListener extends Loggable {
     tag = "IMessageListener";
@@ -22,6 +24,8 @@ export class IMessageListener extends Loggable {
     pollers: IMessagePoller[];
 
     cache: IMessageCache;
+
+    lastCheck = 0;
 
     constructor({ filePaths, repo, cache }: { filePaths: string[], repo: MessageRepository, cache: IMessageCache }) {
         super();
@@ -43,38 +47,30 @@ export class IMessageListener extends Loggable {
         this.pollers.push(poller);
     }
 
-    start() {
-        let lastCheck = 0;
+    getEarliestModifiedDate() {
+        let earliest = new Date();
+        for (const filePath of this.filePaths) {
+            const stat = fs.statSync(filePath);
+            if (stat.mtime < earliest) {
+                earliest = stat.mtime;
+            }
+        }
+
+        return earliest;
+    }
+
+    async start() {
+        this.lastCheck = 0;
+        this.stopped = false;
+
+        // Perform an initial poll to kinda seed the cache.
+        // We'll use the earliest modified date of the files to determine the initial poll date.
+        // We'll also subtract 1 minute just to pre-load the cache with a little bit of data.
+        await this.poll(new Date(this.getEarliestModifiedDate().getTime() - 60000), false);
+
         this.watcher = new MultiFileWatcher(this.filePaths);
-        this.watcher.on("change", async event => {
-            await this.processLock.acquire();
-
-            if (event.currentStat.mtimeMs > lastCheck) {
-                // Use the currentStat's mtimeMs - 10 seconds to account for any time drift.
-                // due to the time it takes to write to the disk.
-                const after = new Date(event.currentStat.mtimeMs - 10000);
-
-                // Invoke the different pollers
-                for (const poller of this.pollers) {
-                    const startMs = new Date().getTime();
-                    const results = await poller.poll(after);
-                    for (const result of results) {
-                        this.emit(result.eventType, result.data);
-                    }
-                    const endMs = new Date().getTime();
-                    this.log.debug(`${poller.tag} took ${endMs - startMs}ms`);
-                }
-
-                // Trim the cache and save the last check
-                this.cache.trimCaches();
-                lastCheck = event.currentStat.mtimeMs;
-            }
-
-            if (this.processLock.nrWaiting() > 0) {
-                await waitMs(10);
-            }
-
-            this.processLock.release();
+        this.watcher.on("change", async (event: FileChangeEvent) => {
+            await this.handleChangeEvent(event);
         });
 
         this.watcher.on("error", (error) => {
@@ -83,5 +79,50 @@ export class IMessageListener extends Loggable {
         });
 
         this.watcher.start();
+    }
+
+    @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', 500)
+    async handleChangeEvent(event: FileChangeEvent) {
+        this.log.debug(`Detected change in database files: ${event.filePath}`);
+        await this.processLock.acquire();
+
+        // Check against the last check using the current change timestamp
+        if (event.currentStat.mtimeMs > this.lastCheck) {
+            this.log.debug(`Processing DB change: ${event.currentStat.mtimeMs} > ${this.lastCheck}`);
+            // Update the last check time.
+            // We'll use the currentStat's mtimeMs - the time it took to poll.
+            this.lastCheck = event.currentStat.mtimeMs;
+            this.log.debug(`Saving last check time: ${this.lastCheck}`);
+            // Use the previousStat's mtimeMs - 30 seconds to account for any time drift.
+            // This allows us to fetch everything since the last mtimeMs.
+            await this.poll(new Date(event.prevStat.mtimeMs - 30000));
+
+            // Trim the cache so it doesn't get too big
+            this.cache.trimCaches();
+
+            if (this.processLock.nrWaiting() > 0) {
+                await waitMs(100);
+            }
+        } else {
+            this.log.debug(`Not processing DB change: ${event.currentStat.mtimeMs} <= ${this.lastCheck}`);
+        }
+
+        this.processLock.release();
+    }
+
+    async poll(after: Date, emitResults = true) {
+        for (const poller of this.pollers) {
+            const startMs = new Date().getTime();
+            const results = await poller.poll(after);
+
+            if (emitResults) {
+                for (const result of results) {
+                    this.emit(result.eventType, result.data);
+                }
+            }
+
+            const endMs = new Date().getTime();
+            // this.log.debug(`${poller.tag} took ${endMs - startMs}ms`);
+        }
     }
 }

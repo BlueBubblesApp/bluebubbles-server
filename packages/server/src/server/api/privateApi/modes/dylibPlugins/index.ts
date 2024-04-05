@@ -93,6 +93,10 @@ export abstract class DylibPlugin extends Loggable {
             throw new Error(`Unable to locate ${this.name} parent process!`);
         }
 
+        // Don't log the output to stdout
+        zx.$.verbose = false;
+
+
         while (this.dylibFailureCounter < 5) {
             try {
                 // Stop the running Messages app
