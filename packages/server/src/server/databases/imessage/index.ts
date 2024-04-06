@@ -381,7 +381,9 @@ export class MessageRepository extends Loggable {
         query.skip(offset);
         query.take(limit);
 
-        return await query.getRawMany();
+        const [sql, parameters] = query.getQueryAndParameters();
+        const results = await this.db.query(sql, parameters);
+        return results;
     }
 
     /**
