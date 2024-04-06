@@ -180,8 +180,8 @@ export class MessageSerializer {
                     cacheRoomnames: message.cacheRoomnames,
                     isSpam: message.isSpam,
                     isExpired: message.isExpirable,
-                    timeExpressiveSendStyleId: message.timeExpressiveSendStyleId
-                        ? message.timeExpressiveSendStyleId.getTime()
+                    timeExpressiveSendPlayed: message.timeExpressiveSendPlayed
+                        ? message.timeExpressiveSendPlayed.getTime()
                         : null,
                     isAudioMessage: message.isAudioMessage,
                     replyToGuid: message.replyToGuid,

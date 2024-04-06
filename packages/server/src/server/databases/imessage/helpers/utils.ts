@@ -9,6 +9,7 @@ import { Metadata } from "@server/fileSystem/types";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
+import { NSAttributedString, Unarchiver } from "node-typedstream";
 
 
 export const getConversionPath = (attachment: Attachment, extension: string): string => {
@@ -166,3 +167,43 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
 
     return metadata;
 };
+
+export const convertAttributedBody = (value: Buffer): any[] => {
+    if (isEmpty(value)) return null;
+
+        try {
+            const attributedBody = Unarchiver.open(value, Unarchiver.BinaryDecoding.decodable).decodeAll();
+            if (isEmpty(attributedBody)) return null;
+
+            let body = null;
+            if (Array.isArray(attributedBody)) {
+                body = attributedBody.map(i => {
+                    if (i.values) {
+                        return i.values.filter((e: any) => {
+                            return e && e instanceof NSAttributedString;
+                        });
+                    } else {
+                        return i;
+                    }
+                });
+            } else {
+                body = attributedBody;
+            }
+
+            // Make sure we don't have nested arrays
+            if (Array.isArray(body)) {
+                body = body.flat();
+            }
+
+            // Make sure all outputs are arrays
+            if (!Array.isArray(body)) {
+                body = [body];
+            }
+
+            return body;
+        } catch (e: any) {
+            Server().log(`Failed to deserialize archive: ${e.message}`, "debug");
+        }
+
+        return null;
+    }

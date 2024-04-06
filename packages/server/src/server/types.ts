@@ -59,7 +59,7 @@ export type MessageResponse = {
     associatedMessageGuid: string | null;
     associatedMessageType: string | null;
     expressiveSendStyleId: string | null;
-    timeExpressiveSendStyleId?: number | null;
+    timeExpressiveSendPlayed?: number | null;
     replyToGuid?: string | null;
     isCorrupt?: boolean;
     isSpam?: boolean;

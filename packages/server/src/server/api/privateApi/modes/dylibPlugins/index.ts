@@ -96,7 +96,6 @@ export abstract class DylibPlugin extends Loggable {
         // Don't log the output to stdout
         zx.$.verbose = false;
 
-
         while (this.dylibFailureCounter < 5) {
             try {
                 // Stop the running Messages app

@@ -2,6 +2,7 @@ import { IMessagePollResult, IMessagePollType, IMessagePoller } from ".";
 import { Message } from "../entity/Message";
 import { isEmpty } from "@server/helpers/utils";
 import { Server } from "@server";
+import { MessageDecoder } from "../entity/decoders/MessageDecoder";
 
 
 export class MessagePoller extends IMessagePoller {
@@ -22,11 +23,26 @@ export class MessagePoller extends IMessagePoller {
         const oneWeekMs = 1000 * 60 * 60 * 24 * 7;
         const afterLookback = new Date(after.getTime() - oneWeekMs);
 
+        let start = new Date();
         const [search, __] = await this.repo.getMessages({
             after: afterLookback,
             withChats: true,
             orderBy: "message.dateCreated"
         });
+        this.log.debug(`getMessages took: ${new Date().getTime() - start.getTime()}ms`);
+
+        start = new Date();
+        await this.repo.getMessagesRaw({
+            after: afterLookback,
+            withChats: true,
+            orderBy: "message.dateCreated"
+        });
+
+        this.log.debug(`getMessagesRaw took: ${new Date().getTime() - start.getTime()}ms`);
+
+        const decoder = new MessageDecoder();
+        const messages = decoder.decodeList(search);
+        this.log.debug(`Full raw & decoding took: ${new Date().getTime() - start.getTime()}ms`);
 
         // Filter out messages that aren't within our actual range.
         // Do this here instead of in SQLite to save on performance
