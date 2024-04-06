@@ -103,8 +103,10 @@ export class MessageDecoder {
             if (!chatExists) message.chats.push(chat);
         }
 
-        const handle = this.decodeHandle(entry);
-        message.handle = handle;
+        if (!message.handle) {
+            const handle = this.decodeHandle(entry);
+            message.handle = handle;
+        }
 
         this.messageCache.set(message.ROWID, message);
         return message;
