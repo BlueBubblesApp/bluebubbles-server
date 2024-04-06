@@ -92,13 +92,19 @@ export class MessageDecoder {
         }
 
         const attachment = this.decodeAttachment(entry);
-        if (attachment) message.attachments.push(attachment);
+        if (attachment) {
+            const attachmentExists = message.attachments.find((a) => a.ROWID === attachment.ROWID);
+            if (!attachmentExists) message.attachments.push(attachment);
+        }
 
         const chat = this.decodeChat(entry);
-        if (chat) message.chats.push(chat);
+        if (chat) {
+            const chatExists = message.chats.find((c) => c.ROWID === chat.ROWID);
+            if (!chatExists) message.chats.push(chat);
+        }
 
         const handle = this.decodeHandle(entry);
-        if (handle) message.handle = handle;
+        message.handle = handle;
 
         this.messageCache.set(message.ROWID, message);
         return message;
