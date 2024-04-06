@@ -325,7 +325,7 @@ export class MessageRepository extends Loggable {
         sort = "DESC",
         orderBy = "message.dateCreated",
         where = []
-    }: DBMessageParams): Promise<Message[]> {
+    }: DBMessageParams): Promise<any[]> {
         // Sanitize some params
         if (after && typeof after === "number") after = new Date(after);
         if (before && typeof before === "number") before = new Date(before);

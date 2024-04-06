@@ -89,6 +89,9 @@ export class MessageDecoder {
             message.partCount = entry.message_part_count;
             message.wasDeliveredQuietly = Boolean(entry.message_was_delivered_quietly);
             message.didNotifyRecipient = Boolean(entry.message_did_notify_recipient);
+        
+            message.chats = [];
+            message.attachments = [];
         }
 
         const attachment = this.decodeAttachment(entry);
