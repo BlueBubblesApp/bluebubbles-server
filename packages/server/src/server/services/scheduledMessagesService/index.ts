@@ -11,6 +11,7 @@ import {
     SCHEDULED_MESSAGE_UPDATED
 } from "@server/events";
 import { Loggable } from "@server/lib/logging/Loggable";
+import { safeTimeout } from "@server/utils/TimeUtils";
 
 /**
  * The possible states of a scheduled message
@@ -282,9 +283,12 @@ export class ScheduledMessagesService extends Loggable {
             await this.handleExpiredMessage(scheduledMessage);
         } else {
             this.log.info(`Scheduling (in ${diff} ms): ${scheduledMessage.toString()}`);
-            this.timers[String(scheduledMessage.id)] = setTimeout(() => {
+            this.timers[String(scheduledMessage.id)] = safeTimeout(() => {
                 this.sendScheduledMessage(scheduledMessage);
-            }, diff);
+            }, diff, (newTimeout) => {
+                clearTimeout(this.timers[String(scheduledMessage.id)]);
+                this.timers[String(scheduledMessage.id)] = newTimeout;
+            });
         }
     }
 
