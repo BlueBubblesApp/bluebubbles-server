@@ -453,7 +453,9 @@ export class FCMService extends Loggable {
                 tokens: devices,
                 android: {
                     priority,
-                    ttl: 60 * 60 * 24 // 24 hr expiration
+                    // 24 hour TTL (in milliseconds).
+                    // The Firebase library takes milliseconds, even though the docs say seconds
+                    ttl: 24 * 60 * 60 * 1000
                 }
             };
 

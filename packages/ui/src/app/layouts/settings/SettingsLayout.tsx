@@ -6,7 +6,6 @@ import { PrivateApiSettings } from './privateApi/PrivateApiSettings';
 import { UpdateSettings } from './update/UpdateSettings';
 import { ResetSettings } from './reset/ResetSettings';
 import { ThemeSettings } from './theme/ThemeSettings';
-import { DatabaseSettings } from './database/DatabaseSettings';
 import { PermissionRequirements } from '../../components/PermissionRequirements';
 import { AttachmentCacheBox } from 'app/components/AttachmentCacheBox';
 
@@ -18,7 +17,6 @@ export const SettingsLayout = (): JSX.Element => {
                 <ConnectionSettings />
                 <PrivateApiSettings />
                 <FeatureSettings />
-                <DatabaseSettings />
                 <UpdateSettings />
                 <ThemeSettings />
                 <Stack direction='row' align='flex-start' flexWrap='wrap' p={5}>
