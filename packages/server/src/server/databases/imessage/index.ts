@@ -9,14 +9,24 @@ import { Message } from "@server/databases/imessage/entity/Message";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import { isNotEmpty } from "@server/helpers/utils";
 import { isMinHighSierra, isMinVentura } from "@server/env";
+import { Loggable } from "@server/lib/logging/Loggable";
 
 /**
  * A repository class to facilitate pulling information from the iMessage database
  */
-export class MessageRepository {
+export class MessageRepository extends Loggable {
+    tag = "MessageRepository";
+
     db: DataSource = null;
 
+    dbPath: string;
+
+    dbPathWal: string;
+
     constructor() {
+        super();
+        this.dbPath = `${process.env.HOME}/Library/Messages/chat.db`;
+        this.dbPathWal = `${process.env.HOME}/Library/Messages/chat.db-wal`;
         this.db = null;
     }
 
@@ -27,7 +37,7 @@ export class MessageRepository {
         this.db = new DataSource({
             name: "iMessage",
             type: "better-sqlite3",
-            database: `${process.env.HOME}/Library/Messages/chat.db`,
+            database: this.dbPath,
             entities: [Chat, Handle, Message, Attachment]
         });
 
@@ -59,7 +69,8 @@ export class MessageRepository {
         withLastMessage = false,
         offset = 0,
         limit = null,
-        where = []
+        where = [],
+        orderBy = "chat.ROWID",
     }: ChatParams = {}): Promise<[Chat[], number]> {
         const query = this.db.getRepository(Chat).createQueryBuilder("chat");
 
@@ -99,7 +110,7 @@ export class MessageRepository {
             query.having("message.ROWID = MAX(message.ROWID)");
         }
 
-        query.orderBy("chat.ROWID", "DESC");
+        query.orderBy(orderBy, "DESC");
 
         // Set page params
         if (offset != null) query.skip(offset);
@@ -216,9 +227,8 @@ export class MessageRepository {
     }
 
     /**
-     * Gets all messages associated with a chat
+     * Query the messages table
      *
-     * @param chat The chat to get the messages from
      * @param offset The offset to start getting the messages from
      * @param limit The max number of messages to return
      * @param after The earliest date to get messages from
@@ -250,9 +260,7 @@ export class MessageRepository {
         if (withAttachments)
             query.leftJoinAndSelect(
                 "message.attachments",
-                "attachment",
-                "message.ROWID = message_attachment.message_id AND " +
-                    "attachment.ROWID = message_attachment.attachment_id"
+                "attachment"
             );
 
         // Inner-join because all messages will have a chat
@@ -260,15 +268,13 @@ export class MessageRepository {
             query
                 .innerJoinAndSelect(
                     "message.chats",
-                    "chat",
-                    "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
+                    "chat"
                 )
                 .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
             query.innerJoinAndSelect(
                 "message.chats",
-                "chat",
-                "message.ROWID = message_chat.message_id AND chat.ROWID = message_chat.chat_id"
+                "chat"
             );
         }
 
@@ -300,6 +306,87 @@ export class MessageRepository {
     }
 
     /**
+     * Query the messages table
+     *
+     * @param offset The offset to start getting the messages from
+     * @param limit The max number of messages to return
+     * @param after The earliest date to get messages from
+     * @param before The latest date to get messages from
+     */
+    async getMessagesRaw({
+        chatGuid = null,
+        offset = 0,
+        limit = 100,
+        after = null,
+        before = null,
+        withChats = false,
+        withChatParticipants = false,
+        withAttachments = true,
+        sort = "DESC",
+        orderBy = "message.dateCreated",
+        where = []
+    }: DBMessageParams): Promise<any[]> {
+        // Sanitize some params
+        if (after && typeof after === "number") after = new Date(after);
+        if (before && typeof before === "number") before = new Date(before);
+
+        // Get messages with sender and the chat it's from
+        const query = this.db
+            .getRepository(Message)
+            .createQueryBuilder("message")
+            .leftJoinAndSelect("message.handle", "handle");
+
+        if (withAttachments)
+            query.leftJoinAndSelect(
+                "message.attachments",
+                "attachment"
+            );
+
+        // Inner-join because all messages will have a chat
+        if (chatGuid) {
+            query
+                .innerJoinAndSelect(
+                    "message.chats",
+                    "chat"
+                )
+                .andWhere("chat.guid = :guid", { guid: chatGuid });
+        } else if (withChats) {
+            query.innerJoinAndSelect(
+                "message.chats",
+                "chat"
+            );
+        }
+
+        if (withChatParticipants) {
+            query.innerJoinAndSelect("chat.participants", "chandle");
+        }
+
+        // Add any custom WHERE clauses
+        if (isNotEmpty(where)) {
+            query.andWhere(
+                new Brackets(qb => {
+                    for (const item of where) {
+                        qb.andWhere(item.statement, item.args);
+                    }
+                })
+            );
+        }
+
+        if (after || before) {
+            this.applyMessageDateQuery(query, after as Date, before as Date);
+        }
+
+        // Add pagination params
+        query.orderBy(orderBy, sort);
+        query.skip(offset);
+        query.take(limit);
+
+        const [sql, parameters] = query.getQueryAndParameters();
+        const results = await this.db.query(sql, parameters);
+        return results;
+    }
+
+    /**
      * Gets all messages that have been updated
      *
      * @param chat The chat to get the messages from
@@ -316,6 +403,7 @@ export class MessageRepository {
         before = null,
         withChats = false,
         withAttachments = true,
+        includeCreated = false,
         sort = "DESC",
         where = []
     }: DBMessageParams) {
@@ -332,9 +420,7 @@ export class MessageRepository {
         if (withAttachments)
             query.leftJoinAndSelect(
                 "message.attachments",
-                "attachment",
-                "message.ROWID = message_attachment.message_id AND " +
-                    "attachment.ROWID = message_attachment.attachment_id"
+                "attachment"
             );
 
         // Inner-join because all messages will have a chat
@@ -342,15 +428,13 @@ export class MessageRepository {
             query
                 .innerJoinAndSelect(
                     "message.chats",
-                    "chat",
-                    "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                    "chat"
                 )
                 .andWhere("chat.guid = :guid", { guid: chatGuid });
         } else if (withChats) {
             query.innerJoinAndSelect(
                 "message.chats",
-                "chat",
-                "message.ROWID == message_chat.message_id AND chat.ROWID == message_chat.chat_id"
+                "chat"
             );
         }
 
@@ -367,7 +451,7 @@ export class MessageRepository {
 
         // Add date_delivered constraints
         if (after || before) {
-            this.applyMessageUpdateDateQuery(query, after as Date, before as Date);
+            this.applyMessageUpdateDateQuery(query, after as Date, before as Date, includeCreated);
         }
 
         // Add pagination params
@@ -599,9 +683,29 @@ export class MessageRepository {
         );
     }
 
-    applyMessageUpdateDateQuery(query: SelectQueryBuilder<Message>, after?: Date, before?: Date) {
+    applyMessageUpdateDateQuery(
+        query: SelectQueryBuilder<Message>,
+        after?: Date,
+        before?: Date,
+        includeCreated = false
+    ) {
         query.andWhere(
             new Brackets(qb => {
+                if (includeCreated) {
+                    qb.orWhere(
+                        new Brackets(qb2 => {
+                            if (after)
+                                qb2.andWhere("message.date >= :after", {
+                                    after: convertDateTo2001Time(after)
+                                });
+                            if (before)
+                                qb2.andWhere("message.date <= :before", {
+                                    before: convertDateTo2001Time(before)
+                                });
+                        })
+                    );
+                }
+
                 qb.orWhere(
                     new Brackets(qb2 => {
                         if (after)

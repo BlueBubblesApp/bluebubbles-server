@@ -102,4 +102,8 @@ export class Chat {
         transformer: BooleanTransformer
     })
     successfulQuery: boolean;
+
+    get isGroup() {
+        return this.style === 43;
+    }
 }

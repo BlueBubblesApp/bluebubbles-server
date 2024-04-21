@@ -1,16 +1,10 @@
-import { MessageRepository } from "@server/databases/imessage";
-import { EventCache } from "@server/eventCache";
-import { ChatChangeListener } from "./chatChangeListener";
 import { convertDateTo2001Time } from "../helpers/dateUtil";
+import { IMessagePollResult, IMessagePollType, IMessagePoller } from ".";
 
-export class ChatUpdateListener extends ChatChangeListener {
-    repo: MessageRepository;
+export class ChatUpdatePoller extends IMessagePoller {
+    tag = "ChatUpdatePoller";
 
-    constructor(repo: MessageRepository, cache: EventCache, pollFrequency: number) {
-        super({ cache, pollFrequency });
-
-        this.repo = repo;
-    }
+    type = IMessagePollType.CHAT;
 
     /**
      * Gets sent entries from yourself. This method has a very different flow
@@ -28,13 +22,9 @@ export class ChatUpdateListener extends ChatChangeListener {
      * @param after
      * @param before The time right before get Entries run
      */
-    async getEntries(after: Date, before: Date): Promise<void> {
-        // Emit when a chat's read status changes
-        const afterOffsetDate = new Date(after.getTime());
-        await this.emitChatReadUpdates(afterOffsetDate);
-    }
+    async poll(after: Date): Promise<IMessagePollResult[]> {
+        const results: IMessagePollResult[] = [];
 
-    async emitChatReadUpdates(after: Date) {
         // 1: Check for updated chats
         const [updatedChats, _] = await this.repo.getChats({
             where: [
@@ -42,16 +32,19 @@ export class ChatUpdateListener extends ChatChangeListener {
                     statement: "chat.last_read_message_timestamp >= :after",
                     args: { after: convertDateTo2001Time(after) }
                 }
-            ]
+            ],
+            orderBy: "chat.lastReadMessageTimestamp"
         });
 
         // Emit all the chats that had a last message update
         for (const entry of updatedChats) {
             const event = this.processChatEvent(entry);
-            if (!event) return;
+            if (!event) continue;
 
             // Emit it as normal entry
-            super.emit(event, entry);
+            results.push({ eventType: event, data: entry });
         }
+
+        return results;
     }
 }

@@ -465,7 +465,7 @@ export class Message {
             default: 0
         })
     )
-    timeExpressiveSendStyleId: Date;
+    timeExpressiveSendPlayed: Date;
 
     @conditional(
         isMinHighSierra,
