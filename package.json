@@ -23,7 +23,7 @@
         "node": "18.19.x",
         "npm": ">=10.x",
         "yarn": ">=1.x",
-        "python": "3.10.x"
+        "python": ">=3.10.x"
     },
     "devDependencies": {
         "concurrently": "^7.0.0"
