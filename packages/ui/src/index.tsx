@@ -1,6 +1,6 @@
 import { ipcRenderer } from 'electron';
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import { Provider } from 'react-redux';
 import App from './app/App';
@@ -148,12 +148,18 @@ ipcRenderer.on('refresh-alerts', (_: any, __: any) => {
 ipcRenderer.on('update-available', (_: any, data: any) => {
     store.dispatch(setConfig({
         name: 'update_available',
-        value: true,
+        value: {
+            version: data,
+            show: true
+        },
         saveToDb: false
     }));
 });
 
-ReactDOM.render(
+const domNode = document.getElementById('root')!;
+const root = createRoot(domNode);
+
+root.render(
     <React.StrictMode>
         <Provider store={store}>
             <ColorModeScript initialColorMode={theme.config.initialColorMode} />
@@ -161,6 +167,5 @@ ReactDOM.render(
                 <App />
             </ChakraProvider>
         </Provider>
-    </React.StrictMode>,
-    document.getElementById('root')
+    </React.StrictMode>
 );

@@ -1,10 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Notification, autoUpdater as nativeUpdater } from "electron";
-import { autoUpdater, UpdateCheckResult } from "electron-updater";
+import { app, BrowserWindow, dialog, Notification } from "electron";
 import * as semver from "semver";
 import { Server } from "@server";
 import { SERVER_UPDATE, SERVER_UPDATE_DOWNLOADING, SERVER_UPDATE_INSTALLING } from "@server/events";
 import { ScheduledService } from "@server/lib/ScheduledService";
 import { Loggable } from "@server/lib/logging/Loggable";
+import axios from "axios";
 
 export class UpdateService extends Loggable {
     tag = "UpdateService";
@@ -19,7 +19,7 @@ export class UpdateService extends Loggable {
 
     hasUpdate = false;
 
-    updateInfo: UpdateCheckResult;
+    updateInfo: any;
 
     constructor(window: BrowserWindow) {
         super();
@@ -33,29 +33,6 @@ export class UpdateService extends Loggable {
         if (this.currentVersion.split(".").length > 3) {
             this.currentVersion = semver.coerce(this.currentVersion).format();
         }
-
-        const autoUpdate = Server().repo.getConfig("auto_install_updates") as boolean;
-        if (autoUpdate) {
-            autoUpdater.autoDownload = true;
-            autoUpdater.autoInstallOnAppQuit = true;
-        } else {
-            autoUpdater.autoDownload = false;
-            autoUpdater.autoInstallOnAppQuit = false;
-        }
-
-        autoUpdater.on("update-downloaded", async _ => {
-            this.log.info("Installing update...");
-            await Server().emitMessage(SERVER_UPDATE_INSTALLING, null);
-            autoUpdater.quitAndInstall();
-        });
-
-        ipcMain.handle("install-update", async (_, __) => {
-            this.log.info("Downloading update...");
-            await Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);
-            autoUpdater.downloadUpdate().then(() => {
-                this.log.info("Finished downloading update...");
-            });
-        });
     }
 
     start() {
@@ -75,19 +52,41 @@ export class UpdateService extends Loggable {
     }
 
     async checkForUpdate({ showNoUpdateDialog = false, showUpdateDialog = true } = {}): Promise<boolean> {
-        const res = (await autoUpdater?.checkForUpdates()) ?? null;
-        this.hasUpdate = !!res?.updateInfo && semver.lt(this.currentVersion, res.updateInfo.version);
-        this.updateInfo = res;
+        const releasesRes = await axios.get(
+            "https://api.github.com/repos/BlueBubblesApp/bluebubbles-server/releases",
+            {
+                headers: {
+                    Accept: "application/vnd.github.v3+json"
+                }
+            }
+        );
+
+        const releases = (releasesRes.data as any[]).filter((x) =>
+            !x.prerelease &&
+            !x.draft &&
+            x.tag_name.match(/v\d+\.\d+\.\d+/) &&
+            x.assets.some((y: any) => y.name.startsWith('BlueBubbles-') && y.name.endsWith('.dmg'))
+        );
+        if (!releases || releases.length === 0) return false;
+    
+        // Get the version of the latest release
+        const latest = releases[0];
+        const latestVersion = latest.tag_name.replace("v", "");
+        const semverVersion = semver.coerce(latestVersion).format();
+
+        // Compare the latest version to the current version
+        this.hasUpdate = semver.lt(this.currentVersion, semverVersion);
+        this.updateInfo = latest;
 
         if (this.hasUpdate) {
-            Server().emitMessage(SERVER_UPDATE, res.updateInfo.version);
-            Server().emitToUI("update-available", res.updateInfo.version);
-            Server().emit("update-available", res.updateInfo.version);
+            Server().emitMessage(SERVER_UPDATE, latestVersion);
+            Server().emitToUI("update-available", latestVersion);
+            Server().emit("update-available", latestVersion);
 
             if (showUpdateDialog) {
                 const notification = {
                     title: "BlueBubbles Update Available!",
-                    body: `BlueBubbles macOS Server v${res.updateInfo.version} is now available to be installed!`
+                    body: `BlueBubbles macOS Server v${latestVersion} is now available to be installed!`
                 };
                 new Notification(notification).show();
             }
