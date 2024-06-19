@@ -245,7 +245,7 @@ export class MessageInterface {
             throw new Error("Failed to send message!");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
@@ -297,7 +297,7 @@ export class MessageInterface {
             throw new Error("Failed to send attachment!");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
@@ -459,7 +459,7 @@ export class MessageInterface {
             Server().log(`Reaction sent with Message GUID: ${result.identifier}`, "debug");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         let retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
@@ -566,7 +566,7 @@ export class MessageInterface {
             throw new Error("Failed to send message!");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
