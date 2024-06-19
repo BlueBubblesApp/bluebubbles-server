@@ -1488,7 +1488,7 @@ class BlueBubblesServer extends EventEmitter {
         // Check the isFromMe key prior to checking the "from" key
         const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
         const time =
-            newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted;
+            newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted ?? newMessage.dateCreated;
         const updateType = newMessage.dateRetracted
             ? "Text Unsent"
             : newMessage.dateEdited
