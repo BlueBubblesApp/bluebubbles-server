@@ -118,7 +118,7 @@ export const convertImage = async (
         // If conversion is successful, we need to modify the attachment a bit
         attachment.mimeType = "image/jpeg";
         attachment.filePath = newPath;
-        attachment.transferName = basename(newPath).replace(`.${ext}`, ".jpeg");
+        attachment.transferName = basename(newPath).replace(new RegExp(`\\.${ext}$`), ".jpeg");
 
         // Set the fPath to the newly converted path
         return newPath;
