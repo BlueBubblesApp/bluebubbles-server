@@ -8,6 +8,7 @@ import { AutoStartField } from '../../../components/fields/AutoStartField';
 import { AutoCaffeinateField } from '../../../components/fields/AutoCaffeinateField';
 import { CheckForUpdatesField } from '../../../components/fields/CheckForUpdatesField';
 import { UseOledDarkModeField } from '../../../components/fields/OledDarkThemeField';
+import { OpenFindMyOnStartupField } from 'app/components/fields/OpenFindMyOnStartupField';
 
 
 export const ConfigurationsWalkthrough = (): JSX.Element => {
@@ -20,6 +21,8 @@ export const ConfigurationsWalkthrough = (): JSX.Element => {
                     you may want to checkout to customize your BlueBubbles experience!
                 </Text>
                 <Text fontSize='3xl' mt={5}>Features</Text>
+                <Box my={3} />
+                <OpenFindMyOnStartupField />
                 <Box my={3} />
                 <AutoStartField />
                 <Box my={3} />
