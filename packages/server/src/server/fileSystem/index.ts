@@ -714,4 +714,41 @@ export class FileSystem {
         const processes = await FindProcess("name", name);
         return processes.length > 0;
     }
+
+    static async createLaunchAgent(): Promise<void> {
+        const appPath = app.getPath("exe");
+        console.log(appPath);
+        const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>Label</key>
+        <string>com.bluebubbles.server</string>
+        <key>Program</key>
+        <string>${appPath}</string>
+        <key>RunAtLoad</key>
+        <true/>
+        <key>KeepAlive</key>
+        <dict>
+	        <key>SuccessfulExit</key>
+	    <false/>
+	</dict>
+    </dict>
+</plist>`;
+
+        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", "com.bluebubbles.server.plist");
+        if (fs.existsSync(filePath)) return;
+
+        fs.writeFileSync(filePath, plist);
+
+        await FileSystem.execShellCommand(`launchctl load -w ${filePath}`);
+    }
+
+    static async removeLaunchAgent(): Promise<void> {
+        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", "com.bluebubbles.server.plist");
+        if (!fs.existsSync(filePath)) return;
+
+        await FileSystem.execShellCommand(`launchctl unload -w ${filePath}`);
+        fs.unlinkSync(filePath);
+    }
 }

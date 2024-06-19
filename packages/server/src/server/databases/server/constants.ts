@@ -1,6 +1,7 @@
 
 export enum AutoStartMethods {
     None = "none",
+    Unset = "unset",
     LoginItem = "login-item",
     LaunchAgent = "launch-agent"
 }

@@ -11,7 +11,7 @@ import {
     AccordionIcon,
     Box
 } from '@chakra-ui/react';
-import { AutoStartField } from '../../../components/fields/AutoStartField';
+import { AutoStartMethodField } from '../../../components/fields/AutoStartMethodField';
 import { AutoCaffeinateField } from '../../../components/fields/AutoCaffeinateField';
 import { DockBadgeField } from '../../../components/fields/DockBadgeField';
 import { HideDockIconField } from '../../../components/fields/HideDockIconField';
@@ -33,7 +33,7 @@ export const FeatureSettings = (): JSX.Element => {
                 <Spacer />
                 <AutoCaffeinateField />
                 <Spacer />
-                <AutoStartField />
+                <AutoStartMethodField />
                 <Spacer />
                 <StartMinimizedField />
                 <Spacer />

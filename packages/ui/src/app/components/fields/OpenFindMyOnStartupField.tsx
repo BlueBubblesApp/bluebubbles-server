@@ -13,11 +13,11 @@ export interface OpenFindMyOnStartupFieldProps {
 }
 
 export const OpenFindMyOnStartupField = ({ helpText }: OpenFindMyOnStartupFieldProps): JSX.Element => {
-    const OpenFindMyOnStartup: boolean = (useAppSelector(state => state.config.open_findmy_on_startup) ?? false);
+    const openFindMyOnStartup: boolean = (useAppSelector(state => state.config.open_findmy_on_startup) ?? false);
 
     return (
         <FormControl>
-            <Checkbox id='open_findmy_on_startup' isChecked={OpenFindMyOnStartup}  onChange={onCheckboxToggle}>Open FindMy App on Startup</Checkbox>
+            <Checkbox id='open_findmy_on_startup' isChecked={openFindMyOnStartup}  onChange={onCheckboxToggle}>Open FindMy App on Startup</Checkbox>
             <FormHelperText>
                 {helpText ?? (
                     <Text>

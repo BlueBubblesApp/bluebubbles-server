@@ -4,7 +4,7 @@ import {
     Text,
     SlideFade,
 } from '@chakra-ui/react';
-import { AutoStartField } from '../../../components/fields/AutoStartField';
+import { AutoStartMethodField } from '../../../components/fields/AutoStartMethodField';
 import { AutoCaffeinateField } from '../../../components/fields/AutoCaffeinateField';
 import { CheckForUpdatesField } from '../../../components/fields/CheckForUpdatesField';
 import { UseOledDarkModeField } from '../../../components/fields/OledDarkThemeField';
@@ -24,7 +24,7 @@ export const ConfigurationsWalkthrough = (): JSX.Element => {
                 <Box my={3} />
                 <OpenFindMyOnStartupField />
                 <Box my={3} />
-                <AutoStartField />
+                <AutoStartMethodField />
                 <Box my={3} />
                 <AutoCaffeinateField />
                 <Text fontSize='3xl' mt={5}>Update Settings</Text>

@@ -70,6 +70,7 @@ import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller"
 import { IMessageCache } from "./databases/imessage/pollers";
 import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { obfuscatedHandle } from "./utils/StringUtils";
+import { AutoStartMethods } from "./databases/server/constants";
 
 const findProcess = require("find-process");
 
@@ -1053,9 +1054,39 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
-        // If auto-start changes
-        if (prevConfig.auto_start !== nextConfig.auto_start) {
-            app.setLoginItemSettings({ openAtLogin: nextConfig.auto_start as boolean, openAsHidden: true });
+        // Check if the auto-start method is None. If it is, then we need to migrate the old "auto_start"
+        // config to the new "auto_start_method" config
+        const autoStart = prevConfig.auto_start as boolean;
+        if (nextConfig.auto_start_method === AutoStartMethods.None) {
+            if (autoStart) {
+                this.logger.debug("Migrating auto-start config to new auto-start method config");
+                await this.repo.setConfig("auto_start_method", AutoStartMethods.LoginItem);
+            } else {
+                await this.repo.setConfig("auto_start_method", AutoStartMethods.Unset);
+            }
+        }
+
+        // Handle when auto start method changes
+        if (prevConfig.auto_start_method !== nextConfig.auto_start_method) {
+            // If we previously starting as a login item, remove it
+            if (prevConfig.auto_start_method === AutoStartMethods.LoginItem) {
+                app.setLoginItemSettings({ openAtLogin: false });
+            }
+
+            // If we are next starting as a login item, add it
+            if (nextConfig.auto_start_method === AutoStartMethods.LoginItem) {
+                app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
+            }
+
+            // If we are starting as a launch agent, add it
+            if (prevConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+                await FileSystem.removeLaunchAgent();
+            }
+
+            // If we are starting as a launch agent, add it
+            if (nextConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+                await FileSystem.createLaunchAgent();
+            }
         }
 
         // Handle when auto caffeinate changes
