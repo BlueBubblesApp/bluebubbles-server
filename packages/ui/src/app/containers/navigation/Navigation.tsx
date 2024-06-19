@@ -36,9 +36,8 @@ import { FiHome, FiSettings, FiMenu, FiBell, FiGithub, FiMessageCircle, FiTrash 
 import { FaDiscord, FaGoogle } from 'react-icons/fa';
 import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart, AiOutlineDownload } from 'react-icons/ai';
 import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill, BsPhone } from 'react-icons/bs';
-import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode, MdOutlineAnnouncement } from 'react-icons/md';
+import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
 import { IconType } from 'react-icons';
-import { ReactText } from 'react';
 
 import { ContactsLayout } from 'app/layouts/contacts/ContactsLayout';
 
@@ -208,7 +207,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
 interface NavItemProps extends FlexProps {
     icon: IconType;
     to: string;
-    children: ReactText;
+    children: string | number;
 }
 const NavItem = ({ icon, to, children, ...rest }: NavItemProps) => {
     const location = useLocation();
