@@ -49,18 +49,27 @@ export class FindMyFriendsCache {
         // We don't want to override a live/shallow location with a legacy one
         if (locationData?.status === "legacy" && currentData?.status !== "legacy") return false;
 
-        // We don't want to overwrite a non [0, 0] location with a [0, 0] one
+        // We don't want to overwrite a non [0, 0] location with a [0, 0] one.
+        // We also don't need to update the cache if the coordinates are the same.
         const currentCoords = currentData?.coordinates ?? [0, 0];
         const updatedCoords = locationData?.coordinates ?? [0, 0];
         const noLocationType = currentData?.status === "legacy" && locationData?.status === "legacy";
         if (
-            noLocationType &&
-            currentCoords[0] !== 0 &&
-            currentCoords[1] !== 0 &&
-            updatedCoords[0] === 0 &&
-            updatedCoords[1] === 0
-        )
+            (
+                noLocationType &&
+                currentCoords[0] !== 0 &&
+                currentCoords[1] !== 0 &&
+                updatedCoords[0] === 0 &&
+                updatedCoords[1] === 0
+            ) ||
+            (
+                currentData?.status === locationData?.status &&
+                currentCoords[0] === updatedCoords[0] &&
+                currentCoords[1] === updatedCoords[1]
+            )
+        ) {
             return false;
+        }
 
         // If the latest update has an older timestamp, ignore it.
         const updateTimestamp = locationData?.last_updated ?? 0;
