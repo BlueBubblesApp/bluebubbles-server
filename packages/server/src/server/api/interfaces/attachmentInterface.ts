@@ -1,6 +1,6 @@
 import { nativeImage } from "electron";
 import fs from "fs";
-import { getBlurHash, isEmpty, resultAwaiter } from "@server/helpers/utils";
+import { getBlurHash, isEmpty, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
 import { FileSystem } from "@server/fileSystem";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import { Server } from "@server";
@@ -44,15 +44,19 @@ export class AttachmentInterface {
         const fPath = attachment?.filePath;
         if (isEmpty(fPath)) return null;
 
-        // Get the existing extension (if any)
-        const ext = fPath.split(".").pop() ?? "";
+        // Get the existing extension (if any).
+        // If it's been converted, it'll have a double-extension.
+        let ext = fPath.includes('.heic.jpeg') ? 'heic.jpeg' : fPath.split(".").pop() ?? "";
 
         // If the extension is not an image extension, return null
         if (!AttachmentInterface.livePhotoExts.includes(ext.toLowerCase())) return null;
+
+        // Escape periods in the extension for the regex
+        ext = ext.replace(/\./g, "\\.");
     
         // Get the path to the live photo
         // Replace the extension with .mov, or add it if there is no extension
-        const livePath = ext ? fPath.replace(new RegExp(`\\.${ext}$`), ".mov") : `${fPath}.mov`;
+        const livePath = isNotEmpty(ext) ? fPath.replace(new RegExp(`\\.${ext}$`), ".mov") : `${fPath}.mov`;
         const realPath = FileSystem.getRealPath(livePath);
 
         // If the live photo doesn't exist, return null
