@@ -151,6 +151,7 @@ export class HttpService extends Loggable {
     async checkIfPortInUse(port: number) {
         try {
             // Check if there are any listening services
+            zx.$.verbose = false;
             const output = await zx.$`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`;
             if (output.toString().includes(`:${port} (LISTEN)`)) return true;
         } catch {
