@@ -17,6 +17,12 @@ export const getConversionPath = (attachment: Attachment, extension: string): st
     const newDir = `${FileSystem.convertDir}/${guid}`;
     if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
     const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
+
+    // If the path already has the extension, return it
+    let newPath = `${newDir}/${newName}`;
+    if (newPath.endsWith(`.${extension}`)) return newPath;
+
+    // Otherwise, return the path with the extension
     return `${newDir}/${newName}.${extension}`;
 }
 
