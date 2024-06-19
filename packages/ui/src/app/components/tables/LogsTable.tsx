@@ -9,7 +9,6 @@ import {
     TableCaption,
 } from '@chakra-ui/react';
 import { LogItem } from '../../slices/LogsSlice';
-import { get } from 'http';
 
 
 export const LogsTable = ({ logs, caption }: { logs: Array<LogItem>, caption?: string }): JSX.Element => {

@@ -25,6 +25,7 @@ import {
 } from "@server/env";
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 import { ZrokManager } from "@server/managers/zrokManager";
+import { ProxyServices } from "@server/databases/server/constants";
 
 export class IPCService extends Loggable {
     tag = "IPCService";
@@ -66,7 +67,7 @@ export class IPCService extends Loggable {
             }
 
             // If we are changing the proxy service to a non-custom url service, we need to make sure "use https" is off
-            if (args.proxy_service && !["dynamic-dns", "lan-url"].includes(args.proxy_service)) {
+            if (args.proxy_service && ![ProxyServices.DynamicDNS, ProxyServices.LanURL].includes(args.proxy_service)) {
                 const httpsStatus = (args.use_custom_certificate ??
                     Server().repo.getConfig("use_custom_certificate")) as boolean;
                 if (httpsStatus) {

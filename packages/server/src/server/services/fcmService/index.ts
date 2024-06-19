@@ -9,6 +9,7 @@ import { ScheduledService } from "@server/lib/ScheduledService";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { AsyncSingleton } from "@server/lib/decorators/AsyncSingletonDecorator";
 import { AsyncRetryer } from "@server/lib/decorators/AsyncRetryerDecorator";
+import { ProxyServices } from "@server/databases/server/constants";
 
 const AppName = "BlueBubbles";
 
@@ -56,7 +57,7 @@ export class FCMService extends Loggable {
 
         // If the proxy service is lan-url or dynamic-dns, we don't need to start this service
         const proxyService = Server().repo.getConfig("proxy_service") as string;
-        if (proxyService === "lan-url" || proxyService === "dynamic-dns") return;
+        if (proxyService === ProxyServices.LanURL || proxyService === ProxyServices.DynamicDNS) return;
 
         this.addressUpdateService = new ScheduledService(() => {
             // If the app has been deleted (service stopped), clear the interval
