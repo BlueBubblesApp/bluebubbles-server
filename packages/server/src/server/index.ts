@@ -69,6 +69,7 @@ import { IMessageListener } from "./databases/imessage/listeners/IMessageListene
 import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
 import { IMessageCache } from "./databases/imessage/pollers";
 import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
+import { obfuscatedHandle } from "./utils/StringUtils";
 
 const findProcess = require("find-process");
 
@@ -1294,7 +1295,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("participant-removed", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1323,7 +1324,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("participant-added", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1352,7 +1353,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("participant-left", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] left [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1381,7 +1382,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("group-icon-changed", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] changed a group photo`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1410,7 +1411,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("group-icon-removed", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] removed a group photo`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1447,7 +1448,7 @@ class BlueBubblesServer extends EventEmitter {
     private async handleNewMessage(item: Message) {
         const newMessage = await insertChatParticipants(item);
         this.logger.info(
-            `New Message from ${newMessage.isFromMe ? 'You' : newMessage.handle?.id}, ${newMessage.contentString()}`);
+            `New Message from ${newMessage.isFromMe ? 'You' : obfuscatedHandle(newMessage.handle?.id)}, ${newMessage.contentString()}`);
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data
@@ -1486,7 +1487,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // ATTENTION: If "from" is null, it means you sent the message from a group chat
         // Check the isFromMe key prior to checking the "from" key
-        const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
+        const from = newMessage.isFromMe ? "You" : obfuscatedHandle(newMessage.handle?.id);
         const time =
             newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted ?? newMessage.dateCreated;
         const updateType = newMessage.dateRetracted

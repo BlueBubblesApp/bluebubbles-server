@@ -5,6 +5,7 @@ import { FindMyLocationItem } from "@server/api/lib/findmy/types";
 import { NEW_FINDMY_LOCATION } from "@server/events";
 import { isEmpty, titleCase, waitMs } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
+import { obfuscatedHandle } from "@server/utils/StringUtils";
 
 export class PrivateApiFindMyEventHandler extends Loggable implements PrivateApiEventHandler {
     tag = "PrivateApiFindMyEventHandler";
@@ -30,10 +31,11 @@ export class PrivateApiFindMyEventHandler extends Loggable implements PrivateApi
         // If there were items updated in the cache, emit them
         let count = 0;
         for (const item of added) {
+            const handle = obfuscatedHandle(item?.handle);
             if (item?.coordinates[0] === 0 && item?.coordinates[1] === 0) {
-                this.log.debug(`Received FindMy ${titleCase(item.status)} (0, 0) Location Update for Handle: ${item?.handle}`);
+                this.log.debug(`Received FindMy ${titleCase(item.status)} (0, 0) Location Update for Handle: ${handle}`);
             } else {
-                this.log.debug(`Received FindMy ${titleCase(item.status)} Location Update for Handle: ${item?.handle}`);
+                this.log.debug(`Received FindMy ${titleCase(item.status)} Location Update for Handle: ${handle}`);
             }
 
             await Server().emitMessage(NEW_FINDMY_LOCATION, item, "normal", false, true);
