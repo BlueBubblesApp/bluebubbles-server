@@ -84,7 +84,7 @@ export class OauthService extends Loggable {
         // Create a route to intercept the oauth callback
         this.koaApp.use(async (ctx, _) => {
             if (ctx.path === "/oauth/callback") {
-                this.log.info("Received oauth callback");
+                this.log.info("Received OAuth callback");
                 ctx.body = "Success! You can close this window and return to the BlueBubbles Server app";
                 ctx.status = 200;
             } else {
@@ -105,7 +105,10 @@ export class OauthService extends Loggable {
 
             this.log.info(`Creating Google Cloud project, "${this.projectName}"...`);
             const project = await this.createGoogleCloudProject();
-            const projectId = project.projectId;
+            const projectId = project?.projectId;
+            if (!projectId) {
+                throw new Error(`Project "${this.projectName}" was not found! Please restart the setup process.`);
+            }
 
             // Enable the required APIs
             await this.enableCloudApis(projectId);
@@ -173,8 +176,10 @@ export class OauthService extends Loggable {
             // Don't await because we don't want to catch the error here.
             FCMService.stop()
                 .then(async () => {
+                    await waitMs(10000);
+
                     // Clear our markers & start the service
-                    Server().fcm.clearLastValues();
+                    await Server().fcm.clearConfig();
                     await Server().fcm.start();
                 })
                 .catch(async err => {
@@ -253,10 +258,10 @@ export class OauthService extends Loggable {
             projectId = `${this.projectName.toLowerCase()}-${generateRandomString(4)}`;
             const data = { name: this.projectName, projectId };
             this.log.info(`Creating project with name, "${this.projectName}", under project ID, "${projectId}"`);
-            const createRes = await this.sendRequest("POST", postUrl, data);
+            const createRes = await this.tryUntilNoError("POST", postUrl, data, 3, 5000);
 
             // Wait for the operation to complete (try for 2 minutes)
-            const operationName = createRes.data.name;
+            const operationName = createRes.name;
             const operationUrl = `https://cloudresourcemanager.googleapis.com/v1/${operationName}`;
             return await this.waitForData("GET", operationUrl, null, "done", 60, 5000);
         };
@@ -289,13 +294,18 @@ export class OauthService extends Loggable {
             throw new Error(`No Project ID was returned!`);
         }
 
-        await waitMs(2000);
-
         // Fetch the project data
         // eslint-disable-next-line max-len
         const getUrl = `https://cloudresourcemanager.googleapis.com/v1/projects?filter=name%3A${this.projectName}%20AND%20lifecycleState%3AACTIVE`;
-        const projectData = await this.sendRequest("GET", getUrl);
-        return projectData.data.projects.find((p: any) => p.projectId === projectId);
+        const projectData = await this.waitForData(
+            "GET",
+            getUrl,
+            null,
+            "projects",
+            12, 10000,  // Wait at least 2 minutes
+            `Project "${this.projectName}" was not found! Please restart the setup process.`
+        );
+        return (projectData.projects ?? []).find((p: any) => p.projectId === projectId);
     }
 
     async enableCloudApis(projectId: string) {
@@ -325,10 +335,10 @@ export class OauthService extends Loggable {
 
     async enableService(projectId: string, service: string) {
         const postUrl = `https://serviceusage.googleapis.com/v1/projects/${projectId}/services/${service}:enable`;
-        const createRes = await this.sendRequest("POST", postUrl, {});
+        const createRes = await this.tryUntilNoError("POST", postUrl, {}, 5, 5000);
 
         // If the operation is already done, return
-        const operationName = createRes.data.name;
+        const operationName = createRes.name;
         if (operationName.endsWith("DONE_OPERATION")) return;
 
         // Wait for the operation to complete
@@ -344,9 +354,10 @@ export class OauthService extends Loggable {
      */
     async addFirebase(projectId: string) {
         try {
+            // Try for at least 2 minutes (8 attempts with 15 second delay)
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}:addFirebase`;
-            const res = await this.sendRequest("POST", url, {});
-            await this.waitForData("GET", `https://firebase.googleapis.com/v1beta1/${res.data.name}`, null, "name");
+            const res = await this.tryUntilNoError("POST", url, {}, 8, 15000);
+            await this.waitForData("GET", `https://firebase.googleapis.com/v1beta1/${res.name}`, null, "name");
             await waitMs(5000); // Wait 5 seconds to ensure Firebase is ready
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
@@ -489,6 +500,8 @@ export class OauthService extends Loggable {
             throw new Error("Failed to get Firebase Service Account! Please ensure that the project was created!");
         }
 
+        await waitMs(5000);
+
         // eslint-disable-next-line max-len
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${accountId}/keys`;
 
@@ -550,7 +563,8 @@ export class OauthService extends Loggable {
         data: Record<string, any> = null,
         key: string = null,
         maxAttempts = 30,
-        waitTime = 2000
+        waitTime = 2000,
+        errorOverride: string = null
     ) {
         let attempts = 0;
 
@@ -563,7 +577,7 @@ export class OauthService extends Loggable {
             attempts += 1;
             if (attempts > maxAttempts) {
                 this.log.debug(`Received data from failed request: ${getObjectAsString(res.data)}`);
-                throw new Error(
+                throw new Error(errorOverride ??
                     `Failed to get data from: ${url}. Please gather server logs and contact the developers!`
                 );
             }
@@ -580,9 +594,8 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @param key The key to check for in the response data (optional)
      */
-    async tryUntilNoError(method: "GET" | "POST", url: string, data: Record<string, any> = null, maxAttempts = 30) {
+    async tryUntilNoError(method: "GET" | "POST", url: string, data: Record<string, any> = null, maxAttempts = 30, waitTime = 2000) {
         let attempts = 0;
-        const waitTime = 2000;
 
         // eslint-disable-next-line no-constant-condition
         while (true) {
