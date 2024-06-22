@@ -33,7 +33,7 @@
     "@emotion/styled": "^11",
     "@reduxjs/toolkit": "^1.8.2",
     "chakra-react-select": "^3.3.7",
-    "electron": "^25.9.8",
+    "electron": "25.9.8",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-prettier": "^4.0.0",
     "framer-motion": "^6.2.9",

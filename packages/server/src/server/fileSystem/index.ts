@@ -29,9 +29,9 @@ import {
     ImageMetadata,
     ImageMetadataKeys
 } from "./types";
-import { rimrafSync } from "rimraf";
 
 const FindProcess = require("find-process");
+const { rimrafSync } = require("rimraf");
 
 // Patch in original user data directory
 app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
