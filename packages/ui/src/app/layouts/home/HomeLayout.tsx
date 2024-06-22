@@ -29,6 +29,7 @@ import { buildQrData, copyToClipboard } from '../../utils/GenericUtils';
 import { BiCopy } from 'react-icons/bi';
 import { TotalMessagesStatBox, TopGroupStatBox, BestFriendStatBox, DailyMessagesStatBox, TotalPicturesStatBox, TotalVideosStatBox } from 'app/components/stats';
 import { TimeframeDropdownField } from 'app/components/fields/TimeframeDropdownField';
+import { IoIosWarning } from 'react-icons/io';
 
 
 export const HomeLayout = (): JSX.Element => {
@@ -39,6 +40,18 @@ export const HomeLayout = (): JSX.Element => {
     const computerId = useAppSelector(state => state.config.computer_id);
     const iMessageEmail = useAppSelector(state => state.config.detected_imessage);
     const [statDays, setStatDays] = useState(180);
+
+    // Only warn if the URL is http://, and not a private IP
+    let shouldWarnUrl = address && address.startsWith('http://') &&
+        // Private IP Space
+        !address.startsWith('http://192.168.') &&
+        !address.startsWith('http://10.') &&
+        !address.startsWith('http://172.16.') &&
+        // Localhost
+        !address.startsWith('http://localhost') &&
+        !address.startsWith('http://127.0.0.1');
+
+    shouldWarnUrl = true;
 
     return (
         <Box p={3} borderRadius={10}>
@@ -78,12 +91,19 @@ export const HomeLayout = (): JSX.Element => {
                     <Flex flexDirection="row" justifyContent="space-between">
                         <Stack>
                             <Flex flexDirection="row" alignItems='center'>
-                                <Text fontSize='md' fontWeight='bold' mr={2}>Server Address: </Text>
+                                <Text fontSize='md' fontWeight='bold' mr={2}>Server URL: </Text>
                                 {(!address) ? (
                                     <SkeletonText noOfLines={1} />
                                 ) : (
                                     <Text fontSize='md'>{address}</Text>
                                 )}
+                                {shouldWarnUrl ? (
+                                    <Tooltip label='Your connection is not secure! Connecting to any server over HTTP could compromise your data! Consider setting up an SSL certificate or changing your setup.'>
+                                        <Box marginRight={1} marginLeft={3}>
+                                            <IoIosWarning color='orange' />
+                                        </Box>
+                                    </Tooltip>
+                                ) : null}
                                 <Tooltip label='Copy Address'>
                                     <IconButton
                                         ml={3}
