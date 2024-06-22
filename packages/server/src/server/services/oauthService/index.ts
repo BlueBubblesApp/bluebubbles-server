@@ -7,8 +7,7 @@ import axios from "axios";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import * as admin from "firebase-admin";
-import { OAuth2Client } from "google-auth-library";
-import { google } from "googleapis";
+import { google, Auth } from "googleapis";
 import { generateRandomString } from "@server/utils/CryptoUtils";
 import { getObjectAsString, isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ProgressStatus } from "@server/types";
@@ -30,7 +29,7 @@ export class OauthService extends Loggable {
 
     httpOpts: any;
 
-    oauthClient: OAuth2Client;
+    oauthClient: Auth.OAuth2Client;
 
     port = 8641;
 
