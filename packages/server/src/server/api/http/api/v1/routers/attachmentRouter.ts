@@ -82,7 +82,13 @@ export class AttachmentRouter {
                 let newName = attachment.transferName;
                 if (quality) {
                     newName += `.${quality as string}`;
-                    opts.quality = quality as string as "good" | "better" | "best";
+
+                    const qualities = ["good", "better", "best"];
+                    if (!qualities.includes(quality as string)) {
+                        throw new BadRequest({ error: `Invalid quality specified! Must be one of: ${qualities.join(', ')}` });
+                    }
+
+                    opts.quality = quality as "good" | "better" | "best";
                 }
                 if (parsedHeight) {
                     newName += `.${parsedHeight}`;
