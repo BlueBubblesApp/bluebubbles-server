@@ -9,9 +9,9 @@ import {
     TableCaption,
     Box,
     Icon,
-    Grid,
     GridItem,
-    Tooltip
+    Tooltip,
+    Stack,
 } from '@chakra-ui/react';
 import { FiTrash } from 'react-icons/fi';
 import { AiOutlineEdit } from 'react-icons/ai';
@@ -42,19 +42,19 @@ export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): J
                             <Td>{item.url}</Td>
                             <Td>{JSON.parse(item.events).map((e: string) => webhookEventValueToLabel(e)).join(', ')}</Td>
                             <Td isNumeric>
-                                <Grid templateColumns="repeat(2, 1fr)">
+                                <Stack direction="row" justifyContent="end">
                                     <Tooltip label='Edit' placement='bottom'>
-                                        <GridItem _hover={{ cursor: 'pointer' }} onClick={() => setSelectedId(item.id)}>
+                                        <GridItem _hover={{ cursor: 'pointer' }} onClick={() => setSelectedId(item.id)} marginRight={1}>
                                             <Icon as={AiOutlineEdit} />
                                         </GridItem>
                                     </Tooltip>
-                                    
+
                                     <Tooltip label='Delete' placement='bottom'>
-                                        <GridItem _hover={{ cursor: 'pointer' }} onClick={() => dispatch(remove(item.id))}>
+                                        <GridItem _hover={{ cursor: 'pointer' }} onClick={() => dispatch(remove(item.id))} marginLeft={1}>
                                             <Icon as={FiTrash} />
                                         </GridItem>
                                     </Tooltip>
-                                </Grid>
+                                </Stack>
                             </Td>
                         </Tr>
                     ))}
