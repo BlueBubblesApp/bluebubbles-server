@@ -98,7 +98,7 @@ export const HomeLayout = (): JSX.Element => {
                                     <Text fontSize='md'>{address}</Text>
                                 )}
                                 {shouldWarnUrl ? (
-                                    <Tooltip label='Your connection is not secure! Connecting to any server over HTTP could compromise your data! Consider setting up an SSL certificate or changing your setup.'>
+                                    <Tooltip label='Your connection is not secure! Connecting to any server over HTTP could compromise your data! Your messages could be intercepted by a man-in-the-middle attack. Consider setting up an SSL certificate or changing your setup.'>
                                         <Box marginRight={1} marginLeft={3}>
                                             <IoIosWarning color='orange' />
                                         </Box>
