@@ -7,12 +7,11 @@ import { Server } from "@server";
 import { generateMd5Hash } from "@server/utils/CryptoUtils";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
-import { isEmpty, isTruthyBool, resultAwaiter } from "@server/helpers/utils";
+import { isEmpty, isTruthyBool } from "@server/helpers/utils";
 import { AttachmentInterface } from "@server/api/interfaces/attachmentInterface";
 import { FileStream, Success } from "../responses/success";
 import { BadRequest, NotFound, ServerError } from "../responses/errors";
 import { AttachmentSerializer } from "@server/api/serializers/AttachmentSerializer";
-import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
 export class AttachmentRouter {
     static async count(ctx: RouterContext, _: Next) {
@@ -83,7 +82,7 @@ export class AttachmentRouter {
                 let newName = attachment.transferName;
                 if (quality) {
                     newName += `.${quality as string}`;
-                    opts.quality = quality as string;
+                    opts.quality = quality as string as "good" | "better" | "best";
                 }
                 if (parsedHeight) {
                     newName += `.${parsedHeight}`;
