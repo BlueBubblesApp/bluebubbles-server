@@ -23,7 +23,6 @@ import {
     FCMService,
     CaffeinateService,
     NgrokService,
-    LocalTunnelService,
     NetworkService,
     QueueService,
     IPCService,
@@ -468,7 +467,6 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Initializing proxy services...");
             this.proxyServices = [
                 new NgrokService(),
-                new LocalTunnelService(),
                 new CloudflareService(),
                 new ZrokService()
             ];

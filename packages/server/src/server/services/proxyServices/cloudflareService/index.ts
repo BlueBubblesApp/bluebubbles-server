@@ -21,7 +21,7 @@ export class CloudflareService extends Proxy {
     }
 
     /**
-     * Sets up a connection to the LocalTunnel servers, opening a secure
+     * Sets up a connection to the Cloudflare servers, opening a secure
      * tunnel between the internet and your Mac (iMessage server)
      */
     async connect(): Promise<string> {
@@ -54,7 +54,7 @@ export class CloudflareService extends Proxy {
     }
 
     /**
-     * Disconnect from LocalTunnel
+     * Disconnect from Cloudflare
      */
     async disconnect(): Promise<void> {
         try {
