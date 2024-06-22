@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
+import { app, BrowserWindow, nativeTheme, systemPreferences, dialog, MessageBoxOptions } from "electron";
 import ServerLog, { LogLevel } from "electron-log";
 import process from "process";
 import path from "path";
@@ -402,7 +402,7 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.logger.error(ex);
 
-            const dialogOpts = {
+            const dialogOpts: MessageBoxOptions = {
                 type: "error",
                 buttons: ["Restart", "Open System Preferences", "Ignore"],
                 title: "BlueBubbles Error",

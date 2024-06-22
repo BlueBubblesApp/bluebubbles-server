@@ -1,7 +1,7 @@
-import { app, BrowserWindow, dialog, Notification } from "electron";
+import { app, BrowserWindow, dialog, MessageBoxOptions, Notification } from "electron";
 import * as semver from "semver";
 import { Server } from "@server";
-import { SERVER_UPDATE, SERVER_UPDATE_DOWNLOADING, SERVER_UPDATE_INSTALLING } from "@server/events";
+import { SERVER_UPDATE } from "@server/events";
 import { ScheduledService } from "@server/lib/ScheduledService";
 import { Loggable } from "@server/lib/logging/Loggable";
 import axios from "axios";
@@ -93,7 +93,7 @@ export class UpdateService extends Loggable {
         }
 
         if (!this.hasUpdate && showNoUpdateDialog) {
-            const dialogOpts = {
+            const dialogOpts: MessageBoxOptions = {
                 type: "info",
                 title: "BlueBubbles Update",
                 message: "You have the latest version installed!",
