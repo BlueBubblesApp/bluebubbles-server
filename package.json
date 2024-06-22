@@ -22,7 +22,6 @@
     "devEngines": {
         "node": "18.19.x",
         "npm": ">=10.x",
-        "yarn": ">=1.22.x",
         "python": ">=3.10.x"
     },
     "devDependencies": {
