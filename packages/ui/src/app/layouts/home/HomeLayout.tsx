@@ -51,8 +51,6 @@ export const HomeLayout = (): JSX.Element => {
         !address.startsWith('http://localhost') &&
         !address.startsWith('http://127.0.0.1');
 
-    shouldWarnUrl = true;
-
     return (
         <Box p={3} borderRadius={10}>
             <Flex flexDirection="column">
