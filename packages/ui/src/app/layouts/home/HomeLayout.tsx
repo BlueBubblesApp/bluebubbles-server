@@ -42,7 +42,7 @@ export const HomeLayout = (): JSX.Element => {
     const [statDays, setStatDays] = useState(180);
 
     // Only warn if the URL is http://, and not a private IP
-    let shouldWarnUrl = address && address.startsWith('http://') &&
+    const shouldWarnUrl = address && address.startsWith('http://') &&
         // Private IP Space
         !address.startsWith('http://192.168.') &&
         !address.startsWith('http://10.') &&
