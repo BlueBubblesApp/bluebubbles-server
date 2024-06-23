@@ -8,6 +8,7 @@ import { isMinMonterey, isMinVentura } from "@server/env";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/apple/mappings";
 import { invisibleMediaChar } from "@server/api/http/constants";
 import { ActionHandler } from "@server/api/apple/actions";
+import { rimrafSync } from "rimraf";
 import type {
     SendMessageParams,
     SendAttachmentParams,
@@ -541,12 +542,10 @@ export class MessageInterface {
         // And delete the original
         for (let i = 0; i < parts.length; i++) {
             if (parts[i].attachment) {
-                const currentPath = path.join(FileSystem.getAttachmentDirectory("private-api"), parts[i].attachment);
+                const baseDir = FileSystem.getAttachmentDirectory("private-api");
+                const currentPath = path.join(baseDir, parts[i].attachment);
                 const newPath = FileSystem.copyAttachment(currentPath, parts[i].name, "private-api");
                 parts[i].filePath = newPath;
-
-                // Delete the original
-                fs.unlinkSync(currentPath);
             }
         }
 
