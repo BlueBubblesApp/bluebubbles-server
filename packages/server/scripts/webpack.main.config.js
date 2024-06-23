@@ -34,11 +34,11 @@ module.exports = merge(baseConfig, {
                     plugins: [
                         ["@babel/plugin-proposal-decorators", { legacy: true }],
                         [
-                            "@babel/plugin-proposal-class-properties",
+                            "@babel/plugin-transform-class-properties",
                             { loose: true }
                         ],
                         [
-                            "@babel/plugin-proposal-private-methods",
+                            "@babel/plugin-transform-private-methods",
                             { loose: true }
                         ],
                         [
