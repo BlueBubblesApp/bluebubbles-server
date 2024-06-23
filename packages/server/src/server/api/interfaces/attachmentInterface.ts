@@ -33,10 +33,7 @@ export class AttachmentInterface {
 
         // Copy the attachment to a more permanent storage using the papi method.
         // This is so the attachment gets copied to the iMessage directory.
-        FileSystem.copyAttachment(path, name, "private-api");
-
-        // Return the name of the attachment
-        return name;
+        return FileSystem.copyAttachment(path, name, "private-api");
     }
 
     static getLivePhotoPath(attachment: Attachment): string | null {

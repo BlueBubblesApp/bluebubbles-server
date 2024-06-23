@@ -540,8 +540,8 @@ export class MessageInterface {
         // Copy the attachments with the correct name.
         // And delete the original
         for (let i = 0; i < parts.length; i++) {
-            if (parts[0].attachment) {
-                const currentPath = path.join(FileSystem.messagesAttachmentsDir, parts[i].attachment);
+            if (parts[i].attachment) {
+                const currentPath = path.join(FileSystem.getAttachmentDirectory("private-api"), parts[i].attachment);
                 const newPath = FileSystem.copyAttachment(currentPath, parts[i].name, "private-api");
                 parts[i].filePath = newPath;
 

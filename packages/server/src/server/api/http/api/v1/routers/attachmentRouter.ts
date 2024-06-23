@@ -4,7 +4,6 @@ import { nativeImage } from "electron";
 import fs from "fs";
 
 import { Server } from "@server";
-import { generateMd5Hash } from "@server/utils/CryptoUtils";
 import { FileSystem } from "@server/fileSystem";
 import { convertAudio, convertImage } from "@server/databases/imessage/helpers/utils";
 import { isEmpty, isTruthyBool } from "@server/helpers/utils";
@@ -180,12 +179,17 @@ export class AttachmentRouter {
         const { files } = ctx.request;
         const attachment = files?.attachment as unknown as File;
 
-        const buffer = fs.readFileSync(attachment.path);
-        const hash = generateMd5Hash(buffer);
-
         // Create a filename using the hash & extension of the attachment
-        await AttachmentInterface.upload(attachment.path, hash);
-        return new Success(ctx, { data: { hash } }).send();
+        const location = await AttachmentInterface.upload(attachment.path, attachment.name);
+
+        // The path will essentially be "<attachment dir>/<uuid>/<hash>.ext".
+        // We want to get the <uuid> and <hash> parts.
+        const parts = location.split("/");
+        const filename = parts.pop();
+        const uuid = parts.pop();
+
+        // Return the last folder
+        return new Success(ctx, { data: { path: `${uuid}/${filename}` } }).send();
     }
 
     static async forceDownload(ctx: RouterContext, _: Next) {
