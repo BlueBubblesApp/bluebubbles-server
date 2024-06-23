@@ -1,5 +1,4 @@
-import * as fs from "fs-extra";
-
+import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as child_process from "child_process";
