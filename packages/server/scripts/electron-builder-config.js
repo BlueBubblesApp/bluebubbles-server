@@ -35,10 +35,10 @@ module.exports = {
         ],
         "target": [
             {
-                "target": "default",
+                "target": "dmg",
                 "arch": [
-                    'x64',
-                    // 'arm64'
+                    "x64",
+                    "arm64"
                 ]
             }
         ],
