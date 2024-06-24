@@ -35,14 +35,13 @@ import {
 import { BsChevronDown, BsCheckAll } from 'react-icons/bs';
 import { FiTrash } from 'react-icons/fi';
 
-import { filter as filterLogs } from '../../slices/LogsSlice';
 import { DropZone } from '../../components/DropZone';
 import { LogsTable } from '../../components/tables/LogsTable';
 import { isValidServerConfig, isValidClientConfig, isValidFirebaseUrl } from '../../utils/FcmUtils';
 import { ErrorDialog, ErrorItem } from '../../components/modals/ErrorDialog';
 import { ConfirmationDialog } from '../../components/modals/ConfirmationDialog';
 import { hasKey, readFile } from '../../utils/GenericUtils';
-import { clearDevices, getFcmConfig, getOauthUrl, restartOauthService } from '../../utils/IpcUtils';
+import { clearDevices, getFcmConfig, getFirebaseOauthUrl, restartOauthService } from '../../utils/IpcUtils';
 import { clearFcmConfiguration, saveFcmClient, saveFcmServer } from '../../actions/FcmActions';
 import { ConfigItem, setConfig, setConfigBulk } from '../../slices/ConfigSlice';
 import { ProgressStatus } from '../../types';
@@ -129,7 +128,7 @@ export const NotificationsLayout = (): JSX.Element => {
         });
 
         ipcRenderer.removeAllListeners('oauth-status');
-        getOauthUrl().then(url => setOauthUrl(url));
+        getFirebaseOauthUrl().then(url => setOauthUrl(url));
 
         ipcRenderer.on('oauth-status', (_: any, data: ProgressStatus) => {
             setAuthStatus(data);
@@ -321,7 +320,6 @@ export const NotificationsLayout = (): JSX.Element => {
                                     leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
                                     variant='outline'
                                     onClick={() => {
-                                        dispatch(filterLogs((item) => !item.message.startsWith('[OauthService]')));
                                         restartOauthService();
                                     }}
                                 >

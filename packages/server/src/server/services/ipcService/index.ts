@@ -427,8 +427,12 @@ export class IPCService extends Loggable {
             return chats;
         });
 
-        ipcMain.handle("get-oauth-url", async (_, __) => {
-            return await Server().oauthService?.getOauthUrl();
+        ipcMain.handle("get-firebase-oauth-url", async (_, __) => {
+            return await Server().oauthService?.getFirebaseOauthUrl();
+        });
+
+        ipcMain.handle("get-contacts-oauth-url", async (_, __) => {
+            return await Server().oauthService?.getContactsOauthUrl();
         });
 
         ipcMain.handle("restart-oauth-service", async (_, __) => {

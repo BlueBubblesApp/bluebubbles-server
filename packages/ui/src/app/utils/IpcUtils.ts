@@ -146,8 +146,12 @@ export const installUpdate = async () => {
     return await ipcRenderer.invoke('install-update');
 };
 
-export const getOauthUrl = async () => {
-    return await ipcRenderer.invoke('get-oauth-url');
+export const getFirebaseOauthUrl = async () => {
+    return await ipcRenderer.invoke('get-firebase-oauth-url');
+};
+
+export const getContactsOauthUrl = async () => {
+    return await ipcRenderer.invoke('get-contacts-oauth-url');
 };
 
 export const restartOauthService = async () => {

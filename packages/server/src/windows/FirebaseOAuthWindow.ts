@@ -1,33 +1,34 @@
 import { BrowserWindow } from "electron";
 import { Window } from ".";
 import { Server } from "@server";
+import { ProgressStatus } from "@server/types";
 
-export class OAuthWindow extends Window {
+export class FirebaseOAuthWindow extends Window {
     private url: string = null;
 
-    private static self: OAuthWindow;
+    private static self: FirebaseOAuthWindow;
 
     private constructor(url: string) {
         super();
         this.url = url;
     }
 
-    public static getInstance(url: string): OAuthWindow {
-        if (!OAuthWindow.self) {
-            OAuthWindow.self = new OAuthWindow(url);
+    public static getInstance(url: string): FirebaseOAuthWindow {
+        if (!FirebaseOAuthWindow.self) {
+            FirebaseOAuthWindow.self = new FirebaseOAuthWindow(url);
         }
 
-        return OAuthWindow.self;
+        return FirebaseOAuthWindow.self;
     }
 
-    build(): OAuthWindow {
+    build(): FirebaseOAuthWindow {
         // Create new Browser window
         if (this.instance && !this.instance.isDestroyed) this.instance.destroy();
         this.instance = new BrowserWindow({
             width: 800,
             height: 600,
             webPreferences: {
-                nodeIntegration: true
+                nodeIntegration: true,
             }
         });
 
@@ -48,6 +49,13 @@ export class OAuthWindow extends Window {
             // Clear the window data
             this.instance.close();
             this.instance = null;
+        });
+
+        // On window close, if the oauth service is not in progress, stop it
+        this.instance.on("close", () => {
+            if (Server().oauthService?.status !== ProgressStatus.IN_PROGRESS) {
+                Server().oauthService.stop();
+            }
         });
 
         return this;

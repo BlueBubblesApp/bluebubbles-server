@@ -23,7 +23,10 @@ import {
     MenuDivider,
     Button,
     MenuList,
-    MenuItem
+    MenuItem,
+    Spinner,
+    Link,
+    Image
 } from '@chakra-ui/react';
 import {
     Pagination,
@@ -33,7 +36,7 @@ import {
     PaginationPageGroup,
 } from '@ajna/pagination';
 import { AiOutlineInfoCircle, AiOutlineSearch } from 'react-icons/ai';
-import { BsChevronDown, BsPersonPlus, BsUnlockFill } from 'react-icons/bs';
+import { BsCheckAll, BsChevronDown, BsPersonPlus, BsUnlockFill } from 'react-icons/bs';
 import { BiImport, BiRefresh } from 'react-icons/bi';
 import { ContactAddress, ContactItem, ContactsTable } from 'app/components/tables/ContactsTable';
 import { ContactDialog } from 'app/components/modals/ContactDialog';
@@ -44,6 +47,10 @@ import { ConfirmationDialog } from 'app/components/modals/ConfirmationDialog';
 import { waitMs } from 'app/utils/GenericUtils';
 import { PaginationPreviousButton } from 'app/components/buttons/PaginationPreviousButton';
 import { PaginationNextButton } from 'app/components/buttons/PaginationNextButton';
+import { ProgressStatus } from 'app/types';
+import { getContactsOauthUrl, restartOauthService } from 'app/utils/IpcUtils';
+import { RiErrorWarningLine } from 'react-icons/ri';
+import GoogleIcon from '../../../images/walkthrough/google-icon.png';
 
 const perPage = 25;
 
@@ -76,6 +83,9 @@ export const ContactsLayout = (): JSX.Element => {
     const [requiresConfirmation, confirm] = useState((): string | null => {
         return null;
     });
+
+    const [authStatus, setAuthStatus] = useState(ProgressStatus.NOT_STARTED);
+    const [oauthUrl, setOauthUrl] = useState('');
 
     let filteredContacts = contacts;
     if (search && search.length > 0) {
@@ -131,9 +141,30 @@ export const ContactsLayout = (): JSX.Element => {
         }
     };
 
+    const getOauthIcon = () => {
+        if (authStatus === ProgressStatus.IN_PROGRESS) {
+            return <Spinner size='md' speed='0.65s' />;
+        } else if (authStatus === ProgressStatus.COMPLETED) {
+            return <BsCheckAll size={24} color='green' />;
+        }
+
+        return <RiErrorWarningLine size={24} />;
+    };
+
     useEffect(() => {
         loadContacts();
         refreshPermissionStatus();
+
+        ipcRenderer.removeAllListeners('oauth-status');
+        getContactsOauthUrl().then(url => setOauthUrl(url));
+
+        ipcRenderer.on('oauth-status', (_: any, data: ProgressStatus) => {
+            setAuthStatus(data);
+
+            if (data === ProgressStatus.COMPLETED) {
+                loadContacts(true);
+            }
+        });
     }, []);
 
     const getEmptyContent = () => {
@@ -338,6 +369,29 @@ export const ContactsLayout = (): JSX.Element => {
                     </Text>
                 </Box>
             </Stack>
+            <Link
+                href={oauthUrl}
+                target="_blank"
+                _hover={{ textDecoration: 'none' }}
+            >
+                <Stack direction='row' alignItems='center'>
+                    <Button
+                        pl={10}
+                        pr={10}
+                        mt={3}
+                        leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
+                        variant='outline'
+                        onClick={() => {
+                            restartOauthService();
+                        }}
+                    >
+                        Continue with Google
+                    </Button>
+                    <Box pt={3} pl={2}>
+                        {getOauthIcon()}
+                    </Box>
+                </Stack>
+            </Link>
             <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                     <Text fontSize='2xl'>Contacts ({filteredContacts.length})</Text>

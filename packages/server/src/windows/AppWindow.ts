@@ -2,7 +2,8 @@ import path from "path";
 import { BrowserWindow, HandlerDetails, shell } from "electron";
 import { Window } from ".";
 import { Server } from "@server";
-import { OAuthWindow } from "@windows/OAuthWindow";
+import { FirebaseOAuthWindow } from "@windows/FirebaseOAuthWindow";
+import { ContactsOAuthWindow } from "./ContactsOAuthWindow";
 
 export class AppWindow extends Window {
     private arguments: Record<string, any> = {};
@@ -75,7 +76,11 @@ export class AppWindow extends Window {
         // Make links open in the browser
         this.instance.webContents.setWindowOpenHandler((details: HandlerDetails) => {
             if (details.url.startsWith("https://accounts.google.com/o/oauth2/v2/auth")) {
-                OAuthWindow.getInstance(details.url).build();
+                if (details.url.includes("type=contacts")) {
+                    ContactsOAuthWindow.getInstance(details.url).build();
+                } else if (details.url.includes("type=firebase")) {
+                    FirebaseOAuthWindow.getInstance(details.url).build();
+                }   
             } else {
                 shell.openExternal(details.url);
             }
