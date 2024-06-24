@@ -49,7 +49,6 @@ import { PaginationPreviousButton } from 'app/components/buttons/PaginationPrevi
 import { PaginationNextButton } from 'app/components/buttons/PaginationNextButton';
 import { ProgressStatus } from 'app/types';
 import { getContactsOauthUrl, restartOauthService } from 'app/utils/IpcUtils';
-import { RiErrorWarningLine } from 'react-icons/ri';
 import GoogleIcon from '../../../images/walkthrough/google-icon.png';
 
 const perPage = 25;
@@ -148,7 +147,7 @@ export const ContactsLayout = (): JSX.Element => {
             return <BsCheckAll size={24} color='green' />;
         }
 
-        return <RiErrorWarningLine size={24} />;
+        return null;
     };
 
     useEffect(() => {
@@ -369,29 +368,35 @@ export const ContactsLayout = (): JSX.Element => {
                     </Text>
                 </Box>
             </Stack>
-            <Link
-                href={oauthUrl}
-                target="_blank"
-                _hover={{ textDecoration: 'none' }}
-            >
-                <Stack direction='row' alignItems='center'>
-                    <Button
-                        pl={10}
-                        pr={10}
-                        mt={3}
-                        leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
-                        variant='outline'
-                        onClick={() => {
-                            restartOauthService();
-                        }}
-                    >
-                        Continue with Google
-                    </Button>
-                    <Box pt={3} pl={2}>
-                        {getOauthIcon()}
-                    </Box>
-                </Stack>
-            </Link>
+            <Box ml={5} mr={5}>
+                <Text fontSize='md'>
+                    Using the button below, you can authorize BlueBubbles to access your Google Contacts. This will allow BlueBubbles to
+                    download your contacts + avatars from Google, and serve them to any connected clients.
+                </Text>
+                <Link
+                    href={oauthUrl}
+                    target="_blank"
+                    _hover={{ textDecoration: 'none' }}
+                >
+                    <Stack direction='row' alignItems='center'>
+                        <Button
+                            pl={10}
+                            pr={10}
+                            mt={4}
+                            leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
+                            variant='outline'
+                            onClick={() => {
+                                restartOauthService();
+                            }}
+                        >
+                            Continue with Google
+                        </Button>
+                        <Box pt={3} pl={2}>
+                            {getOauthIcon()}
+                        </Box>
+                    </Stack>
+                </Link>
+            </Box>
             <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                     <Text fontSize='2xl'>Contacts ({filteredContacts.length})</Text>
