@@ -213,6 +213,7 @@ export class OauthService extends Loggable {
             const contacts = await this.fetchContacts();
 
             this.log.info(`Saving ${contacts.length} contact(s) to the server...`);
+            let errored = false;
             for (const contact of contacts) {
                 if (isEmpty(contact.names)) continue;
 
@@ -229,8 +230,13 @@ export class OauthService extends Loggable {
                         avatar
                     });
                 } catch (ex: any) {
-                    this.log.warn(`Failed to save contact: ${ex?.message}`);
+                    errored = true;
+                    this.log.debug(`Failed to save contact: ${ex?.message}`);
                 }
+            }
+
+            if (errored) {
+                this.log.warn(`Some contacts failed to save. Please check the server logs for more information.`);
             }
 
             this.log.info(`Finished saving contacts to the server!`);
