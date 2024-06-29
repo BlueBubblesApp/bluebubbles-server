@@ -22,7 +22,7 @@ type MessageState = {
     dateEdited: number;
     dateRetracted: number;
     didNotifyRecipient: boolean;
-    isEmpty: boolean;
+    hasUnsentParts: boolean;
 };
 
 type ChatState = {
@@ -125,9 +125,8 @@ export abstract class IMessagePoller extends Loggable {
         const didNotify = message.didNotifyRecipient ?? false;
         if (didNotify !== state.didNotifyRecipient) return "updated-entry";
 
-        // If it was actually unsent, isEmpty is true
-        const isEmpty = message.isEmpty ?? false;
-        if (isEmpty !== state.isEmpty) return "updated-entry";
+        // If it has unsent parts, it's an update
+        if (message.hasUnsentParts !== state.hasUnsentParts) return "updated-entry";
 
         return null;
     }
@@ -147,7 +146,7 @@ export abstract class IMessagePoller extends Loggable {
             dateEdited: message.dateEdited ? message.dateEdited.getTime() : 0,
             dateRetracted: message.dateRetracted ? message.dateRetracted.getTime() : 0,
             didNotifyRecipient: message.didNotifyRecipient ?? false,
-            isEmpty: message.isEmpty ?? false
+            hasUnsentParts: message.hasUnsentParts
         };
 
         return event;
