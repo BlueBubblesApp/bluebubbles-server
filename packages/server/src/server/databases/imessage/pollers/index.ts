@@ -17,6 +17,7 @@ export enum IMessagePollType {
 
 type MessageState = {
     dateCreated: number;
+    isDelivered: boolean;
     dateDelivered: number;
     dateRead: number;
     dateEdited: number;
@@ -112,6 +113,8 @@ export abstract class IMessagePoller extends Loggable {
         const delivered = message?.dateDelivered ? message.dateDelivered.getTime() : 0;
         if (delivered > state.dateDelivered) return "updated-entry";
 
+        if (message.isDelivered !== state.isDelivered) return "updated-entry";
+
         const read = message?.dateRead ? message.dateRead.getTime() : 0;
         if (read > state.dateRead) return "updated-entry";
 
@@ -141,6 +144,7 @@ export abstract class IMessagePoller extends Loggable {
 
         this.messageStates[message.guid] = {
             dateCreated: message.dateCreated.getTime(),
+            isDelivered: message.isDelivered ?? false,
             dateDelivered: message?.dateDelivered ? message.dateDelivered.getTime() : 0,
             dateRead: message?.dateRead ? message.dateRead.getTime() : 0,
             dateEdited: message.dateEdited ? message.dateEdited.getTime() : 0,

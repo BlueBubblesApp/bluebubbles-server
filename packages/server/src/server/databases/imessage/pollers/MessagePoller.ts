@@ -36,6 +36,7 @@ export class MessagePoller extends IMessagePoller {
             (e.dateCreated?.getTime() ?? 0) >= afterTime ||
             // Date delivered only matters if it's from you
             (e.isFromMe && (e.dateDelivered?.getTime() ?? 0)) >= afterTime ||
+            (e.isFromMe && !e.dateDelivered && e.isDelivered) ||
             // Date read only matters if it's from you and it's not a group chat
             (e.isFromMe && !e.chats[0].isGroup && (e.dateRead?.getTime() ?? 0)) >= afterTime ||
             // Date edited can be from anyone (should include edits & unsends)
