@@ -1512,32 +1512,23 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     private async handleUpdatedMessage(item: Message) {
-        const newMessage = await insertChatParticipants(item);
+        const msg = await insertChatParticipants(item);
 
         // ATTENTION: If "from" is null, it means you sent the message from a group chat
         // Check the isFromMe key prior to checking the "from" key
-        const from = newMessage.isFromMe ? "You" : obfuscatedHandle(newMessage.handle?.id);
-        const time =
-            newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted ?? newMessage.dateCreated;
-        const updateType = newMessage.dateRetracted
-            ? "Text Unsent"
-            : newMessage.dateEdited
-            ? "Text Edited"
-            : newMessage.dateRead
-            ? "Text Read"
-            : "Text Delivered";
+        const from = msg.isFromMe ? "You" : obfuscatedHandle(msg.handle?.id);
 
         // Husky pre-commit validator was complaining, so I created vars
-        const content = newMessage.contentString();
-        const localeTime = time?.toLocaleString();
-        this.logger.info(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
+        const content = msg.contentString();
+        const localeTime = msg.lastUpdateTime?.toLocaleString();
+        this.logger.info(`${msg.messageStatus} message from [${from}]: [${content}] - [${localeTime}]`);
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data
         this.httpService.socketServer.emit(
             MESSAGE_UPDATED,
             await MessageSerializer.serialize({
-                message: newMessage,
+                message: msg,
                 config: {
                     parseAttributedBody: true,
                     parseMessageSummary: true,
@@ -1553,7 +1544,7 @@ class BlueBubblesServer extends EventEmitter {
         await this.emitMessage(
             MESSAGE_UPDATED,
             await MessageSerializer.serialize({
-                message: newMessage,
+                message: msg,
                 config: {
                     loadChatParticipants: false,
                     includeChats: false

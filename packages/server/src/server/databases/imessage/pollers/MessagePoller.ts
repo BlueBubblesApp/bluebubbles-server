@@ -2,8 +2,6 @@ import { IMessagePollResult, IMessagePollType, IMessagePoller } from ".";
 import { Message } from "../entity/Message";
 import { isEmpty } from "@server/helpers/utils";
 import { Server } from "@server";
-import { MessageDecoder } from "../entity/decoders/MessageDecoder";
-import { getDateUsing2001 } from "../helpers/dateUtil";
 
 
 export class MessagePoller extends IMessagePoller {
@@ -47,7 +45,8 @@ export class MessagePoller extends IMessagePoller {
             // isEmpty is what's actually used by Apple to determine if it's retracted.
             // (in addition to dateEdited)
             (e.dateRetracted?.getTime() ?? 0) >= afterTime ||
-            (e.isEmpty ?? false) ||
+            // If there are retracted parts, it's unsent
+            e.hasUnsentParts ||
             // If didNotifyRecipient changed (from false to true)
             (e.didNotifyRecipient ?? false)
         ));
