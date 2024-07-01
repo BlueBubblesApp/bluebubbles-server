@@ -163,6 +163,7 @@ export class MessageRouter {
             if (textQueries.length === 1) {
                 // Find the variable name
                 const variable = textQueries[0].statement.split(" ")[2].replace(":", "");
+                const operator = textQueries[0].statement.split(" ")[1];
                 const term = textQueries[0].args[variable];
                 
                 // Strip the % wildcards from the start/end
@@ -170,6 +171,14 @@ export class MessageRouter {
 
                 // Remove the text query from the where clause
                 where = where.filter((w: any) => !w.statement.includes("message.text"));
+
+                // Set the match type based on the operator
+                let matchType: 'contains' | 'exact' = 'contains';
+                if (operator === '=') {
+                    matchType = 'exact';
+                } else if (operator.toLowerCase() === 'is') {
+                    matchType = 'exact';
+                }
 
                 [messages, totalCount] = await MessageInterface.searchMessagesPrivateApi({
                     chatGuid,
@@ -181,7 +190,8 @@ export class MessageRouter {
                     before,
                     after,
                     where: where ?? [],
-                    query: strippedTerm
+                    query: strippedTerm,
+                    matchType
                 });
             }
         }

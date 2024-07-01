@@ -592,7 +592,8 @@ export class MessageInterface {
         before = null,
         after = null,
         where = [],
-        query
+        query,
+        matchType = "contains"
     }: {
         chatGuid?: string,
         withChats?: boolean,
@@ -604,10 +605,11 @@ export class MessageInterface {
         after?: number | null,
         where?: DBWhereItem[],
         query: string,
+        matchType?: "contains" | "exact"
     }): Promise<[Message[], number]> {
         checkPrivateApiStatus();
         
-        const result = await Server().privateApi.message.search(query);
+        const result = await Server().privateApi.message.search(query, matchType);
         if (result?.data?.error) {
             throw new Error(`Failed to search messages: ${result.data.error}`);
         }
