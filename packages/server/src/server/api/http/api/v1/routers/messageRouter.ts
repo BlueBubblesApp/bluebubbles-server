@@ -14,6 +14,7 @@ import { arrayHasOne } from "@server/utils/CollectionUtils";
 import { FileStream, Success } from "../responses/success";
 import { BadRequest, IMessageError, NotFound } from "../responses/errors";
 import { parseWithQuery } from "../utils";
+import { isMinVentura } from "@server/env";
 
 export class MessageRouter {
     static async sentCount(ctx: RouterContext, _: Next) {
@@ -147,18 +148,59 @@ export class MessageRouter {
                 });
         }
 
-        // Fetch the info for the message by GUID
-        const [messages, totalCount] = await Server().iMessageRepo.getMessages({
-            chatGuid,
-            withChats: withChats || withChatParticipants,
-            withAttachments,
-            offset,
-            limit,
-            sort,
-            before,
-            after,
-            where: where ?? []
-        });
+        let messages, totalCount;
+
+        // If the Private API is enabled and we are on ventura or newer, we have to use the Private API to search.
+        // This is because the DB's message.text column is NULL for all outgoing messages.
+        // We have to use the Spotlight API via the Private API helper to execute the search.
+        // The Private API will return the GUIDs of the messages that match the search term.
+        // We will remove the .text query and insert a GUID query.
+        const privateApiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
+        if (isMinVentura && privateApiEnabled && isNotEmpty(where)) {
+            // Sample statement: message.text LIKE :term COLLATE NOCASE
+            // Find any where statement that has message.text <operator> <variable>
+            const textQueries = where.filter((w: any) => w.statement.includes("message.text"));
+            if (textQueries.length === 1) {
+                // Find the variable name
+                const variable = textQueries[0].statement.split(" ")[2].replace(":", "");
+                const term = textQueries[0].args[variable];
+                
+                // Strip the % wildcards from the start/end
+                const strippedTerm = term.replace(/^%+|%+$/g, "");
+
+                // Remove the text query from the where clause
+                where = where.filter((w: any) => !w.statement.includes("message.text"));
+
+                [messages, totalCount] = await MessageInterface.searchMessagesPrivateApi({
+                    chatGuid,
+                    withChats: withChats || withChatParticipants,
+                    withAttachments,
+                    offset,
+                    limit,
+                    sort,
+                    before,
+                    after,
+                    where: where ?? [],
+                    query: strippedTerm
+                });
+            }
+        }
+
+        // If these are null, it means that the Private API is disabled or we are on a version older than Ventura.
+        // Or the where clause had multiple text queries, which is not supported currently in the Private API search.
+        if (messages == null && totalCount == null) {
+            [messages, totalCount] = await Server().iMessageRepo.getMessages({
+                chatGuid,
+                withChats: withChats || withChatParticipants,
+                withAttachments,
+                offset,
+                limit,
+                sort,
+                before,
+                after,
+                where: where ?? []
+            });
+        }
 
         const data = await MessageSerializer.serializeList({
             messages,

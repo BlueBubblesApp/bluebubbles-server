@@ -160,4 +160,11 @@ export class PrivateApiMessage extends PrivateApiAction {
         const request = new TransactionPromise(TransactionType.MESSAGE);
         return this.sendApiMessage(action, { chatGuid, messageGuid }, request);
     }
+
+    async search(query: string): Promise<TransactionResult> {
+        const action = "search-messages";
+        this.throwForNoMissingFields(action, [query]);
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.sendApiMessage(action, { query }, request);
+    }
 }

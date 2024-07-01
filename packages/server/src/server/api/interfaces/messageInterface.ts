@@ -21,6 +21,7 @@ import type {
 } from "@server/api/types";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import path from "path";
+import { DBWhereItem } from "@server/databases/imessage/types";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -579,5 +580,60 @@ export class MessageInterface {
         }
 
         return retMessage;
+    }
+
+    static async searchMessagesPrivateApi({
+        chatGuid = null,
+        withChats = false,
+        withAttachments = false,
+        offset = 0,
+        limit = 100,
+        sort = "DESC",
+        before = null,
+        after = null,
+        where = [],
+        query
+    }: {
+        chatGuid?: string,
+        withChats?: boolean,
+        withAttachments?: boolean,
+        offset?: number,
+        limit?: number,
+        sort?: "ASC" | "DESC",
+        before?: number | null,
+        after?: number | null,
+        where?: DBWhereItem[],
+        query: string,
+    }): Promise<[Message[], number]> {
+        checkPrivateApiStatus();
+        
+        const result = await Server().privateApi.message.search(query);
+        if (result?.data?.error) {
+            throw new Error(`Failed to search messages: ${result.data.error}`);
+        }
+
+        const results = result.data.results ?? [];
+        if (isEmpty(results)) return [[], 0];
+
+        // Modify the WHERE clause to include the message GUIDs
+        where.push({
+            statement: `message.guid IN (:...guids)`,
+            args: {
+                guids: results
+            }
+        });
+
+        // Fetch the info for the message by GUID
+        return await Server().iMessageRepo.getMessages({
+            chatGuid,
+            withChats,
+            withAttachments,
+            offset,
+            limit,
+            sort,
+            before,
+            after,
+            where: where ?? []
+        });
     }
 }
