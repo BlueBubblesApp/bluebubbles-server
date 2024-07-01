@@ -174,9 +174,7 @@ export class MessageRouter {
 
                 // Set the match type based on the operator
                 let matchType: 'contains' | 'exact' = 'contains';
-                if (operator === '=') {
-                    matchType = 'exact';
-                } else if (operator.toLowerCase() === 'is') {
+                if (['=', 'is'].includes(operator.toLowerCase())) {
                     matchType = 'exact';
                 }
 
