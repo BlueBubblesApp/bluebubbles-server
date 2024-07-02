@@ -30,7 +30,8 @@ module.exports = {
                 "owner": "BlueBubblesApp",
                 "private": false,
                 "channel": "latest",
-                "releaseType": "pre-release"
+                "releaseType": "draft",
+                "vPrefixedTagName": true
             }
         ],
         "target": [
@@ -38,7 +39,7 @@ module.exports = {
                 "target": "dmg",
                 "arch": [
                     "x64",
-                    // "arm64"
+                    "arm64"
                 ]
             }
         ],
@@ -61,7 +62,8 @@ module.exports = {
         "minimumSystemVersion": "10.11.0"
     },
     "dmg": {
-        "sign": false
+        "sign": false,
+        "writeUpdateInfo": false
     },
     // "afterSign": "./scripts/notarize.js"
 };
