@@ -8,12 +8,6 @@ module.exports = {
         "output": "release",
         "buildResources": "appResources"
     },
-    "files": [
-        "dist/",
-        "node_modules/",
-        "appResources/",
-        "package.json"
-    ],
     "asar": true,
     "extraResources": [
         "**/appResources/**"
