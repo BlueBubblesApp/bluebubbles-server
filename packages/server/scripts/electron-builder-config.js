@@ -30,12 +30,12 @@ module.exports = {
                 "target": "dmg",
                 "arch": [
                     "x64",
-                    "arm64"
+                    // "arm64"
                 ]
             }
         ],
         "type": "distribution",
-        "icon": "../../icons/regular/icon-512.png",
+        "icon": "../../icons/macos/dock-icon.png",
         "darkModeSupport": true,
         "hardenedRuntime": true,
         "notarize": false,
