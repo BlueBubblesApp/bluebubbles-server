@@ -61,7 +61,8 @@ module.exports = {
         "minimumSystemVersion": "10.11.0"
     },
     "dmg": {
-        "sign": false
+        "sign": false,
+        "writeUpdateInfo": false
     },
     // "afterSign": "./scripts/notarize.js"
 };
