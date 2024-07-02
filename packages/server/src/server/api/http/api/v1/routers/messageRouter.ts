@@ -173,10 +173,15 @@ export class MessageRouter {
                 where = where.filter((w: any) => !w.statement.includes("message.text"));
 
                 // Set the match type based on the operator
-                let matchType: 'contains' | 'exact' = 'contains';
-                if (['=', 'is'].includes(operator.toLowerCase())) {
-                    matchType = 'exact';
-                }
+                // let matchType: 'contains' | 'exact' = 'contains';
+                // if (['=', 'is'].includes(operator.toLowerCase())) {
+                //     matchType = 'exact';
+                // }
+
+                // To match the behavior of the DB search, we will use the 'exact' match type.
+                // Exact match for the Spotlight API actually means "contains".
+                // A contains match in the Spotlight API tokenizes the search term and matches any token.
+                const matchType = 'contains';
 
                 [messages, totalCount] = await MessageInterface.searchMessagesPrivateApi({
                     chatGuid,
