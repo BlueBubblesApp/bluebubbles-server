@@ -30,7 +30,7 @@ module.exports = {
                 "owner": "BlueBubblesApp",
                 "private": false,
                 "channel": "latest",
-                "releaseType": "release"
+                "releaseType": "pre-release"
             }
         ],
         "target": [
@@ -38,7 +38,7 @@ module.exports = {
                 "target": "dmg",
                 "arch": [
                     "x64",
-                    "arm64"
+                    // "arm64"
                 ]
             }
         ],

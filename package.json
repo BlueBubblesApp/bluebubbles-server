@@ -10,7 +10,9 @@
         "start": "concurrently \"cd ./packages/ui && npm run start\" \"cd ./packages/server && npm run start\"",
         "build-ui": "cd ./packages/ui && npm run build && mkdir -p ../server/dist/static && rm -rf ../server/dist/static && cp -R ./build/** ../server/dist/ && cd ../../",
         "build-server": "./node_modules/ngrok/bin/ngrok update && cd ./packages/server && npm run dist && cd ../../",
-        "build": "npm run build-ui && npm run build-server && rm -rf ./dist && mkdir -p ./dist && cp -R ./packages/server/release/* ./dist/ && rm -rf ./packages/server/release/ && rm -rf ./packages/ui/build/"
+        "release-server": "./node_modules/ngrok/bin/ngrok update && cd ./packages/server && npm run release && cd ../../",
+        "build": "npm run build-ui && npm run build-server && rm -rf ./dist && mkdir -p ./dist && cp -R ./packages/server/release/* ./dist/ && rm -rf ./packages/server/release/ && rm -rf ./packages/ui/build/",
+        "release": "npm run build-ui && npm run release-server"
     },
     "repository": "https://www.github.com/BlueBubblesApp/BlueBubbles-Server",
     "author": "BlueBubbles Development Team <bluebubblesapp@gmail.com>",

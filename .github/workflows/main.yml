@@ -1,0 +1,27 @@
+name: Build-BlueBubbles-Server
+
+on:
+  push:
+    branches: [ build-test ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macOS-13.0]
+
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+      - name: Use Node.js 20.11
+        uses: actions/setup-node@v1
+        with:
+          node-version: '20.11'
+      - name: Install Dependencies
+        run: npm install
+      - name: Build/Publish BlueBubbles
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npm run release
