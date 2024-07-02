@@ -108,7 +108,7 @@ export class NgrokService extends Proxy {
         opts.authtoken = safeTrim(ngrokKey);
         await authtoken({
             authtoken: safeTrim(ngrokKey),
-            binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
+            binPath: (_: string) => NgrokService.daemonDir
         });
 
         // If there is no key, force http
@@ -148,7 +148,7 @@ export class NgrokService extends Proxy {
             this.log.debug("Ngrok config file needs upgrading. Upgrading...");
             await upgradeConfig({
                 relocate: true,
-                binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked")
+                binPath: (_: string) => NgrokService.daemonDir
             });
         } catch (ex) {
             this.log.debug("An error occurred while upgrading the Ngrok config file!");
