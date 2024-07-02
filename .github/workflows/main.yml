@@ -16,10 +16,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Install Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Setup Python ${{ matrix.python-version }}
         run: python -m pip install setuptools
       - name: Setup Node.js 20.11
         uses: actions/setup-node@v4
