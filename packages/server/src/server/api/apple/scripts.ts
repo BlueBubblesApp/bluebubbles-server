@@ -69,13 +69,6 @@ const getServiceFromInput = (value: string) => {
 };
 
 /**
- * Locks the macOS account so credentials are needed to be used
- */
-export const lockMacOs = () => {
-    return `tell application "System Events" to keystroke "q" using {control down, command down}`;
-};
-
-/**
  * Hides the Messages app
  */
 export const hideMessages = () => {

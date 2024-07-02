@@ -70,6 +70,7 @@ import { IMessageCache } from "./databases/imessage/pollers";
 import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
+import { MacOsInterface } from "./api/interfaces/macosInterface";
 
 const findProcess = require("find-process");
 
@@ -939,6 +940,17 @@ class BlueBubblesServer extends EventEmitter {
                         "recommend uninstalling MacForge and then rebooting your Mac."
                 );
             }
+        }
+
+        try {
+            const autoLockMac = this.repo.getConfig("auto_lock_mac") as boolean;
+            const uptimeSeconds = os.uptime();
+            if (autoLockMac && uptimeSeconds > 300) {
+                this.logger.info("Auto-locking Mac ...");
+                await MacOsInterface.lock();
+            }
+        } catch (ex: any) {
+            this.logger.debug(`Failed to auto-lock Mac! ${ex.message}`);
         }
 
         this.logger.info("Finished post-start checks...");

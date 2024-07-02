@@ -756,4 +756,11 @@ export class FileSystem {
         await FileSystem.execShellCommand(`launchctl unload -w ${filePath}`);
         fs.unlinkSync(filePath);
     }
+
+    static async lockMacOs(): Promise<void> {
+        const pyPath = path.join(FileSystem.resources, "macos", "tools", "lock_screen_immediately.py");
+        if (!fs.existsSync(pyPath)) throw Error("Lock screen script not found!");
+
+        await FileSystem.execShellCommand(`python ${pyPath}`);
+    }
 }
