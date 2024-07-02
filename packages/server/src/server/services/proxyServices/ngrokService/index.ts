@@ -2,6 +2,7 @@ import { isEmpty, safeTrim } from "@server/helpers/utils";
 import path from "path";
 import fs from "fs";
 import { Server } from "@server";
+import { FileSystem } from "@server/fileSystem";
 import { connect, disconnect, kill, authtoken, Ngrok, upgradeConfig } from "ngrok";
 import { Proxy } from "../proxy";
 import { app } from "electron";
@@ -12,6 +13,10 @@ const oneHour45 = 1000 * 60 * (60 + 45); // This is the new ngrok timeout
 
 export class NgrokService extends Proxy {
     tag = "NgrokService";
+
+    static get daemonDir() {
+        return path.join(FileSystem.resources, "macos", "daemons", "ngrok", (process.arch === "arm64") ? "arm64" : "x86");
+    }
 
     constructor() {
         super({
@@ -82,7 +87,8 @@ export class NgrokService extends Proxy {
         const opts: Ngrok.Options = {
             port: Server().repo.getConfig("socket_port") ?? 1234,
             hostname: isEmpty(ngrokDomain) ? null : ngrokDomain,
-            binPath: (bPath: string) => bPath.replace("app.asar", "app.asar.unpacked"),
+            // Override the bin path with our own
+            binPath: (_: string) => NgrokService.daemonDir,
             onStatusChange: async (status: string) => {
                 this.log.info(`Ngrok status: ${status}`);
 

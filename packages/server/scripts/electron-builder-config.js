@@ -15,9 +15,6 @@ module.exports = {
         "package.json"
     ],
     "asar": true,
-    "asarUnpack": [
-        "**/node_modules/ngrok/bin/**"
-    ],
     "extraResources": [
         "**/appResources/**"
     ],
@@ -55,9 +52,6 @@ module.exports = {
             "NSAppleEventsUsageDescription": "BlueBubbles needs access to run AppleScripts",
             "NSSystemAdministrationUsageDescription": "BlueBubbles needs access to manage your system",
         },
-        "signIgnore": [
-            "ngrok"
-        ],
         "gatekeeperAssess": false,
         "minimumSystemVersion": "10.11.0"
     },

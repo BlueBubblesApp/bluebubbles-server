@@ -13,7 +13,7 @@ export class ZrokManager extends Loggable {
     tag = "ZrokManager";
 
     static get daemonPath() {
-        return path.join(FileSystem.resources, "macos", "daemons", "zrok", "zrok");
+        return path.join(FileSystem.resources, "macos", "daemons", "zrok", (process.arch === "arm64") ? "arm64" : "x86", "zrok");
     }
 
     proc: ChildProcessWithoutNullStreams;
