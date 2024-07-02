@@ -945,7 +945,7 @@ class BlueBubblesServer extends EventEmitter {
         try {
             const autoLockMac = this.repo.getConfig("auto_lock_mac") as boolean;
             const uptimeSeconds = os.uptime();
-            if (autoLockMac && uptimeSeconds > 300) {
+            if (autoLockMac && uptimeSeconds <= 300) {
                 this.logger.info("Auto-locking Mac ...");
                 await MacOsInterface.lock();
             }
