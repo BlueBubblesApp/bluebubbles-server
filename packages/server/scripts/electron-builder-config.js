@@ -46,6 +46,7 @@ module.exports = {
         "icon": "../../icons/regular/icon-512.png",
         "darkModeSupport": true,
         "hardenedRuntime": true,
+        "notarize": false,
         "entitlements": "./scripts/entitlements.mac.plist",
         "entitlementsInherit": "./scripts/entitlements.mac.plist",
         "extendInfo": {
