@@ -23,5 +23,5 @@ jobs:
         run: npm install
       - name: Build/Publish BlueBubbles
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run release
