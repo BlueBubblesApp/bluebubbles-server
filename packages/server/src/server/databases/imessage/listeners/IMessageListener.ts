@@ -83,16 +83,13 @@ export class IMessageListener extends Loggable {
 
     @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', 500)
     async handleChangeEvent(event: FileChangeEvent) {
-        this.log.debug(`Detected change in database files: ${event.filePath}`);
         await this.processLock.acquire();
 
         // Check against the last check using the current change timestamp
         if (event.currentStat.mtimeMs > this.lastCheck) {
-            this.log.debug(`Processing DB change: ${event.currentStat.mtimeMs} > ${this.lastCheck}`);
             // Update the last check time.
             // We'll use the currentStat's mtimeMs - the time it took to poll.
             this.lastCheck = event.currentStat.mtimeMs;
-            this.log.debug(`Saving last check time: ${this.lastCheck}`);
 
             // Make sure that the previous stat is not null/0.
             // If we are trying to pull > 24 hrs worth of data, pull only 24 hrs.
