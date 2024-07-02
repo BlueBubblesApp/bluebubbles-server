@@ -39,7 +39,7 @@ module.exports = {
                 "target": "dmg",
                 "arch": [
                     "x64",
-                    // "arm64"
+                    "arm64"
                 ]
             }
         ],
