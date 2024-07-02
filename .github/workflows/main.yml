@@ -2,7 +2,7 @@ name: Build-BlueBubbles-Server
 
 on:
   push:
-    branches: [ build-test ]
+    branches: [ master ]
 
 jobs:
   build:
