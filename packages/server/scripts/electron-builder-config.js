@@ -21,6 +21,10 @@ module.exports = {
     "extraResources": [
         "**/appResources/**"
     ],
+    "releaseInfo": {
+        "releaseName": "BlueBubbles Server v${version}",
+        "releaseNotes": "# What's New?"
+    },
     "mac": {
         "category": "public.app-category.social-networking",
         "publish": [
@@ -30,7 +34,8 @@ module.exports = {
                 "owner": "BlueBubblesApp",
                 "private": false,
                 "channel": "latest",
-                "releaseType": "draft"
+                "releaseType": "draft",
+                "vPrefixedTagName": true
             }
         ],
         "target": [
