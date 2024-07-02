@@ -38,7 +38,6 @@ import { AiOutlineBug, AiOutlineHome, AiOutlineApi, AiOutlineHeart, AiOutlineDow
 import { BsChevronDown, BsCheckAll, BsBook, BsPersonCircle, BsFillCalendarCheckFill, BsPhone } from 'react-icons/bs';
 import { MdOutlineAttachMoney, MdOutlineLightMode, MdOutlineDarkMode } from 'react-icons/md';
 import { IconType } from 'react-icons';
-import { ReactText } from 'react';
 
 import { ContactsLayout } from 'app/layouts/contacts/ContactsLayout';
 
@@ -208,7 +207,7 @@ const SidebarContent = ({ onClose, ...rest }: SidebarProps) => {
 interface NavItemProps extends FlexProps {
     icon: IconType;
     to: string;
-    children: ReactText;
+    children: string | number;
 }
 const NavItem = ({ icon, to, children, ...rest }: NavItemProps) => {
     const location = useLocation();
@@ -250,7 +249,8 @@ interface MobileProps extends FlexProps {
 const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileProps) => {
     const { colorMode, toggleColorMode } = useColorMode();
     const useOled = useAppSelector(state => state.config.use_oled_dark_mode ?? false);
-    const updateAvailable: boolean = (useAppSelector(state => state.config.update_available) ?? false);
+    const updateAvailable: boolean = (useAppSelector(state => state.config.update_available?.show) ?? false);
+    const updateVersion: string = (useAppSelector(state => state.config.update_available?.version) ?? '');
     const bgColor = (colorMode === 'light') ? 'white' : (useOled ? 'black' : 'gray.800');
 
     return (
@@ -282,15 +282,28 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
 
             <HStack spacing={{ base: '0', md: '1' }}>
                 {(updateAvailable) ? (
-                    <Tooltip label="Install Update" aria-label="update-tip">
-                        <IconButton
-                            size="lg"
-                            variant="ghost"
-                            aria-label="update"
-                            icon={<AiOutlineDownload />}
-                            onClick={downloadAndInstallUpdate}
-                        />
-                    </Tooltip>
+                    <Box position='relative' float='left'>
+                        <Tooltip label="Update Available" aria-label="update-tip">
+                            <IconButton
+                                size="lg"
+                                variant="ghost"
+                                aria-label="update"
+                                icon={<AiOutlineDownload />}
+                                onClick={downloadAndInstallUpdate}
+                            />
+                        </Tooltip>
+                        <Badge
+                            borderRadius='lg'
+                            variant='solid'
+                            colorScheme='green'
+                            position='absolute'
+                            margin={0}
+                            top={2}
+                            right={8}
+                            zIndex={2}
+                            fontSize={10}
+                        >v{updateVersion}</Badge>
+                    </Box>
                 ): null}
                 <Tooltip label="Website Home" aria-label="website-tip">
                     <Link href="https://bluebubbles.app" style={{ textDecoration: 'none' }} target="_blank">

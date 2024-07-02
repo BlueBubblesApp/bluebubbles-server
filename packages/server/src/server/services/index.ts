@@ -2,7 +2,6 @@ import { FCMService } from "./fcmService";
 import { CaffeinateService } from "./caffeinateService";
 import { UpdateService } from "./updateService";
 import { NgrokService } from "./proxyServices/ngrokService";
-import { LocalTunnelService } from "./proxyServices/localTunnelService";
 import { CloudflareService } from "./proxyServices/cloudflareService";
 import { ZrokService } from "./proxyServices/zrokService";
 import { NetworkCheckerService } from "./networkCheckerService";
@@ -18,7 +17,6 @@ export {
     CaffeinateService,
     UpdateService,
     NgrokService,
-    LocalTunnelService,
     ZrokService,
     NetworkCheckerService as NetworkService,
     QueueService,

@@ -9,6 +9,7 @@ import { FileSystem } from "@server/fileSystem";
 import { certSubject, validForDays, millisADay } from "./constants";
 import { onlyAlphaNumeric } from "@server/helpers/utils";
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
+import { ProxyServices } from "@server/databases/server/constants";
 
 export class CertificateService extends Loggable {
     tag = "CertificateService";
@@ -106,7 +107,7 @@ export class CertificateService extends Loggable {
 
         if (
             prevConfig.password === nextConfig.password &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !== "dynamicdns" &&
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !== onlyAlphaNumeric(ProxyServices.DynamicDNS) &&
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase()
         )
@@ -119,7 +120,7 @@ export class CertificateService extends Loggable {
         } else if (
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() === "dynamicdns"
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() === onlyAlphaNumeric(ProxyServices.DynamicDNS)
         ) {
             log.info("Proxy service changed to Dynamic DNS. Refreshing certificate");
             CertificateService.refreshCertificate();

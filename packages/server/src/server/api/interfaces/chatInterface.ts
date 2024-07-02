@@ -406,7 +406,7 @@ export class ChatInterface {
             }
 
             // Extract filename from path
-            const filename = iconPath.split("/").slice(-1)[0];
+            const filename = iconPath.split("/").pop();
 
             // Copy the file to the Messages Attachments folder
             iconPath = FileSystem.copyAttachment(iconPath, `${chat.chatIdentifier}-${filename}`, "private-api");

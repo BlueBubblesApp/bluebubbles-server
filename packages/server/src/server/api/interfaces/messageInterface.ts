@@ -8,6 +8,7 @@ import { isMinMonterey, isMinVentura } from "@server/env";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/apple/mappings";
 import { invisibleMediaChar } from "@server/api/http/constants";
 import { ActionHandler } from "@server/api/apple/actions";
+import { rimrafSync } from "rimraf";
 import type {
     SendMessageParams,
     SendAttachmentParams,
@@ -20,6 +21,7 @@ import type {
 } from "@server/api/types";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import path from "path";
+import { DBWhereItem } from "@server/databases/imessage/types";
 
 export class MessageInterface {
     static possibleReactions: string[] = [
@@ -245,7 +247,7 @@ export class MessageInterface {
             throw new Error("Failed to send message!");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
@@ -297,7 +299,7 @@ export class MessageInterface {
             throw new Error("Failed to send attachment!");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
@@ -459,7 +461,7 @@ export class MessageInterface {
             Server().log(`Reaction sent with Message GUID: ${result.identifier}`, "debug");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         let retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
@@ -540,13 +542,11 @@ export class MessageInterface {
         // Copy the attachments with the correct name.
         // And delete the original
         for (let i = 0; i < parts.length; i++) {
-            if (parts[0].attachment) {
-                const currentPath = path.join(FileSystem.messagesAttachmentsDir, parts[i].attachment);
+            if (parts[i].attachment) {
+                const baseDir = FileSystem.getAttachmentDirectory("private-api");
+                const currentPath = path.join(baseDir, parts[i].attachment);
                 const newPath = FileSystem.copyAttachment(currentPath, parts[i].name, "private-api");
                 parts[i].filePath = newPath;
-
-                // Delete the original
-                fs.unlinkSync(currentPath);
             }
         }
 
@@ -566,7 +566,7 @@ export class MessageInterface {
             throw new Error("Failed to send message!");
         }
 
-        const maxWaitMs = 30000;
+        const maxWaitMs = 60000;
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
@@ -580,5 +580,62 @@ export class MessageInterface {
         }
 
         return retMessage;
+    }
+
+    static async searchMessagesPrivateApi({
+        chatGuid = null,
+        withChats = false,
+        withAttachments = false,
+        offset = 0,
+        limit = 100,
+        sort = "DESC",
+        before = null,
+        after = null,
+        where = [],
+        query,
+        matchType = "contains"
+    }: {
+        chatGuid?: string,
+        withChats?: boolean,
+        withAttachments?: boolean,
+        offset?: number,
+        limit?: number,
+        sort?: "ASC" | "DESC",
+        before?: number | null,
+        after?: number | null,
+        where?: DBWhereItem[],
+        query: string,
+        matchType?: "contains" | "exact"
+    }): Promise<[Message[], number]> {
+        checkPrivateApiStatus();
+        
+        const result = await Server().privateApi.message.search(query, matchType);
+        if (result?.data?.error) {
+            throw new Error(`Failed to search messages: ${result.data.error}`);
+        }
+
+        const results = result.data.results ?? [];
+        if (isEmpty(results)) return [[], 0];
+
+        // Modify the WHERE clause to include the message GUIDs
+        where.push({
+            statement: `message.guid IN (:...guids)`,
+            args: {
+                guids: results
+            }
+        });
+
+        // Fetch the info for the message by GUID
+        return await Server().iMessageRepo.getMessages({
+            chatGuid,
+            withChats,
+            withAttachments,
+            offset,
+            limit,
+            sort,
+            before,
+            after,
+            where: where ?? []
+        });
     }
 }

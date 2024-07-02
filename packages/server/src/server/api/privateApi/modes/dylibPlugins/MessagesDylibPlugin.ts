@@ -25,8 +25,12 @@ export class MessagesDylibPlugin extends DylibPlugin {
 
     async injectPlugin(_?: () => void): Promise<void> {
         return await super.injectPlugin(async () => {
+            // If we've already cached some locations, we don't need to again
             if (Server().findMyCache.getAll().length > 0) return;
-            const locations = await FindMyInterface.refreshFriends();
+
+            // Only open the FindMy App if the user wants to
+            const openFindMy = Server().repo.getConfig("open_findmy_on_startup") as boolean;
+            const locations = await FindMyInterface.refreshFriends(openFindMy);
             if (isNotEmpty(locations)) {
                 Server().findMyCache.addAll(locations);
             }

@@ -77,7 +77,7 @@ export class AppTray extends Tray {
 
         if (Server()?.updater?.hasUpdate ?? false) {
             updateOpt = {
-                label: `Install Update (${Server().updater.updateInfo.updateInfo.version})`,
+                label: `Install Update (${Server().updater.updateInfo.tag_name})`,
                 type: "normal",
                 click: async () => {
                     Server().emitMessage(SERVER_UPDATE_DOWNLOADING, null);

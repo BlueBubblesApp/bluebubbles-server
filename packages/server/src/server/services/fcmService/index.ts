@@ -4,11 +4,12 @@ import { FileSystem } from "@server/fileSystem";
 import { RulesFile } from "firebase-admin/lib/security-rules/security-rules";
 import { App } from "firebase-admin/app";
 import axios from "axios";
-import { isEmpty, waitMs } from "@server/helpers/utils";
+import { isEmpty } from "@server/helpers/utils";
 import { ScheduledService } from "@server/lib/ScheduledService";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { AsyncSingleton } from "@server/lib/decorators/AsyncSingletonDecorator";
 import { AsyncRetryer } from "@server/lib/decorators/AsyncRetryerDecorator";
+import { ProxyServices } from "@server/databases/server/constants";
 
 const AppName = "BlueBubbles";
 
@@ -56,7 +57,7 @@ export class FCMService extends Loggable {
 
         // If the proxy service is lan-url or dynamic-dns, we don't need to start this service
         const proxyService = Server().repo.getConfig("proxy_service") as string;
-        if (proxyService === "lan-url" || proxyService === "dynamic-dns") return;
+        if (proxyService === ProxyServices.LanURL || proxyService === ProxyServices.DynamicDNS) return;
 
         this.addressUpdateService = new ScheduledService(() => {
             // If the app has been deleted (service stopped), clear the interval
@@ -209,10 +210,13 @@ export class FCMService extends Loggable {
         await db.setRules(source);
     }
 
-    clearLastValues() {
+    async clearConfig() {
         this.lastRestart = 0;
         this.lastProjectId = null;
         this.lastProjectNumber = null;
+
+        // Remove all registered apps
+        await Promise.all(admin.apps.map(app => app.delete()));
     }
 
     /**
@@ -232,14 +236,14 @@ export class FCMService extends Loggable {
     }
 
     /**
-     * Sets the ngrok server URL within firebase
+     * Sets the server URL within firebase
      *
      * @param serverUrl The new server URL
      */
     @AsyncSingleton("FCMService.setServerUrl")
     @AsyncRetryer({
         name: "FCMService.setServerUrl",
-        maxTries: 3,
+        maxTries: 12,
         retryDelay: 5000,
         onSuccess: (_data: any) => true
     })

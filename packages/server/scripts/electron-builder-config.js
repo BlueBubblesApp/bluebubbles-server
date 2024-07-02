@@ -3,7 +3,7 @@
 module.exports = {
     "productName": "BlueBubbles",
     "appId": "com.BlueBubbles.BlueBubbles-Server",
-    "npmRebuild": false,
+    "npmRebuild": true,
     "directories": {
         "output": "release",
         "buildResources": "appResources"
@@ -30,15 +30,16 @@ module.exports = {
                 "owner": "BlueBubblesApp",
                 "private": false,
                 "channel": "latest",
-                "releaseType": "release"
+                "releaseType": "draft",
+                "vPrefixedTagName": true
             }
         ],
         "target": [
             {
-                "target": "default",
+                "target": "dmg",
                 "arch": [
-                    'x64',
-                    // 'arm64'
+                    "x64",
+                    "arm64"
                 ]
             }
         ],
@@ -46,6 +47,7 @@ module.exports = {
         "icon": "../../icons/regular/icon-512.png",
         "darkModeSupport": true,
         "hardenedRuntime": true,
+        "notarize": false,
         "entitlements": "./scripts/entitlements.mac.plist",
         "entitlementsInherit": "./scripts/entitlements.mac.plist",
         "extendInfo": {
@@ -60,7 +62,8 @@ module.exports = {
         "minimumSystemVersion": "10.11.0"
     },
     "dmg": {
-        "sign": false
+        "sign": false,
+        "writeUpdateInfo": false
     },
-    "afterSign": "./scripts/notarize.js"
+    // "afterSign": "./scripts/notarize.js"
 };

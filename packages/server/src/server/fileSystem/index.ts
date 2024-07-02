@@ -1,5 +1,4 @@
-import * as fs from "fs-extra";
-
+import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as child_process from "child_process";
@@ -29,9 +28,10 @@ import {
     ImageMetadata,
     ImageMetadataKeys
 } from "./types";
-import { rimrafSync } from "rimraf";
+import { uuidv4 } from "@firebase/util";
 
 const FindProcess = require("find-process");
+const { rimrafSync } = require("rimraf");
 
 // Patch in original user data directory
 app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
@@ -185,10 +185,19 @@ export class FileSystem {
      * @param buffer The attachment bytes (buffer)
      */
     static saveAttachment(name: string, buffer: Uint8Array): string {
-        if (!fs.existsSync(FileSystem.attachmentsDir)) fs.mkdirSync(FileSystem.attachmentsDir);
-        const newPath = path.join(FileSystem.attachmentsDir, name);
-        fs.writeFileSync(newPath, buffer);
-        return newPath;
+        let newFile = FileSystem.getAttachmentDirectory(null);
+        if (!fs.existsSync(newFile)) fs.mkdirSync(newFile, { recursive: true });
+        newFile = path.join(newFile, name);
+        fs.writeFileSync(newFile, buffer);
+        return newFile;
+    }
+
+    static getAttachmentDirectory(method: string): string {
+        if (isMinMonterey || method === "private-api") {
+            return FileSystem.messagesAttachmentsDir;
+        } else {
+            return FileSystem.attachmentsDir;
+        }
     }
 
     /**
@@ -198,18 +207,14 @@ export class FileSystem {
      * @param buffer The attachment bytes (buffer)
      */
     static copyAttachment(originalPath: string, name: string, method = "apple-script"): string {
-        let newPath = path.join(FileSystem.attachmentsDir, name);
-        if (isMinMonterey || method === "private-api") {
-            if (!fs.existsSync(FileSystem.messagesAttachmentsDir)) {
-                fs.mkdirSync(FileSystem.messagesAttachmentsDir, { recursive: true });
-            }
+        // Generate a random folder to put it in. This is so we don't have file name overlap
+        const guid = uuidv4();
+        const dir = FileSystem.getAttachmentDirectory(method);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-            newPath = path.join(FileSystem.messagesAttachmentsDir, name);
-        } else {
-            if (!fs.existsSync(FileSystem.attachmentsDir)) {
-                fs.mkdirSync(FileSystem.attachmentsDir, { recursive: true });
-            }
-        }
+        let newPath = path.join(dir, guid);
+        if (!fs.existsSync(newPath)) fs.mkdirSync(newPath, { recursive: true });
+        newPath = path.join(newPath, name);
 
         if (newPath !== originalPath) {
             fs.copyFileSync(originalPath, newPath);
@@ -433,7 +438,7 @@ export class FileSystem {
      */
     static removeAttachment(name: string): void {
         try {
-            fs.unlinkSync(path.join(FileSystem.attachmentsDir, name));
+            fs.unlinkSync(path.join(FileSystem.getAttachmentDirectory(null), name));
         } catch (ex: any) {
             Server().log(`Could not remove attachment: ${ex.message}`, "error");
         }
@@ -454,7 +459,7 @@ export class FileSystem {
      * then call the delete method
      */
     static purgeAttachments(): void {
-        const files = fs.readdirSync(FileSystem.attachmentsDir);
+        const files = fs.readdirSync(FileSystem.getAttachmentDirectory(null));
         files.forEach(file => {
             FileSystem.removeAttachment(file);
         });
@@ -713,5 +718,49 @@ export class FileSystem {
     static async processIsRunning(name: string): Promise<boolean> {
         const processes = await FindProcess("name", name);
         return processes.length > 0;
+    }
+
+    static async createLaunchAgent(): Promise<void> {
+        const appPath = app.getPath("exe");
+        console.log(appPath);
+        const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>Label</key>
+        <string>com.bluebubbles.server</string>
+        <key>Program</key>
+        <string>${appPath}</string>
+        <key>RunAtLoad</key>
+        <true/>
+        <key>KeepAlive</key>
+        <dict>
+	        <key>SuccessfulExit</key>
+	    <false/>
+	</dict>
+    </dict>
+</plist>`;
+
+        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", "com.bluebubbles.server.plist");
+        if (fs.existsSync(filePath)) return;
+
+        fs.writeFileSync(filePath, plist);
+
+        await FileSystem.execShellCommand(`launchctl load -w ${filePath}`);
+    }
+
+    static async removeLaunchAgent(): Promise<void> {
+        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", "com.bluebubbles.server.plist");
+        if (!fs.existsSync(filePath)) return;
+
+        await FileSystem.execShellCommand(`launchctl unload -w ${filePath}`);
+        fs.unlinkSync(filePath);
+    }
+
+    static async lockMacOs(): Promise<void> {
+        const pyPath = path.join(FileSystem.resources, "macos", "tools", "lock_screen_immediately.py");
+        if (!fs.existsSync(pyPath)) throw Error("Lock screen script not found!");
+
+        await FileSystem.execShellCommand(`python ${pyPath}`);
     }
 }

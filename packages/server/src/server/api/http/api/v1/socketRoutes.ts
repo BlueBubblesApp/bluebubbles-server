@@ -41,6 +41,7 @@ import { HandleSerializer } from "@server/api/serializers/HandleSerializer";
 import { AttachmentSerializer } from "@server/api/serializers/AttachmentSerializer";
 import { MacOsInterface } from "@server/api/interfaces/macosInterface";
 import { getLogger } from "@server/lib/logging/Loggable";
+import { ProxyServices } from "@server/databases/server/constants";
 
 const unknownError = "Unknown Error. Check server logs!";
 const log = getLogger("SocketRoutes");
@@ -110,8 +111,15 @@ export class SocketRoutes {
             // Make sure we have a service
             if (!params?.service) return response(cb, "error", createBadRequestResponse("No service name provided!"));
 
-            // Make sure the service is one that we can handle
-            const serviceOpts = ["ngrok", "cloudflare", "localtunnel", "dynamicdns"];
+            // Make sure the service is one that we can handle'
+            const dynDns = onlyAlphaNumeric(ProxyServices.DynamicDNS);
+            const serviceOpts = [
+                onlyAlphaNumeric(ProxyServices.Ngrok),
+                onlyAlphaNumeric(ProxyServices.Zrok),
+                onlyAlphaNumeric(ProxyServices.Cloudflare),
+                dynDns,
+                onlyAlphaNumeric(ProxyServices.LanURL)
+            ];
             if (!serviceOpts.includes(onlyAlphaNumeric(params.service).toLowerCase()))
                 return response(
                     cb,
@@ -120,7 +128,7 @@ export class SocketRoutes {
                 );
 
             // If the service is dynamic DNS, make sure we have an address
-            if (onlyAlphaNumeric(params.service).toLowerCase() === "dynamicdns" && !params?.address)
+            if (onlyAlphaNumeric(params.service).toLowerCase() === dynDns && !params?.address)
                 return response(cb, "error", createBadRequestResponse("No Dynamic DNS address provided!"));
 
             // Send the response back before restarting
@@ -135,7 +143,7 @@ export class SocketRoutes {
             await Server().repo.setConfig("proxy_service", params.service);
 
             // If it's a dyn dns, set the address
-            if (onlyAlphaNumeric(params.service).toLowerCase() === "dynamicdns") {
+            if (onlyAlphaNumeric(params.service).toLowerCase() === dynDns) {
                 let addr = params.address;
                 if (!addr.startsWith("http")) {
                     addr = `http://${addr}`;

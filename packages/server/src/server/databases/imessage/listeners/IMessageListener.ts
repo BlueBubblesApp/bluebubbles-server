@@ -60,13 +60,13 @@ export class IMessageListener extends Loggable {
     }
 
     async start() {
-        this.lastCheck = 0;
+        this.lastCheck = this.getEarliestModifiedDate().getTime() - 60000;
         this.stopped = false;
 
         // Perform an initial poll to kinda seed the cache.
         // We'll use the earliest modified date of the files to determine the initial poll date.
         // We'll also subtract 1 minute just to pre-load the cache with a little bit of data.
-        await this.poll(new Date(this.getEarliestModifiedDate().getTime() - 60000), false);
+        await this.poll(new Date(this.lastCheck), false);
 
         this.watcher = new MultiFileWatcher(this.filePaths);
         this.watcher.on("change", async (event: FileChangeEvent) => {
@@ -83,19 +83,29 @@ export class IMessageListener extends Loggable {
 
     @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', 500)
     async handleChangeEvent(event: FileChangeEvent) {
-        this.log.debug(`Detected change in database files: ${event.filePath}`);
         await this.processLock.acquire();
 
         // Check against the last check using the current change timestamp
         if (event.currentStat.mtimeMs > this.lastCheck) {
-            this.log.debug(`Processing DB change: ${event.currentStat.mtimeMs} > ${this.lastCheck}`);
             // Update the last check time.
             // We'll use the currentStat's mtimeMs - the time it took to poll.
             this.lastCheck = event.currentStat.mtimeMs;
-            this.log.debug(`Saving last check time: ${this.lastCheck}`);
+
+            // Make sure that the previous stat is not null/0.
+            // If we are trying to pull > 24 hrs worth of data, pull only 24 hrs.
+            // This is to prevent checking too much data at once.
+            let prevTime = event.prevStat ? event.prevStat.mtimeMs : 0;
+            if (prevTime <= 0) {
+                this.log.debug(`Previous time is 0, setting to last check time...`);
+                prevTime = this.lastCheck;
+            } else if (this.lastCheck - prevTime > 86400000) {
+                this.log.debug(`Previous time is > 24 hours, setting to 24 hours ago...`);
+                prevTime = this.lastCheck - 86400000;
+            }
+
             // Use the previousStat's mtimeMs - 30 seconds to account for any time drift.
             // This allows us to fetch everything since the last mtimeMs.
-            await this.poll(new Date(event.prevStat.mtimeMs - 30000));
+            await this.poll(new Date(prevTime - 30000));
 
             // Trim the cache so it doesn't get too big
             this.cache.trimCaches();

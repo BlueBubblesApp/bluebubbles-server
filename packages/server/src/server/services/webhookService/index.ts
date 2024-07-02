@@ -22,7 +22,7 @@ export class WebhookService extends Loggable {
 
             // We don't need to await this
             this.sendPost(i.url, event).catch(ex => {
-                this.log.warn(`Failed to dispatch event to webhook: ${i.url}`);
+                this.log.debug(`Failed to dispatch "${event.type}" event to webhook: ${i.url}`);
                 this.log.debug(ex?.message ?? String(ex));
             });
         }

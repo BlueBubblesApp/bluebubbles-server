@@ -238,7 +238,7 @@ export class MessageValidator {
             if (part.attachment && !part.name)
                 throw new BadRequest({ error: "Each attachment must have a name" });
             if (part.attachment) {
-                const aPath = path.join(FileSystem.messagesAttachmentsDir, part.attachment);
+                const aPath = path.join(FileSystem.getAttachmentDirectory("private-api"), part.attachment);
                 if (!fs.existsSync(aPath)) {
                     throw new BadRequest({ error: `Attachment '${part.attachment}' does not exist` });
                 }

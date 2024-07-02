@@ -37,7 +37,7 @@ export class FindMyInterface {
         await this.refreshLocationsAccessibility();
     }
 
-    static async refreshFriends(): Promise<FindMyLocationItem[]> {
+    static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
         const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
         if (papiEnabled && isMinBigSur && !isMinSonoma) {
             checkPrivateApiStatus();
@@ -52,7 +52,9 @@ export class FindMyInterface {
         // No matter what, open the Find My app.
         // Don't await because it should update in the background.
         // Location updates get emitted as an event as they come in.
-        this.refreshLocationsAccessibility();
+        if (openFindMyApp) {
+            this.refreshLocationsAccessibility();
+        }
 
         return Server().findMyCache.getAll();
     }

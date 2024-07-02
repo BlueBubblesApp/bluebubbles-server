@@ -388,15 +388,15 @@ export const checkPrivateApiStatus = () => {
     }
 };
 
-export const isNotEmpty = (value: string | Array<any> | NodeJS.Dict<any> | number, trim = true): boolean => {
+export const isNotEmpty = (value: string | Array<any> | NodeJS.Dict<any> | number, trimEmpty = true): boolean => {
     if (!value) return false;
 
     // Handle if the input is a string
-    if (typeof value === "string" && (trim ? (value as string).trim() : value).length > 0) return true;
+    if (typeof value === "string" && (trimEmpty ? (value as string).trim() : value).length > 0) return true;
 
     // Handle if the input is a list
     if (typeof value === "object" && Array.isArray(value)) {
-        if (trim) return value.filter(i => isNotEmpty(i)).length > 0;
+        if (trimEmpty) return value.filter(i => isNotEmpty(i)).length > 0;
         return value.length > 0;
     }
 
@@ -505,3 +505,11 @@ export const getObjectAsString = (value: any): string => {
         return String(value);
     }
 };
+
+export const titleCase = (str: string) => {
+    return str
+        .toLowerCase()
+        .split(" ")
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}

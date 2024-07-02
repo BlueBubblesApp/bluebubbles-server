@@ -17,6 +17,12 @@ export const getConversionPath = (attachment: Attachment, extension: string): st
     const newDir = `${FileSystem.convertDir}/${guid}`;
     if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
     const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
+
+    // If the path already has the extension, return it
+    let newPath = `${newDir}/${newName}`;
+    if (newPath.endsWith(`.${extension}`)) return newPath;
+
+    // Otherwise, return the path with the extension
     return `${newDir}/${newName}.${extension}`;
 }
 
@@ -112,7 +118,7 @@ export const convertImage = async (
         // If conversion is successful, we need to modify the attachment a bit
         attachment.mimeType = "image/jpeg";
         attachment.filePath = newPath;
-        attachment.transferName = basename(newPath).replace(`.${ext}`, ".jpeg");
+        attachment.transferName = basename(newPath).replace(new RegExp(`\\.${ext}$`), ".jpeg");
 
         // Set the fPath to the newly converted path
         return newPath;

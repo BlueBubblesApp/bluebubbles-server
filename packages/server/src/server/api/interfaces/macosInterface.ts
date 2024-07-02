@@ -1,16 +1,12 @@
 import { FileSystem } from "@server/fileSystem";
-import { lockMacOs, restartMessages } from "@server/api/apple/scripts";
+import { restartMessages } from "@server/api/apple/scripts";
 import { Server } from "@server";
 import { safeTrim } from "@server/helpers/utils";
 import { ProcessDylibMode } from "@server/api/privateApi/modes/ProcessDylibMode";
 
 export class MacOsInterface {
     static async lock() {
-        // Give it a second so that anything after can finish doing
-        // whatever it wants to do
-        setTimeout(() => {
-            FileSystem.executeAppleScript(lockMacOs());
-        }, 1000);
+        await FileSystem.lockMacOs();
     }
 
     static async restartMessagesApp() {

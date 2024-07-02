@@ -7,7 +7,7 @@ import { MessageTypeTransformer } from "@server/databases/transformers/MessageTy
 import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
-import { isEmpty, sanitizeStr } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, sanitizeStr } from "@server/helpers/utils";
 import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMonterey, isMinSierra, isMinVentura } from "@server/env";
 import { NSAttributedString } from "node-typedstream";
 import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
@@ -63,6 +63,44 @@ export class Message {
         parts.push(`Date: ${this.dateCreated.toLocaleString()}`);
 
         return parts.join("; ");
+    }
+
+    get retractedParts(): number[] {
+        return this.messageSummaryInfo?.[0]?.retractedParts ?? [];
+    }
+
+    get hasUnsentParts(): boolean {
+        return this.dateEdited && isNotEmpty(this.retractedParts, false);
+    }
+
+    get isFullyUnsent(): boolean {
+        // It's fully unsent if we have unsent parts, and all parts are unsent
+        return this.hasUnsentParts && this.retractedParts.length > 0 && this.partCount === 0;
+    }
+
+    get isPartiallyUnsent(): boolean {
+        // It's partially unsent if we have unsent parts, but there are still parts left
+        return this.hasUnsentParts && this.retractedParts.length > 0 && this.partCount > 0;
+    }
+
+    get lastUpdateTime(): Date {
+        return this.dateRetracted ?? this.dateEdited ?? this.dateRead ?? this.dateDelivered ?? this.dateCreated;
+    }
+
+    get messageStatus(): String {
+        return this.dateRetracted
+            ? "Unsent"
+            : this.isFullyUnsent
+            ? "Unsent"
+            : this.isPartiallyUnsent
+            ? "Partially Unsent"
+            : this.dateEdited
+            ? "Edited"
+            : this.dateRead
+            ? "Read"
+            : this.dateDelivered
+            ? "Delivered"
+            : "Sent";
     }
 
     @PrimaryGeneratedColumn({ name: "ROWID" })

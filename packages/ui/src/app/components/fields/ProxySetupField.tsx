@@ -93,8 +93,8 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                     }}
                 >
                     <option value='cloudflare'>Cloudflare (Recommended)</option>
+                    <option value='zrok'>Zrok</option>
                     <option value='ngrok'>Ngrok</option>
-                    <option value='zrok'>Zrok (Beta)</option>
                     <option value='dynamic-dns'>Dynamic DNS / Custom URL</option>
                     <option value='lan-url'>LAN URL</option>
                 </Select>

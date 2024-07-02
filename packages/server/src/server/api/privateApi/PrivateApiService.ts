@@ -20,7 +20,6 @@ import { PrivateApiAddressEventHandler } from "./eventHandlers/PrivateApiAddress
 import { PrivateApiFaceTimeStatusHandler } from "./eventHandlers/PrivateApiFaceTimeStatusHandler";
 import { PrivateApiCloud } from "./apis/PrivateApiCloud";
 import { PrivateApiFaceTime } from "./apis/PrivateApiFaceTime";
-import { LogLevel } from "electron-log";
 import { PrivateApiFindMyEventHandler } from "./eventHandlers/PrivateApiFindMyEventHandler";
 import { Socket } from "../types";
 import { v4 } from "uuid";

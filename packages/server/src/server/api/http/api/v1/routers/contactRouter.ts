@@ -6,6 +6,7 @@ import { ContactInterface } from "@server/api/interfaces/contactInterface";
 import { Success } from "../responses/success";
 import { Contact } from "@server/databases/server/entity";
 import { parseWithQuery } from "../utils";
+import { BadRequest } from "../responses/errors";
 
 export class ContactRouter {
     private static isAddressObject(data: any): boolean {
@@ -28,8 +29,12 @@ export class ContactRouter {
         const addresses = body?.addresses ?? [];
         const extraProps = parseWithQuery(body?.extraProperties ?? [], false);
 
+        if (!Array.isArray(addresses)) {
+            throw new BadRequest({ 'error': 'Addresses must be an array of strings!' });
+        }
+
         let res = [];
-        if (isEmpty(addresses) || !Array.isArray(addresses)) {
+        if (isEmpty(addresses)) {
             res = await ContactInterface.getAllContacts(extraProps);
         } else {
             res = await ContactInterface.queryContacts(addresses, extraProps);
