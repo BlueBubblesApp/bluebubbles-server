@@ -30,7 +30,7 @@ module.exports = {
                 "owner": "BlueBubblesApp",
                 "private": false,
                 "channel": "latest",
-                "releaseType": "pre-release"
+                "releaseType": "draft"
             }
         ],
         "target": [
