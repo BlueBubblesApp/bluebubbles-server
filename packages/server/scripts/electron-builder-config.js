@@ -5,12 +5,12 @@ module.exports = {
     "appId": "com.BlueBubbles.BlueBubbles-Server",
     "npmRebuild": true,
     "directories": {
-        "output": "release",
+        "output": "releases",
         "buildResources": "appResources"
     },
     "asar": true,
     "extraResources": [
-        "**/appResources/**"
+        "appResources"
     ],
     "mac": {
         "category": "public.app-category.social-networking",
@@ -31,7 +31,7 @@ module.exports = {
                 "arch": [
                     "x64",
                     "arm64"
-                ]
+                ],
             }
         ],
         "type": "distribution",
@@ -47,7 +47,12 @@ module.exports = {
             "NSSystemAdministrationUsageDescription": "BlueBubbles needs access to manage your system",
         },
         "gatekeeperAssess": false,
-        "minimumSystemVersion": "10.11.0"
+        "minimumSystemVersion": "10.11.0",
+        "signIgnore": [
+            "ngrok$",
+            "zrok$",
+            "cloudflared$"
+        ],
     },
     "dmg": {
         "sign": false,
