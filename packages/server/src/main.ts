@@ -111,6 +111,15 @@ app.on("window-all-closed", () => {
  */
 app.on("before-quit", event => handleExit(event));
 
+process.on("SIGTERM", async () => {
+    log.debug("Received SIGTERM, exiting...");
+    await handleExit(null, { exit: false });
+});
+process.on("SIGINT", async () => {
+    log.debug("Received SIGINT, exiting...");
+    await handleExit(null, { exit: false });
+});
+
 /**
  * All code below this point has to do with the command-line functionality.
  * This is when you run the app via terminal, we want to give users the ability
