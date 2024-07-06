@@ -370,8 +370,10 @@ class BlueBubblesServer extends EventEmitter {
         this.logger.info("Starting IPC Listeners..");
         IPCService.startIpcListeners();
 
+        // Delay will only occur if your Mac started up within the last 5 minutes
         const startDelay: number = getStartDelay();
-        if (startDelay > 0) {
+        const uptimeSeconds = os.uptime();
+        if (startDelay > 0 && uptimeSeconds < 300) {
             this.logger.info(`Delaying server startup by ${startDelay} seconds`);
             await waitMs(startDelay * 1000);
         }
