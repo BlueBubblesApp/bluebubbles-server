@@ -1,10 +1,9 @@
-import { ProcessOutput, ProcessPromise } from "zx";
-import * as zx from "zx";
 import * as path from "path";
 import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
+import { ChildProcess, spawn } from "child_process";
 
 export class CloudflareManager extends Loggable {
     tag = "CloudflareManager";
@@ -17,7 +16,7 @@ export class CloudflareManager extends Loggable {
 
     pidPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare", "cloudflare.pid");
 
-    proc: ProcessPromise<ProcessOutput>;
+    proc: ChildProcess;
 
     currentProxyUrl: string;
 
@@ -39,34 +38,37 @@ export class CloudflareManager extends Loggable {
 
     private async connectHandler(): Promise<string> {
         return new Promise((resolve, reject) => {
-            const port = Server().repo.getConfig("socket_port") as string;
-            // eslint-disable-next-line max-len
-            this.proc = zx.$`${this.daemonPath} tunnel --url localhost:${port} --config ${this.cfgPath} --pidfile ${this.pidPath}`;
+            try {
+                const port = Server().repo.getConfig("socket_port") as string;
+                this.proc = spawn(this.daemonPath, [
+                    'tunnel',
+                    '--url', `localhost:${port}`,
+                    '--config', this.cfgPath,
+                    '--pidfile', this.pidPath
+                ]);
 
-            // If there is an error with the command, throw the error
-            this.proc.catch(reason => {
-                reject(reason);
-            });
+                // Configure handlers for all the output events
+                this.proc.stdout.on("data", chunk => this.handleData(chunk));
+                this.proc.stdout.on("error", chunk => this.handleError(chunk));
+                this.proc.stderr.on("data", chunk => this.handleData(chunk));
+                this.proc.stderr.on("error", chunk => this.handleError(chunk));
 
-            // Configure handlers for all the output events
-            this.proc.stdout.on("data", chunk => this.handleData(chunk));
-            this.proc.stdout.on("error", chunk => this.handleError(chunk));
-            this.proc.stderr.on("data", chunk => this.handleData(chunk));
-            this.proc.stderr.on("error", chunk => this.handleError(chunk));
+                this.on("new-url", url => resolve(url));
+                this.on("error", err => {
+                    // Ignore certain errors
+                    if (typeof err === "string") {
+                        if (err.includes("Thank you for trying Cloudflare Tunnel.")) return;
+                    }
 
-            this.on("new-url", url => resolve(url));
-            this.on("error", err => {
-                // Ignore certain errors
-                if (typeof err === "string") {
-                    if (err.includes("Thank you for trying Cloudflare Tunnel.")) return;
-                }
+                    reject(err);
+                });
 
-                reject(err);
-            });
-
-            setTimeout(() => {
-                reject(new Error("Failed to connect to Cloudflare after 2 minutes..."));
-            }, 1000 * 60 * 2); // 2 minutes
+                setTimeout(() => {
+                    reject(new Error("Failed to connect to Cloudflare after 2 minutes..."));
+                }, 1000 * 60 * 2); // 2 minutes
+            } catch (ex) {
+                reject(ex);
+            }
         });
     }
 
@@ -90,8 +92,17 @@ export class CloudflareManager extends Loggable {
             return;
         }
 
+        this.detectErrors(data);
         this.detectNewUrl(data);
         this.detectMaxConnectionRetries(data);
+    }
+
+    private detectErrors(data: string) {
+        if (data.includes('no such host')) {
+            this.handleError('Unable to resolve api.trycloudflare.com! Ensure that your Mac has internet access and that any networking tools you use are not blocking the hostname.')
+        } else if (data.includes('failed to request quick Tunnel: ')) {
+            this.handleError(data.split('failed to request quick Tunnel: ')[1]);
+        }
     }
 
     private detectNewUrl(data: string) {
