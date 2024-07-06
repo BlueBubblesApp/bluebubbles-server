@@ -298,7 +298,7 @@ class BlueBubblesServer extends EventEmitter {
     setNotificationCount(count: number) {
         this.notificationCount = count;
 
-        if (this.repo.getConfig("dock_badge")) {
+        if (this.repo?.getConfig("dock_badge")) {
             app.setBadgeCount(this.notificationCount);
         }
     }
@@ -358,7 +358,7 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Initializing filesystem...");
             FileSystem.setup();
         } catch (ex: any) {
-            this.logger.error(`Failed to setup Filesystem! ${ex.message}`);
+            this.logger.error(`Failed to setup Filesystem! ${ex?.message ?? String(ex)}}`);
         }
 
         // Initialize and connect to the server database
@@ -432,7 +432,7 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Initializing connection to Google FCM...");
             this.fcm = new FCMService();
         } catch (ex: any) {
-            this.logger.error(`Failed to setup Google FCM service! ${ex.message}`);
+            this.logger.error(`Failed to setup Google FCM service! ${ex?.message ?? String(ex)}}`);
         }
     }
 
@@ -441,7 +441,7 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Initializing OAuth service...");
             this.oauthService = new OauthService();
         } catch (ex: any) {
-            this.logger.error(`Failed to setup OAuth service! ${ex.message}`);
+            this.logger.error(`Failed to setup OAuth service! ${ex?.message ?? String(ex)}}`);
         }
     }
 
@@ -452,7 +452,7 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Initializing up sockets...");
             this.httpService = new HttpService();
         } catch (ex: any) {
-            this.logger.error(`Failed to setup socket service! ${ex.message}`);
+            this.logger.error(`Failed to setup socket service! ${ex?.message ?? String(ex)}}`);
         }
 
         this.initOauthService();
@@ -461,7 +461,7 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Initializing helper service...");
             this.privateApi = new PrivateApiService();
         } catch (ex: any) {
-            this.logger.error(`Failed to setup helper service! ${ex.message}`);
+            this.logger.error(`Failed to setup helper service! ${ex?.message ?? String(ex)}}`);
         }
 
         try {
@@ -472,28 +472,28 @@ class BlueBubblesServer extends EventEmitter {
                 new ZrokService()
             ];
         } catch (ex: any) {
-            this.logger.error(`Failed to initialize proxy services! ${ex.message}`);
+            this.logger.error(`Failed to initialize proxy services! ${ex?.message ?? String(ex)}}`);
         }
 
         try {
             this.logger.info("Initializing Message Manager...");
             this.messageManager = new OutgoingMessageManager();
         } catch (ex: any) {
-            this.logger.error(`Failed to start Message Manager service! ${ex.message}`);
+            this.logger.error(`Failed to start Message Manager service! ${ex?.message ?? String(ex)}}`);
         }
 
         try {
             this.logger.info("Initializing Webhook Service...");
             this.webhookService = new WebhookService();
         } catch (ex: any) {
-            this.logger.error(`Failed to start Webhook service! ${ex.message}`);
+            this.logger.error(`Failed to start Webhook service! ${ex?.message ?? String(ex)}}`);
         }
 
         try {
             this.logger.info("Initializing Scheduled Messages Service...");
             this.scheduledMessages = new ScheduledMessagesService();
         } catch (ex: any) {
-            this.logger.error(`Failed to start Scheduled Message service! ${ex.message}`);
+            this.logger.error(`Failed to start Scheduled Message service! ${ex?.message ?? String(ex)}}`);
         }
     }
 
@@ -507,7 +507,7 @@ class BlueBubblesServer extends EventEmitter {
             this.httpService.initialize();
             this.httpService.start();
         } catch (ex: any) {
-            this.logger.error(`Failed to start HTTP service! ${ex.message}`);
+            this.logger.error(`Failed to start HTTP service! ${ex?.message ?? String(ex)}}`);
         }
 
         // Only start the oauth service if the tutorial isn't done
@@ -527,14 +527,14 @@ class BlueBubblesServer extends EventEmitter {
         try {
             await this.startProxyServices();
         } catch (ex: any) {
-            this.logger.error(`Failed to connect to proxy service! ${ex.message}`);
+            this.logger.error(`Failed to connect to proxy service! ${ex?.message ?? String(ex)}`);
         }
 
         try {
             this.logger.info("Starting Scheduled Messages service...");
             await this.scheduledMessages.start();
         } catch (ex: any) {
-            this.logger.error(`Failed to start Scheduled Messages service! ${ex.message}`);
+            this.logger.error(`Failed to start Scheduled Messages service! ${ex?.message ?? String(ex)}}`);
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
@@ -553,7 +553,7 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Starting FCM service...");
             await this.fcm.start();
         } catch (ex: any) {
-            this.logger.error(`Failed to start FCM service! ${ex.message}`);
+            this.logger.error(`Failed to start FCM service! ${ex?.message ?? String(ex)}}`);
         }
     }
 
@@ -711,14 +711,14 @@ class BlueBubblesServer extends EventEmitter {
                 this.caffeinate.start();
             }
         } catch (ex: any) {
-            this.logger.error(`Failed to setup caffeinate service! ${ex.message}`);
+            this.logger.error(`Failed to setup caffeinate service! ${ex?.message ?? String(ex)}}`);
         }
 
         try {
             this.logger.info("Initializing queue service...");
             this.queue = new QueueService();
         } catch (ex: any) {
-            this.logger.error(`Failed to setup queue service! ${ex.message}`);
+            this.logger.error(`Failed to setup queue service! ${ex?.message ?? String(ex)}}`);
         }
 
         try {
@@ -743,7 +743,7 @@ class BlueBubblesServer extends EventEmitter {
 
             this.networkChecker.start();
         } catch (ex: any) {
-            this.logger.error(`Failed to setup network service! ${ex.message}`);
+            this.logger.error(`Failed to setup network service! ${ex?.message ?? String(ex)}}`);
         }
     }
 
@@ -950,7 +950,7 @@ class BlueBubblesServer extends EventEmitter {
                 await MacOsInterface.lock();
             }
         } catch (ex: any) {
-            this.logger.debug(`Failed to auto-lock Mac! ${ex.message}`);
+            this.logger.debug(`Failed to auto-lock Mac! ${ex?.message ?? String(ex)}}`);
         }
 
         this.logger.info("Finished post-start checks...");
