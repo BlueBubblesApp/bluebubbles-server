@@ -4,7 +4,7 @@ import { Server } from "@server";
 import { SERVER_UPDATE } from "@server/events";
 import { ScheduledService } from "@server/lib/ScheduledService";
 import { Loggable } from "@server/lib/logging/Loggable";
-import axios from "axios";
+import axios, { AxiosResponse } from "axios";
 
 export class UpdateService extends Loggable {
     tag = "UpdateService";
@@ -52,14 +52,21 @@ export class UpdateService extends Loggable {
     }
 
     async checkForUpdate({ showNoUpdateDialog = false, showUpdateDialog = true } = {}): Promise<boolean> {
-        const releasesRes = await axios.get(
-            "https://api.github.com/repos/BlueBubblesApp/bluebubbles-server/releases",
-            {
-                headers: {
-                    Accept: "application/vnd.github.v3+json"
+        let releasesRes: AxiosResponse<any, any>;
+
+        try {
+            releasesRes = await axios.get(
+                "https://api.github.com/repos/BlueBubblesApp/bluebubbles-server/releases",
+                {
+                    headers: {
+                        Accept: "application/vnd.github.v3+json"
+                    }
                 }
-            }
-        );
+            );
+        } catch (ex: any) {
+            this.log.error(`Failed to fetch release information from GitHub! Error: ${ex?.message ?? String(ex)}`);
+            return false;
+        }
 
         const releases = (releasesRes.data as any[]).filter((x) =>
             !x.prerelease &&
