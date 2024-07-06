@@ -92,17 +92,21 @@ export class CloudflareManager extends Loggable {
             return;
         }
 
-        this.detectErrors(data);
+        const error = this.detectError(data);
+        if (error) this.emitError(error);
+
         this.detectNewUrl(data);
         this.detectMaxConnectionRetries(data);
     }
 
-    private detectErrors(data: string) {
+    private detectError(data: string): string | null {
         if (data.includes('no such host')) {
-            this.handleError('Unable to resolve api.trycloudflare.com! Ensure that your Mac has internet access and that any networking tools you use are not blocking the hostname.')
+            return 'Unable to resolve api.trycloudflare.com! Ensure that your Mac has internet access and that any networking tools you use are not blocking the hostname.';
         } else if (data.includes('failed to request quick Tunnel: ')) {
-            this.handleError(data.split('failed to request quick Tunnel: ')[1]);
+            return data.split('failed to request quick Tunnel: ')[1];
         }
+
+        return null;
     }
 
     private detectNewUrl(data: string) {
@@ -136,6 +140,11 @@ export class CloudflareManager extends Loggable {
     }
 
     handleError(chunk: any) {
-        this.emit("error", chunk);
+        const error = this.detectError(chunk);
+        if (error) this.emitError(error);
+    }
+
+    emitError(err: any) {
+        this.emit("error", err);
     }
 }
