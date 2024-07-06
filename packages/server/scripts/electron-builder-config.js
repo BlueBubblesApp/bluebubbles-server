@@ -3,23 +3,14 @@
 module.exports = {
     "productName": "BlueBubbles",
     "appId": "com.BlueBubbles.BlueBubbles-Server",
-    "npmRebuild": false,
+    "npmRebuild": true,
     "directories": {
-        "output": "release",
+        "output": "releases",
         "buildResources": "appResources"
     },
-    "files": [
-        "dist/",
-        "node_modules/",
-        "appResources/",
-        "package.json"
-    ],
     "asar": true,
-    "asarUnpack": [
-        "**/node_modules/ngrok/bin/**"
-    ],
     "extraResources": [
-        "**/appResources/**"
+        "appResources"
     ],
     "mac": {
         "category": "public.app-category.social-networking",
@@ -30,22 +21,24 @@ module.exports = {
                 "owner": "BlueBubblesApp",
                 "private": false,
                 "channel": "latest",
-                "releaseType": "release"
+                "releaseType": "draft",
+                "vPrefixedTagName": true
             }
         ],
         "target": [
             {
-                "target": "default",
+                "target": "dmg",
                 "arch": [
-                    'x64',
-                    // 'arm64'
-                ]
+                    "x64",
+                    "arm64"
+                ],
             }
         ],
         "type": "distribution",
-        "icon": "../../icons/regular/icon-512.png",
+        "icon": "../../icons/macos/dock-icon.png",
         "darkModeSupport": true,
         "hardenedRuntime": true,
+        "notarize": false,
         "entitlements": "./scripts/entitlements.mac.plist",
         "entitlementsInherit": "./scripts/entitlements.mac.plist",
         "extendInfo": {
@@ -53,14 +46,17 @@ module.exports = {
             "NSAppleEventsUsageDescription": "BlueBubbles needs access to run AppleScripts",
             "NSSystemAdministrationUsageDescription": "BlueBubbles needs access to manage your system",
         },
-        "signIgnore": [
-            "ngrok"
-        ],
         "gatekeeperAssess": false,
-        "minimumSystemVersion": "10.11.0"
+        "minimumSystemVersion": "10.11.0",
+        "signIgnore": [
+            "ngrok$",
+            "zrok$",
+            "cloudflared$"
+        ],
     },
     "dmg": {
-        "sign": false
+        "sign": false,
+        "writeUpdateInfo": false
     },
-    "afterSign": "./scripts/notarize.js"
+    // "afterSign": "./scripts/notarize.js"
 };

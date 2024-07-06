@@ -98,7 +98,7 @@ class FilePicker extends React.Component<FilePickerProps, FilePickerState> {
                     style={{ display: 'none' }}
                     multiple={multipleFiles}
                     onChange={this.handleOnFileChange}
-                    data-testid={inputProps?.placeholder ?? placeholder}
+                    data-testid={placeholder}
                 />
 
                 <Input

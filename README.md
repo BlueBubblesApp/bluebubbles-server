@@ -5,8 +5,9 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 ## Pre-requisites
 
 -   NodeJS: https://nodejs.org/en/
--   Yarn Package Manager: https://yarnpkg.com/
 -   Git: https://git-scm.com/
+
+**Warning**: Yarn may not work for this project. You may run into build errors.
 
 ## Development
 
@@ -15,9 +16,9 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 2. Navigate into the repository on your local machine
     - `cd BlueBubbles-Server`
 3. Install the server dependencies
-    - `yarn`
+    - `npm install`
 4. Run the dev server (this will start both the renderer and server)
-    - `yarn start`
+    - `npm run start`
 
 ### macOS Warning
 
@@ -25,7 +26,7 @@ If you are using macOS 10.x and are having issues building/running the server, p
 
 ```bash
 cd packages/server
-yarn add node-mac-permissions@2.2.0
+npm install node-mac-permissions@2.2.0
 ```
 
 ## Structure / Directory Map

@@ -28,7 +28,7 @@ import { ErrorDialog, ErrorItem } from '../../../components/modals/ErrorDialog';
 import { BsCheckAll } from 'react-icons/bs';
 import { RiErrorWarningLine } from 'react-icons/ri';
 import { readFile } from '../../../utils/GenericUtils';
-import { getOauthUrl } from '../../../utils/IpcUtils';
+import { getFirebaseOauthUrl } from '../../../utils/IpcUtils';
 import { isValidClientConfig, isValidFirebaseUrl, isValidServerConfig } from '../../../utils/FcmUtils';
 import { saveFcmClient, saveFcmServer } from '../../../actions/FcmActions';
 import { setConfig } from '../../../slices/ConfigSlice';
@@ -53,7 +53,7 @@ export const NotificationsWalkthrough = (): JSX.Element => {
 
     useEffect(() => {
         ipcRenderer.removeAllListeners('oauth-status');
-        getOauthUrl().then(url => setOauthUrl(url));
+        getFirebaseOauthUrl().then(url => setOauthUrl(url));
     }, []);
 
     logs = logs.filter(log => log.message.startsWith('[OauthService]'));

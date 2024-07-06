@@ -25,6 +25,7 @@ import { createServerErrorResponse } from "./api/v1/responses";
 import { HELLO_WORLD } from "@server/events";
 import { ScheduledService } from "../../lib/ScheduledService";
 import { Loggable } from "../../lib/logging/Loggable";
+import { ProxyServices } from "@server/databases/server/constants";
 
 /**
  * This service class handles all routing for incoming socket
@@ -65,7 +66,7 @@ export class HttpService extends Loggable {
         try {
             const use_custom_cert = Server().repo.getConfig("use_custom_certificate") as boolean;
             const proxy_service = Server().repo.getConfig("proxy_service") as string;
-            if (onlyAlphaNumeric(proxy_service).toLowerCase() === "dynamicdns") {
+            if (onlyAlphaNumeric(proxy_service).toLowerCase() === onlyAlphaNumeric(ProxyServices.DynamicDNS)) {
                 if (use_custom_cert) {
                     // Only setup certs if the proxy service is
                     this.log.info("Starting Certificate service...");
@@ -151,6 +152,7 @@ export class HttpService extends Loggable {
     async checkIfPortInUse(port: number) {
         try {
             // Check if there are any listening services
+            zx.$.verbose = false;
             const output = await zx.$`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`;
             if (output.toString().includes(`:${port} (LISTEN)`)) return true;
         } catch {

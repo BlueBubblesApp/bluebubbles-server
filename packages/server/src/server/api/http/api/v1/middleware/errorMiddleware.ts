@@ -32,7 +32,7 @@ export const ErrorMiddleware = async (ctx: Context, next: Next) => {
         } else {
             ctx.status = 500;
             ctx.body = createServerErrorResponse(
-                ex.message,
+                ex?.message ?? String(ex),
                 ErrorTypes.SERVER_ERROR,
                 "An unhandled error has occurred!"
             );

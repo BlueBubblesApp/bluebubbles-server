@@ -1,20 +1,20 @@
 // HTTP libraries
 import KoaApp from "koa";
 import http from "http";
-import axios from "axios";
+import axios, { AxiosResponse } from "axios";
 
 // Internal libraries
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import * as admin from "firebase-admin";
-import { OAuth2Client } from "google-auth-library";
-import { google } from "googleapis";
+import { google, Auth } from "googleapis";
 import { generateRandomString } from "@server/utils/CryptoUtils";
 import { getObjectAsString, isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { ProgressStatus } from "@server/types";
 import { FCMService } from "../fcmService";
 import { BrowserWindow, HandlerDetails } from "electron";
 import { Loggable } from "@server/lib/logging/Loggable";
+import { ContactInterface } from "@server/api/interfaces/contactInterface";
 
 /**
  * This service class hhandles the initial oauth workflows
@@ -24,13 +24,15 @@ export class OauthService extends Loggable {
 
     running = false;
 
+    status: ProgressStatus = ProgressStatus.NOT_STARTED
+
     koaApp: KoaApp;
 
     httpServer: http.Server;
 
     httpOpts: any;
 
-    oauthClient: OAuth2Client;
+    oauthClient: Auth.OAuth2Client;
 
     port = 8641;
 
@@ -44,15 +46,17 @@ export class OauthService extends Loggable {
 
     private _packageName = "com.bluebubbles.messaging";
 
-    completed = false;
-
-    private scopes = [
+    private firebaseScopes = [
         "https://www.googleapis.com/auth/cloudplatformprojects",
         "https://www.googleapis.com/auth/service.management",
         "https://www.googleapis.com/auth/firebase",
         "https://www.googleapis.com/auth/datastore",
         "https://www.googleapis.com/auth/iam"
     ];
+
+    private contactScopes = [
+        "https://www.googleapis.com/auth/contacts.readonly"
+    ]
 
     get callbackUrl(): string {
         return `http://localhost:${this.port}/oauth/callback`;
@@ -84,7 +88,7 @@ export class OauthService extends Loggable {
         // Create a route to intercept the oauth callback
         this.koaApp.use(async (ctx, _) => {
             if (ctx.path === "/oauth/callback") {
-                this.log.info("Received oauth callback");
+                this.log.info("Received OAuth callback");
                 ctx.body = "Success! You can close this window and return to the BlueBubbles Server app";
                 ctx.status = 200;
             } else {
@@ -94,6 +98,11 @@ export class OauthService extends Loggable {
         });
     }
 
+    setStatus(status: ProgressStatus) {
+        this.status = status;
+        Server().emitToUI("oauth-status", status);
+    }
+
     /**
      * Handles the project creation workflow.
      * When the flow is complete, the JSON files will be saved to the resources folder.
@@ -101,11 +110,14 @@ export class OauthService extends Loggable {
      */
     async handleProjectCreation() {
         try {
-            Server().emitToUI("oauth-status", ProgressStatus.IN_PROGRESS);
+            this.setStatus(ProgressStatus.IN_PROGRESS);
 
             this.log.info(`Creating Google Cloud project, "${this.projectName}"...`);
             const project = await this.createGoogleCloudProject();
-            const projectId = project.projectId;
+            const projectId = project?.projectId;
+            if (!projectId) {
+                throw new Error(`Project "${this.projectName}" was not found! Please restart the setup process.`);
+            }
 
             // Enable the required APIs
             await this.enableCloudApis(projectId);
@@ -163,18 +175,16 @@ export class OauthService extends Loggable {
             this.log.info(
                 `Successfully created and configured your Google Project! ` + `You may now continue with setup.`
             );
-            this.completed = true;
-            Server().emitToUI("oauth-status", ProgressStatus.COMPLETED);
-
-            // Shutdown the service
-            await this.stop();
+            this.setStatus(ProgressStatus.COMPLETED);
 
             // Start the FCM service.
             // Don't await because we don't want to catch the error here.
             FCMService.stop()
                 .then(async () => {
+                    await waitMs(10000);
+
                     // Clear our markers & start the service
-                    Server().fcm.clearLastValues();
+                    await Server().fcm.clearConfig();
                     await Server().fcm.start();
                 })
                 .catch(async err => {
@@ -188,7 +198,73 @@ export class OauthService extends Loggable {
             }
 
             this.log.debug(`Use the Google Login button and try again. If the issue persists, please contact support.`);
-            Server().emitToUI("oauth-status", ProgressStatus.FAILED);
+            this.setStatus(ProgressStatus.FAILED);
+        } finally {
+            // Shutdown the service
+            await this.stop();
+        }
+    }
+
+    async handleContactsSync() {
+        try {
+            this.setStatus(ProgressStatus.IN_PROGRESS);
+
+            this.log.info(`Fetching Google Contacts...`);
+            const contacts = await this.fetchContacts();
+
+            this.log.info(`Saving ${contacts.length} contact(s) to the server...`);
+            let errored = false;
+            for (const contact of contacts) {
+                if (isEmpty(contact.names)) continue;
+
+                try {
+                    const avatar = await this.loadContactAvatar(contact);
+
+                    await ContactInterface.createContact({
+                        firstName: contact.names[0].givenName,
+                        lastName: contact.names[0].familyName,
+                        displayName: contact.names[0].displayName,
+                        phoneNumbers: (contact.phoneNumbers ?? []).map((p: any) => p.canonicalForm ?? p.value),
+                        emails: (contact.emailAddresses ?? []).map((e: any) => e.value),
+                        updateEntry: true,
+                        avatar
+                    });
+                } catch (ex: any) {
+                    errored = true;
+                    this.log.debug(`Failed to save contact: ${ex?.message}`);
+                }
+            }
+
+            if (errored) {
+                this.log.warn(`Some contacts failed to save. Please check the server logs for more information.`);
+            }
+
+            this.log.info(`Finished saving contacts to the server!`);
+
+            try {
+                this.log.info(`Revoking OAuth token, to prevent further use...`);
+                await this.oauthClient.revokeToken(this.authToken);
+            } catch {
+                // Do nothing
+            }
+
+            // Mark the service as completed
+            this.log.info('Successfully synced your Google Contacts to the BlueBubbles Server!');
+            this.setStatus(ProgressStatus.COMPLETED);
+
+            // Shutdown the service
+            await this.stop();
+        } catch (ex: any) {
+            this.log.error(`Failed to sync contacts: ${ex?.message}`);
+            if (ex?.response?.data?.error) {
+                this.log.debug(`(${ex.response.data.error.code}) ${ex.response.data.error.message}`);
+            }
+
+            this.log.debug(`Use the Google Login button and try again. If the issue persists, please contact support.`);
+            this.setStatus(ProgressStatus.FAILED);
+        } finally {
+            // Shutdown the service
+            await this.stop();
         }
     }
 
@@ -197,13 +273,27 @@ export class OauthService extends Loggable {
      *
      * @returns The OAuth URL
      */
-    async getOauthUrl() {
+    async getFirebaseOauthUrl() {
         const url = await this.oauthClient.generateAuthUrl({
-            scope: this.scopes,
+            scope: this.firebaseScopes,
             response_type: "token"
         });
 
-        return url;
+        return `${url}&type=firebase`;
+    }
+
+    /**
+     * Generates the OAuth URL for the client/UI to use.
+     *
+     * @returns The OAuth URL
+     */
+    async getContactsOauthUrl() {
+        const url = await this.oauthClient.generateAuthUrl({
+            scope: this.contactScopes,
+            response_type: "token"
+        });
+
+        return `${url}&type=contacts`;
     }
 
     /**
@@ -253,10 +343,10 @@ export class OauthService extends Loggable {
             projectId = `${this.projectName.toLowerCase()}-${generateRandomString(4)}`;
             const data = { name: this.projectName, projectId };
             this.log.info(`Creating project with name, "${this.projectName}", under project ID, "${projectId}"`);
-            const createRes = await this.sendRequest("POST", postUrl, data);
+            const createRes = await this.tryUntilNoError("POST", postUrl, data, 3, 5000);
 
             // Wait for the operation to complete (try for 2 minutes)
-            const operationName = createRes.data.name;
+            const operationName = createRes.name;
             const operationUrl = `https://cloudresourcemanager.googleapis.com/v1/${operationName}`;
             return await this.waitForData("GET", operationUrl, null, "done", 60, 5000);
         };
@@ -289,13 +379,18 @@ export class OauthService extends Loggable {
             throw new Error(`No Project ID was returned!`);
         }
 
-        await waitMs(2000);
-
         // Fetch the project data
         // eslint-disable-next-line max-len
         const getUrl = `https://cloudresourcemanager.googleapis.com/v1/projects?filter=name%3A${this.projectName}%20AND%20lifecycleState%3AACTIVE`;
-        const projectData = await this.sendRequest("GET", getUrl);
-        return projectData.data.projects.find((p: any) => p.projectId === projectId);
+        const projectData = await this.waitForData(
+            "GET",
+            getUrl,
+            null,
+            "projects",
+            12, 10000,  // Wait at least 2 minutes
+            `Project "${this.projectName}" was not found! Please restart the setup process.`
+        );
+        return (projectData.projects ?? []).find((p: any) => p.projectId === projectId);
     }
 
     async enableCloudApis(projectId: string) {
@@ -325,10 +420,10 @@ export class OauthService extends Loggable {
 
     async enableService(projectId: string, service: string) {
         const postUrl = `https://serviceusage.googleapis.com/v1/projects/${projectId}/services/${service}:enable`;
-        const createRes = await this.sendRequest("POST", postUrl, {});
+        const createRes = await this.tryUntilNoError("POST", postUrl, {}, 5, 5000);
 
         // If the operation is already done, return
-        const operationName = createRes.data.name;
+        const operationName = createRes.name;
         if (operationName.endsWith("DONE_OPERATION")) return;
 
         // Wait for the operation to complete
@@ -344,9 +439,10 @@ export class OauthService extends Loggable {
      */
     async addFirebase(projectId: string) {
         try {
+            // Try for at least 2 minutes (8 attempts with 15 second delay)
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}:addFirebase`;
-            const res = await this.sendRequest("POST", url, {});
-            await this.waitForData("GET", `https://firebase.googleapis.com/v1beta1/${res.data.name}`, null, "name");
+            const res = await this.tryUntilNoError("POST", url, {}, 8, 15000);
+            await this.waitForData("GET", `https://firebase.googleapis.com/v1beta1/${res.name}`, null, "name");
             await waitMs(5000); // Wait 5 seconds to ensure Firebase is ready
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
@@ -489,6 +585,8 @@ export class OauthService extends Loggable {
             throw new Error("Failed to get Firebase Service Account! Please ensure that the project was created!");
         }
 
+        await waitMs(5000);
+
         // eslint-disable-next-line max-len
         const url = `https://iam.googleapis.com/v1/projects/${projectId}/serviceAccounts/${accountId}/keys`;
 
@@ -550,7 +648,8 @@ export class OauthService extends Loggable {
         data: Record<string, any> = null,
         key: string = null,
         maxAttempts = 30,
-        waitTime = 2000
+        waitTime = 2000,
+        errorOverride: string = null
     ) {
         let attempts = 0;
 
@@ -563,7 +662,7 @@ export class OauthService extends Loggable {
             attempts += 1;
             if (attempts > maxAttempts) {
                 this.log.debug(`Received data from failed request: ${getObjectAsString(res.data)}`);
-                throw new Error(
+                throw new Error(errorOverride ??
                     `Failed to get data from: ${url}. Please gather server logs and contact the developers!`
                 );
             }
@@ -580,9 +679,8 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @param key The key to check for in the response data (optional)
      */
-    async tryUntilNoError(method: "GET" | "POST", url: string, data: Record<string, any> = null, maxAttempts = 30) {
+    async tryUntilNoError(method: "GET" | "POST", url: string, data: Record<string, any> = null, maxAttempts = 30, waitTime = 2000) {
         let attempts = 0;
-        const waitTime = 2000;
 
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -627,6 +725,52 @@ export class OauthService extends Loggable {
         await app.delete();
     }
 
+    async fetchContacts() {
+        // Fetch the project data
+        // eslint-disable-next-line max-len
+        const getUrl = `https://people.googleapis.com/v1/people/me/connections`;
+        const params = {
+            personFields: "names,emailAddresses,phoneNumbers,nicknames,photos"
+        };
+
+        // Paginate through all the data
+        let pageToken = null;
+        let contacts = [];
+        do {
+            const res: AxiosResponse<any, any> = await this.sendRequest("GET", getUrl, null, { ...params, pageToken });
+            contacts.push(...res.data.connections);
+            pageToken = res.data.nextPageToken;
+        } while (pageToken);
+
+        return contacts;
+    }
+
+    async loadContactAvatar(contact: any): Promise<Buffer> {
+        let photoUrl: string = null;
+
+        // Load the avatar for the user (if available).
+        // First try the primary, and if that doesn't exist, use the first.
+        const primary = (contact.photos ?? []).find((p: any) => p.metadata?.primary);
+        if (primary) {
+            photoUrl = primary.url;
+        } else if (isNotEmpty(contact.photos)) {
+            photoUrl = contact.photos[0].url;
+        }
+
+        if (photoUrl) {
+            // Replace the size (100) with size 240 + some flags
+            photoUrl = photoUrl.replace("s100", "s240-p-k-rw-no");
+            try {
+                const avatar = await axios.get(photoUrl, { responseType: "arraybuffer" });
+                return avatar?.data;
+            } catch {
+                // Do nothing
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Sends a generic request to the Google Cloud API.
      * This will automatically apply the correct headers & authentication
@@ -636,7 +780,7 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @returns The response object
      */
-    async sendRequest(method: "GET" | "POST" | "DELETE", url: string, data: Record<string, any> = null) {
+    async sendRequest(method: "GET" | "POST" | "DELETE", url: string, data: Record<string, any> = null, params: Record<string, any> = null) {
         if (!this.authToken) throw new Error("Missing auth token");
 
         const headers: Record<string, string> = {
@@ -653,6 +797,7 @@ export class OauthService extends Loggable {
         return await axios.request({
             method,
             url,
+            params,
             headers,
             data
         });

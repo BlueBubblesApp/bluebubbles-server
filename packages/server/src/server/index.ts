@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 // Dependency Imports
-import { app, BrowserWindow, nativeTheme, systemPreferences, dialog } from "electron";
+import { app, BrowserWindow, nativeTheme, systemPreferences, dialog, MessageBoxOptions } from "electron";
 import ServerLog, { LogLevel } from "electron-log";
 import process from "process";
 import path from "path";
@@ -23,7 +23,6 @@ import {
     FCMService,
     CaffeinateService,
     NgrokService,
-    LocalTunnelService,
     NetworkService,
     QueueService,
     IPCService,
@@ -69,6 +68,9 @@ import { IMessageListener } from "./databases/imessage/listeners/IMessageListene
 import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
 import { IMessageCache } from "./databases/imessage/pollers";
 import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
+import { obfuscatedHandle } from "./utils/StringUtils";
+import { AutoStartMethods } from "./databases/server/constants";
+import { MacOsInterface } from "./api/interfaces/macosInterface";
 
 const findProcess = require("find-process");
 
@@ -401,7 +403,7 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.logger.error(ex);
 
-            const dialogOpts = {
+            const dialogOpts: MessageBoxOptions = {
                 type: "error",
                 buttons: ["Restart", "Open System Preferences", "Ignore"],
                 title: "BlueBubbles Error",
@@ -466,7 +468,6 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Initializing proxy services...");
             this.proxyServices = [
                 new NgrokService(),
-                new LocalTunnelService(),
                 new CloudflareService(),
                 new ZrokService()
             ];
@@ -941,6 +942,17 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
+        try {
+            const autoLockMac = this.repo.getConfig("auto_lock_mac") as boolean;
+            const uptimeSeconds = os.uptime();
+            if (autoLockMac && uptimeSeconds <= 300) {
+                this.logger.info("Auto-locking Mac ...");
+                await MacOsInterface.lock();
+            }
+        } catch (ex: any) {
+            this.logger.debug(`Failed to auto-lock Mac! ${ex.message}`);
+        }
+
         this.logger.info("Finished post-start checks...");
     }
 
@@ -1052,9 +1064,39 @@ class BlueBubblesServer extends EventEmitter {
             }
         }
 
-        // If auto-start changes
-        if (prevConfig.auto_start !== nextConfig.auto_start) {
-            app.setLoginItemSettings({ openAtLogin: nextConfig.auto_start as boolean, openAsHidden: true });
+        // Check if the auto-start method is None. If it is, then we need to migrate the old "auto_start"
+        // config to the new "auto_start_method" config
+        const autoStart = prevConfig.auto_start as boolean;
+        if (nextConfig.auto_start_method === AutoStartMethods.None) {
+            if (autoStart) {
+                this.logger.debug("Migrating auto-start config to new auto-start method config");
+                await this.repo.setConfig("auto_start_method", AutoStartMethods.LoginItem);
+            } else {
+                await this.repo.setConfig("auto_start_method", AutoStartMethods.Unset);
+            }
+        }
+
+        // Handle when auto start method changes
+        if (prevConfig.auto_start_method !== nextConfig.auto_start_method) {
+            // If we previously starting as a login item, remove it
+            if (prevConfig.auto_start_method === AutoStartMethods.LoginItem) {
+                app.setLoginItemSettings({ openAtLogin: false });
+            }
+
+            // If we are next starting as a login item, add it
+            if (nextConfig.auto_start_method === AutoStartMethods.LoginItem) {
+                app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
+            }
+
+            // If we are starting as a launch agent, add it
+            if (prevConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+                await FileSystem.removeLaunchAgent();
+            }
+
+            // If we are starting as a launch agent, add it
+            if (nextConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+                await FileSystem.createLaunchAgent();
+            }
         }
 
         // Handle when auto caffeinate changes
@@ -1294,7 +1336,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("participant-removed", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] removed [${item.otherHandle}] from [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1323,7 +1365,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("participant-added", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] added [${item.otherHandle}] to [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1352,7 +1394,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("participant-left", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] left [${item.cacheRoomnames}]`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1381,7 +1423,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("group-icon-changed", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] changed a group photo`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1410,7 +1452,7 @@ class BlueBubblesServer extends EventEmitter {
         });
 
         this.iMessageListener.on("group-icon-removed", async (item: Message) => {
-            const from = item.isFromMe || item.handleId === 0 ? "You" : item.handle?.id;
+            const from = item.isFromMe || item.handleId === 0 ? "You" : obfuscatedHandle(item.handle?.id);
             this.logger.info(`[${from}] removed a group photo`);
 
             // Manually send the message to the socket so we can serialize it with
@@ -1447,7 +1489,7 @@ class BlueBubblesServer extends EventEmitter {
     private async handleNewMessage(item: Message) {
         const newMessage = await insertChatParticipants(item);
         this.logger.info(
-            `New Message from ${newMessage.isFromMe ? 'You' : newMessage.handle?.id}, ${newMessage.contentString()}`);
+            `New Message from ${newMessage.isFromMe ? 'You' : obfuscatedHandle(newMessage.handle?.id)}, ${newMessage.contentString()}`);
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data
@@ -1482,32 +1524,23 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     private async handleUpdatedMessage(item: Message) {
-        const newMessage = await insertChatParticipants(item);
+        const msg = await insertChatParticipants(item);
 
         // ATTENTION: If "from" is null, it means you sent the message from a group chat
         // Check the isFromMe key prior to checking the "from" key
-        const from = newMessage.isFromMe ? "You" : newMessage.handle?.id;
-        const time =
-            newMessage.dateDelivered ?? newMessage.dateRead ?? newMessage.dateEdited ?? newMessage.dateRetracted;
-        const updateType = newMessage.dateRetracted
-            ? "Text Unsent"
-            : newMessage.dateEdited
-            ? "Text Edited"
-            : newMessage.dateRead
-            ? "Text Read"
-            : "Text Delivered";
+        const from = msg.isFromMe ? "You" : obfuscatedHandle(msg.handle?.id);
 
         // Husky pre-commit validator was complaining, so I created vars
-        const content = newMessage.contentString();
-        const localeTime = time?.toLocaleString();
-        this.logger.info(`Updated message from [${from}]: [${content}] - [${updateType} -> ${localeTime}]`);
+        const content = msg.contentString();
+        const localeTime = msg.lastUpdateTime?.toLocaleString();
+        this.logger.info(`${msg.messageStatus} message from [${from}]: [${content}] - [${localeTime}]`);
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data
         this.httpService.socketServer.emit(
             MESSAGE_UPDATED,
             await MessageSerializer.serialize({
-                message: newMessage,
+                message: msg,
                 config: {
                     parseAttributedBody: true,
                     parseMessageSummary: true,
@@ -1523,7 +1556,7 @@ class BlueBubblesServer extends EventEmitter {
         await this.emitMessage(
             MESSAGE_UPDATED,
             await MessageSerializer.serialize({
-                message: newMessage,
+                message: msg,
                 config: {
                     loadChatParticipants: false,
                     includeChats: false

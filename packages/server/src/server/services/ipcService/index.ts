@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, systemPreferences } from "electron";
+import { app, dialog, ipcMain, systemPreferences, shell } from "electron";
 import { askForAccessibilityAccess, askForFullDiskAccess } from "node-mac-permissions";
 import process from "process";
 
@@ -25,6 +25,7 @@ import {
 } from "@server/env";
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 import { ZrokManager } from "@server/managers/zrokManager";
+import { ProxyServices } from "@server/databases/server/constants";
 
 export class IPCService extends Loggable {
     tag = "IPCService";
@@ -66,7 +67,7 @@ export class IPCService extends Loggable {
             }
 
             // If we are changing the proxy service to a non-custom url service, we need to make sure "use https" is off
-            if (args.proxy_service && !["dynamic-dns", "lan-url"].includes(args.proxy_service)) {
+            if (args.proxy_service && ![ProxyServices.DynamicDNS, ProxyServices.LanURL].includes(args.proxy_service)) {
                 const httpsStatus = (args.use_custom_certificate ??
                     Server().repo.getConfig("use_custom_certificate")) as boolean;
                 if (httpsStatus) {
@@ -426,8 +427,12 @@ export class IPCService extends Loggable {
             return chats;
         });
 
-        ipcMain.handle("get-oauth-url", async (_, __) => {
-            return await Server().oauthService?.getOauthUrl();
+        ipcMain.handle("get-firebase-oauth-url", async (_, __) => {
+            return await Server().oauthService?.getFirebaseOauthUrl();
+        });
+
+        ipcMain.handle("get-contacts-oauth-url", async (_, __) => {
+            return await Server().oauthService?.getContactsOauthUrl();
         });
 
         ipcMain.handle("restart-oauth-service", async (_, __) => {
@@ -450,6 +455,14 @@ export class IPCService extends Loggable {
 
         ipcMain.handle("set-zrok-token", async (_, token) => {
             return await ZrokManager.setToken(token);
+        });
+
+        ipcMain.handle("install-update", async (_, __) => {
+            if (!Server().updater.hasUpdate) {
+                return Server().log("No update available to install!", "debug");
+            }
+
+            shell.openExternal(Server().updater.updateInfo.html_url, { activate: true });
         });
     }
 }

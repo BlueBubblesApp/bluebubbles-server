@@ -11,7 +11,7 @@ import {
     AccordionIcon,
     Box
 } from '@chakra-ui/react';
-import { AutoStartField } from '../../../components/fields/AutoStartField';
+import { AutoStartMethodField } from '../../../components/fields/AutoStartMethodField';
 import { AutoCaffeinateField } from '../../../components/fields/AutoCaffeinateField';
 import { DockBadgeField } from '../../../components/fields/DockBadgeField';
 import { HideDockIconField } from '../../../components/fields/HideDockIconField';
@@ -19,6 +19,8 @@ import { StartViaTerminalField } from '../../../components/fields/StartViaTermin
 import { StartMinimizedField } from '../../../components/fields/StartMinimizedField';
 import { StartDelayField } from 'app/components/fields/StartDelayField';
 import { LandingPageField } from 'app/components/fields/LandingPageField';
+import { OpenFindMyOnStartupField } from 'app/components/fields/OpenFindMyOnStartupField';
+import { AutoLockMacField } from 'app/components/fields/AutoLockMacField';
 
 
 export const FeatureSettings = (): JSX.Element => {
@@ -28,11 +30,15 @@ export const FeatureSettings = (): JSX.Element => {
                 <Text fontSize='2xl'>Features</Text>
                 <Divider orientation='horizontal' />
                 <Spacer />
+                <OpenFindMyOnStartupField />
+                <Spacer />
                 <AutoCaffeinateField />
                 <Spacer />
-                <AutoStartField />
+                <AutoStartMethodField />
                 <Spacer />
                 <StartMinimizedField />
+                <Spacer />
+                <AutoLockMacField />
                 <Spacer />
                 <DockBadgeField />
                 <Spacer />

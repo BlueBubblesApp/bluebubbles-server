@@ -275,7 +275,7 @@ export class ContactInterface {
         phoneNumbers?: string[];
         emails?: string[];
         updateEntry?: boolean;
-        avatar?: Buffer;
+        avatar?: Buffer | null;
     }): Promise<Contact> {
         const repo = Server().repo.contacts();
         let contact = null;

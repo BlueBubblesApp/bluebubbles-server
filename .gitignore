@@ -2,7 +2,6 @@ node_modules/
 dist/
 release/
 .vscode
-.github
 .DS_Store
 **/*.log
 .env

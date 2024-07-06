@@ -1,4 +1,18 @@
-import { Server } from "@server";
+
+export enum AutoStartMethods {
+    None = "none",
+    Unset = "unset",
+    LoginItem = "login-item",
+    LaunchAgent = "launch-agent"
+}
+
+export enum ProxyServices {
+    Cloudflare = "cloudflare",
+    Ngrok = "ngrok",
+    Zrok = "zrok",
+    DynamicDNS = "dynamic-dns",
+    LanURL = "lan-url"
+}
 
 export const DEFAULT_SOCKET_PORT = 1234;
 export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
@@ -13,7 +27,8 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     password: () => "",
     auto_caffeinate: () => 0,
     auto_start: () => 0,
-    proxy_service: () => "Cloudflare",
+    auto_start_method: () => AutoStartMethods.None,
+    proxy_service: () => ProxyServices.Cloudflare,
     encrypt_coms: () => 0,
     hide_dock_icon: () => 0,
     last_fcm_restart: () => 0,
@@ -39,4 +54,6 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     zrok_reserved_name: () => "",
     zrok_reserved_token: () => "",
     landing_page_path: () => "",
+    open_findmy_on_startup: () => 1,
+    auto_lock_mac: () => 0,
 };
