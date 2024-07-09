@@ -205,7 +205,7 @@ export class ProcessSpawner extends Loggable {
                 const args = commandParts.slice(1);
 
                 // Spawn the process and pipe the output to the next process
-                const proc = spawn(program, this.quoteArgs(args), {
+                const proc = spawn(program, args, {
                     stdio: [
                         // If there is a previous process, pipe the output to the next process
                         (lastProcess) ? lastProcess.stdout : "pipe",
@@ -220,7 +220,7 @@ export class ProcessSpawner extends Loggable {
             return lastProcess;
         }
 
-        return spawn(this.command, this.quoteArgs(this.args), this.options);
+        return spawn(this.command, this.args, this.options);
     }
 
     private handleLog(log: string) {
@@ -256,16 +256,6 @@ export class ProcessSpawner extends Loggable {
         if (this.process) {
             this.process.kill();
         }
-    }
-
-    private quoteArgs(args: string[]): string[] {
-        return args.map(arg => {
-            if (arg.includes(" ")) {
-                return `"${arg.replace(/"/g, '\\"')}"`;
-            } else {
-                return arg;
-            }
-        });
     }
 
     static async executeCommand(
