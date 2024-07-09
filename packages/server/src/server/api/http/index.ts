@@ -10,7 +10,6 @@ import koaCors from "koa-cors";
 import * as https from "https";
 import * as http from "http";
 import * as fs from "fs";
-import * as zx from "zx";
 
 // Internal libraries
 import { Server } from "@server";
@@ -26,6 +25,7 @@ import { HELLO_WORLD } from "@server/events";
 import { ScheduledService } from "../../lib/ScheduledService";
 import { Loggable } from "../../lib/logging/Loggable";
 import { ProxyServices } from "@server/databases/server/constants";
+import { ProcessSpawner } from "@server/lib/ProcessSpawner";
 
 /**
  * This service class handles all routing for incoming socket
@@ -152,9 +152,15 @@ export class HttpService extends Loggable {
     async checkIfPortInUse(port: number) {
         try {
             // Check if there are any listening services
-            zx.$.verbose = false;
-            const output = await zx.$`lsof -nP -iTCP -sTCP:LISTEN | grep ${port}`;
-            if (output.toString().includes(`:${port} (LISTEN)`)) return true;
+            const output = await ProcessSpawner.executeCommand('lsof', [
+                '-nP',
+                '-iTCP',
+                '-sTCP:LISTEN',
+                '|',
+                'grep',
+                `${port}`
+            ], {}, "PortChecker");
+            if (output.includes(`:${port} (LISTEN)`)) return true;
         } catch {
             // Don't show an error, I believe this throws a "false error".
             // For instance, if the proxy service doesn't start, and the command returns

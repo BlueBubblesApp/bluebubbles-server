@@ -2,7 +2,7 @@ node_modules/
 !dist/
 dist/*
 !dist/dev-app-update.yml
-release/
+releases/
 .vscode
 .DS_Store
 **/*.log

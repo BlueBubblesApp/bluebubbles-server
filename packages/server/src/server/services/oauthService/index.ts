@@ -513,7 +513,10 @@ export class OauthService extends Loggable {
         try {
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
             const data = { displayName: this.projectName, packageName: this.packageName };
-            const createRes = await this.sendRequest("POST", url, data);
+            const createRes = await this.tryUntilNoError("POST", url, data, 3, 10000);
+            if (!createRes?.data?.name) {
+                throw new Error(`Failed to provision Android App: ${getObjectAsString(createRes)}`);
+            }
 
             // Wait for the app to be created
             const operationName = createRes.data.name;

@@ -1,11 +1,10 @@
 import fs from "fs";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
-import * as zx from "zx";
-import { ProcessPromise, $ } from "zx";
 import { FileSystem } from "@server/fileSystem";
 import { hideApp } from "@server/api/apple/scripts";
 import { Loggable } from "@server/lib/logging/Loggable";
+import { ProcessSpawner } from "@server/lib/ProcessSpawner";
 
 export abstract class DylibPlugin extends Loggable {
     tag = "DylibPlugin";
@@ -19,8 +18,6 @@ export abstract class DylibPlugin extends Loggable {
     isStopping = false;
 
     isInjecting = false;
-
-    dylibProcess: ProcessPromise<any>;
 
     dylibFailureCounter = 0;
 
@@ -93,9 +90,6 @@ export abstract class DylibPlugin extends Loggable {
             throw new Error(`Unable to locate ${this.name} parent process!`);
         }
 
-        // Don't log the output to stdout
-        zx.$.verbose = false;
-
         while (this.dylibFailureCounter < 5) {
             try {
                 // Stop the running Messages app
@@ -109,14 +103,22 @@ export abstract class DylibPlugin extends Loggable {
                     return;
                 }
 
-                this.dylibProcess = zx.$`DYLD_INSERT_LIBRARIES=${this.dylibPath} ${this.parentProcessPath}`;
-                this.dylibProcess.stdout.on("data", (data: string) => {
-                    this.log.debug(`DYLIB: ${data}`);
-                });
+                const spawner = new ProcessSpawner({
+                    command: this.parentProcessPath,
+                    args: [],
+                    verbose: true,
+                    logTag: this.parentApp,
+                    storeOutput: false,
+                    waitForExit: true,
+                    restartOnNonZeroExit: false,
+                    options: {
+                        env: {
+                            DYLD_INSERT_LIBRARIES: this.dylibPath
+                        }
+                    },
+                })
 
-                this.dylibProcess.stderr.on("data", (data: string) => {
-                    this.log.debug(`DYLIB: ${data}`);
-                });
+                const promise = spawner.execute();
 
                 // Hide the app after 5 seconds
                 setTimeout(() => {
@@ -128,9 +130,13 @@ export abstract class DylibPlugin extends Loggable {
                     onSuccessfulStart();
                 });
 
-                await this.dylibProcess;
+                await promise;
+
+                // If it gets here, the dylib exited on its own (code: 0)
+                this.log.debug(`DYLIB exited on its own. Restarting...`);
+                this.dylibFailureCounter = 0;
             } catch (ex: any) {
-                this.log.debug(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex}`);
+                this.log.debug(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`);
                 if (this.isStopping) {
                     this.isInjecting = false;
                     return;
