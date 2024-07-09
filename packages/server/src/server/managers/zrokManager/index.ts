@@ -1,13 +1,12 @@
 import { isNotEmpty, isEmpty } from "@server/helpers/utils";
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 import { FileSystem } from "@server/fileSystem";
-import * as zx from "zx";
 import axios from "axios";
 import { app } from "electron";
 import { Server } from "@server";
-import { ProcessOutput } from "zx";
-import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import path from "path";
+import { ProcessSpawner, ProcessSpawnerError } from "@server/lib/ProcessSpawner";
 
 export class ZrokManager extends Loggable {
     tag = "ZrokManager";
@@ -16,7 +15,7 @@ export class ZrokManager extends Loggable {
         return path.join(FileSystem.resources, "macos", "daemons", "zrok", (process.arch === "arm64") ? "arm64" : "x86", "zrok");
     }
 
-    proc: ChildProcessWithoutNullStreams;
+    proc: ChildProcess;
 
     currentProxyUrl: string;
 
@@ -140,24 +139,18 @@ export class ZrokManager extends Loggable {
         }
     }
 
-    static async setToken(token: string): Promise<ProcessOutput> {
+    static async setToken(token: string): Promise<string> {
         try {
-            return await zx.$`${this.daemonPath} enable ${token}`;
-        } catch (ex: any | ProcessOutput) {
-            if (ex.stderr) {
-                if (ex.stderr.includes("you already have an enabled environment")) {
-                    return ex;
-                }
-
-                throw new Error(ex.stderr.trim());
-            }
-
-            const err = ex.stdout;
-            if (err.includes("enableUnauthorized")) {
+            return await ProcessSpawner.executeCommand(this.daemonPath, ["enable", token], {}, "ZrokManager");
+        } catch (ex: any | ProcessSpawnerError) {
+            const output = ex?.output ?? ex?.message ?? String(ex);
+            if (output.includes("you already have an enabled environment")) {
+                return output;
+            } else if (output.includes("enableUnauthorized")) {
                 throw new Error("Invalid Zrok token!");
             } else {
                 const logger = getLogger("ZrokManager");
-                logger.error(`Failed to set Zrok token! Error: ${err}`);
+                logger.error(`Failed to set Zrok token! Error: ${output}`);
                 throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
             }
         }
@@ -194,8 +187,7 @@ export class ZrokManager extends Loggable {
                 flags.push(name);
             }
 
-            const result = await zx.$`${this.daemonPath} reserve public ${flags}`;
-            const output = result.toString().trim();
+            const output = await ProcessSpawner.executeCommand(this.daemonPath, ["reserve", "public", ...flags], {}, "ZrokManager");
             const urlMatches = output.match(ZrokManager.proxyUrlRegex);
             if (isEmpty(urlMatches)) {
                 logger.debug(`Failed to reserve Zrok tunnel! Unable to find URL in output. Output: ${output}`);
@@ -217,34 +209,25 @@ export class ZrokManager extends Loggable {
 
             await Server().repo.setConfig("zrok_reserved_token", token);
             return token;
-        } catch (ex: any | ProcessOutput) {
-            if (ex.stderr) {
-                throw new Error(ex.stderr.trim());
+        } catch (ex: any | ProcessSpawnerError) {
+            const output = ex?.output ?? ex?.message ?? String(ex);
+            const logger = getLogger("ZrokManager");
+            if (output.includes("shareInternalServerError")) {
+                throw new Error("Failed to reserve Zrok share! Internal server error! Share may be in use.");
+            } else {
+                logger.error(`Failed to set Zrok token! Error: ${output}`);
+                throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
             }
-
-            const err = ex.stdout;
-            if (err) {
-                const logger = getLogger("ZrokManager");
-                if (err.includes("shareInternalServerError")) {
-                    throw new Error("Failed to reserve Zrok share! Internal server error! Share may be in use.");
-                } else {
-                    logger.error(`Failed to set Zrok token! Error: ${err}`);
-                    throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
-                }
-            }
-
-            throw ex;
         }
     }
 
-    static async disable(): Promise<ProcessOutput> {
-        return await zx.$`${this.daemonPath} disable`;
+    static async disable(): Promise<string> {
+        return await ProcessSpawner.executeCommand(this.daemonPath, ["disable"], {}, "ZrokManager");
     }
 
     static async getExistingReservedShareToken(name?: string): Promise<string | null> {
         // Run the overview command and parse the output
-        const result = await zx.$`${this.daemonPath} overview`;
-        const output = result.toString().trim();
+        const output = await ProcessSpawner.executeCommand(this.daemonPath, ["overview"], {}, "ZrokManager");
         const json = JSON.parse(output);
         const host = Server().computerIdentifier;
 
@@ -268,25 +251,21 @@ export class ZrokManager extends Loggable {
         return reserved?.token ?? null;
     }
 
-    static async release(token: string): Promise<ProcessOutput> {
+    static async release(token: string): Promise<string> {
         try {
-            const result = await zx.$`${this.daemonPath} release ${token}`;
+            const result = await ProcessSpawner.executeCommand(this.daemonPath, ["release", token], {}, "ZrokManager");
 
             // Clear the token from the config
             await Server().repo.setConfig("zrok_reserved_token", "");
             return result;
-        } catch (ex: any | ProcessOutput) {
-            if (ex.stderr) {
-                if (ex.stderr.includes("unshareNotFound")) {
-                    return ex;
-                }
-
-                throw new Error(ex.stderr.trim());
+        } catch (ex: any | ProcessSpawnerError) {
+            const output = ex?.output ?? ex?.message ?? String(ex);
+            const logger = getLogger("ZrokManager");
+            if (output.includes("unshareNotFound")) {
+                return output;
             }
 
-            const err = ex.stdout ?? "Unknown";
-            const logger = getLogger("ZrokManager");
-            logger.error(`Failed to release Zrok share! Error: ${err}`);
+            logger.error(`Failed to release Zrok share! Error: ${output}`);
             throw new Error("Failed to release Zrok share! Please check your server logs for more information.");
         }
     }

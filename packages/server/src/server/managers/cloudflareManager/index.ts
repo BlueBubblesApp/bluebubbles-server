@@ -3,7 +3,7 @@ import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
-import { ChildProcess, spawn } from "child_process";
+import { ProcessSpawner } from "@server/lib/ProcessSpawner";
 
 export class CloudflareManager extends Loggable {
     tag = "CloudflareManager";
@@ -16,7 +16,7 @@ export class CloudflareManager extends Loggable {
 
     pidPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare", "cloudflare.pid");
 
-    proc: ChildProcess;
+    proc: ProcessSpawner;
 
     currentProxyUrl: string;
 
@@ -37,21 +37,26 @@ export class CloudflareManager extends Loggable {
     }
 
     private async connectHandler(): Promise<string> {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             try {
                 const port = Server().repo.getConfig("socket_port") as string;
-                this.proc = spawn(this.daemonPath, [
-                    'tunnel',
-                    '--url', `localhost:${port}`,
-                    '--config', this.cfgPath,
-                    '--pidfile', this.pidPath
-                ]);
 
-                // Configure handlers for all the output events
-                this.proc.stdout.on("data", chunk => this.handleData(chunk));
-                this.proc.stdout.on("error", chunk => this.handleError(chunk));
-                this.proc.stderr.on("data", chunk => this.handleData(chunk));
-                this.proc.stderr.on("error", chunk => this.handleError(chunk));
+                this.log.debug("Starting Cloudflare Tunnel...");
+                this.proc = new ProcessSpawner({
+                    command: this.daemonPath,
+                    args: [
+                        'tunnel',
+                        '--url', `localhost:${port}`,
+                        '--config', this.cfgPath,
+                        '--pidfile', this.pidPath
+                    ],
+                    verbose: true,
+                    logTag: "CloudflareDaemon",
+                    onOutput: (data) => this.handleData(data),
+                    restartOnNonZeroExit: true,
+                    waitForExit: false,
+                    storeOutput: false
+                });
 
                 this.on("new-url", url => resolve(url));
                 this.on("error", err => {
@@ -66,6 +71,8 @@ export class CloudflareManager extends Loggable {
                 setTimeout(() => {
                     reject(new Error("Failed to connect to Cloudflare after 2 minutes..."));
                 }, 1000 * 60 * 2); // 2 minutes
+
+                await this.proc.execute();
             } catch (ex) {
                 reject(ex);
             }
@@ -102,6 +109,10 @@ export class CloudflareManager extends Loggable {
     private detectError(data: string): string | null {
         if (data.includes('no such host')) {
             return 'Unable to resolve api.trycloudflare.com! Ensure that your Mac has internet access and that any networking tools you use are not blocking the hostname.';
+        } else if (data.includes("context deadline exceeded")) {
+            return "Failed to connect to Cloudflare's servers! Connection timed out. Please check your internet connection and try again.";
+        } else if (data.includes("connect: bad file descriptor")) {
+            return "Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date";
         } else if (data.includes('failed to request quick Tunnel: ')) {
             return data.split('failed to request quick Tunnel: ')[1];
         }
@@ -137,11 +148,6 @@ export class CloudflareManager extends Loggable {
                 // Don't do anything
             }
         }
-    }
-
-    handleError(chunk: any) {
-        const error = this.detectError(chunk);
-        if (error) this.emitError(error);
     }
 
     emitError(err: any) {
