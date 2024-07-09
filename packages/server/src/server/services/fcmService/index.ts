@@ -257,7 +257,7 @@ export class FCMService extends Loggable {
         if (isEmpty(serverUrl)) return;
 
         // Make sure that if we haven't initialized, we do so
-        if (!this.hasInitialized || !(await this.start())) return;
+        if (!this.hasInitialized && !(await this.start())) return;
 
         this.log.debug(`Attempting to write server URL to database...`);
         await this.saveUrlToDb(serverUrl);
@@ -449,7 +449,7 @@ export class FCMService extends Loggable {
         priority: "normal" | "high" = "normal"
     ): Promise<admin.messaging.BatchResponse> {
         try {
-            if (!this.hasInitialized || !(await this.start())) return null;
+            if (!this.hasInitialized && !(await this.start())) return null;
 
             // Build out the notification message
             const payload: admin.messaging.MulticastMessage = {
