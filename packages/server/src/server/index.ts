@@ -1079,24 +1079,26 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Handle when auto start method changes
-        if (prevConfig.auto_start_method !== nextConfig.auto_start_method) {
-            // If we previously starting as a login item, remove it
-            if (prevConfig.auto_start_method === AutoStartMethods.LoginItem) {
-                app.setLoginItemSettings({ openAtLogin: false });
-            }
+        const prevAutoStart = prevConfig.auto_start_method as AutoStartMethods;
+        const nextAutoStart = nextConfig.auto_start_method as AutoStartMethods;
+        if (prevAutoStart !== nextAutoStart) {
+            this.log(`Auto-start method changed from ${prevAutoStart} to ${nextAutoStart}`);
 
-            // If we are next starting as a login item, add it
-            if (nextConfig.auto_start_method === AutoStartMethods.LoginItem) {
-                app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
-            }
-
-            // If we are starting as a launch agent, add it
-            if (prevConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+            // Handle stop cases
+            if (prevAutoStart === AutoStartMethods.LoginItem) {
+                this.log("Disabling auto-start at login item...");
+                app.setLoginItemSettings({ openAtLogin: false, openAsHidden: false });
+                this.log("Auto-start at login item disabled!");
+            } else if (prevAutoStart === AutoStartMethods.LaunchAgent) {
                 await FileSystem.removeLaunchAgent();
             }
 
-            // If we are starting as a launch agent, add it
-            if (nextConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+            // Handle start cases
+            if (nextAutoStart === AutoStartMethods.LoginItem) {
+                this.log("Enabling auto-start at login item...");
+                app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
+                this.log("Auto-start at login item enabled!");
+            } else if (nextAutoStart === AutoStartMethods.LaunchAgent) {
                 await FileSystem.createLaunchAgent();
             }
         }
