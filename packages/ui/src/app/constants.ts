@@ -60,6 +60,10 @@ export const webhookEventOptions = [
         value: 'new-server'
     },
     {
+        label: 'FindMy Location Update',
+        value: 'new-findmy-location'
+    },
+    {
         label: 'Websocket Hello World',
         value: 'hello-world'
     },

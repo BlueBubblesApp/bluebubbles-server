@@ -726,6 +726,10 @@ export class FileSystem {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
     <dict>
+        <key>AssociatedBundleIdentifiers</key>
+        <array>
+            <string>com.BlueBubbles.BlueBubbles-Server</string>
+        </array>
         <key>Label</key>
         <string>com.bluebubbles.server</string>
         <key>Program</key>
