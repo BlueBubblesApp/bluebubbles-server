@@ -99,6 +99,10 @@ export class ProcessSpawner extends Loggable {
         super();
         
         this.command = command;
+        if (this.command.includes(" ")) {
+            this.command = `"${this.command}"`;
+        }
+
         this.args = args;
         this.options = options;
         this.verbose = verbose;

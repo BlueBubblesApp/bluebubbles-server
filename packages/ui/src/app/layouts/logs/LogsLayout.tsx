@@ -28,7 +28,7 @@ import { clearEventCache } from '../../actions/DebugActions';
 import { hasKey, copyToClipboard } from '../../utils/GenericUtils';
 import { useAppSelector , useAppDispatch} from '../../hooks';
 import { AnyAction } from '@reduxjs/toolkit';
-import { clear as clearLogs, setDebug } from '../../slices/LogsSlice';
+import { clear as clearLogs, setDebug, setMessagesAppLogs } from '../../slices/LogsSlice';
 import {
     openLogLocation,
     openAppLocation,
@@ -89,14 +89,24 @@ export const LogsLayout = (): JSX.Element => {
     const alertRef = useRef(null);
     let logs = useAppSelector(state => state.logStore.logs);
     const showDebug = useAppSelector(state => state.logStore.debug);
+    const showMessagesAppLogs = useAppSelector(state => state.logStore.messagesAppLogs);
 
     // If we don't want to show debug logs, filter them out
     if (!showDebug) {
         logs = logs.filter(e => e.type !== 'debug');
     }
 
+    // If we don't want to show messages app logs, filter them out
+    if (!showMessagesAppLogs) {
+        logs = logs.filter(e => !e.message.startsWith('[Messages] [std'));
+    }
+
     const toggleDebugMode = (e: React.ChangeEvent<HTMLInputElement>) => {
         dispatch(setDebug(e.target.checked));
+    };
+
+    const toggleMessagesAppLogs = (e: React.ChangeEvent<HTMLInputElement>) => {
+        dispatch(setMessagesAppLogs(e.target.checked));
     };
 
     return (
@@ -195,11 +205,31 @@ export const LogsLayout = (): JSX.Element => {
                             <PopoverContent>
                                 <PopoverArrow />
                                 <PopoverCloseButton />
-                                <PopoverHeader>Inforamation</PopoverHeader>
+                                <PopoverHeader>Information</PopoverHeader>
                                 <PopoverBody>
                                     <Text>
                                         Enabling this option will show DEBUG level logs. Leaving
                                         this disabled will only INFO, WARN, and ERROR level logs.
+                                    </Text>
+                                </PopoverBody>
+                            </PopoverContent>
+                        </Popover>
+                        <Box ml={5} />
+                        <Checkbox onChange={(e) => toggleMessagesAppLogs(e)} isChecked={showMessagesAppLogs}>Show Messages App Logs</Checkbox>
+                        <Popover trigger='hover'>
+                            <PopoverTrigger>
+                                <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>
+                                    <AiOutlineInfoCircle />
+                                </Box>
+                            </PopoverTrigger>
+                            <PopoverContent>
+                                <PopoverArrow />
+                                <PopoverCloseButton />
+                                <PopoverHeader>Information</PopoverHeader>
+                                <PopoverBody>
+                                    <Text>
+                                        Enabling this option will show logs coming from the Messages app.
+                                        This is disabled by default, as it can be quite verbose.
                                     </Text>
                                 </PopoverBody>
                             </PopoverContent>
