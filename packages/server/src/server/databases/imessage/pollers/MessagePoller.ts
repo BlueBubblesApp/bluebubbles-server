@@ -52,47 +52,6 @@ export class MessagePoller extends IMessagePoller {
             (e.didNotifyRecipient ?? false)
         ));
 
-        // this.log.debug(`Normal getMessages took: ${new Date().getTime() - start.getTime()}ms`);
-
-        // start = new Date();
-        // let rawResults = await this.repo.getMessagesRaw({
-        //     after: afterLookback,
-        //     withChats: true,
-        //     orderBy: "message.dateCreated"
-        // });
-
-        // // Filter the raw results by date before doing the full decode.
-        // // This is so we don't over-process the data.
-        // rawResults = rawResults.filter((e) => {
-        //     const created = getDateUsing2001(e.message_date);
-        //     const isFromMe = Boolean(e.message_is_from_me);
-        //     const delivered = getDateUsing2001(e.message_date_delivered);
-        //     const read = getDateUsing2001(e.message_date_read);
-        //     const edited = getDateUsing2001(e.message_date_edited);
-        //     const retracted = getDateUsing2001(e.message_date_retracted);
-        //     const isEmpty = Boolean(e.message_is_empty);
-        //     const didNotifyRecipient = Boolean(e.message_did_notify_recipient);
-        //     return (created?.getTime() ?? 0) >= afterTime ||
-        //         // Date delivered only matters if it's from you
-        //         (isFromMe && (delivered?.getTime() ?? 0)) >= afterTime ||
-        //         // Date read only matters if it's from you and it's not a group chat
-        //         (isFromMe && e.chat_style !== 43 && (read?.getTime() ?? 0)) >= afterTime ||
-        //         // Date edited can be from anyone (should include edits & unsends)
-        //         (edited?.getTime() ?? 0) >= afterTime || 
-        //         // Date retracted can be from anyone, but Apple doesn't even use this field.
-        //         // We still want to be thorough and check it.
-        //         // isEmpty is what's actually used by Apple to determine if it's retracted.
-        //         // (in addition to dateEdited)
-        //         (retracted?.getTime() ?? 0) >= afterTime ||
-        //         (isEmpty ?? false) ||
-        //         // If didNotifyRecipient changed (from false to true)
-        //         (didNotifyRecipient ?? false);
-        // });
-
-        // const decoder = new MessageDecoder();
-        // decoder.decodeList(rawResults);
-        // this.log.debug(`Raw getMessages took: ${new Date().getTime() - start.getTime()}ms`);
-
         // Handle group changes
         const groupChangeEntries = entries.filter(e => isEmpty(e.text) && [1, 2, 3].includes(e.itemType));
         results = results.concat(this.handleGroupChanges(groupChangeEntries));
@@ -132,6 +91,9 @@ export class MessagePoller extends IMessagePoller {
             // Emit the event
             results.push({ eventType: event, data: entry });
         }
+
+        // Sort results ascending order by date created so that older messages are processed first
+        results.sort((a, b) => a.data.dateCreated.getTime() - b.data.dateCreated.getTime());
 
         return results;
     }

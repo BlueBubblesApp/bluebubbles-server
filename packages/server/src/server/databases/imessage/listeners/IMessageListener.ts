@@ -116,17 +116,14 @@ export class IMessageListener extends Loggable {
 
     async poll(after: Date, emitResults = true) {
         for (const poller of this.pollers) {
-            const startMs = new Date().getTime();
             const results = await poller.poll(after);
 
             if (emitResults) {
                 for (const result of results) {
                     this.emit(result.eventType, result.data);
+                    await waitMs(10);
                 }
             }
-
-            const endMs = new Date().getTime();
-            // this.log.debug(`${poller.tag} took ${endMs - startMs}ms`);
         }
     }
 }
