@@ -6,6 +6,8 @@ export class CloudflareService extends Proxy {
 
     manager: CloudflareManager;
 
+    connectPromise: Promise<string>;
+
     constructor() {
         super({
             name: "Cloudflare",
@@ -25,6 +27,24 @@ export class CloudflareService extends Proxy {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async connect(): Promise<string> {
+        if (this.connectPromise) {
+            this.log.debug("Already connecting to Cloudflare. Waiting for connection to complete.");
+            await this.connectPromise;
+        }
+
+        try {
+            this.connectPromise = this._connect();
+            this.url = await this.connectPromise;
+            this.connectPromise = null;
+            return this.url;
+        } catch (ex: any) {
+            this.connectPromise = null;
+            this.log.info(`Failed to connect to Cloudflare! Error: ${ex.toString()}`);
+            throw ex;
+        }
+    }
+
+    async _connect(): Promise<string> {
         // Create the connection
         this.manager = new CloudflareManager();
 
@@ -60,7 +80,7 @@ export class CloudflareService extends Proxy {
         try {
             if (this.manager) {
                 this.manager.removeAllListeners();
-                this.manager.stop();
+                await this.manager.stop();
             }
         } finally {
             this.url = null;
