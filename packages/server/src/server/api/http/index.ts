@@ -42,7 +42,7 @@ export class HttpService extends Loggable {
 
     socketOpts: Partial<ServerOptions> = {
         pingTimeout: 1000 * 60 * 2, // 2 Minute ping timeout
-        pingInterval: 1000 * 30, // 30 Second ping interval
+        pingInterval: 1000 * 60, // 1 minute ping interval
         upgradeTimeout: 1000 * 30, // 30 Seconds
 
         // 100 MB. 1000 == 1kb. 1000 * 1000 == 1mb
