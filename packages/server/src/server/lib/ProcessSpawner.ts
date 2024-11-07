@@ -11,6 +11,7 @@ export type ProcessSpawnerConstructorArgs = {
     onExit?: ((code: number) => void) | null;
     logTag?: string | null;
     restartOnNonZeroExit?: boolean;
+    restartOnNonZeroExitCondition?: ((code: number) => boolean) | null;
     storeOutput?: boolean;
     waitForExit?: boolean;
     errorOnStderr?: boolean;
@@ -43,6 +44,8 @@ export class ProcessSpawner extends Loggable {
     process: ChildProcess;
 
     restartOnNonZeroExit: boolean;
+
+    restartOnNonZeroExitCondition: ((code: number) => boolean) | null;
 
     storeOutput: boolean;
 
@@ -92,6 +95,7 @@ export class ProcessSpawner extends Loggable {
         onExit = null,
         logTag = null,
         restartOnNonZeroExit = false,
+        restartOnNonZeroExitCondition = null,
         storeOutput = true,
         waitForExit = true,
         errorOnStderr = false
@@ -109,6 +113,7 @@ export class ProcessSpawner extends Loggable {
         this.onOutput = onOutput;
         this.onExit = onExit;
         this.restartOnNonZeroExit = restartOnNonZeroExit;
+        this.restartOnNonZeroExitCondition = restartOnNonZeroExitCondition;
         this.storeOutput = storeOutput;
         this.waitForExit = waitForExit;
         this.errorOnStderr = errorOnStderr;
@@ -203,7 +208,9 @@ export class ProcessSpawner extends Loggable {
         }
 
         if (code !== 0 && this.restartOnNonZeroExit) {
-            this.execute();
+            if (!this.restartOnNonZeroExitCondition || this.restartOnNonZeroExitCondition(code)) {
+                this.execute();
+            }
         }
     }
 

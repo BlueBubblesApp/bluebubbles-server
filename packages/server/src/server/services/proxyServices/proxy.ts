@@ -138,6 +138,10 @@ export abstract class Proxy extends Loggable {
         return false;
     }
 
+    async shouldRelaunch(): Promise<boolean> {
+        return true;
+    }
+
     /**
      * Helper for restarting the ngrok connection
      */
@@ -177,8 +181,12 @@ export abstract class Proxy extends Loggable {
         }
 
         if (tries >= maxTries) {
-            this.log.info(`Reached maximum retry attempts for ${this.opts.name}. Force restarting app...`);
-            Server().relaunch();
+            if (await this.shouldRelaunch()) {
+                this.log.info(`Reached maximum retry attempts for ${this.opts.name}. Force restarting app...`);
+                Server().relaunch();
+            } else {
+                this.log.warn('Max retry attempts reached for proxy service! Not relaunching...');
+            }
         }
 
         return connected;
@@ -190,7 +198,7 @@ export abstract class Proxy extends Loggable {
     async restartHandler(wait = 1000): Promise<boolean> {
         try {
             await this.disconnect();
-            await new Promise((resolve, _) => setTimeout(resolve, wait));
+            await waitMs(wait);
             await this.start();
         } catch (ex: any) {
             const output = ex?.toString() ?? "";

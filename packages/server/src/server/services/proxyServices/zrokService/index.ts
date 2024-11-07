@@ -53,7 +53,9 @@ export class ZrokService extends Proxy {
 
     async _connect(): Promise<string> {
         // Create the connection
-        this.manager = new ZrokManager();
+        if (!this.manager) {
+            this.manager = new ZrokManager();
+        }
 
         // When we get a new URL, set the URL and update
         this.manager.on("new-url", async url => {
@@ -85,6 +87,10 @@ export class ZrokService extends Proxy {
      * Disconnect from Zrok
      */
     async disconnect(): Promise<void> {
+        if (this.connectPromise) {
+            this.connectPromise = null;
+        }
+
         try {
             if (this.manager) {
                 this.manager.removeAllListeners();

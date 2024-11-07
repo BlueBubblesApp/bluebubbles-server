@@ -8,6 +8,8 @@ export class CloudflareService extends Proxy {
 
     connectPromise: Promise<string>;
 
+    lastError: string;
+
     constructor() {
         super({
             name: "Cloudflare",
@@ -20,6 +22,14 @@ export class CloudflareService extends Proxy {
      */
     isConnected(): boolean {
         return this.url !== null;
+    }
+
+    async checkForError(log: string, _: any = null): Promise<boolean> {
+        return this.lastError === log;
+    }
+
+    async shouldRelaunch(): Promise<boolean> {
+        return !this.manager?.isRateLimited;
     }
 
     /**
@@ -46,7 +56,9 @@ export class CloudflareService extends Proxy {
 
     async _connect(): Promise<string> {
         // Create the connection
-        this.manager = new CloudflareManager();
+        if (!this.manager) {
+            this.manager = new CloudflareManager();
+        }
 
         // When we get a new URL, set the URL and update
         this.manager.on("new-url", async url => {
@@ -58,7 +70,6 @@ export class CloudflareService extends Proxy {
             }, 5000);
         });
 
-        // When we get a new URL, set the URL and update
         this.manager.on("needs-restart", async _ => {
             try {
                 await this.restart();
@@ -77,6 +88,10 @@ export class CloudflareService extends Proxy {
      * Disconnect from Cloudflare
      */
     async disconnect(): Promise<void> {
+        if (this.connectPromise) {
+            this.connectPromise = null;
+        }
+
         try {
             if (this.manager) {
                 this.manager.removeAllListeners();

@@ -25,7 +25,13 @@ export class ZrokManager extends Loggable {
 
     connectPromise: Promise<string> = null;
 
+    isRateLimited = false;
+
     async start(): Promise<string> {
+        if (this.isRateLimited) {
+            throw new Error("Rate limited by Cloudflare. Waiting 1 hour before retrying...");
+        }
+
         try {
             this.emit("started");
             return await this.connectHandler();
@@ -42,7 +48,7 @@ export class ZrokManager extends Loggable {
         const reservedTunnel = (Server().repo.getConfig("zrok_reserve_tunnel") as boolean) ?? false;
         const tunnelToken = await ZrokManager.reserve(null);
 
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             // Didn't use zx here because I couldn't figure out how to pipe the stdout
             // properly, without taking over the terminal outputs.
             // Conditionally change the command based on if we are reserving a tunnel or not
@@ -51,6 +57,11 @@ export class ZrokManager extends Loggable {
                 ...(reservedTunnel ? ["reserved", "--headless"] : ["public", "--backend-mode", "proxy", "--headless"]),
                 ...(reservedTunnel ? [tunnelToken] : [`0.0.0.0:${port}`])
             ];
+
+            if (this.proc && !this.proc?.killed) {
+                this.log.debug("Zrok Tunnel already running. Stopping...");
+                await this.stop();
+            }
 
             this.proc = spawn(ZrokManager.daemonPath, commndFlags);
             this.proc.stdout.on("data", chunk => this.handleData(chunk));
