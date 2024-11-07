@@ -37,7 +37,7 @@ export const DebounceSubsequentWithWait = <T extends (...args: any[]) => any>(
                 }
             }
 
-            const promise = promiseWrapper();
+            const promise = promiseWrapper.call(this);
             timeouts.set(name, promise);
             return await promise;
         };
