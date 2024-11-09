@@ -32,9 +32,10 @@ export class FindMyInterface {
         }
     }
 
-    static async refreshDevices() {
+    static async refreshDevices(): Promise<Array<FindMyDevice> | null> {
         // Can't use the Private API to refresh devices yet
         await this.refreshLocationsAccessibility();
+        return await this.getDevices();
     }
 
     static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
