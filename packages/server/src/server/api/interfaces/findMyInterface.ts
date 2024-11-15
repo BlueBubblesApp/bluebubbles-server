@@ -21,13 +21,15 @@ export class FindMyInterface {
             ]);
 
             // Return null if neither of the files exist
-            if (!devices && !items) return null;
+            if (devices == null && items == null) return null;
 
             // Transform the items to match the same shape as devices
             const transformedItems = (items ?? []).map(transformFindMyItemToDevice);
 
             return [...(devices ?? []), ...transformedItems];
-        } catch {
+        } catch (ex: any) {
+            Server().logger.debug('An error occurred while reading FindMy Device cache files.');
+            Server().logger.debug(String(ex));
             return null;
         }
     }
