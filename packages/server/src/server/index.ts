@@ -34,7 +34,7 @@ import {
     ZrokService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
+import { runTerminalScript, openSystemPreferences, startMessages } from "@server/api/apple/scripts";
 
 import { ActionHandler } from "./api/apple/actions";
 import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
@@ -1041,7 +1041,13 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Install the bundle if the Private API is turned on
-        if (
+        if (!nextConfig.enable_private_api && !nextConfig.enable_ft_private_api) {
+            this.logger.debug("Detected Private API disable");
+            await Server().privateApi.stop();
+
+            // Start messages after so we can properly use AppleScript
+            await FileSystem.executeAppleScript(startMessages());
+        } else if (
             prevConfig.enable_private_api !== nextConfig.enable_private_api ||
             prevConfig.enable_ft_private_api !== nextConfig.enable_ft_private_api
         ) {
