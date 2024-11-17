@@ -457,6 +457,10 @@ export class IPCService extends Loggable {
             return await ZrokManager.setToken(token);
         });
 
+        ipcMain.handle("disable-zrok", async (_, __) => {
+            return await ZrokManager.disable();
+        });
+
         ipcMain.handle("install-update", async (_, __) => {
             if (!Server().updater.hasUpdate) {
                 return Server().log("No update available to install!", "debug");

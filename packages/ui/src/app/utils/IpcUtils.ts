@@ -173,3 +173,7 @@ export const registerZrokEmail = async (email: string) => {
 export const setZrokToken = async (token: string) => {
     return await ipcRenderer.invoke('set-zrok-token', token);
 };
+
+export const disableZrok = async () => {
+    return await ipcRenderer.invoke('disable-zrok');
+};
