@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     FormControl,
     FormHelperText,
@@ -12,9 +12,7 @@ import {
 import { useAppSelector } from '../../hooks';
 import { onCheckboxToggle } from '../../actions/ConfigActions';
 import { PrivateApiRequirements } from '../PrivateApiRequirements';
-import { ConfirmationItems } from '../../utils/ToastUtils';
-import { ConfirmationDialog } from '../modals/ConfirmationDialog';
-import { getEnv, reinstallHelperBundle } from '../../utils/IpcUtils';
+import { getEnv } from '../../utils/IpcUtils';
 import { PrivateApiStatus } from '../PrivateApiStatus';
 import { FaceTimeCallingField } from './FaceTimeCallingField';
 
@@ -23,24 +21,10 @@ export interface PrivateApiFieldProps {
     helpTextFaceTime?: string;
 }
 
-const confirmationActions: ConfirmationItems = {
-    reinstall: {
-        message: (
-            'Are you sure you want to reinstall the Private API helper bundle?<br /><br />' +
-            'This will overwrite any existing helper bundle installation.'
-        ),
-        func: reinstallHelperBundle
-    }
-};
-
 export const PrivateApiField = ({ helpTextMessages, helpTextFaceTime }: PrivateApiFieldProps): JSX.Element => {
     const privateApi: boolean = (useAppSelector(state => state.config.enable_private_api) ?? false);
     const ftPrivateApi: boolean = (useAppSelector(state => state.config.enable_ft_private_api) ?? false);
     const [env, setEnv] = useState({} as Record<string, any>);
-    const alertRef = useRef(null);
-    const [requiresConfirmation, confirm] = useState((): string | null => {
-        return null;
-    });
 
     useEffect(() => {
         getEnv().then((env) => {
@@ -100,16 +84,6 @@ export const PrivateApiField = ({ helpTextMessages, helpTextFaceTime }: PrivateA
                     ) : null}
                 </Stack>
             </FormControl>
-
-            <ConfirmationDialog
-                modalRef={alertRef}
-                onClose={() => confirm(null)}
-                body={confirmationActions[requiresConfirmation as string]?.message}
-                onAccept={() => {
-                    confirmationActions[requiresConfirmation as string].func();
-                }}
-                isOpen={requiresConfirmation !== null}
-            />
         </Box>
     );
 };
