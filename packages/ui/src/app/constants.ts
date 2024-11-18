@@ -1,3 +1,4 @@
+// Also modify packages/server/src/server/api/http/constants.ts
 export const webhookEventOptions = [
     {
         label: 'All Events',

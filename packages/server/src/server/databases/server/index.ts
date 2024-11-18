@@ -182,8 +182,16 @@ export class ServerRepository extends EventEmitter {
         }
     }
 
-    public async getWebhooks(): Promise<Array<Webhook>> {
+    public async getWebhooks({
+        url = null,
+        id = null
+    }: {
+        url?: string | null;
+        id?: number | null;
+    } = {}): Promise<Array<Webhook>> {
         const repo = this.webhooks();
+        if (id) return [await repo.findOneBy({ id })];
+        if (url) return [await repo.findOneBy({ url })];
         return await repo.find();
     }
 
@@ -228,7 +236,8 @@ export class ServerRepository extends EventEmitter {
         return item;
     }
 
-    public async deleteWebhook({ url = null, id = null }: { url: string | null; id: number | null }): Promise<void> {
+    public async deleteWebhook({ url = null, id = null }: { url?: string | null; id?: number | null }): Promise<void> {
+        if (!url && !id) throw new Error("Failed to delete webhook! No URL or ID provided!");
         const repo = this.webhooks();
         const item = url ? await repo.findOneBy({ url }) : await repo.findOneBy({ id });
         if (!item) return;
