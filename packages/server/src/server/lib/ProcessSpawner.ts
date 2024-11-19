@@ -234,14 +234,15 @@ export class ProcessSpawner extends Loggable {
         command: string,
         args: string[] = [],
         options: SpawnOptionsWithoutStdio = {},
-        tag = 'CommandExecutor'
+        tag = 'CommandExecutor',
+        verbose = false
     ): Promise<string> {
         const spawner = new ProcessSpawner({
             command,
             args,
             logTag: tag,
             options,
-            verbose: false,
+            verbose,
             restartOnNonZeroExit: false,
             storeOutput: true,
             waitForExit: true

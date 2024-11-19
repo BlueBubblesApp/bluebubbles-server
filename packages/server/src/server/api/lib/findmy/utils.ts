@@ -32,7 +32,12 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
     crowdSourcedLocation: item?.crowdSourcedLocation,
 
     // Extras from FindMyItem
+    identifier: item?.identifier,
+    productIdentifier: item?.productIdentifier,
     role: item?.role,
     serialNumber: item?.serialNumber,
-    lostModeMetadata: item?.lostModeMetadata
+    lostModeMetadata: item?.lostModeMetadata,
+    groupIdentifier: item?.groupIdentifier,
+    isAppleAudioAccessory: item?.isAppleAudioAccessory,
+    capabilities: item?.capabilities,
 });
