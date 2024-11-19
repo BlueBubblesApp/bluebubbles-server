@@ -180,10 +180,13 @@ export class ZrokManager extends Loggable {
 
         if (existingShare) {
             logger.info(`Found existing reserved Zrok share: ${existingToken}`);
+        } else {
+            logger.debug(`No existing reserved Zrok share found.`);
         }
 
         // If we don't want to reserve a tunnel, clear the configs and release the existing token
         if (!reservedTunnel) {
+            logger.debug(`Disabling reserved Zrok tunnel...`);
             await Server().repo.setConfig("zrok_reserved_token", "");
             await Server().repo.setConfig("zrok_reserved_name", "");
 
@@ -197,6 +200,8 @@ export class ZrokManager extends Loggable {
         }
 
         if (isNotEmpty(existingToken)) {
+            logger.debug('Handling existing token...');
+
             // If the token is different, release the existing tunnel
             if (existingToken !== reservedToken) {
                 logger.info(`Releasing existing Zrok share (${existingToken}) because the reserve token has changed.`);
@@ -276,6 +281,9 @@ export class ZrokManager extends Loggable {
         const output = await ProcessSpawner.executeCommand(this.daemonPath, ["overview"], {}, "ZrokManager");
         const json = JSON.parse(output);
         const host = Server().computerIdentifier;
+
+        const logger = getLogger("ZrokManager");
+        logger.debug(`Found ${json.environments.length} environments in Zrok overview`);
 
         // Find the proper environment based on the computer user & name
         const env = (json.environments ?? []).find((e: any) => e.environment?.description === host);
