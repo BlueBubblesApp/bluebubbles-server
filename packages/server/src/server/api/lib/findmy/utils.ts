@@ -38,6 +38,7 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
     serialNumber: item?.serialNumber,
     lostModeMetadata: item?.lostModeMetadata,
     groupIdentifier: item?.groupIdentifier,
+    groupName: item.groupName,
     isAppleAudioAccessory: item?.isAppleAudioAccessory,
     capabilities: item?.capabilities,
 });

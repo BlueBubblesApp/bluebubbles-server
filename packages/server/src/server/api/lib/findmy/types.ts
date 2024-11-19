@@ -55,6 +55,9 @@ export interface FindMyDevice {
     groupIdentifier?: FindMyItem["groupIdentifier"];
     isAppleAudioAccessory?: FindMyItem["isAppleAudioAccessory"];
     capabilities?: FindMyItem["capabilities"];
+
+    // Extra properties from BlueBubbles
+    groupName?: FindMyItem["groupName"];
 }
 
 export interface FindMyItem {
@@ -87,7 +90,8 @@ export interface FindMyItem {
     productIdentifier: string;
     isAppleAudioAccessory: boolean;
     crowdSourcedLocation: FindMyLocation;
-    groupIdentifier: null;
+    groupIdentifier: string | null;
+    groupName?: string | null;
     role: {
         name: string;
         emoji: string;

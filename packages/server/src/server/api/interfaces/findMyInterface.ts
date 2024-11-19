@@ -28,6 +28,31 @@ export class FindMyInterface {
             // Return null if neither of the files exist
             if (devices == null && items == null) return null;
 
+            // Get any items with a group identifier
+            const itemsWithGroup = items.filter(item => item.groupIdentifier);
+            if (itemsWithGroup.length > 0) {
+                try {
+                    const itemGroups = await FindMyInterface.readItemGroups();
+                    if (itemGroups) {
+                        // Create a map of group IDs to group names
+                        const groupMap = itemGroups.reduce((acc, group) => {
+                            acc[group.identifier] = group.name;
+                            return acc;
+                        }, {} as Record<string, string>);
+
+                        // Iterate over the items and add the group name
+                        for (const item of items) {
+                            if (item.groupIdentifier && groupMap[item.groupIdentifier]) {
+                                item.groupName = groupMap[item.groupIdentifier];
+                            }
+                        }
+                    }
+                } catch (ex: any) {
+                    Server().logger.debug('An error occurred while reading FindMy ItemGroups cache file.');
+                    Server().logger.debug(String(ex));
+                }
+            }
+
             // Transform the items to match the same shape as devices
             const transformedItems = (items ?? []).map(transformFindMyItemToDevice);
 
@@ -85,6 +110,29 @@ export class FindMyInterface {
         await FileSystem.executeAppleScript(hideFindMyFriends());
     }
 
+    static async readItemGroups(): Promise<Array<any>> {
+        const itemGroupsPath = path.join(FileSystem.findMyDir, "ItemGroups.data");
+        if (!fs.existsSync(itemGroupsPath)) return [];
+
+        return new Promise((resolve, reject) => {
+            fs.readFile(itemGroupsPath, { encoding: "utf-8" }, (err, data) => {
+                // Couldn't read the file
+                if (err) return resolve(null);
+
+                try {
+                    const parsedData = JSON.parse(data.toString());
+                    if (Array.isArray(parsedData)) {
+                        return resolve(parsedData);
+                    } else {
+                        reject(new Error("Failed to read FindMy ItemGroups cache file! It is not an array!"));
+                    }
+                } catch {
+                    reject(new Error("Failed to read FindMy ItemGroups cache file! It is not in the correct format!"));
+                }
+            });
+        });
+    }
+
     private static readDataFile<T extends "Devices" | "Items">(
         type: T
     ): Promise<Array<T extends "Devices" ? FindMyDevice : FindMyItem> | null> {
@@ -95,7 +143,12 @@ export class FindMyInterface {
                 if (err) return resolve(null);
 
                 try {
-                    return resolve(JSON.parse(data.toString()));
+                    const parsedData = JSON.parse(data.toString());
+                    if (Array.isArray(parsedData)) {
+                        return resolve(parsedData);
+                    } else {
+                        reject(new Error(`Failed to read FindMy ${type} cache file! It is not an array!`));
+                    }
                 } catch {
                     reject(new Error(`Failed to read FindMy ${type} cache file! It is not in the correct format!`));
                 }
