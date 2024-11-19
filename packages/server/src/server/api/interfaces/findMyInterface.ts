@@ -2,7 +2,7 @@ import { Server } from "@server";
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { isMinBigSur, isMinSonoma } from "@server/env";
+import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
 import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
@@ -14,6 +14,11 @@ export class FindMyInterface {
     }
 
     static async getDevices(): Promise<Array<FindMyDevice> | null> {
+        if (isMinSequoia) {
+            Server().logger.debug('Cannot fetch FindMy devices on macOS Sequoia or later.');
+            return null;
+        }
+
         try {
             const [devices, items] = await Promise.all([
                 FindMyInterface.readDataFile("Devices"),
