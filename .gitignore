@@ -9,3 +9,4 @@ release/
 .swiftpm
 .yarn
 .yarnrc*
+packages/server/appResources/macos/daemons/cloudflare/cloudflare.pid

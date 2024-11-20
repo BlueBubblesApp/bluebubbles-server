@@ -1,45 +1,50 @@
 import { waitMs } from "@server/helpers/utils";
 
-const timeouts = new Map<string, Promise<any>>();
+const timeouts = new Map<string, { promise: Promise<any>; timeoutId: NodeJS.Timeout }>();
 
 /**
- * This function debounces an async function,
- * ensuring that only the first call is executed
- * within the specified time frame. All subsequent
- * calls will simply return the result of the first.
- * The initial call will be executed after the timeout.
- *
- * @param name 
- * @returns 
+ * Debounces an async function, ensuring that only one call is executed within the
+ * specified timeframe. Subsequent calls within the timeout reset the timer.
+ * The decorated function returns the promise of the last invoked call.
+ * Optionally cancels any pending invocations.
  */
 export const DebounceSubsequentWithWait = <T extends (...args: any[]) => any>(
     name: string,
-    timeoutMs: number
+    timeoutMs: number,
+    cancelPrevious?: boolean // Optional flag to cancel previous calls
 ): MethodDecorator => {
     return (_target: any, _propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
         const originalMethod = descriptor.value;
 
         descriptor.value = async function (...args: any[]): Promise<ReturnType<T>> {
-            const executor = timeouts.get(name);
-            if (executor) return await executor;
+            const existingTimeout = timeouts.get(name);
 
-            // Wrap the original method in a promise.
-            // This will call the original function after the timeout.
-            const promiseWrapper = async () => {
-                try {
-                    await waitMs(timeoutMs);
-                    const result = await originalMethod.apply(this, args);
-                    timeouts.delete(name);
-                    return result;
-                } catch (ex) {
-                    timeouts.delete(name);
-                    throw ex;
-                }
+            if (existingTimeout && cancelPrevious) {
+                clearTimeout(existingTimeout.timeoutId);
+                timeouts.delete(name);
             }
 
-            const promise = promiseWrapper.call(this);
-            timeouts.set(name, promise);
-            return await promise;
+            let resolve: (value: any) => void;
+            let reject: (reason?: any) => void;
+
+            const promise = new Promise<ReturnType<T>>((res, rej) => {
+                resolve = res;
+                reject = rej;
+            });
+
+            const timeoutId = setTimeout(async () => {
+                try {
+                    const result = await originalMethod.apply(this, args);
+                    resolve(result);
+                } catch (ex) {
+                    reject(ex);
+                } finally {
+                    timeouts.delete(name);
+                }
+            }, timeoutMs);
+
+            timeouts.set(name, { promise, timeoutId });
+            return promise;
         };
 
         return descriptor;
