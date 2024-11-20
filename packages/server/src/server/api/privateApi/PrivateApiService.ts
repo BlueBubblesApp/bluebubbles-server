@@ -4,6 +4,7 @@ import { Sema } from "async-sema";
 import { clamp, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { TransactionPromise, TransactionResult } from "@server/managers/transactionManager/transactionPromise";
 import { TransactionManager } from "@server/managers/transactionManager";
+import { execSync } from "child_process";
 
 import { MAX_PORT, MIN_PORT } from "./Constants";
 import { PrivateApiEventHandler } from "./eventHandlers";
@@ -104,6 +105,9 @@ export class PrivateApiService extends Loggable {
         // Configure & start the listener
         this.log.debug("Starting Private API Helper Services...");
         await this.configureServer();
+
+        // Execute the boot argument command if conditions are met
+        this.setBootArgs();
 
         // we need to get the port to open the server on (to allow multiple users to use the bundle)
         // we'll base this off the users uid (a unique id for each user, starting from 501)
@@ -407,5 +411,20 @@ export class PrivateApiService extends Loggable {
 
         await this.mode?.stop();
         this.log.info(`Private API Helper Stopped...`);
+    }
+
+    private setBootArgs() {
+        const osVersion = os.release();
+        const isM1Mac = os.cpus().some(cpu => cpu.model.includes("Apple M1"));
+        const isVentura = osVersion.startsWith("22.");
+
+        if (isM1Mac && isVentura) {
+            try {
+                execSync("sudo nvram boot-args=-arm64e_preview_abi");
+                this.log.info("Successfully set boot-args for macOS Ventura on M1 Mac.");
+            } catch (error) {
+                this.log.error("Failed to set boot-args for macOS Ventura on M1 Mac:", error);
+            }
+        }
     }
 }
