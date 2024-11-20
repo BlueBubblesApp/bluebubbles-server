@@ -347,7 +347,7 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
                     />
                     {(unreadCount > 0) ? (
                         <Badge
-                            borderRadius='lg'
+                            borderRadius={10}
                             variant='solid'
                             colorScheme='red'
                             position='absolute'
@@ -355,6 +355,10 @@ const MobileNav = ({ onOpen, onNotificationOpen, unreadCount, ...rest }: MobileP
                             top={1}
                             right={1}
                             zIndex={2}
+                            minWidth={5}
+                            minHeight={5}
+                            textAlign={'center'}
+                            paddingTop='1px'
                         >{unreadCount}</Badge>
                     ) : null}
                 </Box>

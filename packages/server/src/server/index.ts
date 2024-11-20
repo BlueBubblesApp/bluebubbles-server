@@ -34,7 +34,7 @@ import {
     ZrokService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
-import { runTerminalScript, openSystemPreferences } from "@server/api/apple/scripts";
+import { runTerminalScript, openSystemPreferences, startMessages } from "@server/api/apple/scripts";
 
 import { ActionHandler } from "./api/apple/actions";
 import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
@@ -1041,7 +1041,13 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Install the bundle if the Private API is turned on
-        if (
+        if (!nextConfig.enable_private_api && !nextConfig.enable_ft_private_api) {
+            this.logger.debug("Detected Private API disable");
+            await Server().privateApi.stop();
+
+            // Start messages after so we can properly use AppleScript
+            await FileSystem.executeAppleScript(startMessages());
+        } else if (
             prevConfig.enable_private_api !== nextConfig.enable_private_api ||
             prevConfig.enable_ft_private_api !== nextConfig.enable_ft_private_api
         ) {
@@ -1079,24 +1085,26 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         // Handle when auto start method changes
-        if (prevConfig.auto_start_method !== nextConfig.auto_start_method) {
-            // If we previously starting as a login item, remove it
-            if (prevConfig.auto_start_method === AutoStartMethods.LoginItem) {
-                app.setLoginItemSettings({ openAtLogin: false });
-            }
+        const prevAutoStart = prevConfig.auto_start_method as AutoStartMethods;
+        const nextAutoStart = nextConfig.auto_start_method as AutoStartMethods;
+        if (prevAutoStart !== nextAutoStart) {
+            this.log(`Auto-start method changed from ${prevAutoStart} to ${nextAutoStart}`);
 
-            // If we are next starting as a login item, add it
-            if (nextConfig.auto_start_method === AutoStartMethods.LoginItem) {
-                app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
-            }
-
-            // If we are starting as a launch agent, add it
-            if (prevConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+            // Handle stop cases
+            if (prevAutoStart === AutoStartMethods.LoginItem) {
+                this.log("Disabling auto-start at login item...");
+                app.setLoginItemSettings({ openAtLogin: false, openAsHidden: false });
+                this.log("Auto-start at login item disabled!");
+            } else if (prevAutoStart === AutoStartMethods.LaunchAgent) {
                 await FileSystem.removeLaunchAgent();
             }
 
-            // If we are starting as a launch agent, add it
-            if (nextConfig.auto_start_method === AutoStartMethods.LaunchAgent) {
+            // Handle start cases
+            if (nextAutoStart === AutoStartMethods.LoginItem) {
+                this.log("Enabling auto-start at login item...");
+                app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
+                this.log("Auto-start at login item enabled!");
+            } else if (nextAutoStart === AutoStartMethods.LaunchAgent) {
                 await FileSystem.createLaunchAgent();
             }
         }

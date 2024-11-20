@@ -6,6 +6,10 @@ export class CloudflareService extends Proxy {
 
     manager: CloudflareManager;
 
+    connectPromise: Promise<string>;
+
+    lastError: string;
+
     constructor() {
         super({
             name: "Cloudflare",
@@ -20,13 +24,41 @@ export class CloudflareService extends Proxy {
         return this.url !== null;
     }
 
+    async checkForError(log: string, _: any = null): Promise<boolean> {
+        return this.lastError === log;
+    }
+
+    async shouldRelaunch(): Promise<boolean> {
+        return !this.manager?.isRateLimited;
+    }
+
     /**
      * Sets up a connection to the Cloudflare servers, opening a secure
      * tunnel between the internet and your Mac (iMessage server)
      */
     async connect(): Promise<string> {
+        if (this.connectPromise) {
+            this.log.debug("Already connecting to Cloudflare. Waiting for connection to complete.");
+            await this.connectPromise;
+        }
+
+        try {
+            this.connectPromise = this._connect();
+            this.url = await this.connectPromise;
+            this.connectPromise = null;
+            return this.url;
+        } catch (ex: any) {
+            this.connectPromise = null;
+            this.log.info(`Failed to connect to Cloudflare! Error: ${ex.toString()}`);
+            throw ex;
+        }
+    }
+
+    async _connect(): Promise<string> {
         // Create the connection
-        this.manager = new CloudflareManager();
+        if (!this.manager) {
+            this.manager = new CloudflareManager();
+        }
 
         // When we get a new URL, set the URL and update
         this.manager.on("new-url", async url => {
@@ -38,7 +70,6 @@ export class CloudflareService extends Proxy {
             }, 5000);
         });
 
-        // When we get a new URL, set the URL and update
         this.manager.on("needs-restart", async _ => {
             try {
                 await this.restart();
@@ -57,10 +88,14 @@ export class CloudflareService extends Proxy {
      * Disconnect from Cloudflare
      */
     async disconnect(): Promise<void> {
+        if (this.connectPromise) {
+            this.connectPromise = null;
+        }
+
         try {
             if (this.manager) {
                 this.manager.removeAllListeners();
-                this.manager.stop();
+                await this.manager.stop();
             }
         } finally {
             this.url = null;

@@ -1,7 +1,7 @@
 import * as path from "path";
 import { FileSystem } from "@server/fileSystem";
 import { Server } from "@server";
-import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, waitMs } from "@server/helpers/utils";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { ProcessSpawner } from "@server/lib/ProcessSpawner";
 
@@ -22,9 +22,15 @@ export class CloudflareManager extends Loggable {
 
     isRestarting = false;
 
+    isRateLimited = false;
+
     private proxyUrlRegex = /INF \|\s{1,}(https:\/\/[^\s]+)\s{1,}\|/m;
 
     async start(): Promise<string> {
+        if (this.isRateLimited) {
+            throw new Error("Cloudflare is rate limiting your requests. Waiting 1 hour... If you do not wawnt to wait 1 hour, fully restart the server.");
+        }
+
         try {
             this.emit("started");
             return this.connectHandler();
@@ -40,6 +46,10 @@ export class CloudflareManager extends Loggable {
         return new Promise(async (resolve, reject) => {
             try {
                 const port = Server().repo.getConfig("socket_port") as string;
+                if (this.proc && !this.proc?.process?.killed) {
+                    this.log.debug("Cloudflare Tunnel already running. Stopping...");
+                    await this.stop();
+                }
 
                 this.log.debug("Starting Cloudflare Tunnel...");
                 this.proc = new ProcessSpawner({
@@ -54,6 +64,7 @@ export class CloudflareManager extends Loggable {
                     logTag: "CloudflareDaemon",
                     onOutput: (data) => this.handleData(data),
                     restartOnNonZeroExit: true,
+                    restartOnNonZeroExitCondition: (_) => !this.isRateLimited,
                     waitForExit: false,
                     storeOutput: false
                 });
@@ -80,8 +91,8 @@ export class CloudflareManager extends Loggable {
     }
 
     async stop() {
-        if (!this.proc) return;
         this.currentProxyUrl = null;
+        if (!this.proc) return;
         await this.proc.kill();
     }
 
@@ -115,6 +126,15 @@ export class CloudflareManager extends Loggable {
             return "Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date";
         } else if (data.includes('failed to request quick Tunnel: ')) {
             return data.split('failed to request quick Tunnel: ')[1];
+        } else if (data.includes('failed to unmarshal quick Tunnel')) {
+            this.isRateLimited = true;
+            this.stop();
+            waitMs(1000 * 60 * 60).then(() => {
+                this.isRateLimited = false;
+                this.start();
+            });
+    
+            return 'Cloudflare is rate limiting your requests. Waiting 1 hour...';
         }
 
         return null;

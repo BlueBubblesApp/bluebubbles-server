@@ -8,6 +8,8 @@ export class ZrokService extends Proxy {
 
     manager: ZrokManager;
 
+    connectPromise: Promise<string>;
+
     constructor() {
         super({
             name: "Zrok",
@@ -27,13 +29,33 @@ export class ZrokService extends Proxy {
      * tunnel between the internet and your Mac (iMessage server)
      */
     async connect(): Promise<string> {
+        if (this.connectPromise) {
+            this.log.debug("Already connecting to Zrok. Waiting for connection to complete.");
+            await this.connectPromise;
+        }
+
         const token = Server().repo.getConfig("zrok_token") as string;
         if (isEmpty(token)) {
             throw new Error("Auth Token missing! Please perform the Zrok setup in the settings page.");
         }
 
+        try {
+            this.connectPromise = this._connect();
+            this.url = await this.connectPromise;
+            this.connectPromise = null;
+            return this.url;
+        } catch (ex: any) {
+            this.connectPromise = null;
+            this.log.info(`Failed to connect to Zrok! Error: ${ex.toString()}`);
+            throw ex;
+        }
+    }
+
+    async _connect(): Promise<string> {
         // Create the connection
-        this.manager = new ZrokManager();
+        if (!this.manager) {
+            this.manager = new ZrokManager();
+        }
 
         // When we get a new URL, set the URL and update
         this.manager.on("new-url", async url => {
@@ -65,10 +87,14 @@ export class ZrokService extends Proxy {
      * Disconnect from Zrok
      */
     async disconnect(): Promise<void> {
+        if (this.connectPromise) {
+            this.connectPromise = null;
+        }
+
         try {
             if (this.manager) {
                 this.manager.removeAllListeners();
-                this.manager.stop();
+                await this.manager.stop();
             }
         } finally {
             this.url = null;

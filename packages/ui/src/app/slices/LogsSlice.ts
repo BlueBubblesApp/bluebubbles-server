@@ -12,12 +12,14 @@ interface LogsState {
     max: number;
     logs: Array<LogItem>;
     debug: boolean;
+    messagesAppLogs: boolean;
 }
 
 const initialState: LogsState = {
     max: 100,
     logs: [],
-    debug: false
+    debug: false,
+    messagesAppLogs: false
 };
 
 export const LogsSlice = createSlice({
@@ -37,6 +39,9 @@ export const LogsSlice = createSlice({
         setDebug: (state, action: PayloadAction<boolean>) => {
             state.debug = action.payload;
         },
+        setMessagesAppLogs: (state, action: PayloadAction<boolean>) => {
+            state.messagesAppLogs = action.payload;
+        },
         filter: (state, action: PayloadAction<(item: LogItem) => boolean>) => {
             state.logs = state.logs.filter(action.payload);
         },
@@ -51,6 +56,6 @@ export const LogsSlice = createSlice({
 });
 
 // Action creators are generated for each case reducer function
-export const { add, prune, setDebug, clear, filter } = LogsSlice.actions;
+export const { add, prune, setDebug, setMessagesAppLogs, clear, filter } = LogsSlice.actions;
 
 export default LogsSlice.reducer;

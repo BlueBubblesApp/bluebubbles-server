@@ -2,7 +2,7 @@ import { Server } from "@server";
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { isMinBigSur, isMinSonoma } from "@server/env";
+import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
 import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
@@ -14,6 +14,11 @@ export class FindMyInterface {
     }
 
     static async getDevices(): Promise<Array<FindMyDevice> | null> {
+        if (isMinSequoia) {
+            Server().logger.debug('Cannot fetch FindMy devices on macOS Sequoia or later.');
+            return null;
+        }
+
         try {
             const [devices, items] = await Promise.all([
                 FindMyInterface.readDataFile("Devices"),
@@ -21,20 +26,48 @@ export class FindMyInterface {
             ]);
 
             // Return null if neither of the files exist
-            if (!devices && !items) return null;
+            if (devices == null && items == null) return null;
+
+            // Get any items with a group identifier
+            const itemsWithGroup = items.filter(item => item.groupIdentifier);
+            if (itemsWithGroup.length > 0) {
+                try {
+                    const itemGroups = await FindMyInterface.readItemGroups();
+                    if (itemGroups) {
+                        // Create a map of group IDs to group names
+                        const groupMap = itemGroups.reduce((acc, group) => {
+                            acc[group.identifier] = group.name;
+                            return acc;
+                        }, {} as Record<string, string>);
+
+                        // Iterate over the items and add the group name
+                        for (const item of items) {
+                            if (item.groupIdentifier && groupMap[item.groupIdentifier]) {
+                                item.groupName = groupMap[item.groupIdentifier];
+                            }
+                        }
+                    }
+                } catch (ex: any) {
+                    Server().logger.debug('An error occurred while reading FindMy ItemGroups cache file.');
+                    Server().logger.debug(String(ex));
+                }
+            }
 
             // Transform the items to match the same shape as devices
             const transformedItems = (items ?? []).map(transformFindMyItemToDevice);
 
             return [...(devices ?? []), ...transformedItems];
-        } catch {
+        } catch (ex: any) {
+            Server().logger.debug('An error occurred while reading FindMy Device cache files.');
+            Server().logger.debug(String(ex));
             return null;
         }
     }
 
-    static async refreshDevices() {
+    static async refreshDevices(): Promise<Array<FindMyDevice> | null> {
         // Can't use the Private API to refresh devices yet
         await this.refreshLocationsAccessibility();
+        return await this.getDevices();
     }
 
     static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
@@ -77,6 +110,29 @@ export class FindMyInterface {
         await FileSystem.executeAppleScript(hideFindMyFriends());
     }
 
+    static async readItemGroups(): Promise<Array<any>> {
+        const itemGroupsPath = path.join(FileSystem.findMyDir, "ItemGroups.data");
+        if (!fs.existsSync(itemGroupsPath)) return [];
+
+        return new Promise((resolve, reject) => {
+            fs.readFile(itemGroupsPath, { encoding: "utf-8" }, (err, data) => {
+                // Couldn't read the file
+                if (err) return resolve(null);
+
+                try {
+                    const parsedData = JSON.parse(data.toString());
+                    if (Array.isArray(parsedData)) {
+                        return resolve(parsedData);
+                    } else {
+                        reject(new Error("Failed to read FindMy ItemGroups cache file! It is not an array!"));
+                    }
+                } catch {
+                    reject(new Error("Failed to read FindMy ItemGroups cache file! It is not in the correct format!"));
+                }
+            });
+        });
+    }
+
     private static readDataFile<T extends "Devices" | "Items">(
         type: T
     ): Promise<Array<T extends "Devices" ? FindMyDevice : FindMyItem> | null> {
@@ -87,7 +143,12 @@ export class FindMyInterface {
                 if (err) return resolve(null);
 
                 try {
-                    return resolve(JSON.parse(data.toString()));
+                    const parsedData = JSON.parse(data.toString());
+                    if (Array.isArray(parsedData)) {
+                        return resolve(parsedData);
+                    } else {
+                        reject(new Error(`Failed to read FindMy ${type} cache file! It is not an array!`));
+                    }
                 } catch {
                     reject(new Error(`Failed to read FindMy ${type} cache file! It is not in the correct format!`));
                 }

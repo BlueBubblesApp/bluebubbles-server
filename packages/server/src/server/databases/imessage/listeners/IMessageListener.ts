@@ -84,55 +84,46 @@ export class IMessageListener extends Loggable {
     @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', 500)
     async handleChangeEvent(event: FileChangeEvent) {
         await this.processLock.acquire();
-
-        // Check against the last check using the current change timestamp
-        if (event.currentStat.mtimeMs > this.lastCheck) {
-            // Update the last check time.
-            // We'll use the currentStat's mtimeMs - the time it took to poll.
-            this.lastCheck = event.currentStat.mtimeMs;
-
-            // Make sure that the previous stat is not null/0.
-            // If we are trying to pull > 24 hrs worth of data, pull only 24 hrs.
-            // This is to prevent checking too much data at once.
-            let prevTime = event.prevStat ? event.prevStat.mtimeMs : 0;
-            if (prevTime <= 0) {
-                this.log.debug(`Previous time is 0, setting to last check time...`);
-                prevTime = this.lastCheck;
-            } else if (this.lastCheck - prevTime > 86400000) {
-                this.log.debug(`Previous time is > 24 hours, setting to 24 hours ago...`);
-                prevTime = this.lastCheck - 86400000;
+        try {
+            const now = Date.now();
+            let prevTime = this.lastCheck;
+    
+            if (prevTime <= 0 || prevTime > now) {
+                this.log.debug(`Previous time is invalid (${prevTime}), setting to now...`);
+                prevTime = now;
+            } else if (now - prevTime > 86400000) {
+                this.log.debug(`Previous time is > 24 hours ago, setting to 24 hours ago...`);
+                prevTime = now - 86400000;
             }
-
-            // Use the previousStat's mtimeMs - 30 seconds to account for any time drift.
-            // This allows us to fetch everything since the last mtimeMs.
-            await this.poll(new Date(prevTime - 30000));
-
-            // Trim the cache so it doesn't get too big
+    
+            let afterTime = prevTime - 30000;
+            if (afterTime > now) {
+                afterTime = now;
+            }
+            await this.poll(new Date(afterTime));
+            this.lastCheck = now;
+    
             this.cache.trimCaches();
-
             if (this.processLock.nrWaiting() > 0) {
                 await waitMs(100);
             }
-        } else {
-            this.log.debug(`Not processing DB change: ${event.currentStat.mtimeMs} <= ${this.lastCheck}`);
+        } catch (error) {
+            this.log.error(`Error handling change event: ${error}`);
+        } finally {
+            this.processLock.release();
         }
-
-        this.processLock.release();
     }
 
     async poll(after: Date, emitResults = true) {
         for (const poller of this.pollers) {
-            const startMs = new Date().getTime();
             const results = await poller.poll(after);
 
             if (emitResults) {
                 for (const result of results) {
                     this.emit(result.eventType, result.data);
+                    await waitMs(10);
                 }
             }
-
-            const endMs = new Date().getTime();
-            // this.log.debug(`${poller.tag} took ${endMs - startMs}ms`);
         }
     }
 }

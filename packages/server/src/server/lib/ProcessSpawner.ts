@@ -11,6 +11,7 @@ export type ProcessSpawnerConstructorArgs = {
     onExit?: ((code: number) => void) | null;
     logTag?: string | null;
     restartOnNonZeroExit?: boolean;
+    restartOnNonZeroExitCondition?: ((code: number) => boolean) | null;
     storeOutput?: boolean;
     waitForExit?: boolean;
     errorOnStderr?: boolean;
@@ -43,6 +44,8 @@ export class ProcessSpawner extends Loggable {
     process: ChildProcess;
 
     restartOnNonZeroExit: boolean;
+
+    restartOnNonZeroExitCondition: ((code: number) => boolean) | null;
 
     storeOutput: boolean;
 
@@ -92,6 +95,7 @@ export class ProcessSpawner extends Loggable {
         onExit = null,
         logTag = null,
         restartOnNonZeroExit = false,
+        restartOnNonZeroExitCondition = null,
         storeOutput = true,
         waitForExit = true,
         errorOnStderr = false
@@ -99,12 +103,17 @@ export class ProcessSpawner extends Loggable {
         super();
         
         this.command = command;
+        if (this.command.includes(" ")) {
+            this.command = `"${this.command}"`;
+        }
+
         this.args = args;
         this.options = options;
         this.verbose = verbose;
         this.onOutput = onOutput;
         this.onExit = onExit;
         this.restartOnNonZeroExit = restartOnNonZeroExit;
+        this.restartOnNonZeroExitCondition = restartOnNonZeroExitCondition;
         this.storeOutput = storeOutput;
         this.waitForExit = waitForExit;
         this.errorOnStderr = errorOnStderr;
@@ -121,7 +130,7 @@ export class ProcessSpawner extends Loggable {
     async execute(): Promise<ProcessSpawner> {
         return new Promise((resolve: (spawner: ProcessSpawner) => void, reject: (err: ProcessSpawnerError) => void) => {
             try {
-                this.process = this.spawnProcesses();
+                this.process = spawn(this.command, this.quoteArgs(this.args), { ...this.options, shell: true });
                 this.process.stdout.on("data", chunk => this.handleOutput(chunk, "stdout"));
                 this.process.stderr.on("data", chunk => {
                     this.handleOutput(chunk, "stderr");
@@ -174,55 +183,6 @@ export class ProcessSpawner extends Loggable {
         });
     }
 
-    private spawnProcesses() {
-        // If the args contain a pipe character, we need to split the command and args into separate processes.
-        // The separate processes should dynamically pipe the result into the next, returning the last process
-        // as the final result.
-        if (this.args.some(arg => arg.includes("|"))) {
-            // Combine the command and args into a single string
-            const commandStr = `${this.command} ${this.args.join(" ")}`;
-
-            // Split by the pipe character, and trim any whitespace
-            const commands = commandStr.split("|").map(x => x.trim());
-            if (commands.length < 2) {
-                throw new Error(`Invalid pipe command! Input: ${commandStr}`);
-            }
-
-            // Iterate over the commands, executing them and piping the
-            // output to the next process. Then return the last process.
-            let lastProcess: ChildProcess = null;
-            for (let i = 0; i < commands.length; i++) {
-                const command = commands[i].trim();
-
-                // Get the command
-                if (!command) {
-                    throw new Error(`Invalid command! Input: ${command}`);
-                }
-
-                // Pull the first command off the list
-                const commandParts = command.split(" ");
-                const program = commandParts[0];
-                const args = commandParts.slice(1);
-
-                // Spawn the process and pipe the output to the next process
-                const proc = spawn(program, args, {
-                    stdio: [
-                        // If there is a previous process, pipe the output to the next process
-                        (lastProcess) ? lastProcess.stdout : "pipe",
-                        "pipe",
-                        "pipe"
-                    ]
-                });
-
-                lastProcess = proc;
-            }
-
-            return lastProcess;
-        }
-
-        return spawn(this.command, this.args, this.options);
-    }
-
     private handleLog(log: string) {
         if (this.verbose) {
             this.log.debug(log);
@@ -248,7 +208,9 @@ export class ProcessSpawner extends Loggable {
         }
 
         if (code !== 0 && this.restartOnNonZeroExit) {
-            this.execute();
+            if (!this.restartOnNonZeroExitCondition || this.restartOnNonZeroExitCondition(code)) {
+                this.execute();
+            }
         }
     }
 
@@ -258,18 +220,29 @@ export class ProcessSpawner extends Loggable {
         }
     }
 
+    private quoteArgs(args: string[]): string[] {
+        return args.map(arg => {
+            if (arg.includes(" ")) {
+                return `"${arg.replace(/"/g, '\\"')}"`;
+            } else {
+                return arg;
+            }
+        });
+    }
+
     static async executeCommand(
         command: string,
         args: string[] = [],
         options: SpawnOptionsWithoutStdio = {},
-        tag = 'CommandExecutor'
+        tag = 'CommandExecutor',
+        verbose = false
     ): Promise<string> {
         const spawner = new ProcessSpawner({
             command,
             args,
             logTag: tag,
             options,
-            verbose: false,
+            verbose,
             restartOnNonZeroExit: false,
             storeOutput: true,
             waitForExit: true

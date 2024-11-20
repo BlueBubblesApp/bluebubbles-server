@@ -42,6 +42,7 @@ export type MessageResponse = {
     dateDelivered: number | null;
     isFromMe: boolean;
     isDelayed?: boolean;
+    isDelivered?: boolean;
     isAutoReply?: boolean;
     isSystemMessage?: boolean;
     isServiceMessage?: boolean;

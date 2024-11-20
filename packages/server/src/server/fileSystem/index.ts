@@ -722,11 +722,14 @@ export class FileSystem {
 
     static async createLaunchAgent(): Promise<void> {
         const appPath = app.getPath("exe");
-        console.log(appPath);
         const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
     <dict>
+        <key>AssociatedBundleIdentifiers</key>
+        <array>
+            <string>com.BlueBubbles.BlueBubbles-Server</string>
+        </array>
         <key>Label</key>
         <string>com.bluebubbles.server</string>
         <key>Program</key>
@@ -736,25 +739,50 @@ export class FileSystem {
         <key>KeepAlive</key>
         <dict>
 	        <key>SuccessfulExit</key>
-	    <false/>
-	</dict>
+	        <false/>
+            <key>Crashed</key>
+            <true/>
+	    </dict>
     </dict>
 </plist>`;
 
-        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", "com.bluebubbles.server.plist");
-        if (fs.existsSync(filePath)) return;
+        const plistName = "com.bluebubbles.server";
+        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", `${plistName}.plist`);
+        if (!fs.existsSync(filePath)) {
+            fs.writeFileSync(filePath, plist);
+        }
 
-        fs.writeFileSync(filePath, plist);
+        try {
+            // Always disable first, which will never error out.
+            // Makes a clean slate for enabling then bootstrapping
+            await FileSystem.execShellCommand(`launchctl disable gui/${os.userInfo().uid}/${plistName}`);
 
-        await FileSystem.execShellCommand(`launchctl load -w ${filePath}`);
+            // Enable should allow start on boot
+            await FileSystem.execShellCommand(`launchctl enable gui/${os.userInfo().uid}/${plistName}`);
+
+            // Bootstrap should load and start the service
+            await FileSystem.execShellCommand(`launchctl bootstrap gui/${os.userInfo().uid} "${filePath}"`);
+        } catch (ex: any) {
+            Server().log(`Failed to create launch agent: ${ex?.message ?? String(ex)}`, "error");
+        }
     }
 
     static async removeLaunchAgent(): Promise<void> {
-        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", "com.bluebubbles.server.plist");
-        if (!fs.existsSync(filePath)) return;
+        const plistName = "com.bluebubbles.server";
+        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", `${plistName}.plist`);
 
-        await FileSystem.execShellCommand(`launchctl unload -w ${filePath}`);
-        fs.unlinkSync(filePath);
+        // Disable should stop the service from starting on boot
+        try {
+            await FileSystem.execShellCommand(`launchctl disable gui/${os.userInfo().uid}/${plistName}`);
+            await FileSystem.execShellCommand(`launchctl bootout gui/${os.userInfo().uid}/${plistName}`);
+        } catch (ex: any) {
+            Server().log(`Failed to remove launch agent: ${ex?.message ?? String(ex)}`, "error");
+        }
+
+        // The shell command requires the path to exist
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
     }
 
     static async lockMacOs(): Promise<void> {

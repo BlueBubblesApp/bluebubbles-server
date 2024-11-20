@@ -26,7 +26,7 @@ export interface FindMyDevice {
     lostDevice?: unknown;
     lostModeEnabled?: unknown;
     deviceDisplayName?: string;
-    safeLocations?: Array<unknown>;
+    safeLocations?: Array<FindMySafeLocation>;
     name?: string;
     canWipeAfterLock?: unknown;
     isMac?: unknown;
@@ -47,9 +47,17 @@ export interface FindMyDevice {
     crowdSourcedLocation: FindMyLocation;
 
     // Extra properties from FindMyItem
+    identifier?: FindMyItem["identifier"];
+    productIdentifier?: FindMyItem["productIdentifier"];
     role?: FindMyItem["role"];
     serialNumber?: string;
     lostModeMetadata?: FindMyItem["lostModeMetadata"];
+    groupIdentifier?: FindMyItem["groupIdentifier"];
+    isAppleAudioAccessory?: FindMyItem["isAppleAudioAccessory"];
+    capabilities?: FindMyItem["capabilities"];
+
+    // Extra properties from BlueBubbles
+    groupName?: FindMyItem["groupName"];
 }
 
 export interface FindMyItem {
@@ -57,7 +65,7 @@ export interface FindMyItem {
     isFirmwareUpdateMandatory: boolean;
     productType: {
         type: string;
-        productInformation: {
+        productInformation: null | {
             manufacturerName: string;
             modelName: string;
             productIdentifier: number;
@@ -65,7 +73,7 @@ export interface FindMyItem {
             antennaPower: number;
         };
     };
-    safeLocations?: Array<unknown>;
+    safeLocations?: Array<FindMySafeLocation>;
     owner: string;
     batteryStatus: number;
     serialNumber: string;
@@ -80,9 +88,10 @@ export interface FindMyItem {
     address: FindMyAddress;
     location: FindMyLocation;
     productIdentifier: string;
-    isAppleAudioAccessory: false;
+    isAppleAudioAccessory: boolean;
     crowdSourcedLocation: FindMyLocation;
-    groupIdentifier: null;
+    groupIdentifier: string | null;
+    groupName?: string | null;
     role: {
         name: string;
         emoji: string;
@@ -132,4 +141,13 @@ export type FindMyLocationItem = {
     last_updated: number;
     is_locating_in_progress: 0 | 1;
     status: "legacy" | "live" | "shallow";
+};
+
+export type FindMySafeLocation = {
+    type: number;
+    approvalState: number;
+    name: string | null;
+    identifier: string;
+    location: FindMyLocation;
+    address: FindMyAddress;
 };

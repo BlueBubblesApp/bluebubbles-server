@@ -38,6 +38,8 @@ import { ThemeValidator } from "./validators/themeValidator";
 import type { Context, Next } from "koa";
 import { FindMyRouter } from "./routers/findmyRouter";
 import { getLogger } from "@server/lib/logging/Loggable";
+import { WebhookRouter } from "./routers/webhookRouter";
+import { WebhookValidator } from "./validators/webhookValidator";
 
 export class HttpRoutes {
     static version = 1;
@@ -658,6 +660,30 @@ export class HttpRoutes {
                         path: "settings",
                         validators: [SettingsValidator.validateDelete],
                         controller: SettingsRouter.delete
+                    }
+                ]
+            },
+            {
+                name: "Webhooks",
+                middleware: HttpRoutes.protected,
+                prefix: "webhook",
+                routes: [
+                    {
+                        method: HttpMethod.GET,
+                        path: "",
+                        validators: [WebhookValidator.validateGetWebhooks],
+                        controller: WebhookRouter.get
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "",
+                        validators: [WebhookValidator.validateCreateWebhook],
+                        controller: WebhookRouter.create
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":id",
+                        controller: WebhookRouter.delete
                     }
                 ]
             }

@@ -149,6 +149,7 @@ export class MessageSerializer {
             dateCreated: message.dateCreated ? message.dateCreated.getTime() : null,
             dateRead: message.dateRead ? message.dateRead.getTime() : null,
             dateDelivered: message.dateDelivered ? message.dateDelivered.getTime() : null,
+            isDelivered: message.isDelivered,
             isFromMe: message.isFromMe,
             hasDdResults: message.hasDdResults,
             isArchived: message.isArchived,

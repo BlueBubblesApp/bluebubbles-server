@@ -1,3 +1,4 @@
+// Also modify packages/server/src/server/api/http/constants.ts
 export const webhookEventOptions = [
     {
         label: 'All Events',
@@ -58,6 +59,10 @@ export const webhookEventOptions = [
     {
         label: 'New Server URL',
         value: 'new-server'
+    },
+    {
+        label: 'FindMy Location Update',
+        value: 'new-findmy-location'
     },
     {
         label: 'Websocket Hello World',

@@ -7,8 +7,11 @@ import { FindMyInterface } from "@server/api/interfaces/findMyInterface";
 export class FindMyRouter {
     static async refreshDevices(ctx: RouterContext, _: Next) {
         try {
-            await FindMyInterface.refreshDevices();
-            return new Success(ctx, { message: "Successfully refreshed Find My device locations!" }).send();
+            const locations = await FindMyInterface.refreshDevices();
+            return new Success(ctx, {
+                message: "Successfully refreshed Find My device locations!",
+                data: locations
+            }).send();
         } catch (ex: any) {
             throw new ServerError({
                 message: "Failed to refresh Find My device locations!",
