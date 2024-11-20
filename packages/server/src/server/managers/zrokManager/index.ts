@@ -68,7 +68,10 @@ export class ZrokManager extends Loggable {
             this.proc.stderr.on("data", chunk => this.handleData(chunk));
 
             this.on("new-url", url => resolve(url));
-            this.on("error", err => reject(err));
+            this.on("error", async err => {
+                await this.handleError(err);
+                reject(err);
+            });
 
             setTimeout(() => {
                 reject(new Error("Failed to connect to Zrok after 2 minutes..."));
@@ -116,8 +119,16 @@ export class ZrokManager extends Loggable {
         if (isNotEmpty(urlMatches)) this.setProxyUrl(urlMatches[1]);
     }
 
-    handleError(chunk: any) {
+    async handleError(chunk: any) {
         this.emit("error", chunk);
+
+        // Attempt to disable and re-enable the Zrok proxy
+        try {
+            await ZrokManager.disable();
+            await this.start();
+        } catch (ex) {
+            this.log.error(`Failed to restart Zrok after error: ${ex.toString()}`);
+        }
     }
 
     static async getInvite(email: string): Promise<void> {

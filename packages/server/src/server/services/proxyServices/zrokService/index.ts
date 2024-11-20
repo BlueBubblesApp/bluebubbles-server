@@ -79,6 +79,16 @@ export class ZrokService extends Proxy {
             }
         });
 
+        // Handle Zrok proxy issue
+        this.manager.on("error", async error => {
+            try {
+                await this.disconnect();
+                await this.connect();
+            } catch (ex) {
+                this.log.error(`[ZrokService] Failed to restart Zrok! Error: ${ex.message}`);
+            }
+        });
+
         this.url = await this.manager.start();
         return this.url;
     }

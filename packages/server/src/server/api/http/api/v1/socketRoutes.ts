@@ -42,6 +42,7 @@ import { AttachmentSerializer } from "@server/api/serializers/AttachmentSerializ
 import { MacOsInterface } from "@server/api/interfaces/macosInterface";
 import { getLogger } from "@server/lib/logging/Loggable";
 import { ProxyServices } from "@server/databases/server/constants";
+import { ZrokService } from "@server/services/proxyServices/zrokService";
 
 const unknownError = "Unknown Error. Check server logs!";
 const log = getLogger("SocketRoutes");
@@ -154,6 +155,20 @@ export class SocketRoutes {
 
             // Restart the proxy services
             await Server().restartProxyServices();
+
+            // Handle Zrok proxy issue
+            if (onlyAlphaNumeric(params.service).toLowerCase() === onlyAlphaNumeric(ProxyServices.Zrok).toLowerCase()) {
+                const zrokService = new ZrokService();
+                if (zrokService.isConnected()) {
+                    try {
+                        await zrokService.disconnect();
+                        await zrokService.connect();
+                    } catch (error) {
+                        log.error(`[ZrokService] Failed to restart Zrok! Error: ${error.message}`);
+                    }
+                }
+            }
+
             return res;
         });
 
