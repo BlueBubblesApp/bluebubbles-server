@@ -29,7 +29,6 @@ import {
     UpdateService,
     CloudflareService,
     WebhookService,
-    ScheduledMessagesService,
     OauthService,
     ZrokService
 } from "@server/services";
@@ -71,6 +70,7 @@ import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
+import { ServiceManager } from "./lib/ServiceManager";
 
 const findProcess = require("find-process");
 
@@ -171,6 +171,8 @@ class BlueBubblesServer extends EventEmitter {
 
     typingCache: string[];
 
+    serviceManager: ServiceManager;
+
     get hasDiskAccess(): boolean {
         // As long as we've tried to initialize the DB, we know if we do/do not have access.
         const dbInit: boolean | null = this.iMessageRepo?.db?.isInitialized;
@@ -245,6 +247,8 @@ class BlueBubblesServer extends EventEmitter {
         this.region = null;
         this.typingCache = [];
         this.findMyCache = null;
+
+        this.serviceManager = new ServiceManager();
     }
 
     emitToUI(event: string, data: any) {
@@ -497,6 +501,18 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.logger.error(`Failed to start Scheduled Message service! ${ex?.message ?? String(ex)}}`);
         }
+
+        this.serviceManager.registerService("HttpService", this.httpService);
+        this.serviceManager.registerService("PrivateApiService", this.privateApi);
+        this.serviceManager.registerService("FCMService", this.fcm);
+        this.serviceManager.registerService("NetworkService", this.networkChecker);
+        this.serviceManager.registerService("CaffeinateService", this.caffeinate);
+        this.serviceManager.registerService("QueueService", this.queue);
+        this.serviceManager.registerService("UpdateService", this.updater);
+        this.serviceManager.registerService("OutgoingMessageManager", this.messageManager);
+        this.serviceManager.registerService("WebhookService", this.webhookService);
+        this.serviceManager.registerService("ScheduledMessagesService", this.scheduledMessages);
+        this.serviceManager.registerService("OauthService", this.oauthService);
     }
 
     /**
@@ -505,11 +521,10 @@ class BlueBubblesServer extends EventEmitter {
      */
     async startServices(): Promise<void> {
         try {
-            this.logger.info("Starting HTTP service...");
-            this.httpService.initialize();
-            this.httpService.start();
+            this.logger.info("Starting services using ServiceManager...");
+            await this.serviceManager.startServices();
         } catch (ex: any) {
-            this.logger.error(`Failed to start HTTP service! ${ex?.message ?? String(ex)}}`);
+            this.logger.error(`Failed to start services using ServiceManager! ${ex?.message ?? String(ex)}}`);
         }
 
         // Only start the oauth service if the tutorial isn't done
@@ -532,13 +547,6 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.error(`Failed to connect to proxy service! ${ex?.message ?? String(ex)}`);
         }
 
-        try {
-            this.logger.info("Starting Scheduled Messages service...");
-            await this.scheduledMessages.start();
-        } catch (ex: any) {
-            this.logger.error(`Failed to start Scheduled Messages service! ${ex?.message ?? String(ex)}}`);
-        }
-
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         const ftPrivateApiEnabled = this.repo.getConfig("enable_ft_private_api") as boolean;
         if (privateApiEnabled || ftPrivateApiEnabled) {
@@ -550,23 +558,16 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.info("Starting iMessage Database listeners...");
             await this.startChatListeners();
         }
-
-        try {
-            this.logger.info("Starting FCM service...");
-            await this.fcm.start();
-        } catch (ex: any) {
-            this.logger.error(`Failed to start FCM service! ${ex?.message ?? String(ex)}}`);
-        }
     }
 
     async stopServices(): Promise<void> {
         this.isStopping = true;
-        this.logger.info("Stopping services...");
+        this.logger.info("Stopping services using ServiceManager...");
 
         try {
-            FCMService.stop();
+            await this.serviceManager.stopServices();
         } catch (ex: any) {
-            this.logger.info(`Failed to stop FCM service! ${ex?.message ?? ex}`);
+            this.logger.error(`Failed to stop services using ServiceManager! ${ex?.message ?? ex}`);
         }
 
         try {
@@ -577,36 +578,10 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
-            await this.privateApi?.stop();
-        } catch (ex: any) {
-            this.logger.info(`Failed to stop Private API Helper service! ${ex?.message ?? ex}`);
-        }
-
-        try {
             await this.stopProxyServices();
         } catch (ex: any) {
             this.logger.info(`Failed to stop Proxy services! ${ex?.message ?? ex}`);
         }
-
-        try {
-            await this.httpService?.stop();
-        } catch (ex: any) {
-            this.logger.error(`Failed to stop HTTP service! ${ex?.message ?? ex}`);
-        }
-
-        try {
-            await this.oauthService?.stop();
-        } catch (ex: any) {
-            this.logger.error(`Failed to stop OAuth service! ${ex?.message ?? ex}`);
-        }
-
-        try {
-            this.scheduledMessages?.stop();
-        } catch (ex: any) {
-            this.logger.error(`Failed to stop Scheduled Messages service! ${ex?.message ?? ex}`);
-        }
-
-        this.logger.info("Finished stopping services...");
     }
 
     async stopServerComponents() {
