@@ -97,7 +97,7 @@ export class ZrokManager extends Loggable {
 
     async handleData(chunk: any) {
         const data: string = chunk.toString();
-        if (data.includes("dial tcp: lookup api.zrok.io")) {
+        if (data.includes("dial tcp: lookup api-v1.zrok.io")) {
             this.handleError("Failed to connect to Zrok's servers! Please make sure you're connected to the internet.");
             return;
         } else if (data.includes("getShareDetailNotFound")) {
@@ -127,7 +127,7 @@ export class ZrokManager extends Loggable {
             logger.info(`Dispatching Zrok invite to ${email}...`);
 
             // Use axios to get the invite with the following spec
-            await axios.post("https://api.zrok.io/api/v1/invite", JSON.stringify({ email }), {
+            await axios.post("https://api-v1.zrok.io/api/v1/invite", JSON.stringify({ email }), {
                 headers: {
                     "Content-Type": "application/zrok.v1+json",
                     Accept: "application/zrok.v1+json",
