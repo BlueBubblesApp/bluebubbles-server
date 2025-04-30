@@ -175,7 +175,7 @@ export class ZrokManager extends Loggable {
 
         logger.info(`Looking for existing reserved Zrok share...`);
         const existingShare = await ZrokManager.getExistingReservedShareToken(reservedToken);
-        const existingToken = existingShare?.token;
+        const existingToken = existingShare?.shareToken;
         const existingIsReserved = existingShare?.reserved;
 
         if (existingShare) {
@@ -299,7 +299,7 @@ export class ZrokManager extends Loggable {
                 s.backendProxyEndpoint === endpoint &&
                 s.reserved === true &&
                 // If a name is provided, make sure it matches
-                (isEmpty(name) || s.token === name)
+                (isEmpty(name) || s.shareToken === name)
         );
 
         return reserved;
