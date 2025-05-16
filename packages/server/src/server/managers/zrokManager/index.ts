@@ -97,7 +97,7 @@ export class ZrokManager extends Loggable {
 
     async handleData(chunk: any) {
         const data: string = chunk.toString();
-        if (data.includes("dial tcp: lookup api.zrok.io")) {
+        if (data.includes("dial tcp: lookup api-v1.zrok.io")) {
             this.handleError("Failed to connect to Zrok's servers! Please make sure you're connected to the internet.");
             return;
         } else if (data.includes("getShareDetailNotFound")) {
@@ -127,7 +127,7 @@ export class ZrokManager extends Loggable {
             logger.info(`Dispatching Zrok invite to ${email}...`);
 
             // Use axios to get the invite with the following spec
-            await axios.post("https://api.zrok.io/api/v1/invite", JSON.stringify({ email }), {
+            await axios.post("https://api-v1.zrok.io/api/v1/invite", JSON.stringify({ email }), {
                 headers: {
                     "Content-Type": "application/zrok.v1+json",
                     Accept: "application/zrok.v1+json",
@@ -175,7 +175,7 @@ export class ZrokManager extends Loggable {
 
         logger.info(`Looking for existing reserved Zrok share...`);
         const existingShare = await ZrokManager.getExistingReservedShareToken(reservedToken);
-        const existingToken = existingShare?.token;
+        const existingToken = existingShare?.shareToken;
         const existingIsReserved = existingShare?.reserved;
 
         if (existingShare) {
@@ -299,7 +299,7 @@ export class ZrokManager extends Loggable {
                 s.backendProxyEndpoint === endpoint &&
                 s.reserved === true &&
                 // If a name is provided, make sure it matches
-                (isEmpty(name) || s.token === name)
+                (isEmpty(name) || s.shareToken === name)
         );
 
         return reserved;
