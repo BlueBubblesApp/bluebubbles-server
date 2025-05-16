@@ -1,6 +1,6 @@
 {
     "name": "@bluebubbles/server",
-    "version": "1.9.8",
+    "version": "1.9.9",
     "main": "./dist/main.js",
     "license": "Apache-2.0",
     "author": {
