@@ -453,7 +453,11 @@ export class FCMService extends Loggable {
 
             // Build out the notification message
             const payload: admin.messaging.MulticastMessage = {
-                data,
+                notification: {
+                    title: "New Message from BlueBubbles",
+                    body: "You have a new message."
+                },
+                data, // Retain existing data
                 tokens: devices,
                 android: {
                     priority,
@@ -466,21 +470,21 @@ export class FCMService extends Loggable {
             this.log.debug(`Sending FCM notification (Priority: ${priority}) to ${devices.length} device(s)`);
             const response = await FCMService.getApp().messaging().sendEachForMulticast(payload);
             if (response.failureCount > 0) {
-                response.responses.forEach(resp => {
+                response.responses.forEach((resp, index) => { // Added index here
                     if (!resp.success && resp.error) {
-                        const code = resp.error?.code;
-                        const msg = resp.error?.message;
-                        if (code === "messaging/payload-size-limit-exceeded") {
-                            // Manually handle the size limit error
-                            this.log.warn("Could not send Firebase Notification due to payload exceeding size limits!");
-                            this.log.debug(`Failed notification Payload: ${JSON.stringify(data)}`);
-                        } else if (code !== "messaging/registration-token-not-registered") {
-                            // Ignore token not registered errors
-                            this.log.error(`Firebase returned the following error (Code: ${code}): ${msg}`);
+                        const failedToken = devices[index]; // Get the token using the index
+                        this.log.error(`Failed to send notification to token: ${failedToken}`);
+                        this.log.error(`Firebase error details: ${JSON.stringify(resp.error, null, 2)}`);
 
-                            if (resp.error?.stack) {
-                                this.log.debug(`Firebase Stacktrace: ${resp.error.stack}`);
-                            }
+                        // Keep specific handling for payload size limit if needed, but ensure full error is logged.
+                        if (resp.error.code === "messaging/payload-size-limit-exceeded") {
+                            this.log.warn("Firebase Notification payload exceeded size limits!");
+                            this.log.debug(`Failed notification Payload: ${JSON.stringify(data)}`);
+                        }
+                        // You might still want to avoid spamming logs for 'registration-token-not-registered'
+                        // but ensure it's clear which token it was.
+                        if (resp.error.code === "messaging/registration-token-not-registered") {
+                            this.log.info(`Token not registered: ${failedToken}`);
                         }
                     }
                 });
@@ -488,7 +492,11 @@ export class FCMService extends Loggable {
 
             return response;
         } catch (ex: any) {
-            this.log.debug(`Failed to send notification! ${ex.message}`);
+            this.log.error(`Failed to send notification! Error: ${ex.message}`);
+            this.log.debug(`Stacktrace: ${ex.stack}`); // Add stacktrace if available
+            // Log the data and devices if it's useful for debugging
+            this.log.debug(`Notification data: ${JSON.stringify(data, null, 2)}`);
+            this.log.debug(`Target devices: ${JSON.stringify(devices, null, 2)}`);
         }
 
         return { responses: [], successCount: 0, failureCount: 0 };
