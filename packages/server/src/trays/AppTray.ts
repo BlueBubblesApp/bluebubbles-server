@@ -37,7 +37,12 @@ export class AppTray extends Tray {
     }
 
     async build(): Promise<void> {
-        let iconPath = path.join(FileSystem.resources, "macos", "icons", "tray", "iconTemplate.png");
+        let iconPath = path.join(FileSystem.resources, "macos", "icons", "tray", "icon-darkTemplate.png");
+        if (nativeTheme.shouldUseDarkColors) {
+            // When in dark mode, we use the white icon
+            iconPath = path.join(FileSystem.resources, "macos", "icons", "tray", "icon-lightTemplate.png");
+        }
+
         let trayIcon = nativeImage.createFromPath(iconPath);
         trayIcon.setTemplateImage(true);
 
