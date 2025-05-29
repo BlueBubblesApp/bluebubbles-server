@@ -473,13 +473,30 @@ export class OauthService extends Loggable {
         this.log.info(`Resuming setup...`);
     }
 
+    async enableBillingManual(url: string) {
+        this.log.info(
+            `You must enable billing for your Google Cloud Project before creating the Firestore database! ` +
+                `You will need to verify your identity and add a payment method. ` +
+                `Luckily, Cloud Messaging (FCM) is free to use, and BlueBubbles' database usage is negligible.` +
+                `As such, you will not be charged for using this service. ` +
+                `We recommend using a service like privacy.com to create a virtual card for this purpose. ` +
+                `In 15 seconds, a window will open where you can enable billing. ` +
+                `Once billing is enabled, you can close the window and setup will continue.`
+        );
+
+        await waitMs(15000);
+        await this.openWindow(url);
+        this.log.info(`Resuming setup in 3 minutes. Please wait patiently while we wait for billing to propagate...`);
+        await waitMs(180000);
+    }
+
     /**
      * Creates the default database for the Google Cloud Project
      *
      * @param projectId The project ID
      * @throws An HTTP error if the error code is not 409
      */
-    async createDatabase(projectId: string) {
+    async createDatabase(projectId: string, attempt: number = 1) {
         const dbName = "(default)";
 
         try {
@@ -497,7 +514,20 @@ export class OauthService extends Loggable {
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
                 this.log.info(`Firestore already exists!`);
+            } else if (ex.response?.data?.error?.code === 403 && (ex.response?.data?.error?.message ?? '').includes('requires billing')) {
+                if (attempt == 1) {
+                    await this.enableBillingManual(`https://console.developers.google.com/billing/enable?project=${projectId}`);
+
+                    // Try again after enabling billing
+                    await this.createDatabase(projectId, 2);
+                } else {
+                    throw new Error(`Failed to create Firestore database: ${this.getErrorMessage(ex)}`);
+                }
             } else {
+                if (ex.response?.data?.error) {
+                    this.log.debug(`Failed to create Firestore database: ${this.getErrorMessage(ex)}`);
+                }
+
                 throw ex;
             }
         }
@@ -529,6 +559,10 @@ export class OauthService extends Loggable {
             if (ex.response?.data?.error?.code === 409) {
                 this.log.info(`Android Configuration already exists!`);
             } else {
+                if (ex.response?.data?.error) {
+                    this.log.debug(`Failed to create Android Configuration: ${this.getErrorMessage(ex)}`);
+                }
+
                 throw ex;
             }
         }
@@ -851,6 +885,16 @@ export class OauthService extends Loggable {
                 resolve(null);
             }
         });
+    }
+
+    private getErrorMessage(ex: any): string {
+        if (ex?.response?.data?.error?.code && ex?.response?.data?.error?.message) {
+            return `[${ex.response.data.error.code}] ${ex.response.data.error.message}`;
+        } else if (ex?.message) {
+            return ex.message;
+        }
+
+        return "An unknown error occurred";
     }
 
     /**
