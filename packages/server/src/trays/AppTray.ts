@@ -3,7 +3,7 @@ import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { Tray } from ".";
 import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
-import { Menu, nativeTheme, Tray as ElectronTray, app } from "electron";
+import { Menu, nativeTheme, Tray as ElectronTray, app, nativeImage } from "electron";
 import { AppWindow } from "@windows/AppWindow";
 import path from "path";
 
@@ -37,18 +37,18 @@ export class AppTray extends Tray {
     }
 
     async build(): Promise<void> {
-        let iconPath = path.join(FileSystem.resources, "macos", "icons", "tray-icon-dark.png");
-        if (!nativeTheme.shouldUseDarkColors)
-            iconPath = path.join(FileSystem.resources, "macos", "icons", "tray-icon-light.png");
+        let iconPath = path.join(FileSystem.resources, "macos", "icons", "tray", "iconTemplate.png");
+        let trayIcon = nativeImage.createFromPath(iconPath);
+        trayIcon.setTemplateImage(true);
 
         // If the this.instance is already created, just change the icon color
         if (this.instance) {
-            this.instance.setImage(iconPath);
+            this.instance.setImage(trayIcon);
             return;
         }
 
         try {
-            this.instance = new ElectronTray(iconPath);
+            this.instance = new ElectronTray(trayIcon);
             this.instance.setToolTip("BlueBubbles");
             this.instance.setContextMenu(this.buildMenu());
 
