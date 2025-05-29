@@ -194,10 +194,10 @@ export class OauthService extends Loggable {
         } catch (ex: any) {
             this.log.error(`Failed to create project: ${ex?.message}`);
             if (ex?.response?.data?.error) {
-                this.log.debug(`(${ex.response.data.error.code}) ${ex.response.data.error.message}`);
+                this.log.info(`Error: (${ex.response.data.error.code}) ${ex.response.data?.error?.message ?? 'Unknown error'}`);
             }
 
-            this.log.debug(`Use the Google Login button and try again. If the issue persists, please contact support.`);
+            this.log.info(`Use the Google Login button and try again. If the issue persists, please contact support.`);
             this.setStatus(ProgressStatus.FAILED);
         } finally {
             // Shutdown the service
@@ -451,11 +451,7 @@ export class OauthService extends Loggable {
                 await this.addFirebaseManual();
             } else {
                 this.log.debug(`Failed to add Firebase to project: Data: ${getObjectAsString(ex.response?.data)}`);
-                throw new Error(
-                    `Failed to add Firebase to project: ${getObjectAsString(
-                        ex.response?.data?.error?.message ?? ex.message
-                    )}}`
-                );
+                throw ex;
             }
         }
     }
@@ -544,12 +540,12 @@ export class OauthService extends Loggable {
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
             const data = { displayName: this.projectName, packageName: this.packageName };
             const createRes = await this.tryUntilNoError("POST", url, data, 3, 10000);
-            if (!createRes?.data?.name) {
+            const operationName = createRes?.name;
+            if (!operationName) {
                 throw new Error(`Failed to provision Android App: ${getObjectAsString(createRes)}`);
             }
 
             // Wait for the app to be created
-            const operationName = createRes.data.name;
             const operationUrl = `https://firebase.googleapis.com/v1beta1/${operationName}`;
             const operationResult = await this.waitForData("GET", operationUrl, null, "done", 60, 5000);
             if (operationResult.error) {
@@ -559,10 +555,6 @@ export class OauthService extends Loggable {
             if (ex.response?.data?.error?.code === 409) {
                 this.log.info(`Android Configuration already exists!`);
             } else {
-                if (ex.response?.data?.error) {
-                    this.log.debug(`Failed to create Android Configuration: ${this.getErrorMessage(ex)}`);
-                }
-
                 throw ex;
             }
         }
@@ -725,8 +717,6 @@ export class OauthService extends Loggable {
                 const res = await this.sendRequest(method, url, data);
                 return res.data;
             } catch (ex: any) {
-                // For duplicates, just throw the error so it can be handled properly.
-                if (ex.response?.data?.error?.code === 409) throw ex;
                 attempts += 1;
                 if (attempts > maxAttempts) throw ex;
                 await waitMs(waitTime);
