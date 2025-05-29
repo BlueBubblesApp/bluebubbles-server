@@ -71,6 +71,7 @@ import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
+import { ZrokManager } from "./managers/zrokManager";
 
 const findProcess = require("find-process");
 
@@ -1010,6 +1011,13 @@ class BlueBubblesServer extends EventEmitter {
 
         // If the zrok proxy config has changed, we need to restart the zrok service
         if (prevConfig.zrok_reserved_name !== nextConfig.zrok_reserved_name && !proxiesRestarted) {
+            // If we previously had a reserved name and it changes from a non-empty value to an empty value,
+            // we need to release the previous reserved token
+            if (isNotEmpty(prevConfig.zrok_reserved_name as string) && isEmpty(nextConfig.zrok_reserved_name as string)) {
+                this.logger.debug("Releasing previous Zrok reserved token due to the reserved name being cleared");
+                await ZrokManager.safeRelease(prevConfig.zrok_reserved_token as string, { clearToken: true });
+            }
+
             await this.restartProxyServices();
             proxiesRestarted = true;
         }
