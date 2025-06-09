@@ -25,7 +25,7 @@ if (fs.existsSync(FileSystem.cfgFile)) {
     cfg = yaml.load(fs.readFileSync(FileSystem.cfgFile, "utf8"));
 }
 
-// Parse the CLI args and marge with config args
+// Parse the CLI args and merge with config args
 const args = ParseArguments(process.argv);
 const parsedArgs: Record<string, any> = { ...cfg, ...args };
 let isHandlingExit = false;

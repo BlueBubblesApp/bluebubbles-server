@@ -21,7 +21,7 @@ export const AutoLockMacField = ({ helpText }: AutoLockMacFieldProps): JSX.Eleme
             <FormHelperText>
                 {helpText ?? (
                     <Text>
-                        When enabled, you mac will be automatically locked when the BlueBubbles Server detects that it has just booted up.
+                        When enabled, your Mac will be automatically locked when the BlueBubbles Server detects that it has just booted up.
                         The criteria for this is that the uptime for your Mac is less than 5 minutes.
                     </Text>
                 )}
