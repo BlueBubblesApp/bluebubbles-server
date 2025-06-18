@@ -340,8 +340,13 @@ class BlueBubblesServer extends EventEmitter {
                 continue;
             }
 
+            const shouldLog = !normalizedKey.includes('token') && !normalizedKey.includes('key') &&
+                              !normalizedKey.includes('password') && !normalizedKey.includes('secret');
+            if (shouldLog) {
+                this.logger.info(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`);
+            }
+
             // Set the value
-            this.logger.info(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`);
             this.repo.setConfig(normalizedKey, value, persist);
         }
     }
