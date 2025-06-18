@@ -477,7 +477,8 @@ export class OauthService extends Loggable {
                 `As such, you will not be charged for using this service. ` +
                 `We recommend using a service like privacy.com to create a virtual card for this purpose. ` +
                 `In 15 seconds, a window will open where you can enable billing. ` +
-                `Once billing is enabled, you can close the window and setup will continue.`
+                `Once billing is enabled, you can close the window and setup will continue. ` +
+                `You can downgrade your billing plan after setup, if you wish, but it shouldn't be required.`
         );
 
         await waitMs(15000);
