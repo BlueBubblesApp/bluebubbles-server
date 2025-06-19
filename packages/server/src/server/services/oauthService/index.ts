@@ -220,7 +220,7 @@ export class OauthService extends Loggable {
                 try {
                     const avatar = await this.loadContactAvatar(contact);
 
-                    await ContactInterface.createContact({
+                    await ContactInterface.createOrUpdateContact({
                         firstName: contact.names[0].givenName,
                         lastName: contact.names[0].familyName,
                         displayName: contact.names[0].displayName,

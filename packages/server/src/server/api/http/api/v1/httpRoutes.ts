@@ -40,6 +40,7 @@ import { FindMyRouter } from "./routers/findmyRouter";
 import { getLogger } from "@server/lib/logging/Loggable";
 import { WebhookRouter } from "./routers/webhookRouter";
 import { WebhookValidator } from "./validators/webhookValidator";
+import { ContactValidator } from "./validators/contactValidator";
 
 export class HttpRoutes {
     static version = 1;
@@ -614,6 +615,35 @@ export class HttpRoutes {
                         controller: ContactRouter.create,
                         // Increase the timeout to 5 minutes for requests in case there are avatars
                         requestTimeoutMs: 5 * 60 * 1000
+                    },
+                    {
+                        method: HttpMethod.PUT,
+                        path: "",
+                        validators: [ContactValidator.validateUpdate],
+                        controller: ContactRouter.update
+                    },
+                    {
+                        method: HttpMethod.PUT,
+                        path: ":id",
+                        validators: [ContactValidator.validateUpdate],
+                        controller: ContactRouter.update
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: "external/:externalId",
+                        controller: ContactRouter.findByExternalId
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: ":id",
+                        validators: [ContactValidator.validateDelete],
+                        controller: ContactRouter.delete
+                    },
+                    {
+                        method: HttpMethod.DELETE,
+                        path: "",
+                        validators: [ContactValidator.validateDelete],
+                        controller: ContactRouter.delete
                     },
                     {
                         method: HttpMethod.POST,

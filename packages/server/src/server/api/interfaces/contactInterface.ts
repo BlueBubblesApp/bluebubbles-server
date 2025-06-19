@@ -9,6 +9,7 @@ import { ContactsLib } from "../lib/ContactsLib";
 
 type GenericContactParams = {
     contactId?: number;
+    externalId?: string;
     contact?: Contact;
 };
 
@@ -89,7 +90,8 @@ export class ContactInterface {
                 birthday: contact?.birthday,
                 avatar: isNotEmpty(avatar) ? base64.bytesToBase64(avatar) : "",
                 sourceType,
-                id: contact?.identifier ?? contact?.id
+                id: contact?.identifier ?? contact?.id,
+                externalId: contact?.externalId
             };
         });
     }
@@ -258,8 +260,9 @@ export class ContactInterface {
      * @param emails A list of emails to add to the contact
      * @returns The contact object
      */
-    static async createContact({
+    static async createOrUpdateContact({
         id,
+        externalId,
         firstName = "",
         lastName = "",
         displayName = "",
@@ -269,6 +272,7 @@ export class ContactInterface {
         updateEntry = false
     }: {
         id?: number;
+        externalId?: string;
         firstName?: string;
         lastName?: string;
         displayName?: string;
@@ -281,10 +285,10 @@ export class ContactInterface {
         let contact = null;
 
         // Throw an error if we don't have enough information to update an entry
-        if (updateEntry && isEmpty(id) && isEmpty(firstName) && isEmpty(lastName) && isEmpty(displayName)) {
+        if (updateEntry && isEmpty(id) && isEmpty(externalId) && isEmpty(firstName) && isEmpty(lastName) && isEmpty(displayName)) {
             throw new Error(
                 "To update an existing contact, you must provide one of the following: " +
-                    "id, firstName, lastName, displayName"
+                    "id, externalId, firstName, lastName, displayName"
             );
         }
 
@@ -296,6 +300,8 @@ export class ContactInterface {
         let existingContacts: Contact[] = [];
         if (id) {
             existingContacts = await repo.find({ where: { id }, relations: { addresses: true } });
+        } else if (externalId) {
+            existingContacts = await repo.find({ where: { externalId }, relations: { addresses: true } });
         } else if (firstName || lastName || displayName) {
             const where: FindOptionsWhere<Contact> = {};
             if (firstName) where.firstName = firstName;
@@ -319,7 +325,7 @@ export class ContactInterface {
         let isNew = false;
         if (!contact) {
             // If the contact doesn't exists, create it
-            contact = repo.create({ firstName, lastName, avatar, displayName });
+            contact = repo.create({ externalId, firstName, lastName, avatar, displayName });
             await repo.save(contact);
 
             isNew = true;
@@ -359,6 +365,11 @@ export class ContactInterface {
             updated = true;
         }
 
+        if (externalId !== undefined && externalId !== contact.externalId) {
+            contact.externalId = externalId;
+            updated = true;
+        }
+
         if (updated) {
             await repo.save(contact);
         }
@@ -376,20 +387,35 @@ export class ContactInterface {
      */
     static async findDbContact({
         contactId,
+        externalId,
         contact,
         throwError = true
-    }: GenericContactParams & { throwError?: boolean }): Promise<Contact | null> {
-        if (!contactId && !contact) {
-            throw new Error("A `contactId` or `contact` must be provided to find a Contact!");
+    }: GenericContactParams & { externalId?: string; throwError?: boolean }): Promise<Contact | null> {
+        if (!contactId && !contact && !externalId) {
+            throw new Error("A `contactId`, `externalId`, or `contact` must be provided to find a Contact!");
         }
 
-        const foundContact =
-            contact ??
-            (await Server()
-                .repo.contacts()
-                .findOne({ where: { id: contactId }, relations: { addresses: true } }));
+        let foundContact = contact;
+        if (!foundContact) {
+            if (contactId) {
+                foundContact = await Server()
+                    .repo.contacts()
+                    .findOne({ where: { id: contactId }, relations: { addresses: true } });
+            } else if (externalId) {
+                foundContact = await Server()
+                    .repo.contacts()
+                    .findOne({ where: { externalId }, relations: { addresses: true } });
+            }
+        }
+        
         if (!foundContact && throwError) {
-            throw new Error(`No contact found with the ID: ${contactId}`);
+            if (contactId) {
+                throw new Error(`No contact found with the ID: ${contactId}`);
+            } else if (externalId) {
+                throw new Error(`No contact found with the externalId: ${externalId}`);
+            } else {
+                throw new Error("Contact not found");
+            }
         }
 
         return foundContact;
@@ -430,10 +456,11 @@ export class ContactInterface {
      * Deletes a contact from the local DB
      *
      * @param contactId A number representing the contact ID
+     * @param externalId A string representing the external identifier for the contact
      * @param contact The actual contact object
      */
-    static async deleteContact({ contactId, contact }: GenericContactParams): Promise<void> {
-        const contactToDelete = await ContactInterface.findDbContact({ contactId, contact });
+    static async deleteContact({ contactId, externalId, contact }: GenericContactParams): Promise<void> {
+        const contactToDelete = await ContactInterface.findDbContact({ contactId, externalId, contact });
         await Server().repo.contacts().delete(contactToDelete.id);
     }
 
@@ -506,7 +533,7 @@ export class ContactInterface {
             }
 
             try {
-                const newContact = await ContactInterface.createContact(params);
+                const newContact = await ContactInterface.createOrUpdateContact(params);
                 output.push(newContact);
             } catch (ex: any) {
                 Server().log(`Error importing contact: ${ex?.message ?? String(ex)}`);
@@ -522,5 +549,158 @@ export class ContactInterface {
     static async deleteAllContacts(): Promise<void> {
         const repo = Server().repo.contacts();
         await repo.clear();
+    }
+    
+    /**
+     * Checks if an object has the required fields to be considered a contact
+     * 
+     * @param data The object to check
+     * @returns True if the object is a valid contact object
+     */
+    static isAddressObject(data: any): boolean {
+        return (
+            data &&
+            typeof data === "object" &&
+            !Array.isArray(data) &&
+            (Object.keys(data).includes("firstName") || Object.keys(data).includes("displayName"))
+        );
+    }
+    
+    /**
+     * Creates multiple contacts from an array of contact data
+     * 
+     * @param contactData Array of contact data to create
+     * @returns Object containing created contacts and any errors
+     */
+    static async batchCreateContacts(contactData: any[]): Promise<{ contacts: Contact[], errors: any[] }> {
+        const contacts: Contact[] = [];
+        const errors: any[] = [];
+        
+        for (const item of contactData) {
+            if (!ContactInterface.isAddressObject(item)) {
+                errors.push({
+                    entry: item,
+                    error: "Input address object does not contain the required information!"
+                });
+                continue;
+            }
+
+            try {
+                contacts.push(
+                    await ContactInterface.createOrUpdateContact({
+                        firstName: item.firstName ?? '',
+                        lastName: item?.lastName ?? '',
+                        displayName: item?.displayName ?? '',
+                        phoneNumbers: item?.phoneNumbers ?? [],
+                        emails: item?.emails ?? [],
+                        avatar: item?.avatar ?? null,
+                        updateEntry: true
+                    })
+                );
+            } catch (ex: any) {
+                console.log(ex);
+                errors.push({
+                    entry: item,
+                    error: ex?.message ?? String(ex)
+                });
+            }
+        }
+        
+        return { contacts, errors };
+    }
+    
+    /**
+     * Updates multiple contacts from an array of contact data
+     * 
+     * @param contactData Array of contact data to update
+     * @returns Object containing updated contacts and any errors
+     */
+    static async batchUpdateContacts(contactData: any[]): Promise<{ contacts: Contact[], errors: any[] }> {
+        const updatedContacts: Contact[] = [];
+        const errors: any[] = [];
+        
+        for (const item of contactData) {
+            try {
+                // Find the contact by ID or externalId
+                let contact: Contact | null = null;
+                
+                if (item.id) {
+                    contact = await ContactInterface.findDbContact({ contactId: item.id, throwError: false });
+                } else if (item.externalId) {
+                    contact = await ContactInterface.findDbContact({ externalId: item.externalId, throwError: false });
+                }
+                
+                if (!contact) {
+                    errors.push({
+                        entry: item,
+                        error: item.id 
+                            ? `Contact not found with ID: ${item.id}` 
+                            : `Contact not found with externalId: ${item.externalId}`
+                    });
+                    continue;
+                }
+                
+                // Update the contact with provided fields
+                const updatedContact = await ContactInterface.createOrUpdateContact({
+                    id: contact.id,
+                    externalId: item.externalId !== undefined ? item.externalId : contact.externalId,
+                    firstName: item.firstName !== undefined ? item.firstName : contact.firstName,
+                    lastName: item.lastName !== undefined ? item.lastName : contact.lastName,
+                    displayName: item.displayName !== undefined ? item.displayName : contact.displayName,
+                    phoneNumbers: item.phoneNumbers || [],
+                    emails: item.emails || [],
+                    avatar: item.avatar !== undefined ? item.avatar : contact.avatar,
+                    updateEntry: true
+                });
+                
+                updatedContacts.push(updatedContact);
+            } catch (ex: any) {
+                console.log(ex);
+                errors.push({
+                    entry: item,
+                    error: ex?.message ?? String(ex)
+                });
+            }
+        }
+        
+        return { contacts: updatedContacts, errors };
+    }
+    
+    /**
+     * Deletes multiple contacts by ID or externalId
+     * 
+     * @param contactData Array of contact deletion data (containing id or externalId)
+     * @returns Object containing deleted IDs and any errors
+     */
+    static async batchDeleteContacts(contactData: any[]): Promise<{ deletedIds: any[], errors: any[] }> {
+        const deletedIds = [];
+        const errors = [];
+        
+        for (const item of contactData) {
+            try {
+                if (!item.id && !item.externalId) {
+                    errors.push({
+                        entry: item,
+                        error: "Each contact deletion must include either an 'id' or 'externalId' field!"
+                    });
+                    continue;
+                }
+                
+                if (item.id) {
+                    await ContactInterface.deleteContact({ contactId: item.id });
+                    deletedIds.push({ id: item.id });
+                } else if (item.externalId) {
+                    await ContactInterface.deleteContact({ externalId: item.externalId });
+                    deletedIds.push({ externalId: item.externalId });
+                }
+            } catch (ex: any) {
+                errors.push({
+                    entry: item,
+                    error: ex?.message ?? String(ex)
+                });
+            }
+        }
+        
+        return { deletedIds, errors };
     }
 }

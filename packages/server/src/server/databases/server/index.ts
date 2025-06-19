@@ -8,6 +8,7 @@ import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, Schedul
 import { DEFAULT_DB_ITEMS } from "./constants";
 import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
 import { ScheduledMessageTable1665083072000 } from "./migrations/1665083072000-ScheduledMessageTable";
+import { AddExternalIdToContacts1750299580000 } from "./migrations/1750299580000-AddExternalIdToContacts";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
@@ -44,7 +45,11 @@ export class ServerRepository extends EventEmitter {
             type: "better-sqlite3",
             database: dbPath,
             entities: [Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, ScheduledMessage],
-            migrations: [ContactTables1654432080899, ScheduledMessageTable1665083072000],
+            migrations: [
+                ContactTables1654432080899,
+                ScheduledMessageTable1665083072000,
+                AddExternalIdToContacts1750299580000
+            ],
             migrationsRun: !shouldSync,
             migrationsTableName: "migrations",
             synchronize: shouldSync
@@ -197,7 +202,7 @@ export class ServerRepository extends EventEmitter {
 
     public async getContacts(withAvatars = false): Promise<Array<Contact>> {
         const repo = this.contacts();
-        const fields: (keyof Contact)[] = ["firstName", "lastName", "displayName", "id"];
+        const fields: (keyof Contact)[] = ["firstName", "lastName", "displayName", "id", "externalId"];
         if (withAvatars) {
             fields.push("avatar");
         }
