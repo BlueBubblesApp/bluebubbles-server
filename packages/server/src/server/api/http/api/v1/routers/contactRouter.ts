@@ -131,4 +131,34 @@ export class ContactRouter {
             throw new BadRequest({ error: ex?.message ?? String(ex) });
         }
     }
+
+    static async importVcf(ctx: RouterContext, _: Next) {
+        try {
+            const { files } = ctx.request;
+            const vcfFile = files?.vcf as any;
+            
+            if (!vcfFile) {
+                throw new BadRequest({ error: 'VCF file is required!' });
+            }
+            
+            // The file is already stored in a temp location (vcfFile.path)
+            // We can use it directly with the ContactInterface
+            const contacts = await ContactInterface.importFromVcf(vcfFile.path);
+            
+            // Map the imported contacts and prepare response
+            const mappedContacts = ContactInterface.mapContacts(contacts, "db");
+            const output: any = { 
+                message: `${contacts.length} contacts imported successfully`,
+                data: mappedContacts
+            };
+            
+            if (contacts.length === 0) {
+                output.message = "No contacts were imported. The VCF file may be empty or invalid.";
+            }
+            
+            return new Success(ctx, output).send();
+        } catch (ex: any) {
+            throw new BadRequest({ error: ex?.message ?? String(ex) });
+        }
+    }
 }

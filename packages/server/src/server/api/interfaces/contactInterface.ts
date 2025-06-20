@@ -494,7 +494,16 @@ export class ContactInterface {
     static async importFromVcf(filePath: string): Promise<any[]> {
         Server().log(`Importing VCF from path: ${filePath}`, "debug");
 
-        const content = fs.readFileSync(filePath, { encoding: "utf-8" }).toString() ?? "";
+        let content = fs.readFileSync(filePath, { encoding: "utf-8" }).toString() ?? "";
+
+        // If the file doesn't use \r\n, we need to convert it to use \r\n
+        // so that the vcf package can parse it correctly.
+        // See: https://codeberg.org/jhermsmeier/node-vcf/src/commit/b1024165d874b199b61ec07bbd79291cf922d959/lib/vcard.js#L263
+        if (!content.includes("\r\n")) {
+            const lines = content.split("\n");
+            content = lines.map(line => line.trim()).join("\r\n");
+        }
+
         const parsed = vcf.parse(content);
         const output: Contact[] = [];
         for (const contact of parsed) {

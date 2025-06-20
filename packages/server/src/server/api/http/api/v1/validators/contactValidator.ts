@@ -2,6 +2,7 @@ import { BadRequest } from "../responses/errors";
 import { Next } from "koa";
 import { RouterContext } from "koa-router";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import fs from "fs";
 
 export class ContactValidator {
     static async validateUpdate(ctx: RouterContext, next: Next) {
@@ -64,6 +65,34 @@ export class ContactValidator {
             if (!item.id && !item.externalId) {
                 throw new BadRequest({ error: "Each contact deletion must include either an 'id' or 'externalId' field!" });
             }
+        }
+        
+        return await next();
+    }
+
+    static async validateImportVcf(ctx: RouterContext, next: Next) {
+        const { files } = ctx.request;
+
+        // Check if a VCF file was provided
+        const vcfFile = files?.vcf as any;
+        if (!vcfFile) {
+            throw new BadRequest({ error: "VCF file is required! Upload using multipart/form-data with field name 'vcf'" });
+        }
+        
+        // Check if file has content
+        if (vcfFile.size === 0) {
+            throw new BadRequest({ error: "VCF file is empty!" });
+        }
+        
+        // Check file type
+        const fileName = vcfFile.name.toLowerCase();
+        if (!fileName.endsWith('.vcf') && !fileName.endsWith('.vcard')) {
+            throw new BadRequest({ error: "File must be a valid VCF or vCard file (.vcf or .vcard extension)" });
+        }
+        
+        // Check if file exists at the temp location
+        if (!fs.existsSync(vcfFile.path)) {
+            throw new BadRequest({ error: "Failed to upload VCF file" });
         }
         
         return await next();

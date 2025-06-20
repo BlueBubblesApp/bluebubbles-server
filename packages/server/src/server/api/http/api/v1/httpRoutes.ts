@@ -649,6 +649,13 @@ export class HttpRoutes {
                         method: HttpMethod.POST,
                         path: "query",
                         controller: ContactRouter.query
+                    },
+                    {
+                        method: HttpMethod.POST,
+                        path: "import/vcf",
+                        validators: [ContactValidator.validateImportVcf],
+                        controller: ContactRouter.importVcf,
+                        requestTimeoutMs: 5 * 60 * 1000
                     }
                 ]
             },
