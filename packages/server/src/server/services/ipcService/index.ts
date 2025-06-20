@@ -343,6 +343,10 @@ export class IPCService extends Loggable {
             Server().repo.devices().clear();
         });
 
+        ipcMain.handle("delete-device", async (_, { name, identifier }) => {
+            return await Server().repo.devices().delete({ name, identifier });
+        });
+
         ipcMain.handle("restart-via-terminal", (_, __) => {
             Server().restartViaTerminal();
         });
