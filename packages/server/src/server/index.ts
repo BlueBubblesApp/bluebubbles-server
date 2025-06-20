@@ -782,8 +782,10 @@ class BlueBubblesServer extends EventEmitter {
         // Set the dock icon according to the config
         this.setDockIcon();
 
+        // Don't relaunch if the auto start method is set to launch agent. This will cause a loop.
         const noGpu = Server().repo.getConfig("disable_gpu") ?? false;
-        if (noGpu && !this.args["disable-gpu"]) {
+        const isLaunchAgent = Server().repo.getConfig("auto_start_method") === AutoStartMethods.LaunchAgent;
+        if (noGpu && !this.args["disable-gpu"] && !isLaunchAgent) {
             this.relaunch();
         }
 
