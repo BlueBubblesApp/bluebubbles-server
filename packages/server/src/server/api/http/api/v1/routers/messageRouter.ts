@@ -2,10 +2,12 @@
 import { RouterContext } from "koa-router";
 import { Next } from "koa";
 import type { File } from "formidable";
+import * as fs from "fs";
+import * as path from "path";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
-import { isEmpty, isNotEmpty } from "@server/helpers/utils";
+import { isEmpty, isNotEmpty, isTruthyBool } from "@server/helpers/utils";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { MessageInterface } from "@server/api/interfaces/messageInterface";
 import { MessagePromiseRejection } from "@server/managers/outgoingMessageManager/messagePromise";
@@ -402,7 +404,7 @@ export class MessageRouter {
         let { parts, tempGuid, attributedBody, chatGuid, effectId, subject, selectedMessageGuid, partIndex, ddScan } =
             ctx?.request?.body ?? {};
 
-        // Remove from cache
+        // Add to send cache if tempGuid is provided
         if (isNotEmpty(tempGuid)) {
             Server().httpService.sendCache.add(tempGuid);
         }
@@ -421,7 +423,9 @@ export class MessageRouter {
             });
 
             // Remove from cache
-            Server().httpService.sendCache.remove(tempGuid);
+            if (isNotEmpty(tempGuid)) {
+                Server().httpService.sendCache.remove(tempGuid);
+            }
 
             // Convert to an API response
             // No need to load the participants since we sent the message
@@ -451,7 +455,9 @@ export class MessageRouter {
             }
         } catch (ex: any) {
             // Remove from cache
-            Server().httpService.sendCache.remove(tempGuid);
+            if (isNotEmpty(tempGuid)) {
+                Server().httpService.sendCache.remove(tempGuid);
+            }
 
             if (ex instanceof Message) {
                 throw new IMessageError({
@@ -481,6 +487,118 @@ export class MessageRouter {
                 });
             } else {
                 throw new IMessageError({ message: "Message Send Error", error: ex?.message ?? ex.toString() });
+            }
+        }
+    }
+
+    static async sendAttachmentChunk(ctx: RouterContext, _: Next) {
+        const { files } = ctx.request;
+        const { 
+            attachmentGuid, chatGuid, name, method, subject, 
+            selectedMessageGuid, partIndex, effectId, isAudioMessage,
+            chunkIndex, totalChunks, isComplete = false
+        } = ctx.request?.body ?? {};
+        const chunk = files?.chunk as File;
+
+        try {
+            // Save the chunk to the specified location
+            const chunkData = fs.readFileSync(chunk.path);
+            FileSystem.saveAttachmentChunk(attachmentGuid, parseInt(chunkIndex, 10), new Uint8Array(Buffer.from(chunkData)));
+
+            // If this is the last chunk and isComplete is true, assemble and send the attachment
+            if (isTruthyBool(isComplete)) {
+                // Verify we have all expected chunks
+                const chunksDir = path.join(FileSystem.attachmentsDir, attachmentGuid);
+                const chunkFiles = fs.readdirSync(chunksDir)
+                    .filter((file: string) => file.endsWith('.chunk'))
+                    .sort((a: string, b: string) => parseInt(a, 10) - parseInt(b, 10));
+
+                // Make sure we have all the chunks
+                if (chunkFiles.length !== parseInt(totalChunks, 10)) {
+                    throw new Error(`Missing chunks. Expected ${totalChunks} chunks, but found ${chunkFiles.length}.`);
+                }
+                
+                // Use the existing FileSystem method to build the attachment from chunks
+                const tempFilePath = FileSystem.buildAttachmentChunks(attachmentGuid, name);
+
+                // Add to send cache
+                Server().httpService.sendCache.add(attachmentGuid);
+
+                // Send the assembled attachment
+                const sentMessage: Message = await MessageInterface.sendAttachmentSync({
+                    chatGuid,
+                    attachmentPath: tempFilePath,
+                    attachmentName: name,
+                    attachmentGuid,
+                    method,
+                    isAudioMessage,
+                    subject,
+                    effectId,
+                    selectedMessageGuid,
+                    partIndex
+                });
+
+                // Remove from cache
+                Server().httpService.sendCache.remove(attachmentGuid);
+
+                // Clean up the temporary files
+                FileSystem.deleteChunks(attachmentGuid);
+
+                // Convert to an API response
+                const data = await MessageSerializer.serialize({
+                    message: sentMessage,
+                    config: {
+                        loadChatParticipants: false,
+                        parseAttributedBody: true,
+                        parseMessageSummary: true,
+                        parsePayloadData: true
+                    }
+                });
+                return new Success(ctx, { message: "Attachment sent!", data }).send();
+            }
+
+            // If not complete, just return success for this chunk
+            return new Success(ctx, { 
+                message: `Chunk ${chunkIndex}/${totalChunks - 1} uploaded successfully.`,
+                data: { 
+                    attachmentGuid, 
+                    chunkIndex, 
+                    totalChunks,
+                    remainingChunks: parseInt(totalChunks, 10) - parseInt(chunkIndex, 10) - 1
+                } 
+            }).send();
+        } catch (ex: any) {
+            // Remove from cache if we've added it
+            if (isTruthyBool(isComplete)) {
+                Server().httpService.sendCache.remove(attachmentGuid);
+            }
+
+            if (ex instanceof Message) {
+                throw new IMessageError({
+                    message: "Attachment Chunk Send Error",
+                    data: await MessageSerializer.serialize({
+                        message: ex,
+                        config: {
+                            loadChatParticipants: false
+                        }
+                    }),
+                    error: "Failed to send attachment! See attached message error code."
+                });
+            } else if (ex instanceof MessagePromiseRejection) {
+                throw new IMessageError({
+                    message: "Attachment Chunk Send Error",
+                    data: ex?.msg
+                        ? await MessageSerializer.serialize({
+                              message: ex.msg,
+                              config: {
+                                  loadChatParticipants: false
+                              }
+                          })
+                        : null,
+                    error: "Failed to send attachment! See attached message error code."
+                });
+            } else {
+                throw new IMessageError({ message: "Attachment Chunk Send Error", error: ex?.message ?? ex.toString() });
             }
         }
     }

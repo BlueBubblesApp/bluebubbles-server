@@ -320,7 +320,10 @@ export class FileSystem {
      * @param guid Unique identifier for the attachment
      */
     static buildAttachmentChunks(guid: string, name: string): string {
-        let chunks = new Uint8Array(0);
+        // Use the concatUint8Arrays helper so that the type will be the same as
+        // when we concat the actual attachment chunks. If we just create a new Uint8Array(0),
+        // we will get a type-error because the type will be a Uint8Array<ArrayBufferLike>.
+        let chunks = concatUint8Arrays(new Uint8Array(0), new Uint8Array(0));
 
         // Get the files in ascending order
         const files = fs.readdirSync(path.join(FileSystem.attachmentsDir, guid));

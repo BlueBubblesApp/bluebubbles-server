@@ -440,6 +440,12 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: "attachment/chunk",
+                        validators: [MessageValidator.validateAttachmentChunk],
+                        controller: MessageRouter.sendAttachmentChunk
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: "multipart",
                         validators: [MessageValidator.validateMultipart],
                         controller: MessageRouter.sendMultipartMessage

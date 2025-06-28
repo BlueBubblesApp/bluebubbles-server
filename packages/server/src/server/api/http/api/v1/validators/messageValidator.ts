@@ -4,7 +4,7 @@ import type { File } from "formidable";
 import path from "path";
 import fs from "fs";
 import { Server } from "@server";
-import { isEmpty } from "@server/helpers/utils";
+import { isEmpty, isTruthyBool } from "@server/helpers/utils";
 import { FileSystem } from "@server/fileSystem";
 import { MessageInterface } from "@server/api/interfaces/messageInterface";
 
@@ -250,6 +250,60 @@ export class MessageValidator {
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
             throw new BadRequest({ error: "Message is already queued to be sent!" });
+        }
+
+        await next();
+    }
+
+    static attachmentChunkRules = {
+        chatGuid: "required|string",
+        attachmentGuid: "required|string",
+        name: "required|string",
+        chunkIndex: "required|numeric|min:0",
+        totalChunks: "required|numeric|min:1",
+        isComplete: "boolean",
+        method: "string|in:apple-script,private-api",
+        isAudioMessage: "boolean",
+        effectId: "string",
+        subject: "string",
+        selectedMessageGuid: "string",
+        partIndex: "numeric|min:0"
+    };
+
+    static async validateAttachmentChunk(ctx: RouterContext, next: Next) {
+        const { files } = ctx.request;
+        let {chunkIndex, totalChunks, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
+            ctx.request?.body,
+            MessageValidator.attachmentChunkRules
+        );
+
+        // Convert the string values (form data) to their appropriate types.
+        // Do it for both the request body and the parsed values. This is so whatever is
+        // after this middleware can use the parsed values directly.
+        chunkIndex = parseInt(chunkIndex, 10);
+        totalChunks = parseInt(totalChunks, 10);
+        isAudioMessage = isTruthyBool(isAudioMessage) ? true : false;
+
+        let saniMethod = method ?? "apple-script";
+        if (effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
+            saniMethod = "private-api";
+        }
+
+        // Inject the new/converted fields (we have to force it to thing it's anything)
+        ctx.request.body.method = saniMethod;
+        ctx.request.body.isAudioMessage = isAudioMessage;
+        ctx.request.body.chunkIndex = chunkIndex;
+        ctx.request.body.totalChunks = totalChunks;
+
+        // Make sure the chunk file is provided
+        const chunk = files?.chunk as File;
+        if (!chunk || chunk.size === 0) {
+            throw new BadRequest({ error: "Chunk not provided or was empty!" });
+        }
+
+        // Validate that chunkIndex is less than totalChunks
+        if (chunkIndex >= totalChunks) {
+            throw new BadRequest({ error: "Chunk index cannot be greater than or equal to total chunks!" });
         }
 
         await next();
