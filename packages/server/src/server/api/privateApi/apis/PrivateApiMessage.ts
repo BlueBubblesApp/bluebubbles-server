@@ -14,6 +14,7 @@ export class PrivateApiMessage extends PrivateApiAction {
         chatGuid: string,
         message: string,
         attributedBody: Record<string, any> = null,
+        textFormatting: Record<string, any> = null,
         subject: string = null,
         effectId: string = null,
         selectedMessageGuid: string = null,
@@ -29,6 +30,7 @@ export class PrivateApiMessage extends PrivateApiAction {
             subject,
             message,
             attributedBody,
+            textFormatting,
             effectId,
             selectedMessageGuid,
             partIndex

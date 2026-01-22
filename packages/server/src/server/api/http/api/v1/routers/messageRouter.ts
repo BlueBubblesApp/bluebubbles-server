@@ -236,7 +236,7 @@ export class MessageRouter {
 
     static async sendText(ctx: RouterContext, _: Next) {
         let {
-            tempGuid, message, attributedBody, method, chatGuid,
+            tempGuid, message, attributedBody, textFormatting, method, chatGuid,
             effectId, subject, selectedMessageGuid, partIndex, ddScan
         } = ctx?.request?.body ?? {};
 
@@ -250,6 +250,7 @@ export class MessageRouter {
                 message,
                 method,
                 attributedBody,
+                textFormatting,
                 subject,
                 effectId,
                 selectedMessageGuid,
