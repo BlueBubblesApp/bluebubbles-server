@@ -4,7 +4,8 @@ import {
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
-import type { TextFormatting, ValidTapback, ValidRemoveTapback } from "@server/types";
+import type { ValidTapback, ValidRemoveTapback } from "@server/types";
+import type { TextFormatting } from "@server/api/types";
 import { isMinCatalina, isMinMonterey } from "@server/env";
 
 export class PrivateApiMessage extends PrivateApiAction {
