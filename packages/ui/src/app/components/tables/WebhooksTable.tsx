@@ -33,6 +33,7 @@ export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): J
                     <Tr>
                         <Th>URL</Th>
                         <Th>Event Subscriptions</Th>
+                        <Th>Chat Filter</Th>
                         <Th isNumeric>Actions</Th>
                     </Tr>
                 </Thead>
@@ -41,6 +42,7 @@ export const WebhooksTable = ({ webhooks }: { webhooks: Array<WebhookItem> }): J
                         <Tr key={item.id}>
                             <Td>{item.url}</Td>
                             <Td>{JSON.parse(item.events).map((e: string) => webhookEventValueToLabel(e)).join(', ')}</Td>
+                            <Td>{item.chatGuids && item.chatGuids.length > 0 ? `${item.chatGuids.length} chat(s)` : 'All Chats'}</Td>
                             <Td isNumeric>
                                 <Stack direction="row" justifyContent="end">
                                     <Tooltip label='Edit' placement='bottom'>

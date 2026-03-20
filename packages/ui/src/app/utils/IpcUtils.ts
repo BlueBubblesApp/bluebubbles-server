@@ -77,7 +77,7 @@ export const getWebhooks = async () => {
     return await ipcRenderer.invoke('get-webhooks');
 };
 
-export const createWebhook = async (payload: { url: string, events: Array<MultiSelectValue> }) => {
+export const createWebhook = async (payload: { url: string, events: Array<MultiSelectValue>, chatGuids?: Array<string> }) => {
     return await ipcRenderer.invoke('create-webhook', payload);
 };
 
@@ -85,8 +85,8 @@ export const deleteWebhook = async ({ url = null, id = null }: { url?: string | 
     return await ipcRenderer.invoke('delete-webhook', { url, id });
 };
 
-export const updateWebhook = async ({ id, url, events }: { id: number, url?: string, events?: Array<MultiSelectValue> }) => {
-    return await ipcRenderer.invoke('update-webhook', { id, url, events });
+export const updateWebhook = async ({ id, url, events, chatGuids }: { id: number, url?: string, events?: Array<MultiSelectValue>, chatGuids?: Array<string> | null }) => {
+    return await ipcRenderer.invoke('update-webhook', { id, url, events, chatGuids });
 };
 
 export const reinstallHelperBundle = async () => {
