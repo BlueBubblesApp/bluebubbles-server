@@ -21,13 +21,14 @@ export class WebhookValidator {
 
     static createRules = {
         url: "required|string",
-        events: "required|array"
+        events: "required|array",
+        chatGuids: "array"
     };
 
     static async validateCreateWebhook(ctx: RouterContext, next: Next) {
         ValidateInput(ctx?.request?.body, WebhookValidator.createRules);
 
-        const { url, events } = ctx.request.body;
+        const { url, events, chatGuids } = ctx.request.body;
         if (url.length === 0) {
             throw new BadRequest({ error: "Webhook URL is required!" });
         } else if (!url.startsWith('http')) {
@@ -53,6 +54,15 @@ export class WebhookValidator {
 
         // Update the events
         ctx.request.body.events = validatedEvents;
+
+        // Validate chatGuids if provided
+        if (chatGuids) {
+            for (const guid of chatGuids) {
+                if (typeof guid !== "string") {
+                    throw new BadRequest({ error: "Webhook chatGuids must be strings!" });
+                }
+            }
+        }
 
         await next();
     }

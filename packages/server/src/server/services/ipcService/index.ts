@@ -150,13 +150,24 @@ export class IPCService extends Loggable {
 
         ipcMain.handle("get-webhooks", async (event, args) => {
             const res = await Server().repo.getWebhooks();
-            return res.map(e => ({ id: e.id, url: e.url, events: e.events, created: e.created }));
+            return res.map(e => ({
+                id: e.id,
+                url: e.url,
+                events: e.events,
+                chatGuids: e.chatGuids ? JSON.parse(e.chatGuids) : null,
+                created: e.created
+            }));
         });
 
         ipcMain.handle("create-webhook", async (event, payload) => {
-            const res = await Server().repo.addWebhook(payload.url, payload.events);
-            const output = { id: res.id, url: res.url, events: res.events, created: res.created };
-            return output;
+            const res = await Server().repo.addWebhook(payload.url, payload.events, payload?.chatGuids);
+            return {
+                id: res.id,
+                url: res.url,
+                events: res.events,
+                chatGuids: res.chatGuids ? JSON.parse(res.chatGuids) : null,
+                created: res.created
+            };
         });
 
         ipcMain.handle("delete-webhook", async (event, args) => {
@@ -164,7 +175,7 @@ export class IPCService extends Loggable {
         });
 
         ipcMain.handle("update-webhook", async (event, args) => {
-            return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events });
+            return await Server().repo.updateWebhook({ id: args.id, url: args?.url, events: args?.events, chatGuids: args?.chatGuids });
         });
 
         ipcMain.handle("contact-permission-status", async (event, _) => {
