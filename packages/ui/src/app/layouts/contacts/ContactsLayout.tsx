@@ -68,6 +68,19 @@ const getPermissionColor = (status: string | null): string => {
     return 'red';
 };
 
+const getGoogleStatusColor = (status: ProgressStatus): string => {
+    if (status === ProgressStatus.COMPLETED) return 'green';
+    if (status === ProgressStatus.FAILED) return 'red';
+    return 'yellow';
+};
+
+const getGoogleStatusText = (status: ProgressStatus): string => {
+    if (status === ProgressStatus.IN_PROGRESS) return 'Syncing...';
+    if (status === ProgressStatus.COMPLETED) return 'Synced';
+    if (status === ProgressStatus.FAILED) return 'Failed';
+    return 'Not Connected';
+};
+
 export const ContactsLayout = (): JSX.Element => {
     const [search, setSearch] = useState('' as string);
     const [isLoading, setIsLoading] = useBoolean(true);
@@ -294,12 +307,15 @@ export const ContactsLayout = (): JSX.Element => {
             <Stack direction='column' p={5}>
                 <Text fontSize='2xl'>Controls</Text>
                 <Divider orientation='horizontal' />
+                <Text fontSize='md' mt={2} mb={2}>
+                    Add, import, refresh, or clear your local contacts.
+                </Text>
                 <Box>
                     <Menu>
                         <MenuButton
                             as={Button}
                             rightIcon={<BsChevronDown />}
-                            width="12em"mr={5}
+                            width="12em"
                         >
                             Manage
                         </MenuButton>
@@ -341,6 +357,13 @@ export const ContactsLayout = (): JSX.Element => {
                             </MenuItem>
                         </MenuList>
                     </Menu>
+                </Box>
+                <Divider orientation='horizontal' mt={4} mb={4} />
+                <Text fontSize='md' mb={2}>
+                    Grant access to your macOS Contacts to pull richer contact details like avatars and addresses
+                    from the native Address Book.
+                </Text>
+                <Box>
                     <Menu>
                         <MenuButton
                             as={Button}
@@ -362,41 +385,46 @@ export const ContactsLayout = (): JSX.Element => {
                         </MenuList>
                     </Menu>
                     <Text as="span" verticalAlign="middle">
-                        Status: <Text as="span" color={getPermissionColor(permission)}>
+                        macOS Contacts: <Text as="span" color={getPermissionColor(permission)}>
                             {permission ? permission : 'Checking...'}
                         </Text>
                     </Text>
                 </Box>
-            </Stack>
-            <Box ml={5} mr={5}>
-                <Text fontSize='md'>
-                    Using the button below, you can authorize BlueBubbles to access your Google Contacts. This will allow BlueBubbles to
-                    download your contacts + avatars from Google, and serve them to any connected clients.
+                <Divider orientation='horizontal' mt={4} mb={4} />
+                <Text fontSize='md' mb={2}>
+                    Authorize BlueBubbles to access your Google Contacts to download contacts and avatars
+                    from Google, and serve them to any connected clients.
                 </Text>
-                <Link
-                    href={oauthUrl}
-                    target="_blank"
-                    _hover={{ textDecoration: 'none' }}
-                >
-                    <Stack direction='row' alignItems='center'>
-                        <Button
-                            pl={10}
-                            pr={10}
-                            mt={4}
-                            leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
-                            variant='outline'
-                            onClick={() => {
-                                restartOauthService();
-                            }}
-                        >
-                            Continue with Google
-                        </Button>
-                        <Box pt={3} pl={2}>
-                            {getOauthIcon()}
-                        </Box>
-                    </Stack>
-                </Link>
-            </Box>
+                <Box>
+                    <Link
+                        href={oauthUrl}
+                        target="_blank"
+                        _hover={{ textDecoration: 'none' }}
+                    >
+                        <Stack direction='row' alignItems='center'>
+                            <Button
+                                pl={10}
+                                pr={10}
+                                leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
+                                variant='outline'
+                                onClick={() => {
+                                    restartOauthService();
+                                }}
+                            >
+                                Continue with Google
+                            </Button>
+                            <Box pl={2}>
+                                {getOauthIcon()}
+                            </Box>
+                            <Text as="span" verticalAlign="middle" pl={2}>
+                                Google Contacts: <Text as="span" color={getGoogleStatusColor(authStatus)}>
+                                    {getGoogleStatusText(authStatus)}
+                                </Text>
+                            </Text>
+                        </Stack>
+                    </Link>
+                </Box>
+            </Stack>
             <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                     <Text fontSize='2xl'>Contacts ({filteredContacts.length})</Text>

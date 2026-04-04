@@ -1,5 +1,5 @@
 import { app, dialog, ipcMain, systemPreferences, shell } from "electron";
-import { askForAccessibilityAccess, askForFullDiskAccess } from "node-mac-permissions";
+import { askForAccessibilityAccess, askForFullDiskAccess, askForContactsAccess } from "node-mac-permissions";
 import process from "process";
 
 import { Server } from "@server";
@@ -9,7 +9,7 @@ import { openLogs, openAppData } from "@server/api/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/interfaces/contactInterface";
 import { PrivateApiService } from "../../api/privateApi/PrivateApiService";
-import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
+import { getContactPermissionStatus, requestContactPermission, grantContactsViaTCC } from "@server/utils/PermissionUtils";
 import { ScheduledMessagesInterface } from "@server/api/interfaces/scheduledMessagesInterface";
 import { ChatInterface } from "@server/api/interfaces/chatInterface";
 import { GeneralInterface } from "@server/api/interfaces/generalInterface";
@@ -172,7 +172,21 @@ export class IPCService extends Loggable {
         });
 
         ipcMain.handle("request-contact-permission", async (event, force) => {
-            return await requestContactPermission(force);
+            let status = await requestContactPermission(force);
+            if (status !== "Authorized") {
+                // Try granting via TCC database (shows native password dialog)
+                const granted = await grantContactsViaTCC();
+                if (granted) {
+                    // Re-check status after TCC grant
+                    status = await requestContactPermission(true);
+                }
+
+                // If still not authorized, open System Settings as fallback
+                if (status !== "Authorized") {
+                    askForContactsAccess();
+                }
+            }
+            return status;
         });
 
         ipcMain.handle("get-contacts", async (event, extraProperties) => {

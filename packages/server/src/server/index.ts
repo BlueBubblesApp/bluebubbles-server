@@ -42,7 +42,7 @@ import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMojave, isMinMonterey
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
-import { requestContactPermission } from "./utils/PermissionUtils";
+import { getContactPermissionStatus, requestContactPermission } from "./utils/PermissionUtils";
 import { AlertsInterface } from "./api/interfaces/alertsInterface";
 import { MessageSerializer } from "./api/serializers/MessageSerializer";
 import {
@@ -1250,18 +1250,30 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     async checkPermissions(): Promise<Array<NodeJS.Dict<any>>> {
+        const isDev = process.env.NODE_ENV !== "production";
+        const appName = isDev ? "Electron" : "BlueBubbles";
+        const contactStatus = getContactPermissionStatus();
+
         const output = [
             {
                 name: "Accessibility (Optional)",
                 pass: systemPreferences.isTrustedAccessibilityClient(false),
-                solution: "Open System Preferences > Security > Privacy > Accessibility, then add BlueBubbles"
+                solution: `Open System Preferences > Security > Privacy > Accessibility, then add ${appName}`
             },
             {
                 name: "Full Disk Access",
                 pass: this.hasDiskAccess,
                 solution:
-                    "Open System Preferences > Security > Privacy > Full Disk Access, " +
-                    "then add BlueBubbles. Lastly, restart BlueBubbles."
+                    `Open System Preferences > Security > Privacy > Full Disk Access, ` +
+                    `then add ${appName}. Lastly, restart BlueBubbles.`
+            },
+            {
+                name: "Contacts (Optional)",
+                pass: contactStatus === "Authorized",
+                solution: isDev
+                    ? "Open System Preferences > Security > Privacy > Contacts, then add Electron.app " +
+                      "from: ~/Developer/bluebubbles/bluebubbles-server/node_modules/electron/dist/"
+                    : "Open System Preferences > Security > Privacy > Contacts, then add BlueBubbles"
             }
         ];
 
