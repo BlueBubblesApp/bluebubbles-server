@@ -14,6 +14,7 @@ import macosVersion from "macos-version";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { isEmpty, isNotEmpty, onlyAlphaNumeric, safeTrim } from "@server/helpers/utils";
+import { hasTextFormatting } from "@server/utils/TextFormattingUtils";
 
 // Helpers
 import { ChatResponse, HandleResponse, ServerMetadataResponse } from "@server/types";
@@ -500,6 +501,7 @@ export class SocketRoutes {
             let tempGuid = params?.tempGuid;
             const chatGuid = params?.guid;
             const message = params?.message;
+            const textFormatting = params?.textFormatting ?? null;
 
             // Make sure a chat GUID is provided
             if (!chatGuid) return response(cb, "error", createBadRequestResponse("No chat GUID provided"));
@@ -565,7 +567,8 @@ export class SocketRoutes {
                     sentMessage = await MessageInterface.sendMessageSync({
                         chatGuid,
                         message,
-                        method: "apple-script",
+                        method: hasTextFormatting(textFormatting) ? "private-api" : "apple-script",
+                        textFormatting,
                         tempGuid
                     });
                 }

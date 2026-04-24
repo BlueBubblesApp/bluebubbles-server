@@ -1,9 +1,11 @@
 node_modules/
-!dist/
-dist/*
-!dist/dev-app-update.yml
+dist/
 releases/
 .vscode
 .DS_Store
 **/*.log
 .env
+.env.*
+*.asar
+*.dmg
+*.zip

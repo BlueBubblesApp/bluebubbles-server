@@ -2,7 +2,7 @@ import { Server } from "@server";
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
+import { isMinBigSur, isMinSequoia } from "@server/env";
 import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
@@ -72,10 +72,10 @@ export class FindMyInterface {
 
     static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
         const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
-        if (papiEnabled && isMinBigSur && !isMinSonoma) {
+        if (papiEnabled && isMinBigSur) {
             checkPrivateApiStatus();
             const result = await Server().privateApi.findmy.refreshFriends();
-            const refreshLocations = result?.data?.locations ?? [];
+            const refreshLocations = result?.data?.locations ?? (result as any)?.locations ?? [];
 
             // Save the data to the cache
             // The cache will handle properly updating the data.
