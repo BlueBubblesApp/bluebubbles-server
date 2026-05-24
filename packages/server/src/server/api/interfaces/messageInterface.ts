@@ -18,7 +18,11 @@ import type {
     UnsendMessageParams,
     EditMessageParams,
     SendAttachmentPrivateApiParams,
-    SendMultipartTextParams
+    SendMultipartTextParams,
+    SendPollParams,
+    ReadPollParams,
+    PollData,
+    PollResponse
 } from "@server/api/types";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import path from "path";
@@ -39,6 +43,241 @@ export class MessageInterface {
         "-emphasize",
         "-question"
     ];
+
+    private static getArchiveObject(objects: any[], value: any): any {
+        if (typeof value?.UID !== "number") return value;
+        return objects?.[value.UID];
+    }
+
+    private static getArchiveDictionaryValue(objects: any[], dictionary: any, key: string): any {
+        if (dictionary == null) return undefined;
+        if (Object.prototype.hasOwnProperty.call(dictionary, key)) return dictionary[key];
+
+        const keys = dictionary["NS.keys"];
+        const values = dictionary["NS.objects"];
+        if (!Array.isArray(keys) || !Array.isArray(values)) return undefined;
+
+        for (let i = 0; i < keys.length; i++) {
+            if (MessageInterface.getArchiveObject(objects, keys[i]) === key) return values[i];
+        }
+
+        return undefined;
+    }
+
+    private static bufferFromArchiveData(rawData: any): Buffer | null {
+        if (Buffer.isBuffer(rawData)) {
+            return rawData;
+        } else if (rawData instanceof Uint8Array) {
+            return Buffer.from(rawData);
+        } else if (Array.isArray(rawData?.data)) {
+            return Buffer.from(rawData.data);
+        }
+
+        return null;
+    }
+
+    private static getArchiveString(objects: any[], value: any): string | null {
+        const raw = MessageInterface.getArchiveObject(objects, value);
+        if (typeof raw === "string") return raw;
+
+        const relative = MessageInterface.getArchiveObject(objects, raw?.["NS.relative"]);
+        const base = MessageInterface.getArchiveObject(objects, raw?.["NS.base"]);
+        if (typeof relative === "string") {
+            const prefix = typeof base === "string" && base !== "$null" ? base : "";
+            return `${prefix}${relative}`;
+        }
+
+        return null;
+    }
+
+    private static getArchiveUuid(objects: any[], value: any): string | null {
+        const raw = MessageInterface.getArchiveObject(objects, value);
+        if (typeof raw === "string") return raw;
+
+        const uuidBytes = MessageInterface.getArchiveObject(objects, raw?.["NS.uuidbytes"]);
+        const buffer = MessageInterface.bufferFromArchiveData(uuidBytes);
+        if (!buffer || buffer.length !== 16) return null;
+
+        const hex = Array.from(buffer, byte => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+
+    private static parsePollDefinition(rawData: any): any | null {
+        let buffer = MessageInterface.bufferFromArchiveData(rawData);
+
+        if (!buffer && typeof rawData === "string" && rawData.startsWith("data:")) {
+            return MessageInterface.parsePollDefinitionUrl(rawData);
+        } else if (typeof rawData === "string") {
+            try {
+                return JSON.parse(rawData);
+            } catch {
+                buffer = Buffer.from(rawData, "base64");
+            }
+        }
+
+        if (!buffer) return null;
+
+        try {
+            return JSON.parse(buffer.toString("utf8"));
+        } catch {
+            return null;
+        }
+    }
+
+    private static parsePollDefinitionUrl(rawUrl: string | null): any | null {
+        if (typeof rawUrl !== "string" || !rawUrl.startsWith("data:")) return null;
+
+        if (rawUrl.startsWith("data:application/octet-stream;base64,")) {
+            return MessageInterface.parsePollDefinition(rawUrl.replace("data:application/octet-stream;base64,", ""));
+        }
+
+        const commaIndex = rawUrl.indexOf(",");
+        if (commaIndex < 0) return null;
+
+        const queryIndex = rawUrl.indexOf("?", commaIndex + 1);
+        const encoded = rawUrl.slice(commaIndex + 1, queryIndex < 0 ? undefined : queryIndex);
+        try {
+            return JSON.parse(decodeURIComponent(encoded));
+        } catch {
+            try {
+                return JSON.parse(encoded);
+            } catch {
+                try {
+                    return JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+                } catch {
+                    return null;
+                }
+            }
+        }
+    }
+
+    private static readPollFromPayload(message: Message): PollData | null {
+        for (const payload of message?.payloadData ?? []) {
+            const objects = payload?.$objects;
+            if (!Array.isArray(objects)) continue;
+
+            const root = MessageInterface.getArchiveObject(objects, payload?.$top?.root);
+            const pollDefinitionData = MessageInterface.getArchiveObject(
+                objects,
+                MessageInterface.getArchiveDictionaryValue(objects, root, "IMPLUGIN_DATA_KEY")
+            );
+            const pollDefinitionUrl = MessageInterface.getArchiveString(
+                objects,
+                MessageInterface.getArchiveDictionaryValue(objects, root, "URL")
+            );
+            const versionedPollDefinition =
+                MessageInterface.parsePollDefinition(pollDefinitionData) ??
+                MessageInterface.parsePollDefinitionUrl(pollDefinitionUrl);
+            const pollDefinition = versionedPollDefinition?.item ?? versionedPollDefinition?.pollDefinition;
+            const rawOptions = pollDefinition?.orderedPollOptions;
+            if (!Array.isArray(rawOptions)) continue;
+
+            const options = rawOptions.map(option => ({
+                optionIdentifier: option?.optionIdentifier ?? null,
+                creatorHandle: option?.creatorHandle ?? null,
+                text: option?.text ?? null,
+                attributedText: option?.attributedText ?? null,
+                canBeEdited: option?.canBeEdited
+            }));
+
+            return {
+                messageGuid: message.guid,
+                title: pollDefinition?.title ?? null,
+                options,
+                responses: [],
+                optionCount: options.length,
+                bundleIdentifier: message.balloonBundleId ?? null,
+                pluginSessionGuid:
+                    MessageInterface.getArchiveObject(
+                        objects,
+                        MessageInterface.getArchiveDictionaryValue(objects, root, "IMPLUGIN_PLUGINSESSIONGUID_KEY")
+                    ) ??
+                    MessageInterface.getArchiveUuid(
+                        objects,
+                        MessageInterface.getArchiveDictionaryValue(objects, root, "sessionIdentifier")
+                    ) ??
+                    null
+            };
+        }
+
+        return null;
+    }
+
+    private static readPollResponsesFromPayload(message: Message): PollResponse[] {
+        const responses: PollResponse[] = [];
+
+        for (const payload of message?.payloadData ?? []) {
+            const objects = payload?.$objects;
+            if (!Array.isArray(objects)) continue;
+
+            const root = MessageInterface.getArchiveObject(objects, payload?.$top?.root);
+            const pollResponseUrl = MessageInterface.getArchiveString(
+                objects,
+                MessageInterface.getArchiveDictionaryValue(objects, root, "URL")
+            );
+            const versionedResponse = MessageInterface.parsePollDefinitionUrl(pollResponseUrl);
+            const votes = versionedResponse?.item?.votes;
+            if (!Array.isArray(votes)) continue;
+
+            const byHandle = new Map<string | null, string[]>();
+            for (const vote of votes) {
+                const handle = vote?.participantHandle ?? null;
+                const optionIdentifier = vote?.voteOptionIdentifier ?? null;
+                if (!optionIdentifier) continue;
+
+                const optionIdentifiers = byHandle.get(handle) ?? [];
+                if (!optionIdentifiers.includes(optionIdentifier)) {
+                    optionIdentifiers.push(optionIdentifier);
+                }
+                byHandle.set(handle, optionIdentifiers);
+            }
+
+            for (const [handle, optionIdentifiers] of byHandle.entries()) {
+                responses.push({ handle, optionIdentifiers });
+            }
+        }
+
+        return responses;
+    }
+
+    private static async readPollResponsesForMessage(chatGuid: string, messageGuid: string): Promise<PollResponse[]> {
+        const [messages] = await Server().iMessageRepo.getMessages({
+            chatGuid,
+            withAttachments: false,
+            sort: "ASC",
+            orderBy: "message.dateCreated",
+            where: [
+                {
+                    statement: "(message.associatedMessageGuid = :messageGuid OR message.replyToGuid = :messageGuid)",
+                    args: { messageGuid }
+                },
+                {
+                    statement: "message.payloadData IS NOT NULL",
+                    args: null
+                }
+            ]
+        });
+
+        const byHandle = new Map<string | null, string[]>();
+        for (const message of messages) {
+            for (const response of MessageInterface.readPollResponsesFromPayload(message)) {
+                byHandle.set(response.handle, response.optionIdentifiers);
+            }
+        }
+
+        return Array.from(byHandle.entries()).map(([handle, optionIdentifiers]) => ({
+            handle,
+            optionIdentifiers
+        }));
+    }
+
+    private static async mergePollResponses(chatGuid: string, messageGuid: string, poll: PollData): Promise<PollData> {
+        const responses = await MessageInterface.readPollResponsesForMessage(chatGuid, messageGuid);
+        return {
+            ...poll,
+            responses
+        };
+    }
 
     /**
      * Sends a message by executing the sendMessage AppleScript
@@ -601,6 +840,68 @@ export class MessageInterface {
         }
 
         return retMessage;
+    }
+
+    static async sendPoll({
+        chatGuid,
+        title = null,
+        question = null,
+        message = null,
+        options
+    }: SendPollParams): Promise<{ message: Message; poll: PollData | null }> {
+        checkPrivateApiStatus();
+        if (!chatGuid) throw new Error("No chat GUID provided");
+        if (isEmpty(options, false)) throw new Error("No poll options provided");
+
+        const result = await Server().privateApi.message.sendPoll({
+            chatGuid,
+            title,
+            question,
+            message,
+            options
+        });
+
+        if (!result?.identifier) {
+            throw new Error("Failed to send poll!");
+        }
+
+        const maxWaitMs = 60000;
+        const retMessage = await resultAwaiter({
+            maxWaitMs,
+            getData: async _ => {
+                return await Server().iMessageRepo.getMessage(result.identifier, true, false);
+            }
+        });
+
+        if (!retMessage) {
+            throw new Error(`Failed to send poll! Message not found in database after ${maxWaitMs / 1000} seconds!`);
+        }
+
+        return {
+            message: retMessage,
+            poll: result?.data?.poll ?? null
+        };
+    }
+
+    static async readPoll({ chatGuid, messageGuid, message = null }: ReadPollParams): Promise<PollData> {
+        checkPrivateApiStatus();
+        if (!chatGuid) throw new Error("No chat GUID provided");
+        if (!messageGuid) throw new Error("No message GUID provided");
+
+        try {
+            const result = await Server().privateApi.message.readPoll(chatGuid, messageGuid);
+            const poll = result?.data?.poll;
+            if (!poll) {
+                throw new Error("Failed to read poll!");
+            }
+
+            return await MessageInterface.mergePollResponses(chatGuid, messageGuid, poll);
+        } catch (ex) {
+            const fallbackMessage = message ?? await Server().iMessageRepo.getMessage(messageGuid, true, false);
+            const payloadPoll = MessageInterface.readPollFromPayload(fallbackMessage);
+            if (payloadPoll) return await MessageInterface.mergePollResponses(chatGuid, messageGuid, payloadPoll);
+            throw ex;
+        }
     }
 
     static async searchMessagesPrivateApi({

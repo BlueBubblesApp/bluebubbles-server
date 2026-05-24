@@ -486,6 +486,64 @@ export class MessageRouter {
         }
     }
 
+    static async sendPoll(ctx: RouterContext, _: Next) {
+        const { chatGuid, title, question, message, options } = ctx?.request?.body ?? {};
+
+        try {
+            const result = await MessageInterface.sendPoll({
+                chatGuid,
+                title,
+                question,
+                message,
+                options
+            });
+
+            const serializedMessage = await MessageSerializer.serialize({
+                message: result.message,
+                config: {
+                    loadChatParticipants: false,
+                    parseAttributedBody: true,
+                    parseMessageSummary: true,
+                    parsePayloadData: true
+                }
+            });
+
+            return new Success(ctx, {
+                message: "Poll sent!",
+                data: {
+                    message: serializedMessage,
+                    poll: result.poll
+                }
+            }).send();
+        } catch (ex: any) {
+            throw new IMessageError({ message: "Poll Send Error", error: ex?.message ?? ex.toString() });
+        }
+    }
+
+    static async readPoll(ctx: RouterContext, _: Next) {
+        const { guid: messageGuid } = ctx?.params ?? {};
+
+        try {
+            const message = await Server().iMessageRepo.getMessage(messageGuid, true, false);
+            if (!message) throw new BadRequest({ error: "Selected message does not exist!" });
+            if (isEmpty(message?.chats ?? [])) throw new BadRequest({ error: "Associated chat not found!" });
+
+            const poll = await MessageInterface.readPoll({
+                chatGuid: message.chats[0].guid,
+                messageGuid,
+                message
+            });
+
+            return new Success(ctx, {
+                message: "Poll read!",
+                data: poll
+            }).send();
+        } catch (ex: any) {
+            if (ex instanceof BadRequest) throw ex;
+            throw new IMessageError({ message: "Poll Read Error", error: ex?.message ?? ex.toString() });
+        }
+    }
+
     static async react(ctx: RouterContext, _: Next) {
         const { chatGuid, selectedMessageGuid, reaction, partIndex } = ctx?.request?.body ?? {};
 

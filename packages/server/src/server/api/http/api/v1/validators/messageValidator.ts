@@ -273,4 +273,57 @@ export class MessageValidator {
 
         await next();
     }
+
+    static pollRules = {
+        chatGuid: "required|string",
+        title: "string",
+        question: "string",
+        message: "string",
+        options: "required|array"
+    };
+
+    static async validatePoll(ctx: RouterContext, next: Next) {
+        const { title, question, message, options } = ValidateInput(ctx.request.body, MessageValidator.pollRules);
+
+        if (!title && !question && !message) {
+            throw new BadRequest({ error: "A poll title, question, or message is required" });
+        }
+
+        if (options.length < 2) {
+            throw new BadRequest({ error: "At least two poll options are required" });
+        }
+
+        let validOptions = 0;
+        for (const option of options) {
+            if (typeof option === "string") {
+                if (option.trim().length > 0) validOptions += 1;
+                continue;
+            }
+
+            if (typeof option !== "object" || Array.isArray(option) || option == null) {
+                throw new BadRequest({ error: "Each poll option must be a string or dictionary" });
+            }
+
+            if (typeof option.text !== "string" || option.text.trim().length === 0) {
+                throw new BadRequest({ error: "Each poll option dictionary must have non-empty text" });
+            }
+
+            if (option.optionIdentifier != null && typeof option.optionIdentifier !== "string") {
+                throw new BadRequest({ error: "Poll option identifiers must be strings" });
+            }
+
+            validOptions += 1;
+        }
+
+        if (validOptions < 2) {
+            throw new BadRequest({ error: "At least two non-empty poll options are required" });
+        }
+
+        await next();
+    }
+
+    static async validateReadPoll(ctx: RouterContext, next: Next) {
+        ValidateInput(ctx?.params ?? {}, MessageValidator.findParamRules);
+        await next();
+    }
 }

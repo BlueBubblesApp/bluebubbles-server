@@ -445,6 +445,13 @@ export class HttpRoutes {
                     },
                     {
                         method: HttpMethod.POST,
+                        path: "poll",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [MessageValidator.validatePoll],
+                        controller: MessageRouter.sendPoll
+                    },
+                    {
+                        method: HttpMethod.POST,
                         path: "react",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         validators: [MessageValidator.validateReaction],
@@ -523,6 +530,13 @@ export class HttpRoutes {
                         path: ":guid/notify",
                         middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: MessageRouter.notify
+                    },
+                    {
+                        method: HttpMethod.GET,
+                        path: ":guid/poll",
+                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        validators: [MessageValidator.validateReadPoll],
+                        controller: MessageRouter.readPoll
                     },
                     {
                         method: HttpMethod.GET,

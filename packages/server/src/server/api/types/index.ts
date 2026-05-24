@@ -87,6 +87,48 @@ export type SendMultipartTextParams = {
     ddScan?: boolean;
 };
 
+export type SendPollOption = string | {
+    text: string;
+    optionIdentifier?: string;
+};
+
+export type SendPollParams = {
+    chatGuid: string;
+    title?: string;
+    question?: string;
+    message?: string;
+    options: SendPollOption[];
+};
+
+export type ReadPollParams = {
+    chatGuid: string;
+    messageGuid: string;
+    message?: Message | null;
+};
+
+export type PollOption = {
+    optionIdentifier?: string | null;
+    creatorHandle?: string | null;
+    text?: string | null;
+    attributedText?: Record<string, any> | null;
+    canBeEdited?: boolean;
+};
+
+export type PollResponse = {
+    handle: string | null;
+    optionIdentifiers: string[];
+};
+
+export type PollData = {
+    messageGuid?: string | null;
+    title?: string | null;
+    options?: PollOption[];
+    responses?: PollResponse[];
+    optionCount?: number;
+    bundleIdentifier?: string | null;
+    pluginSessionGuid?: string | null;
+};
+
 export type TextFormattingStyle = "bold" | "italic" | "underline" | "strikethrough";
 
 export type TextFormattingRange = {

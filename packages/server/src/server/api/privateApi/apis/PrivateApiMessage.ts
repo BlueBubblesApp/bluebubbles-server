@@ -5,7 +5,7 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 import type { ValidTapback, ValidRemoveTapback } from "@server/types";
-import type { TextFormatting } from "@server/api/types";
+import type { SendPollOption, TextFormatting } from "@server/api/types";
 import { isMinCatalina, isMinMonterey } from "@server/env";
 
 export class PrivateApiMessage extends PrivateApiAction {
@@ -73,6 +73,43 @@ export class PrivateApiMessage extends PrivateApiAction {
         }
 
         return this.sendApiMessage(action, data, request);
+    }
+
+    async sendPoll({
+        chatGuid,
+        title = null,
+        question = null,
+        message = null,
+        options
+    }: {
+        chatGuid: string;
+        title?: string;
+        question?: string;
+        message?: string;
+        options: SendPollOption[];
+    }): Promise<TransactionResult> {
+        const action = "send-poll";
+        this.throwForNoMissingFields(action, [chatGuid, options]);
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+
+        return this.sendApiMessage(
+            action,
+            {
+                chatGuid,
+                title,
+                question,
+                message,
+                options
+            },
+            request
+        );
+    }
+
+    async readPoll(chatGuid: string, messageGuid: string): Promise<TransactionResult> {
+        const action = "read-poll";
+        this.throwForNoMissingFields(action, [chatGuid, messageGuid]);
+        const request = new TransactionPromise(TransactionType.MESSAGE);
+        return this.sendApiMessage(action, { chatGuid, messageGuid }, request);
     }
 
     async react(
