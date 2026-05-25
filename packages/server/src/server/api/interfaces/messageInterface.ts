@@ -29,6 +29,8 @@ import path from "path";
 import { DBWhereItem } from "@server/databases/imessage/types";
 
 export class MessageInterface {
+    private static readonly pollBundleIdentifier = "com.apple.messages.Polls";
+
     static possibleReactions: string[] = [
         "love",
         "like",
@@ -100,6 +102,43 @@ export class MessageInterface {
 
         const hex = Array.from(buffer, byte => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
         return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+
+    private static isPollBundle(bundleIdentifier?: string | null): boolean {
+        return (
+            typeof bundleIdentifier === "string" &&
+            bundleIdentifier.includes(MessageInterface.pollBundleIdentifier)
+        );
+    }
+
+    private static normalizePollMessageGuid(messageGuid?: string | null): string | null {
+        if (typeof messageGuid !== "string") return null;
+
+        let normalized = messageGuid.trim();
+        const slashIndex = normalized.indexOf("/");
+        if (
+            slashIndex >= 0 &&
+            slashIndex < normalized.length - 1 &&
+            (normalized.startsWith("p:") || normalized.startsWith("bp:"))
+        ) {
+            normalized = normalized.slice(slashIndex + 1).trim();
+        }
+
+        return normalized.length > 0 ? normalized : null;
+    }
+
+    private static pollMessageGuidVariants(messageGuid: string): string[] {
+        const normalized = MessageInterface.normalizePollMessageGuid(messageGuid) ?? messageGuid;
+        return Array.from(new Set([normalized, `p:0/${normalized}`, `bp:0/${normalized}`]));
+    }
+
+    private static pollRootMessageGuid(messageGuid: string, message?: Message | null): string {
+        const associatedMessageGuid = MessageInterface.normalizePollMessageGuid(message?.associatedMessageGuid);
+        if (associatedMessageGuid && MessageInterface.isPollBundle(message?.balloonBundleId)) {
+            return associatedMessageGuid;
+        }
+
+        return MessageInterface.normalizePollMessageGuid(messageGuid) ?? messageGuid;
     }
 
     private static parsePollDefinition(rawData: any): any | null {
@@ -241,6 +280,17 @@ export class MessageInterface {
     }
 
     private static async readPollResponsesForMessage(chatGuid: string, messageGuid: string): Promise<PollResponse[]> {
+        const messageGuids = MessageInterface.pollMessageGuidVariants(messageGuid);
+        const responseGuidWhere = messageGuids
+            .map(
+                (_, index) =>
+                    `(message.associatedMessageGuid = :messageGuid${index} OR message.replyToGuid = :messageGuid${index})`
+            )
+            .join(" OR ");
+        const responseGuidArgs = messageGuids.reduce<Record<string, string>>((args, guid, index) => {
+            args[`messageGuid${index}`] = guid;
+            return args;
+        }, {});
         const [messages] = await Server().iMessageRepo.getMessages({
             chatGuid,
             withAttachments: false,
@@ -248,8 +298,8 @@ export class MessageInterface {
             orderBy: "message.dateCreated",
             where: [
                 {
-                    statement: "(message.associatedMessageGuid = :messageGuid OR message.replyToGuid = :messageGuid)",
-                    args: { messageGuid }
+                    statement: `(${responseGuidWhere})`,
+                    args: responseGuidArgs
                 },
                 {
                     statement: "message.payloadData IS NOT NULL",
@@ -888,18 +938,30 @@ export class MessageInterface {
         if (!chatGuid) throw new Error("No chat GUID provided");
         if (!messageGuid) throw new Error("No message GUID provided");
 
+        const selectedMessage =
+            message ?? (await Server().iMessageRepo.getMessage(messageGuid, true, false));
+        const pollMessageGuid = MessageInterface.pollRootMessageGuid(messageGuid, selectedMessage);
+
         try {
-            const result = await Server().privateApi.message.readPoll(chatGuid, messageGuid);
+            const result = await Server().privateApi.message.readPoll(chatGuid, pollMessageGuid);
             const poll = result?.data?.poll;
             if (!poll) {
                 throw new Error("Failed to read poll!");
             }
 
-            return await MessageInterface.mergePollResponses(chatGuid, messageGuid, poll);
+            return await MessageInterface.mergePollResponses(chatGuid, pollMessageGuid, poll);
         } catch (ex) {
-            const fallbackMessage = message ?? await Server().iMessageRepo.getMessage(messageGuid, true, false);
+            const fallbackMessage =
+                selectedMessage?.guid === pollMessageGuid
+                    ? selectedMessage
+                    : await Server().iMessageRepo.getMessage(pollMessageGuid, true, false);
             const payloadPoll = MessageInterface.readPollFromPayload(fallbackMessage);
-            if (payloadPoll) return await MessageInterface.mergePollResponses(chatGuid, messageGuid, payloadPoll);
+            if (payloadPoll) {
+                return await MessageInterface.mergePollResponses(chatGuid, pollMessageGuid, {
+                    ...payloadPoll,
+                    messageGuid: pollMessageGuid
+                });
+            }
             throw ex;
         }
     }
