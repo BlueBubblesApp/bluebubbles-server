@@ -132,6 +132,25 @@ export class MessageInterface {
         return Array.from(new Set([normalized, `p:0/${normalized}`, `bp:0/${normalized}`]));
     }
 
+    private static pollRelatedMessageWhere(messageGuid: string): DBWhereItem {
+        const messageGuids = MessageInterface.pollMessageGuidVariants(messageGuid);
+        const statement = messageGuids
+            .map(
+                (_, index) =>
+                    `(message.associatedMessageGuid = :messageGuid${index} OR message.replyToGuid = :messageGuid${index})`
+            )
+            .join(" OR ");
+        const args = messageGuids.reduce<Record<string, string>>((values, guid, index) => {
+            values[`messageGuid${index}`] = guid;
+            return values;
+        }, {});
+
+        return {
+            statement: `(${statement})`,
+            args
+        };
+    }
+
     private static pollRootMessageGuid(messageGuid: string, message?: Message | null): string {
         const associatedMessageGuid = MessageInterface.normalizePollMessageGuid(message?.associatedMessageGuid);
         if (associatedMessageGuid && MessageInterface.isPollBundle(message?.balloonBundleId)) {
@@ -139,6 +158,44 @@ export class MessageInterface {
         }
 
         return MessageInterface.normalizePollMessageGuid(messageGuid) ?? messageGuid;
+    }
+
+    private static readablePollText(text?: string | null): string | null {
+        if (typeof text !== "string") return null;
+
+        const normalized = text.trim();
+        if (!normalized || normalized === "\uFFFD") return null;
+
+        return normalized;
+    }
+
+    private static pollHasOptionLabels(poll?: PollData | null): boolean {
+        return (
+            Array.isArray(poll?.options) &&
+            poll.options.some(option => MessageInterface.readablePollText(option?.text) != null)
+        );
+    }
+
+    private static mergePollDefinitions(primary: PollData, fallback?: PollData | null): PollData {
+        if (!fallback) return primary;
+
+        const merged: PollData = { ...primary };
+        if (!MessageInterface.readablePollText(merged.title) && MessageInterface.readablePollText(fallback.title)) {
+            merged.title = fallback.title;
+            merged.titleSource = fallback.titleSource ?? "poll-payload";
+        }
+        if (!MessageInterface.pollHasOptionLabels(merged) && MessageInterface.pollHasOptionLabels(fallback)) {
+            merged.options = fallback.options;
+            merged.optionCount = fallback.optionCount ?? fallback.options?.length ?? merged.optionCount;
+        }
+        if (!MessageInterface.readablePollText(merged.pluginSessionGuid) && fallback.pluginSessionGuid) {
+            merged.pluginSessionGuid = fallback.pluginSessionGuid;
+        }
+        if (!MessageInterface.readablePollText(merged.bundleIdentifier) && fallback.bundleIdentifier) {
+            merged.bundleIdentifier = fallback.bundleIdentifier;
+        }
+
+        return merged;
     }
 
     private static parsePollDefinition(rawData: any): any | null {
@@ -222,6 +279,7 @@ export class MessageInterface {
             return {
                 messageGuid: message.guid,
                 title: pollDefinition?.title ?? null,
+                titleSource: MessageInterface.readablePollText(pollDefinition?.title) ? "poll-payload" : null,
                 options,
                 responses: [],
                 optionCount: options.length,
@@ -280,27 +338,13 @@ export class MessageInterface {
     }
 
     private static async readPollResponsesForMessage(chatGuid: string, messageGuid: string): Promise<PollResponse[]> {
-        const messageGuids = MessageInterface.pollMessageGuidVariants(messageGuid);
-        const responseGuidWhere = messageGuids
-            .map(
-                (_, index) =>
-                    `(message.associatedMessageGuid = :messageGuid${index} OR message.replyToGuid = :messageGuid${index})`
-            )
-            .join(" OR ");
-        const responseGuidArgs = messageGuids.reduce<Record<string, string>>((args, guid, index) => {
-            args[`messageGuid${index}`] = guid;
-            return args;
-        }, {});
         const [messages] = await Server().iMessageRepo.getMessages({
             chatGuid,
             withAttachments: false,
             sort: "ASC",
             orderBy: "message.dateCreated",
             where: [
-                {
-                    statement: `(${responseGuidWhere})`,
-                    args: responseGuidArgs
-                },
+                MessageInterface.pollRelatedMessageWhere(messageGuid),
                 {
                     statement: "message.payloadData IS NOT NULL",
                     args: null
@@ -321,12 +365,82 @@ export class MessageInterface {
         }));
     }
 
+    private static async readPollCompanionTitle(
+        chatGuid: string,
+        messageGuid: string
+    ): Promise<{ title: string; messageGuid: string } | null> {
+        const [messages] = await Server().iMessageRepo.getMessages({
+            chatGuid,
+            withAttachments: false,
+            sort: "ASC",
+            orderBy: "message.dateCreated",
+            limit: 25,
+            where: [
+                MessageInterface.pollRelatedMessageWhere(messageGuid),
+                {
+                    statement: "message.text IS NOT NULL",
+                    args: {}
+                },
+                {
+                    statement: "(message.balloonBundleId IS NULL OR message.balloonBundleId = '')",
+                    args: {}
+                }
+            ]
+        });
+
+        for (const message of messages) {
+            const title = MessageInterface.readablePollText(message.text);
+            if (title) {
+                return {
+                    title,
+                    messageGuid: message.guid
+                };
+            }
+        }
+
+        return null;
+    }
+
     private static async mergePollResponses(chatGuid: string, messageGuid: string, poll: PollData): Promise<PollData> {
         const responses = await MessageInterface.readPollResponsesForMessage(chatGuid, messageGuid);
         return {
             ...poll,
             responses
         };
+    }
+
+    private static async enrichPoll(
+        chatGuid: string,
+        messageGuid: string,
+        poll: PollData,
+        fallbackMessage?: Message | null
+    ): Promise<PollData> {
+        let enriched = MessageInterface.mergePollDefinitions(
+            {
+                ...poll,
+                messageGuid
+            },
+            MessageInterface.readPollFromPayload(fallbackMessage)
+        );
+
+        if (!MessageInterface.readablePollText(enriched.title)) {
+            const companionTitle = await MessageInterface.readPollCompanionTitle(chatGuid, messageGuid);
+            if (companionTitle) {
+                enriched = {
+                    ...enriched,
+                    title: companionTitle.title,
+                    titleMessageGuid: companionTitle.messageGuid,
+                    titleSource: "companion-message"
+                };
+            }
+        } else if (!enriched.titleSource) {
+            enriched = {
+                ...enriched,
+                titleSource: "poll-payload"
+            };
+        }
+
+        return MessageInterface.mergePollResponses(chatGuid, messageGuid, enriched);
     }
 
     /**
@@ -941,6 +1055,10 @@ export class MessageInterface {
         const selectedMessage =
             message ?? (await Server().iMessageRepo.getMessage(messageGuid, true, false));
         const pollMessageGuid = MessageInterface.pollRootMessageGuid(messageGuid, selectedMessage);
+        const fallbackMessage =
+            selectedMessage?.guid === pollMessageGuid
+                ? selectedMessage
+                : await Server().iMessageRepo.getMessage(pollMessageGuid, true, false);
 
         try {
             const result = await Server().privateApi.message.readPoll(chatGuid, pollMessageGuid);
@@ -949,18 +1067,11 @@ export class MessageInterface {
                 throw new Error("Failed to read poll!");
             }
 
-            return await MessageInterface.mergePollResponses(chatGuid, pollMessageGuid, poll);
+            return await MessageInterface.enrichPoll(chatGuid, pollMessageGuid, poll, fallbackMessage);
         } catch (ex) {
-            const fallbackMessage =
-                selectedMessage?.guid === pollMessageGuid
-                    ? selectedMessage
-                    : await Server().iMessageRepo.getMessage(pollMessageGuid, true, false);
             const payloadPoll = MessageInterface.readPollFromPayload(fallbackMessage);
             if (payloadPoll) {
-                return await MessageInterface.mergePollResponses(chatGuid, pollMessageGuid, {
-                    ...payloadPoll,
-                    messageGuid: pollMessageGuid
-                });
+                return await MessageInterface.enrichPoll(chatGuid, pollMessageGuid, payloadPoll, fallbackMessage);
             }
             throw ex;
         }

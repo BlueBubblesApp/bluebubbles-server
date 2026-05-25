@@ -122,6 +122,8 @@ export type PollResponse = {
 export type PollData = {
     messageGuid?: string | null;
     title?: string | null;
+    titleMessageGuid?: string | null;
+    titleSource?: string | null;
     options?: PollOption[];
     responses?: PollResponse[];
     optionCount?: number;
