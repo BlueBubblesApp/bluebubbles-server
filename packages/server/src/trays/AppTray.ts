@@ -160,7 +160,10 @@ export class AppTray extends Tray {
                     }
                     return history.map(item => ({
                         label: `${item.text.substring(0, 45)}${item.text.length > 45 ? "…" : ""}`,
-                        click: () => Server().emitMessage(CLIPBOARD_SYNC, { content: item.text }, "normal", false)
+                        click: () => {
+                            Server().clipboardService?.writeFromClient(item.text);
+                            Server().emitMessage(CLIPBOARD_SYNC, { content: item.text }, "normal", false);
+                        }
                     }));
                 })()
             },
