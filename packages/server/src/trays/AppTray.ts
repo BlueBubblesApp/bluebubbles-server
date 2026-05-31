@@ -2,7 +2,7 @@ import { autoUpdater } from "electron-updater";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
 import { Tray } from ".";
-import { SERVER_UPDATE_DOWNLOADING } from "@server/events";
+import { SERVER_UPDATE_DOWNLOADING, CLIPBOARD_SYNC } from "@server/events";
 import { Menu, nativeTheme, Tray as ElectronTray, app } from "electron";
 import { AppWindow } from "@windows/AppWindow";
 import path from "path";
@@ -147,6 +147,22 @@ export class AppTray extends Tray {
             {
                 label: `Caffeinated: ${Server().caffeinate?.isCaffeinated}`,
                 enabled: false
+            },
+            {
+                type: "separator"
+            },
+            {
+                label: "Clipboard History",
+                submenu: (() => {
+                    const history = Server().clipboardService?.getHistory() ?? [];
+                    if (history.length === 0) {
+                        return [{ label: "No items yet", enabled: false }];
+                    }
+                    return history.map(item => ({
+                        label: `${item.text.substring(0, 45)}${item.text.length > 45 ? "…" : ""}`,
+                        click: () => Server().emitMessage(CLIPBOARD_SYNC, { content: item.text }, "normal", false)
+                    }));
+                })()
             },
             {
                 type: "separator"
