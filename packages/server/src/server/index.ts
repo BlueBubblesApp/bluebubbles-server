@@ -31,7 +31,8 @@ import {
     WebhookService,
     ScheduledMessagesService,
     OauthService,
-    ZrokService
+    ZrokService,
+    ClipboardService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
 import { runTerminalScript, openSystemPreferences, startMessages } from "@server/api/apple/scripts";
@@ -146,6 +147,8 @@ class BlueBubblesServer extends EventEmitter {
     webhookService: WebhookService;
 
     oauthService: OauthService;
+
+    clipboardService: ClipboardService;
 
     actionHandler: ActionHandler;
 
@@ -497,6 +500,13 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.logger.error(`Failed to start Scheduled Message service! ${ex?.message ?? String(ex)}}`);
         }
+
+        try {
+            this.logger.info("Initializing Clipboard Sync Service...");
+            this.clipboardService = new ClipboardService();
+        } catch (ex: any) {
+            this.logger.error(`Failed to initialize Clipboard Sync service! ${ex?.message ?? String(ex)}}`);
+        }
     }
 
     /**
@@ -537,6 +547,13 @@ class BlueBubblesServer extends EventEmitter {
             await this.scheduledMessages.start();
         } catch (ex: any) {
             this.logger.error(`Failed to start Scheduled Messages service! ${ex?.message ?? String(ex)}}`);
+        }
+
+        try {
+            this.logger.info("Starting Clipboard Sync service...");
+            this.clipboardService.start();
+        } catch (ex: any) {
+            this.logger.error(`Failed to start Clipboard Sync service! ${ex?.message ?? String(ex)}}`);
         }
 
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
@@ -604,6 +621,12 @@ class BlueBubblesServer extends EventEmitter {
             this.scheduledMessages?.stop();
         } catch (ex: any) {
             this.logger.error(`Failed to stop Scheduled Messages service! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            this.clipboardService?.stop();
+        } catch (ex: any) {
+            this.logger.error(`Failed to stop Clipboard Sync service! ${ex?.message ?? ex}`);
         }
 
         this.logger.info("Finished stopping services...");

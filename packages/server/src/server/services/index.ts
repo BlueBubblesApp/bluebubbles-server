@@ -11,6 +11,7 @@ import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
 import { ScheduledMessagesService } from "./scheduledMessagesService";
 import { OauthService } from "./oauthService";
+import { ClipboardService } from "./clipboardService";
 
 export {
     FCMService,
@@ -25,5 +26,6 @@ export {
     CloudflareService,
     WebhookService,
     ScheduledMessagesService,
-    OauthService
+    OauthService,
+    ClipboardService
 };

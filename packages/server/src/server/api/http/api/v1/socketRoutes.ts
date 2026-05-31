@@ -1079,6 +1079,20 @@ export class SocketRoutes {
             return response(cb, "save-vcf", createSuccessResponse(await GeneralInterface.checkForUpdate()));
         });
 
+        /**
+         * Receives clipboard content from a client and writes it to the Mac clipboard.
+         * The ClipboardService will broadcast it to all other connected clients.
+         */
+        socket.on("clipboard-sync", async (params, cb): Promise<void> => {
+            if (!params?.content) return response(cb, "error", createBadRequestResponse("No content provided!"));
+            try {
+                Server().clipboardService.writeFromClient(params.content);
+                return response(cb, "clipboard-sync-success", createSuccessResponse(null));
+            } catch {
+                return response(cb, "clipboard-sync-error", createServerErrorResponse("Failed to sync clipboard!"));
+            }
+        });
+
         socket.on("disconnect", reason => {
             log.info(`Client ${socket.id} disconnected! Reason: ${reason}`);
         });
