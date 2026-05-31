@@ -16,6 +16,7 @@ import {
 } from "@server/helpers/utils";
 import { isMinMonterey } from "@server/env";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
+import { APP_DATA_DIR_NAME, LEGACY_PACKAGE_DATA_DIR_NAME } from "@server/runtime/paths";
 
 import { startMessages } from "../api/apple/scripts";
 import {
@@ -33,8 +34,8 @@ import { uuidv4 } from "@firebase/util";
 const FindProcess = require("find-process");
 const { rimrafSync } = require("rimraf");
 
-// Patch in original user data directory
-app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
+// Keep this app's runtime state isolated from the legacy BlueBubbles Server app.
+app.setPath("userData", app.getPath("userData").replace(LEGACY_PACKAGE_DATA_DIR_NAME, APP_DATA_DIR_NAME));
 
 // Directory modifiers based on the environment
 let subdir = "";
@@ -42,7 +43,7 @@ let moddir = "app.asar.unpacked";
 let appPath = __dirname.replace("/app.asar/dist", "");
 if (process.env.NODE_ENV !== "production") {
     appPath = __dirname.replace("/dist", "");
-    subdir = "bluebubbles-server";
+    subdir = APP_DATA_DIR_NAME;
     moddir = "";
 }
 

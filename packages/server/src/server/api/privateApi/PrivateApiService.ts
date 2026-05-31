@@ -39,6 +39,10 @@ export class PrivateApiService extends Loggable {
 
     restartCounter = 0;
 
+    startedAt = 0;
+
+    lastClientActivityAt = 0;
+
     transactionManager: TransactionManager;
 
     eventHandlers: PrivateApiEventHandler[];
@@ -101,6 +105,7 @@ export class PrivateApiService extends Loggable {
     }
 
     async start(): Promise<void> {
+        this.startedAt = Date.now();
         // Configure & start the listener
         this.log.debug("Starting Private API Helper Services...");
         await this.configureServer();
@@ -147,16 +152,19 @@ export class PrivateApiService extends Loggable {
     }
 
     registerClient(process: string, socket: Socket) {
+        this.lastClientActivityAt = Date.now();
         this.activeClients[process] = socket;
         this.emit("client-registered", { process, socket });
     }
 
     addClient(client: Socket) {
+        this.lastClientActivityAt = Date.now();
         this.clients.push(client);
         this.log.info(`Added socket client (Total: ${this.clients.length})`);
     }
 
     removeClient(client: Socket) {
+        this.lastClientActivityAt = Date.now();
         const proc = this.getProcessByClientId(client.id);
         this.log.debug(`Private API Helper (${proc ?? "Anonymous"}) disconnected!`);
 
@@ -169,6 +177,8 @@ export class PrivateApiService extends Loggable {
         if (proc) {
             delete this.activeClients[proc];
         }
+
+        this.emit("client-disconnected", { process: proc, socket: client });
     }
 
     async configureServer(): Promise<void> {
@@ -218,6 +228,7 @@ export class PrivateApiService extends Loggable {
     }
 
     async onEvent(eventRaw: string, socket: net.Socket): Promise<void> {
+        this.lastClientActivityAt = Date.now();
         if (eventRaw == null) {
             this.log.info(`Received null data from BlueBubblesHelper!`);
             return;
@@ -344,6 +355,13 @@ export class PrivateApiService extends Loggable {
         return null;
     }
 
+    async keepAlive(): Promise<void> {
+        await this.writeData("ping", {
+            source: "bluebubbles-server",
+            timestamp: Date.now()
+        });
+    }
+
     private async writeToClients(data: string): Promise<boolean> {
         let success = false;
         for (const client of this.clients) {
@@ -407,5 +425,15 @@ export class PrivateApiService extends Loggable {
 
         await this.mode?.stop();
         this.log.info(`Private API Helper Stopped...`);
+    }
+
+    getHealthSnapshot() {
+        return {
+            startedAt: this.startedAt,
+            lastClientActivityAt: this.lastClientActivityAt,
+            clients: this.clients.length,
+            activeClients: Object.keys(this.activeClients),
+            serverListening: this.server?.listening ?? false
+        };
     }
 }

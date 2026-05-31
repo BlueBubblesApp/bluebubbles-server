@@ -13,11 +13,12 @@ import { isEmpty, safeTrim } from "@server/helpers/utils";
 import { AppWindow } from "@windows/AppWindow";
 import { AppTray } from "@trays/AppTray";
 import { getLogger } from "@server/lib/logging/Loggable";
+import { APP_DATA_DIR_NAME, LEGACY_PACKAGE_DATA_DIR_NAME } from "@server/runtime/paths";
 
 app.commandLine.appendSwitch("in-process-gpu");
 
-// Patch in original user data directory
-app.setPath("userData", app.getPath("userData").replace("@bluebubbles/server", "bluebubbles-server"));
+// Keep this app's runtime state isolated from the legacy BlueBubbles Server app.
+app.setPath("userData", app.getPath("userData").replace(LEGACY_PACKAGE_DATA_DIR_NAME, APP_DATA_DIR_NAME));
 
 // Load the config file
 let cfg = {};

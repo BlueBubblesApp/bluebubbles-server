@@ -29,6 +29,7 @@ import {
     UpdateService,
     CloudflareService,
     WebhookService,
+    MessageListenerHealthService,
     ScheduledMessagesService,
     OauthService,
     ZrokService
@@ -71,6 +72,7 @@ import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
+import { APP_LOG_DIR_NAME } from "./runtime/paths";
 
 const findProcess = require("find-process");
 
@@ -81,9 +83,9 @@ const logFormat = "[{y}-{m}-{d} {h}:{i}:{s}.{ms}][{level}]{text}";
 ServerLog.transports.console.format = logFormat;
 ServerLog.transports.file.format = logFormat;
 
-// Patch in the original package path so we don't use @bluebubbles/server
+// Keep logs isolated from the legacy BlueBubbles Server app.
 ServerLog.transports.file.resolvePath = () =>
-    path.join(os.homedir(), "Library", "Logs", "bluebubbles-server", "main.log");
+    path.join(os.homedir(), "Library", "Logs", APP_LOG_DIR_NAME, "main.log");
 
 /**
  * Create a singleton for the server so that it can be referenced everywhere.
@@ -144,6 +146,8 @@ class BlueBubblesServer extends EventEmitter {
     proxyServices: Proxy[];
 
     webhookService: WebhookService;
+
+    messageListenerHealth: MessageListenerHealthService;
 
     oauthService: OauthService;
 
@@ -232,6 +236,7 @@ class BlueBubblesServer extends EventEmitter {
         this.updater = null;
         this.messageManager = null;
         this.webhookService = null;
+        this.messageListenerHealth = null;
         this.scheduledMessages = null;
         this.oauthService = null;
         this.iMessageListener = null;
@@ -492,6 +497,13 @@ class BlueBubblesServer extends EventEmitter {
         }
 
         try {
+            this.logger.info("Initializing Message Listener Health Service...");
+            this.messageListenerHealth = new MessageListenerHealthService();
+        } catch (ex: any) {
+            this.logger.error(`Failed to start Message Listener Health service! ${ex?.message ?? String(ex)}}`);
+        }
+
+        try {
             this.logger.info("Initializing Scheduled Messages Service...");
             this.scheduledMessages = new ScheduledMessagesService();
         } catch (ex: any) {
@@ -549,6 +561,7 @@ class BlueBubblesServer extends EventEmitter {
         if (this.hasDiskAccess) {
             this.logger.info("Starting iMessage Database listeners...");
             await this.startChatListeners();
+            this.messageListenerHealth?.start();
         }
 
         try {
@@ -574,6 +587,12 @@ class BlueBubblesServer extends EventEmitter {
             this.removeAllListeners();
         } catch (ex: any) {
             this.logger.info(`Failed to stop iMessage database listeners! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            this.messageListenerHealth?.stop();
+        } catch (ex: any) {
+            this.logger.info(`Failed to stop Message Listener Health service! ${ex?.message ?? ex}`);
         }
 
         try {
@@ -1493,13 +1512,40 @@ class BlueBubblesServer extends EventEmitter {
         this.iMessageListener.on("error", (error: Error) => this.logger.error(error.message));
 
         // Start the listeners with a 500ms delay between each to prevent locks.
-        this.iMessageListener.start();
+        await this.iMessageListener.start();
+    }
+
+    async restartChatListenersOnly(reason = "unknown") {
+        if (!this.hasDiskAccess || !this.iMessageRepo) return;
+
+        this.logger.warn(`Restarting iMessage Database listeners only (${reason})...`);
+        this.removeChatListeners();
+        await this.startChatListeners();
+    }
+
+    async dispatchBackfilledIncomingMessage(item: Message) {
+        if (!item || item.isFromMe) return;
+
+        const message = await insertChatParticipants(item);
+        await this.webhookService?.dispatch({
+            type: NEW_MESSAGE,
+            data: await MessageSerializer.serialize({
+                message,
+                config: {
+                    enforceMaxSize: true
+                },
+                isForNotification: true
+            })
+        });
+        this.messageListenerHealth?.recordIncomingMessage(message);
     }
 
     private async handleNewMessage(item: Message) {
         const newMessage = await insertChatParticipants(item);
+        const from = newMessage.isFromMe ? "You" : obfuscatedHandle(newMessage.handle?.id);
         this.logger.info(
-            `New Message from ${newMessage.isFromMe ? 'You' : obfuscatedHandle(newMessage.handle?.id)}, ${newMessage.contentString()}`);
+            `New Message from ${from}, ${newMessage.contentString()}`
+        );
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data
@@ -1531,6 +1577,7 @@ class BlueBubblesServer extends EventEmitter {
             true,
             false
         );
+        this.messageListenerHealth?.recordIncomingMessage(newMessage);
     }
 
     private async handleUpdatedMessage(item: Message) {

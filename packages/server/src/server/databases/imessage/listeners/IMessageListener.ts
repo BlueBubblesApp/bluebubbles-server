@@ -27,6 +27,18 @@ export class IMessageListener extends Loggable {
 
     lastCheck = 0;
 
+    startedAt = 0;
+
+    lastPollStartedAt = 0;
+
+    lastPollFinishedAt = 0;
+
+    lastPollErrorAt = 0;
+
+    lastChangeEventAt = 0;
+
+    pollInFlight = false;
+
     constructor({ filePaths, repo, cache }: { filePaths: string[], repo: MessageRepository, cache: IMessageCache }) {
         super();
 
@@ -40,6 +52,8 @@ export class IMessageListener extends Loggable {
 
     stop() {
         this.stopped = true;
+        this.watcher?.stop();
+        this.watcher = null;
         this.removeAllListeners();
     }
 
@@ -60,6 +74,7 @@ export class IMessageListener extends Loggable {
     }
 
     async start() {
+        this.startedAt = Date.now();
         this.lastCheck = this.getEarliestModifiedDate().getTime() - 60000;
         this.stopped = false;
 
@@ -83,6 +98,7 @@ export class IMessageListener extends Loggable {
 
     @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', 500)
     async handleChangeEvent(event: FileChangeEvent) {
+        this.lastChangeEventAt = Date.now();
         await this.processLock.acquire();
         try {
             const now = Date.now();
@@ -115,15 +131,59 @@ export class IMessageListener extends Loggable {
     }
 
     async poll(after: Date, emitResults = true) {
-        for (const poller of this.pollers) {
-            const results = await poller.poll(after);
+        this.pollInFlight = true;
+        this.lastPollStartedAt = Date.now();
 
-            if (emitResults) {
-                for (const result of results) {
-                    this.emit(result.eventType, result.data);
-                    await waitMs(10);
+        try {
+            for (const poller of this.pollers) {
+                const results = await poller.poll(after);
+
+                if (emitResults) {
+                    for (const result of results) {
+                        await this.emitAsync(result.eventType, result.data);
+                        await waitMs(10);
+                    }
                 }
             }
+            this.lastPollFinishedAt = Date.now();
+        } catch (ex: any) {
+            this.lastPollErrorAt = Date.now();
+            throw ex;
+        } finally {
+            this.pollInFlight = false;
         }
+    }
+
+    async heartbeat(after: Date) {
+        await this.processLock.acquire();
+        try {
+            await this.poll(after);
+            this.lastCheck = Date.now();
+            this.cache.trimCaches();
+        } finally {
+            this.processLock.release();
+        }
+    }
+
+    private async emitAsync(eventType: string, data: any) {
+        const listeners = this.listeners(eventType);
+        for (const listener of listeners) {
+            await listener(data);
+        }
+    }
+
+    getHeartbeat() {
+        return {
+            stopped: this.stopped,
+            startedAt: this.startedAt,
+            lastCheck: this.lastCheck,
+            lastChangeEventAt: this.lastChangeEventAt,
+            lastPollStartedAt: this.lastPollStartedAt,
+            lastPollFinishedAt: this.lastPollFinishedAt,
+            lastPollErrorAt: this.lastPollErrorAt,
+            pollInFlight: this.pollInFlight,
+            waitingPolls: this.processLock.nrWaiting(),
+            watcherActive: this.watcher != null
+        };
     }
 }
