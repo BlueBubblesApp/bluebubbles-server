@@ -31,18 +31,16 @@ export class ChatInterface {
         limit = null,
         sort = "lastmessage"
     }: any = {}): Promise<[ChatResponse[], number]> {
-        // First fetch chats without the last message.
-        // This is because fetching the last message will make the participants list 1 for each chat.
-        // It will also only return chats that have a last message.
-        const [chats, totalChats] = await Server().iMessageRepo.getChats({
-            chatGuid: guid as string,
-            withLastMessage: false,
-            withArchived,
-            offset,
-            limit
-        });
+        const sortByLastMessage = sort === "lastmessage" && withLastMessage;
 
+        // Build a cache of each chat's last message. When sorting by last
+        // message we also use it to order ALL chats by recency *before*
+        // paginating. Previously offset/limit were applied in DB (ROWID) order
+        // and only the resulting page was sorted, so the most-recent chats were
+        // not guaranteed to be in the first page (e.g. a staged/paginated client
+        // would show stale chats first).
         const lastMessageCache: { [key: string]: Message | null } = {};
+        let orderedGuids: string[] | null = null;
         if (withLastMessage) {
             const [tmpChats, _] = await Server().iMessageRepo.getChats({
                 chatGuid: guid as string,
@@ -56,6 +54,77 @@ export class ChatInterface {
             for (const chat of tmpChats) {
                 lastMessageCache[chat.guid] = chat.messages.length > 0 ? chat.messages[0] : null;
             }
+
+            if (sortByLastMessage) {
+                // Order ALL chats by recency. A higher last-message ROWID means a
+                // more recent message; chats with no messages have no cached
+                // message and sort last. We fetch the full guid list separately
+                // (the withLastMessage query only returns chats that have a
+                // message) so message-less chats are still included, matching the
+                // previous behaviour.
+                const [allChats] = await Server().iMessageRepo.getChats({
+                    chatGuid: guid as string,
+                    withLastMessage: false,
+                    withParticipants: false,
+                    withArchived,
+                    offset: null,
+                    limit: null
+                });
+                orderedGuids = allChats
+                    .map((c: Chat) => c.guid)
+                    .sort((a: string, b: string) => (lastMessageCache[b]?.ROWID ?? 0) - (lastMessageCache[a]?.ROWID ?? 0));
+            }
+        }
+
+        // Fetch the page of chats (with participants) we actually need to return.
+        // We fetch participants separately from the last message because joining
+        // the last message collapses the participants list to one per chat.
+        let chats: Chat[];
+        let totalChats: number;
+        if (sortByLastMessage && orderedGuids) {
+            totalChats = orderedGuids.length;
+            const start = offset ?? 0;
+            const end = limit != null ? start + limit : orderedGuids.length;
+            const pageGuids = orderedGuids.slice(start, end);
+
+            if (isEmpty(pageGuids)) {
+                chats = [];
+            } else {
+                // For the common (paginated) case, fetch just this page via an IN
+                // filter. Fall back to fetching everything if the page is large
+                // enough to risk SQLite's bound-variable limit.
+                let pageChats: Chat[];
+                if (pageGuids.length <= 900) {
+                    [pageChats] = await Server().iMessageRepo.getChats({
+                        chatGuid: guid as string,
+                        withLastMessage: false,
+                        withArchived,
+                        offset: null,
+                        limit: null,
+                        where: [{ statement: "chat.guid IN (:...guids)", args: { guids: pageGuids } }]
+                    });
+                } else {
+                    [pageChats] = await Server().iMessageRepo.getChats({
+                        chatGuid: guid as string,
+                        withLastMessage: false,
+                        withArchived,
+                        offset: null,
+                        limit: null
+                    });
+                }
+
+                // SQL `IN` doesn't preserve order, so re-apply the recency order.
+                const byGuid = new Map<string, Chat>(pageChats.map((c: Chat) => [c.guid, c]));
+                chats = pageGuids.map((g: string) => byGuid.get(g)).filter((c): c is Chat => !!c);
+            }
+        } else {
+            [chats, totalChats] = await Server().iMessageRepo.getChats({
+                chatGuid: guid as string,
+                withLastMessage: false,
+                withArchived,
+                offset,
+                limit
+            });
         }
 
         const results = [];

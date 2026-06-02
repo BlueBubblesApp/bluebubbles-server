@@ -15,7 +15,8 @@ export type DBMessageParams = {
 
 export type DBWhereItem = {
     statement: string;
-    args: { [key: string]: string | number };
+    // Arrays are supported for `IN (:...param)` style clauses.
+    args: { [key: string]: string | number | (string | number)[] };
 };
 
 export type ChatParams = {
