@@ -103,12 +103,14 @@ export class ContactInterface {
      * @param preloadedContacts If you already loaded a list of contacts, pass it here
      * @returns A contact entry dictionary
      */
-    static findContact(address: string, { preloadedContacts }: { preloadedContacts?: any[] | null } = {}): any | null {
-        const contactList = preloadedContacts ?? ContactsLib.getAllContacts();
+    /**
+     * Build a map of stripped-address -> contact from a contact list. Build this
+     * ONCE and pass it to [findContact] via `preloadedCacheMap` when looking up
+     * many addresses, so the map isn't rebuilt on every lookup (which made
+     * queryContacts O(addresses * contacts)).
+     */
+    static buildContactAddressMap(contactList: any[]): NodeJS.Dict<any> {
         const alphaNumericRegex = /[^a-zA-Z0-9_]/gi;
-        const addr = address.replace(alphaNumericRegex, "");
-
-        // Build a map where the address is the key and contact dict is the value
         const cacheMap: NodeJS.Dict<any> = {};
         for (const c of contactList) {
             const addresses = [
@@ -120,6 +122,24 @@ export class ContactInterface {
             }
         }
 
+        return cacheMap;
+    }
+
+    static findContact(
+        address: string,
+        { preloadedContacts, preloadedCacheMap }:
+            { preloadedContacts?: any[] | null; preloadedCacheMap?: NodeJS.Dict<any> | null } = {}
+    ): any | null {
+        const alphaNumericRegex = /[^a-zA-Z0-9_]/gi;
+        const addr = address.replace(alphaNumericRegex, "");
+
+        // Use the prebuilt address -> contact map when provided (the fast path
+        // for bulk lookups); otherwise build one from the contact list.
+        const cacheMap =
+            preloadedCacheMap ??
+            ContactInterface.buildContactAddressMap(preloadedContacts ?? ContactsLib.getAllContacts());
+        const keys = Object.keys(cacheMap);
+
         // Find a key that matches the last 'x' characters.
         // First, test the entire string, then slowly remove numbers from the start
         // until we find a match. If we don't find a match after testing 4 varients, we are done.
@@ -127,9 +147,9 @@ export class ContactInterface {
         let output: NodeJS.Dict<any> = null;
         for (const sub of choices) {
             const ending = addr.substring(addr.length - sub, addr.length);
-            const matches = Object.keys(cacheMap).filter(e => e && e.endsWith(ending));
-            if (matches && matches.length > 0) {
-                output = cacheMap[matches[0]];
+            const match = keys.find(e => e && e.endsWith(ending));
+            if (match) {
+                output = cacheMap[match];
                 break;
             }
         }
@@ -475,9 +495,15 @@ export class ContactInterface {
         const data: any[] = [];
 
         const contactList = await ContactInterface.getAllContacts(extraProperties);
+        // Build the address -> contact map once and reuse it for every address
+        // (was rebuilt per address — O(addresses * contacts)). Dedupe results so
+        // a contact matched by several of its addresses is only returned once.
+        const cacheMap = ContactInterface.buildContactAddressMap(contactList);
+        const seen = new Set<any>();
         for (const i of addresses) {
-            const found = ContactInterface.findContact(i, { preloadedContacts: contactList });
-            if (found) {
+            const found = ContactInterface.findContact(i, { preloadedCacheMap: cacheMap });
+            if (found && !seen.has(found)) {
+                seen.add(found);
                 data.push(found);
             }
         }
