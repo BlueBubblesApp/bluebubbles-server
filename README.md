@@ -20,6 +20,15 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 4. Run the dev server (this will start both the renderer and server)
     - `npm run start`
 
+### Development Ports
+
+When running the dev server with `npm run start`, the following ports are used:
+
+- **Port 1234** - BlueBubbles API/Socket server (the actual backend that clients connect to)
+- **Port 3000** - React dev server for the Electron app UI (hot-reloading frontend)
+
+The Cloudflare tunnel (if configured) proxies external traffic to `localhost:1234`.
+
 ### macOS Warning
 
 If you are using macOS 10.x and are having issues building/running the server, please downgrade the `node-mac-permissions` dependency to `v2.2.0`. The reason it's on a newer version is to fix a production crashing issue on Big Sur+. Please downgrade it manually for testing on macOS v10.x.
