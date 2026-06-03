@@ -16,6 +16,11 @@ export class ContactsOAuthWindow extends Window {
     public static getInstance(url: string): ContactsOAuthWindow {
         if (!ContactsOAuthWindow.self) {
             ContactsOAuthWindow.self = new ContactsOAuthWindow(url);
+        } else {
+            // Always use the latest URL. Each attempt generates a fresh PKCE
+            // challenge that must match the server's current code verifier;
+            // reusing a stale URL causes an "Invalid code verifier" error.
+            ContactsOAuthWindow.self.url = url;
         }
 
         return ContactsOAuthWindow.self;
@@ -35,16 +40,31 @@ export class ContactsOAuthWindow extends Window {
         this.instance.loadURL(this.url);
         this.instance.webContents.on("did-finish-load", () => {
             const url = this.instance.webContents.getURL();
-            if (url.split("#")[0] !== Server().oauthService?.callbackUrl) return;
+            const callbackUrl = Server().oauthService?.callbackUrl;
+            if (!callbackUrl || !url.startsWith(callbackUrl)) return;
 
-            // Extract the token from the URL
-            const hash = url.split("#")[1];
-            const params = new URLSearchParams(hash);
-            const token = params.get("access_token");
-            const expires = params.get("expires_in");
-            Server().oauthService.authToken = token;
-            Server().oauthService.expiresIn = Number.parseInt(expires);
-            Server().oauthService.handleContactsSync();
+            // Two possible flows:
+            //  - Background sync (own client): authorization code in the query string (?code=...)
+            //  - One-time sync (built-in client): access token in the URL fragment (#access_token=...)
+            const params = new URL(url).searchParams;
+            const code = params.get("code");
+            const error = params.get("error");
+
+            const hash = url.includes("#") ? url.split("#")[1] : "";
+            const hashParams = new URLSearchParams(hash);
+            const accessToken = hashParams.get("access_token");
+
+            if (code) {
+                Server().oauthService.handleContactsAuthCode(code);
+            } else if (accessToken) {
+                Server().oauthService.authToken = accessToken;
+                Server().oauthService.expiresIn = Number.parseInt(hashParams.get("expires_in") ?? "3600");
+                Server().oauthService.handleContactsSync();
+            } else {
+                // The user denied access or an error occurred.
+                Server().oauthService.setStatus(error ? ProgressStatus.FAILED : ProgressStatus.NOT_STARTED);
+                Server().oauthService.stop();
+            }
 
             // Clear the window data
             this.instance.close();

@@ -56,4 +56,25 @@ export const DEFAULT_DB_ITEMS: { [key: string]: () => any } = {
     landing_page_path: () => "",
     open_findmy_on_startup: () => 1,
     auto_lock_mac: () => 0,
+    // Google Contacts background sync.
+    // Selects the Google flow: 0 = one-time import using the built-in client
+    // (implicit flow, no setup); 1 = use the user's own OAuth client for
+    // offline/background sync (approach "B").
+    google_contacts_use_own_client: () => 0,
+    // Opt-in: disabled by default. When enabled, the server keeps the local
+    // contact database in sync with the user's Google Contacts on an interval.
+    google_contacts_sync_enabled: () => 0,
+    // Minutes between background syncs (default: 6 hours).
+    google_contacts_sync_interval: () => 360,
+    // The OAuth refresh token used for offline/background access. Empty until
+    // the user authorizes with offline access (authorization-code + PKCE flow).
+    google_contacts_refresh_token: () => "",
+    // The People API sync token, used to fetch only changes since the last sync.
+    google_contacts_sync_token: () => "",
+    // Timestamp (ms) of the last successful Google Contacts sync.
+    google_contacts_last_sync: () => 0,
+    // Optional user-provided OAuth client (approach B). When both are set, they
+    // override the built-in shared client. Leave empty to use the built-in one.
+    google_oauth_client_id: () => "",
+    google_oauth_client_secret: () => "",
 };

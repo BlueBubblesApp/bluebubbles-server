@@ -26,7 +26,12 @@ import {
     MenuItem,
     Spinner,
     Link,
-    Image
+    Image,
+    Switch,
+    FormControl,
+    FormLabel,
+    NumberInput,
+    NumberInputField
 } from '@chakra-ui/react';
 import {
     Pagination,
@@ -48,7 +53,16 @@ import { waitMs } from 'app/utils/GenericUtils';
 import { PaginationPreviousButton } from 'app/components/buttons/PaginationPreviousButton';
 import { PaginationNextButton } from 'app/components/buttons/PaginationNextButton';
 import { ProgressStatus } from 'app/types';
-import { getContactsOauthUrl, restartOauthService } from 'app/utils/IpcUtils';
+import {
+    getContactsOauthUrl,
+    restartOauthService,
+    getGoogleContactsSyncStatus,
+    googleContactsSyncNow,
+    googleContactsDisconnect,
+    setGoogleContactsSyncEnabled,
+    setGoogleContactsSyncInterval,
+    GoogleContactsStatus
+} from 'app/utils/IpcUtils';
 import GoogleIcon from '../../../images/walkthrough/google-icon.png';
 
 const perPage = 25;
@@ -98,6 +112,17 @@ export const ContactsLayout = (): JSX.Element => {
 
     const [authStatus, setAuthStatus] = useState(ProgressStatus.NOT_STARTED);
     const [oauthUrl, setOauthUrl] = useState('');
+
+    const [syncStatus, setSyncStatus] = useState(null as GoogleContactsStatus | null);
+    const [intervalInput, setIntervalInput] = useState('360');
+    const [savingSync, setSavingSync] = useState(false);
+    const [syncingNow, setSyncingNow] = useState(false);
+
+    const [useOwnClient, setUseOwnClient] = useState(false);
+    const [clientIdInput, setClientIdInput] = useState('');
+    const [clientSecretInput, setClientSecretInput] = useState('');
+    const [hasSecret, setHasSecret] = useState(false);
+    const [savingClient, setSavingClient] = useState(false);
 
     let filteredContacts = contacts;
     if (search && search.length > 0) {
@@ -163,9 +188,100 @@ export const ContactsLayout = (): JSX.Element => {
         return null;
     };
 
+    const refreshSyncStatus = async (): Promise<void> => {
+        const status = await getGoogleContactsSyncStatus();
+        if (status) {
+            setSyncStatus(status);
+            setIntervalInput(String(status.interval));
+        }
+    };
+
+    const onToggleSync = async (enabled: boolean): Promise<void> => {
+        setSavingSync(true);
+        try {
+            const status = await setGoogleContactsSyncEnabled(enabled);
+            if (status) setSyncStatus(status);
+        } finally {
+            setSavingSync(false);
+        }
+    };
+
+    const onCommitInterval = async (): Promise<void> => {
+        const minutes = Math.max(15, Number(intervalInput) || 360);
+        const status = await setGoogleContactsSyncInterval(minutes);
+        if (status) {
+            setSyncStatus(status);
+            setIntervalInput(String(status.interval));
+        }
+    };
+
+    const onSyncNow = async (): Promise<void> => {
+        setSyncingNow(true);
+        try {
+            await googleContactsSyncNow();
+            showSuccessToast({ id: 'gc-sync', description: 'Finished syncing Google Contacts!' });
+            loadContacts();
+            await refreshSyncStatus();
+        } catch {
+            // Errors are surfaced in the server logs.
+        } finally {
+            setSyncingNow(false);
+        }
+    };
+
+    const onDisconnectSync = async (): Promise<void> => {
+        const status = await googleContactsDisconnect();
+        if (status) setSyncStatus(status);
+        setAuthStatus(ProgressStatus.NOT_STARTED);
+    };
+
+    const loadClientConfig = async (): Promise<void> => {
+        const cfg = await ipcRenderer.invoke('get-config');
+        if (cfg) {
+            setUseOwnClient(!!cfg.google_contacts_use_own_client);
+            setClientIdInput(cfg.google_oauth_client_id ?? '');
+            setHasSecret(!!cfg.google_oauth_client_secret);
+        }
+    };
+
+    const onToggleMode = async (enabled: boolean): Promise<void> => {
+        setUseOwnClient(enabled);
+        await ipcRenderer.invoke('set-config', { google_contacts_use_own_client: enabled });
+        // Regenerate the OAuth URL so the button uses the correct flow for the mode.
+        const url = await getContactsOauthUrl();
+        setOauthUrl(url);
+    };
+
+    const onSaveCustomClient = async (): Promise<void> => {
+        setSavingClient(true);
+        try {
+            const payload: NodeJS.Dict<string> = { google_oauth_client_id: clientIdInput.trim() };
+            // Only overwrite the secret if a new one was entered.
+            if (clientSecretInput.trim().length > 0) {
+                payload.google_oauth_client_secret = clientSecretInput.trim();
+            }
+            await ipcRenderer.invoke('set-config', payload);
+
+            // Regenerate the OAuth URL so it uses the newly-saved client.
+            const url = await getContactsOauthUrl();
+            setOauthUrl(url);
+
+            if (payload.google_oauth_client_secret) setHasSecret(true);
+            setClientSecretInput('');
+            showSuccessToast({
+                id: 'gc-client',
+                description: 'Saved your Google OAuth client. Now click "Continue with Google".'
+            });
+        } finally {
+            setSavingClient(false);
+        }
+    };
+
     useEffect(() => {
         loadContacts();
         refreshPermissionStatus();
+        refreshSyncStatus();
+        loadClientConfig();
 
         ipcRenderer.removeAllListeners('oauth-status');
         getContactsOauthUrl().then(url => setOauthUrl(url));
@@ -175,6 +291,7 @@ export const ContactsLayout = (): JSX.Element => {
 
             if (data === ProgressStatus.COMPLETED) {
                 loadContacts(true);
+                refreshSyncStatus();
             }
         });
     }, []);
@@ -395,7 +512,60 @@ export const ContactsLayout = (): JSX.Element => {
                     Authorize BlueBubbles to access your Google Contacts to download contacts and avatars
                     from Google, and serve them to any connected clients.
                 </Text>
+                <FormControl display='flex' alignItems='center' mb={2}>
+                    <FormLabel htmlFor='gc-mode-toggle' mb='0' fontSize='md'>
+                        Use my own Google OAuth client (enables automatic background sync)
+                    </FormLabel>
+                    <Switch
+                        id='gc-mode-toggle'
+                        isChecked={useOwnClient}
+                        onChange={(e) => onToggleMode(e.target.checked)}
+                    />
+                </FormControl>
+                {!useOwnClient ? (
+                    <Text fontSize='sm' color='gray.500' mb={2}>
+                        One-time import using BlueBubbles&apos; built-in Google sign-in. Quick to set up, but
+                        contacts won&apos;t update automatically afterward.
+                    </Text>
+                ) : (
+                    <Box>
+                        <Text fontSize='sm' fontWeight='bold' mb={1}>
+                            Step 1 — Your Google OAuth client
+                        </Text>
+                        <Text fontSize='sm' color='gray.500' mb={3}>
+                            Background sync needs offline access, which the built-in client can&apos;t grant. In
+                            Google Cloud Console: enable the People API, set up the OAuth consent screen (add
+                            yourself as a test user), and create an OAuth client of type &quot;Desktop app&quot;.
+                            Paste its credentials below and Save, then connect.
+                        </Text>
+                        <Box p={3} borderWidth='1px' borderRadius='md' mb={3}>
+                            <Stack direction='row' alignItems='center' spacing={3}>
+                                <Input
+                                    size='sm'
+                                    placeholder='Client ID'
+                                    value={clientIdInput}
+                                    onChange={(e) => setClientIdInput(e.target.value)}
+                                />
+                                <Input
+                                    size='sm'
+                                    type='password'
+                                    placeholder={hasSecret ? '•••••••• (saved)' : 'Client Secret'}
+                                    value={clientSecretInput}
+                                    onChange={(e) => setClientSecretInput(e.target.value)}
+                                />
+                                <Button size='sm' isLoading={savingClient} onClick={() => onSaveCustomClient()}>
+                                    Save
+                                </Button>
+                            </Stack>
+                        </Box>
+                    </Box>
+                )}
                 <Box>
+                    {useOwnClient ? (
+                        <Text fontSize='sm' fontWeight='bold' mb={1}>
+                            Step 2 — Connect
+                        </Text>
+                    ) : null}
                     <Link
                         href={oauthUrl}
                         target="_blank"
@@ -407,6 +577,7 @@ export const ContactsLayout = (): JSX.Element => {
                                 pr={10}
                                 leftIcon={<Image src={GoogleIcon} mr={1} width={5} />}
                                 variant='outline'
+                                isDisabled={useOwnClient && !clientIdInput}
                                 onClick={() => {
                                     restartOauthService();
                                 }}
@@ -424,6 +595,57 @@ export const ContactsLayout = (): JSX.Element => {
                         </Stack>
                     </Link>
                 </Box>
+                {useOwnClient && syncStatus?.connected ? (
+                    <Box mt={3}>
+                        <FormControl display='flex' alignItems='center'>
+                            <FormLabel htmlFor='gc-sync-toggle' mb='0' fontSize='md'>
+                                Keep contacts synced in the background
+                            </FormLabel>
+                            <Switch
+                                id='gc-sync-toggle'
+                                isChecked={syncStatus?.enabled ?? false}
+                                isDisabled={savingSync}
+                                onChange={(e) => onToggleSync(e.target.checked)}
+                            />
+                        </FormControl>
+                        <Stack direction='row' alignItems='center' spacing={3} mt={3}>
+                            <Text fontSize='sm'>Sync every</Text>
+                            <NumberInput
+                                size='sm'
+                                maxW='6.5em'
+                                min={15}
+                                value={intervalInput}
+                                onChange={(valStr) => setIntervalInput(valStr)}
+                                onBlur={() => onCommitInterval()}
+                            >
+                                <NumberInputField />
+                            </NumberInput>
+                            <Text fontSize='sm'>minutes</Text>
+                            <Button
+                                size='sm'
+                                leftIcon={<BiRefresh />}
+                                isLoading={syncingNow}
+                                onClick={() => onSyncNow()}
+                            >
+                                Sync Now
+                            </Button>
+                            <Button
+                                size='sm'
+                                variant='outline'
+                                colorScheme='red'
+                                onClick={() => onDisconnectSync()}
+                            >
+                                Disconnect
+                            </Button>
+                        </Stack>
+                        <Text fontSize='sm' color='gray.500' mt={2}>
+                            {syncStatus?.lastSync
+                                ? `Last synced ${new Date(syncStatus.lastSync).toLocaleString()}`
+                                : 'Not yet synced'}
+                            {syncStatus?.usingCustomClient ? ' • Using your own OAuth client' : ''}
+                        </Text>
+                    </Box>
+                ) : null}
             </Stack>
             <Stack direction='column' p={5}>
                 <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>

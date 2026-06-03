@@ -31,6 +31,7 @@ import {
     WebhookService,
     ScheduledMessagesService,
     OauthService,
+    GoogleContactsService,
     ZrokService
 } from "@server/services";
 import { EventCache } from "@server/eventCache";
@@ -148,6 +149,8 @@ class BlueBubblesServer extends EventEmitter {
 
     oauthService: OauthService;
 
+    googleContactsService: GoogleContactsService;
+
     actionHandler: ActionHandler;
 
     eventCache: EventCache;
@@ -235,6 +238,7 @@ class BlueBubblesServer extends EventEmitter {
         this.webhookService = null;
         this.scheduledMessages = null;
         this.oauthService = null;
+        this.googleContactsService = null;
         this.iMessageListener = null;
 
         this.hasSetup = false;
@@ -451,6 +455,13 @@ class BlueBubblesServer extends EventEmitter {
         } catch (ex: any) {
             this.logger.error(`Failed to setup OAuth service! ${ex?.message ?? String(ex)}}`);
         }
+
+        try {
+            this.logger.info("Initializing Google Contacts service...");
+            this.googleContactsService = new GoogleContactsService();
+        } catch (ex: any) {
+            this.logger.error(`Failed to setup Google Contacts service! ${ex?.message ?? String(ex)}}`);
+        }
     }
 
     async initServices(): Promise<void> {
@@ -545,6 +556,12 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.error(`Failed to start Scheduled Messages service! ${ex?.message ?? String(ex)}}`);
         }
 
+        try {
+            await this.googleContactsService?.start();
+        } catch (ex: any) {
+            this.logger.error(`Failed to start Google Contacts sync! ${ex?.message ?? String(ex)}}`);
+        }
+
         const privateApiEnabled = this.repo.getConfig("enable_private_api") as boolean;
         const ftPrivateApiEnabled = this.repo.getConfig("enable_ft_private_api") as boolean;
         if (privateApiEnabled || ftPrivateApiEnabled) {
@@ -604,6 +621,12 @@ class BlueBubblesServer extends EventEmitter {
             await this.oauthService?.stop();
         } catch (ex: any) {
             this.logger.error(`Failed to stop OAuth service! ${ex?.message ?? ex}`);
+        }
+
+        try {
+            await this.googleContactsService?.stop();
+        } catch (ex: any) {
+            this.logger.error(`Failed to stop Google Contacts service! ${ex?.message ?? ex}`);
         }
 
         try {

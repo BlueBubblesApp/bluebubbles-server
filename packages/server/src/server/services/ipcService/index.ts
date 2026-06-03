@@ -77,7 +77,9 @@ export class IPCService extends Loggable {
 
             for (const item of Object.keys(args)) {
                 if (Server().repo.hasConfig(item) && Server().repo.getConfig(item) !== args[item]) {
-                    Server().repo.setConfig(item, args[item]);
+                    // Await so the in-memory config is updated before we return;
+                    // callers may immediately read it back (e.g. OAuth client config).
+                    await Server().repo.setConfig(item, args[item]);
                 }
             }
 
@@ -456,6 +458,29 @@ export class IPCService extends Loggable {
         ipcMain.handle("restart-oauth-service", async (_, __) => {
             if (Server().oauthService?.running) return;
             await Server().oauthService?.restart();
+        });
+
+        ipcMain.handle("google-contacts-sync-status", async (_, __) => {
+            return Server().googleContactsService?.getStatus() ?? null;
+        });
+
+        ipcMain.handle("google-contacts-sync-now", async (_, __) => {
+            return await Server().googleContactsService?.syncNow(true);
+        });
+
+        ipcMain.handle("google-contacts-disconnect", async (_, __) => {
+            await Server().googleContactsService?.disconnect();
+            return Server().googleContactsService?.getStatus() ?? null;
+        });
+
+        ipcMain.handle("google-contacts-set-sync-enabled", async (_, enabled: boolean) => {
+            await Server().googleContactsService?.setEnabled(!!enabled);
+            return Server().googleContactsService?.getStatus() ?? null;
+        });
+
+        ipcMain.handle("google-contacts-set-sync-interval", async (_, minutes: number) => {
+            await Server().googleContactsService?.setSyncInterval(Number(minutes));
+            return Server().googleContactsService?.getStatus() ?? null;
         });
 
         ipcMain.handle("save-lan-url", async (_, __) => {

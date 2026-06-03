@@ -15,6 +15,7 @@ import { FCMService } from "../fcmService";
 import { BrowserWindow, HandlerDetails } from "electron";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { ContactInterface } from "@server/api/interfaces/contactInterface";
+import { resolveGoogleOAuthClientConfig, BUILTIN_GOOGLE_CLIENT_ID } from "../googleContactsService";
 
 /**
  * This service class hhandles the initial oauth workflows
@@ -33,6 +34,13 @@ export class OauthService extends Loggable {
     httpOpts: any;
 
     oauthClient: Auth.OAuth2Client;
+
+    // A separate client for the Google Contacts authorization-code + PKCE flow.
+    // This may use a user-provided OAuth client (approach "B") instead of the
+    // built-in shared one, so it is kept distinct from the Firebase client.
+    contactsOauthClient: Auth.OAuth2Client;
+
+    private contactsCodeVerifier: string;
 
     port = 8641;
 
@@ -287,13 +295,96 @@ export class OauthService extends Loggable {
      *
      * @returns The OAuth URL
      */
+    /**
+     * Builds (or rebuilds) the OAuth client used for the Google Contacts flow.
+     * Uses a user-provided client if one is configured, otherwise the built-in one.
+     */
+    private buildContactsOauthClient(): Auth.OAuth2Client {
+        const { clientId, clientSecret } = resolveGoogleOAuthClientConfig();
+        this.contactsOauthClient = new google.auth.OAuth2(clientId, clientSecret ?? undefined, this.callbackUrl);
+        return this.contactsOauthClient;
+    }
+
     async getContactsOauthUrl() {
-        const url = await this.oauthClient.generateAuthUrl({
+        const useOwnClient = (Server().repo?.getConfig("google_contacts_use_own_client") as boolean) ?? false;
+
+        if (useOwnClient) {
+            // Background sync: authorization-code + PKCE with offline access, using
+            // the user's own OAuth client, so we obtain a refresh token.
+            const client = this.buildContactsOauthClient();
+            const { codeVerifier, codeChallenge } = await client.generateCodeVerifierAsync();
+            this.contactsCodeVerifier = codeVerifier;
+
+            const url = client.generateAuthUrl({
+                access_type: "offline",
+                prompt: "consent",
+                scope: this.contactScopes,
+                code_challenge_method: Auth.CodeChallengeMethod.S256,
+                code_challenge: codeChallenge
+            });
+
+            return `${url}&type=contacts`;
+        }
+
+        // One-time sync: implicit flow with the built-in client (no secret required).
+        this.contactsOauthClient = new google.auth.OAuth2(BUILTIN_GOOGLE_CLIENT_ID, undefined, this.callbackUrl);
+        const url = this.contactsOauthClient.generateAuthUrl({
             scope: this.contactScopes,
             response_type: "token"
         });
 
         return `${url}&type=contacts`;
+    }
+
+    /**
+     * Handles the OAuth callback for the Google Contacts flow. Exchanges the
+     * authorization code for tokens. If a refresh token is returned, background
+     * sync is enabled; otherwise we fall back to a one-time sync.
+     *
+     * @param code The authorization code from the OAuth callback
+     */
+    async handleContactsAuthCode(code: string) {
+        try {
+            this.setStatus(ProgressStatus.IN_PROGRESS);
+
+            // Rebuild from the latest config so we always send the current client
+            // credentials (the auth URL was built from the same config).
+            const client = this.buildContactsOauthClient();
+            const { tokens } = await client.getToken({ code, codeVerifier: this.contactsCodeVerifier });
+
+            if (isNotEmpty(tokens.refresh_token)) {
+                // We have offline access — enable background sync.
+                this.log.info("Received offline access for Google Contacts. Enabling background sync...");
+                await Server().googleContactsService.connectWithRefreshToken(tokens.refresh_token);
+                this.log.info("Successfully connected Google Contacts for background sync!");
+                this.setStatus(ProgressStatus.COMPLETED);
+            } else {
+                // No refresh token issued for this client. Fall back to a one-time
+                // sync using the access token (legacy behavior).
+                this.log.warn(
+                    "Google did not issue a refresh token for this OAuth client, so background sync " +
+                        "could not be enabled. Performing a one-time contact sync instead. To enable " +
+                        "background sync, configure your own Google OAuth client ID/secret in the server."
+                );
+                this.authToken = tokens.access_token;
+                this.expiresIn = tokens.expiry_date
+                    ? Math.floor((tokens.expiry_date - Date.now()) / 1000)
+                    : 3600;
+                await this.handleContactsSync();
+            }
+        } catch (ex: any) {
+            // OAuth token errors put the detail in error_description / error (a string);
+            // People API errors put it in error.message (an object).
+            const data = ex?.response?.data;
+            const oauthError =
+                data?.error_description ??
+                (typeof data?.error === "string" ? data.error : data?.error?.message) ??
+                ex?.message;
+            this.log.error(`Failed to authorize Google Contacts: ${oauthError ?? this.getErrorMessage(ex)}`);
+            this.setStatus(ProgressStatus.FAILED);
+        } finally {
+            await this.stop();
+        }
     }
 
     /**

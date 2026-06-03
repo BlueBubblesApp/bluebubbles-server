@@ -162,6 +162,35 @@ export const restartOauthService = async () => {
     return await ipcRenderer.invoke('restart-oauth-service');
 };
 
+export interface GoogleContactsStatus {
+    enabled: boolean;
+    connected: boolean;
+    syncing: boolean;
+    interval: number;
+    lastSync: number;
+    usingCustomClient: boolean;
+}
+
+export const getGoogleContactsSyncStatus = async (): Promise<GoogleContactsStatus | null> => {
+    return await ipcRenderer.invoke('google-contacts-sync-status');
+};
+
+export const googleContactsSyncNow = async () => {
+    return await ipcRenderer.invoke('google-contacts-sync-now');
+};
+
+export const googleContactsDisconnect = async (): Promise<GoogleContactsStatus | null> => {
+    return await ipcRenderer.invoke('google-contacts-disconnect');
+};
+
+export const setGoogleContactsSyncEnabled = async (enabled: boolean): Promise<GoogleContactsStatus | null> => {
+    return await ipcRenderer.invoke('google-contacts-set-sync-enabled', enabled);
+};
+
+export const setGoogleContactsSyncInterval = async (minutes: number): Promise<GoogleContactsStatus | null> => {
+    return await ipcRenderer.invoke('google-contacts-set-sync-interval', minutes);
+};
+
 export const getCurrentPermissions = async () => {
     return await ipcRenderer.invoke('get-current-permissions');
 };
