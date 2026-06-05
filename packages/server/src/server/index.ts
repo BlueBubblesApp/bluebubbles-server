@@ -1506,7 +1506,9 @@ class BlueBubblesServer extends EventEmitter {
 
         const newMessage = await insertChatParticipants(item);
         this.logger.info(
-            `New Message from ${newMessage.isFromMe ? 'You' : obfuscatedHandle(newMessage.handle?.id)}, ${newMessage.contentString()}`);
+            `New Message from ${newMessage.isFromMe ? 'You' : obfuscatedHandle(newMessage.handle?.id)}, ` +
+                newMessage.contentString()
+        );
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data

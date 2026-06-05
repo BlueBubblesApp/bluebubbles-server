@@ -682,7 +682,13 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @param key The key to check for in the response data (optional)
      */
-    async tryUntilNoError(method: "GET" | "POST", url: string, data: Record<string, any> = null, maxAttempts = 30, waitTime = 2000) {
+    async tryUntilNoError(
+        method: "GET" | "POST",
+        url: string,
+        data: Record<string, any> = null,
+        maxAttempts = 30,
+        waitTime = 2000
+    ) {
         let attempts = 0;
 
         // eslint-disable-next-line no-constant-condition
@@ -738,7 +744,7 @@ export class OauthService extends Loggable {
 
         // Paginate through all the data
         let pageToken = null;
-        let contacts = [];
+        const contacts = [];
         do {
             const res: AxiosResponse<any, any> = await this.sendRequest("GET", getUrl, null, { ...params, pageToken });
             contacts.push(...res.data.connections);
@@ -783,7 +789,12 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @returns The response object
      */
-    async sendRequest(method: "GET" | "POST" | "DELETE", url: string, data: Record<string, any> = null, params: Record<string, any> = null) {
+    async sendRequest(
+        method: "GET" | "POST" | "DELETE",
+        url: string,
+        data: Record<string, any> = null,
+        params: Record<string, any> = null
+    ) {
         if (!this.authToken) throw new Error("Missing auth token");
 
         const headers: Record<string, string> = {
