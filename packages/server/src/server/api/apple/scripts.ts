@@ -65,7 +65,8 @@ const getServiceFromInput = (value: string) => {
     if (valSplit.length <= 1) return "iMessage";
 
     // Otherwise, return the "first" index in the array,
-    return valSplit[0];
+    const service = valSplit[0];
+    return service === "any" ? "iMessage" : service;
 };
 
 /**
@@ -183,7 +184,7 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
     // If the chat is to an individual, we need to make sure the number is formatted correctly
     if (chatGuid.includes(";-;")) {
         const strSplit = chatGuid.split(";-;");
-        const service = strSplit[0];
+        const service = strSplit[0] === "any" ? "iMessage" : strSplit[0];
         const addr = strSplit[1];
         chatGuid = `${service};-;${getiMessageAddressFormat(addr)}`;
     }

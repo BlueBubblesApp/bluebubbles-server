@@ -1497,6 +1497,13 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     private async handleNewMessage(item: Message) {
+        // If this is a dummy message with a UUID body (often emitted when an audio message is played), ignore it.
+        const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i;
+        if (item.text && isUUID.test(item.text) && !item.cacheHasAttachments) {
+            this.logger.info(`Ignoring audio note play receipt with UUID body: ${item.text}`);
+            return;
+        }
+
         const newMessage = await insertChatParticipants(item);
         this.logger.info(
             `New Message from ${newMessage.isFromMe ? 'You' : obfuscatedHandle(newMessage.handle?.id)}, ${newMessage.contentString()}`);
