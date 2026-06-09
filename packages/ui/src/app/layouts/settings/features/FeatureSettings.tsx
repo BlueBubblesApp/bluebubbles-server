@@ -20,6 +20,7 @@ import { StartMinimizedField } from '../../../components/fields/StartMinimizedFi
 import { StartDelayField } from 'app/components/fields/StartDelayField';
 import { LandingPageField } from 'app/components/fields/LandingPageField';
 import { OpenFindMyOnStartupField } from 'app/components/fields/OpenFindMyOnStartupField';
+import { FindMyKeysField } from 'app/components/fields/FindMyKeysField';
 import { AutoLockMacField } from 'app/components/fields/AutoLockMacField';
 
 
@@ -31,6 +32,8 @@ export const FeatureSettings = (): JSX.Element => {
                 <Divider orientation='horizontal' />
                 <Spacer />
                 <OpenFindMyOnStartupField />
+                <Spacer />
+                <FindMyKeysField />
                 <Spacer />
                 <AutoCaffeinateField />
                 <Spacer />

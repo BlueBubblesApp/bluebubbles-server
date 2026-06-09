@@ -112,6 +112,24 @@ export class FileSystem {
 
     public static findMyFriendsDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.icloud.fmfd");
 
+    // FMF cache (contains friend display names / contacts, ChaCha20-Poly1305 encrypted on macOS 14.4+)
+    public static findMyFmfCacheDir = path.join(userHomeDir(), "Library", "Caches", "com.apple.findmy.fmfcore");
+
+    // Encrypted SQLite database that holds friend coordinates on macOS 14.0+
+    public static findMyLocalStorageDir = path.join(
+        userHomeDir(),
+        "Library",
+        "Group Containers",
+        "group.com.apple.findmy.findmylocateagent",
+        "Library",
+        "Application Support"
+    );
+
+    public static findMyLocalStorageDbPath = path.join(FileSystem.findMyLocalStorageDir, "LocalStorage.db");
+
+    // Where BlueBubbles stores the user-imported Find My decryption keys
+    public static findMyKeysDir = path.join(FileSystem.baseDir, "FindMyKeys");
+
     public static get usingCustomFcm(): boolean {
         const fcmClient = Server().args["fcm-client"];
         const fcmServer = Server().args["fcm-server"];
@@ -153,6 +171,7 @@ export class FileSystem {
         if (!fs.existsSync(FileSystem.certsDir)) fs.mkdirSync(FileSystem.certsDir);
         if (!fs.existsSync(FileSystem.themesDir)) fs.mkdirSync(FileSystem.themesDir);
         if (!fs.existsSync(FileSystem.settingsDir)) fs.mkdirSync(FileSystem.settingsDir);
+        if (!fs.existsSync(FileSystem.findMyKeysDir)) fs.mkdirSync(FileSystem.findMyKeysDir);
 
         if (isMinMonterey) {
             if (!fs.existsSync(FileSystem.iMessageAttachmentsDir)) fs.mkdirSync(FileSystem.iMessageAttachmentsDir);
