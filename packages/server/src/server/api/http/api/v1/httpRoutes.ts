@@ -1,6 +1,7 @@
 import * as KoaRouter from "koa-router";
 import { Server } from "@server";
 import { isNotEmpty } from "@server/helpers/utils";
+import { isMinSonoma14_4 } from "@server/env";
 
 // Middleware
 import { AuthMiddleware } from "./middleware/authMiddleware";
@@ -124,7 +125,12 @@ export class HttpRoutes {
                     {
                         method: HttpMethod.GET,
                         path: "findmy/friends",
-                        middleware: [...HttpRoutes.protected, PrivateApiMiddleware],
+                        // Version-aware: macOS 14.4+ populates friend locations by decrypting the Find
+                        // My cache (no Private API helper needed), so only require the helper on older
+                        // versions (11–14.3) where friends still come from the Private API injection.
+                        middleware: isMinSonoma14_4
+                            ? HttpRoutes.protected
+                            : [...HttpRoutes.protected, PrivateApiMiddleware],
                         controller: FindMyRouter.friends
                     },
                     {

@@ -1,9 +1,13 @@
 import { app, dialog, ipcMain, systemPreferences, shell } from "electron";
 import { askForAccessibilityAccess, askForFullDiskAccess } from "node-mac-permissions";
 import process from "process";
+import fs from "fs";
+import path from "path";
 
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
+import { FindMyKeyManager } from "@server/api/lib/findmy/FindMyKeyManager";
+import { dumpLocalStorageSchema } from "@server/api/lib/findmy/decrypt/localStorageReader";
 import { AlertsInterface } from "@server/api/interfaces/alertsInterface";
 import { openLogs, openAppData } from "@server/api/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
@@ -21,7 +25,8 @@ import {
     isMinMonterey,
     isMinSierra,
     isMinVentura,
-    isMinSonoma
+    isMinSonoma,
+    isMinSonoma14_4
 } from "@server/env";
 import { Loggable, getLogger } from "@server/lib/logging/Loggable";
 import { ZrokManager } from "@server/managers/zrokManager";
@@ -45,7 +50,8 @@ export class IPCService extends Loggable {
                 isMinBigSur: isMinBigSur,
                 isMinMonterey: isMinMonterey,
                 isMinVentura: isMinVentura,
-                isMinSonoma: isMinSonoma
+                isMinSonoma: isMinSonoma,
+                isMinSonoma14_4: isMinSonoma14_4
             };
         });
 
@@ -138,6 +144,51 @@ export class IPCService extends Loggable {
 
         ipcMain.handle("reinstall-helper-bundle", async (_, __) => {
             return await Server().privateApi.modeType.install(true);
+        });
+
+        ipcMain.handle("get-findmy-keys-status", async (_, __) => {
+            return await FindMyKeyManager.getStatus();
+        });
+
+        ipcMain.handle("import-findmy-keys", async (_, __) => {
+            const win = Server().window;
+            const dialogResult = win
+                ? await dialog.showOpenDialog(win, {
+                      title: "Select the folder containing your Find My keys",
+                      message:
+                          "Select the 'keys' folder produced by findmy-key-extractor " +
+                          "(it should contain LocalStorage.key, FMIPDataManager.bplist, and FMFDataManager.bplist).",
+                      properties: ["openDirectory"]
+                  })
+                : await dialog.showOpenDialog({
+                      title: "Select the folder containing your Find My keys",
+                      properties: ["openDirectory"]
+                  });
+
+            if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
+                return { canceled: true, result: null };
+            }
+
+            const importResult = await FindMyKeyManager.importFromDirectory(dialogResult.filePaths[0]);
+            return { canceled: false, result: importResult };
+        });
+
+        // Diagnostic: dump the decrypted LocalStorage.db schema to help locate address fields
+        ipcMain.handle("findmy-dump-schema", async (_, __) => {
+            const key = FindMyKeyManager.loadLocalStorageKey();
+            if (!key) return { success: false, error: "LocalStorage key not imported" };
+            if (!fs.existsSync(FileSystem.findMyLocalStorageDbPath)) {
+                return { success: false, error: "LocalStorage.db not found on this machine" };
+            }
+
+            try {
+                const schema = dumpLocalStorageSchema(key);
+                const outPath = path.join(FileSystem.baseDir, "findmy-localstorage-schema.json");
+                fs.writeFileSync(outPath, JSON.stringify(schema, null, 2));
+                return { success: true, schema, path: outPath };
+            } catch (ex: any) {
+                return { success: false, error: String(ex?.message ?? ex) };
+            }
         });
 
         ipcMain.handle("get-fcm-server", (event, args) => {
