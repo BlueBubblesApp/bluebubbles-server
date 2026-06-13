@@ -28,6 +28,16 @@ export class ContactsLib {
         'socialProfiles'
     ];
 
+    // In-memory cache of native contact results, keyed by the requested extra-prop set.
+    // node-mac-contacts' getAllContacts() is SYNCHRONOUS and, when images/thumbnails are
+    // requested, marshals avatar data for every contact — multi-second on large address
+    // books, which blocks the Node event loop and stalls all other HTTP requests (including
+    // the socket health probe), causing clients to drop and reconnect. Caching makes repeat
+    // calls instant so the synchronous native call stays off the hot path.
+    private static cache: Map<string, any[]> = new Map();
+    private static cacheLoadedAt = 0;
+    private static readonly cacheTtlMs = 5 * 60 * 1000; // safety net; also cleared on OS contact-change
+
     static async requestAccess() {
         if (!contacts) return "Unknown";
         return await contacts.requestAccess();
@@ -46,6 +56,18 @@ export class ContactsLib {
     static getAllContacts(extraProps: string[] = []) {
         if (!contacts) return [];
 
+        // Drop the cache after the TTL as a safety net in case an OS change event is missed.
+        if (ContactsLib.cacheLoadedAt && Date.now() - ContactsLib.cacheLoadedAt > ContactsLib.cacheTtlMs) {
+            ContactsLib.invalidateCache();
+        }
+
+        // Serve from cache when we already have a result for this exact prop set. This keeps
+        // the synchronous native call (and its event-loop block) off the hot path — repeat
+        // requests, e.g. clients re-fetching contacts-with-avatars on every reconnect, are free.
+        const key = JSON.stringify(extraProps.map(e => e.toLowerCase()).sort());
+        const cached = ContactsLib.cache.get(key);
+        if (cached) return cached;
+
         // If it's the first load, we need to load all available info.
         // And also listen for changes so we can reload all the info again.
         if (isFirstLoad) {
@@ -54,7 +76,15 @@ export class ContactsLib {
             ContactsLib.listenForChanges();
         }
 
-        return contacts.getAllContacts(extraProps);
+        const result = contacts.getAllContacts(extraProps);
+        ContactsLib.cache.set(key, result);
+        if (!ContactsLib.cacheLoadedAt) ContactsLib.cacheLoadedAt = Date.now();
+        return result;
+    }
+
+    static invalidateCache() {
+        ContactsLib.cache.clear();
+        ContactsLib.cacheLoadedAt = 0;
     }
 
     static listenForChanges() {
@@ -63,6 +93,7 @@ export class ContactsLib {
         contacts.listener.once('contact-changed', (_: string) => {
             Server().log("Detected contact change, queueing full reload...", "debug");
             isFirstLoad = true;
+            ContactsLib.invalidateCache();
             contacts.listener.remove();
         });
     }
