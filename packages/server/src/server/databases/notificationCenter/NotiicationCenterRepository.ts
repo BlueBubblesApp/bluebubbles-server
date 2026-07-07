@@ -1,4 +1,6 @@
 import fs from "fs";
+import os from "os";
+import path from "path";
 import { Brackets, DataSource } from "typeorm";
 import { Record } from "./entity/Record";
 import { App } from "./entity/App";
@@ -36,8 +38,11 @@ class NotificationCenterDatabase {
     }
 
     async getDbPath(): Promise<string> {
+        const usernotedPath = path.join(os.homedir(), "Library", "Group Containers", "group.com.apple.usernoted", "db2", "db");
+        if (fs.existsSync(usernotedPath)) return usernotedPath;
+
         const basePath = await FileSystem.getUserConfDir();
-        return `${basePath}com.apple.notificationcenter/db2/db`;
+        return path.join(basePath, "com.apple.notificationcenter", "db2", "db");
     }
 
     async dbExists(): Promise<boolean> {
@@ -54,7 +59,7 @@ class NotificationCenterDatabase {
 
         // Check if the DB path exists
         const dbPath = await this.getDbPath();
-        if (!this.dbExists()) {
+        if (!await this.dbExists()) {
             throw new Error("NotificationCenter database does not exist!");
         }
 
