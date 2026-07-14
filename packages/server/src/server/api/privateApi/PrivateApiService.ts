@@ -59,6 +59,11 @@ export class PrivateApiService extends Loggable {
         return this.clients.length > 0;
     }
 
+    hasClient(process?: string): boolean {
+        if (!process) return this.helper;
+        return this.activeClients[process] != null && !this.activeClients[process].destroyed;
+    }
+
     get message(): PrivateApiMessage {
         return new PrivateApiMessage(this);
     }
@@ -305,7 +310,8 @@ export class PrivateApiService extends Loggable {
     async writeData(
         action: string,
         data: NodeJS.Dict<any>,
-        transaction?: TransactionPromise
+        transaction?: TransactionPromise,
+        process?: string
     ): Promise<TransactionResult> {
         const msg = "Failed to send request to Private API!";
         await writeLock.acquire();
@@ -324,8 +330,8 @@ export class PrivateApiService extends Loggable {
                     d.transactionId = transaction.transactionId;
                 }
 
-                // For each ocket client, write data
-                this.writeToClients(`${JSON.stringify(d)}\n`).then(success => {
+                // For each socket client, write data
+                this.writeToClients(`${JSON.stringify(d)}\n`, process).then(success => {
                     if (success) return resolve();
                     reject();
                 });
@@ -346,7 +352,14 @@ export class PrivateApiService extends Loggable {
         return null;
     }
 
-    private async writeToClients(data: string): Promise<boolean> {
+    private async writeToClients(data: string, process?: string): Promise<boolean> {
+        if (process) {
+            const client = this.activeClients[process];
+            if (!client) return false;
+            await this.writeToClient(client, data);
+            return true;
+        }
+
         let success = false;
         for (const client of this.clients) {
             try {

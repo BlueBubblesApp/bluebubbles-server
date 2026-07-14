@@ -13,8 +13,8 @@ export class PrivateApiAction extends Loggable {
         this.api = api;
     }
 
-    throwForBadStatus() {
-        if (!this.api.helper || !this.api.server) {
+    throwForBadStatus(process?: string) {
+        if (!this.api.hasClient(process) || !this.api.server) {
             throw new Error("Failed to invoke Private API! Error: BlueBubblesHelper is not running!");
         }
     }
@@ -31,9 +31,10 @@ export class PrivateApiAction extends Loggable {
     async sendApiMessage(
         action: string,
         data: NodeJS.Dict<any>,
-        transaction?: TransactionPromise
+        transaction?: TransactionPromise,
+        process?: string
     ): Promise<TransactionResult> {
-        this.throwForBadStatus();
-        return await this.api.writeData(action, data, transaction);
+        this.throwForBadStatus(process);
+        return await this.api.writeData(action, data, transaction, process);
     }
 }
