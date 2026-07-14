@@ -2,10 +2,15 @@ import { PrivateApiMode } from ".";
 import { MacForgeMode } from "./MacForgeMode";
 import { MessagesDylibPlugin } from "./dylibPlugins/MessagesDylibPlugin";
 import { FaceTimeDylibPlugin } from "./dylibPlugins/FaceTimeDylibPlugin";
+import { FindMyDylibPlugin } from "./dylibPlugins/FindMyDylibPlugin";
 import { getLogger } from "@server/lib/logging/Loggable";
 
 export class ProcessDylibMode extends PrivateApiMode {
-    static plugins = [new MessagesDylibPlugin("Messages Helper"), new FaceTimeDylibPlugin("FaceTime Helper")];
+    static plugins = [
+        new MessagesDylibPlugin("Messages Helper"),
+        new FaceTimeDylibPlugin("FaceTime Helper"),
+        new FindMyDylibPlugin("Find My Helper")
+    ];
 
     static async install() {
         const log = getLogger("ProcessDylibMode");

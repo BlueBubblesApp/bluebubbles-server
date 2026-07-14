@@ -84,6 +84,18 @@ export const startMessages = () => {
     return startApp("Messages");
 };
 
+export const requestMessagesAutomation = () => {
+    return `tell application "Messages" to get name`;
+};
+
+export const requestSystemEventsAutomation = () => {
+    return `tell application "System Events" to count processes`;
+};
+
+export const requestFindMyAutomation = () => {
+    return `tell application id "com.apple.findmy" to get name`;
+};
+
 /**
  * The AppleScript used to hide an app
  */

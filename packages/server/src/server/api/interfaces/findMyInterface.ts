@@ -2,15 +2,15 @@ import { Server } from "@server";
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
+import { isMinSequoia } from "@server/env";
 import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
-import { transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
+import { normalizeFindMyLocationItems, transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
 
 export class FindMyInterface {
     static async getFriends() {
-        return Server().findMyCache.getAll();
+        return normalizeFindMyLocationItems(Server().findMyCache.getAll());
     }
 
     static async getDevices(): Promise<Array<FindMyDevice> | null> {
@@ -72,24 +72,26 @@ export class FindMyInterface {
 
     static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
         const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
-        if (papiEnabled && isMinBigSur && !isMinSonoma) {
+        let usedPrivateApi = false;
+        if (papiEnabled && isMinSequoia) {
             checkPrivateApiStatus();
             const result = await Server().privateApi.findmy.refreshFriends();
-            const refreshLocations = result?.data?.locations ?? [];
+            const refreshLocations = normalizeFindMyLocationItems(result?.data?.locations ?? []);
+            usedPrivateApi = true;
 
             // Save the data to the cache
             // The cache will handle properly updating the data.
             Server().findMyCache.addAll(refreshLocations);
         }
 
-        // No matter what, open the Find My app.
+        // Fallback path: open Find My so the app refreshes its own cache.
         // Don't await because it should update in the background.
         // Location updates get emitted as an event as they come in.
-        if (openFindMyApp) {
+        if (openFindMyApp && !usedPrivateApi) {
             this.refreshLocationsAccessibility();
         }
 
-        return Server().findMyCache.getAll();
+        return normalizeFindMyLocationItems(Server().findMyCache.getAll());
     }
 
     static async refreshLocationsAccessibility() {
