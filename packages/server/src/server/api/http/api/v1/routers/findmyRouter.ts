@@ -3,8 +3,20 @@ import { RouterContext } from "koa-router";
 import { Success } from "../responses/success";
 import { ServerError } from "../responses/errors";
 import { FindMyInterface } from "@server/api/interfaces/findMyInterface";
+import { FindMyLocationItem } from "@server/api/lib/findmy/types";
+import { NEW_FINDMY_LOCATION } from "@server/events";
+import { Server } from "@server";
 
 export class FindMyRouter {
+    static async emitFriendLocations(locations: FindMyLocationItem[]) {
+        if (!Array.isArray(locations)) return;
+        for (const item of locations) {
+            await Server().emitMessage(NEW_FINDMY_LOCATION, item, "normal", false, true);
+        }
+
+        Server().logger.debug(`Emitted ${locations.length} FindMy friend location update(s) to socket clients after refresh.`);
+    }
+
     static async refreshDevices(ctx: RouterContext, _: Next) {
         try {
             const locations = await FindMyInterface.refreshDevices();
@@ -23,6 +35,7 @@ export class FindMyRouter {
     static async refreshFriends(ctx: RouterContext, _: Next) {
         try {
             const locations = await FindMyInterface.refreshFriends();
+            await FindMyRouter.emitFriendLocations(locations);
             return new Success(ctx, {
                 message: "Successfully refreshed Find My friends locations!",
                 data: locations
