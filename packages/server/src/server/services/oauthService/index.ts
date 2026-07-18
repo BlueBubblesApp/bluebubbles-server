@@ -122,6 +122,9 @@ export class OauthService extends Loggable {
             await this.enableCloudResourceManager(projectId);
             await this.enableFirebaseManagementApi(projectId);
             await this.enableFirestoreApi(projectId);
+            await this.enableIdentityApi(projectId);
+            await this.enableCloudMessagingApi(projectId);
+            await this.enableFirebaseRulesApi(projectId);
 
             this.log.info(`Adding Firebase to Google Cloud Project`);
             await this.addFirebase(projectId);
@@ -372,6 +375,11 @@ export class OauthService extends Loggable {
             // Try again
             this.log.info(`Retrying project creation...`);
             operationData = await createProj();
+
+            // If the retry still failed, throw the actual error instead of masking it
+            if (isNotEmpty(operationData?.error)) {
+                throw new Error(`Error: ${getObjectAsString(operationData.error)}`);
+            }
         }
 
         // Throw an error if a project ID isn't returned
@@ -419,13 +427,23 @@ export class OauthService extends Loggable {
         await this.enableService(projectId, "iam.googleapis.com");
     }
 
+    async enableCloudMessagingApi(projectId: string) {
+        this.log.info(`Enabling Cloud Messaging APIs`);
+        await this.enableService(projectId, "fcm.googleapis.com");
+    }
+
+    async enableFirebaseRulesApi(projectId: string) {
+        this.log.info(`Enabling Firebase Rules APIs`);
+        await this.enableService(projectId, "firebaserules.googleapis.com");
+    }
+
     async enableService(projectId: string, service: string) {
         const postUrl = `https://serviceusage.googleapis.com/v1/projects/${projectId}/services/${service}:enable`;
         const createRes = await this.tryUntilNoError("POST", postUrl, {}, 5, 5000);
 
         // If the operation is already done, return
         const operationName = createRes.name;
-        if (operationName.endsWith("DONE_OPERATION")) return;
+        if (createRes.done === true) return;
 
         // Wait for the operation to complete
         const operationUrl = `https://serviceusage.googleapis.com/v1/${operationName}`;
@@ -659,7 +677,7 @@ export class OauthService extends Loggable {
     async getGoogleServicesJson(projectId: string) {
         const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
         const appsRes = await this.sendRequest("GET", url);
-        const appId = (appsRes.data.apps ?? []).find((app: any) => app.packageName === this.packageName).appId;
+        const appId = (appsRes.data.apps ?? []).find((app: any) => app.packageName === this.packageName)?.appId;
         if (!appId) throw new Error(`Could not find appId for package name ${this.packageName}`);
 
         // eslint-disable-next-line max-len
