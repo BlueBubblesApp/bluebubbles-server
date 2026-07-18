@@ -969,11 +969,20 @@ class BlueBubblesServer extends EventEmitter {
         if (!this.repo || !this.repo.db) return;
 
         const hideDockIcon = this.repo.getConfig("hide_dock_icon") as boolean;
+        // Use app.setActivationPolicy() instead of app.dock.hide()/show().
+        // setActivationPolicy is the runtime equivalent of LSUIElement in
+        // Info.plist and reliably hides the app from the Dock + app
+        // switcher across window-creation cycles. app.dock.hide() alone is
+        // brittle: creating a BrowserWindow after the call re-promotes the
+        // app to the Dock, and on macOS 26 (Tahoe) app.dock.hide() does not
+        // take effect at all — neither from startup config-load nor from
+        // the in-app UI toggle. The previous `app.show()` after dock.hide()
+        // was also counterproductive: app.show() focuses the app, which
+        // re-activates the Dock icon as a side effect.
         if (hideDockIcon) {
-            app.dock.hide();
-            app.show();
+            app.setActivationPolicy("accessory");
         } else {
-            app.dock.show();
+            app.setActivationPolicy("regular");
         }
     }
 
