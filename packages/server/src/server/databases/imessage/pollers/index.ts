@@ -83,11 +83,6 @@ export abstract class IMessagePoller extends Loggable {
 
     cache: IMessageCache;
 
-    // Cache of the last state of the message that has been seen by a listener
-    messageStates: Record<string, MessageState> = {};
-
-    chatStates: Record<string, ChatState> = {};
-
     constructor(repo: MessageRepository, cache: IMessageCache) {
         super();
 
@@ -104,7 +99,7 @@ export abstract class IMessagePoller extends Loggable {
 
         // If the GUID exists, check the date created.
         // If it doesn't exist, a race condition occurred and we should ignore it (return null)
-        const state = this.messageStates[guid];
+        const state = this.cache.messageStates[guid];
         if (!state) return null;
 
         // If any of the dates are newer, it's an update
@@ -142,7 +137,7 @@ export abstract class IMessagePoller extends Loggable {
             this.cache.events.add(message.guid);
         }
 
-        this.messageStates[message.guid] = {
+        this.cache.messageStates[message.guid] = {
             dateCreated: message.dateCreated.getTime(),
             isDelivered: message.isDelivered ?? false,
             dateDelivered: message?.dateDelivered ? message.dateDelivered.getTime() : 0,
@@ -164,7 +159,7 @@ export abstract class IMessagePoller extends Loggable {
 
         // If the GUID exists, check the date created.
         // If it doesn't exist, a race condition occurred and we should ignore it (return null)
-        const state = this.chatStates[guid];
+        const state = this.cache.chatStates[guid];
         if (!state) return null;
 
         const lastReadMessageTimestamp = chat.lastReadMessageTimestamp?.getTime() ?? 0;
@@ -183,7 +178,7 @@ export abstract class IMessagePoller extends Loggable {
             this.cache.events.add(chat.guid);
         }
 
-        this.chatStates[chat.guid] = {
+        this.cache.chatStates[chat.guid] = {
             cacheTime: new Date().getTime(),
             lastReadMessageTimestamp: chat.lastReadMessageTimestamp?.getTime() ?? 0
         };
