@@ -128,6 +128,13 @@ export class MessageInterface {
                 partIndex,
                 ddScan
             });
+
+            // We already have the exact message via its GUID, so resolve the awaiter directly
+            // instead of leaving it to be matched (by text) on a future poll. This attaches
+            // the tempGuid immediately and stops the poller from matching against it further.
+            if (sentMessage && !awaiter.isResolved) {
+                await awaiter.resolve(sentMessage);
+            }
         } else {
             throw new Error(`Invalid send method: ${method}`);
         }
@@ -216,6 +223,12 @@ export class MessageInterface {
                 // Only wait for the promise if it's not sent yet.
                 if (sentMessage && !sentMessage.isSent) {
                     sentMessage = await awaiter.promise;
+                } else if (sentMessage && !awaiter.isResolved) {
+                    // We already have the exact message via its GUID, so resolve the awaiter
+                    // directly instead of leaving it to be matched (by filename) on a future
+                    // poll. This attaches the tempGuid immediately and stops the poller from
+                    // matching against it further.
+                    await awaiter.resolve(sentMessage);
                 }
             } catch (e) {
                 if (sentMessage) {
@@ -324,7 +337,10 @@ export class MessageInterface {
         const retMessage = await resultAwaiter({
             maxWaitMs,
             getData: async _ => {
-                return await Server().iMessageRepo.getMessage(result.identifier, true, false);
+                // withAttachments: true -- this is returned as the API response and also used
+                // to resolve the send awaiter directly (see sendAttachmentSync), which broadcasts
+                // it to other clients. Both need the attachment data included.
+                return await Server().iMessageRepo.getMessage(result.identifier, true, true);
             }
         });
 
@@ -493,6 +509,11 @@ export class MessageInterface {
         // If we can't get the message via the transaction, try via the promise
         if (!retMessage) {
             retMessage = await awaiter.promise;
+        } else if (!awaiter.isResolved) {
+            // We already have the exact message via its GUID, so resolve the awaiter directly
+            // instead of leaving it to be matched (by text) on a future poll. This attaches
+            // the tempGuid immediately and stops the poller from matching against it further.
+            await awaiter.resolve(retMessage);
         }
 
         // Check if the name changed
