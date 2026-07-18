@@ -138,6 +138,31 @@ export const deleteScheduledMessages = async () => {
     return await ipcRenderer.invoke('delete-scheduled-messages');
 };
 
+export const getFindMyKeyPrerequisites = async (): Promise<{
+    hasLldb: boolean;
+    hasPython3: boolean;
+    hasPip3: boolean;
+    isSipDisabled: boolean;
+}> => {
+    return await ipcRenderer.invoke('get-findmy-key-prerequisites');
+};
+
+export const selectFindMyKeysFolder = async (): Promise<string | null> => {
+    return await ipcRenderer.invoke('select-findmy-keys-folder');
+};
+
+export const importFindMyKeys = async (folderPath: string) => {
+    return await ipcRenderer.invoke('import-findmy-keys', folderPath);
+};
+
+export const getFindMyKeysStatus = async () => {
+    return await ipcRenderer.invoke('get-findmy-keys-status');
+};
+
+export const decryptFindMyLocalStorage = async (): Promise<string> => {
+    return await ipcRenderer.invoke('decrypt-findmy-localstorage');
+};
+
 export const createScheduledMessage = async (message: ScheduledMessageItem) => {
     return await ipcRenderer.invoke('create-scheduled-message', message);
 };

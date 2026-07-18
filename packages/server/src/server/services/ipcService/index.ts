@@ -8,6 +8,7 @@ import { AlertsInterface } from "@server/api/interfaces/alertsInterface";
 import { openLogs, openAppData } from "@server/api/apple/scripts";
 import { fixServerUrl } from "@server/helpers/utils";
 import { ContactInterface } from "@server/api/interfaces/contactInterface";
+import { FindMyKeyExtractor } from "@server/api/lib/findmy/keyExtractor";
 import { PrivateApiService } from "../../api/privateApi/PrivateApiService";
 import { getContactPermissionStatus, requestContactPermission } from "@server/utils/PermissionUtils";
 import { ScheduledMessagesInterface } from "@server/api/interfaces/scheduledMessagesInterface";
@@ -219,6 +220,32 @@ export class IPCService extends Loggable {
 
         ipcMain.handle("import-vcf", async (event, path) => {
             return await ContactInterface.importFromVcf(path);
+        });
+
+        ipcMain.handle("get-findmy-key-prerequisites", async (_, __) => {
+            return FindMyKeyExtractor.checkPrerequisites();
+        });
+
+        ipcMain.handle("select-findmy-keys-folder", async (_, __) => {
+            const result = await dialog.showOpenDialog(Server().window, {
+                properties: ["openDirectory"],
+                title: "Select the folder containing your extracted Find My keys"
+            });
+
+            if (result.canceled || result.filePaths.length === 0) return null;
+            return result.filePaths[0];
+        });
+
+        ipcMain.handle("import-findmy-keys", async (_, folderPath: string) => {
+            return FindMyKeyExtractor.importFromFolder(folderPath);
+        });
+
+        ipcMain.handle("get-findmy-keys-status", async (_, __) => {
+            return FindMyKeyExtractor.getImportStatus();
+        });
+
+        ipcMain.handle("decrypt-findmy-localstorage", async (_, __) => {
+            return FindMyKeyExtractor.decryptLocalStorageDb();
         });
 
         ipcMain.handle("toggle-tutorial", async (_, toggle) => {

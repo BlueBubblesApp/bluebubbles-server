@@ -84,7 +84,7 @@ export class OauthService extends Loggable {
         if (!this.koaApp) return;
 
         // Create a route to intercept the oauth callback
-        this.koaApp.use(async (ctx, _) => {
+        this.koaApp.use(async (ctx: any, _: any) => {
             if (ctx.path === "/oauth/callback") {
                 this.log.info("Received OAuth callback");
                 ctx.body = "Success! You can close this window and return to the BlueBubbles Server app";
