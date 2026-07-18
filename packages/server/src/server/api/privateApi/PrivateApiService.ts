@@ -243,12 +243,12 @@ export class PrivateApiService extends Loggable {
                 data = JSON.parse(event);
             } catch (e) {
                 this.log.info(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
-                return;
+                continue;
             }
 
             if (data == null) {
                 this.log.warn("BlueBubblesHelper sent null data");
-                return;
+                continue;
             }
 
             if (data.transactionId) {
