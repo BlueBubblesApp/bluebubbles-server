@@ -25,6 +25,24 @@ export const getEnv = async () => {
     return await ipcRenderer.invoke('get-env');
 };
 
+export type FindMyKeyStatus = { present: boolean; valid: boolean };
+export type FindMyKeysStatus = {
+    LocalStorage: FindMyKeyStatus;
+    FMIP: FindMyKeyStatus;
+    FMF: FindMyKeyStatus;
+};
+
+export const getFindMyKeysStatus = async (): Promise<FindMyKeysStatus> => {
+    return await ipcRenderer.invoke('get-findmy-keys-status');
+};
+
+export const importFindMyKeys = async (): Promise<{
+    canceled: boolean;
+    result: Record<string, 'imported' | 'invalid' | 'missing'> | null;
+}> => {
+    return await ipcRenderer.invoke('import-findmy-keys');
+};
+
 export const getDevices = async () => {
     return await ipcRenderer.invoke('get-devices');
 };

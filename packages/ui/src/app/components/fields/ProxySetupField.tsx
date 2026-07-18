@@ -22,6 +22,7 @@ import { ConfirmationDialog } from '../modals/ConfirmationDialog';
 import { saveLanUrl } from 'app/utils/IpcUtils';
 import { NgrokSetupDialog } from '../modals/NgrokSetupDialog';
 import { ZrokSetupDialog } from '../modals/ZrokSetupDialog';
+import { LanUrlDialog } from '../modals/LanUrlDialog';
 
 
 export interface ProxySetupFieldProps {
@@ -48,13 +49,17 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
     const dnsRef = useRef(null);
     const ngrokRef = useRef(null);
     const zrokRef = useRef(null);
+    const lanRef = useRef(null);
     const alertRef = useRef(null);
     const proxyService: string = (useAppSelector(state => state.config.proxy_service) ?? '').toLowerCase().replace(' ', '-');
     const address: string = useAppSelector(state => state.config.server_address) ?? '';
     const port: number = useAppSelector(state => state.config.socket_port) ?? 1234;
+    const localIps: string[] = useAppSelector(state => state.config.local_ipv4s) ?? [];
+    const useHttps: boolean = useAppSelector(state => state.config.use_custom_certificate) ?? false;
     const [dnsModalOpen, setDnsModalOpen] = useBoolean();
     const [ngrokModalOpen, setNgrokModalOpen] = useBoolean();
     const [zrokModalOpen, setZrokModalOpen] = useBoolean();
+    const [lanModalOpen, setLanModalOpen] = useBoolean();
     const [requiresConfirmation, confirm] = useState((): string | null => {
         return null;
     });
@@ -84,7 +89,14 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                         } else if (e.target.value === 'cloudflare') {
                             confirm('confirmation');
                         } else if (e.target.value === 'lan-url') {
-                            saveLanUrl();
+                            // With multiple LAN IPs, let the user choose which one to use.
+                            // With a single (or no) IP, keep the original auto-select behavior.
+                            if (localIps.length > 1) {
+                                shouldSave = false;
+                                setLanModalOpen.on();
+                            } else {
+                                saveLanUrl();
+                            }
                         }
 
                         if (shouldSave) {
@@ -105,6 +117,15 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                             aria-label='Set address'
                             icon={<AiOutlineEdit />}
                             onClick={() => setDnsModalOpen.on()}
+                        />
+                    ) : null}
+                {(proxyService === 'lan-url' && localIps.length > 1)
+                    ? (
+                        <IconButton
+                            mr={3}
+                            aria-label='Choose LAN address'
+                            icon={<AiOutlineEdit />}
+                            onClick={() => setLanModalOpen.on()}
                         />
                     ) : null}
                 {(showAddress) ? (
@@ -152,6 +173,20 @@ export const ProxySetupField = ({ helpText, showAddress = true }: ProxySetupFiel
                 }}
                 isOpen={zrokModalOpen}
                 onClose={() => setZrokModalOpen.off()}
+            />
+
+            <LanUrlDialog
+                modalRef={lanRef}
+                ips={localIps}
+                port={port as number}
+                useHttps={useHttps}
+                currentAddress={address}
+                onConfirm={(url) => {
+                    dispatch(setConfig({ name: 'proxy_service', value: 'lan-url' }));
+                    dispatch(setConfig({ name: 'server_address', value: url }));
+                }}
+                isOpen={lanModalOpen}
+                onClose={() => setLanModalOpen.off()}
             />
 
             <ConfirmationDialog
