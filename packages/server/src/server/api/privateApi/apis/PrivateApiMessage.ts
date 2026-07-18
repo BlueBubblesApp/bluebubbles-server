@@ -5,6 +5,7 @@ import {
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
 import type { ValidTapback, ValidRemoveTapback } from "@server/types";
+import type { TextFormatting } from "@server/api/types";
 import { isMinCatalina, isMinMonterey } from "@server/env";
 
 export class PrivateApiMessage extends PrivateApiAction {
@@ -14,6 +15,7 @@ export class PrivateApiMessage extends PrivateApiAction {
         chatGuid: string,
         message: string,
         attributedBody: Record<string, any> = null,
+        textFormatting: TextFormatting = null,
         subject: string = null,
         effectId: string = null,
         selectedMessageGuid: string = null,
@@ -29,6 +31,7 @@ export class PrivateApiMessage extends PrivateApiAction {
             subject,
             message,
             attributedBody,
+            textFormatting,
             effectId,
             selectedMessageGuid,
             partIndex

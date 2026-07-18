@@ -4,11 +4,12 @@ import { FileSystem } from "@server/fileSystem";
 import { MessagePromise } from "@server/managers/outgoingMessageManager/messagePromise";
 import { Message } from "@server/databases/imessage/entity/Message";
 import { checkPrivateApiStatus, isEmpty, isNotEmpty, resultAwaiter } from "@server/helpers/utils";
-import { isMinMonterey, isMinVentura } from "@server/env";
+import { isMinMonterey, isMinSequoia, isMinVentura } from "@server/env";
 import { negativeReactionTextMap, reactionTextMap } from "@server/api/apple/mappings";
 import { invisibleMediaChar } from "@server/api/http/constants";
 import { ActionHandler } from "@server/api/apple/actions";
 import { rimrafSync } from "rimraf";
+import { hasTextFormatting, validateTextFormatting } from "@server/utils/TextFormattingUtils";
 import type {
     SendMessageParams,
     SendAttachmentParams,
@@ -54,6 +55,7 @@ export class MessageInterface {
         message,
         method = "apple-script",
         attributedBody = null,
+        textFormatting = null,
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
@@ -64,6 +66,22 @@ export class MessageInterface {
         if (!chatGuid) throw new Error("No chat GUID provided");
 
         Server().log(`Sending message "${message}" to ${chatGuid}`, "debug");
+
+        if (hasTextFormatting(textFormatting)) {
+            if (attributedBody) {
+                throw new Error("Use either textFormatting or attributedBody, not both");
+            }
+
+            if (method !== "private-api") {
+                throw new Error("Text formatting requires the Private API send method");
+            }
+
+            if (!isMinSequoia) {
+                throw new Error("Text formatting is only supported on macOS Sequoia (15) and newer");
+            }
+
+            validateTextFormatting(textFormatting, message ?? "");
+        }
 
         // We need offsets here due to iMessage's save times being a bit off for some reason
         const now = new Date(new Date().getTime() - 10000).getTime(); // With 10 second offset
@@ -103,6 +121,7 @@ export class MessageInterface {
                 chatGuid,
                 message,
                 attributedBody,
+                textFormatting,
                 subject,
                 effectId,
                 selectedMessageGuid,
@@ -225,6 +244,7 @@ export class MessageInterface {
         chatGuid,
         message,
         attributedBody = null,
+        textFormatting = null,
         subject = null,
         effectId = null,
         selectedMessageGuid = null,
@@ -236,6 +256,7 @@ export class MessageInterface {
             chatGuid,
             message,
             attributedBody ?? null,
+            textFormatting ?? null,
             subject ?? null,
             effectId ?? null,
             selectedMessageGuid ?? null,
