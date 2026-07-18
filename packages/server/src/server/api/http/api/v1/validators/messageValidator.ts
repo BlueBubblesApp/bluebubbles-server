@@ -82,10 +82,8 @@ export class MessageValidator {
     };
 
     static async validateText(ctx: RouterContext, next: Next) {
-        const { tempGuid, method, effectId, subject, selectedMessageGuid, message, ddScan, textFormatting } = ValidateInput(
-            ctx.request.body,
-            MessageValidator.sendTextRules
-        );
+        const { tempGuid, method, effectId, subject, selectedMessageGuid, message, ddScan, textFormatting } =
+            ValidateInput(ctx.request.body, MessageValidator.sendTextRules);
         let saniMethod = method;
 
         // Default the method to AppleScript
@@ -93,7 +91,14 @@ export class MessageValidator {
 
         // If we have an effectId, subject, reply, or attributedBody
         // let's imply we want to use the Private API
-        if (effectId || subject || selectedMessageGuid || ddScan || ctx.request.body.attributedBody || hasTextFormatting(textFormatting)) {
+        if (
+            effectId ||
+            subject ||
+            selectedMessageGuid ||
+            ddScan ||
+            ctx.request.body.attributedBody ||
+            hasTextFormatting(textFormatting)
+        ) {
             saniMethod = "private-api";
         }
 
@@ -236,10 +241,7 @@ export class MessageValidator {
     };
 
     static async validateMultipart(ctx: RouterContext, next: Next) {
-        const { parts, tempGuid } = ValidateInput(
-            ctx.request.body,
-            MessageValidator.multipartRules
-        );
+        const { parts, tempGuid } = ValidateInput(ctx.request.body, MessageValidator.multipartRules);
 
         // Validate the parts. We have a few rules for this:
         // 1. Each part must be a dictionary
@@ -254,8 +256,7 @@ export class MessageValidator {
             if (typeof part.partIndex !== "number") throw new BadRequest({ error: "Each partIndex must be a number" });
             if (!part.text && !part.attachment)
                 throw new BadRequest({ error: "Each part must have either a text or attachment" });
-            if (part.attachment && !part.name)
-                throw new BadRequest({ error: "Each attachment must have a name" });
+            if (part.attachment && !part.name) throw new BadRequest({ error: "Each attachment must have a name" });
             if (part.attachment) {
                 const aPath = path.join(FileSystem.getAttachmentDirectory("private-api"), part.attachment);
                 if (!fs.existsSync(aPath)) {
@@ -291,7 +292,8 @@ export class MessageValidator {
 
     static async validateAttachmentChunk(ctx: RouterContext, next: Next) {
         const { files } = ctx.request;
-        let {chunkIndex, totalChunks, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
+        // eslint-disable-next-line prefer-const
+        let { chunkIndex, totalChunks, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
             ctx.request?.body,
             MessageValidator.attachmentChunkRules
         );

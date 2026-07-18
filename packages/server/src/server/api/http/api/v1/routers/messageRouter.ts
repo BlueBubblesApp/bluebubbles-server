@@ -167,7 +167,7 @@ export class MessageRouter {
                 const variable = textQueries[0].statement.split(" ")[2].replace(":", "");
                 const operator = textQueries[0].statement.split(" ")[1];
                 const term = textQueries[0].args[variable];
-                
+
                 // Strip the % wildcards from the start/end
                 const strippedTerm = term.replace(/^%+|%+$/g, "");
 
@@ -183,7 +183,7 @@ export class MessageRouter {
                 // To match the behavior of the DB search, we will use the 'exact' match type.
                 // Exact match for the Spotlight API actually means "contains".
                 // A contains match in the Spotlight API tokenizes the search term and matches any token.
-                const matchType = 'contains';
+                const matchType = "contains";
 
                 [messages, totalCount] = await MessageInterface.searchMessagesPrivateApi({
                     chatGuid,
@@ -238,8 +238,17 @@ export class MessageRouter {
 
     static async sendText(ctx: RouterContext, _: Next) {
         let {
-            tempGuid, message, attributedBody, textFormatting, method, chatGuid,
-            effectId, subject, selectedMessageGuid, partIndex, ddScan
+            tempGuid,
+            message,
+            attributedBody,
+            textFormatting,
+            method,
+            chatGuid,
+            effectId,
+            subject,
+            selectedMessageGuid,
+            partIndex,
+            ddScan
         } = ctx?.request?.body ?? {};
 
         // Add to send cache
@@ -494,31 +503,45 @@ export class MessageRouter {
 
     static async sendAttachmentChunk(ctx: RouterContext, _: Next) {
         const { files } = ctx.request;
-        const { 
-            attachmentGuid, chatGuid, name, method, subject, 
-            selectedMessageGuid, partIndex, effectId, isAudioMessage,
-            chunkIndex, totalChunks, isComplete = false
+        const {
+            attachmentGuid,
+            chatGuid,
+            name,
+            method,
+            subject,
+            selectedMessageGuid,
+            partIndex,
+            effectId,
+            isAudioMessage,
+            chunkIndex,
+            totalChunks,
+            isComplete = false
         } = ctx.request?.body ?? {};
         const chunk = files?.chunk as File;
 
         try {
             // Save the chunk to the specified location
             const chunkData = fs.readFileSync(chunk.path);
-            FileSystem.saveAttachmentChunk(attachmentGuid, parseInt(chunkIndex, 10), new Uint8Array(Buffer.from(chunkData)));
+            FileSystem.saveAttachmentChunk(
+                attachmentGuid,
+                parseInt(chunkIndex, 10),
+                new Uint8Array(Buffer.from(chunkData))
+            );
 
             // If this is the last chunk and isComplete is true, assemble and send the attachment
             if (isTruthyBool(isComplete)) {
                 // Verify we have all expected chunks
                 const chunksDir = path.join(FileSystem.attachmentsDir, attachmentGuid);
-                const chunkFiles = fs.readdirSync(chunksDir)
-                    .filter((file: string) => file.endsWith('.chunk'))
+                const chunkFiles = fs
+                    .readdirSync(chunksDir)
+                    .filter((file: string) => file.endsWith(".chunk"))
                     .sort((a: string, b: string) => parseInt(a, 10) - parseInt(b, 10));
 
                 // Make sure we have all the chunks
                 if (chunkFiles.length !== parseInt(totalChunks, 10)) {
                     throw new Error(`Missing chunks. Expected ${totalChunks} chunks, but found ${chunkFiles.length}.`);
                 }
-                
+
                 // Use the existing FileSystem method to build the attachment from chunks
                 const tempFilePath = FileSystem.buildAttachmentChunks(attachmentGuid, name);
 
@@ -559,14 +582,14 @@ export class MessageRouter {
             }
 
             // If not complete, just return success for this chunk
-            return new Success(ctx, { 
+            return new Success(ctx, {
                 message: `Chunk ${chunkIndex}/${totalChunks - 1} uploaded successfully.`,
-                data: { 
-                    attachmentGuid, 
-                    chunkIndex, 
+                data: {
+                    attachmentGuid,
+                    chunkIndex,
                     totalChunks,
                     remainingChunks: parseInt(totalChunks, 10) - parseInt(chunkIndex, 10) - 1
-                } 
+                }
             }).send();
         } catch (ex: any) {
             // Remove from cache if we've added it
@@ -599,7 +622,10 @@ export class MessageRouter {
                     error: "Failed to send attachment! See attached message error code."
                 });
             } else {
-                throw new IMessageError({ message: "Attachment Chunk Send Error", error: ex?.message ?? ex.toString() });
+                throw new IMessageError({
+                    message: "Attachment Chunk Send Error",
+                    error: ex?.message ?? ex.toString()
+                });
             }
         }
     }

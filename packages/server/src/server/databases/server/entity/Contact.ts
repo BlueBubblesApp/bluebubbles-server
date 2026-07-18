@@ -1,5 +1,14 @@
 import { Base64Transformer } from "@server/databases/transformers/Base64Transformer";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Unique, Index } from "typeorm";
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
+    OneToMany,
+    Unique,
+    Index
+} from "typeorm";
 import { ContactAddress } from "./ContactAddress";
 
 @Entity({ name: "contact" })
