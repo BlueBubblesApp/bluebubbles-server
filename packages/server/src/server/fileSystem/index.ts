@@ -541,7 +541,7 @@ export class FileSystem {
     static async convertMp3ToCaf(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
         const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`
+            `/usr/bin/afconvert -f caff -d opus@24000 -c 1 "${oldPath}" "${outputPath}"`
         );
         if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert audio to CAF: ${output}`);
