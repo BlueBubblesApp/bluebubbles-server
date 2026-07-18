@@ -16,6 +16,7 @@ export enum IMessagePollType {
 }
 
 type MessageState = {
+    cacheTime: number;
     dateCreated: number;
     isDelivered: boolean;
     dateDelivered: number;
@@ -56,7 +57,7 @@ export class IMessageCache {
         const now = new Date().getTime();
         for (const guid in this.messageStates) {
             // Clear entries older than 1 hour
-            if (this.messageStates[guid].dateCreated < now - 1000 * 60 * 60) {
+            if (this.messageStates[guid].cacheTime < now - 1000 * 60 * 60) {
                 delete this.messageStates[guid];
             }
         }
@@ -138,6 +139,7 @@ export abstract class IMessagePoller extends Loggable {
         }
 
         this.cache.messageStates[message.guid] = {
+            cacheTime: new Date().getTime(),
             dateCreated: message.dateCreated.getTime(),
             isDelivered: message.isDelivered ?? false,
             dateDelivered: message?.dateDelivered ? message.dateDelivered.getTime() : 0,
