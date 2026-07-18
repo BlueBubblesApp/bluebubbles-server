@@ -31,7 +31,8 @@ export class PrivateApiMessage extends PrivateApiAction {
             subject,
             message,
             attributedBody,
-            textFormatting,
+            // Commented out until confirmation that the helper dylib supports this.
+            // textFormatting,
             effectId,
             selectedMessageGuid,
             partIndex
