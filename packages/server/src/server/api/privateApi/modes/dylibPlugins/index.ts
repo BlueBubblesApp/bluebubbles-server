@@ -168,7 +168,7 @@ export abstract class DylibPlugin extends Loggable {
         try {
             await FileSystem.executeAppleScript(hideApp(this.parentApp));
         } catch (ex) {
-            console.log(ex);
+            this.log.error(ex instanceof Error ? ex.message : String(ex));
             // Don't do anything
         }
     }

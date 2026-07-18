@@ -44,7 +44,9 @@ export class WebhookValidator {
             // Find the webhook value in the webhook events
             const webhookEvent = webhookEventOptions.find(e => e.value === event);
             if (!webhookEvent) {
-                throw new BadRequest({ error: `Invalid webhook event: ${event}! Webhook must be one of: ${WebhookValidator.webhookValues}` });
+                throw new BadRequest({
+                    error: `Invalid webhook event: ${event}! Webhook must be one of: ${WebhookValidator.webhookValues}`
+                });
             }
 
             // Update the event to the label

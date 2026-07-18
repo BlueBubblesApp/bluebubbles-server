@@ -7,8 +7,11 @@ import { Success } from "../responses/success";
 import { Contact } from "@server/databases/server/entity";
 import { parseWithQuery } from "../utils";
 import { BadRequest } from "../responses/errors";
+import { getLogger } from "@server/lib/logging/Loggable";
 
 export class ContactRouter {
+    private static log = getLogger("ContactRouter");
+
     private static isAddressObject(data: any): boolean {
         return (
             data &&
@@ -77,7 +80,7 @@ export class ContactRouter {
                     })
                 );
             } catch (ex: any) {
-                console.log(ex);
+                ContactRouter.log.error(ex);
                 errors.push({
                     entry: item,
                     error: ex?.message ?? String(ex)

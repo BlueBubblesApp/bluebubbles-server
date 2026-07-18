@@ -19,7 +19,7 @@ export const getConversionPath = (attachment: Attachment, extension: string): st
     const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
 
     // If the path already has the extension, return it
-    let newPath = `${newDir}/${newName}`;
+    const newPath = `${newDir}/${newName}`;
     if (newPath.endsWith(`.${extension}`)) return newPath;
 
     // Otherwise, return the path with the extension
