@@ -8,7 +8,22 @@ export class PrivateApiTypingEventHandler implements PrivateApiEventHandler {
 
     cache: Record<string, Record<string, any>> = {};
 
+    // Entries older than this are no longer relevant to the de-dupe logic below,
+    // so we can safely drop them to keep the cache from growing forever.
+    private static readonly CACHE_TTL_MS = 1000 * 60 * 60;
+
+    private pruneCache() {
+        const now = new Date().getTime();
+        for (const guid of Object.keys(this.cache)) {
+            if (now - this.cache[guid].lastSeen > PrivateApiTypingEventHandler.CACHE_TTL_MS) {
+                delete this.cache[guid];
+            }
+        }
+    }
+
     async handle(data: EventData, _: net.Socket) {
+        this.pruneCache();
+
         const display = data.event === "started-typing";
         const guid = data.guid;
         let shouldEmit = false;

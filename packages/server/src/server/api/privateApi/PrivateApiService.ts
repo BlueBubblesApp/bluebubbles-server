@@ -39,6 +39,8 @@ export class PrivateApiService extends Loggable {
 
     restartCounter = 0;
 
+    isRestarting = false;
+
     transactionManager: TransactionManager;
 
     eventHandlers: PrivateApiEventHandler[];
@@ -379,11 +381,21 @@ export class PrivateApiService extends Loggable {
         }
 
         this.clients = [];
+        this.activeClients = {};
     }
 
     async restart(): Promise<void> {
-        await this.stop();
-        await this.start();
+        // Guard against overlapping restarts (e.g. multiple rapid "error" events
+        // on the socket server), which would otherwise race on this.server/this.mode.
+        if (this.isRestarting) return;
+        this.isRestarting = true;
+
+        try {
+            await this.stop();
+            await this.start();
+        } finally {
+            this.isRestarting = false;
+        }
     }
 
     async stop() {
@@ -396,7 +408,7 @@ export class PrivateApiService extends Loggable {
         }
 
         try {
-            if (this.server && this.server.listening) {
+            if (this.server) {
                 this.server.removeAllListeners();
                 this.server.close();
                 this.server = null;
