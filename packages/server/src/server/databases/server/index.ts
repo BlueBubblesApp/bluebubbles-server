@@ -8,6 +8,7 @@ import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, Schedul
 import { DEFAULT_DB_ITEMS } from "./constants";
 import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
 import { ScheduledMessageTable1665083072000 } from "./migrations/1665083072000-ScheduledMessageTable";
+import { WebhookChatGuids1710720000000 } from "./migrations/1710720000000-WebhookChatGuids";
 import { AddExternalIdToContacts1750299580000 } from "./migrations/1750299580000-AddExternalIdToContacts";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
@@ -48,6 +49,7 @@ export class ServerRepository extends EventEmitter {
             migrations: [
                 ContactTables1654432080899,
                 ScheduledMessageTable1665083072000,
+                WebhookChatGuids1710720000000,
                 AddExternalIdToContacts1750299580000
             ],
             migrationsRun: !shouldSync,
@@ -210,25 +212,35 @@ export class ServerRepository extends EventEmitter {
         return await repo.find({ select: fields, relations: ["addresses"] });
     }
 
-    public async addWebhook(url: string, events: Array<{ label: string; value: string }>): Promise<Webhook> {
+    public async addWebhook(
+        url: string,
+        events: Array<{ label: string; value: string }>,
+        chatGuids: string[] | null = null
+    ): Promise<Webhook> {
         const repo = this.webhooks();
         const item = await repo.findOneBy({ url });
 
         // If the webhook exists, don't re-add it, just return it
         if (item) return item;
 
-        const webhook = repo.create({ url, events: JSON.stringify(events.map(e => e.value)) });
+        const webhook = repo.create({
+            url,
+            events: JSON.stringify(events.map(e => e.value)),
+            chatGuids: chatGuids ? JSON.stringify(chatGuids) : null
+        });
         return await repo.save(webhook);
     }
 
     public async updateWebhook({
         id,
         url = null,
-        events = null
+        events = null,
+        chatGuids
     }: {
         id: number;
         url: string;
         events: Array<{ label: string; value: string }>;
+        chatGuids?: string[] | null;
     }): Promise<Webhook> {
         const repo = this.webhooks();
         const item = await repo.findOneBy({ id });
@@ -236,6 +248,9 @@ export class ServerRepository extends EventEmitter {
 
         if (url) item.url = url;
         if (events) item.events = JSON.stringify(events.map(e => e.value));
+        // Unlike url/events, chatGuids can be explicitly set to null (to clear the filter),
+        // so we check for undefined to distinguish "not provided" from "clear"
+        if (chatGuids !== undefined) item.chatGuids = chatGuids ? JSON.stringify(chatGuids) : null;
 
         await repo.update(id, item);
         return item;

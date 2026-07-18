@@ -8,6 +8,7 @@ export interface WebhookItem {
     id: number;
     url: string;
     events: string;
+    chatGuids: string[] | null;
     created: Date;
 }
 
@@ -29,7 +30,7 @@ export const WebhooksSlice = createSlice({
                 if (!exists) state.webhooks.push(i);
             }
         },
-        create: (state, action: PayloadAction<{ url: string, events: Array<MultiSelectValue> }>) => {
+        create: (state, action: PayloadAction<{ url: string, events: Array<MultiSelectValue>, chatGuids?: Array<string> }>) => {
             const exists = state.webhooks.find(e => e.url === action.payload.url);
             if (exists) {
                 return showErrorToast({
@@ -53,7 +54,7 @@ export const WebhooksSlice = createSlice({
                 });
             });
         },
-        update: (state, action: PayloadAction<{ id: number, url: string, events: Array<MultiSelectValue> }>) => {
+        update: (state, action: PayloadAction<{ id: number, url: string, events: Array<MultiSelectValue>, chatGuids?: Array<string> | null }>) => {
             const existingIndex = state.webhooks.findIndex(e => e.id === action.payload.id);
             if (existingIndex === -1) {
                 return showErrorToast({
@@ -67,13 +68,14 @@ export const WebhooksSlice = createSlice({
             state.webhooks = state.webhooks.map(e => (e.id === action.payload.id) ?
                 { ...e, url: action.payload.url, events: JSON.stringify(action.payload.events.map(i => {
                     return i.value;
-                })) } : e);
+                })), chatGuids: action.payload.chatGuids ?? null } : e);
 
             // Send the update to the backend
             updateWebhook({
                 id: action.payload.id,
                 url: action.payload.url,
-                events: action.payload.events
+                events: action.payload.events,
+                chatGuids: action.payload.chatGuids
             }).then(() => {
                 showSuccessToast({
                     id: 'webhooks',

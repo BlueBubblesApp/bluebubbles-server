@@ -11,9 +11,11 @@ import {
     FormControl,
     FormErrorMessage,
     FormLabel,
+    FormHelperText,
     Text
 } from '@chakra-ui/react';
 import { Select as MultiSelect } from 'chakra-react-select';
+import { ipcRenderer } from 'electron';
 import { FocusableElement } from '@chakra-ui/utils';
 import { webhookEventOptions } from '../../constants';
 import { MultiSelectValue } from '../../types';
@@ -47,6 +49,27 @@ export const AddWebhookDialog = ({
     const isUrlInvalid = (urlError ?? '').length > 0;
     const [eventsError, setEventsError] = useState('');
     const isEventsError = (eventsError ?? '').length > 0;
+    const [chatOptions, setChatOptions] = useState([] as Array<MultiSelectValue>);
+    const [selectedChats, setSelectedChats] = useState([] as Array<MultiSelectValue>);
+
+    useEffect(() => {
+        ipcRenderer.invoke('get-chats').then((chats: any[]) => {
+            chats.sort((a, b) => {
+                const aHasName = !!a.displayName;
+                const bHasName = !!b.displayName;
+                if (aHasName === bHasName) return 0;
+                return aHasName ? -1 : 1;
+            });
+            const options = chats.map((e: any) => {
+                let label = e.displayName ?? '';
+                if (label.length === 0) {
+                    label = e.participants?.map((p: any) => p.address).join(', ') ?? e.chatIdentifier ?? e.guid;
+                }
+                return { label, value: e.guid };
+            });
+            setChatOptions(options);
+        });
+    }, []);
 
     useEffect(() => {
         if (!existingId) return;
@@ -57,6 +80,21 @@ export const AddWebhookDialog = ({
             setSelectedEvents(convertMultiSelectValues(JSON.parse(webhook.events)));
         }
     }, [existingId]);
+
+    useEffect(() => {
+        if (!existingId) return;
+
+        const webhook = webhooks.find(e => e.id === existingId);
+        if (webhook?.chatGuids && webhook.chatGuids.length > 0) {
+            const matched = webhook.chatGuids.map(guid => {
+                const option = chatOptions.find(o => o.value === guid);
+                return option ?? { label: guid, value: guid };
+            });
+            setSelectedChats(matched);
+        } else {
+            setSelectedChats([]);
+        }
+    }, [existingId, chatOptions]);
 
     return (
         <AlertDialog
@@ -104,7 +142,21 @@ export const AddWebhookDialog = ({
                                 <FormErrorMessage>{eventsError}</FormErrorMessage>
                             ) : null}
                         </FormControl>
-                        
+                        <FormControl mt={5}>
+                            <FormLabel>Chat Filter</FormLabel>
+                            <MultiSelect
+                                size='md'
+                                isMulti={true}
+                                options={chatOptions}
+                                value={selectedChats}
+                                placeholder='All Chats'
+                                onChange={(newValues) => {
+                                    setSelectedChats(newValues as Array<MultiSelectValue>);
+                                }}
+                            />
+                            <FormHelperText>Select specific chats to receive events from. Leave empty for all chats.</FormHelperText>
+                        </FormControl>
+
                     </AlertDialogBody>
 
                     <AlertDialogFooter>
@@ -113,6 +165,7 @@ export const AddWebhookDialog = ({
                             onClick={() => {
                                 if (onCancel) onCancel();
                                 setUrl('');
+                                setSelectedChats([]);
                                 onClose();
                             }}
                         >
@@ -133,13 +186,16 @@ export const AddWebhookDialog = ({
                                     return;
                                 }
 
+                                const chatGuids = selectedChats.length > 0 ? selectedChats.map(c => c.value) : undefined;
+
                                 if (existingId) {
-                                    dispatch(update({ id: existingId, url, events: selectedEvents }));
+                                    dispatch(update({ id: existingId, url, events: selectedEvents, chatGuids: chatGuids ?? null }));
                                 } else {
-                                    dispatch(create({ url, events: selectedEvents }));
+                                    dispatch(create({ url, events: selectedEvents, chatGuids }));
                                 }
 
                                 setUrl('');
+                                setSelectedChats([]);
                                 onClose();
                             }}
                         >

@@ -12,6 +12,10 @@ export class Webhook {
     @Column("text", { name: "events", nullable: false })
     events: string;
 
+    // JSON String — optional list of chat GUIDs to filter events by
+    @Column("text", { name: "chat_guids", nullable: true })
+    chatGuids: string;
+
     @CreateDateColumn()
     created: Date;
 }
