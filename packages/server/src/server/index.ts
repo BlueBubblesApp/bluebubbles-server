@@ -1276,7 +1276,8 @@ class BlueBubblesServer extends EventEmitter {
                 this.iMessageRepo.dbPathWal
             ],
             cache,
-            repo: this.iMessageRepo
+            repo: this.iMessageRepo,
+            pollIntervalMs: this.repo.getConfig("db_poll_interval") as number
         });
 
         this.iMessageListener.addPoller(new MessagePoller(this.iMessageRepo, cache));
