@@ -163,7 +163,12 @@ export class FCMService extends Loggable {
                 "    }\n" +
                 "\n" +
                 "    match /server/commands {\n" +
-                "      allow write;\n" +
+                "      allow read: if false;\n" +
+                "      allow create, update: if request.resource.data.keys().hasOnly(['nextRestart'])\n" +
+                "        && request.resource.data.nextRestart is int\n" +
+                "        && request.resource.data.nextRestart > (resource != null ? resource.data.nextRestart : 0)\n" +
+                "        && request.resource.data.nextRestart <= request.time.toMillis() + 60000;\n" +
+                "      allow delete: if false;\n" +
                 "    }\n" +
                 "  }\n" +
                 "}"
