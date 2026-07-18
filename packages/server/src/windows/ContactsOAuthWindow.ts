@@ -4,7 +4,7 @@ import { Server } from "@server";
 import { ProgressStatus } from "@server/types";
 
 export class ContactsOAuthWindow extends Window {
-    private url: string = null;
+    url: string = null;
 
     private static self: ContactsOAuthWindow;
 
@@ -16,6 +16,8 @@ export class ContactsOAuthWindow extends Window {
     public static getInstance(url: string): ContactsOAuthWindow {
         if (!ContactsOAuthWindow.self) {
             ContactsOAuthWindow.self = new ContactsOAuthWindow(url);
+        } else {
+            ContactsOAuthWindow.self.url = url;
         }
 
         return ContactsOAuthWindow.self;
@@ -40,6 +42,14 @@ export class ContactsOAuthWindow extends Window {
             // Extract the token from the URL
             const hash = url.split("#")[1];
             const params = new URLSearchParams(hash);
+            const error = params.get("error");
+            if (error) {
+                Server().log(`Google OAuth request was not completed: ${error}`, "warn");
+                this.instance.close();
+                this.instance = null;
+                return;
+            }
+
             const token = params.get("access_token");
             const expires = params.get("expires_in");
             Server().oauthService.authToken = token;
