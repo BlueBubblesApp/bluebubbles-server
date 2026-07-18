@@ -9,6 +9,7 @@ import { QueueService } from "./queueService";
 import { IPCService } from "./ipcService";
 import { CertificateService } from "./certificateService";
 import { WebhookService } from "./webhookService";
+import { MessageListenerHealthService } from "./messageListenerHealthService";
 import { ScheduledMessagesService } from "./scheduledMessagesService";
 import { OauthService } from "./oauthService";
 
@@ -24,6 +25,7 @@ export {
     CertificateService,
     CloudflareService,
     WebhookService,
+    MessageListenerHealthService,
     ScheduledMessagesService,
     OauthService
 };

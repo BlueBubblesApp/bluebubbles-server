@@ -8,6 +8,7 @@ import { Config, Alert, Device, Queue, Webhook, Contact, ContactAddress, Schedul
 import { DEFAULT_DB_ITEMS } from "./constants";
 import { ContactTables1654432080899 } from "./migrations/1654432080899-ContactTables";
 import { ScheduledMessageTable1665083072000 } from "./migrations/1665083072000-ScheduledMessageTable";
+import { APP_DATA_DIR_NAME } from "@server/runtime/paths";
 
 export type ServerConfig = { [key: string]: Date | string | boolean | number };
 export type ServerConfigChange = { prevConfig: ServerConfig; nextConfig: ServerConfig };
@@ -35,7 +36,7 @@ export class ServerRepository extends EventEmitter {
 
         let dbPath = `${app.getPath("userData")}/config.db`;
         if (isDev) {
-            dbPath = `${app.getPath("userData")}/bluebubbles-server/config.db`;
+            dbPath = `${app.getPath("userData")}/${APP_DATA_DIR_NAME}/config.db`;
         }
 
         const shouldSync = !fs.existsSync(dbPath) || isDev;

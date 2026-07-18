@@ -2,7 +2,7 @@
 // Making them relative to the scripts folder will break the commands
 module.exports = {
     "productName": "BlueBubbles",
-    "appId": "com.BlueBubbles.BlueBubbles-Server",
+    "appId": "com.BlueBubbles.BlueBubbles",
     "npmRebuild": true,
     "directories": {
         "output": "releases",
