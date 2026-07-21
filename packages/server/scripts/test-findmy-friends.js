@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const typescript = require("typescript");
 
-const loadTypeScriptModule = relativeSourcePath => {
+const loadTypeScriptModule = (relativeSourcePath, moduleMocks = {}) => {
     const sourcePath = path.resolve(__dirname, relativeSourcePath);
     const sourceCode = fs.readFileSync(sourcePath, "utf8");
     const compiledCode = typescript.transpileModule(sourceCode, {
@@ -16,14 +16,19 @@ const loadTypeScriptModule = relativeSourcePath => {
 
     const loadedModule = { exports: {} };
     const executeModule = new Function("require", "module", "exports", compiledCode);
-    executeModule(require, loadedModule, loadedModule.exports);
+    const moduleRequire = moduleName => {
+        return Object.prototype.hasOwnProperty.call(moduleMocks, moduleName)
+            ? moduleMocks[moduleName]
+            : require(moduleName);
+    };
+    executeModule(moduleRequire, loadedModule, loadedModule.exports);
     return loadedModule.exports;
 };
 
-const { normalizeFindMyFriendLocation, normalizeFindMyFriendLocations } = loadTypeScriptModule(
-    "../src/server/api/lib/findmy/utils.ts"
-);
+const findMyUtilities = loadTypeScriptModule("../src/server/api/lib/findmy/utils.ts");
+const { normalizeFindMyFriendLocation, normalizeFindMyFriendLocations } = findMyUtilities;
 const { JsonLineBuffer } = loadTypeScriptModule("../src/server/api/privateApi/JsonLineBuffer.ts");
+const { selectPrivateApiClients } = loadTypeScriptModule("../src/server/api/privateApi/PrivateApiClientSelector.ts");
 
 const normalizedLocation = normalizeFindMyFriendLocation({
     handle: " alice@example.com ",
@@ -103,4 +108,168 @@ assert.deepEqual(splitUtf8Messages.append(utf8MessageBytes.subarray(accentedChar
     utf8Message.trim()
 ]);
 
-console.log("PASS: Find My Friends normalization and socket framing");
+const messagesClient = { name: "messages", destroyed: false };
+const findMyClient = { name: "findmy", destroyed: false };
+const disconnectedClient = { name: "disconnected", destroyed: true };
+const connectedClients = [messagesClient, findMyClient, disconnectedClient];
+const clientsByProcessIdentifier = {
+    "com.apple.MobileSMS": messagesClient,
+    "com.apple.findmy": findMyClient,
+    "com.apple.disconnected": disconnectedClient
+};
+
+assert.deepEqual(selectPrivateApiClients(connectedClients, clientsByProcessIdentifier, "com.apple.findmy"), [
+    findMyClient
+]);
+assert.deepEqual(selectPrivateApiClients(connectedClients, clientsByProcessIdentifier, "com.apple.unknown"), []);
+assert.deepEqual(selectPrivateApiClients(connectedClients, clientsByProcessIdentifier, "com.apple.disconnected"), []);
+assert.deepEqual(selectPrivateApiClients(connectedClients, clientsByProcessIdentifier), [messagesClient, findMyClient]);
+
+let activeServer;
+const { FindMyInterface } = loadTypeScriptModule("../src/server/api/interfaces/findMyInterface.ts", {
+    "@server": { Server: () => activeServer },
+    "@server/fileSystem": { FileSystem: {} },
+    "@server/env": { isMinSequoia: true },
+    "@server/helpers/utils": { waitMs: async () => {} },
+    "../apple/scripts": {
+        quitFindMyFriends: () => "",
+        startFindMyFriends: () => "",
+        showFindMyFriends: () => "",
+        hideFindMyFriends: () => ""
+    },
+    "@server/api/lib/findmy/utils": findMyUtilities
+});
+
+const createRefreshScenario = ({
+    helperAvailable,
+    helperResponse,
+    helperError,
+    fallbackError,
+    initialLocations = [normalizedLocation]
+}) => {
+    let cachedLocations = [...initialLocations];
+    const observations = {
+        fallbackCalls: 0,
+        helperCalls: 0,
+        warnings: []
+    };
+
+    activeServer = {
+        repo: {
+            getConfig: name => name === "enable_private_api"
+        },
+        privateApi: {
+            hasClient: processIdentifier => {
+                assert.equal(processIdentifier, "com.apple.findmy");
+                return helperAvailable;
+            },
+            findmy: {
+                refreshFriends: async () => {
+                    observations.helperCalls += 1;
+                    if (helperError) throw helperError;
+                    return helperResponse;
+                }
+            }
+        },
+        findMyCache: {
+            getAll: () => cachedLocations,
+            updateAll: locations => {
+                if (locations.length > 0) cachedLocations = locations;
+                return locations;
+            }
+        },
+        logger: {
+            warn: message => observations.warnings.push(message)
+        }
+    };
+
+    FindMyInterface.refreshUsingFindMyApp = async () => {
+        observations.fallbackCalls += 1;
+        if (fallbackError) throw fallbackError;
+    };
+
+    return observations;
+};
+
+const settleBackgroundFallback = () => new Promise(resolve => setImmediate(resolve));
+
+const runRefreshBranchTests = async () => {
+    let observations = createRefreshScenario({ helperAvailable: false });
+    let locations = await FindMyInterface.refreshFriends();
+    await settleBackgroundFallback();
+    assert.equal(observations.helperCalls, 0);
+    assert.equal(observations.fallbackCalls, 1);
+    assert.equal(locations.length, 1);
+
+    observations = createRefreshScenario({
+        helperAvailable: true,
+        helperResponse: {
+            data: {
+                locations: [],
+                partial: true,
+                friendListTimedOut: true,
+                timedOutHandles: [],
+                skippedFriends: 0
+            }
+        }
+    });
+    locations = await FindMyInterface.refreshFriends();
+    await settleBackgroundFallback();
+    assert.equal(observations.helperCalls, 1);
+    assert.equal(observations.fallbackCalls, 1, "an empty partial helper response must start the fallback");
+    assert.equal(locations.length, 1, "an empty partial response must not erase cached friends");
+
+    observations = createRefreshScenario({
+        helperAvailable: true,
+        helperResponse: {
+            data: {
+                locations: [normalizedLocation],
+                partial: true,
+                friendListTimedOut: false,
+                timedOutHandles: ["bob@example.com"],
+                skippedFriends: 0
+            }
+        }
+    });
+    locations = await FindMyInterface.refreshFriends();
+    await settleBackgroundFallback();
+    assert.equal(observations.fallbackCalls, 0, "a partial response with usable records must not restart Find My");
+    assert.equal(locations.length, 1);
+
+    observations = createRefreshScenario({
+        helperAvailable: true,
+        helperResponse: {
+            data: {
+                locations: [],
+                partial: false,
+                friendListTimedOut: false,
+                timedOutHandles: [],
+                skippedFriends: 0
+            }
+        },
+        initialLocations: []
+    });
+    locations = await FindMyInterface.refreshFriends();
+    await settleBackgroundFallback();
+    assert.equal(observations.fallbackCalls, 0, "a complete empty list is a valid helper response");
+    assert.deepEqual(locations, []);
+
+    observations = createRefreshScenario({
+        helperAvailable: true,
+        helperError: new Error("helper failed"),
+        fallbackError: new Error("fallback failed")
+    });
+    locations = await FindMyInterface.refreshFriends();
+    await settleBackgroundFallback();
+    assert.equal(observations.helperCalls, 1);
+    assert.equal(observations.fallbackCalls, 1);
+    assert.equal(locations.length, 1);
+    assert.equal(observations.warnings.length, 2, "helper and fallback failures must both be observed");
+};
+
+runRefreshBranchTests()
+    .then(() => console.log("PASS: Find My Friends integration tests"))
+    .catch(error => {
+        console.error(error);
+        process.exitCode = 1;
+    });

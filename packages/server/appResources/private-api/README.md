@@ -25,3 +25,16 @@ npm run verify:findmy-helper
 Automation permission requests for Find My and System Events happen only when
 the Find My integration is started or its Accessibility fallback is explicitly
 used. Normal server startup does not prompt for unrelated Automation access.
+
+## Find My release smoke test
+
+TCC Automation grants are tied to the signed application identity. Before a
+release, test a normally signed package on a user account without an existing
+BlueBubbles Automation grant:
+
+1. Enable Private API and **Open FindMy App on Startup**.
+2. Confirm macOS requests Find My and System Events Automation access for
+   BlueBubbles.
+3. Confirm the helper registers as `com.apple.findmy` and Find My can be hidden.
+4. Call the Friends GET, refresh, and GET routes and verify that all three
+   succeed without helper, framing, transaction, or permission errors.

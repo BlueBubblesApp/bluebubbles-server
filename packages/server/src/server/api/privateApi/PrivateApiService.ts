@@ -25,6 +25,7 @@ import { Socket } from "../types";
 import { v4 } from "uuid";
 import { Loggable } from "../../lib/logging/Loggable";
 import { JsonLineBuffer } from "./JsonLineBuffer";
+import { selectPrivateApiClients } from "./PrivateApiClientSelector";
 
 const FIRST_MACOS_USER_IDENTIFIER = 501;
 const MAX_SOCKET_RESTART_ATTEMPTS = 5;
@@ -340,15 +341,13 @@ export class PrivateApiService extends Loggable {
     }
 
     private async writeToClients(data: string, targetProcessIdentifier?: string): Promise<boolean> {
-        if (targetProcessIdentifier) {
-            const client = this.clientsByProcessIdentifier[targetProcessIdentifier];
-            if (!client) return false;
-            await this.writeToClient(client, data);
-            return true;
-        }
-
         let success = false;
-        for (const client of this.connectedClients) {
+        const selectedClients = selectPrivateApiClients(
+            this.connectedClients,
+            this.clientsByProcessIdentifier,
+            targetProcessIdentifier
+        );
+        for (const client of selectedClients) {
             try {
                 await this.writeToClient(client, data);
                 success = true;
