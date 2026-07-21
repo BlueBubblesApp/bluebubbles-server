@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { isMinSequoia } from "@server/env";
-import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
+import { waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
 import { normalizeFindMyLocationItems, transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
@@ -71,30 +71,50 @@ export class FindMyInterface {
     }
 
     static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
-        const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
+        const papiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
+        const findMyHelperAvailable = Server().privateApi.hasClient("com.apple.findmy");
         let usedPrivateApi = false;
-        if (papiEnabled && isMinSequoia) {
-            checkPrivateApiStatus();
-            const result = await Server().privateApi.findmy.refreshFriends();
-            const refreshLocations = normalizeFindMyLocationItems(result?.data?.locations ?? []);
-            usedPrivateApi = true;
+        if (papiEnabled && isMinSequoia && findMyHelperAvailable) {
+            try {
+                const result = await Server().privateApi.findmy.refreshFriends();
+                if (Array.isArray(result?.data?.locations)) {
+                    const refreshLocations = normalizeFindMyLocationItems(result.data.locations);
+                    usedPrivateApi = true;
 
-            // Save the data to the cache
-            // The cache will handle properly updating the data.
-            Server().findMyCache.addAll(refreshLocations);
+                    // The cache rejects stale or unchanged records.
+                    Server().findMyCache.addAll(refreshLocations);
+
+                    if (result.data.partial) {
+                        const timedOutHandles = Array.isArray(result.data.timedOutHandles)
+                            ? result.data.timedOutHandles.length
+                            : 0;
+                        Server().logger.warn(
+                            `Find My Friends returned a partial response (${timedOutHandles} timed-out handle(s), ` +
+                                `${Number(result.data.skippedFriends ?? 0)} skipped friend(s)).`
+                        );
+                    }
+                }
+            } catch (ex: any) {
+                Server().logger.warn(
+                    `Unable to refresh Find My Friends through the helper: ${ex?.message ?? String(ex)}`
+                );
+            }
         }
 
         // Fallback path: open Find My so the app refreshes its own cache.
         // Don't await because it should update in the background.
         // Location updates get emitted as an event as they come in.
         if (openFindMyApp && !usedPrivateApi) {
-            this.refreshLocationsAccessibility();
+            void this.refreshLocationsAccessibility().catch((ex: any) => {
+                Server().logger.warn(`Unable to refresh Find My through Accessibility: ${ex?.message ?? String(ex)}`);
+            });
         }
 
         return normalizeFindMyLocationItems(Server().findMyCache.getAll());
     }
 
     static async refreshLocationsAccessibility() {
+        await FileSystem.requestFindMyAutomationPermissions();
         await FileSystem.executeAppleScript(quitFindMyFriends());
         await waitMs(3000);
 

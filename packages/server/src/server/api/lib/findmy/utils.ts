@@ -1,4 +1,4 @@
-import { FindMyItem, FindMyDevice, FindMyLocationItem } from "@server/api/lib/findmy/types";
+import type { FindMyItem, FindMyDevice, FindMyLocationItem } from "@server/api/lib/findmy/types";
 
 export const getFindMyItemModelDisplayName = (item: FindMyItem): string => {
     if (item?.productType?.type === "b389") return "AirTag";
@@ -44,30 +44,46 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
 });
 
 export const normalizeFindMyLocationItem = (item: FindMyLocationItem): FindMyLocationItem => {
-    const output: any = { ...item };
+    const output: Record<string, any> = { ...item };
+
+    const optionalString = (value: unknown): string | null => {
+        if (typeof value !== "string") return null;
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const optionalNumber = (value: unknown): number | null => {
+        if (value == null || (typeof value === "string" && value.trim().length === 0)) return null;
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) ? numericValue : null;
+    };
 
     if (Array.isArray(output.title)) {
-        output.title = output.title.find((value: unknown) => typeof value === "string" && value.length > 0) ?? null;
-    } else if (output.title != null && typeof output.title !== "string") {
-        output.title = String(output.title);
+        output.title = output.title.map(optionalString).find((value: string | null) => value != null) ?? null;
+    } else {
+        output.title = optionalString(output.title);
     }
 
-    if (Array.isArray(output.coordinates)) {
-        output.coordinates = [
-            Number(output.coordinates[0] ?? 0),
-            Number(output.coordinates[1] ?? 0)
-        ];
-    } else if (output.coordinates == null) {
-        output.coordinates = null;
+    const latitude = Array.isArray(output.coordinates) ? optionalNumber(output.coordinates[0]) : null;
+    const longitude = Array.isArray(output.coordinates) ? optionalNumber(output.coordinates[1]) : null;
+    output.coordinates = latitude != null && longitude != null ? [latitude, longitude] : null;
+
+    output.handle = optionalString(output.handle);
+    for (const field of ["long_address", "short_address", "subtitle"] as const) {
+        output[field] = optionalString(output[field]);
     }
 
-    if (output.last_updated == null) output.last_updated = null;
-    if (output.is_locating_in_progress == null) output.is_locating_in_progress = false;
+    output.last_updated = optionalNumber(output.last_updated);
+    output.is_locating_in_progress =
+        output.is_locating_in_progress === true || output.is_locating_in_progress === 1 ? 1 : 0;
+    if (!["legacy", "live", "shallow"].includes(output.status)) output.status = "legacy";
 
-    return output;
+    return output as FindMyLocationItem;
 };
 
-export const normalizeFindMyLocationItems = (items: FindMyLocationItem[]): FindMyLocationItem[] => {
+export const normalizeFindMyLocationItems = (
+    items: FindMyLocationItem[] | null | undefined
+): FindMyLocationItem[] => {
     if (!Array.isArray(items)) return [];
-    return items.map(normalizeFindMyLocationItem);
+    return items.map(normalizeFindMyLocationItem).filter(item => item.handle != null);
 };
