@@ -17,12 +17,7 @@ import {
 import { isMinMonterey } from "@server/env";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 
-import {
-    requestFindMyAutomation,
-    requestMessagesAutomation,
-    requestSystemEventsAutomation,
-    startMessages
-} from "../api/apple/scripts";
+import { requestFindMyAutomation, requestSystemEventsAutomation, startMessages } from "../api/apple/scripts";
 import {
     AudioMetadata,
     AudioMetadataKeys,
@@ -501,12 +496,8 @@ export class FileSystem {
         return FileSystem.execShellCommand(`osascript -e ${parts.join(" -e ")}`);
     }
 
-    /**
-     * Requests Automation permissions for the apps BlueBubbles drives with Apple Events.
-     */
-    static async requestAutomationPermissions() {
+    static async requestFindMyAutomationPermissions() {
         const requests = [
-            { name: "Messages", script: requestMessagesAutomation() },
             { name: "System Events", script: requestSystemEventsAutomation() },
             { name: "Find My", script: requestFindMyAutomation() }
         ];

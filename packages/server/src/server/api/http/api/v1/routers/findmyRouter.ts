@@ -14,7 +14,9 @@ export class FindMyRouter {
             await Server().emitMessage(NEW_FINDMY_LOCATION, item, "normal", false, true);
         }
 
-        Server().logger.debug(`Emitted ${locations.length} FindMy friend location update(s) to socket clients after refresh.`);
+        Server().logger.debug(
+            `Emitted ${locations.length} FindMy friend location update(s) to socket clients after refresh.`
+        );
     }
 
     static async refreshDevices(ctx: RouterContext, _: Next) {
