@@ -863,12 +863,6 @@ class BlueBubblesServer extends EventEmitter {
             this.logger.error("Full-disk access permissions are required!");
         }
 
-        try {
-            await FileSystem.requestAutomationPermissions();
-        } catch (ex: any) {
-            this.logger.warn(`Unable to request Automation permissions! CLI Error: ${ex?.message ?? String(ex)}`);
-        }
-
         // Make sure Messages is running
         try {
             await FileSystem.startMessages();

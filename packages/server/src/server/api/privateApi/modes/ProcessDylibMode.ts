@@ -34,12 +34,10 @@ export class ProcessDylibMode extends PrivateApiMode {
 
         // Start the dylib process
         for (const plugin of ProcessDylibMode.plugins) {
-            try {
-                // Don't await this. This is a blocking call.
-                plugin.injectPlugin();
-            } catch (e: any) {
+            // Don't await this. The promise remains pending while the parent app runs.
+            void plugin.injectPlugin().catch((e: any) => {
                 this.log.warn(`Failed to inject ${plugin.name} DYLIB: ${e?.message ?? String(e)}`);
-            }
+            });
         }
     }
 

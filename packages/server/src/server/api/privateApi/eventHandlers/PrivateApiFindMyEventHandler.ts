@@ -34,7 +34,12 @@ export class PrivateApiFindMyEventHandler extends Loggable implements PrivateApi
         let count = 0;
         for (const item of added) {
             const handle = obfuscatedHandle(item?.handle);
-            if (item?.coordinates[0] === 0 && item?.coordinates[1] === 0) {
+            const coordinates = item?.coordinates;
+            if (coordinates == null) {
+                this.log.debug(
+                    `Received FindMy ${titleCase(item.status)} Update Without a Location for Handle: ${handle}`
+                );
+            } else if (coordinates[0] === 0 && coordinates[1] === 0) {
                 this.log.debug(
                     `Received FindMy ${titleCase(item.status)} (0, 0) Location Update for Handle: ${handle}`
                 );

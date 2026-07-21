@@ -19,11 +19,16 @@ export class FindMyDylibPlugin extends DylibPlugin {
     }
 
     get isEnabled() {
-        return (Server().repo.getConfig("enable_private_api") as boolean) && isMinSequoia;
+        const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
+        const openFindMyOnStartup = Boolean(Server().repo.getConfig("open_findmy_on_startup"));
+        return privateApiEnabled && openFindMyOnStartup && isMinSequoia;
     }
 
-    async injectPlugin(_?: () => void): Promise<void> {
-        return await super.injectPlugin(async () => {
+    async injectPlugin(_?: () => void | Promise<void>): Promise<void> {
+        if (!this.isEnabled) return;
+
+        await FileSystem.requestFindMyAutomationPermissions();
+        return super.injectPlugin(async () => {
             if (Server().findMyCache.getAll().length > 0) return;
 
             await FindMyInterface.refreshFriends(false);

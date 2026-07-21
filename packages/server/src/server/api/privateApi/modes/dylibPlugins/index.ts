@@ -74,7 +74,7 @@ export abstract class DylibPlugin extends Loggable {
         }
     }
 
-    async injectPlugin(onSuccessfulStart: () => void = null) {
+    async injectPlugin(onSuccessfulStart: (() => void | Promise<void>) | null = null) {
         if (!this.isEnabled) return;
         if (this.isInjecting) return;
         this.isInjecting = true;
@@ -84,36 +84,32 @@ export abstract class DylibPlugin extends Loggable {
         this.dylibFailureCounter = 0;
         this.dylibLastErrorTime = 0;
 
-        // Register the "client-registered" listener once for this injection attempt,
-        // rather than once per retry loop iteration, and always remove it when we're
-        // done so it doesn't accumulate on the long-lived PrivateApiService instance.
-        const onClientRegistered = (info: any) => {
-            if (info?.process !== this.bundleIdentifier) return;
-            onSuccessfulStart?.();
+        // If there are 5 failures in a row, we'll stop trying to start it
+        const parentPath = this.parentProcessPath;
+        if (!parentPath) {
+            this.isInjecting = false;
+            throw new Error(`Unable to locate ${this.name} parent process!`);
+        }
+
+        const handleSuccessfulStart = (info: { process?: string }) => {
+            if (info?.process !== this.bundleIdentifier || !onSuccessfulStart) return;
+
+            Promise.resolve(onSuccessfulStart()).catch((ex: any) => {
+                this.log.warn(`Failed to initialize ${this.name} after injection: ${ex?.message ?? String(ex)}`);
+            });
         };
-        Server().privateApi.on("client-registered", onClientRegistered);
+        Server().privateApi.on("client-registered", handleSuccessfulStart);
 
         try {
-            // If there are 5 failures in a row, we'll stop trying to start it
-            const parentPath = this.parentProcessPath;
-            if (!parentPath) {
-                throw new Error(`Unable to locate ${this.name} parent process!`);
-            }
-
             while (this.dylibFailureCounter < 5) {
                 try {
-                    // Stop the running Messages app
                     await this.stopParentProcess();
                     await waitMs(1000);
 
-                    // Execute shell command to start the dylib.
-                    // eslint-disable-next-line max-len
-                    if (!this.isEnabled || this.isStopping) {
-                        return;
-                    }
+                    if (!this.isEnabled || this.isStopping) return;
 
                     const spawner = new ProcessSpawner({
-                        command: this.parentProcessPath,
+                        command: parentPath,
                         args: [],
                         verbose: true,
                         logTag: this.parentApp,
@@ -124,8 +120,8 @@ export abstract class DylibPlugin extends Loggable {
                             env: {
                                 DYLD_INSERT_LIBRARIES: this.dylibPath
                             }
-                        },
-                    })
+                        }
+                    });
 
                     const promise = spawner.execute();
 
@@ -140,14 +136,12 @@ export abstract class DylibPlugin extends Loggable {
                     this.log.debug(`DYLIB exited on its own. Restarting...`);
                     this.dylibFailureCounter = 0;
                 } catch (ex: any) {
-                    this.log.debug(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`);
-                    if (this.isStopping) {
-                        return;
-                    }
+                    this.log.debug(
+                        `Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`
+                    );
+                    if (this.isStopping) return;
 
-                    // If the last time we errored was more than 15 seconds ago, reset the counter.
-                    // This would indicate that the dylib was running, but then crashed.
-                    // Rather than an immediate crash.
+                    // A process that ran for a while should get a fresh retry budget.
                     if (Date.now() - this.dylibLastErrorTime > 15000) {
                         this.dylibFailureCounter = 0;
                     }
@@ -155,17 +149,19 @@ export abstract class DylibPlugin extends Loggable {
                     this.dylibFailureCounter += 1;
                     this.dylibLastErrorTime = Date.now();
                     if (this.dylibFailureCounter >= 5) {
-                        this.log.error(`Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`);
+                        this.log.error(
+                            `Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`
+                        );
                     }
                 }
             }
-
-            if (this.dylibFailureCounter >= 5) {
-                this.log.error(`Failed to start ${this.name} DYLIB 3 times in a row, giving up...`);
-            }
         } finally {
-            Server().privateApi.off("client-registered", onClientRegistered);
+            Server().privateApi.removeListener("client-registered", handleSuccessfulStart);
             this.isInjecting = false;
+        }
+
+        if (this.dylibFailureCounter >= 5) {
+            this.log.error(`Failed to start ${this.name} DYLIB 5 times in a row, giving up...`);
         }
     }
 
@@ -179,6 +175,8 @@ export abstract class DylibPlugin extends Loggable {
     }
 
     async stop() {
+        if (!this.isInjecting) return;
+
         this.isStopping = true;
         await this.stopParentProcess();
         this.isStopping = false;
