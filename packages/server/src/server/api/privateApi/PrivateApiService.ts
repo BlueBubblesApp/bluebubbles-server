@@ -6,7 +6,7 @@ import { TransactionPromise, TransactionResult } from "@server/managers/transact
 import { TransactionManager } from "@server/managers/transactionManager";
 
 import { MAX_PORT, MIN_PORT } from "./Constants";
-import { PrivateApiEventHandler } from "./eventHandlers";
+import { EventData, PrivateApiEventHandler } from "./eventHandlers";
 import { PrivateApiTypingEventHandler } from "./eventHandlers/PrivateApiTypingEventHandler";
 import { PrivateApiMessage } from "./apis/PrivateApiMessage";
 import { PrivateApiChat } from "./apis/PrivateApiChat";
@@ -24,20 +24,24 @@ import { PrivateApiFindMyEventHandler } from "./eventHandlers/PrivateApiFindMyEv
 import { Socket } from "../types";
 import { v4 } from "uuid";
 import { Loggable } from "../../lib/logging/Loggable";
+import { JsonLineBuffer } from "./JsonLineBuffer";
 
-// We only want to allow one write at a time
-const writeLock = new Sema(1);
+const FIRST_MACOS_USER_IDENTIFIER = 501;
+const MAX_SOCKET_RESTART_ATTEMPTS = 5;
+const SOCKET_LISTEN_BACKLOG = 511;
+const SOCKET_WRITE_RELEASE_DELAY_MS = 200;
+const socketWriteLock = new Sema(1);
 
 export class PrivateApiService extends Loggable {
     tag = "PrivateApiService";
 
     server: net.Server;
 
-    clients: Socket[] = [];
+    connectedClients: Socket[] = [];
 
-    activeClients: Record<string, Socket> = {};
+    clientsByProcessIdentifier: Record<string, Socket> = {};
 
-    restartCounter = 0;
+    socketRestartCount = 0;
 
     isRestarting = false;
 
@@ -50,18 +54,17 @@ export class PrivateApiService extends Loggable {
     modeType: PrivateApiModeConstructor;
 
     static get port(): number {
-        return clamp(MIN_PORT + os.userInfo().uid - 501, MIN_PORT, MAX_PORT);
+        return clamp(MIN_PORT + os.userInfo().uid - FIRST_MACOS_USER_IDENTIFIER, MIN_PORT, MAX_PORT);
     }
 
-    // Backwards compatibility getter.
-    // Eventually, we probably want to remove this alias
     get helper(): boolean {
-        return this.clients.length > 0;
+        return this.connectedClients.length > 0;
     }
 
-    hasClient(process?: string): boolean {
-        if (!process) return this.helper;
-        return this.activeClients[process] != null && !this.activeClients[process].destroyed;
+    hasClient(processIdentifier?: string): boolean {
+        if (!processIdentifier) return this.helper;
+        const client = this.clientsByProcessIdentifier[processIdentifier];
+        return client != null && !client.destroyed;
     }
 
     get message(): PrivateApiMessage {
@@ -94,10 +97,9 @@ export class PrivateApiService extends Loggable {
 
     constructor() {
         super();
-        this.restartCounter = 0;
+        this.socketRestartCount = 0;
         this.transactionManager = new TransactionManager();
 
-        // Register the event handlers
         this.eventHandlers = [
             new PrivateApiTypingEventHandler(),
             new PrivateApiPingEventHandler(),
@@ -108,17 +110,12 @@ export class PrivateApiService extends Loggable {
     }
 
     async start(): Promise<void> {
-        // Configure & start the listener
         this.log.debug("Starting Private API Helper Services...");
         await this.configureServer();
 
-        // we need to get the port to open the server on (to allow multiple users to use the bundle)
-        // we'll base this off the users uid (a unique id for each user, starting from 501)
-        // we'll subtract 501 to get an id starting at 0, incremented for each user
-        // then we add this to the base port to get a unique port for the socket
         this.log.info(`Starting socket server on port ${PrivateApiService.port}`);
-        this.server.listen(PrivateApiService.port, "localhost", 511, () => {
-            this.restartCounter = 0;
+        this.server.listen(PrivateApiService.port, "localhost", SOCKET_LISTEN_BACKLOG, () => {
+            this.socketRestartCount = 0;
         });
 
         await this.startPerMode();
@@ -137,51 +134,50 @@ export class PrivateApiService extends Loggable {
             await this.modeType.install();
             this.mode = new this.modeType();
             await this.mode.start();
-        } catch (ex: any) {
-            this.log.error(`Failed to start Private API: ${ex?.message ?? String(ex)}`);
+        } catch (error: any) {
+            this.log.error(`Failed to start Private API: ${error?.message ?? String(error)}`);
             return;
         }
     }
 
-    private getProcessByClientId(socketId: string): string | null {
-        for (const key of Object.keys(this.activeClients)) {
-            if (this.activeClients[key].id === socketId) {
-                return key;
+    private getProcessIdentifierForSocket(socketId: string): string | null {
+        for (const processIdentifier of Object.keys(this.clientsByProcessIdentifier)) {
+            if (this.clientsByProcessIdentifier[processIdentifier].id === socketId) {
+                return processIdentifier;
             }
         }
 
         return null;
     }
 
-    registerClient(process: string, socket: Socket) {
-        this.activeClients[process] = socket;
-        this.emit("client-registered", { process, socket });
+    registerClient(processIdentifier: string, socket: Socket) {
+        this.clientsByProcessIdentifier[processIdentifier] = socket;
+        this.emit("client-registered", { process: processIdentifier, socket });
     }
 
     addClient(client: Socket) {
-        this.clients.push(client);
-        this.log.info(`Added socket client (Total: ${this.clients.length})`);
+        this.connectedClients.push(client);
+        this.log.info(`Added socket client (Total: ${this.connectedClients.length})`);
     }
 
     removeClient(client: Socket) {
-        const proc = this.getProcessByClientId(client.id);
-        this.log.debug(`Private API Helper (${proc ?? "Anonymous"}) disconnected!`);
+        const processIdentifier = this.getProcessIdentifierForSocket(client.id);
+        this.log.debug(`Private API Helper (${processIdentifier ?? "Anonymous"}) disconnected!`);
 
-        const idx = this.clients.indexOf(client);
-        if (idx !== -1) {
-            this.clients.splice(idx, 1);
-            this.log.info(`Removed socket client (Total: ${this.clients.length})`);
+        const clientIndex = this.connectedClients.indexOf(client);
+        if (clientIndex !== -1) {
+            this.connectedClients.splice(clientIndex, 1);
+            this.log.info(`Removed socket client (Total: ${this.connectedClients.length})`);
         }
 
-        if (proc) {
-            delete this.activeClients[proc];
+        if (processIdentifier) {
+            delete this.clientsByProcessIdentifier[processIdentifier];
         }
     }
 
     async configureServer(): Promise<void> {
-        return new Promise<void>((resolve, _) => {
+        return new Promise<void>(resolve => {
             this.server = net.createServer((client: net.Socket) => {
-                // Apply a UUID to the connection
                 const socketId = v4();
                 const socket = client as Socket;
                 socket.setDefaultEncoding("utf8");
@@ -200,19 +196,19 @@ export class PrivateApiService extends Loggable {
                     this.log.debug(`Socket Ended by Client (${socketId})`);
                 });
 
-                socket.on("error", err => {
-                    this.log.debug("An error occured in a BlueBubbles Private API Helper connection! Closing...");
-                    this.log.debug(String(err));
+                socket.on("error", error => {
+                    this.log.debug("An error occurred in a BlueBubbles Private API Helper connection! Closing...");
+                    this.log.debug(String(error));
                     socket.destroy();
                 });
             });
 
-            this.server.on("error", err => {
-                this.log.warn("An error occured in the TCP Socket! Restarting");
-                this.log.warn(err.toString());
+            this.server.on("error", error => {
+                this.log.warn("An error occurred in the TCP Socket! Restarting");
+                this.log.warn(error.toString());
 
-                if (this.restartCounter <= 5) {
-                    this.restartCounter += 1;
+                if (this.socketRestartCount < MAX_SOCKET_RESTART_ATTEMPTS) {
+                    this.socketRestartCount += 1;
                     this.restart();
                 } else {
                     this.log.info("Max restart count reached for Private API listener...");
@@ -224,162 +220,152 @@ export class PrivateApiService extends Loggable {
         });
     }
 
-    async onEvent(eventRaw: string, socket: net.Socket): Promise<void> {
-        if (eventRaw == null) {
-            this.log.info(`Received null data from BlueBubblesHelper!`);
+    async onEvent(serializedMessage: string, socket: net.Socket): Promise<void> {
+        if (!serializedMessage) {
+            this.log.info("Received empty data from BlueBubblesHelper");
             return;
         }
 
-        // Data can contain multiple events, each split by the demiliter (\n)
-        const eventData: string[] = String(eventRaw).split("\n");
-        const uniqueEvents = [...new Set(eventData)];
-        for (const event of uniqueEvents) {
-            if (!event || event.trim().length === 0) continue;
-            if (event == null) {
-                this.log.info(`Failed to decode null BlueBubblesHelper data!`);
-                continue;
-            }
+        let message: NodeJS.Dict<any>;
+        try {
+            message = JSON.parse(serializedMessage);
+        } catch (error) {
+            this.log.info(`Failed to decode BlueBubblesHelper data: ${String(error)}`);
+            return;
+        }
 
-            // this.log.info(`Received data from BlueBubblesHelper: ${event}`, "debug");
-            let data;
+        if (message == null || typeof message !== "object" || Array.isArray(message)) {
+            this.log.warn("BlueBubblesHelper sent invalid data");
+            return;
+        }
 
-            // Handle in a timeout so that we handle each event asyncronously
+        if (message.transactionId) {
             try {
-                data = JSON.parse(event);
-            } catch (e) {
-                this.log.info(`Failed to decode BlueBubblesHelper data! ${event}, ${e}`);
-                continue;
-            }
-
-            if (data == null) {
-                this.log.warn("BlueBubblesHelper sent null data");
-                continue;
-            }
-
-            if (data.transactionId) {
-                try {
-                    // Resolve the promise from the transaction manager
-                    const idx = this.transactionManager.findIndex(data.transactionId);
-                    if (idx >= 0) {
-                        if (isNotEmpty(data?.error ?? "")) {
-                            this.transactionManager.promises[idx].reject(data.error);
-                        } else {
-                            const result = this.readTransactionData(data);
-                            this.transactionManager.promises[idx].resolve(data.identifier, result);
-                        }
+                const transactionIndex = this.transactionManager.findIndex(message.transactionId);
+                if (transactionIndex >= 0) {
+                    const transaction = this.transactionManager.promises[transactionIndex];
+                    if (isNotEmpty(message.error ?? "")) {
+                        transaction.reject(message.error);
+                    } else {
+                        transaction.resolve(message.identifier, this.extractTransactionData(message));
                     }
-                } catch (ex: any) {
-                    this.log.info(`Failed to handle transaction! Error: ${ex?.message ?? String(ex)}`);
                 }
-            } else if (data.event) {
-                for (const eventHandler of this.eventHandlers) {
-                    try {
-                        if (eventHandler.types.includes(data.event)) {
-                            await eventHandler.handle(data, socket);
-                        }
-                    } catch (ex: any) {
-                        this.log.info(`Failed to handle event, '${data.event}'! Error: ${ex?.message ?? String(ex)}`);
+            } catch (error: any) {
+                this.log.info(`Failed to handle transaction! Error: ${error?.message ?? String(error)}`);
+            }
+        } else if (message.event) {
+            for (const eventHandler of this.eventHandlers) {
+                try {
+                    if (eventHandler.types.includes(message.event)) {
+                        await eventHandler.handle(message as EventData, socket);
                     }
+                } catch (error: any) {
+                    this.log.info(
+                        `Failed to handle event, '${message.event}'! Error: ${error?.message ?? String(error)}`
+                    );
                 }
             }
         }
     }
 
     setupListeners(socket: net.Socket) {
-        socket.on("data", (event: string) => this.onEvent(event, socket));
+        const messageBuffer = new JsonLineBuffer();
+        let messageProcessingQueue = Promise.resolve();
+
+        socket.on("data", (chunk: Buffer | string) => {
+            try {
+                for (const serializedMessage of messageBuffer.append(chunk)) {
+                    messageProcessingQueue = messageProcessingQueue
+                        .then(() => this.onEvent(serializedMessage, socket))
+                        .catch((error: any) => {
+                            this.log.warn(`Failed to process Private API message: ${error?.message ?? String(error)}`);
+                        });
+                }
+            } catch (error: any) {
+                this.log.warn(`Failed to buffer Private API message: ${error?.message ?? String(error)}`);
+                socket.destroy();
+            }
+        });
     }
 
-    private readTransactionData(response: NodeJS.Dict<any>) {
-        // If there is a non-empty data key, return that
+    private extractTransactionData(response: NodeJS.Dict<any>) {
         if (isNotEmpty(response?.data)) return response.data;
 
-        // Otherwise, strip the "standard" keys and return the rest as the data
-        const data = { ...response };
-        const stripKeys = ["transactionId", "error", "identifier"];
-        for (const key of stripKeys) {
-            if (Object.keys(data).includes(key)) {
-                delete data[key];
-            }
+        const transactionData = { ...response };
+        const envelopeKeys = ["transactionId", "error", "identifier"];
+        for (const envelopeKey of envelopeKeys) {
+            delete transactionData[envelopeKey];
         }
 
-        // Return null if there is no data
-        if (isEmpty(data)) return null;
-        return data;
+        return isEmpty(transactionData) ? null : transactionData;
     }
 
     async writeData(
         action: string,
-        data: NodeJS.Dict<any>,
+        payload: NodeJS.Dict<any>,
         transaction?: TransactionPromise,
-        process?: string
+        targetProcessIdentifier?: string
     ): Promise<TransactionResult> {
-        const msg = "Failed to send request to Private API!";
-        await writeLock.acquire();
+        const failureMessage = "Failed to send request to Private API!";
+        await socketWriteLock.acquire();
 
         try {
-            // If we have a transaction, add it to the manager
             if (transaction) {
                 this.transactionManager.add(transaction);
             }
 
             await new Promise<void>((resolve, reject) => {
-                const d: NodeJS.Dict<any> = { action, data };
+                const requestMessage: NodeJS.Dict<any> = { action, data: payload };
 
-                // If we have a transaction, set the transaction ID for the request
                 if (transaction) {
-                    d.transactionId = transaction.transactionId;
+                    requestMessage.transactionId = transaction.transactionId;
                 }
 
-                // For each socket client, write data
-                this.writeToClients(`${JSON.stringify(d)}\n`, process).then(success => {
+                this.writeToClients(`${JSON.stringify(requestMessage)}\n`, targetProcessIdentifier).then(success => {
                     if (success) return resolve();
                     reject();
                 });
             });
 
-            // If we have a transaction, wait until the transaction is fulfilled to return
             if (transaction) {
                 return transaction.promise;
             }
-        } catch (ex: any) {
-            this.log.debug(`${msg} ${ex?.message ?? ex}`);
+        } catch (error: any) {
+            this.log.debug(`${failureMessage} ${error?.message ?? error}`);
         } finally {
-            // Release the lock after a short delay.
-            // This gives the other side a chance to process the data.
-            setTimeout(() => writeLock.release(), 200);
+            setTimeout(() => socketWriteLock.release(), SOCKET_WRITE_RELEASE_DELAY_MS);
         }
 
         return null;
     }
 
-    private async writeToClients(data: string, process?: string): Promise<boolean> {
-        if (process) {
-            const client = this.activeClients[process];
+    private async writeToClients(data: string, targetProcessIdentifier?: string): Promise<boolean> {
+        if (targetProcessIdentifier) {
+            const client = this.clientsByProcessIdentifier[targetProcessIdentifier];
             if (!client) return false;
             await this.writeToClient(client, data);
             return true;
         }
 
         let success = false;
-        for (const client of this.clients) {
+        for (const client of this.connectedClients) {
             try {
                 await this.writeToClient(client, data);
                 success = true;
             } catch {
-                // Do nothing
+                continue;
             }
         }
 
-        // We are successful if at least one helper gets the message
         return success;
     }
 
     private async writeToClient(client: net.Socket, data: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            client.write(data, (err: Error) => {
-                if (err) {
-                    this.log.info(`Socket write error: ${err?.message ?? String(err)}`);
-                    reject(err);
+            client.write(data, (error: Error) => {
+                if (error) {
+                    this.log.info(`Socket write error: ${error?.message ?? String(error)}`);
+                    reject(error);
                 } else {
                     resolve();
                 }
@@ -388,13 +374,13 @@ export class PrivateApiService extends Loggable {
     }
 
     destroySocketClients() {
-        for (const client of this.clients) {
+        for (const client of this.connectedClients) {
             if (client.destroyed) continue;
             client.destroy();
         }
 
-        this.clients = [];
-        this.activeClients = {};
+        this.connectedClients = [];
+        this.clientsByProcessIdentifier = {};
     }
 
     async restart(): Promise<void> {
@@ -416,8 +402,8 @@ export class PrivateApiService extends Loggable {
 
         try {
             this.destroySocketClients();
-        } catch (ex: any) {
-            this.log.debug(`Failed to stop Private API Helpers! Error: ${ex.toString()}`);
+        } catch (error: any) {
+            this.log.debug(`Failed to stop Private API Helpers! Error: ${error.toString()}`);
         }
 
         try {
@@ -426,8 +412,8 @@ export class PrivateApiService extends Loggable {
                 this.server.close();
                 this.server = null;
             }
-        } catch (ex: any) {
-            this.log.debug(`Failed to stop Private API Helper! Error: ${ex.toString()}`);
+        } catch (error: any) {
+            this.log.debug(`Failed to stop Private API Helper! Error: ${error.toString()}`);
         }
 
         await this.mode?.stop();

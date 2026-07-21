@@ -17,8 +17,8 @@ export class ProcessDylibMode extends PrivateApiMode {
         for (const plugin of ProcessDylibMode.plugins) {
             try {
                 plugin.locateDependencies();
-            } catch (e: any) {
-                log.warn(`Failed to locate dependencies for ${plugin.name}: ${e?.message ?? String(e)}`);
+            } catch (error: any) {
+                log.warn(`Failed to locate dependencies for ${plugin.name}: ${error?.message ?? String(error)}`);
             }
         }
 
@@ -26,17 +26,15 @@ export class ProcessDylibMode extends PrivateApiMode {
     }
 
     static async uninstall() {
-        // Do nothing here
+        return;
     }
 
     async start() {
         this.isStopping = false;
 
-        // Start the dylib process
         for (const plugin of ProcessDylibMode.plugins) {
-            // Don't await this. The promise remains pending while the parent app runs.
-            void plugin.injectPlugin().catch((e: any) => {
-                this.log.warn(`Failed to inject ${plugin.name} DYLIB: ${e?.message ?? String(e)}`);
+            void plugin.injectPlugin().catch((error: any) => {
+                this.log.warn(`Failed to inject ${plugin.name} DYLIB: ${error?.message ?? String(error)}`);
             });
         }
     }
@@ -44,12 +42,11 @@ export class ProcessDylibMode extends PrivateApiMode {
     async stop() {
         this.isStopping = true;
 
-        // Stop the dylib processes
         for (const plugin of ProcessDylibMode.plugins) {
             try {
                 await plugin.stop();
-            } catch (ex) {
-                this.log.debug(`Error stopping DYLIB for ${plugin.parentApp}! Error: ${ex}`);
+            } catch (error) {
+                this.log.debug(`Error stopping DYLIB for ${plugin.parentApp}! Error: ${error}`);
             }
         }
 

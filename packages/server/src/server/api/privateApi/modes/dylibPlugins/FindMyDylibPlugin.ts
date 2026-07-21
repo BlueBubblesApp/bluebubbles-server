@@ -5,7 +5,7 @@ import { Server } from "@server";
 import { FindMyInterface } from "@server/api/interfaces/findMyInterface";
 import path from "path";
 
-const macVer = "macos11";
+const PRIVATE_API_RESOURCE_VERSION = "macos11";
 
 export class FindMyDylibPlugin extends DylibPlugin {
     tag = "FindMyDylibPlugin";
@@ -15,7 +15,12 @@ export class FindMyDylibPlugin extends DylibPlugin {
     bundleIdentifier = "com.apple.findmy";
 
     get dylibPath() {
-        return path.join(FileSystem.resources, "private-api", macVer, "BlueBubblesFindMyHelper.dylib");
+        return path.join(
+            FileSystem.resources,
+            "private-api",
+            PRIVATE_API_RESOURCE_VERSION,
+            "BlueBubblesFindMyHelper.dylib"
+        );
     }
 
     get isEnabled() {
@@ -24,14 +29,12 @@ export class FindMyDylibPlugin extends DylibPlugin {
         return privateApiEnabled && openFindMyOnStartup && isMinSequoia;
     }
 
-    async injectPlugin(_?: () => void | Promise<void>): Promise<void> {
-        if (!this.isEnabled) return;
-
+    protected async prepareForInjection(): Promise<void> {
         await FileSystem.requestFindMyAutomationPermissions();
-        return super.injectPlugin(async () => {
-            if (Server().findMyCache.getAll().length > 0) return;
+    }
 
-            await FindMyInterface.refreshFriends(false);
-        });
+    protected async afterClientRegistration(): Promise<void> {
+        if (Server().findMyCache.getAll().length > 0) return;
+        await FindMyInterface.refreshFriends(false);
     }
 }
