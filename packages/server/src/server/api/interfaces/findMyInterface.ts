@@ -77,14 +77,14 @@ export class FindMyInterface {
     static async refreshFriends(allowFindMyAppFallback = true): Promise<FindMyFriendLocation[]> {
         const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
         const findMyHelperAvailable = Server().privateApi.hasClient("com.apple.findmy");
-        let receivedHelperLocations = false;
+        let receivedUsableHelperResponse = false;
         if (privateApiEnabled && isMinSequoia && findMyHelperAvailable) {
             try {
                 const result = await Server().privateApi.findmy.refreshFriends();
                 const refreshResponse = result?.data as FindMyFriendsRefreshResponse | undefined;
                 if (Array.isArray(refreshResponse?.locations)) {
                     const refreshedLocations = normalizeFindMyFriendLocations(refreshResponse.locations);
-                    receivedHelperLocations = true;
+                    receivedUsableHelperResponse = !refreshResponse.partial || refreshedLocations.length > 0;
                     Server().findMyCache.updateAll(refreshedLocations);
 
                     if (refreshResponse.partial) {
@@ -105,7 +105,7 @@ export class FindMyInterface {
             }
         }
 
-        if (allowFindMyAppFallback && !receivedHelperLocations) {
+        if (allowFindMyAppFallback && !receivedUsableHelperResponse) {
             void this.refreshUsingFindMyApp().catch((error: any) => {
                 Server().logger.warn(`Unable to refresh Find My through the app: ${error?.message ?? String(error)}`);
             });
