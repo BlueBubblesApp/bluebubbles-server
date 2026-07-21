@@ -6,6 +6,11 @@ import { hideApp } from "@server/api/apple/scripts";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { ProcessSpawner } from "@server/lib/ProcessSpawner";
 
+const APP_HIDE_DELAY_MS = 5000;
+const FAILURE_BUDGET_RESET_INTERVAL_MS = 15000;
+const MAX_CONSECUTIVE_FAILURES = 5;
+const PROCESS_RESTART_DELAY_MS = 1000;
+
 export abstract class DylibPlugin extends Loggable {
     tag = "DylibPlugin";
 
@@ -15,13 +20,17 @@ export abstract class DylibPlugin extends Loggable {
 
     bundleIdentifier: string = null;
 
-    isStopping = false;
+    stopRequested = false;
 
-    isInjecting = false;
+    injectionRunning = false;
 
-    dylibFailureCounter = 0;
+    consecutiveFailureCount = 0;
 
-    dylibLastErrorTime = 0;
+    lastFailureAt = 0;
+
+    private injectionCompletion: Promise<void> = Promise.resolve();
+
+    private resolveInjectionCompletion: (() => void) | null = null;
 
     abstract get isEnabled(): boolean;
 
@@ -32,33 +41,33 @@ export abstract class DylibPlugin extends Loggable {
         this.name = name;
     }
 
+    protected prepareForInjection(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    protected afterClientRegistration(): Promise<void> {
+        return Promise.resolve();
+    }
+
     async stopParentProcess(): Promise<void> {
         try {
             this.log.debug(`Killing process: ${this.parentApp}`);
             await FileSystem.killProcess(this.parentApp);
-        } catch (ex: any) {
-            const errStr = (typeof ex === "object" ? ex?.message ?? String(ex) : String(ex)).trim();
-            if (!errStr.includes("No matching processes belonging to you were found")) {
-                this.log.debug(`Failed to kill parent process (${this.parentApp})! Error: ${errStr}`);
+        } catch (error: any) {
+            const errorMessage = (typeof error === "object" ? error?.message ?? String(error) : String(error)).trim();
+            if (!errorMessage.includes("No matching processes belonging to you were found")) {
+                this.log.debug(`Failed to kill parent process (${this.parentApp})! Error: ${errorMessage}`);
             }
         }
     }
 
     get parentProcessPath(): string | null {
-        // Paths are different on Pre/Post Catalina.
-        // We are gonna test for both just in case an app was installed prior to the OS upgrade.
-        const possiblePaths = [
+        const candidatePaths = [
             `/System/Applications/${this.parentApp}.app/Contents/MacOS/${this.parentApp}`,
             `/Applications/${this.parentApp}.app/Contents/MacOS/${this.parentApp}`
         ];
 
-        // Return the first path that exists
-        for (const path of possiblePaths) {
-            const exists = fs.existsSync(path);
-            if (exists) return path;
-        }
-
-        return null;
+        return candidatePaths.find(candidatePath => fs.existsSync(candidatePath)) ?? null;
     }
 
     locateDependencies() {
@@ -67,49 +76,55 @@ export abstract class DylibPlugin extends Loggable {
             throw new Error(`Unable to locate embedded ${this.name} DYLIB! Please reinstall the app.`);
         }
 
-        if (!fs.existsSync(this.parentProcessPath)) {
+        const parentExecutablePath = this.parentProcessPath;
+        if (!parentExecutablePath || !fs.existsSync(parentExecutablePath)) {
             throw new Error(
                 `Unable to locate ${this.name} parent process! Please give the BlueBubbles Server Full Disk Access.`
             );
         }
     }
 
-    async injectPlugin(onSuccessfulStart: (() => void | Promise<void>) | null = null) {
-        if (!this.isEnabled) return;
-        if (this.isInjecting) return;
-        this.isInjecting = true;
-        this.log.debug(`Injecting ${this.name} DYLIB...`);
+    async injectPlugin(): Promise<void> {
+        if (!this.isEnabled || this.injectionRunning) return;
 
-        // Clear the markers
-        this.dylibFailureCounter = 0;
-        this.dylibLastErrorTime = 0;
+        this.stopRequested = false;
+        this.injectionRunning = true;
+        this.consecutiveFailureCount = 0;
+        this.lastFailureAt = 0;
+        this.injectionCompletion = new Promise(resolve => {
+            this.resolveInjectionCompletion = resolve;
+        });
 
-        // If there are 5 failures in a row, we'll stop trying to start it
-        const parentPath = this.parentProcessPath;
-        if (!parentPath) {
-            this.isInjecting = false;
-            throw new Error(`Unable to locate ${this.name} parent process!`);
-        }
+        let hideTimer: NodeJS.Timeout | null = null;
+        const handleClientRegistration = (registration: { process?: string }) => {
+            if (registration?.process !== this.bundleIdentifier) return;
 
-        const handleSuccessfulStart = (info: { process?: string }) => {
-            if (info?.process !== this.bundleIdentifier || !onSuccessfulStart) return;
-
-            Promise.resolve(onSuccessfulStart()).catch((ex: any) => {
-                this.log.warn(`Failed to initialize ${this.name} after injection: ${ex?.message ?? String(ex)}`);
+            this.afterClientRegistration().catch((error: any) => {
+                this.log.warn(`Failed to initialize ${this.name} after injection: ${error?.message ?? String(error)}`);
             });
         };
-        Server().privateApi.on("client-registered", handleSuccessfulStart);
 
         try {
-            while (this.dylibFailureCounter < 5) {
+            await this.prepareForInjection();
+            if (this.stopRequested || !this.isEnabled) return;
+
+            const parentExecutablePath = this.parentProcessPath;
+            if (!parentExecutablePath) {
+                throw new Error(`Unable to locate ${this.name} parent process!`);
+            }
+
+            Server().privateApi.on("client-registered", handleClientRegistration);
+            this.log.debug(`Injecting ${this.name} DYLIB...`);
+
+            while (this.consecutiveFailureCount < MAX_CONSECUTIVE_FAILURES) {
                 try {
                     await this.stopParentProcess();
-                    await waitMs(1000);
+                    await waitMs(PROCESS_RESTART_DELAY_MS);
 
-                    if (!this.isEnabled || this.isStopping) return;
+                    if (this.stopRequested || !this.isEnabled) return;
 
-                    const spawner = new ProcessSpawner({
-                        command: parentPath,
+                    const parentProcess = new ProcessSpawner({
+                        command: parentExecutablePath,
                         args: [],
                         verbose: true,
                         logTag: this.parentApp,
@@ -123,62 +138,64 @@ export abstract class DylibPlugin extends Loggable {
                         }
                     });
 
-                    const promise = spawner.execute();
+                    const parentProcessExit = parentProcess.execute();
+                    hideTimer = setTimeout(() => {
+                        void this.hideApp();
+                    }, APP_HIDE_DELAY_MS);
 
-                    // Hide the app after 5 seconds
-                    setTimeout(() => {
-                        this.hideApp();
-                    }, 5000);
-
-                    await promise;
-
-                    // If it gets here, the dylib exited on its own (code: 0)
-                    this.log.debug(`DYLIB exited on its own. Restarting...`);
-                    this.dylibFailureCounter = 0;
-                } catch (ex: any) {
+                    await parentProcessExit;
+                    this.log.debug(`${this.name} parent process exited; restarting`);
+                    this.consecutiveFailureCount = 0;
+                } catch (error: any) {
                     this.log.debug(
-                        `Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`
+                        `Detected DYLIB crash for App ${this.parentApp}. Error: ${error?.message ?? String(error)}`
                     );
-                    if (this.isStopping) return;
+                    if (this.stopRequested) return;
 
-                    // A process that ran for a while should get a fresh retry budget.
-                    if (Date.now() - this.dylibLastErrorTime > 15000) {
-                        this.dylibFailureCounter = 0;
+                    if (Date.now() - this.lastFailureAt > FAILURE_BUDGET_RESET_INTERVAL_MS) {
+                        this.consecutiveFailureCount = 0;
                     }
 
-                    this.dylibFailureCounter += 1;
-                    this.dylibLastErrorTime = Date.now();
-                    if (this.dylibFailureCounter >= 5) {
+                    this.consecutiveFailureCount += 1;
+                    this.lastFailureAt = Date.now();
+                    if (this.consecutiveFailureCount >= MAX_CONSECUTIVE_FAILURES) {
                         this.log.error(
-                            `Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`
+                            `Failed to start ${this.name} DYLIB after ${MAX_CONSECUTIVE_FAILURES} tries: ` +
+                                `${error?.message ?? String(error)}`
                         );
+                    }
+                } finally {
+                    if (hideTimer) {
+                        clearTimeout(hideTimer);
+                        hideTimer = null;
                     }
                 }
             }
-        } finally {
-            Server().privateApi.removeListener("client-registered", handleSuccessfulStart);
-            this.isInjecting = false;
-        }
 
-        if (this.dylibFailureCounter >= 5) {
-            this.log.error(`Failed to start ${this.name} DYLIB 5 times in a row, giving up...`);
+            this.log.error(
+                `Failed to start ${this.name} DYLIB ${MAX_CONSECUTIVE_FAILURES} times in a row, giving up...`
+            );
+        } finally {
+            Server().privateApi.removeListener("client-registered", handleClientRegistration);
+            this.injectionRunning = false;
+            this.resolveInjectionCompletion?.();
+            this.resolveInjectionCompletion = null;
         }
     }
 
-    async hideApp() {
+    async hideApp(): Promise<void> {
         try {
             await FileSystem.executeAppleScript(hideApp(this.parentApp));
-        } catch (ex) {
-            console.log(ex);
-            // Don't do anything
+        } catch (error: any) {
+            this.log.debug(`Unable to hide ${this.parentApp}: ${error?.message ?? String(error)}`);
         }
     }
 
-    async stop() {
-        if (!this.isInjecting) return;
+    async stop(): Promise<void> {
+        this.stopRequested = true;
+        if (!this.injectionRunning) return;
 
-        this.isStopping = true;
         await this.stopParentProcess();
-        this.isStopping = false;
+        await this.injectionCompletion;
     }
 }

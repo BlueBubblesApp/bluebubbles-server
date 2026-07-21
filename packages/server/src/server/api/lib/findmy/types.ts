@@ -131,7 +131,7 @@ interface FindMyLocation {
     locationFinished?: boolean;
 }
 
-export type FindMyLocationItem = {
+export type FindMyFriendLocation = {
     handle: string | null;
     coordinates: [number, number] | null;
     long_address: string | null;
@@ -141,6 +141,19 @@ export type FindMyLocationItem = {
     last_updated: number | null;
     is_locating_in_progress: 0 | 1;
     status: "legacy" | "live" | "shallow";
+    location_type?: number | null;
+    horizontal_accuracy?: number | null;
+    vertical_accuracy?: number | null;
+    speed?: number | null;
+    altitude?: number | null;
+};
+
+export type FindMyFriendsRefreshResponse = {
+    locations: FindMyFriendLocation[];
+    partial: boolean;
+    friendListTimedOut: boolean;
+    timedOutHandles: string[];
+    skippedFriends: number;
 };
 
 export type FindMySafeLocation = {
