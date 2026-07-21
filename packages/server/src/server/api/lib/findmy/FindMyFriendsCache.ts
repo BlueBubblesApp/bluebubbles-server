@@ -1,90 +1,60 @@
 import { isEmpty } from "@server/helpers/utils";
-import { FindMyLocationItem } from "./types";
-import { Server } from "@server";
+import { FindMyFriendLocation } from "./types";
 
 export class FindMyFriendsCache {
-    cache: Record<string, FindMyLocationItem> = {};
+    private locationsByHandle: Record<string, FindMyFriendLocation> = {};
 
-    /**
-     * Adds a list of location data to the cache.
-     * Location data may be dropped if it doesn't update/change the cache at all.
-     *
-     * @param locationData
-     * @returns The location data that was updated in the cache
-     */
-    addAll(locationData: FindMyLocationItem[]): FindMyLocationItem[] {
-        const output: FindMyLocationItem[] = [];
-        for (const i of locationData) {
-            const success = this.add(i);
-            if (success) {
-                output.push(i);
+    updateAll(friendLocations: FindMyFriendLocation[]): FindMyFriendLocation[] {
+        const updatedLocations: FindMyFriendLocation[] = [];
+        for (const friendLocation of friendLocations) {
+            if (this.update(friendLocation)) {
+                updatedLocations.push(friendLocation);
             }
         }
 
-        return output;
+        return updatedLocations;
     }
 
-    /**
-     * Adds a single location data to the cache
-     *
-     * @param locationData
-     * @returns Whether the location data updated the cache at all
-     */
-    add(locationData: FindMyLocationItem): boolean {
-        const handle = locationData?.handle;
-        if (isEmpty(handle)) return false;
+    update(friendLocation: FindMyFriendLocation): boolean {
+        const friendHandle = friendLocation?.handle;
+        if (isEmpty(friendHandle)) return false;
 
-        const updateCache = (): boolean => {
-            this.cache[handle] = locationData;
+        const storeLocation = (): true => {
+            this.locationsByHandle[friendHandle] = friendLocation;
             return true;
         };
 
-        // If we don't have a cache item, add it to the cache as-is
-        const currentData = this.cache[handle];
-        if (!currentData) {
-            return updateCache();
-        }
+        const cachedLocation = this.locationsByHandle[friendHandle];
+        if (!cachedLocation) return storeLocation();
+        if (friendLocation.status === "legacy" && cachedLocation.status !== "legacy") return false;
 
-        // If the update is a "legacy" update, and the current location isn't, ignore it.
-        // We don't want to override a live/shallow location with a legacy one
-        if (locationData?.status === "legacy" && currentData?.status !== "legacy") return false;
+        const cachedCoordinates = cachedLocation.coordinates ?? [0, 0];
+        const updatedCoordinates = friendLocation.coordinates ?? [0, 0];
+        const bothLocationsAreLegacy = cachedLocation.status === "legacy" && friendLocation.status === "legacy";
+        const wouldReplaceKnownLegacyCoordinates =
+            bothLocationsAreLegacy &&
+            cachedCoordinates[0] !== 0 &&
+            cachedCoordinates[1] !== 0 &&
+            updatedCoordinates[0] === 0 &&
+            updatedCoordinates[1] === 0;
+        const updatedTimestamp = friendLocation.last_updated ?? 0;
+        const cachedTimestamp = cachedLocation.last_updated ?? 0;
+        const hasUnchangedLocation =
+            cachedLocation.status === friendLocation.status &&
+            cachedCoordinates[0] === updatedCoordinates[0] &&
+            cachedCoordinates[1] === updatedCoordinates[1] &&
+            updatedTimestamp === cachedTimestamp;
+        const hasOlderTimestamp = updatedTimestamp < cachedTimestamp;
 
-        // We don't want to overwrite a non [0, 0] location with a [0, 0] one.
-        // We also don't need to update the cache if the metadata is the same.
-        // Lastly, if the update timestamp is older than the current one, ignore it.
-        const currentCoords = currentData?.coordinates ?? [0, 0];
-        const updatedCoords = locationData?.coordinates ?? [0, 0];
-        const noLocationType = currentData?.status === "legacy" && locationData?.status === "legacy";
-        const updateTimestamp = locationData?.last_updated ?? 0;
-        const currentTimestamp = currentData?.last_updated ?? 0;
-        if (
-            (
-                noLocationType &&
-                currentCoords[0] !== 0 &&
-                currentCoords[1] !== 0 &&
-                updatedCoords[0] === 0 &&
-                updatedCoords[1] === 0
-            ) ||
-            (
-                currentData?.status === locationData?.status &&
-                currentCoords[0] === updatedCoords[0] &&
-                currentCoords[1] === updatedCoords[1] &&
-                updateTimestamp === currentTimestamp
-            ) || (
-                updateTimestamp < currentTimestamp
-            )
-        ) {
-            return false;
-        }
-
-        return updateCache();
+        if (wouldReplaceKnownLegacyCoordinates || hasUnchangedLocation || hasOlderTimestamp) return false;
+        return storeLocation();
     }
 
-    get(handle: string): FindMyLocationItem | null {
-        return this.cache[handle] ?? null;
+    get(handle: string): FindMyFriendLocation | null {
+        return this.locationsByHandle[handle] ?? null;
     }
 
-    getAll(): FindMyLocationItem[] {
-        return Object.values(this.cache);
+    getAll(): FindMyFriendLocation[] {
+        return Object.values(this.locationsByHandle);
     }
 }

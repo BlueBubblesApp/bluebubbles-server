@@ -1,4 +1,37 @@
-import type { FindMyItem, FindMyDevice, FindMyLocationItem } from "@server/api/lib/findmy/types";
+import type { FindMyItem, FindMyDevice, FindMyFriendLocation } from "@server/api/lib/findmy/types";
+
+const FIND_MY_FRIEND_STATUSES = ["legacy", "live", "shallow"] as const;
+
+const isFindMyFriendStatus = (value: unknown): value is FindMyFriendLocation["status"] => {
+    return FIND_MY_FRIEND_STATUSES.some(status => status === value);
+};
+
+const normalizeOptionalString = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const trimmedValue = value.trim();
+    return trimmedValue.length > 0 ? trimmedValue : null;
+};
+
+const normalizeOptionalNumber = (value: unknown): number | null => {
+    if (value == null || (typeof value === "string" && value.trim().length === 0)) return null;
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const normalizeCoordinatePair = (value: unknown): [number, number] | null => {
+    if (!Array.isArray(value)) return null;
+
+    const latitude = normalizeOptionalNumber(value[0]);
+    const longitude = normalizeOptionalNumber(value[1]);
+    if (latitude == null || longitude == null) return null;
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
+    return [latitude, longitude];
+};
+
+const normalizeLocationTitle = (value: unknown): string | null => {
+    if (!Array.isArray(value)) return normalizeOptionalString(value);
+    return value.map(normalizeOptionalString).find(candidate => candidate != null) ?? null;
+};
 
 export const getFindMyItemModelDisplayName = (item: FindMyItem): string => {
     if (item?.productType?.type === "b389") return "AirTag";
@@ -31,7 +64,6 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
     deviceClass: item?.productType?.type,
     crowdSourcedLocation: item?.crowdSourcedLocation,
 
-    // Extras from FindMyItem
     identifier: item?.identifier,
     productIdentifier: item?.productIdentifier,
     role: item?.role,
@@ -40,50 +72,34 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
     groupIdentifier: item?.groupIdentifier,
     groupName: item.groupName,
     isAppleAudioAccessory: item?.isAppleAudioAccessory,
-    capabilities: item?.capabilities,
+    capabilities: item?.capabilities
 });
 
-export const normalizeFindMyLocationItem = (item: FindMyLocationItem): FindMyLocationItem => {
-    const output: Record<string, any> = { ...item };
+export const normalizeFindMyFriendLocation = (location: FindMyFriendLocation): FindMyFriendLocation => {
+    const untrustedLocation = location as unknown as Record<string, unknown>;
+    const untrustedStatus = untrustedLocation.status;
+    const status = isFindMyFriendStatus(untrustedStatus) ? untrustedStatus : "legacy";
 
-    const optionalString = (value: unknown): string | null => {
-        if (typeof value !== "string") return null;
-        const trimmed = value.trim();
-        return trimmed.length > 0 ? trimmed : null;
+    return {
+        ...location,
+        handle: normalizeOptionalString(untrustedLocation.handle),
+        coordinates: normalizeCoordinatePair(untrustedLocation.coordinates),
+        long_address: normalizeOptionalString(untrustedLocation.long_address),
+        short_address: normalizeOptionalString(untrustedLocation.short_address),
+        subtitle: normalizeOptionalString(untrustedLocation.subtitle),
+        title: normalizeLocationTitle(untrustedLocation.title),
+        last_updated: normalizeOptionalNumber(untrustedLocation.last_updated),
+        is_locating_in_progress:
+            untrustedLocation.is_locating_in_progress === true || untrustedLocation.is_locating_in_progress === 1
+                ? 1
+                : 0,
+        status
     };
-
-    const optionalNumber = (value: unknown): number | null => {
-        if (value == null || (typeof value === "string" && value.trim().length === 0)) return null;
-        const numericValue = Number(value);
-        return Number.isFinite(numericValue) ? numericValue : null;
-    };
-
-    if (Array.isArray(output.title)) {
-        output.title = output.title.map(optionalString).find((value: string | null) => value != null) ?? null;
-    } else {
-        output.title = optionalString(output.title);
-    }
-
-    const latitude = Array.isArray(output.coordinates) ? optionalNumber(output.coordinates[0]) : null;
-    const longitude = Array.isArray(output.coordinates) ? optionalNumber(output.coordinates[1]) : null;
-    output.coordinates = latitude != null && longitude != null ? [latitude, longitude] : null;
-
-    output.handle = optionalString(output.handle);
-    for (const field of ["long_address", "short_address", "subtitle"] as const) {
-        output[field] = optionalString(output[field]);
-    }
-
-    output.last_updated = optionalNumber(output.last_updated);
-    output.is_locating_in_progress =
-        output.is_locating_in_progress === true || output.is_locating_in_progress === 1 ? 1 : 0;
-    if (!["legacy", "live", "shallow"].includes(output.status)) output.status = "legacy";
-
-    return output as FindMyLocationItem;
 };
 
-export const normalizeFindMyLocationItems = (
-    items: FindMyLocationItem[] | null | undefined
-): FindMyLocationItem[] => {
-    if (!Array.isArray(items)) return [];
-    return items.map(normalizeFindMyLocationItem).filter(item => item.handle != null);
+export const normalizeFindMyFriendLocations = (
+    locations: FindMyFriendLocation[] | null | undefined
+): FindMyFriendLocation[] => {
+    if (!Array.isArray(locations)) return [];
+    return locations.map(normalizeFindMyFriendLocation).filter(location => location.handle != null);
 };
