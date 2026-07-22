@@ -711,7 +711,7 @@ export class FileSystem {
             }
         } catch (ex) {
             Server().log("Failed to sync time with time servers!", "debug");
-            Server().log(ex, 'debug');
+            Server().log(ex, "debug");
         }
 
         return null;

@@ -75,13 +75,15 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
     capabilities: item?.capabilities
 });
 
-export const normalizeFindMyFriendLocation = (location: FindMyFriendLocation): FindMyFriendLocation => {
-    const untrustedLocation = location as unknown as Record<string, unknown>;
+export const normalizeFindMyFriendLocation = (location: unknown): FindMyFriendLocation => {
+    const untrustedLocation =
+        location != null && typeof location === "object" && !Array.isArray(location)
+            ? (location as Record<string, unknown>)
+            : {};
     const untrustedStatus = untrustedLocation.status;
     const status = isFindMyFriendStatus(untrustedStatus) ? untrustedStatus : "legacy";
 
     return {
-        ...location,
         handle: normalizeOptionalString(untrustedLocation.handle),
         coordinates: normalizeCoordinatePair(untrustedLocation.coordinates),
         long_address: normalizeOptionalString(untrustedLocation.long_address),
@@ -93,13 +95,16 @@ export const normalizeFindMyFriendLocation = (location: FindMyFriendLocation): F
             untrustedLocation.is_locating_in_progress === true || untrustedLocation.is_locating_in_progress === 1
                 ? 1
                 : 0,
-        status
+        status,
+        location_type: normalizeOptionalNumber(untrustedLocation.location_type),
+        horizontal_accuracy: normalizeOptionalNumber(untrustedLocation.horizontal_accuracy),
+        vertical_accuracy: normalizeOptionalNumber(untrustedLocation.vertical_accuracy),
+        speed: normalizeOptionalNumber(untrustedLocation.speed),
+        altitude: normalizeOptionalNumber(untrustedLocation.altitude)
     };
 };
 
-export const normalizeFindMyFriendLocations = (
-    locations: FindMyFriendLocation[] | null | undefined
-): FindMyFriendLocation[] => {
+export const normalizeFindMyFriendLocations = (locations: unknown): FindMyFriendLocation[] => {
     if (!Array.isArray(locations)) return [];
     return locations.map(normalizeFindMyFriendLocation).filter(location => location.handle != null);
 };

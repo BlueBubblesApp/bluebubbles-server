@@ -5,7 +5,7 @@ import { Server } from "@server";
 import { FindMyInterface } from "@server/api/interfaces/findMyInterface";
 import path from "path";
 
-const PRIVATE_API_RESOURCE_VERSION = "macos11";
+const FIND_MY_HELPER_RESOURCE_DIRECTORY = "macos11";
 
 export class FindMyDylibPlugin extends DylibPlugin {
     tag = "FindMyDylibPlugin";
@@ -18,7 +18,7 @@ export class FindMyDylibPlugin extends DylibPlugin {
         return path.join(
             FileSystem.resources,
             "private-api",
-            PRIVATE_API_RESOURCE_VERSION,
+            FIND_MY_HELPER_RESOURCE_DIRECTORY,
             "BlueBubblesFindMyHelper.dylib"
         );
     }
