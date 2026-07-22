@@ -26,7 +26,7 @@ export class PrivateApiFindMyEventHandler extends Loggable implements PrivateApi
     async handleNewLocations(locationUpdates: FindMyFriendLocation[]) {
         if (isEmpty(locationUpdates)) return;
         const normalizedLocations = normalizeFindMyFriendLocations(locationUpdates);
-        const updatedLocations = Server().findMyCache.updateAll(normalizedLocations);
+        const updatedLocations = Server().findMyFriendsCache.updateAll(normalizedLocations);
 
         let emittedLocationCount = 0;
         for (const location of updatedLocations) {

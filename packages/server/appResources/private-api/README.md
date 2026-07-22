@@ -16,6 +16,12 @@ only when both Private API and **Open FindMy App on Startup** are enabled.
 Older supported macOS releases continue to route Friends requests through the
 Messages helper when that private API is available.
 
+On macOS 15 or later, the Devices GET route reads the server's latest helper
+snapshot without changing the Find My view. The explicit Devices refresh route
+opens `findmy://devices`, waits for the dedicated helper, and reads the
+app-owned FMIP device collection. It does not use Accessibility clicks,
+keyboard events, visible-cell scraping, or fixed view-loading delays.
+
 The artifact checksum must match its `.md5` file, it must contain `x86_64` and
 `arm64` slices, and it must use `@rpath/BlueBubblesFindMyHelper.dylib` as its
 install name. Every server build checks this contract through:
@@ -40,3 +46,6 @@ BlueBubbles Automation grant:
 3. Confirm the helper registers as `com.apple.findmy` and Find My can be hidden.
 4. Call the Friends GET, refresh, and GET routes and verify that all three
    succeed without helper, framing, transaction, or permission errors.
+5. Call the Devices GET, refresh, and GET routes. Confirm the first GET does not
+   switch Find My views and the refreshed response includes both online and
+   offline devices without converting missing locations to `(0, 0)`.
