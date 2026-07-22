@@ -2,7 +2,7 @@ import { Server } from "@server";
 import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
-import { isMinSequoia } from "@server/env";
+import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
 import { waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import {
@@ -12,6 +12,7 @@ import {
     FindMyItem
 } from "@server/api/lib/findmy/types";
 import { normalizeFindMyFriendLocations, transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
+import { resolveFindMyFriendsPrivateApiTarget } from "@server/api/lib/findmy/privateApiSupport";
 
 export class FindMyInterface {
     static async getFriends(): Promise<FindMyFriendLocation[]> {
@@ -76,18 +77,32 @@ export class FindMyInterface {
 
     static async refreshFriends(allowFindMyAppFallback = true): Promise<FindMyFriendLocation[]> {
         const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
-        const findMyHelperAvailable = Server().privateApi.hasClient("com.apple.findmy");
+        const privateApiTarget = resolveFindMyFriendsPrivateApiTarget({ isMinBigSur, isMinSonoma, isMinSequoia });
+        const privateApiHelperAvailable = privateApiTarget != null && Server().privateApi.hasClient(privateApiTarget);
         let receivedUsableHelperResponse = false;
-        if (privateApiEnabled && isMinSequoia && findMyHelperAvailable) {
+        if (privateApiEnabled && privateApiTarget != null && privateApiHelperAvailable) {
             try {
                 const result = await Server().privateApi.findmy.refreshFriends();
                 const refreshResponse = result?.data as FindMyFriendsRefreshResponse | undefined;
                 if (Array.isArray(refreshResponse?.locations)) {
                     const refreshedLocations = normalizeFindMyFriendLocations(refreshResponse.locations);
-                    receivedUsableHelperResponse = !refreshResponse.partial || refreshedLocations.length > 0;
-                    Server().findMyCache.updateAll(refreshedLocations);
+                    const responseContainsOnlyInvalidLocations =
+                        refreshResponse.locations.length > 0 && refreshedLocations.length === 0;
+                    const responseIsPartial = refreshResponse.partial === true;
+                    receivedUsableHelperResponse =
+                        !responseContainsOnlyInvalidLocations && (!responseIsPartial || refreshedLocations.length > 0);
 
-                    if (refreshResponse.partial) {
+                    if (!responseContainsOnlyInvalidLocations) {
+                        if (responseIsPartial) {
+                            Server().findMyCache.updateAll(refreshedLocations);
+                        } else {
+                            Server().findMyCache.replaceAll(refreshedLocations);
+                        }
+                    } else {
+                        Server().logger.warn("Find My Friends helper returned no identifiable locations.");
+                    }
+
+                    if (responseIsPartial) {
                         const timedOutFriendCount = Array.isArray(refreshResponse.timedOutHandles)
                             ? refreshResponse.timedOutHandles.length
                             : 0;
@@ -105,7 +120,8 @@ export class FindMyInterface {
             }
         }
 
-        if (allowFindMyAppFallback && !receivedUsableHelperResponse) {
+        const shouldRefreshUsingFindMyApp = allowFindMyAppFallback && (!receivedUsableHelperResponse || !isMinSequoia);
+        if (shouldRefreshUsingFindMyApp) {
             void this.refreshUsingFindMyApp().catch((error: any) => {
                 Server().logger.warn(`Unable to refresh Find My through the app: ${error?.message ?? String(error)}`);
             });
