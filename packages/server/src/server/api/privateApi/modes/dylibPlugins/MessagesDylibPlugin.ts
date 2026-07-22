@@ -23,7 +23,7 @@ export class MessagesDylibPlugin extends DylibPlugin {
     }
 
     protected async afterClientRegistration(): Promise<void> {
-        if (isMinSequoia || Server().findMyCache.getAll().length > 0) return;
+        if (isMinSequoia || Server().findMyFriendsCache.getAll().length > 0) return;
 
         const allowFindMyAppFallback = Boolean(Server().repo.getConfig("open_findmy_on_startup"));
         await FindMyInterface.refreshFriends(allowFindMyAppFallback);

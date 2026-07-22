@@ -7,22 +7,32 @@ import { waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
 import {
     FindMyDevice,
+    FindMyDevicesRefreshResponse,
     FindMyFriendLocation,
     FindMyFriendsRefreshResponse,
     FindMyItem
 } from "@server/api/lib/findmy/types";
-import { normalizeFindMyFriendLocations, transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
-import { resolveFindMyFriendsPrivateApiTarget } from "@server/api/lib/findmy/privateApiSupport";
+import {
+    normalizeFindMyDevices,
+    normalizeFindMyFriendLocations,
+    transformFindMyItemToDevice
+} from "@server/api/lib/findmy/utils";
+import {
+    resolveFindMyDevicesPrivateApiTarget,
+    resolveFindMyFriendsPrivateApiTarget
+} from "@server/api/lib/findmy/privateApiSupport";
+
+const FIND_MY_DEVICES_HELPER_CONNECTION_TIMEOUT_MS = 10_000;
+const FIND_MY_DEVICES_HELPER_CONNECTION_POLL_MS = 100;
 
 export class FindMyInterface {
     static async getFriends(): Promise<FindMyFriendLocation[]> {
-        return normalizeFindMyFriendLocations(Server().findMyCache.getAll());
+        return normalizeFindMyFriendLocations(Server().findMyFriendsCache.getAll());
     }
 
     static async getDevices(): Promise<Array<FindMyDevice> | null> {
         if (isMinSequoia) {
-            Server().logger.debug("Cannot fetch FindMy devices on macOS Sequoia or later.");
-            return null;
+            return Server().findMyDevicesCache.getAll();
         }
 
         try {
@@ -71,8 +81,90 @@ export class FindMyInterface {
     }
 
     static async refreshDevices(): Promise<Array<FindMyDevice> | null> {
+        if (isMinSequoia) {
+            return this.refreshDevicesThroughPrivateApi();
+        }
+
         await this.refreshUsingFindMyApp();
-        return await this.getDevices();
+        return this.getDevices();
+    }
+
+    private static async refreshDevicesThroughPrivateApi(): Promise<FindMyDevice[]> {
+        const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
+        if (!privateApiEnabled) {
+            throw new Error("Find My Devices on macOS 15 or later requires the Private API");
+        }
+
+        const openFindMyOnStartup = Boolean(Server().repo.getConfig("open_findmy_on_startup"));
+        if (!openFindMyOnStartup) {
+            throw new Error("Find My Devices requires Open FindMy App on Startup to be enabled");
+        }
+
+        const targetProcessIdentifier = resolveFindMyDevicesPrivateApiTarget({ isMinSequoia });
+        if (targetProcessIdentifier == null) {
+            throw new Error("The Find My Devices helper is unavailable on this macOS version");
+        }
+
+        await FileSystem.execShellCommand("/usr/bin/open findmy://devices");
+        const helperAvailable = await this.waitForPrivateApiClient(targetProcessIdentifier);
+        if (!helperAvailable) {
+            throw new Error("The Find My Devices helper did not connect before the refresh timeout");
+        }
+
+        const result = await Server().privateApi.findmy.refreshDevices();
+        const refreshResponse = result?.data as FindMyDevicesRefreshResponse | undefined;
+        if (!Array.isArray(refreshResponse?.devices)) {
+            throw new Error("The Find My Devices helper returned an invalid response");
+        }
+        if (typeof refreshResponse.partial !== "boolean") {
+            throw new Error("The Find My Devices helper returned an invalid completion state");
+        }
+        const skippedDeviceCount = refreshResponse.skippedDevices;
+        if (typeof skippedDeviceCount !== "number" || !Number.isInteger(skippedDeviceCount) || skippedDeviceCount < 0) {
+            throw new Error("The Find My Devices helper returned an invalid skipped-device count");
+        }
+        if (refreshResponse.partial !== skippedDeviceCount > 0) {
+            throw new Error("The Find My Devices helper returned an inconsistent completion state");
+        }
+
+        const devices = normalizeFindMyDevices(refreshResponse.devices);
+        if (devices.length !== refreshResponse.devices.length) {
+            throw new Error("The Find My Devices helper returned invalid device records");
+        }
+
+        const deviceIdentifiers = devices.map(device => device.identifier);
+        if (new Set(deviceIdentifiers).size !== deviceIdentifiers.length) {
+            throw new Error("The Find My Devices helper returned duplicate device identifiers");
+        }
+
+        if (refreshResponse.partial) {
+            Server().findMyDevicesCache.updateAll(devices);
+            Server().logger.warn(
+                `Find My Devices returned a partial response (${skippedDeviceCount} ` + "unidentifiable device(s))."
+            );
+        } else {
+            Server().findMyDevicesCache.replaceAll(devices);
+        }
+
+        const devicesWithLocations = devices.filter(device => device.location != null).length;
+        Server().logger.debug(
+            `Refreshed ${devices.length} Find My device(s) through FMIPDataManager; ` +
+                `${devicesWithLocations} included a location.`
+        );
+        return Server().findMyDevicesCache.getAll();
+    }
+
+    private static async waitForPrivateApiClient(processIdentifier: string): Promise<boolean> {
+        const maximumAttempts = Math.ceil(
+            FIND_MY_DEVICES_HELPER_CONNECTION_TIMEOUT_MS / FIND_MY_DEVICES_HELPER_CONNECTION_POLL_MS
+        );
+        for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+            if (Server().privateApi.hasClient(processIdentifier)) {
+                return true;
+            }
+            await waitMs(FIND_MY_DEVICES_HELPER_CONNECTION_POLL_MS);
+        }
+        return Server().privateApi.hasClient(processIdentifier);
     }
 
     static async refreshFriends(allowFindMyAppFallback = true): Promise<FindMyFriendLocation[]> {
@@ -94,9 +186,9 @@ export class FindMyInterface {
 
                     if (!responseContainsOnlyInvalidLocations) {
                         if (responseIsPartial) {
-                            Server().findMyCache.updateAll(refreshedLocations);
+                            Server().findMyFriendsCache.updateAll(refreshedLocations);
                         } else {
-                            Server().findMyCache.replaceAll(refreshedLocations);
+                            Server().findMyFriendsCache.replaceAll(refreshedLocations);
                         }
                     } else {
                         Server().logger.warn("Find My Friends helper returned no identifiable locations.");
@@ -127,7 +219,7 @@ export class FindMyInterface {
             });
         }
 
-        return normalizeFindMyFriendLocations(Server().findMyCache.getAll());
+        return normalizeFindMyFriendLocations(Server().findMyFriendsCache.getAll());
     }
 
     static async refreshUsingFindMyApp() {

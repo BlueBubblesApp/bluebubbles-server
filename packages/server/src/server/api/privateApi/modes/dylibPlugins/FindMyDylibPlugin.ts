@@ -34,7 +34,12 @@ export class FindMyDylibPlugin extends DylibPlugin {
     }
 
     protected async afterClientRegistration(): Promise<void> {
-        if (Server().findMyCache.getAll().length > 0) return;
-        await FindMyInterface.refreshFriends(false);
+        if (Server().findMyFriendsCache.getAll().length === 0) {
+            await FindMyInterface.refreshFriends(false);
+        }
+
+        if (Server().findMyDevicesCache.getAll().length === 0) {
+            await FindMyInterface.refreshDevices();
+        }
     }
 }
