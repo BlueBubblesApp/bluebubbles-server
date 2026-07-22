@@ -15,7 +15,7 @@ const buildServiceScript = (inputService: string) => {
         theService = `"${theService}"`;
     }
 
-    const svcClass = isMinVentura ? 'account' : 'service';
+    const svcClass = isMinVentura ? "account" : "service";
 
     let serviceScript = `set targetService to 1st ${svcClass} whose service type = ${theService}`;
     if (!isMinBigSur && theService !== "iMessage") {

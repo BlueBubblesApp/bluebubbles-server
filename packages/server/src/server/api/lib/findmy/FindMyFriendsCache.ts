@@ -15,6 +15,21 @@ export class FindMyFriendsCache {
         return updatedLocations;
     }
 
+    replaceAll(friendLocations: FindMyFriendLocation[]): FindMyFriendLocation[] {
+        const snapshotHandles = new Set(
+            friendLocations
+                .map(friendLocation => friendLocation.handle)
+                .filter((friendHandle): friendHandle is string => !isEmpty(friendHandle))
+        );
+        for (const cachedHandle of Object.keys(this.locationsByHandle)) {
+            if (!snapshotHandles.has(cachedHandle)) {
+                delete this.locationsByHandle[cachedHandle];
+            }
+        }
+
+        return this.updateAll(friendLocations);
+    }
+
     update(friendLocation: FindMyFriendLocation): boolean {
         const friendHandle = friendLocation?.handle;
         if (isEmpty(friendHandle)) return false;

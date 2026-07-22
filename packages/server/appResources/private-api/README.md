@@ -13,6 +13,8 @@ You can also check the current versions of these bundles by opening the `version
 `BlueBubblesFindMyHelper.dylib` is built from the companion
 `bluebubbles-helper` Find My target. The server enables it on macOS 15 or later
 only when both Private API and **Open FindMy App on Startup** are enabled.
+Older supported macOS releases continue to route Friends requests through the
+Messages helper when that private API is available.
 
 The artifact checksum must match its `.md5` file, it must contain `x86_64` and
 `arm64` slices, and it must use `@rpath/BlueBubblesFindMyHelper.dylib` as its
