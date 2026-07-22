@@ -16,3 +16,9 @@ export const resolveFindMyFriendsPrivateApiTarget = ({
     if (isMinBigSur && !isMinSonoma) return MESSAGES_PROCESS_IDENTIFIER;
     return null;
 };
+
+export const resolveFindMyDevicesPrivateApiTarget = ({
+    isMinSequoia
+}: Pick<FindMyPrivateApiPlatform, "isMinSequoia">): string | null => {
+    return isMinSequoia ? FIND_MY_PROCESS_IDENTIFIER : null;
+};

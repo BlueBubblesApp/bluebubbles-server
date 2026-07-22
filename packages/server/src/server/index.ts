@@ -62,6 +62,7 @@ import { HttpService } from "./api/http";
 import { Alert } from "./databases/server/entity";
 import { getStartDelay } from "./utils/ConfigUtils";
 import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
+import { FindMyDevicesCache } from "./api/lib/findmy/FindMyDevicesCache";
 import { ScheduledService } from "./lib/ScheduledService";
 import { getLogger } from "./lib/logging/Loggable";
 import { IMessageListener } from "./databases/imessage/listeners/IMessageListener";
@@ -152,7 +153,9 @@ class BlueBubblesServer extends EventEmitter {
 
     eventCache: EventCache;
 
-    findMyCache: FindMyFriendsCache;
+    findMyFriendsCache: FindMyFriendsCache;
+
+    findMyDevicesCache: FindMyDevicesCache;
 
     iMessageListener: IMessageListener;
 
@@ -245,7 +248,8 @@ class BlueBubblesServer extends EventEmitter {
 
         this.region = null;
         this.typingCache = [];
-        this.findMyCache = null;
+        this.findMyFriendsCache = null;
+        this.findMyDevicesCache = null;
     }
 
     emitToUI(event: string, data: any) {
@@ -708,8 +712,9 @@ class BlueBubblesServer extends EventEmitter {
         this.logger.info("Initializing event cache...");
         this.eventCache = new EventCache();
 
-        this.logger.info("Initializing FindMy Location cache...");
-        this.findMyCache = new FindMyFriendsCache();
+        this.logger.info("Initializing Find My caches...");
+        this.findMyFriendsCache = new FindMyFriendsCache();
+        this.findMyDevicesCache = new FindMyDevicesCache();
 
         try {
             this.logger.info("Initializing caffeinate service...");

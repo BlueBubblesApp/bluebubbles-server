@@ -216,8 +216,12 @@ export class FindMyDylibPlugin extends DylibPlugin {
         if (!this.acceptRegistration || this.stopRequested || !this.isEnabled) return;
         this.clearRegistrationTimer();
         this.state = { status: "ready", reason: null, message: "Find My helper is connected." };
-        if (Server().findMyCache.getAll().length === 0) {
+        if (Server().findMyFriendsCache.getAll().length === 0) {
             await FindMyInterface.refreshFriends(false);
+        }
+
+        if (Server().findMyDevicesCache.getAll().length === 0) {
+            await FindMyInterface.refreshDevices();
         }
     }
 }
