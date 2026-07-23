@@ -4,6 +4,7 @@ import { Message } from "../entity/Message";
 import { CHAT_READ_STATUS_CHANGED } from "@server/events";
 import { Chat } from "../entity/Chat";
 import { Loggable } from "@server/lib/logging/Loggable";
+import { CHAT_DEDUP_CACHE_RETENTION_MS, MESSAGE_DEDUP_CACHE_RETENTION_MS } from "./constants";
 
 export type IMessagePollResult = {
     eventType: string;
@@ -37,27 +38,26 @@ export class IMessageCache {
 
     chatStates: Record<string, ChatState> = {};
 
-    events: EventCache;
+    messageEvents: EventCache;
+
+    chatEvents: EventCache;
 
     constructor() {
-        this.events = new EventCache();
+        this.messageEvents = new EventCache();
+        this.chatEvents = new EventCache();
     }
 
     trimCaches() {
         this.trimMessageStates();
         this.trimChatStates();
-        this.trimEventCache();
-    }
-
-    private trimEventCache() {
-        this.events.trim(1000 * 60 * 60);
+        this.messageEvents.trim(MESSAGE_DEDUP_CACHE_RETENTION_MS);
+        this.chatEvents.trim(CHAT_DEDUP_CACHE_RETENTION_MS);
     }
 
     private trimMessageStates() {
         const now = new Date().getTime();
         for (const guid in this.messageStates) {
-            // Clear entries older than 1 hour
-            if (this.messageStates[guid].cacheTime < now - 1000 * 60 * 60) {
+            if (this.messageStates[guid].cacheTime < now - MESSAGE_DEDUP_CACHE_RETENTION_MS) {
                 delete this.messageStates[guid];
             }
         }
@@ -67,11 +67,10 @@ export class IMessageCache {
         const now = new Date().getTime();
         for (const guid in this.chatStates) {
             // Clear entries older than 1 hour
-            if (this.chatStates[guid].cacheTime < now - 1000 * 60 * 60) {
+            if (this.chatStates[guid].cacheTime < now - CHAT_DEDUP_CACHE_RETENTION_MS) {
                 delete this.chatStates[guid];
             }
         }
-    
     }
 }
 
@@ -96,7 +95,7 @@ export abstract class IMessagePoller extends Loggable {
     getMessageEvent(message: Message): string | null {
         // If the GUID doesn't exist, it's a new message
         const guid = message.guid;
-        if (!this.cache.events.find(guid)) return "new-entry";
+        if (!this.cache.messageEvents.find(guid)) return "new-entry";
 
         // If the GUID exists, check the date created.
         // If it doesn't exist, a race condition occurred and we should ignore it (return null)
@@ -135,7 +134,7 @@ export abstract class IMessagePoller extends Loggable {
         if (!event) return null;
 
         if (event === "new-entry") {
-            this.cache.events.add(message.guid);
+            this.cache.messageEvents.add(message.guid);
         }
 
         this.cache.messageStates[message.guid] = {
@@ -157,7 +156,7 @@ export abstract class IMessagePoller extends Loggable {
         // If the GUID doesn't exist, it's a new chat
         const guid = chat.guid;
 
-        if (!this.cache.events.find(guid)) return defaultEvent;
+        if (!this.cache.chatEvents.find(guid)) return defaultEvent;
 
         // If the GUID exists, check the date created.
         // If it doesn't exist, a race condition occurred and we should ignore it (return null)
@@ -177,7 +176,7 @@ export abstract class IMessagePoller extends Loggable {
         if (!event) return null;
 
         if (event === defaultEvent) {
-            this.cache.events.add(chat.guid);
+            this.cache.chatEvents.add(chat.guid);
         }
 
         this.cache.chatStates[chat.guid] = {
