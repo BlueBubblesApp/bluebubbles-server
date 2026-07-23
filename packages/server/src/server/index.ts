@@ -72,6 +72,7 @@ import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
 import { ZrokManager } from "./managers/zrokManager";
+import { minimizeWindowIfRequested } from "./utils/WindowUtils";
 
 const findProcess = require("find-process");
 
@@ -790,9 +791,7 @@ class BlueBubblesServer extends EventEmitter {
 
         // Start minimized if enabled
         const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
-        if (startMinimized) {
-            this.window.minimize();
-        }
+        minimizeWindowIfRequested(startMinimized, this.window);
 
         // Disable the encryp coms setting if it's enabled.
         // This is a temporary fix until the android client supports it again.
