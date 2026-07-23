@@ -34,22 +34,23 @@ export class AttachmentRouter {
         const forceDownload = isTruthyBool((force as string) ?? "true");
 
         // Fetch the info for the attachment by GUID
-        const attachment = await Server().iMessageRepo.getAttachment(guid);
-        if (!attachment) {
-            const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
-            if (!forceDownload || !papiEnabled) {
-                throw new NotFound({ error: "Attachment does not exist!" });
-            }
+        let attachment = await Server().iMessageRepo.getAttachment(guid);
+        if (!attachment) throw new NotFound({ error: "Attachment does not exist!" });
 
-            // Try to force download the attachment
-            try {
-                await AttachmentInterface.forceDownload(attachment);
-            } catch (ex) {
-                Server().log(`Failed for force download attachment (GUID: ${attachment.guid}): ${String(ex)}`);
+        let aPath = FileSystem.getRealPath(attachment.filePath);
+        if (!fs.existsSync(aPath) && forceDownload) {
+            const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
+            if (papiEnabled) {
+                // Try to restore an attachment that exists in the database but has been purged from disk
+                try {
+                    attachment = await AttachmentInterface.forceDownload(attachment);
+                    aPath = FileSystem.getRealPath(attachment.filePath);
+                } catch (ex) {
+                    Server().log(`Failed to force download attachment (GUID: ${attachment.guid}): ${String(ex)}`);
+                }
             }
         }
 
-        let aPath = FileSystem.getRealPath(attachment.filePath);
         let mimeType = attachment.getMimeType();
         if (!fs.existsSync(aPath)) throw new ServerError({ error: "Attachment does not exist in disk!" });
 
