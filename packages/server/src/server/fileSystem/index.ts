@@ -558,6 +558,16 @@ export class FileSystem {
         }
     }
 
+    static async convertToPng(originalPath: string, outputPath: string): Promise<void> {
+        const oldPath = FileSystem.getRealPath(originalPath);
+        const output = await FileSystem.execShellCommand(
+            `/usr/bin/sips --setProperty "format" "png" "${oldPath}" --out "${outputPath}"`
+        );
+        if (isNotEmpty(output) && output.includes("Error:")) {
+            throw Error(`Failed to convert image to PNG: ${output}`);
+        }
+    }
+
     static async isSipDisabled(): Promise<boolean> {
         const res = ((await FileSystem.execShellCommand(`csrutil status`)) ?? "").trim();
         return !res.endsWith("enabled.");
