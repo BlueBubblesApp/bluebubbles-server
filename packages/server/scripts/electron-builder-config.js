@@ -56,7 +56,7 @@ module.exports = {
     },
     "dmg": {
         "sign": false,
-        "writeUpdateInfo": false
+        "writeUpdateInfo": true
     },
     // "afterSign": "./scripts/notarize.js"
 };
