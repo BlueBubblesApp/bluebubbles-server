@@ -64,8 +64,9 @@ const getServiceFromInput = (value: string) => {
     // so we should default to iMessage
     if (valSplit.length <= 1) return "iMessage";
 
-    // Otherwise, return the "first" index in the array,
-    return valSplit[0];
+    // Tahoe uses "any" for iMessage chat GUIDs, but Messages AppleScript requires a concrete service type.
+    const service = valSplit[0];
+    return service === "any" ? "iMessage" : service;
 };
 
 /**
