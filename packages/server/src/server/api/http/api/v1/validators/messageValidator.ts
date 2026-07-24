@@ -155,6 +155,17 @@ export class MessageValidator {
     };
 
     static async validateAttachment(ctx: RouterContext, next: Next) {
+        // curl -F treats semicolons as field options and can truncate chatGuid.
+        // Accept a query fallback when the body is missing or is its truncated prefix.
+        const bodyChatGuid = ctx.request.body.chatGuid;
+        const queryChatGuid = ctx.request.query.chatGuid;
+        if (
+            typeof queryChatGuid === "string" &&
+            (bodyChatGuid == null || (typeof bodyChatGuid === "string" && queryChatGuid.startsWith(`${bodyChatGuid};`)))
+        ) {
+            ctx.request.body.chatGuid = queryChatGuid;
+        }
+
         const { files } = ctx.request;
         const { tempGuid, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
             ctx.request?.body,
