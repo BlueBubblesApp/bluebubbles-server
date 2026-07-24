@@ -15,7 +15,7 @@ const buildServiceScript = (inputService: string) => {
         theService = `"${theService}"`;
     }
 
-    const svcClass = isMinVentura ? 'account' : 'service';
+    const svcClass = isMinVentura ? "account" : "service";
 
     let serviceScript = `set targetService to 1st ${svcClass} whose service type = ${theService}`;
     if (!isMinBigSur && theService !== "iMessage") {
@@ -82,6 +82,14 @@ export const hideMessages = () => {
  */
 export const startMessages = () => {
     return startApp("Messages");
+};
+
+export const requestSystemEventsAutomation = () => {
+    return `tell application "System Events" to count processes`;
+};
+
+export const requestFindMyAutomation = () => {
+    return `tell application id "com.apple.findmy" to get name`;
 };
 
 /**

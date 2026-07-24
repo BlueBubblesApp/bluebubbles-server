@@ -35,6 +35,7 @@ export interface FindMyDevice {
     trackingInfo?: unknown;
     features?: Record<string, boolean>;
     deviceDiscoveryId?: string;
+    systemVersion?: string;
     prsId?: string;
     scd?: unknown;
     locationCapable?: unknown;
@@ -44,7 +45,7 @@ export interface FindMyDevice {
     deviceWithYou?: unknown;
     maxMsgChar?: number;
     deviceClass?: string;
-    crowdSourcedLocation: FindMyLocation;
+    crowdSourcedLocation?: FindMyLocation;
 
     // Extra properties from FindMyItem
     identifier?: FindMyItem["identifier"];
@@ -131,16 +132,35 @@ interface FindMyLocation {
     locationFinished?: boolean;
 }
 
-export type FindMyLocationItem = {
+export type FindMyFriendLocation = {
     handle: string | null;
-    coordinates: [number, number];
+    coordinates: [number, number] | null;
     long_address: string | null;
     short_address: string | null;
     subtitle: string | null;
     title: string | null;
-    last_updated: number;
+    last_updated: number | null;
     is_locating_in_progress: 0 | 1;
     status: "legacy" | "live" | "shallow";
+    location_type?: number | null;
+    horizontal_accuracy?: number | null;
+    vertical_accuracy?: number | null;
+    speed?: number | null;
+    altitude?: number | null;
+};
+
+export type FindMyFriendsRefreshResponse = {
+    locations: FindMyFriendLocation[];
+    partial: boolean;
+    friendListTimedOut: boolean;
+    timedOutHandles: string[];
+    skippedFriends: number;
+};
+
+export type FindMyDevicesRefreshResponse = {
+    devices: unknown[];
+    partial: boolean;
+    skippedDevices: number;
 };
 
 export type FindMySafeLocation = {
