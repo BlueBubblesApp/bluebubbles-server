@@ -153,7 +153,7 @@ export class MessageRepository extends Loggable {
      * @param attachmentGuid A specific attachment identifier to get
      * @param withMessages Whether to include the participants or not
      */
-    async getAttachment(attachmentGuid: string, withMessages = false) {
+    async getAttachment(attachmentGuid: string, withMessages = false): Promise<Attachment | null> {
         const query = this.db.getRepository(Attachment).createQueryBuilder("attachment");
 
         if (withMessages) query.leftJoinAndSelect("attachment.messages", "message");
@@ -163,7 +163,7 @@ export class MessageRepository extends Loggable {
         // Original GUIDs can also be prefixed with at_x_ or p:/.
         const lookupGuids = [attachmentGuid];
         if (attachmentGuid.length > 36) {
-            lookupGuids.push(attachmentGuid.substring(attachmentGuid.length - 36));
+            lookupGuids.push(this.normalizeAttachmentGuid(attachmentGuid));
         }
 
         for (const lookupGuid of lookupGuids) {
@@ -203,6 +203,7 @@ export class MessageRepository extends Loggable {
         query.andWhere("message.guid = :guid", { guid });
 
         const message = await query.getOne();
+        if (withAttachments && message) await this.addMissingAttachmentsFromAttributedBody([message]);
         return message;
     }
 
@@ -303,7 +304,9 @@ export class MessageRepository extends Loggable {
         query.skip(offset);
         query.take(limit);
 
-        return await query.getManyAndCount();
+        const [messages, totalCount] = await query.getManyAndCount();
+        if (withAttachments) await this.addMissingAttachmentsFromAttributedBody(messages);
+        return [messages, totalCount];
     }
 
     /**
@@ -460,7 +463,59 @@ export class MessageRepository extends Loggable {
         query.skip(offset);
         query.take(limit);
 
-        return await query.getMany();
+        const messages = await query.getMany();
+        if (withAttachments) await this.addMissingAttachmentsFromAttributedBody(messages);
+        return messages;
+    }
+
+    private normalizeAttachmentGuid(guid: string): string {
+        return guid.slice(-36).toLowerCase();
+    }
+
+    private getAttributedBodyAttachmentGuids(message: Message): string[] {
+        const guids = new Set<string>();
+        for (const item of message.attributedBody ?? []) {
+            for (const run of item?.runs ?? []) {
+                const guid = run?.attributes?.__kIMFileTransferGUIDAttributeName;
+                if (typeof guid === "string" && guid.length > 0) guids.add(guid);
+            }
+        }
+
+        return Array.from(guids);
+    }
+
+    private async addMissingAttachmentsFromAttributedBody(messages: Message[]): Promise<void> {
+        const attachmentCache = new Map<string, Attachment | null>();
+
+        for (const message of messages) {
+            const guids = this.getAttributedBodyAttachmentGuids(message);
+            if (guids.length === 0) continue;
+
+            if (!message.attachments) message.attachments = [];
+
+            for (const guid of guids) {
+                const normalizedGuid = this.normalizeAttachmentGuid(guid);
+                const existing = message.attachments.some(attachment => {
+                    return [attachment.guid, attachment.originalGuid].some(attachmentGuid => {
+                        return (
+                            typeof attachmentGuid === "string" &&
+                            this.normalizeAttachmentGuid(attachmentGuid) === normalizedGuid
+                        );
+                    });
+                });
+                if (existing) continue;
+
+                if (!attachmentCache.has(normalizedGuid)) {
+                    attachmentCache.set(normalizedGuid, await this.getAttachment(guid));
+                }
+
+                const attachment = attachmentCache.get(normalizedGuid);
+                if (!attachment) continue;
+
+                const alreadyAdded = message.attachments.some(item => item.ROWID === attachment.ROWID);
+                if (!alreadyAdded) message.attachments.push(attachment);
+            }
+        }
     }
 
     /**
