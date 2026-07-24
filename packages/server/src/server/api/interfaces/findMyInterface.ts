@@ -3,19 +3,25 @@ import path from "path";
 import fs from "fs";
 import { FileSystem } from "@server/fileSystem";
 import { isMinBigSur, isMinSequoia, isMinSonoma } from "@server/env";
-import { checkPrivateApiStatus, waitMs } from "@server/helpers/utils";
+import { waitMs } from "@server/helpers/utils";
 import { quitFindMyFriends, startFindMyFriends, showFindMyFriends, hideFindMyFriends } from "../apple/scripts";
-import { FindMyDevice, FindMyItem, FindMyLocationItem } from "@server/api/lib/findmy/types";
-import { transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
+import {
+    FindMyDevice,
+    FindMyFriendLocation,
+    FindMyFriendsRefreshResponse,
+    FindMyItem
+} from "@server/api/lib/findmy/types";
+import { normalizeFindMyFriendLocations, transformFindMyItemToDevice } from "@server/api/lib/findmy/utils";
+import { resolveFindMyFriendsPrivateApiTarget } from "@server/api/lib/findmy/privateApiSupport";
 
 export class FindMyInterface {
-    static async getFriends() {
-        return Server().findMyCache.getAll();
+    static async getFriends(): Promise<FindMyFriendLocation[]> {
+        return normalizeFindMyFriendLocations(Server().findMyCache.getAll());
     }
 
     static async getDevices(): Promise<Array<FindMyDevice> | null> {
         if (isMinSequoia) {
-            Server().logger.debug('Cannot fetch FindMy devices on macOS Sequoia or later.');
+            Server().logger.debug("Cannot fetch FindMy devices on macOS Sequoia or later.");
             return null;
         }
 
@@ -48,7 +54,7 @@ export class FindMyInterface {
                         }
                     }
                 } catch (ex: any) {
-                    Server().logger.debug('An error occurred while reading FindMy ItemGroups cache file.');
+                    Server().logger.debug("An error occurred while reading FindMy ItemGroups cache file.");
                     Server().logger.debug(String(ex));
                 }
             }
@@ -58,55 +64,83 @@ export class FindMyInterface {
 
             return [...(devices ?? []), ...transformedItems];
         } catch (ex: any) {
-            Server().logger.debug('An error occurred while reading FindMy Device cache files.');
+            Server().logger.debug("An error occurred while reading FindMy Device cache files.");
             Server().logger.debug(String(ex));
             return null;
         }
     }
 
     static async refreshDevices(): Promise<Array<FindMyDevice> | null> {
-        // Can't use the Private API to refresh devices yet
-        await this.refreshLocationsAccessibility();
+        await this.refreshUsingFindMyApp();
         return await this.getDevices();
     }
 
-    static async refreshFriends(openFindMyApp = true): Promise<FindMyLocationItem[]> {
-        const papiEnabled = Server().repo.getConfig("enable_private_api") as boolean;
-        if (papiEnabled && isMinBigSur && !isMinSonoma) {
-            checkPrivateApiStatus();
-            const result = await Server().privateApi.findmy.refreshFriends();
-            const refreshLocations = result?.data?.locations ?? [];
+    static async refreshFriends(allowFindMyAppFallback = true): Promise<FindMyFriendLocation[]> {
+        const privateApiEnabled = Boolean(Server().repo.getConfig("enable_private_api"));
+        const privateApiTarget = resolveFindMyFriendsPrivateApiTarget({ isMinBigSur, isMinSonoma, isMinSequoia });
+        const privateApiHelperAvailable = privateApiTarget != null && Server().privateApi.hasClient(privateApiTarget);
+        let receivedUsableHelperResponse = false;
+        if (privateApiEnabled && privateApiTarget != null && privateApiHelperAvailable) {
+            try {
+                const result = await Server().privateApi.findmy.refreshFriends();
+                const refreshResponse = result?.data as FindMyFriendsRefreshResponse | undefined;
+                if (Array.isArray(refreshResponse?.locations)) {
+                    const refreshedLocations = normalizeFindMyFriendLocations(refreshResponse.locations);
+                    const responseContainsOnlyInvalidLocations =
+                        refreshResponse.locations.length > 0 && refreshedLocations.length === 0;
+                    const responseIsPartial = refreshResponse.partial === true;
+                    receivedUsableHelperResponse =
+                        !responseContainsOnlyInvalidLocations && (!responseIsPartial || refreshedLocations.length > 0);
 
-            // Save the data to the cache
-            // The cache will handle properly updating the data.
-            Server().findMyCache.addAll(refreshLocations);
+                    if (!responseContainsOnlyInvalidLocations) {
+                        if (responseIsPartial) {
+                            Server().findMyCache.updateAll(refreshedLocations);
+                        } else {
+                            Server().findMyCache.replaceAll(refreshedLocations);
+                        }
+                    } else {
+                        Server().logger.warn("Find My Friends helper returned no identifiable locations.");
+                    }
+
+                    if (responseIsPartial) {
+                        const timedOutFriendCount = Array.isArray(refreshResponse.timedOutHandles)
+                            ? refreshResponse.timedOutHandles.length
+                            : 0;
+                        const skippedFriendCount = Number(refreshResponse.skippedFriends ?? 0);
+                        Server().logger.warn(
+                            `Find My Friends returned a partial response (${timedOutFriendCount} timed-out ` +
+                                `handle(s), ${skippedFriendCount} skipped friend(s)).`
+                        );
+                    }
+                }
+            } catch (error: any) {
+                Server().logger.warn(
+                    `Unable to refresh Find My Friends through the helper: ${error?.message ?? String(error)}`
+                );
+            }
         }
 
-        // No matter what, open the Find My app.
-        // Don't await because it should update in the background.
-        // Location updates get emitted as an event as they come in.
-        if (openFindMyApp) {
-            this.refreshLocationsAccessibility();
+        const shouldRefreshUsingFindMyApp = allowFindMyAppFallback && (!receivedUsableHelperResponse || !isMinSequoia);
+        if (shouldRefreshUsingFindMyApp) {
+            void this.refreshUsingFindMyApp().catch((error: any) => {
+                Server().logger.warn(`Unable to refresh Find My through the app: ${error?.message ?? String(error)}`);
+            });
         }
 
-        return Server().findMyCache.getAll();
+        return normalizeFindMyFriendLocations(Server().findMyCache.getAll());
     }
 
-    static async refreshLocationsAccessibility() {
+    static async refreshUsingFindMyApp() {
+        await FileSystem.requestFindMyAutomationPermissions();
         await FileSystem.executeAppleScript(quitFindMyFriends());
         await waitMs(3000);
 
-        // Make sure the Find My app is open.
-        // Give it 5 seconds to open
         await FileSystem.executeAppleScript(startFindMyFriends());
         await waitMs(5000);
 
-        // Bring the Find My app to the foreground so it refreshes the devices
-        // Give it 15 seconods to refresh
         await FileSystem.executeAppleScript(showFindMyFriends());
         await waitMs(15000);
 
-        // Re-hide the Find My App
         await FileSystem.executeAppleScript(hideFindMyFriends());
     }
 
