@@ -46,7 +46,13 @@ const makeAttachment = ({ guid = "attachment-guid", filePath, mimeType }) => ({
     getMimeType: () => mimeType
 });
 
-const loadAttachmentRouter = ({ attachment, privateApiEnabled = true, existingPaths = [], forceResult }) => {
+const loadAttachmentRouter = ({
+    attachment,
+    privateApiEnabled = true,
+    existingPaths = [],
+    forceResult,
+    forceError
+}) => {
     const calls = {
         forceDownload: [],
         config: [],
@@ -97,6 +103,7 @@ const loadAttachmentRouter = ({ attachment, privateApiEnabled = true, existingPa
             AttachmentInterface: {
                 forceDownload: async value => {
                     calls.forceDownload.push(value);
+                    if (forceError) throw forceError;
                     return forceResult;
                 }
             }
@@ -186,5 +193,23 @@ test("returns a server error when the file is still missing after a force downlo
         return true;
     });
     assert.deepEqual(calls.forceDownload, [original]);
+    assert.equal(calls.fileStreams.length, 0);
+});
+
+test("logs a failed force download once and returns a server error without streaming", async () => {
+    const original = makeAttachment({ filePath: "/attachments/missing.jpg", mimeType: "image/jpeg" });
+    const { AttachmentRouter, calls } = loadAttachmentRouter({
+        attachment: original,
+        forceError: new Error("force download failed")
+    });
+
+    await assert.rejects(AttachmentRouter.download(makeContext()), error => {
+        assert.equal(error.status, 500);
+        assert.equal(error.response.error, "Attachment does not exist in disk!");
+        return true;
+    });
+    assert.deepEqual(calls.forceDownload, [original]);
+    assert.equal(calls.logs.length, 1);
+    assert.match(calls.logs[0][0], /GUID: attachment-guid/);
     assert.equal(calls.fileStreams.length, 0);
 });
