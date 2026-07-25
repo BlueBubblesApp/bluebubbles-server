@@ -2,7 +2,7 @@ import { IMessagePollResult, IMessagePollType, IMessagePoller } from ".";
 import { Message } from "../entity/Message";
 import { isEmpty } from "@server/helpers/utils";
 import { Server } from "@server";
-
+import { MESSAGE_FAST_LOOKBACK_MS, MESSAGE_RECONCILE_INTERVAL_MS, MESSAGE_RECONCILE_LOOKBACK_MS } from "./constants";
 
 export class MessagePoller extends IMessagePoller {
     tag = "MessagePoller";
@@ -13,14 +13,14 @@ export class MessagePoller extends IMessagePoller {
 
     // Apple only allows edits within ~15 minutes and unsends within ~2 minutes of sending,
     // so a much smaller lookback than a full week is enough to catch those on every tick.
-    static readonly FAST_LOOKBACK_MS = 1000 * 60 * 30;
+    static readonly FAST_LOOKBACK_MS = MESSAGE_FAST_LOOKBACK_MS;
 
     // Periodically we still widen the lookback to a full week so we don't permanently miss
     // things that can legitimately change well outside the fast window (e.g. a read receipt
     // or notification flag on an older message).
-    static readonly RECONCILE_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 7;
+    static readonly RECONCILE_LOOKBACK_MS = MESSAGE_RECONCILE_LOOKBACK_MS;
 
-    static readonly RECONCILE_INTERVAL_MS = 1000 * 60 * 5;
+    static readonly RECONCILE_INTERVAL_MS = MESSAGE_RECONCILE_INTERVAL_MS;
 
     lastReconcileAt = 0;
 
@@ -59,7 +59,7 @@ export class MessagePoller extends IMessagePoller {
             // Date read only matters if it's from you and it's not a group chat
             (e.isFromMe && !e.chats[0].isGroup && (e.dateRead?.getTime() ?? 0)) >= afterTime ||
             // Date edited can be from anyone (should include edits & unsends)
-            (e.dateEdited?.getTime() ?? 0) >= afterTime || 
+            (e.dateEdited?.getTime() ?? 0) >= afterTime ||
             // Date retracted can be from anyone, but Apple doesn't even use this field.
             // We still want to be thorough and check it.
             // isEmpty is what's actually used by Apple to determine if it's retracted.
@@ -143,10 +143,10 @@ export class MessagePoller extends IMessagePoller {
             const identifier = `group-change-${entry.ROWID}`;
 
             // Skip over any that we've finished
-            if (this.cache.events.find(identifier)) continue;
+            if (this.cache.messageEvents.find(identifier)) continue;
 
             // Add to cache
-            this.cache.events.add(identifier);
+            this.cache.messageEvents.add(identifier);
 
             // Send the built message object
             if (entry.itemType === 1 && entry.groupActionType === 0) {
