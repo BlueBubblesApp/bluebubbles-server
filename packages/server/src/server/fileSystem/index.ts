@@ -29,6 +29,7 @@ import {
     ImageMetadataKeys
 } from "./types";
 import { uuidv4 } from "@firebase/util";
+import { convertImageWithSips } from "./sipsImageConversion";
 
 const FindProcess = require("find-process");
 const { rimrafSync } = require("rimraf");
@@ -550,22 +551,12 @@ export class FileSystem {
 
     static async convertToJpg(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(
-            `/usr/bin/sips --setProperty "format" "jpeg" "${oldPath}" --out "${outputPath}"`
-        );
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert image to JPEG: ${output}`);
-        }
+        await convertImageWithSips(FileSystem.execShellCommand, oldPath, outputPath, "jpeg");
     }
 
     static async convertToPng(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
-        const output = await FileSystem.execShellCommand(
-            `/usr/bin/sips --setProperty "format" "png" "${oldPath}" --out "${outputPath}"`
-        );
-        if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert image to PNG: ${output}`);
-        }
+        await convertImageWithSips(FileSystem.execShellCommand, oldPath, outputPath, "png");
     }
 
     static async isSipDisabled(): Promise<boolean> {
@@ -703,7 +694,7 @@ export class FileSystem {
             }
         } catch (ex) {
             Server().log("Failed to sync time with time servers!", "debug");
-            Server().log(ex, 'debug');
+            Server().log(ex, "debug");
         }
 
         return null;
