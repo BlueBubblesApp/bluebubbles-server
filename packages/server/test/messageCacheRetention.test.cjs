@@ -21,7 +21,7 @@ const constantsPath = path.join(__dirname, "../src/server/databases/imessage/pol
 const constants = loadTypeScriptModule(constantsPath);
 
 const eventCachePath = path.join(__dirname, "../src/server/eventCache/index.ts");
-const { EventCache } = loadTypeScriptModule(eventCachePath, {
+const { EventCache, KeyedEventCache } = loadTypeScriptModule(eventCachePath, {
     "@server/helpers/utils": {
         isEmpty: value => value === null || value === undefined || value.length === 0
     }
@@ -29,7 +29,7 @@ const { EventCache } = loadTypeScriptModule(eventCachePath, {
 
 const pollerPath = path.join(__dirname, "../src/server/databases/imessage/pollers/index.ts");
 const { IMessageCache, IMessagePoller } = loadTypeScriptModule(pollerPath, {
-    "@server/eventCache": { EventCache },
+    "@server/eventCache": { EventCache, KeyedEventCache },
     "@server/events": { CHAT_READ_STATUS_CHANGED: "chat-read-status-changed" },
     "@server/lib/logging/Loggable": { Loggable: class {} },
     "./constants": constants
@@ -65,7 +65,7 @@ test("a reconciled message stays deduplicated for the full lookback", () => {
     const guid = "reconciled-message";
     const reconciledAt = Date.now() - constants.MESSAGE_RECONCILE_LOOKBACK_MS;
 
-    cache.messageEvents.items.push({ date: reconciledAt, item: guid });
+    cache.messageEvents.items.set(guid, reconciledAt);
     cache.messageStates[guid] = makeMessageState(reconciledAt);
 
     cache.trimCaches();
@@ -79,7 +79,7 @@ test("expired message entries are still pruned", () => {
     const guid = "expired-message";
     const expiredAt = Date.now() - constants.MESSAGE_DEDUP_CACHE_RETENTION_MS - 1;
 
-    cache.messageEvents.items.push({ date: expiredAt, item: guid });
+    cache.messageEvents.items.set(guid, expiredAt);
     cache.messageStates[guid] = makeMessageState(expiredAt);
 
     cache.trimCaches();
@@ -103,4 +103,15 @@ test("chat deduplication keeps its shorter retention", () => {
 
     assert.equal(cache.chatEvents.find(guid), null);
     assert.equal(cache.chatStates[guid], undefined);
+});
+
+test("message event cache uses keyed lookup without changing chat cache storage", () => {
+    const cache = new IMessageCache();
+
+    assert.equal(cache.messageEvents.items instanceof Map, true);
+    assert.equal(Array.isArray(cache.chatEvents.items), true);
+    assert.equal(cache.messageEvents.add("message-guid"), true);
+    assert.equal(cache.messageEvents.add("message-guid"), false);
+    assert.equal(cache.messageEvents.find("message-guid"), "message-guid");
+    assert.equal(cache.messageEvents.size(), 1);
 });
