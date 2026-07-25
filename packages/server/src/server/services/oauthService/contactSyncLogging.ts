@@ -1,3 +1,7 @@
+import { CONTACT_ERROR_CODES, ContactErrorCode } from "@server/api/interfaces/contactErrors";
+
+const KNOWN_CONTACT_ERROR_CODES = new Set<ContactErrorCode>(Object.values(CONTACT_ERROR_CODES));
+
 export type GoogleContactSyncCounts = {
     total: number;
     succeeded: number;
@@ -63,15 +67,7 @@ export const formatGoogleContactSyncSummary = (counts: GoogleContactSyncCounts):
     `${counts.succeeded} succeeded, ${counts.skipped} skipped, ${counts.failed} failed (${counts.total} total)`;
 
 export const getGoogleContactSyncFailureReason = (error: any): string => {
-    const message = typeof error?.message === "string" ? error.message : "";
-
-    if (message.includes("must provide one of")) return "missing-contact-identity";
-    if (message.includes("Criteria returned multiple Contacts")) return "ambiguous-contact-match";
-    if (message.includes("Existing contact with similar info")) return "duplicate-contact";
-
-    const rawCode = error?.code;
-    const code = typeof rawCode === "string" || typeof rawCode === "number" ? String(rawCode) : "";
-    if (/^[a-zA-Z0-9_.-]{1,64}$/.test(code)) return `error-code-${code}`;
+    if (KNOWN_CONTACT_ERROR_CODES.has(error?.code)) return error.code;
 
     return "unknown-error";
 };

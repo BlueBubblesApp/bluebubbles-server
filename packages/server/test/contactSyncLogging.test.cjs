@@ -3,16 +3,25 @@ const path = require("node:path");
 const test = require("node:test");
 const babel = require("@babel/core");
 
+const transformModule = modulePath =>
+    babel.transformFileSync(modulePath, {
+        presets: [
+            [require.resolve("@babel/preset-env"), { targets: { node: "20" }, modules: "commonjs" }],
+            require.resolve("@babel/preset-typescript")
+        ]
+    }).code;
+
+const contactErrorsPath = path.join(__dirname, "../src/server/api/interfaces/contactErrors.ts");
+const contactErrorsModule = { exports: {} };
+const loadContactErrors = new Function("module", "exports", "require", transformModule(contactErrorsPath));
+loadContactErrors(contactErrorsModule, contactErrorsModule.exports, require);
+
 const modulePath = path.join(__dirname, "../src/server/services/oauthService/contactSyncLogging.ts");
-const transformed = babel.transformFileSync(modulePath, {
-    presets: [
-        [require.resolve("@babel/preset-env"), { targets: { node: "20" }, modules: "commonjs" }],
-        require.resolve("@babel/preset-typescript")
-    ]
-});
 const loadedModule = { exports: {} };
-const loadModule = new Function("module", "exports", "require", transformed.code);
-loadModule(loadedModule, loadedModule.exports, require);
+const loadModule = new Function("module", "exports", "require", transformModule(modulePath));
+const loadDependency = moduleId =>
+    moduleId === "@server/api/interfaces/contactErrors" ? contactErrorsModule.exports : require(moduleId);
+loadModule(loadedModule, loadedModule.exports, loadDependency);
 
 const {
     formatGoogleContactSyncLogContext,
@@ -20,6 +29,7 @@ const {
     getGoogleContactSyncFailureReason,
     getGoogleContactSyncLogContext
 } = loadedModule.exports;
+const { CONTACT_ERROR_CODES } = contactErrorsModule.exports;
 
 test("contact sync context exposes field presence without provider values", () => {
     const contact = {
@@ -101,19 +111,16 @@ test("contact sync summary reports every result category", () => {
     );
 });
 
-test("failure reasons do not echo arbitrary exception text", () => {
-    assert.equal(
-        getGoogleContactSyncFailureReason({
-            message: "To update an existing contact, you must provide one of the following: firstName"
-        }),
-        "missing-contact-identity"
-    );
+test("failure reasons consume only stable ContactInterface codes", () => {
+    for (const code of Object.values(CONTACT_ERROR_CODES)) {
+        assert.equal(getGoogleContactSyncFailureReason({ code }), code);
+    }
 
     const privateMessage = "Database failed for private@example.com and +15555550123";
     const reason = getGoogleContactSyncFailureReason({ message: privateMessage });
     assert.equal(reason, "unknown-error");
     assert.equal(reason.includes(privateMessage), false);
 
-    assert.equal(getGoogleContactSyncFailureReason({ code: "SQLITE_CONSTRAINT" }), "error-code-SQLITE_CONSTRAINT");
+    assert.equal(getGoogleContactSyncFailureReason({ code: "SQLITE_CONSTRAINT" }), "unknown-error");
     assert.equal(getGoogleContactSyncFailureReason({ code: "unsafe code with spaces" }), "unknown-error");
 });
