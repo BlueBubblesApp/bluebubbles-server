@@ -25,16 +25,19 @@ const window = {
     }
 };
 
-assert.doesNotThrow(
-    () => minimizeWindowIfRequested(true, null),
-    "headless startup must not minimize a missing BrowserWindow"
-);
+let didMinimize;
+assert.doesNotThrow(() => {
+    didMinimize = minimizeWindowIfRequested(true, null);
+}, "headless startup must not minimize a missing BrowserWindow");
+assert.equal(didMinimize, false, "headless startup must report that no window was minimized");
 assert.equal(minimizeCalls, 0);
 
-minimizeWindowIfRequested(false, window);
+didMinimize = minimizeWindowIfRequested(false, window);
+assert.equal(didMinimize, false, "disabled start minimized must report that no window was minimized");
 assert.equal(minimizeCalls, 0, "a visible window must remain unchanged when start minimized is disabled");
 
-minimizeWindowIfRequested(true, window);
+didMinimize = minimizeWindowIfRequested(true, window);
+assert.equal(didMinimize, true, "enabled start minimized must report a successful minimization");
 assert.equal(minimizeCalls, 1, "a visible window must still minimize when start minimized is enabled");
 
 console.log("Headless window minimization checks passed.");

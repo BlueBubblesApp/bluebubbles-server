@@ -791,7 +791,10 @@ class BlueBubblesServer extends EventEmitter {
 
         // Start minimized if enabled
         const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
-        minimizeWindowIfRequested(startMinimized, this.window);
+        const didMinimizeWindow = minimizeWindowIfRequested(startMinimized, this.window);
+        if (startMinimized && !didMinimizeWindow) {
+            this.logger.debug("Skipping start-minimized behavior because headless mode has no BrowserWindow.");
+        }
 
         // Disable the encryp coms setting if it's enabled.
         // This is a temporary fix until the android client supports it again.
