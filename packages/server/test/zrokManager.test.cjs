@@ -139,3 +139,15 @@ test("preserves invalid-token errors from the retry", async () => {
         expectedCall(ZrokManager, ["enable", token])
     ]);
 });
+
+test("stops recovery and preserves the disable error when stale-environment cleanup fails", async () => {
+    const { calls, ZrokManager } = loadZrokManager([
+        { error: alreadyEnabledError },
+        failure("[ERROR]: environment is still in use")
+    ]);
+
+    await assert.rejects(() => ZrokManager.setToken(token), {
+        message: "Failed to disable Zrok tunnel! Please check your server logs for more information."
+    });
+    assert.deepEqual(calls, [expectedCall(ZrokManager, ["enable", token]), expectedCall(ZrokManager, ["disable"])]);
+});
