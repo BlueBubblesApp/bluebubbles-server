@@ -15,7 +15,7 @@ const buildServiceScript = (inputService: string) => {
         theService = `"${theService}"`;
     }
 
-    const svcClass = isMinVentura ? 'account' : 'service';
+    const svcClass = isMinVentura ? "account" : "service";
 
     let serviceScript = `set targetService to 1st ${svcClass} whose service type = ${theService}`;
     if (!isMinBigSur && theService !== "iMessage") {
@@ -56,7 +56,7 @@ const getAddressFromInput = (value: string) => {
     return valSplit[valSplit.length - 1];
 };
 
-const getServiceFromInput = (value: string) => {
+const getServiceFromInput = (value: string, resolvedService: string = null) => {
     // This should always produce an array of minimum length, 1
     const valSplit = value.split(";");
 
@@ -64,9 +64,12 @@ const getServiceFromInput = (value: string) => {
     // so we should default to iMessage
     if (valSplit.length <= 1) return "iMessage";
 
-    // Tahoe uses "any" for iMessage chat GUIDs, but Messages AppleScript requires a concrete service type.
+    // Tahoe uses "any" for multiple chat services, but Messages AppleScript requires a concrete service type.
     const service = valSplit[0];
-    return service === "any" ? "iMessage" : service;
+    if (service !== "any") return service;
+
+    const supportedServices = ["iMessage", "SMS", "RCS"];
+    return supportedServices.includes(resolvedService) ? resolvedService : "iMessage";
 };
 
 /**
@@ -198,7 +201,12 @@ export const sendMessage = (chatGuid: string, message: string, attachment: strin
     end tell`;
 };
 
-export const sendMessageFallback = (chatGuid: string, message: string, attachment: string) => {
+export const sendMessageFallback = (
+    chatGuid: string,
+    message: string,
+    attachment: string,
+    resolvedService: string = null
+) => {
     if (!chatGuid || (!message && !attachment)) return null;
 
     // Build the sending scripts
@@ -207,7 +215,7 @@ export const sendMessageFallback = (chatGuid: string, message: string, attachmen
 
     // Extract the address and service from the input address/GUID
     const address = getAddressFromInput(chatGuid);
-    const service = getServiceFromInput(chatGuid);
+    const service = getServiceFromInput(chatGuid, resolvedService);
 
     // If it starts with `chat`, it's a group chat, and we can't use this script for that
     if (address.startsWith("chat")) {
