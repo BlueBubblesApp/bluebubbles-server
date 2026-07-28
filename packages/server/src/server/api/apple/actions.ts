@@ -100,11 +100,8 @@ export class ActionHandler {
                             limit: 1
                         });
                         resolvedService = chats[0]?.serviceName ?? null;
-                    } catch (serviceError: any) {
-                        log.debug(
-                            `Failed to resolve the fallback chat service: ` +
-                                `${serviceError?.message ?? String(serviceError)}`
-                        );
+                    } catch {
+                        log.debug("Failed to resolve the fallback chat service; using the legacy iMessage default.");
                     }
                 }
 

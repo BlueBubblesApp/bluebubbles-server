@@ -55,9 +55,10 @@ test("unresolved any GUIDs retain the legacy iMessage fallback", () => {
     assert.match(unknownServiceScript, /service type = iMessage/);
 });
 
-test("ActionHandler passes the matching chat service to the fallback script", async () => {
+test("ActionHandler passes the matching service and safely handles lookup failures", async () => {
     const executedScripts = [];
     const chatQueries = [];
+    const debugMessages = [];
     const server = {
         iMessageRepo: {
             getChats: async options => {
@@ -70,11 +71,11 @@ test("ActionHandler passes the matching chat service to the fallback script", as
         convertMp3ToCaf: async () => undefined,
         executeAppleScript: async script => {
             executedScripts.push(script);
-            if (executedScripts.length === 1) throw new Error("force fallback");
+            if (executedScripts.length % 2 === 1) throw new Error("force fallback");
         }
     };
     const logger = {
-        debug: () => undefined,
+        debug: message => debugMessages.push(message),
         warn: () => undefined
     };
     const actionsPath = path.join(__dirname, "../src/server/api/apple/actions.ts");
@@ -101,4 +102,20 @@ test("ActionHandler passes the matching chat service to the fallback script", as
     ]);
     assert.equal(executedScripts.length, 2);
     assert.match(executedScripts[1], /service type = RCS/);
+
+    server.iMessageRepo.getChats = async () => {
+        throw new Error("private-database-details");
+    };
+    await ActionHandler.sendMessage("any;-;test-address", "test", null);
+
+    assert.equal(executedScripts.length, 4);
+    assert.match(executedScripts[3], /service type = iMessage/);
+    assert.equal(
+        debugMessages.some(message => message.includes("private-database-details")),
+        false
+    );
+    assert.equal(
+        debugMessages.includes("Failed to resolve the fallback chat service; using the legacy iMessage default."),
+        true
+    );
 });
