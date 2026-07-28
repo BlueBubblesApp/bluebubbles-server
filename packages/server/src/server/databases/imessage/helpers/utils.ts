@@ -9,6 +9,7 @@ import { Metadata } from "@server/fileSystem/types";
 import { isEmpty, isNotEmpty } from "@server/helpers/utils";
 import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
+import { getConvertedImageName, getImageConversion } from "./imageConversion";
 import { NSAttributedString, Unarchiver } from "node-typedstream";
 
 export const getConversionPath = (attachment: Attachment, extension: string): string => {
@@ -84,40 +85,46 @@ export const convertImage = async (
     } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const newPath = getConversionPath(attachment, "jpeg");
     const mType = originalMimeType ?? attachment.getMimeType();
-    let failed = false;
-    let ext: string = null;
+    const conversion = getImageConversion(attachment.uti, mType);
+    if (!conversion) return null;
 
-    // Only convert certain types
-    if (attachment.uti === "public.heic" || mType.startsWith("image/heic")) {
-        ext = "heic";
-    } else if (attachment.uti === "public.heif" || mType.startsWith("image/heif")) {
-        ext = "heif";
-    } else if (attachment.uti === "public.tiff" || mType.startsWith("image/tiff") || mType.endsWith("tif")) {
-        ext = "tiff";
-    }
+    const guid = attachment.originalGuid ?? attachment.guid;
+    const newDir = `${FileSystem.convertDir}/${guid}`;
+    if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
+    const originalName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
+    const outputName = getConvertedImageName(originalName, conversion);
+    const newPath = `${newDir}/${outputName}`;
+    let failed = false;
 
     if (!fs.existsSync(newPath) && !dryRun) {
         try {
-            if (isNotEmpty(ext)) {
-                Server().log(`Converting image attachment, ${attachment.transferName}, to an JPEG...`);
+            if (conversion.outputExtension === "png") {
+                Server().log(`Converting image attachment, ${attachment.transferName}, to a PNG...`);
+                await FileSystem.convertToPng(attachment.filePath, newPath);
+            } else {
+                Server().log(`Converting image attachment, ${attachment.transferName}, to a JPEG...`);
                 await FileSystem.convertToJpg(attachment.filePath, newPath);
             }
         } catch (ex: any) {
             failed = true;
-            Server().log(`Failed to convert image to JPEG for attachment, ${attachment.transferName}`, "debug");
+            Server().log(
+                `Failed to convert image to ${conversion.outputExtension.toUpperCase()} for attachment, ${
+                    attachment.transferName
+                }`,
+                "debug"
+            );
             Server().log(ex?.message ?? ex, "error");
         }
     } else {
         Server().log("Attachment has already been converted! Skipping...", "debug");
     }
 
-    if (!failed && ext && (fs.existsSync(newPath) || dryRun)) {
+    if (!failed && (fs.existsSync(newPath) || dryRun)) {
         // If conversion is successful, we need to modify the attachment a bit
-        attachment.mimeType = "image/jpeg";
+        attachment.mimeType = conversion.outputMimeType;
         attachment.filePath = newPath;
-        attachment.transferName = basename(newPath).replace(new RegExp(`\\.${ext}$`), ".jpeg");
+        attachment.transferName = basename(newPath);
 
         // Set the fPath to the newly converted path
         return newPath;

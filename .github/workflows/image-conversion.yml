@@ -1,0 +1,40 @@
+name: Image Conversion
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/image-conversion.yml"
+      - "package-lock.json"
+      - "packages/server/package.json"
+      - "packages/server/src/server/databases/imessage/helpers/imageConversion.ts"
+      - "packages/server/src/server/databases/imessage/helpers/utils.ts"
+      - "packages/server/src/server/fileSystem/index.ts"
+      - "packages/server/src/server/fileSystem/sipsImageConversion.ts"
+      - "packages/server/test/fixtures/**"
+      - "packages/server/test/imageConversion.test.js"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/image-conversion.yml"
+      - "package-lock.json"
+      - "packages/server/package.json"
+      - "packages/server/src/server/databases/imessage/helpers/imageConversion.ts"
+      - "packages/server/src/server/databases/imessage/helpers/utils.ts"
+      - "packages/server/src/server/fileSystem/index.ts"
+      - "packages/server/src/server/fileSystem/sipsImageConversion.ts"
+      - "packages/server/test/fixtures/**"
+      - "packages/server/test/imageConversion.test.js"
+
+jobs:
+  image-conversion:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20.11"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:image-conversion --workspace @bluebubbles/server
