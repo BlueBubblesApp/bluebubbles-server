@@ -8,6 +8,8 @@ import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import { ProcessSpawner, ProcessSpawnerError } from "@server/lib/ProcessSpawner";
 
+const ALREADY_ENABLED_ENVIRONMENT_ERROR = "you already have an enabled environment";
+
 export class ZrokManager extends Loggable {
     tag = "ZrokManager";
 
@@ -158,19 +160,33 @@ export class ZrokManager extends Loggable {
 
     static async setToken(token: string): Promise<string> {
         const logger = getLogger("ZrokManager");
+        const enable = () => ProcessSpawner.executeCommand(this.daemonPath, ["enable", token], {}, "ZrokManager");
+        const throwEnableError = (ex: any | ProcessSpawnerError): never => {
+            const output = ex?.output ?? ex?.message ?? String(ex);
+            if (output.includes("enableUnauthorized")) {
+                throw new Error("Invalid Zrok token!");
+            }
 
+            logger.error(`Failed to set Zrok token! Error: ${output}`);
+            throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
+        };
+
+        logger.info(`Enabling Zrok...`);
         try {
-            logger.info(`Enabling Zrok...`);
-            return await ProcessSpawner.executeCommand(this.daemonPath, ["enable", token], {}, "ZrokManager");
+            return await enable();
         } catch (ex: any | ProcessSpawnerError) {
             const output = ex?.output ?? ex?.message ?? String(ex);
-            if (output.includes("you already have an enabled environment")) {
-                return output;
-            } else if (output.includes("enableUnauthorized")) {
-                throw new Error("Invalid Zrok token!");
-            } else {
-                logger.error(`Failed to set Zrok token! Error: ${output}`);
-                throw new Error("Failed to set Zrok token! Please check your server logs for more information.");
+            if (!output.includes(ALREADY_ENABLED_ENVIRONMENT_ERROR)) {
+                return throwEnableError(ex);
+            }
+
+            logger.info("Zrok already has an enabled environment. Disabling it before retrying...");
+            await this.disable();
+
+            try {
+                return await enable();
+            } catch (retryEx: any | ProcessSpawnerError) {
+                return throwEnableError(retryEx);
             }
         }
     }
