@@ -14,6 +14,7 @@
         "lint": "eslint --ext=jsx,js,tsx,ts src",
         "dist": "npm run build && electron-builder build --mac --publish never --config ./scripts/electron-builder-config.js",
         "release": "npm run build && electron-builder build --mac --publish always --config ./scripts/electron-builder-config.js",
+        "test:attachment-download": "node --test test/attachmentDownload.test.cjs",
         "rebuild": "electron-rebuild -f better-sqlite3 node-mac-contacts node-mac-permissions",
         "postinstall": "electron-rebuild install-app-deps && npm run rebuild"
     },
