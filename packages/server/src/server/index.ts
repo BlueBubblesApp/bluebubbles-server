@@ -72,6 +72,7 @@ import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
 import { ZrokManager } from "./managers/zrokManager";
+import { minimizeWindowIfRequested } from "./utils/WindowUtils";
 
 const findProcess = require("find-process");
 
@@ -790,8 +791,9 @@ class BlueBubblesServer extends EventEmitter {
 
         // Start minimized if enabled
         const startMinimized = Server().repo.getConfig("start_minimized") as boolean;
-        if (startMinimized) {
-            this.window.minimize();
+        const didMinimizeWindow = minimizeWindowIfRequested(startMinimized, this.window);
+        if (startMinimized && !didMinimizeWindow) {
+            this.logger.debug("Skipping start-minimized behavior because headless mode has no BrowserWindow.");
         }
 
         // Disable the encryp coms setting if it's enabled.
