@@ -15,6 +15,13 @@ import { FCMService } from "../fcmService";
 import { BrowserWindow, HandlerDetails } from "electron";
 import { Loggable } from "@server/lib/logging/Loggable";
 import { ContactInterface } from "@server/api/interfaces/contactInterface";
+import {
+    formatGoogleContactSyncLogContext,
+    formatGoogleContactSyncSummary,
+    getGoogleContactSyncFailureReason,
+    getGoogleContactSyncLogContext,
+    GoogleContactSyncCounts
+} from "./contactSyncLogging";
 
 /**
  * This service class hhandles the initial oauth workflows
@@ -213,33 +220,55 @@ export class OauthService extends Loggable {
             const contacts = await this.fetchContacts();
 
             this.log.info(`Saving ${contacts.length} contact(s) to the server...`);
-            let errored = false;
-            for (const contact of contacts) {
-                if (isEmpty(contact.names)) continue;
+            const counts: GoogleContactSyncCounts = {
+                total: contacts.length,
+                succeeded: 0,
+                skipped: 0,
+                failed: 0
+            };
+
+            for (const [index, contact] of contacts.entries()) {
+                if (isEmpty(contact?.names)) {
+                    counts.skipped += 1;
+                    continue;
+                }
 
                 try {
                     const avatar = await this.loadContactAvatar(contact);
+                    const name = contact.names[0] ?? {};
 
                     await ContactInterface.createOrUpdateContact({
-                        firstName: contact.names[0].givenName,
-                        lastName: contact.names[0].familyName,
-                        displayName: contact.names[0].displayName,
+                        firstName: name.givenName,
+                        lastName: name.familyName,
+                        displayName: name.displayName,
                         phoneNumbers: (contact.phoneNumbers ?? []).map((p: any) => p.canonicalForm ?? p.value),
                         emails: (contact.emailAddresses ?? []).map((e: any) => e.value),
                         updateEntry: true,
                         avatar
                     });
+
+                    counts.succeeded += 1;
                 } catch (ex: any) {
-                    errored = true;
-                    this.log.debug(`Failed to save contact: ${ex?.message}`);
+                    counts.failed += 1;
+
+                    const context = getGoogleContactSyncLogContext(contact, index + 1);
+                    const failureReason = getGoogleContactSyncFailureReason(ex);
+                    this.log.debug(
+                        `Failed to save Google contact (${formatGoogleContactSyncLogContext(context)}, ` +
+                            `failureReason=${failureReason}).`
+                    );
                 }
             }
 
-            if (errored) {
-                this.log.warn(`Some contacts failed to save. Please check the server logs for more information.`);
+            const summary = formatGoogleContactSyncSummary(counts);
+            if (counts.failed > 0) {
+                this.log.warn(
+                    `Finished saving Google contacts with failures: ${summary}. ` +
+                        `Please check the debug logs for privacy-safe failure details.`
+                );
+            } else {
+                this.log.info(`Finished saving Google contacts: ${summary}.`);
             }
-
-            this.log.info(`Finished saving contacts to the server!`);
 
             try {
                 this.log.info(`Revoking OAuth token, to prevent further use...`);

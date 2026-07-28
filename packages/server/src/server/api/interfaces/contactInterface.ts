@@ -6,6 +6,7 @@ import * as base64 from "byte-base64";
 import { deduplicateObjectArray, isEmpty, isNotEmpty } from "@server/helpers/utils";
 import type { FindOptionsWhere } from "typeorm";
 import { ContactsLib } from "../lib/ContactsLib";
+import { CONTACT_ERROR_CODES, ContactInterfaceError } from "./contactErrors";
 
 type GenericContactParams = {
     contactId?: number;
@@ -293,7 +294,8 @@ export class ContactInterface {
             isEmpty(lastName) &&
             isEmpty(displayName)
         ) {
-            throw new Error(
+            throw new ContactInterfaceError(
+                CONTACT_ERROR_CODES.MISSING_UPDATE_IDENTITY,
                 "To update an existing contact, you must provide one of the following: " +
                     "id, externalId, firstName, lastName, displayName"
             );
@@ -318,13 +320,17 @@ export class ContactInterface {
         }
 
         if (updateEntry && existingContacts.length > 1) {
-            throw new Error(
+            throw new ContactInterfaceError(
+                CONTACT_ERROR_CODES.AMBIGUOUS_UPDATE_MATCH,
                 "Failed to update Contact! Criteria returned multiple Contacts. " +
                     "Please add additional criteria, i.e.: firstName, lastName, displayName"
             );
         }
         if (!updateEntry && isNotEmpty(existingContacts)) {
-            throw new Error("Failed to create new Contact! Existing contact with similar info already exists!");
+            throw new ContactInterfaceError(
+                CONTACT_ERROR_CODES.DUPLICATE_CONTACT,
+                "Failed to create new Contact! Existing contact with similar info already exists!"
+            );
         }
 
         contact = isEmpty(existingContacts) ? null : existingContacts[0];
