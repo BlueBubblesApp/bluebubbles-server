@@ -33,29 +33,35 @@ const scripts = loadTypeScriptModule(scriptsPath, {
 
 test("Tahoe any GUIDs use the service resolved from the matching chat", () => {
     const imessageScript = scripts.sendMessageFallback("any;-;test-address", "test", null, "iMessage");
+    const smsScript = scripts.sendMessageFallback("any;-;test-address", "test", null, "SMS");
     const rcsScript = scripts.sendMessageFallback("any;-;test-address", "test", null, "RCS");
 
     assert.match(imessageScript, /service type = iMessage/);
-    assert.match(rcsScript, /service type = RCS/);
-});
-
-test("explicit service GUIDs remain authoritative", () => {
-    const smsScript = scripts.sendMessageFallback("SMS;-;test-address", "test", null, "RCS");
-    const rcsScript = scripts.sendMessageFallback("RCS;-;test-address", "test", null, "iMessage");
-
     assert.match(smsScript, /service type = SMS/);
     assert.match(rcsScript, /service type = RCS/);
 });
 
-test("unresolved any GUIDs retain the legacy iMessage fallback", () => {
-    const fallbackScript = scripts.sendMessageFallback("any;-;test-address", "test", null);
-    const unknownServiceScript = scripts.sendMessageFallback("any;-;test-address", "test", null, "unknown");
+test("explicit service GUIDs and unqualified addresses preserve their existing behavior", () => {
+    const imessageScript = scripts.sendMessageFallback("iMessage;-;test-address", "test", null, "SMS");
+    const smsScript = scripts.sendMessageFallback("SMS;-;test-address", "test", null, "RCS");
+    const rcsScript = scripts.sendMessageFallback("RCS;-;test-address", "test", null, "iMessage");
+    const unqualifiedScript = scripts.sendMessageFallback("test-address", "test", null);
 
-    assert.match(fallbackScript, /service type = iMessage/);
-    assert.match(unknownServiceScript, /service type = iMessage/);
+    assert.match(imessageScript, /service type = iMessage/);
+    assert.match(smsScript, /service type = SMS/);
+    assert.match(rcsScript, /service type = RCS/);
+    assert.match(unqualifiedScript, /service type = iMessage/);
 });
 
-test("ActionHandler passes the matching service and safely handles lookup failures", async () => {
+test("unresolved or unsupported any GUID services fail closed", () => {
+    const expectedError =
+        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/;
+
+    assert.throws(() => scripts.sendMessageFallback("any;-;test-address", "test", null), expectedError);
+    assert.throws(() => scripts.sendMessageFallback("any;-;test-address", "test", null, "unknown"), expectedError);
+});
+
+test("ActionHandler passes the matching service and fails closed when lookup cannot resolve it", async () => {
     const executedScripts = [];
     const chatQueries = [];
     const debugMessages = [];
@@ -71,7 +77,7 @@ test("ActionHandler passes the matching service and safely handles lookup failur
         convertMp3ToCaf: async () => undefined,
         executeAppleScript: async script => {
             executedScripts.push(script);
-            if (executedScripts.length % 2 === 1) throw new Error("force fallback");
+            if (script.includes("set targetChat to")) throw new Error("force fallback");
         }
     };
     const logger = {
@@ -106,16 +112,32 @@ test("ActionHandler passes the matching service and safely handles lookup failur
     server.iMessageRepo.getChats = async () => {
         throw new Error("private-database-details");
     };
-    await ActionHandler.sendMessage("any;-;test-address", "test", null);
+    await assert.rejects(
+        () => ActionHandler.sendMessage("any;-;test-address", "test", null),
+        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/
+    );
 
-    assert.equal(executedScripts.length, 4);
-    assert.match(executedScripts[3], /service type = iMessage/);
+    assert.equal(executedScripts.length, 3);
     assert.equal(
         debugMessages.some(message => message.includes("private-database-details")),
         false
     );
     assert.equal(
-        debugMessages.includes("Failed to resolve the fallback chat service; using the legacy iMessage default."),
+        debugMessages.includes("Failed to resolve the fallback chat service; the fallback message will not be sent."),
         true
     );
+
+    server.iMessageRepo.getChats = async () => [[], 0];
+    await assert.rejects(
+        () => ActionHandler.sendMessage("any;-;test-address", "test", null),
+        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/
+    );
+    assert.equal(executedScripts.length, 4);
+
+    server.iMessageRepo.getChats = async () => [[{ serviceName: "unknown" }], 1];
+    await assert.rejects(
+        () => ActionHandler.sendMessage("any;-;test-address", "test", null),
+        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/
+    );
+    assert.equal(executedScripts.length, 5);
 });

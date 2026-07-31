@@ -56,7 +56,7 @@ const getAddressFromInput = (value: string) => {
     return valSplit[valSplit.length - 1];
 };
 
-const getServiceFromInput = (value: string, resolvedService: string = null) => {
+const getServiceFromInput = (value: string, resolvedService: string | null = null) => {
     // This should always produce an array of minimum length, 1
     const valSplit = value.split(";");
 
@@ -69,7 +69,9 @@ const getServiceFromInput = (value: string, resolvedService: string = null) => {
     if (service !== "any") return service;
 
     const supportedServices = ["iMessage", "SMS", "RCS"];
-    return supportedServices.includes(resolvedService) ? resolvedService : "iMessage";
+    if (resolvedService && supportedServices.includes(resolvedService)) return resolvedService;
+
+    throw new Error("Unable to resolve a supported Messages service for this chat; the fallback message was not sent.");
 };
 
 /**
@@ -205,7 +207,7 @@ export const sendMessageFallback = (
     chatGuid: string,
     message: string,
     attachment: string,
-    resolvedService: string = null
+    resolvedService: string | null = null
 ) => {
     if (!chatGuid || (!message && !attachment)) return null;
 

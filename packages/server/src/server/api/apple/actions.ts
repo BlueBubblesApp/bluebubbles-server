@@ -91,7 +91,7 @@ export class ActionHandler {
             try {
                 // Generate the new send script
                 log.debug(`Sending AppleScript text using fallback script...`);
-                let resolvedService: string = null;
+                let resolvedService: string | null = null;
                 if (chatGuid.startsWith("any;")) {
                     try {
                         const [chats] = await Server().iMessageRepo.getChats({
@@ -101,7 +101,9 @@ export class ActionHandler {
                         });
                         resolvedService = chats[0]?.serviceName ?? null;
                     } catch {
-                        log.debug("Failed to resolve the fallback chat service; using the legacy iMessage default.");
+                        log.debug(
+                            "Failed to resolve the fallback chat service; the fallback message will not be sent."
+                        );
                     }
                 }
 
