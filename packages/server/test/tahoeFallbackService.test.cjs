@@ -30,6 +30,21 @@ const scripts = loadTypeScriptModule(scriptsPath, {
     "@server/helpers/utils": helpers,
     "@server/env": { isMinBigSur: true, isMinVentura: true }
 });
+const actionsPath = path.join(__dirname, "../src/server/api/apple/actions.ts");
+const loadActionHandler = ({ server, fileSystem, logger }) =>
+    loadTypeScriptModule(actionsPath, {
+        "@server": { Server: () => server },
+        "@server/fileSystem": { FileSystem: fileSystem },
+        "@server/types": {},
+        "@server/api/apple/scripts": scripts,
+        "../../types": {},
+        "../../helpers/utils": helpers,
+        "./mappings": { tapbackUIMap: {} },
+        "../interfaces/messageInterface": { MessageInterface: {} },
+        "../../lib/logging/Loggable": { getLogger: () => logger }
+    }).ActionHandler;
+const resolutionError =
+    "Unable to resolve a supported Messages service for this chat; the fallback message was not sent.";
 
 test("Tahoe any GUIDs use the service resolved from the matching chat", () => {
     const imessageScript = scripts.sendMessageFallback("any;-;test-address", "test", null, "iMessage");
@@ -54,22 +69,101 @@ test("explicit service GUIDs and unqualified addresses preserve their existing b
 });
 
 test("unresolved or unsupported any GUID services fail closed", () => {
-    const expectedError =
-        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/;
-
-    assert.throws(() => scripts.sendMessageFallback("any;-;test-address", "test", null), expectedError);
-    assert.throws(() => scripts.sendMessageFallback("any;-;test-address", "test", null, "unknown"), expectedError);
+    assert.throws(() => scripts.sendMessageFallback("any;-;test-address", "test", null), {
+        message: resolutionError
+    });
+    assert.throws(() => scripts.sendMessageFallback("any;-;test-address", "test", null, "unknown"), {
+        message: resolutionError
+    });
 });
 
-test("ActionHandler passes the matching service and fails closed when lookup cannot resolve it", async () => {
+test("ActionHandler passes every supported service resolved from a Tahoe any chat", async () => {
     const executedScripts = [];
     const chatQueries = [];
-    const debugMessages = [];
+    let resolvedService;
     const server = {
         iMessageRepo: {
             getChats: async options => {
                 chatQueries.push(options);
-                return [[{ serviceName: "RCS" }], 1];
+                return [[{ serviceName: resolvedService }], 1];
+            }
+        }
+    };
+    const fileSystem = {
+        convertMp3ToCaf: async () => undefined,
+        executeAppleScript: async script => {
+            executedScripts.push(script);
+            if (script.includes("set targetChat to")) throw new Error("force fallback");
+        }
+    };
+    const logger = {
+        debug: () => undefined,
+        warn: () => undefined
+    };
+    const ActionHandler = loadActionHandler({ server, fileSystem, logger });
+    const supportedServices = ["iMessage", "SMS", "RCS"];
+
+    for (const service of supportedServices) {
+        resolvedService = service;
+        await ActionHandler.sendMessage("any;-;test-address", "test", null);
+        assert.match(executedScripts.at(-1), new RegExp(`service type = ${service}`));
+    }
+
+    assert.deepEqual(
+        chatQueries,
+        supportedServices.map(() => ({
+            chatGuid: "any;-;test-address",
+            withParticipants: false,
+            limit: 1
+        }))
+    );
+    assert.equal(executedScripts.length, supportedServices.length * 2);
+    assert.equal(
+        executedScripts.filter(script => script.includes("set targetBuddy to")).length,
+        supportedServices.length
+    );
+});
+
+test("ActionHandler does not query chat metadata for explicit service GUIDs", async () => {
+    const executedScripts = [];
+    let chatQueries = 0;
+    const server = {
+        iMessageRepo: {
+            getChats: async () => {
+                chatQueries += 1;
+                return [[{ serviceName: "iMessage" }], 1];
+            }
+        }
+    };
+    const fileSystem = {
+        convertMp3ToCaf: async () => undefined,
+        executeAppleScript: async script => {
+            executedScripts.push(script);
+            if (script.includes("set targetChat to")) throw new Error("force fallback");
+        }
+    };
+    const logger = {
+        debug: () => undefined,
+        warn: () => undefined
+    };
+    const ActionHandler = loadActionHandler({ server, fileSystem, logger });
+
+    for (const service of ["iMessage", "SMS", "RCS"]) {
+        await ActionHandler.sendMessage(`${service};-;test-address`, "test", null);
+        assert.match(executedScripts.at(-1), new RegExp(`service type = ${service}`));
+    }
+
+    assert.equal(chatQueries, 0);
+});
+
+test("ActionHandler fails closed without executing fallback when lookup cannot resolve a service", async () => {
+    const executedScripts = [];
+    const debugMessages = [];
+    const warnMessages = [];
+    const server = {
+        iMessageRepo: {
+            getChats: async () => {
+                throw new Error("private-database-details");
             }
         }
     };
@@ -82,62 +176,40 @@ test("ActionHandler passes the matching service and fails closed when lookup can
     };
     const logger = {
         debug: message => debugMessages.push(message),
-        warn: () => undefined
+        warn: message => warnMessages.push(message)
     };
-    const actionsPath = path.join(__dirname, "../src/server/api/apple/actions.ts");
-    const { ActionHandler } = loadTypeScriptModule(actionsPath, {
-        "@server": { Server: () => server },
-        "@server/fileSystem": { FileSystem: fileSystem },
-        "@server/types": {},
-        "@server/api/apple/scripts": scripts,
-        "../../types": {},
-        "../../helpers/utils": helpers,
-        "./mappings": { tapbackUIMap: {} },
-        "../interfaces/messageInterface": { MessageInterface: {} },
-        "../../lib/logging/Loggable": { getLogger: () => logger }
-    });
+    const ActionHandler = loadActionHandler({ server, fileSystem, logger });
+    const resolutionFailures = [
+        async () => {
+            throw new Error("private-database-details");
+        },
+        async () => [[], 0],
+        async () => [[{ serviceName: null }], 1],
+        async () => [[{ serviceName: "unknown" }], 1]
+    ];
 
-    await ActionHandler.sendMessage("any;-;test-address", "test", null);
+    for (const getChats of resolutionFailures) {
+        server.iMessageRepo.getChats = getChats;
+        await assert.rejects(() => ActionHandler.sendMessage("any;-;test-address", "test", null), {
+            message: resolutionError
+        });
+    }
 
-    assert.deepEqual(chatQueries, [
-        {
-            chatGuid: "any;-;test-address",
-            withParticipants: false,
-            limit: 1
-        }
-    ]);
-    assert.equal(executedScripts.length, 2);
-    assert.match(executedScripts[1], /service type = RCS/);
-
-    server.iMessageRepo.getChats = async () => {
-        throw new Error("private-database-details");
-    };
-    await assert.rejects(
-        () => ActionHandler.sendMessage("any;-;test-address", "test", null),
-        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/
+    assert.equal(executedScripts.length, resolutionFailures.length);
+    assert.equal(
+        executedScripts.every(script => script.includes("set targetChat to")),
+        true
     );
-
-    assert.equal(executedScripts.length, 3);
     assert.equal(
         debugMessages.some(message => message.includes("private-database-details")),
         false
+    );
+    assert.deepEqual(
+        warnMessages,
+        resolutionFailures.map(() => resolutionError)
     );
     assert.equal(
         debugMessages.includes("Failed to resolve the fallback chat service; the fallback message will not be sent."),
         true
     );
-
-    server.iMessageRepo.getChats = async () => [[], 0];
-    await assert.rejects(
-        () => ActionHandler.sendMessage("any;-;test-address", "test", null),
-        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/
-    );
-    assert.equal(executedScripts.length, 4);
-
-    server.iMessageRepo.getChats = async () => [[{ serviceName: "unknown" }], 1];
-    await assert.rejects(
-        () => ActionHandler.sendMessage("any;-;test-address", "test", null),
-        /Unable to resolve a supported Messages service for this chat; the fallback message was not sent/
-    );
-    assert.equal(executedScripts.length, 5);
 });
