@@ -158,7 +158,12 @@ export class MessageSerializer {
             groupActionType: message.groupActionType,
             balloonBundleId: message.balloonBundleId,
             associatedMessageGuid: message.associatedMessageGuid,
-            associatedMessageType: message.associatedMessageType,
+            associatedMessageType: message.associatedMessageEmoji
+                ? (message.associatedMessageType === "3006" || message.associatedMessageType === "-emoji"
+                    ? `-${message.associatedMessageEmoji}`
+                    : message.associatedMessageEmoji)
+                : message.associatedMessageType,
+            associatedMessageEmoji: message.associatedMessageEmoji,
             expressiveSendStyleId: message.expressiveSendStyleId,
             threadOriginatorGuid: message.threadOriginatorGuid,
             hasPayloadData: !!message.payloadData

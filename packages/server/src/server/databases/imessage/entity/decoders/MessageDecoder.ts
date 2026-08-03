@@ -71,6 +71,7 @@ export class MessageDecoder {
             message.messageSource = entry.message_message_source;
             message.associatedMessageGuid = entry.message_associated_message_guid;
             message.associatedMessageType = entry.message_associated_message_type;
+            message.associatedMessageEmoji = entry.message_associated_message_emoji;
             message.balloonBundleId = entry.message_balloon_bundle_id;
             message.payloadData = convertAttributedBody(entry.message_payload_data);
             message.expressiveSendStyleId = entry.message_expressive_send_style_id;
