@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import { waitMs } from "@server/helpers/utils";
 import { Server } from "@server";
 import { FileSystem } from "@server/fileSystem";
@@ -122,10 +123,14 @@ export abstract class DylibPlugin extends Loggable {
                         restartOnNonZeroExit: false,
                         options: {
                             env: {
-                                DYLD_INSERT_LIBRARIES: this.dylibPath
+                                ...process.env,
+                                DYLD_INSERT_LIBRARIES: `${path.join(
+                                    path.dirname(this.dylibPath),
+                                    "ChatKitLoader.dylib"
+                                )}:${this.dylibPath}`
                             }
-                        },
-                    })
+                        }
+                    });
 
                     const promise = spawner.execute();
 
@@ -140,7 +145,9 @@ export abstract class DylibPlugin extends Loggable {
                     this.log.debug(`DYLIB exited on its own. Restarting...`);
                     this.dylibFailureCounter = 0;
                 } catch (ex: any) {
-                    this.log.debug(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`);
+                    this.log.debug(
+                        `Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`
+                    );
                     if (this.isStopping) {
                         return;
                     }
@@ -155,7 +162,9 @@ export abstract class DylibPlugin extends Loggable {
                     this.dylibFailureCounter += 1;
                     this.dylibLastErrorTime = Date.now();
                     if (this.dylibFailureCounter >= 5) {
-                        this.log.error(`Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`);
+                        this.log.error(
+                            `Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`
+                        );
                     }
                 }
             }
