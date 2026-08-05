@@ -8,7 +8,15 @@ import { Handle } from "@server/databases/imessage/entity/Handle";
 import { Chat } from "@server/databases/imessage/entity/Chat";
 import { Attachment } from "@server/databases/imessage/entity/Attachment";
 import { isEmpty, isNotEmpty, sanitizeStr } from "@server/helpers/utils";
-import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMonterey, isMinSierra, isMinVentura } from "@server/env";
+import { 
+    isMinBigSur,
+    isMinCatalina,
+    isMinHighSierra,
+    isMinMonterey,
+    isMinSierra,
+    isMinVentura,
+    isMinSequoia
+} from "@server/env";
 import { NSAttributedString } from "node-typedstream";
 import { AttributedBodyTransformer } from "@server/databases/transformers/AttributedBodyTransformer";
 import { AttributedBodyUtils } from "@server/utils/AttributedBodyUtils";
@@ -456,6 +464,16 @@ export class Message {
         })
     )
     associatedMessageType: string;
+
+    @conditional(
+        isMinSequoia,
+        Column({
+            name: "associated_message_emoji",
+            type: "text",
+            nullable: true
+        })
+    )
+    associatedMessageEmoji: string;
 
     @conditional(isMinHighSierra, Column({ name: "balloon_bundle_id", type: "text", nullable: true }))
     balloonBundleId: string;

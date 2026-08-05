@@ -85,15 +85,28 @@ export class PrivateApiMessage extends PrivateApiAction {
         const action = "send-reaction";
         this.throwForNoMissingFields(action, [chatGuid, selectedMessageGuid, reactionType]);
 
+        const isStandard = [
+            "love", "like", "dislike", "laugh", "emphasize", "question"
+        ].includes((reactionType as string).replace("-", "").toLowerCase());
+
+        const payload: Record<string, any> = {
+            chatGuid,
+            selectedMessageGuid,
+            reactionType,
+            partIndex: partIndex ?? 0
+        };
+
+        if (!isStandard) {
+            const isRemoved = (reactionType as string).startsWith("-");
+            const cleanEmoji = isRemoved ? (reactionType as string).substring(1) : (reactionType as string);
+            payload.reactionType = isRemoved ? "-emoji" : "emoji";
+            payload.reactionEmoji = cleanEmoji;
+        }
+
         const request = new TransactionPromise(TransactionType.MESSAGE);
         return this.sendApiMessage(
             action,
-            {
-                chatGuid,
-                selectedMessageGuid,
-                reactionType,
-                partIndex: partIndex ?? 0
-            },
+            payload,
             request
         );
     }
