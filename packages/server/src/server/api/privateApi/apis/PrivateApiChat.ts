@@ -5,6 +5,7 @@ import {
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
+import { v4 as uuidv4 } from "uuid";
 
 export class PrivateApiChat extends PrivateApiAction {
     tag = "PrivateApiChat";
@@ -28,6 +29,7 @@ export class PrivateApiChat extends PrivateApiAction {
     }): Promise<TransactionResult> {
         const action = "create-chat";
         this.throwForNoMissingFields(action, forceNew ? [addresses] : [addresses, message]);
+        const creationToken = forceNew ? uuidv4() : null;
 
         // Silent creation returns the chat GUID directly; creation with a first
         // message retains the existing message-GUID transaction behavior.
@@ -41,7 +43,8 @@ export class PrivateApiChat extends PrivateApiAction {
                 attributedBody,
                 effectId,
                 subject,
-                forceNew
+                forceNew,
+                creationToken
             },
             request
         );
