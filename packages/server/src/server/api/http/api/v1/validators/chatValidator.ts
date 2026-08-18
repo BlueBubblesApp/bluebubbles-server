@@ -48,6 +48,7 @@ export class ChatValidator {
         tempGuid: "string",
         effectId: "string",
         subject: "string",
+        forceNew: "boolean"
     };
 
     static async validateCreate(ctx: RouterContext, next: Next) {
