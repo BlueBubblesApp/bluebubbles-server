@@ -5,6 +5,7 @@ import {
     TransactionType
 } from "@server/managers/transactionManager/transactionPromise";
 import { PrivateApiAction } from ".";
+import { v4 as uuidv4 } from "uuid";
 
 export class PrivateApiChat extends PrivateApiAction {
     tag = "PrivateApiChat";
@@ -15,20 +16,24 @@ export class PrivateApiChat extends PrivateApiAction {
         service = "iMessage",
         attributedBody = null,
         effectId = null,
-        subject = null
+        subject = null,
+        forceNew = false
     }: {
         addresses: string[];
-        message: string;
+        message?: string | null;
         service?: "iMessage" | "SMS";
         attributedBody?: Record<string, any> | null;
         effectId?: string;
         subject?: string;
+        forceNew?: boolean;
     }): Promise<TransactionResult> {
         const action = "create-chat";
-        this.throwForNoMissingFields(action, [addresses, message]);
+        this.throwForNoMissingFields(action, forceNew ? [addresses] : [addresses, message]);
+        const creationToken = forceNew ? uuidv4() : null;
 
-        // Yes this is correct. The transaction returns a message GUID, not a chat GUID
-        const request = new TransactionPromise(TransactionType.MESSAGE);
+        // Silent creation returns the chat GUID directly; creation with a first
+        // message retains the existing message-GUID transaction behavior.
+        const request = new TransactionPromise(message ? TransactionType.MESSAGE : TransactionType.CHAT);
         return this.sendApiMessage(
             "create-chat",
             {
@@ -37,7 +42,9 @@ export class PrivateApiChat extends PrivateApiAction {
                 service,
                 attributedBody,
                 effectId,
-                subject
+                subject,
+                forceNew,
+                creationToken
             },
             request
         );

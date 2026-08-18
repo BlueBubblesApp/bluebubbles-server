@@ -144,14 +144,16 @@ export class ChatInterface {
         service = "iMessage",
         attributedBody = null,
         subject = null,
-        effectId = null
+        effectId = null,
+        forceNew = false
     }: {
         addresses: string[];
-        message: string;
+        message: string | null;
         service: "iMessage" | "SMS";
         attributedBody?: Record<string, any> | null;
         subject?: string;
         effectId?: string;
+        forceNew?: boolean;
     }): Promise<Chat> {
         checkPrivateApiStatus();
 
@@ -161,10 +163,35 @@ export class ChatInterface {
             service,
             attributedBody,
             subject,
-            effectId
+            effectId,
+            forceNew
         });
         if (isEmpty(result.identifier)) {
             throw new Error("Failed to create chat via the Private API!");
+        }
+
+        if (isEmpty(message)) {
+            const chatGuid = result.identifier;
+            Server().log(`Verifying silent Chat creation for Chat GUID: ${chatGuid}`, "debug");
+            const maxWaitMs = 3000;
+            const chat = await resultAwaiter({
+                maxWaitMs,
+                initialWaitMs: 250,
+                getData: async _ => {
+                    const [chats] = await Server().iMessageRepo.getChats({
+                        chatGuid,
+                        withParticipants: true
+                    });
+                    return chats[0] ?? null;
+                },
+                dataLoopCondition: data => isEmpty(data)
+            });
+
+            if (!chat) {
+                throw new Error(`Silent chat ${chatGuid} was returned by IMCore but did not persist to chat.db.`);
+            }
+
+            return chat;
         }
 
         const messageGuid = result.identifier;
@@ -287,7 +314,8 @@ export class ChatInterface {
         tempGuid,
         attributedBody = null,
         subject = null,
-        effectId = null
+        effectId = null,
+        forceNew = false
     }: {
         addresses: string[];
         message?: string | null;
@@ -297,17 +325,26 @@ export class ChatInterface {
         attributedBody?: Record<string, any> | null;
         subject?: string;
         effectId?: string;
+        forceNew?: boolean;
     }): Promise<Chat> {
         // Make sure we are executing this on a group chat
         if (isEmpty(addresses)) {
             throw new Error("No addresses provided!");
         }
 
+        if (forceNew && method !== "private-api") {
+            throw new Error("Forced chat creation requires the Private API!");
+        } else if (forceNew && addresses.length < 2) {
+            throw new Error("Forced chat creation requires at least two addresses!");
+        } else if (forceNew && service !== "iMessage") {
+            throw new Error("Forced chat creation is only supported for iMessage groups!");
+        }
+
         if (method == 'apple-script' && isMinBigSur && addresses.length > 1) {
             throw new Error("Cannot create group chats on macOS Big Sur or newer!");
         } else if (method == 'apple-script' && isMinBigSur && isEmpty(message)) {
             throw new Error("A message is required when creating chats on macOS Big Sur or newer!");
-        } else if (method === "private-api" && isEmpty(message)) {
+        } else if (method === "private-api" && isEmpty(message) && !forceNew) {
             throw new Error("A message is required when creating chats with the Private API!");
         }
 
@@ -320,7 +357,8 @@ export class ChatInterface {
                 service,
                 attributedBody,
                 subject,
-                effectId
+                effectId,
+                forceNew
             });
         } else {
             return await ChatInterface.createWithAppleScript({

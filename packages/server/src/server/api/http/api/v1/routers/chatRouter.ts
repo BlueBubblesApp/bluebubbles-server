@@ -200,7 +200,8 @@ export class ChatRouter {
             tempGuid,
             subject,
             effectId,
-            attributedBody
+            attributedBody,
+            forceNew
         } = body;
 
         const chat = await ChatInterface.create({
@@ -211,7 +212,8 @@ export class ChatRouter {
             tempGuid,
             subject,
             effectId,
-            attributedBody
+            attributedBody,
+            forceNew
         });
         if (!chat) throw new IMessageError({ error: "Failed to create chat!" });
 
