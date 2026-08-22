@@ -1,4 +1,37 @@
-import { FindMyItem, FindMyDevice } from "@server/api/lib/findmy/types";
+import type { FindMyItem, FindMyDevice, FindMyFriendLocation } from "@server/api/lib/findmy/types";
+
+const FIND_MY_FRIEND_STATUSES = ["legacy", "live", "shallow"] as const;
+
+const isFindMyFriendStatus = (value: unknown): value is FindMyFriendLocation["status"] => {
+    return FIND_MY_FRIEND_STATUSES.some(status => status === value);
+};
+
+const normalizeOptionalString = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const trimmedValue = value.trim();
+    return trimmedValue.length > 0 ? trimmedValue : null;
+};
+
+const normalizeOptionalNumber = (value: unknown): number | null => {
+    if (value == null || (typeof value === "string" && value.trim().length === 0)) return null;
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const normalizeCoordinatePair = (value: unknown): [number, number] | null => {
+    if (!Array.isArray(value)) return null;
+
+    const latitude = normalizeOptionalNumber(value[0]);
+    const longitude = normalizeOptionalNumber(value[1]);
+    if (latitude == null || longitude == null) return null;
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
+    return [latitude, longitude];
+};
+
+const normalizeLocationTitle = (value: unknown): string | null => {
+    if (!Array.isArray(value)) return normalizeOptionalString(value);
+    return value.map(normalizeOptionalString).find(candidate => candidate != null) ?? null;
+};
 
 export const getFindMyItemModelDisplayName = (item: FindMyItem): string => {
     if (item?.productType?.type === "b389") return "AirTag";
@@ -31,7 +64,6 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
     deviceClass: item?.productType?.type,
     crowdSourcedLocation: item?.crowdSourcedLocation,
 
-    // Extras from FindMyItem
     identifier: item?.identifier,
     productIdentifier: item?.productIdentifier,
     role: item?.role,
@@ -40,5 +72,39 @@ export const transformFindMyItemToDevice = (item: FindMyItem): FindMyDevice => (
     groupIdentifier: item?.groupIdentifier,
     groupName: item.groupName,
     isAppleAudioAccessory: item?.isAppleAudioAccessory,
-    capabilities: item?.capabilities,
+    capabilities: item?.capabilities
 });
+
+export const normalizeFindMyFriendLocation = (location: unknown): FindMyFriendLocation => {
+    const untrustedLocation =
+        location != null && typeof location === "object" && !Array.isArray(location)
+            ? (location as Record<string, unknown>)
+            : {};
+    const untrustedStatus = untrustedLocation.status;
+    const status = isFindMyFriendStatus(untrustedStatus) ? untrustedStatus : "legacy";
+
+    return {
+        handle: normalizeOptionalString(untrustedLocation.handle),
+        coordinates: normalizeCoordinatePair(untrustedLocation.coordinates),
+        long_address: normalizeOptionalString(untrustedLocation.long_address),
+        short_address: normalizeOptionalString(untrustedLocation.short_address),
+        subtitle: normalizeOptionalString(untrustedLocation.subtitle),
+        title: normalizeLocationTitle(untrustedLocation.title),
+        last_updated: normalizeOptionalNumber(untrustedLocation.last_updated),
+        is_locating_in_progress:
+            untrustedLocation.is_locating_in_progress === true || untrustedLocation.is_locating_in_progress === 1
+                ? 1
+                : 0,
+        status,
+        location_type: normalizeOptionalNumber(untrustedLocation.location_type),
+        horizontal_accuracy: normalizeOptionalNumber(untrustedLocation.horizontal_accuracy),
+        vertical_accuracy: normalizeOptionalNumber(untrustedLocation.vertical_accuracy),
+        speed: normalizeOptionalNumber(untrustedLocation.speed),
+        altitude: normalizeOptionalNumber(untrustedLocation.altitude)
+    };
+};
+
+export const normalizeFindMyFriendLocations = (locations: unknown): FindMyFriendLocation[] => {
+    if (!Array.isArray(locations)) return [];
+    return locations.map(normalizeFindMyFriendLocation).filter(location => location.handle != null);
+};
