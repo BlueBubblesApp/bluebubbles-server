@@ -7,3 +7,45 @@ The `<Type>Helper.md5` files within each macOS directory contain a single string
 **GitHub Release Reference**: https://github.com/BlueBubblesApp/BlueBubbles-Server-Helper/releases
 
 You can also check the current versions of these bundles by opening the `version.txt` file.
+
+## Find My helper artifact
+
+`BlueBubblesFindMyHelper.dylib` is built from the companion
+`bluebubbles-helper` Find My target. The server enables it on macOS 15 or later
+only when both Private API and **Open FindMy App on Startup** are enabled.
+Older supported macOS releases continue to route Friends requests through the
+Messages helper when that private API is available.
+
+On macOS 15 or later, the Devices GET route reads the server's latest helper
+snapshot without changing the Find My view. The explicit Devices refresh route
+opens `findmy://devices`, waits for the dedicated helper, and reads the
+app-owned FMIP device collection. It does not use Accessibility clicks,
+keyboard events, visible-cell scraping, or fixed view-loading delays.
+
+The artifact checksum must match its `.md5` file, it must contain `x86_64` and
+`arm64` slices, and it must use `@rpath/BlueBubblesFindMyHelper.dylib` as its
+install name. Every server build checks this contract through:
+
+```sh
+npm run verify:findmy-helper
+```
+
+Automation permission requests for Find My and System Events happen only when
+the Find My integration is started or its Accessibility fallback is explicitly
+used. Normal server startup does not prompt for unrelated Automation access.
+
+## Find My release smoke test
+
+TCC Automation grants are tied to the signed application identity. Before a
+release, test a normally signed package on a user account without an existing
+BlueBubbles Automation grant:
+
+1. Enable Private API and **Open FindMy App on Startup**.
+2. Confirm macOS requests Find My and System Events Automation access for
+   BlueBubbles.
+3. Confirm the helper registers as `com.apple.findmy` and Find My can be hidden.
+4. Call the Friends GET, refresh, and GET routes and verify that all three
+   succeed without helper, framing, transaction, or permission errors.
+5. Call the Devices GET, refresh, and GET routes. Confirm the first GET does not
+   switch Find My views and the refreshed response includes both online and
+   offline devices without converting missing locations to `(0, 0)`.
