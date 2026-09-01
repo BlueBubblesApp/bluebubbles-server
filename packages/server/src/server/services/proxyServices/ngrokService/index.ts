@@ -2,11 +2,10 @@ import { isEmpty, safeTrim } from "@server/helpers/utils";
 import path from "path";
 import fs from "fs";
 import { Server } from "@server";
-import { FileSystem } from "@server/fileSystem";
+import { FileSystem, userHomeDir } from "@server/fileSystem";
 import { connect, disconnect, kill, authtoken, Ngrok, upgradeConfig } from "ngrok";
 import { Proxy } from "../proxy";
 import { app } from "electron";
-import { userHomeDir } from "@server/fileSystem";
 
 // const sevenHours = 1000 * 60 * 60 * 7;  // This is the old ngrok timeout
 const oneHour45 = 1000 * 60 * (60 + 45); // This is the new ngrok timeout
@@ -15,7 +14,7 @@ export class NgrokService extends Proxy {
     tag = "NgrokService";
 
     static get daemonDir() {
-        return path.join(FileSystem.resources, "macos", "daemons", "ngrok", (process.arch === "arm64") ? "arm64" : "x86");
+        return path.join(FileSystem.resources, "macos", "daemons", "ngrok", process.arch === "arm64" ? "arm64" : "x86");
     }
 
     constructor() {
@@ -31,9 +30,7 @@ export class NgrokService extends Proxy {
         // Check for any errors or other restart cases
         if (log.includes("lvl=error") || log.includes("lvl=crit")) {
             if (
-                log.includes(
-                    "The authtoken you specified does not look like a proper ngrok tunnel authtoken"
-                ) ||
+                log.includes("The authtoken you specified does not look like a proper ngrok tunnel authtoken") ||
                 log.includes("The authtoken you specified is properly formed, but it is invalid")
             ) {
                 this.log.error(`Ngrok Auth Token is invalid, removing...!`);
@@ -53,11 +50,13 @@ export class NgrokService extends Proxy {
             await Server().repo.setConfig("ngrok_custom_domain", "");
             this.log.error(
                 "Failed to use custom Ngrok subdomain. " +
-                "You must reserve a subdomain on the Ngrok website! " +
-                "Removing custom subdomain...");
+                    "You must reserve a subdomain on the Ngrok website! " +
+                    "Removing custom subdomain..."
+            );
         } else if (log.includes("socket hang up") || log.includes("[object Object]")) {
             this.log.info(
-                `Failed to restart ${this.opts.name}! Socket hang up detected. Performing full server restart...`);
+                `Failed to restart ${this.opts.name}! Socket hang up detected. Performing full server restart...`
+            );
             Server().relaunch();
         } else if (err?.body?.details?.err) {
             this.log.error(`Failed to restart ${this.opts.name}! Error: ${err?.body?.details?.err}`);

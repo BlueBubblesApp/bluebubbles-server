@@ -58,7 +58,8 @@ export const UpdatableStatBox = (
         autoUpdate = true,
         updateInterval = 60000,
         delay = 0,
-        pastDays = null
+        pastDays = null,
+        pastHours = null
     }:
     {
         title: string,
@@ -73,6 +74,7 @@ export const UpdatableStatBox = (
         updateInterval?: number,
         delay?: number,
         pastDays?: number | null
+        pastHours?: number | null
     }
 ): JSX.Element => {
     const dispatch = useAppDispatch();
@@ -93,6 +95,9 @@ export const UpdatableStatBox = (
         if (pastDays && pastDays > 0) {
             if (!finalArgs) finalArgs = {};
             finalArgs.after = new Date(new Date().getTime() - (pastDays * 86_400_000));
+        } else if (pastHours && pastHours > 0) {
+            if (!finalArgs) finalArgs = {};
+            finalArgs.after = new Date(new Date().getTime() - (pastHours * 3_600_000));
         }
 
         ipcRenderer.invoke(ipcEvent, finalArgs).then(async (value) => {

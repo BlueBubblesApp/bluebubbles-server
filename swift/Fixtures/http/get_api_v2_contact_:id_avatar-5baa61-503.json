@@ -1,0 +1,35 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/contact/882BB792-0AD7-4F41-9C99-2E5F2BE8AEDF/avatar?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 503,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Server Error",
+        "status": 503,
+        "error": {
+          "message": "contact access has not been granted to this server",
+          "type": "Server Error"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:14:22.800Z"
+}

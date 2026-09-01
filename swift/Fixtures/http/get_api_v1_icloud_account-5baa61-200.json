@@ -1,0 +1,72 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/icloud/account?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Successfully fetched account info!",
+        "data": {
+          "account_name": "Zach Shames",
+          "vetted_aliases": [
+            {
+              "Alias": "person@example.com",
+              "Status": 3,
+              "IsUserVisible": true
+            },
+            {
+              "Alias": "person@example.com",
+              "Status": 3,
+              "IsUserVisible": true
+            },
+            {
+              "Alias": "person@example.com",
+              "Status": 3,
+              "IsUserVisible": true
+            }
+          ],
+          "aliases": [
+            {
+              "Alias": "person@example.com",
+              "Status": 3,
+              "IsUserVisible": true
+            },
+            {
+              "Alias": "person@example.com",
+              "Status": 3,
+              "IsUserVisible": true
+            },
+            {
+              "Alias": "person@example.com",
+              "Status": 3,
+              "IsUserVisible": true
+            }
+          ],
+          "active_alias": "person@example.com",
+          "sms_forwarding_enabled": false,
+          "apple_id": "person@example.com",
+          "sms_forwarding_capable": false,
+          "login_status_message": "Connected"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:10.443Z"
+}

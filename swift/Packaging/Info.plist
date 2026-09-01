@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Template. __VERSION__ and __BUILD__ are substituted by build-app.sh from Packaging/VERSION,
+    so the tag, the bundle, and what GET /api/v1/server/info reports cannot disagree.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>BlueBubbles</string>
+    <key>CFBundleDisplayName</key>
+    <string>BlueBubbles</string>
+    <key>CFBundleExecutable</key>
+    <string>BlueBubbles</string>
+    <!--
+        Unchanged from the Electron build. This identifier is what TCC keys its permission
+        grants on, so changing it would silently revoke every existing user's Full Disk
+        Access, Automation and Contacts approvals and require them to grant all three again.
+    -->
+    <key>CFBundleIdentifier</key>
+    <string>com.BlueBubbles.BlueBubbles-Server</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__BUILD__</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+
+    <!--
+        macOS 14. Raised from the Electron build's 10.14 deliberately: the Swift server
+        targets Ventura and newer, and Hummingbird 2's availability macros gate its entire
+        API to macOS 14. See DEPENDENCIES.md.
+    -->
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+
+    <!--
+        Shown verbatim in the permission prompts. Text that explains WHY is the difference
+        between a user granting Full Disk Access and cancelling it.
+    -->
+    <key>NSContactsUsageDescription</key>
+    <string>BlueBubbles reads your contacts so messages show names and photos instead of phone numbers.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>BlueBubbles controls Messages to send messages on your behalf.</string>
+    <key>NSSystemAdministrationUsageDescription</key>
+    <string>BlueBubbles needs this to manage its own background service.</string>
+
+    <!--
+        Sparkle. SUPublicEDKey is substituted at build time from the release keypair; a build
+        without it simply cannot auto-update, which is correct for a local build.
+    -->
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/BlueBubblesApp/bluebubbles-server/master/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>__SPARKLE_PUBLIC_KEY__</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+
+    <!--
+        A menu-bar application: no Dock icon, no menu bar of its own. LSUIElement is what
+        makes that so, and it is why the server can run all day without cluttering the Dock.
+    -->
+    <key>LSUIElement</key>
+    <true/>
+</dict>
+</plist>

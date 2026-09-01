@@ -60,14 +60,41 @@ export class CertificateService extends Loggable {
             try {
                 const pem = fs.readFileSync(CertificateService.certPath, { encoding: "utf-8" });
                 const now = new Date().getTime();
-                if (pem.includes("BEGIN EC PRIVATE KEY")) {
-                    const cert = new x509.X509Certificate(pem);
-                    if (now > cert.notAfter.getTime()) {
-                        shouldRefresh = true;
+
+                // Try multiple methods to read the certificate based on its type
+                try {
+                    if (pem.includes("BEGIN EC PRIVATE KEY") || pem.includes("BEGIN CERTIFICATE")) {
+                        // Use @peculiar/x509 for OID certificates
+                        const cert = new x509.X509Certificate(pem);
+                        if (now > cert.notAfter.getTime()) {
+                            shouldRefresh = true;
+                        }
+                    } else {
+                        // Use node-forge for RSA certificates
+                        const cert = pki.certificateFromPem(pem);
+                        if (now > cert.validity.notAfter.getTime()) {
+                            shouldRefresh = true;
+                        }
                     }
-                } else {
-                    const cert = pki.certificateFromPem(pem);
-                    if (now > cert.validity.notAfter.getTime()) {
+                } catch (certError: any) {
+                    // If the first method fails, try the alternative
+                    try {
+                        const cert = pem.includes("BEGIN CERTIFICATE")
+                            ? new x509.X509Certificate(pem)
+                            : pki.certificateFromPem(pem);
+
+                        const expirationTime =
+                            cert instanceof x509.X509Certificate
+                                ? cert.notAfter.getTime()
+                                : cert.validity.notAfter.getTime();
+
+                        if (now > expirationTime) {
+                            shouldRefresh = true;
+                        }
+                    } catch (fallbackError: any) {
+                        // If both methods fail, log and refresh
+                        log.warn("Failed to read certificate with both methods");
+                        log.warn(`Error: ${fallbackError?.message ?? fallbackError ?? "Unknown Error"}`);
                         shouldRefresh = true;
                     }
                 }
@@ -107,7 +134,8 @@ export class CertificateService extends Loggable {
 
         if (
             prevConfig.password === nextConfig.password &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !== onlyAlphaNumeric(ProxyServices.DynamicDNS) &&
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() !==
+                onlyAlphaNumeric(ProxyServices.DynamicDNS) &&
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase()
         )
@@ -120,7 +148,8 @@ export class CertificateService extends Loggable {
         } else if (
             onlyAlphaNumeric(prevConfig.proxy_service as string).toLowerCase() !==
                 onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() &&
-            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() === onlyAlphaNumeric(ProxyServices.DynamicDNS)
+            onlyAlphaNumeric(nextConfig.proxy_service as string).toLowerCase() ===
+                onlyAlphaNumeric(ProxyServices.DynamicDNS)
         ) {
             log.info("Proxy service changed to Dynamic DNS. Refreshing certificate");
             CertificateService.refreshCertificate();

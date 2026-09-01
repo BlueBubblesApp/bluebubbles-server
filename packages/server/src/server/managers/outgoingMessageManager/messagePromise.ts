@@ -146,6 +146,10 @@ export class MessagePromise {
             // If this was supposed to be an attachment, but there are no attachments, there's no match
             if ((message.attachments ?? []).length === 0) return false;
 
+            // Ignore messages that existed before this promise started waiting, otherwise we can
+            // match a new send against an old message that happens to share an attachment filename
+            if (this.sentAt > message.dateCreated.getTime()) return false;
+
             // Iterate over the attachments and check if any of the transfer names match the one we are awaiting on
             for (const a of message.attachments) {
                 // If the transfer names match, congratz we have a match.

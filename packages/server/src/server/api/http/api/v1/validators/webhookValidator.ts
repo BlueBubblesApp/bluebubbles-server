@@ -6,12 +6,11 @@ import { BadRequest } from "../responses/errors";
 import { webhookEventOptions } from "@server/api/http/constants";
 
 export class WebhookValidator {
-
     static webhookValues = webhookEventOptions.map(e => e.value);
 
     static getWebhookRules = {
         name: "string",
-        id: "number",
+        id: "number"
     };
 
     static async validateGetWebhooks(ctx: RouterContext, next: Next) {
@@ -30,7 +29,7 @@ export class WebhookValidator {
         const { url, events } = ctx.request.body;
         if (url.length === 0) {
             throw new BadRequest({ error: "Webhook URL is required!" });
-        } else if (!url.startsWith('http')) {
+        } else if (!url.startsWith("http")) {
             throw new BadRequest({ error: "Webhook URL must include an HTTP scheme!" });
         }
 
@@ -44,7 +43,9 @@ export class WebhookValidator {
             // Find the webhook value in the webhook events
             const webhookEvent = webhookEventOptions.find(e => e.value === event);
             if (!webhookEvent) {
-                throw new BadRequest({ error: `Invalid webhook event: ${event}! Webhook must be one of: ${WebhookValidator.webhookValues}` });
+                throw new BadRequest({
+                    error: `Invalid webhook event: ${event}! Webhook must be one of: ${WebhookValidator.webhookValues}`
+                });
             }
 
             // Update the event to the label

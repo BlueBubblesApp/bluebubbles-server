@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BlueBubbles API Reference</title>
+
+    <!--
+      The page is offline and must stay that way. `connect-src 'none'` is the load-bearing
+      directive: Scalar's quickstart configures `proxyUrl: 'https://proxy.scalar.com'` to
+      dodge CORS on its built-in client, and this API authenticates with the server password.
+      A relay through a third party is not a thing to leave one config key away.
+
+      The client is also switched off below, so this is the second of two locks on the same
+      door. Belt and braces on purpose: the config is a line someone can delete while
+      copying a newer Scalar quickstart, and the CSP is not.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+               script-src 'self' 'unsafe-inline' 'unsafe-eval';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data:;
+               font-src 'self' data:;
+               connect-src 'none'"
+    />
+
+    <style>
+      html,
+      body,
+      #app {
+        height: 100%;
+        margin: 0;
+      }
+      /* Shown only if the bundle fails to load or the spec never arrived. Styled inline
+         because a stylesheet that failed to load cannot report that it failed to load. */
+      #fallback {
+        font: 13px -apple-system, system-ui, sans-serif;
+        color: #888;
+        padding: 2rem;
+      }
+      /* `withDefaultFonts: false` below stops Scalar fetching Inter from
+         fonts.scalar.com, which leaves it with no font at all rather than a fallback.
+         This supplies one, and the system stack is what the rest of the app renders in. */
+      :root {
+        --scalar-font: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        --scalar-font-code: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      /* Scalar's "Generate MCP" affordance, which links out to their platform.
+         `agent: { disabled: true }` removes "Ask AI" but NOT this, and 1.67.0 exposes no
+         config key for it — so it comes out with CSS. This is the one piece of the page a
+         version bump can silently undo, which is why it is a Scalar-namespaced class
+         rather than one of the utility classes beside it: `.scalar-mcp-layer` is a name
+         they chose, so it is the most stable hook on offer. */
+      .scalar-mcp-layer {
+        display: none !important;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app"><p id="fallback">Loading the API reference…</p></div>
+
+    <script src="scalar.standalone.js"></script>
+    <script>
+      (function () {
+        var mount = document.getElementById("app");
+
+        function fail(message) {
+          mount.innerHTML = '<p id="fallback"></p>';
+          mount.firstChild.textContent = message;
+        }
+
+        // Injected by the host as a WKUserScript at document start, so it is always set
+        // before this runs. If it is missing, the Swift side failed to generate — say so
+        // rather than rendering an empty reference that looks like a server with no routes.
+        var spec = window.__BB_OPENAPI_SPEC__;
+        if (!spec) {
+          fail("The API document was not provided by the app.");
+          return;
+        }
+        if (!window.Scalar || !window.Scalar.createApiReference) {
+          fail("The API reference bundle failed to load.");
+          return;
+        }
+
+        window.Scalar.createApiReference("#app", {
+          content: spec,
+
+          // NO proxyUrl. See the CSP note above.
+
+          // OFF BY DEFAULT IN NAME ONLY — every one of these ships enabled and reaches the
+          // network, which is not what an offline viewer embedded in a desktop app should
+          // do. Measured against 1.67.0 with the CSP above reporting each violation:
+          //
+          //   telemetry        defaults to TRUE.
+          //   withDefaultFonts defaults to TRUE — 14 requests to fonts.scalar.com.
+          //   agent.disabled   "Ask AI" and "Generate MCP", which post to
+          //                    api.scalar.com. The switch is `agent: { disabled: true }`
+          //                    on the DOCUMENT config — there is also a top-level
+          //                    `agentEnabled` and setting it does nothing, which is
+          //                    exactly the sort of thing to re-check on a version bump.
+          //   showDeveloperTools defaults to "localhost", so a Share/Deploy toolbar
+          //                    appears exactly when the server is local, which is always.
+          //
+          // The CSP blocks all of it regardless. These keys are what stops the UI
+          // advertising features that then fail.
+          telemetry: false,
+          withDefaultFonts: false,
+          agent: { disabled: true },
+          showDeveloperTools: "never",
+
+          // Read-only reference, not a request console. Removing the client is what makes
+          // the missing proxy a non-issue rather than a broken feature: with the client
+          // present and no proxy, every "Send" would fail on CORS and read as a bug.
+          hideClientButton: true,
+          hideTestRequestButton: true,
+
+          // The document is generated in-process and never written to disk, so there is no
+          // file for a download button to point at. (`hideDownloadButton` is the deprecated
+          // spelling and warns at runtime; this is the current one.)
+          documentDownloadType: "none",
+
+          showSidebar: true,
+          darkMode: window.matchMedia("(prefers-color-scheme: dark)").matches,
+        });
+      })();
+    </script>
+  </body>
+</html>

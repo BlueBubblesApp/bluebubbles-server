@@ -39,6 +39,7 @@ export const HomeLayout = (): JSX.Element => {
     const qrCode: any = buildQrData(password, address);
     const computerId = useAppSelector(state => state.config.computer_id);
     const iMessageEmail = useAppSelector(state => state.config.detected_imessage);
+    const version = useAppSelector(state => state.config.server_version);
     const [statDays, setStatDays] = useState(180);
 
     // Only warn if the URL is http://, and not a private IP
@@ -57,6 +58,7 @@ export const HomeLayout = (): JSX.Element => {
                 <Stack direction='column' p={5}>
                     <Flex flexDirection='row' justifyContent='flex-start' alignItems='center'>
                         <Text fontSize='2xl'>Server Information</Text>
+                        <Text fontSize='sm' ml={2} color='gray.500'>(v{ version })</Text>
                         <Popover trigger='hover'>
                             <PopoverTrigger>
                                 <Box ml={2} _hover={{ color: 'brand.primary', cursor: 'pointer' }}>

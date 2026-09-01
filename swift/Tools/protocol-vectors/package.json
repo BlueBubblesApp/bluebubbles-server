@@ -1,0 +1,1 @@
+{"name":"ref","private":true,"dependencies":{"engine.io-parser":"^5.2.3","node-typedstream":"^1.4.1","socket.io-parser":"^4.2.7"}}

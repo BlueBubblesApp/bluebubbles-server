@@ -1,0 +1,88 @@
+name: CLA
+
+# Gates pull requests that touch the Swift server on a signed Contributor License
+# Agreement. See swift/CLA.md for the agreement itself and why it exists: the Swift
+# server is dual-licensed (PolyForm Small Business for everyone, negotiated
+# commercial terms above the size threshold), and we cannot lawfully include a
+# contributor's code in a commercial license unless they granted us the right to
+# sublicense it. A DCO would not be enough — it certifies provenance, not
+# relicensing rights.
+#
+# SCOPE: swift/** only. The Electron server in packages/ is Apache 2.0, stays
+# Apache 2.0, and needs no CLA — contributors there are unaffected, which is the
+# whole reason for the paths filter below.
+#
+# Contributors sign once, by comment, and are never asked again. Signatures are
+# recorded on the cla-signatures branch.
+
+on:
+  # pull_request_target (not pull_request) is REQUIRED here: the action must write
+  # the signature file and post comments, which needs a token with write access,
+  # and pull_request grants forks a read-only token. The standing danger with
+  # pull_request_target is that it runs with write permissions in the base repo's
+  # context, so checking out and executing PR code would hand a fork our token.
+  # This workflow never checks out the PR — no actions/checkout, no build step —
+  # so that class of attack does not apply. Do not add one.
+  pull_request_target:
+    types: [opened, synchronize, reopened, closed]
+    branches: [master, development]
+    paths:
+      - 'swift/**'
+
+  # How a contributor actually signs: by commenting the exact sentence configured
+  # in custom-pr-sign-comment below. Comment events cannot be filtered by path,
+  # so this fires repo-wide and the action decides whether the PR is relevant.
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: cla-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cla:
+    name: Check CLA signature
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      actions: write
+      contents: write # writes the signature file to the signatures branch
+      pull-requests: write
+      statuses: write
+
+    steps:
+      - name: CLA check
+        # Skip the noise: only run on comment events that are actually the signing
+        # phrase, and on PR events other than a plain close.
+        if: >
+          (github.event.issue.pull_request
+            && contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA'))
+          || github.event_name == 'pull_request_target'
+        uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Signatures live on a dedicated orphan-ish branch so they never appear in
+          # normal diffs or trigger the Swift CI workflows.
+          branch: cla-signatures
+          path-to-signatures: signatures/v1/cla.json
+
+          # Shown to contributors in the bot's comment. Must be a URL, not a path.
+          path-to-document: https://github.com/BlueBubblesApp/BlueBubbles-Server/blob/master/swift/CLA.md
+
+          custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
+          custom-notsigned-prcomment: >
+            Thanks for the pull request! Because it touches `swift/`, we need a
+            signed Contributor License Agreement before it can be merged. Please
+            read the CLA and, if you agree, reply to this pull request with
+            exactly:
+          custom-allsigned-prcomment: 'All contributors have signed the CLA. Thanks!'
+
+          # Maintainers and bots. Anyone here is never prompted — keep it to people
+          # whose rights are already settled by other means.
+          allowlist: zlshames,dependabot[bot],dependabot,github-actions[bot],*[bot]
+
+          # Contributions authored by an organization are covered by a signed
+          # CLA-ENTITY.md handled over email, so those accounts get added to the
+          # allowlist above rather than signing individually.

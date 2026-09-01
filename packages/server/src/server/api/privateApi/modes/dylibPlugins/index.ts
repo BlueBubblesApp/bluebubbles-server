@@ -84,84 +84,89 @@ export abstract class DylibPlugin extends Loggable {
         this.dylibFailureCounter = 0;
         this.dylibLastErrorTime = 0;
 
-        // If there are 5 failures in a row, we'll stop trying to start it
-        const parentPath = this.parentProcessPath;
-        if (!parentPath) {
-            throw new Error(`Unable to locate ${this.name} parent process!`);
-        }
+        // Register the "client-registered" listener once for this injection attempt,
+        // rather than once per retry loop iteration, and always remove it when we're
+        // done so it doesn't accumulate on the long-lived PrivateApiService instance.
+        const onClientRegistered = (info: any) => {
+            if (info?.process !== this.bundleIdentifier) return;
+            onSuccessfulStart?.();
+        };
+        Server().privateApi.on("client-registered", onClientRegistered);
 
-        while (this.dylibFailureCounter < 5) {
-            try {
-                // Stop the running Messages app
-                await this.stopParentProcess();
-                await waitMs(1000);
+        try {
+            // If there are 5 failures in a row, we'll stop trying to start it
+            const parentPath = this.parentProcessPath;
+            if (!parentPath) {
+                throw new Error(`Unable to locate ${this.name} parent process!`);
+            }
 
-                // Execute shell command to start the dylib.
-                // eslint-disable-next-line max-len
-                if (!this.isEnabled || this.isStopping) {
-                    this.isInjecting = false;
-                    return;
-                }
+            while (this.dylibFailureCounter < 5) {
+                try {
+                    // Stop the running Messages app
+                    await this.stopParentProcess();
+                    await waitMs(1000);
 
-                const spawner = new ProcessSpawner({
-                    command: this.parentProcessPath,
-                    args: [],
-                    verbose: true,
-                    logTag: this.parentApp,
-                    storeOutput: false,
-                    waitForExit: true,
-                    restartOnNonZeroExit: false,
-                    options: {
-                        env: {
-                            DYLD_INSERT_LIBRARIES: this.dylibPath
-                        }
-                    },
-                })
+                    // Execute shell command to start the dylib.
+                    // eslint-disable-next-line max-len
+                    if (!this.isEnabled || this.isStopping) {
+                        return;
+                    }
 
-                const promise = spawner.execute();
+                    const spawner = new ProcessSpawner({
+                        command: this.parentProcessPath,
+                        args: [],
+                        verbose: true,
+                        logTag: this.parentApp,
+                        storeOutput: false,
+                        waitForExit: true,
+                        restartOnNonZeroExit: false,
+                        options: {
+                            env: {
+                                DYLD_INSERT_LIBRARIES: this.dylibPath
+                            }
+                        },
+                    })
 
-                // Hide the app after 5 seconds
-                setTimeout(() => {
-                    this.hideApp();
-                }, 5000);
+                    const promise = spawner.execute();
 
-                Server().privateApi.on("client-registered", info => {
-                    if (info?.process !== this.bundleIdentifier) return;
-                    onSuccessfulStart();
-                });
+                    // Hide the app after 5 seconds
+                    setTimeout(() => {
+                        this.hideApp();
+                    }, 5000);
 
-                await promise;
+                    await promise;
 
-                // If it gets here, the dylib exited on its own (code: 0)
-                this.log.debug(`DYLIB exited on its own. Restarting...`);
-                this.dylibFailureCounter = 0;
-            } catch (ex: any) {
-                this.log.debug(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`);
-                if (this.isStopping) {
-                    this.isInjecting = false;
-                    return;
-                }
-
-                // If the last time we errored was more than 15 seconds ago, reset the counter.
-                // This would indicate that the dylib was running, but then crashed.
-                // Rather than an immediate crash.
-                if (Date.now() - this.dylibLastErrorTime > 15000) {
+                    // If it gets here, the dylib exited on its own (code: 0)
+                    this.log.debug(`DYLIB exited on its own. Restarting...`);
                     this.dylibFailureCounter = 0;
-                }
+                } catch (ex: any) {
+                    this.log.debug(`Detected DYLIB crash for App ${this.parentApp}. Error: ${ex?.message ?? String(ex)}`);
+                    if (this.isStopping) {
+                        return;
+                    }
 
-                this.dylibFailureCounter += 1;
-                this.dylibLastErrorTime = Date.now();
-                if (this.dylibFailureCounter >= 5) {
-                    this.log.error(`Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`);
+                    // If the last time we errored was more than 15 seconds ago, reset the counter.
+                    // This would indicate that the dylib was running, but then crashed.
+                    // Rather than an immediate crash.
+                    if (Date.now() - this.dylibLastErrorTime > 15000) {
+                        this.dylibFailureCounter = 0;
+                    }
+
+                    this.dylibFailureCounter += 1;
+                    this.dylibLastErrorTime = Date.now();
+                    if (this.dylibFailureCounter >= 5) {
+                        this.log.error(`Failed to start ${this.name} DYLIB after 5 tries: ${ex?.message ?? String(ex)}`);
+                    }
                 }
             }
-        }
 
-        if (this.dylibFailureCounter >= 5) {
-            this.log.error(`Failed to start ${this.name} DYLIB 3 times in a row, giving up...`);
+            if (this.dylibFailureCounter >= 5) {
+                this.log.error(`Failed to start ${this.name} DYLIB 3 times in a row, giving up...`);
+            }
+        } finally {
+            Server().privateApi.off("client-registered", onClientRegistered);
+            this.isInjecting = false;
         }
-
-        this.isInjecting = false;
     }
 
     async hideApp() {

@@ -1,0 +1,37 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/facetime/link?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "link": {
+            "group_uuid": "9C97AE+15555550100A58-8BB9-1E987EA00F18",
+            "url": "https://facetime.apple.com/join#v=1&p=kvf+k6R5EfGC+BaDqh1Ing&k=uyT1YUfBkhh93Q5o5jCTZWW9fHiO0hRMcwoIBF8xzFw"
+          }
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:31:08.964Z"
+}

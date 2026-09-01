@@ -1,0 +1,84 @@
+//  ServerLifecycle
+//  Stopping, starting and replacing the server, as a thing rather than as a method on the
+//  container.
+//
+//  These three verbs used to live on `AppContext`, and `requestFullRestart` is why moving them
+//  matters more than tidiness: it calls `execv` and REPLACES THE PROCESS IMAGE. A dependency
+//  container that can do that is not a container any more, and its type no longer tells a
+//  reader what it is for. `AppContext` is now what its name says — long-lived references, held
+//  once — and everything that ACTS on the server as a whole is here.
+//
+//  Held by `AppContext` and reachable through `ServerControlling`, so the handlers that offer
+//  a restart button are unchanged.
+//
+//  See `.claude/docs/architecture.md`.
+
+import BBHandlers
+import BBInterfaces
+import BBServiceKit
+import Foundation
+import Logging
+
+/// Drives the whole server: full stop/start, and process replacement.
+///
+/// An actor because the registry is one, and because two restarts arriving at once — a remote
+/// one through Firebase and a local one from the UI — must not interleave `stopAll` and
+/// `startAll`.
+public actor ServerLifecycle {
+
+  private let registry: ServiceRegistry<AppContext>
+  private let logger: Logger
+
+  init(registry: ServiceRegistry<AppContext>, logger: Logger) {
+    self.registry = registry
+    self.logger = logger
+  }
+
+  /// Stops every service in reverse dependency order and starts them again.
+  ///
+  /// A remote restart request arrives through Firebase; honouring it means exactly this, and
+  /// only the registry can do it in the right order.
+  public func restartServices() async {
+    logger.warning("Restart requested")
+    await registry.stopAll()
+    try? await registry.startAll()
+  }
+
+  /// Replaces the process.
+  ///
+  /// `execv` rather than spawn-and-exit: the new process inherits the same PID, so whatever
+  /// supervises the server — launchd, a terminal, the app — keeps watching the same thing
+  /// rather than deciding the server died. A spawn-then-exit would look like a crash to
+  /// launchd and trigger its own restart, racing ours.
+  ///
+  /// Services are stopped first so chat.db and the app database are closed cleanly. If
+  /// `execv` returns at all it FAILED, and the fallback is an ordinary service restart —
+  /// degraded, but the server stays up.
+  public func replaceProcess() async {
+    logger.warning("Full restart requested")
+    await registry.stopAll()
+
+    let executable = CommandLine.arguments.first ?? ProcessInfo.processInfo.arguments[0]
+    var arguments = CommandLine.arguments.map { strdup($0) }
+    arguments.append(nil)
+    defer { for argument in arguments where argument != nil { free(argument) } }
+
+    execv(executable, &arguments)
+
+    logger.error(
+      "Could not replace the process; restarting services instead",
+      metadata: [
+        "errno": .stringConvertible(errno)
+      ])
+    try? await registry.startAll()
+  }
+
+  /// Rebuilds the push service from the credentials as they are now.
+  ///
+  /// Deliberately `restart` rather than `restartWithDependents`: nothing depends on push, and
+  /// taking the socket or the tunnel down because someone imported a Firebase key would
+  /// disconnect every client mid-setup.
+  public func restartPush() async {
+    await registry.restart(.push)
+  }
+}

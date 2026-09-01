@@ -1,0 +1,576 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/chat/query?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "limit": 5,
+        "offset": 0,
+        "with": [
+          "participants",
+          "lastMessage"
+        ],
+        "sort": "lastmessage"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": [
+          {
+            "originalROWID": 478,
+            "guid": "any;-;person@example.com",
+            "style": 45,
+            "chatIdentifier": "REDACTED",
+            "isArchived": false,
+            "displayName": "REDACTED",
+            "participants": [
+              {
+                "originalROWID": 2,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              }
+            ],
+            "messages": [],
+            "isFiltered": false,
+            "groupId": "CF6E08D2-5939-4D94-9BDD-+15555550100",
+            "properties": [
+              {
+                "smsHandshakeState": 0,
+                "pv": 0,
+                "hasViewedPotentialSpamChat": true,
+                "supportsEncryption": true,
+                "numberOfTimesRespondedtoThread": 3,
+                "shouldForceToSMS": false,
+                "messageHandshakeState": 2,
+                "lastSeenMessageGuid": "REDACTED",
+                "markedAsKnownDate": "+15555550100T21:21:10.019Z",
+                "LSMD": "+15555550100T03:20:25.535Z"
+              }
+            ],
+            "lastAddressedHandle": "REDACTED",
+            "lastMessage": {
+              "originalROWID": 418211,
+              "guid": "850A0E04-6FFB-4435-BDEB-40D4A405FC71",
+              "text": "REDACTED",
+              "attributedBody": null,
+              "handle": null,
+              "handleId": 2,
+              "otherHandle": 0,
+              "attachments": [],
+              "subject": null,
+              "error": 0,
+              "dateCreated": 1787973625535,
+              "dateRead": 1788076248127,
+              "dateDelivered": 1788076248127,
+              "isDelivered": true,
+              "isFromMe": true,
+              "hasDdResults": false,
+              "isArchived": false,
+              "itemType": 0,
+              "groupTitle": null,
+              "groupActionType": 0,
+              "balloonBundleId": null,
+              "associatedMessageGuid": "p:0/C8A507A0-F53C-46FD-A952-D326B5277373",
+              "associatedMessageType": "laugh",
+              "expressiveSendStyleId": null,
+              "threadOriginatorGuid": null,
+              "hasPayloadData": false,
+              "country": null,
+              "isDelayed": false,
+              "isAutoReply": false,
+              "isSystemMessage": false,
+              "isServiceMessage": false,
+              "isForward": false,
+              "threadOriginatorPart": null,
+              "isCorrupt": false,
+              "datePlayed": null,
+              "cacheRoomnames": null,
+              "isSpam": false,
+              "isExpired": false,
+              "timeExpressiveSendPlayed": null,
+              "isAudioMessage": false,
+              "replyToGuid": null,
+              "shareStatus": 0,
+              "shareDirection": 0,
+              "wasDeliveredQuietly": false,
+              "didNotifyRecipient": false,
+              "chats": [],
+              "messageSummaryInfo": null,
+              "payloadData": null,
+              "dateEdited": null,
+              "dateRetracted": null,
+              "partCount": 1
+            }
+          },
+          {
+            "originalROWID": 481,
+            "guid": "any;+;bcb9a1843dfc4b65bb47ce50afec8d32",
+            "style": 43,
+            "chatIdentifier": "REDACTED",
+            "isArchived": false,
+            "displayName": "REDACTED",
+            "participants": [
+              {
+                "originalROWID": 2,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 3,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 4,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              }
+            ],
+            "messages": [],
+            "isFiltered": false,
+            "groupId": "9DB6C8D7-1BA3-400F-B5D7-25AE57832A97",
+            "properties": [
+              {
+                "pv": 3,
+                "put": 1787943599.351112,
+                "numberOfTimesRespondedtoThread": 1,
+                "shouldForceToSMS": false,
+                "lastSeenMessageGuid": "REDACTED",
+                "hasBeenAutoSpamReported": true,
+                "markedAsKnownDate": "+15555550100T18:55:12.667Z",
+                "LSMD": "+15555550100T18:55:12.659Z"
+              }
+            ],
+            "lastAddressedHandle": "REDACTED",
+            "lastMessage": {
+              "originalROWID": 418296,
+              "guid": "8CC5B00A-2D71-4CCD-A631-FBE482A0347A",
+              "text": null,
+              "attributedBody": null,
+              "handle": null,
+              "handleId": 0,
+              "otherHandle": 0,
+              "attachments": [],
+              "subject": null,
+              "error": 0,
+              "dateCreated": 1787943366026,
+              "dateRead": null,
+              "dateDelivered": null,
+              "isDelivered": false,
+              "isFromMe": false,
+              "hasDdResults": false,
+              "isArchived": false,
+              "itemType": 2,
+              "groupTitle": "REDACTED",
+              "groupActionType": 0,
+              "balloonBundleId": null,
+              "associatedMessageGuid": null,
+              "associatedMessageType": null,
+              "expressiveSendStyleId": null,
+              "threadOriginatorGuid": null,
+              "hasPayloadData": false,
+              "country": null,
+              "isDelayed": false,
+              "isAutoReply": false,
+              "isSystemMessage": false,
+              "isServiceMessage": false,
+              "isForward": false,
+              "threadOriginatorPart": null,
+              "isCorrupt": false,
+              "datePlayed": null,
+              "cacheRoomnames": "bcb9a1843dfc4b65bb47ce50afec8d32",
+              "isSpam": false,
+              "isExpired": false,
+              "timeExpressiveSendPlayed": null,
+              "isAudioMessage": false,
+              "replyToGuid": null,
+              "shareStatus": 0,
+              "shareDirection": 0,
+              "wasDeliveredQuietly": false,
+              "didNotifyRecipient": false,
+              "chats": [],
+              "messageSummaryInfo": null,
+              "payloadData": null,
+              "dateEdited": null,
+              "dateRetracted": null,
+              "partCount": 0
+            }
+          },
+          {
+            "originalROWID": 480,
+            "guid": "any;+;49d0b618798a414c9a74291223a99b6e",
+            "style": 43,
+            "chatIdentifier": "REDACTED",
+            "isArchived": false,
+            "displayName": "REDACTED",
+            "participants": [
+              {
+                "originalROWID": 2,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 4,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              }
+            ],
+            "messages": [],
+            "isFiltered": false,
+            "groupId": "0F4B116C-4092-44A6-B5B7-CA5390D8507E",
+            "properties": [
+              {
+                "pv": 1,
+                "numberOfTimesRespondedtoThread": 1,
+                "shouldForceToSMS": false,
+                "lastSeenMessageGuid": "REDACTED",
+                "hasBeenAutoSpamReported": true,
+                "groupPhotoGuid": "2885FE0B-263F-4F+15555550100A530F34B57",
+                "markedAsKnownDate": "+15555550100T18:46:03.537Z",
+                "LSMD": "+15555550100T18:46:03.555Z"
+              }
+            ],
+            "lastAddressedHandle": "REDACTED",
+            "lastMessage": {
+              "originalROWID": 418089,
+              "guid": "38C96D49-9D5F-4CE3-B+15555550100DFDEA",
+              "text": null,
+              "attributedBody": null,
+              "handle": null,
+              "handleId": 0,
+              "otherHandle": 0,
+              "attachments": [],
+              "subject": null,
+              "error": 0,
+              "dateCreated": 1787942857369,
+              "dateRead": null,
+              "dateDelivered": null,
+              "isDelivered": false,
+              "isFromMe": false,
+              "hasDdResults": false,
+              "isArchived": false,
+              "itemType": 3,
+              "groupTitle": null,
+              "groupActionType": 1,
+              "balloonBundleId": null,
+              "associatedMessageGuid": null,
+              "associatedMessageType": null,
+              "expressiveSendStyleId": null,
+              "threadOriginatorGuid": null,
+              "hasPayloadData": false,
+              "country": null,
+              "isDelayed": false,
+              "isAutoReply": false,
+              "isSystemMessage": false,
+              "isServiceMessage": false,
+              "isForward": false,
+              "threadOriginatorPart": null,
+              "isCorrupt": false,
+              "datePlayed": null,
+              "cacheRoomnames": "49d0b618798a414c9a74291223a99b6e",
+              "isSpam": false,
+              "isExpired": false,
+              "timeExpressiveSendPlayed": null,
+              "isAudioMessage": false,
+              "replyToGuid": null,
+              "shareStatus": 0,
+              "shareDirection": 0,
+              "wasDeliveredQuietly": false,
+              "didNotifyRecipient": false,
+              "chats": [],
+              "messageSummaryInfo": null,
+              "payloadData": null,
+              "dateEdited": null,
+              "dateRetracted": null,
+              "partCount": 0
+            }
+          },
+          {
+            "originalROWID": 479,
+            "guid": "any;+;0123456789abcdef0123456789abcdef",
+            "style": 43,
+            "chatIdentifier": "REDACTED",
+            "isArchived": false,
+            "displayName": "REDACTED",
+            "participants": [
+              {
+                "originalROWID": 7,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 36,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 37,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 44,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": "REDACTED",
+                "country": "US"
+              },
+              {
+                "originalROWID": 46,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              }
+            ],
+            "messages": [],
+            "isFiltered": false,
+            "groupId": "8F8A68F5-28C3-471B-9D02-31F04746FF8F",
+            "properties": [
+              {
+                "pv": 0,
+                "numberOfTimesRespondedtoThread": 3,
+                "lastSeenMessageGuid": "REDACTED",
+                "LSMD": "+15555550100T23:39:03.703Z",
+                "shouldForceToSMS": false
+              }
+            ],
+            "lastAddressedHandle": "REDACTED",
+            "lastMessage": {
+              "originalROWID": 417277,
+              "guid": "D3CDF3D0-4F0E-434E-B9EB-262C7B17160A",
+              "text": "REDACTED",
+              "attributedBody": null,
+              "handle": null,
+              "handleId": 0,
+              "otherHandle": 0,
+              "attachments": [],
+              "subject": null,
+              "error": 0,
+              "dateCreated": 1787355543703,
+              "dateRead": null,
+              "dateDelivered": null,
+              "isDelivered": false,
+              "isFromMe": true,
+              "hasDdResults": false,
+              "isArchived": false,
+              "itemType": 0,
+              "groupTitle": null,
+              "groupActionType": 0,
+              "balloonBundleId": null,
+              "associatedMessageGuid": null,
+              "associatedMessageType": null,
+              "expressiveSendStyleId": null,
+              "threadOriginatorGuid": null,
+              "hasPayloadData": false,
+              "country": null,
+              "isDelayed": false,
+              "isAutoReply": false,
+              "isSystemMessage": false,
+              "isServiceMessage": false,
+              "isForward": false,
+              "threadOriginatorPart": null,
+              "isCorrupt": false,
+              "datePlayed": null,
+              "cacheRoomnames": "0123456789abcdef0123456789abcdef",
+              "isSpam": false,
+              "isExpired": false,
+              "timeExpressiveSendPlayed": null,
+              "isAudioMessage": false,
+              "replyToGuid": null,
+              "shareStatus": 0,
+              "shareDirection": 0,
+              "wasDeliveredQuietly": false,
+              "didNotifyRecipient": false,
+              "chats": [],
+              "messageSummaryInfo": null,
+              "payloadData": null,
+              "dateEdited": null,
+              "dateRetracted": null,
+              "partCount": 1
+            }
+          },
+          {
+            "originalROWID": 477,
+            "guid": "any;+;5738c4ea264b438baaeb6a76b69e99db",
+            "style": 43,
+            "chatIdentifier": "REDACTED",
+            "isArchived": false,
+            "displayName": "REDACTED",
+            "participants": [
+              {
+                "originalROWID": 7,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 36,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 37,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 44,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": "REDACTED",
+                "country": "US"
+              },
+              {
+                "originalROWID": 45,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": "REDACTED",
+                "country": "US"
+              },
+              {
+                "originalROWID": 46,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 47,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 61,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              },
+              {
+                "originalROWID": 95,
+                "address": "REDACTED",
+                "service": "iMessage",
+                "uncanonicalizedId": null,
+                "country": "US"
+              }
+            ],
+            "messages": [],
+            "isFiltered": false,
+            "groupId": "AD2C5849-7FC7-41DB-A0D8-F+15555550100B3",
+            "properties": [
+              {
+                "shouldForceToSMS": false,
+                "lastSeenMessageGuid": "REDACTED"
+              }
+            ],
+            "lastAddressedHandle": "REDACTED",
+            "lastMessage": {
+              "originalROWID": 414203,
+              "guid": "EF3818CA-14E1-4CB9-9F04-C76A80AE180A",
+              "text": "REDACTED",
+              "attributedBody": null,
+              "handle": null,
+              "handleId": 47,
+              "otherHandle": 0,
+              "attachments": [],
+              "subject": null,
+              "error": 0,
+              "dateCreated": 1785683396337,
+              "dateRead": 1785763946489,
+              "dateDelivered": null,
+              "isDelivered": true,
+              "isFromMe": false,
+              "hasDdResults": false,
+              "isArchived": false,
+              "itemType": 0,
+              "groupTitle": null,
+              "groupActionType": 0,
+              "balloonBundleId": null,
+              "associatedMessageGuid": null,
+              "associatedMessageType": null,
+              "expressiveSendStyleId": null,
+              "threadOriginatorGuid": null,
+              "hasPayloadData": false,
+              "country": null,
+              "isDelayed": false,
+              "isAutoReply": false,
+              "isSystemMessage": false,
+              "isServiceMessage": false,
+              "isForward": false,
+              "threadOriginatorPart": null,
+              "isCorrupt": false,
+              "datePlayed": null,
+              "cacheRoomnames": "5738c4ea264b438baaeb6a76b69e99db",
+              "isSpam": false,
+              "isExpired": false,
+              "timeExpressiveSendPlayed": null,
+              "isAudioMessage": false,
+              "replyToGuid": "8F88645B-B566-4C3E-957A-AB100D8CBAAB",
+              "shareStatus": 0,
+              "shareDirection": 0,
+              "wasDeliveredQuietly": false,
+              "didNotifyRecipient": false,
+              "chats": [],
+              "messageSummaryInfo": null,
+              "payloadData": null,
+              "dateEdited": null,
+              "dateRetracted": null,
+              "partCount": 1
+            }
+          }
+        ],
+        "metadata": {
+          "count": 5,
+          "total": 480,
+          "offset": 0,
+          "limit": 5
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:07.653Z"
+}

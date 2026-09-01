@@ -1,0 +1,313 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/facetime/recents?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "data": [
+          {
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "service": "FaceTime",
+            "is_video": false,
+            "call_uuid": "3EDB4690-2A33-4AE+15555550100D8179E632",
+            "is_missed": false,
+            "address": "REDACTED",
+            "date_created": 1788097145143,
+            "is_outgoing": true,
+            "group_uuid": "+15555550100F39-4C21-9C00-EDFEDFDB72C4",
+            "duration": 0,
+            "is_answered": false
+          },
+          {
+            "is_missed": false,
+            "group_uuid": "B874F48D-887F-4A08-BEC5-517764FAFFD3",
+            "date_created": 1788095811035,
+            "is_outgoing": true,
+            "duration": 0,
+            "is_answered": false,
+            "is_video": false,
+            "service": "FaceTime",
+            "address": "REDACTED",
+            "call_uuid": "B4BC8D0F-9FDD-469B-B87A-949B6DBFC20C",
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ]
+          },
+          {
+            "duration": 0,
+            "is_video": false,
+            "is_outgoing": true,
+            "is_answered": false,
+            "is_missed": false,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "address": "REDACTED",
+            "date_created": 1788095743508,
+            "call_uuid": "7250550A-C7BD-4939-A2B3-05204A5F661A",
+            "group_uuid": "B54C8C0F-C8CD-4F65-83BD-14C082A7BB66",
+            "service": "FaceTime"
+          },
+          {
+            "address": "REDACTED",
+            "date_created": 1788095683105,
+            "group_uuid": "F8D8C7AB-D993-41B8-BCE+15555550100E7110",
+            "service": "FaceTime",
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "duration": 0,
+            "call_uuid": "90BF6CA+15555550100D4-ACF9-16EA019D66A1",
+            "is_outgoing": true,
+            "is_answered": false,
+            "is_missed": false,
+            "is_video": false
+          },
+          {
+            "is_answered": false,
+            "call_uuid": "4C61DF7E-EDC8-42A3-85CA-ADCB427F6816",
+            "is_outgoing": true,
+            "is_missed": false,
+            "is_video": true,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "duration": 0,
+            "date_created": 1788094308089,
+            "service": "FaceTime",
+            "address": "REDACTED"
+          },
+          {
+            "is_video": true,
+            "date_created": 1788091118578,
+            "duration": 0,
+            "service": "FaceTime",
+            "call_uuid": "AA47018E-FAEF-4D96-B47E-422ADBDAFBBF",
+            "is_missed": false,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "is_answered": false,
+            "is_outgoing": true,
+            "address": "REDACTED"
+          },
+          {
+            "is_answered": false,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "is_missed": false,
+            "service": "FaceTime",
+            "duration": 0,
+            "is_outgoing": true,
+            "date_created": 1788090729647,
+            "call_uuid": "C808AE48-99C7-40E7-B84C-F551408DBAA9",
+            "is_video": true,
+            "address": "REDACTED"
+          },
+          {
+            "is_missed": false,
+            "date_created": 1788051965120,
+            "is_video": true,
+            "is_outgoing": true,
+            "call_uuid": "32C04A+15555550100E4F-E60C61303EA6",
+            "duration": 16060,
+            "participants": [
+              {
+                "address": "REDACTED"
+              },
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "service": "FaceTime",
+            "address": "REDACTED",
+            "group_uuid": "20618F91-D005-4B81-BD58-0EFF09CB0A0F",
+            "is_answered": false
+          },
+          {
+            "duration": 58548,
+            "date_created": 1788051371480,
+            "is_outgoing": true,
+            "is_answered": false,
+            "participants": [
+              {
+                "address": "REDACTED"
+              },
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "service": "FaceTime",
+            "call_uuid": "9A72775D-+15555550100-AAE6-16C5CB9A4E3D",
+            "is_missed": false,
+            "address": "REDACTED",
+            "group_uuid": "266DD8A4-46C2-49CF-874E-7459BDE8653B",
+            "is_video": true
+          },
+          {
+            "duration": 51294,
+            "address": "REDACTED",
+            "group_uuid": "206EA83F-FB3D-458C-9044-F7EAF992787F",
+            "is_missed": false,
+            "is_video": true,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "service": "FaceTime",
+            "call_uuid": "4243CC9A-C513-40B+15555550100A430FE2A",
+            "is_answered": false,
+            "is_outgoing": true,
+            "date_created": 1788050131837
+          },
+          {
+            "group_uuid": "6453E631-CE66-4BDC-B730-B0E8C9807610",
+            "duration": 25593,
+            "is_outgoing": false,
+            "date_created": 1786205104668,
+            "call_uuid": "9759D11C-2E75-4671-B+15555550100EF3F85",
+            "is_video": false,
+            "is_answered": true,
+            "is_missed": false,
+            "service": "FaceTime",
+            "address": "REDACTED",
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ]
+          },
+          {
+            "date_created": 1786069533473,
+            "is_video": true,
+            "service": "FaceTime",
+            "group_uuid": "33F5D9E+15555550100-A85C-E7B859A04178",
+            "is_missed": true,
+            "duration": 0,
+            "is_outgoing": false,
+            "address": "REDACTED",
+            "call_uuid": "5EFE5328-66F3-4B58-8A9A-01151C29A76F",
+            "is_answered": false,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ]
+          },
+          {
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "date_created": 1785331521886,
+            "duration": 2241813,
+            "is_missed": false,
+            "address": "REDACTED",
+            "is_video": true,
+            "is_answered": false,
+            "is_outgoing": true,
+            "service": "FaceTime",
+            "call_uuid": "4A87F680-8A4E-4A89-9FAA-46D46FFB8DF3",
+            "group_uuid": "D31F+15555550100B00-9C0A-3EC9EC9379F3"
+          },
+          {
+            "date_created": 1778241631157,
+            "is_answered": false,
+            "group_uuid": "CF0EBAF4-AF06-45EB-ACB8-38B01B76F297",
+            "duration": 0,
+            "call_uuid": "39BA7979-1A81-4E99-9CD7-32D0898E750A",
+            "is_outgoing": false,
+            "is_video": false,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "address": "REDACTED",
+            "is_missed": true,
+            "service": "FaceTime"
+          },
+          {
+            "is_video": true,
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "is_outgoing": false,
+            "service": "FaceTime",
+            "duration": 0,
+            "address": "REDACTED",
+            "group_uuid": "FFD0004D-7525-4E4D-8151-76EF7C2B0D08",
+            "call_uuid": "0C1D0E1D-A05E-43D6-BF6F-B43CF258DDD7",
+            "is_answered": false,
+            "is_missed": true,
+            "date_created": 1771110188542
+          },
+          {
+            "participants": [
+              {
+                "address": "REDACTED"
+              }
+            ],
+            "call_uuid": "D7B8785D-DF35-4CF7-BA5F-586F16BB722C",
+            "duration": 0,
+            "address": "REDACTED",
+            "group_uuid": "4DA4A32E-FB0F-4747-BF94-436A104C8CB1",
+            "service": "FaceTime",
+            "date_created": 1770044981217,
+            "is_outgoing": false,
+            "is_missed": true,
+            "is_answered": false,
+            "is_video": false
+          }
+        ],
+        "message": "Success",
+        "metadata": {
+          "offset": 0,
+          "limit": 50,
+          "count": 16
+        },
+        "status": 200
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:30:57.677Z"
+}

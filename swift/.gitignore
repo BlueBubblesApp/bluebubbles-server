@@ -1,0 +1,25 @@
+.build/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# The recorded corpus lives in swift/Fixtures/ and IS committed. It was local-only while the
+# scrubber let real content through: multipart request bodies bypassed scrubbing entirely, so
+# form fields carrying an address were written verbatim, and link-local IPv6 addresses (which
+# embed the interface MAC) and absolute /Users/<name> paths in stack traces were never
+# touched. All three are scrubbed now, and the corpus was re-scrubbed and audited before
+# being committed. See docs/api/README.md.
+#
+# If you record against a live server, RE-AUDIT before pushing — the scrubber is a filter, not
+# a guarantee, and it has been wrong before.
+
+# Generated chat.db fixtures — rebuild with Tools/chatdb-fixtures.
+Tests/ChatDBFixtures/*.db
+
+# Reference implementations, installed locally to generate protocol vectors.
+Tools/protocol-vectors/node_modules/
+Tools/protocol-vectors/package-lock.json
+
+# The observation probe is a separate package with its own build directory.
+Tools/observation-probe/.build/

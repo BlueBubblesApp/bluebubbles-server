@@ -1,0 +1,251 @@
+name: Swift — Release
+
+# Cuts a release from a `vX.Y.Z` tag: universal build, signed, notarized, stapled, packaged
+# as a DMG, with a signed appcast entry and a DRAFT GitHub release.
+#
+# Draft rather than published, matching the Node workflow's `releaseType: "draft"` — a human
+# still presses the button.
+#
+# The existing Node workflow (main.yml) is untouched and can release independently while both
+# servers coexist.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build, e.g. v1.2.3'
+        required: true
+
+concurrency:
+  # Never two releases for one tag at once. Cancel-in-progress is deliberately OFF: a
+  # half-finished release that has already submitted to Apple should finish, not be killed.
+  group: swift-release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: swift
+
+jobs:
+  # ---------------------------------------------------------------------------------------
+  # Everything that can reject the release runs FIRST, before any secret is touched and
+  # before Apple sees anything. A tag that should not have been pushed fails here in seconds.
+  # ---------------------------------------------------------------------------------------
+  verify:
+    name: Verify the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The ancestry check needs history. A shallow clone makes `merge-base` fail on
+          # every tag, which would look like the guard working when it is merely broken.
+          fetch-depth: 0
+
+      - name: Resolve the tag
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG"
+
+      - name: The tag must be an ancestor of the default branch
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          DEFAULT="${{ github.event.repository.default_branch }}"
+          git fetch origin "$DEFAULT" --depth=0
+
+          # Without this, anyone able to push a tag can ship arbitrary code — a tag on a
+          # feature branch would build and release code that never passed review.
+          if ! git merge-base --is-ancestor "$TAG" "origin/$DEFAULT"; then
+            echo "::error::$TAG is not an ancestor of $DEFAULT."
+            echo "::error::Tags must be cut from the default branch. Merge first, then tag."
+            exit 1
+          fi
+          echo "$TAG is an ancestor of $DEFAULT."
+
+      - name: The tag must match Packaging/VERSION
+        run: |
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          FILE_VERSION="$(tr -d '[:space:]' < Packaging/VERSION)"
+
+          # The bundle takes its version from this file, so a disagreement ships a DMG named
+          # for one version containing another — and Sparkle then offers an update that
+          # installs to a version the user already has.
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::Tag says $TAG_VERSION, Packaging/VERSION says $FILE_VERSION."
+            echo "::error::Update Packaging/VERSION on the default branch, then re-tag."
+            exit 1
+          fi
+          echo "Tag and Packaging/VERSION agree on $TAG_VERSION."
+
+  # ---------------------------------------------------------------------------------------
+  # The gate, re-run against the tagged commit. The PR check ran against a merge commit,
+  # which is not what is being shipped.
+  # ---------------------------------------------------------------------------------------
+  test:
+    name: Test
+    needs: verify
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.3.app
+      - name: Build and test
+        run: |
+          swift build --build-tests
+          swift test --skip-build
+
+  release:
+    name: Build, sign, notarize
+    needs: [verify, test]
+    runs-on: macos-15
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.3.app
+
+      # -------------------------------------------------------------------------------
+      # Signing identity, in a temporary keychain that is deleted at the end of the job.
+      # Carried over from the Node workflow, which is sound — minus the provisioning
+      # profile, which Developer ID direct distribution does not use.
+      # -------------------------------------------------------------------------------
+      - name: Import the Developer ID certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          # -s SETS the search list. The default keychain must be re-listed alongside it or
+          # nothing else on the runner can reach its own keychain items.
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          rm -f "$CERT_PATH"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep 'Developer ID Application' | head -1 | sed 's/.*"\(.*\)"/\1/')"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No Developer ID Application identity in the imported certificate."
+            exit 1
+          fi
+          # Written to the environment, not echoed: the identity string contains the team ID.
+          echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "Imported a Developer ID Application identity."
+
+      - name: Build the app
+        env:
+          # Baked into Info.plist as SUPublicEDKey. Derived from the private key rather than
+          # stored separately, so the two cannot drift — a mismatch here means every shipped
+          # install rejects every future update.
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          export SPARKLE_PUBLIC_KEY="$(swift run bb-appcast public-key)"
+          Packaging/build-app.sh --output "$RUNNER_TEMP/package"
+
+      - name: Sign
+        run: |
+          Packaging/sign-app.sh \
+            --app "$RUNNER_TEMP/package/BlueBubbles.app" \
+            --identity "$SIGNING_IDENTITY"
+
+      - name: Notarize and staple
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          Packaging/notarize-app.sh --app "$RUNNER_TEMP/package/BlueBubbles.app"
+
+      - name: Build the DMG
+        id: dmg
+        run: |
+          DMG="$(Packaging/make-dmg.sh \
+            --app "$RUNNER_TEMP/package/BlueBubbles.app" \
+            --output "$RUNNER_TEMP/package/BlueBubbles-${{ needs.verify.outputs.version }}.dmg" \
+            | tail -1)"
+          echo "path=$DMG" >> "$GITHUB_OUTPUT"
+
+      # The DMG is signed too. Gatekeeper checks the image itself on download, and an
+      # unsigned image shows a warning before the user ever reaches the app inside it.
+      - name: Sign the DMG
+        run: |
+          codesign --force --timestamp --sign "$SIGNING_IDENTITY" "${{ steps.dmg.outputs.path }}"
+          codesign --verify --verbose=2 "${{ steps.dmg.outputs.path }}"
+
+      - name: Update the appcast
+        env:
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          TAG="${{ needs.verify.outputs.tag }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/$TAG/BlueBubbles-$VERSION.dmg"
+
+          swift run bb-appcast add \
+            --appcast ../appcast.xml \
+            --short-version "$VERSION" \
+            --artifact "${{ steps.dmg.outputs.path }}" \
+            --url "$URL"
+
+          # Verified against the PUBLIC key before anything is published. A signature that
+          # does not verify produces a release nobody can auto-update to, and the symptom
+          # appears weeks later with nothing in any log.
+          swift run bb-appcast verify \
+            --appcast ../appcast.xml \
+            --artifact "${{ steps.dmg.outputs.path }}" \
+            --public-key "$(swift run bb-appcast public-key)"
+
+      - name: Commit the appcast
+        run: |
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          # Pushed to the default branch, not to the tag: the tag is immutable and the feed
+          # has to be readable at a stable URL.
+          if git diff --cached --quiet; then
+            echo "The appcast did not change."
+          else
+            git commit -m "chore: appcast for ${{ needs.verify.outputs.tag }}"
+            git push origin "HEAD:${{ github.event.repository.default_branch }}"
+          fi
+
+      - name: Draft the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ needs.verify.outputs.tag }}" \
+            "${{ steps.dmg.outputs.path }}" \
+            --draft \
+            --title "BlueBubbles Server ${{ needs.verify.outputs.version }}" \
+            --generate-notes \
+            --repo "${{ github.repository }}"
+
+      - name: Clean up the keychain
+        if: always()
+        run: |
+          # `always()`, so a failed notarization does not leave a signing identity unlocked
+          # on the runner.
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true

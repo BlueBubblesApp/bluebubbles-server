@@ -1,0 +1,394 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/v1/ping"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mac/lock"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mac/imessage/restart"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/icloud/account"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/icloud/account/alias"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/icloud/contact"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/icloud/findmy/devices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/icloud/findmy/devices/refresh"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/icloud/findmy/friends"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/icloud/findmy/friends/refresh"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/info"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/logs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/restart/soft"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/restart/hard"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/update/check"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/server/update/install"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/alert"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/server/alert/read"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/statistics/totals"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/statistics/media"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/server/statistics/media/chat"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/fcm/device"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/fcm/client"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/attachment/count"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/attachment/upload"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/attachment/:guid/download"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/attachment/:guid/download/force"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/attachment/:guid/blurhash"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/attachment/:guid/live"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/attachment/:guid"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/new"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/chat/count"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/query"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/chat/:guid/message"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/chat/:guid/share/contact/status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/share/contact"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/read"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/unread"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/leave"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/participant"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/chat/:guid/participant"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/participant/add"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/participant/remove"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/typing"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/chat/:guid/typing"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/chat/:guid/icon"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/chat/:guid/icon"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/chat/:guid/icon"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/chat/:guid/:messageGuid"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/chat/:guid"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/chat/:guid"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/chat/:guid"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/text"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/attachment"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/attachment/chunk"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/multipart"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/react"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/message/count"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/message/count/updated"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/message/count/me"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/query"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/message/schedule"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/schedule"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/message/schedule/:id"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/message/schedule/:id"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/message/schedule/:id"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/message/:guid"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/:guid/edit"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/:guid/unsend"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/message/:guid/notify"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/message/:guid/embedded-media"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/handle/count"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/handle/query"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/handle/availability/imessage"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/handle/availability/facetime"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/handle/:guid"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/handle/:guid/focus"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/facetime/session"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/facetime/answer/:call_uuid"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/facetime/leave/:call_uuid"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contact"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contact"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/contact"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/contact/:id"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contact/external/:externalId"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/contact/:id"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/contact"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contact/query"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contact/import/vcf"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/backup/theme"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/backup/theme"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/backup/theme"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/backup/settings"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/backup/settings"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/backup/settings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhook"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/webhook/:id"
+  }
+]

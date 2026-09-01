@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "DELETE",
+    "path": "/api/v1/contact?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": [
+        {
+          "id": 554
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "1 contacts deleted successfully",
+        "data": [
+          {
+            "id": 554
+          }
+        ]
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:36:54.433Z"
+}

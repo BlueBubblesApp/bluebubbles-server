@@ -1,0 +1,113 @@
+//  FailingPrivateAPI
+//  A helper that refuses everything, so the interfaces layer can be driven without one.
+//
+//  `PrivateAPI` has sixty-eight members and no default implementations, which is why nothing
+//  in this package had a fake for it and why every Private-API path went untested. It is
+//  cheaper than it looks: every member is `async throws`, so every body here is `throw error`
+//  and NO return value has to be constructed — not one `ChatMuteState`, not one
+//  `FaceTimeCall`. That is the whole trick, and it is what makes exhaustive coverage of
+//  `ChatInterface`'s twenty-three operations a loop rather than twenty-three fixtures.
+//
+//  Deliberately not selective: an operation that forgets to route through `throughMessages`
+//  fails the test that walks all of them, which is the failure mode a hand-picked stub would
+//  miss.
+
+import BBPrivateAPIContract
+import Foundation
+
+struct FailingPrivateAPI: PrivateAPI {
+
+  /// What every call throws. `PrivateAPIError` is what the real client raises, so this is the
+  /// error the translation actually has to cope with.
+  let error: any Error
+
+  init(error: any Error = PrivateAPIError.rejectedByMessages(reason: "Messages said no")) {
+    self.error = error
+  }
+
+  /// True, so a caller that gates on connectedness proceeds and reaches the failure. A fake
+  /// that reported itself disconnected would test the gate instead of the translation.
+  var isConnected: Bool { get async { true } }
+
+  var events: AsyncStream<PrivateAPIEvent> { AsyncStream { $0.finish() } }
+
+  func sendMessage(_ request: SendMessageRequest) async throws -> SentMessage { throw error }
+  func sendMultipart(_ request: SendMultipartRequest) async throws -> SentMessage { throw error }
+  func sendAttachment(_ request: SendAttachmentRequest) async throws -> SentMessage { throw error }
+  func react(_ request: ReactionRequest) async throws { throw error }
+  func editMessage(
+    _ guid: MessageGUID, in chat: ChatGUID, partIndex: Int, newText: String,
+    backwardCompatibilityText: String
+  ) async throws { throw error }
+  func unsendMessage(_ guid: MessageGUID, in chat: ChatGUID, partIndex: Int) async throws {
+    throw error
+  }
+  func deleteMessage(_ guid: MessageGUID, in chat: ChatGUID) async throws { throw error }
+  func notifyAnyways(_ guid: MessageGUID) async throws { throw error }
+  func searchMessages(_ request: MessageSearchRequest) async throws -> [MessageGUID] { throw error }
+  func balloonBundleMediaPath(for guid: MessageGUID) async throws -> String { throw error }
+  func createChat(addresses: [String], service: String, message: String?) async throws -> ChatGUID {
+    throw error
+  }
+  func deleteChat(_ chat: ChatGUID) async throws { throw error }
+  func leaveChat(_ chat: ChatGUID) async throws { throw error }
+  func setDisplayName(chat: ChatGUID, to name: String) async throws { throw error }
+  func updateGroupPhoto(chat: ChatGUID, imagePath: String) async throws { throw error }
+  func addParticipant(_ address: String, to chat: ChatGUID) async throws { throw error }
+  func removeParticipant(_ address: String, from chat: ChatGUID) async throws { throw error }
+  func setPinned(chat: ChatGUID, pinned: Bool) async throws { throw error }
+  func muteState(chat: ChatGUID) async throws -> ChatMuteState { throw error }
+  func setMute(_ request: ChatMuteRequest) async throws -> ChatMuteState { throw error }
+  func unmute(chat: ChatGUID, syncToPairedDevice: Bool) async throws -> ChatMuteState {
+    throw error
+  }
+  func refetchChatBackground(chat: ChatGUID) async throws { throw error }
+  func clearChatHistory(_ chat: ChatGUID) async throws -> Bool { throw error }
+  func chatFilterState(chat: ChatGUID) async throws -> ChatFilterState { throw error }
+  func markSenderKnown(chat: ChatGUID, saveInContacts: Bool) async throws -> ChatFilterState {
+    throw error
+  }
+  func markChatAsSpam(_ request: ChatSpamRequest) async throws -> ChatSpamResult { throw error }
+  func reportChatAsJunk(_ request: ChatSpamRequest) async throws -> ChatSpamResult { throw error }
+  func setChatFilter(chat: ChatGUID, category: Int) async throws -> ChatFilterState { throw error }
+  func pinnedChats() async throws -> [ChatGUID] { throw error }
+  func startTyping(chat: ChatGUID) async throws { throw error }
+  func stopTyping(chat: ChatGUID) async throws { throw error }
+  func checkTypingStatus(chat: ChatGUID) async throws -> Bool { throw error }
+  func markRead(chat: ChatGUID) async throws { throw error }
+  func markUnread(chat: ChatGUID) async throws { throw error }
+  func checkIMessageAvailability(address: String) async throws -> Bool { throw error }
+  func checkFaceTimeAvailability(address: String) async throws -> Bool { throw error }
+  func checkFocusStatus(address: String) async throws -> String { throw error }
+  func accountInfo() async throws -> AccountInfo { throw error }
+  func nicknameInfo(for address: String?) async throws -> NicknameInfo { throw error }
+  func shouldOfferNicknameSharing(chat: ChatGUID) async throws -> Bool { throw error }
+  func shareNickname(chat: ChatGUID) async throws { throw error }
+  func modifyActiveAlias(_ alias: String) async throws { throw error }
+  func downloadPurgedAttachment(guid: String) async throws -> String { throw error }
+  func findMyStatus() async throws -> FindMyStatus { throw error }
+  func findMyFriends() async throws -> [FindMyFriend] { throw error }
+  func refreshFindMyFriends() async throws -> [FindMyFriend] { throw error }
+  func refreshFindMyLocation(handle: String) async throws -> FindMyFriend { throw error }
+  func requestFindMyLocationShare(handle: String) async throws { throw error }
+  func startSharingFindMyLocation(_ request: FindMyShareRequest) async throws { throw error }
+  func stopSharingFindMyLocation(chat: ChatGUID, address: String?) async throws { throw error }
+  func generateFaceTimeLink(invitedAddresses: [String]) async throws -> FaceTimeLink { throw error }
+  func dialFaceTime(_ request: FaceTimeStartRequest) async throws -> FaceTimeCall { throw error }
+  func generateFaceTimeLinkForCall(callUUID: String) async throws -> FaceTimeLink { throw error }
+  func answerFaceTimeCall(callUUID: String) async throws { throw error }
+  func leaveFaceTimeCall(callUUID: String) async throws { throw error }
+  func admitFaceTimeParticipant(conversationUUID: String, handle: String) async throws {
+    throw error
+  }
+  func faceTimeMembers(conversationUUID: String) async throws -> [FaceTimeMember] { throw error }
+  func silenceFaceTimeCall(callUUID: String) async throws -> (muted: Bool, sendingVideo: Bool) {
+    throw error
+  }
+  func faceTimeActiveCalls() async throws -> [FaceTimeCall] { throw error }
+  func faceTimeCallStatus(callUUID: String) async throws -> FaceTimeCallStatus { throw error }
+  func faceTimeWindows() async throws -> [String] { throw error }
+  func dismissFaceTimeAlert() async throws -> Int { throw error }
+  func faceTimeDebugState(conversationUUID: String) async throws -> [String: String] { throw error }
+  func invalidateFaceTimeLinks(urls: [String]?) async throws -> [String] { throw error }
+}

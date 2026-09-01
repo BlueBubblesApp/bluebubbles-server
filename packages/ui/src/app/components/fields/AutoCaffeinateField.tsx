@@ -21,7 +21,7 @@ export const AutoCaffeinateField = ({ helpText }: AutoCaffeinateFieldProps): JSX
             <FormHelperText>
                 {helpText ?? (
                     <Text>
-                        When enabled, you mac will not fall asleep due to inactivity or a screen screen saver.
+                        When enabled, your Mac will not fall asleep due to inactivity or a screen screen saver.
                         However, your computer lid's close action may override this.
                         Make sure your computer does not go to sleep when the lid is closed.
                     </Text>

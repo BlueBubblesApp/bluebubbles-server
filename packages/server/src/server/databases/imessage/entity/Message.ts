@@ -87,7 +87,7 @@ export class Message {
         return this.dateRetracted ?? this.dateEdited ?? this.dateRead ?? this.dateDelivered ?? this.dateCreated;
     }
 
-    get messageStatus(): String {
+    get messageStatus(): string {
         return this.dateRetracted
             ? "Unsent"
             : this.isFullyUnsent

@@ -10,8 +10,6 @@ export class PrivateApiAddressEventHandler extends Loggable implements PrivateAp
 
     types: string[] = ["aliases-removed"];
 
-    cache: Record<string, Record<string, any>> = {};
-
     async handle(data: EventData, _: net.Socket) {
         if (data.event === "aliases-removed") {
             await this.handleDeregistration(data);

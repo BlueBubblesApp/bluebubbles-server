@@ -1,0 +1,13 @@
+# Routes with no recorded fixture.
+#
+# A RATCHET, not a to-do list: `bb-openapi coverage --check` fails if a route not
+# listed here is uncovered, AND if a route listed here has since been covered. So
+# this file can only shrink. Record a fixture, delete the line.
+#
+# Regenerate the baseline (do this only to re-establish it, never to make a
+# failing check pass):
+#   swift run bb-openapi coverage --write-allowlist
+#
+# 0 of 148 routes.
+
+

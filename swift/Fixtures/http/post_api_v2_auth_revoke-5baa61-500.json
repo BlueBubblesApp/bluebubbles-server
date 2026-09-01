@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/auth/revoke?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "device_id": "bb_648529b2cbe64580abe28803b607b458"
+      }
+    }
+  },
+  "response": {
+    "status": 500,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "error": {
+          "type": "Server Error",
+          "message": "unknownDevice"
+        },
+        "status": 500,
+        "message": "Server Error"
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T19:21:21.391Z"
+}

@@ -1,0 +1,176 @@
+name: Swift — PR
+
+# The gate for the Swift server. Deliberately fast and secret-free: the Xcode app target is
+# built unsigned, so pull requests from forks run the full build and test suite with no
+# secrets available.
+#
+# The existing Node workflow (main.yml) is untouched and runs independently.
+
+on:
+  pull_request:
+    # master is the repository default branch; development is where day-to-day PRs
+    # actually land. Gating both means the check runs wherever the work arrives.
+    branches: [master, development]
+    paths:
+      - 'swift/**'
+      - '.github/workflows/swift-pr.yml'
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes the previous run rather than queueing behind it.
+  group: swift-pr-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: swift
+
+jobs:
+  build-and-test:
+    name: Build and test
+    # macos-15 or newer is REQUIRED: GRDB 7 needs Swift 6.1 / Xcode 16.3, which the
+    # macOS-13 image used by the Node workflow cannot supply. See swift/DEPENDENCIES.md.
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    # A warning is a defect that has not been triaged yet, so it fails the build.
+    #
+    # Without this the count only ever goes up: it reached 237 before anyone looked, and at
+    # that noise floor a genuinely important warning — an `any` annotation that becomes an
+    # error in the next language mode, a discarded `try?`, an `#expect` comparing a
+    # non-optional to nil and therefore asserting nothing — arrives invisible.
+    #
+    # DeprecatedDeclaration is the one group held at warning level, because exactly two call
+    # sites cannot be fixed from inside this repository and neither has a replacement:
+    #
+    #   * Sources/BBAppleScript/AddressFormatter.swift — PhoneNumberKit deprecated its own
+    #     initialiser when the package changed repositories. Migrating means changing the
+    #     dependency, not the call.
+    #   * Tests/SerializationTests/AttributedBodyTests.swift — NSArchiver is the ONLY writer
+    #     for the typedstream format the decoder parses. NSKeyedArchiver, which the
+    #     deprecation points at, produces a different format and would not exercise the code
+    #     under test.
+    #
+    # Both stay visible in the log. If either is resolved, drop the exception rather than
+    # leaving a hole nothing needs.
+    #
+    # Passed to EVERY SwiftPM invocation in this job, not just the build. Flags are part of
+    # the build plan, so a step that omits them recompiles the whole graph a second time.
+    env:
+      STRICT: -Xswiftc -warnings-as-errors -Xswiftc -Wwarning -Xswiftc DeprecatedDeclaration
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -switch /Applications/Xcode_16.3.app
+          swift --version
+
+      - name: Verify the toolchain matches .swift-version
+        run: |
+          pinned="$(tr -d '[:space:]' < .swift-version)"
+          actual="$(swift --version 2>&1 | grep -oE 'Swift version [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+          echo "pinned=$pinned actual=$actual"
+          if [ "$actual" != "$pinned" ]; then
+            echo "::error::Toolchain mismatch. .swift-version pins $pinned but the runner has $actual."
+            echo "::error::Update the Xcode selection above, or the pin, but not silently."
+            exit 1
+          fi
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            swift/.build
+            ~/.cache/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('swift/Package.resolved', 'swift/Package.swift') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Resolve dependencies
+        run: swift package resolve
+
+      - name: Build
+        run: swift build --build-tests $STRICT
+
+      - name: Test
+        run: swift test --skip-build $STRICT
+
+      # The generated API description, its payload schemas, and the fixture ratchet.
+      #
+      # All three run in DEBUG, which is what `swift build` above produced and what the
+      # committed document was generated from. That matters: `AdditiveRoutes.security` and
+      # the FaceTime diagnostics are `#if DEBUG`, so a release build legitimately emits ten
+      # fewer routes. Checking a release build against a debug-generated document would fail
+      # for a reason that has nothing to do with the change under review.
+
+      # Payload schemas are inferred from the committed corpus and committed themselves, so
+      # they drift the moment a fixture is recorded or re-scrubbed. Checked BEFORE the
+      # document, because the document is built from them.
+      - name: Payload schemas match the recorded corpus
+        run: swift run $STRICT bb-openapi infer-schemas --check
+
+      - name: OpenAPI document is current
+        run: swift run $STRICT bb-openapi emit --check
+
+      # Fails when a route without a fixture is not on the known-gaps list, when a listed
+      # route has since been covered (the list may only shrink), or when an entry names a
+      # route that no longer exists.
+      - name: Fixture coverage ratchet
+        run: swift run $STRICT bb-openapi coverage --check
+
+  lint:
+    name: Format
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.3.app
+      - name: swift-format
+        run: swift format lint --strict --recursive Sources Tests Helper
+
+      # Package.swift is the only thing enforcing layering, and nothing was checking that it
+      # still described the code. It had drifted 41 edges in both directions — targets
+      # declaring dependencies they never imported (which silently widens what they are
+      # ALLOWED to import) and targets importing modules they never declared (which compile
+      # only while some other target happens to pull them in).
+      #
+      # Neither is visible to the compiler, so `swift build` passing proves nothing here.
+      #
+      # It lives in this job rather than the build job because it needs only the manifest —
+      # `swift package dump-package` evaluates it without resolving or compiling anything —
+      # so it fails in seconds instead of behind a full build.
+      - name: Package graph matches the imports
+        run: python3 Tools/package-graph/check.py
+
+  tools:
+    name: Phase 0 tooling
+    # These run on Linux because they are plain Node and Python, and keeping them off the
+    # macOS runners is cheaper and faster.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Conformance recorder self-test
+        run: node Tools/conformance-recorder/selftest.mjs
+
+      - name: chat.db fixture generator self-test
+        run: python3 Tools/chatdb-fixtures/generate.py --self-test
+
+      # The package-graph check itself. Its import scanner is the part with real risk: a
+      # regex that quietly stopped matching `@_exported import struct X.Y` would turn the
+      # check in the lint job into one that always passes. Runs here because it needs no
+      # Swift toolchain, only the scanner.
+      - name: Package graph checker self-test
+        run: python3 Tools/package-graph/check.py --self-test

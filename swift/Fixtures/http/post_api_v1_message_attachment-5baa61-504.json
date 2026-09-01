@@ -1,0 +1,36 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/message/attachment?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "multipart/form-data; boundary=------------------------vUVkFKwnRMOvj9RGXQitw6"
+    },
+    "body": {
+      "kind": "text",
+      "value": "--------------------------vUVkFKwnRMOvj9RGXQitw6\r\nContent-Disposition: form-data; name=\"chatGuid\"\r\n\r\nany\r\n--------------------------vUVkFKwnRMOvj9RGXQitw6\r\nContent-Disposition: form-data; name=\"tempGuid\"\r\n\r\nfixture-CBC09991-98F8-482B-AA85-E8F93012A567\r\n--------------------------vUVkFKwnRMOvj9RGXQitw6\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nfixture.png\r\n--------------------------vUVkFKwnRMOvj9RGXQitw6\r\nContent-Disposition: form-data; name=\"method\"\r\n\r\napple-script\r\n--------------------------vUVkFKwnRMOvj9RGXQitw6\r\nContent-Disposition: form-data; name=\"attachment\"; filename=\"fixture.png\"\r\nContent-Type: image/png\r\n\r\n�PNG\r\n\u001a\n\u0000\u0000\u0000\rIHDR\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0010\b\u0002\u0000\u0000\u0000��h6\u0000\u0000\u0000HIDATx����\u0014�\u0000\u0000��!�\u0010B\b!�\u0010B\b!�\u0010B\u001f\u0003\b!�\u0010B�a�\u000e0\u001el\u0019m�l�mYlYm�l�m9l9m�l�mylym�L�\u0017,\u0010�φ\u0014\u0000\u0000\u0000\u0000IEND�B`�\r\n--------------------------vUVkFKwnRMOvj9RGXQitw6--\r\n"
+    }
+  },
+  "response": {
+    "status": 504,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 504,
+        "message": "The request timed-out after 300000!",
+        "error": {
+          "type": "Gateway Timeout",
+          "message": "The server took too long to respond and has timed-out!"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:44:11.223Z"
+}

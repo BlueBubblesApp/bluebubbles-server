@@ -11,7 +11,6 @@ import { Attachment } from "../entity/Attachment";
 import { handledImageMimes } from "./constants";
 import { NSAttributedString, Unarchiver } from "node-typedstream";
 
-
 export const getConversionPath = (attachment: Attachment, extension: string): string => {
     const guid = attachment.originalGuid ?? attachment.guid;
     const newDir = `${FileSystem.convertDir}/${guid}`;
@@ -19,12 +18,12 @@ export const getConversionPath = (attachment: Attachment, extension: string): st
     const newName = isEmpty(attachment.transferName) ? guid : attachment.transferName;
 
     // If the path already has the extension, return it
-    let newPath = `${newDir}/${newName}`;
+    const newPath = `${newDir}/${newName}`;
     if (newPath.endsWith(`.${extension}`)) return newPath;
 
     // Otherwise, return the path with the extension
     return `${newDir}/${newName}.${extension}`;
-}
+};
 
 export const convertAudio = async (
     attachment: Attachment,
@@ -32,8 +31,8 @@ export const convertAudio = async (
         originalMimeType = null,
         dryRun = false
     }: {
-        originalMimeType?: string,
-        dryRun?: boolean
+        originalMimeType?: string;
+        dryRun?: boolean;
     } = {}
 ): Promise<string> => {
     if (!attachment) return null;
@@ -80,8 +79,8 @@ export const convertImage = async (
         originalMimeType = null,
         dryRun = false
     }: {
-        originalMimeType?: string
-        dryRun?: boolean
+        originalMimeType?: string;
+        dryRun?: boolean;
     } = {}
 ): Promise<string> => {
     if (!attachment) return null;
@@ -177,39 +176,39 @@ export const getAttachmentMetadata = async (attachment: Attachment): Promise<Met
 export const convertAttributedBody = (value: Buffer): any[] => {
     if (isEmpty(value)) return null;
 
-        try {
-            const attributedBody = Unarchiver.open(value, Unarchiver.BinaryDecoding.decodable).decodeAll();
-            if (isEmpty(attributedBody)) return null;
+    try {
+        const attributedBody = Unarchiver.open(value, Unarchiver.BinaryDecoding.decodable).decodeAll();
+        if (isEmpty(attributedBody)) return null;
 
-            let body = null;
-            if (Array.isArray(attributedBody)) {
-                body = attributedBody.map(i => {
-                    if (i.values) {
-                        return i.values.filter((e: any) => {
-                            return e && e instanceof NSAttributedString;
-                        });
-                    } else {
-                        return i;
-                    }
-                });
-            } else {
-                body = attributedBody;
-            }
-
-            // Make sure we don't have nested arrays
-            if (Array.isArray(body)) {
-                body = body.flat();
-            }
-
-            // Make sure all outputs are arrays
-            if (!Array.isArray(body)) {
-                body = [body];
-            }
-
-            return body;
-        } catch (e: any) {
-            Server().log(`Failed to deserialize archive: ${e.message}`, "debug");
+        let body = null;
+        if (Array.isArray(attributedBody)) {
+            body = attributedBody.map(i => {
+                if (i.values) {
+                    return i.values.filter((e: any) => {
+                        return e && e instanceof NSAttributedString;
+                    });
+                } else {
+                    return i;
+                }
+            });
+        } else {
+            body = attributedBody;
         }
 
-        return null;
+        // Make sure we don't have nested arrays
+        if (Array.isArray(body)) {
+            body = body.flat();
+        }
+
+        // Make sure all outputs are arrays
+        if (!Array.isArray(body)) {
+            body = [body];
+        }
+
+        return body;
+    } catch (e: any) {
+        Server().log(`Failed to deserialize archive: ${e.message}`, "debug");
     }
+
+    return null;
+};

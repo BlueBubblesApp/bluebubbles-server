@@ -1,0 +1,87 @@
+name: Swift — dependency update
+
+# Weekly `swift package update`, opening a PR when anything moves.
+#
+# The point is that drift is visible in days rather than discovered in years. The Electron
+# tree is the counter-example: 309 open Dependabot advisories on the default branch, and
+# several pins that are now their own migration project.
+#
+# See swift/DEPENDENCIES.md § Policy.
+
+on:
+  schedule:
+    # Mondays, 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    name: Resolve latest and open a PR
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.3.app
+
+      - name: Update dependencies
+        working-directory: swift
+        run: swift package update
+
+      - name: Stop if nothing moved
+        id: check
+        working-directory: swift
+        run: |
+          if git diff --quiet -- Package.resolved; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency changes."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- Package.resolved
+          fi
+
+      # Build and test before proposing the bump, so a PR that opens is a PR worth reviewing
+      # rather than one that immediately goes red.
+      - name: Build
+        if: steps.check.outputs.changed == 'true'
+        working-directory: swift
+        run: swift build --build-tests
+
+      - name: Test
+        if: steps.check.outputs.changed == 'true'
+        working-directory: swift
+        run: swift test --skip-build
+
+      - name: Open pull request
+        if: steps.check.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: swift/dependency-update
+          base: master
+          title: 'chore(swift): update dependencies'
+          commit-message: |
+            chore(swift): update dependencies
+
+            Automated `swift package update`. Build and tests passed before this
+            PR was opened.
+          body: |
+            Automated weekly dependency update for the Swift server.
+
+            `swift build` and `swift test` both passed against the updated graph
+            before this PR was opened.
+
+            Review the `Package.resolved` diff. If a package moved a major
+            version, check its migration notes and update
+            `swift/DEPENDENCIES.md` in this PR rather than afterwards.
+
+            Per the dependency policy, only the macOS 13 floor and the pinned
+            Swift toolchain may hold a version back. Anything else is work to
+            schedule, not a reason to pin.
+          labels: dependencies
+          delete-branch: true

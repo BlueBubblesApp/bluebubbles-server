@@ -184,7 +184,7 @@ export class IPCService extends Loggable {
         });
 
         ipcMain.handle("add-contact", async (event, args) => {
-            return await ContactInterface.createContact({
+            return await ContactInterface.createOrUpdateContact({
                 firstName: args?.firstName ?? "",
                 lastName: args?.lastName ?? "",
                 displayName: args?.displayName ?? "",
@@ -194,7 +194,7 @@ export class IPCService extends Loggable {
         });
 
         ipcMain.handle("update-contact", async (event, args) => {
-            return await ContactInterface.createContact({
+            return await ContactInterface.createOrUpdateContact({
                 id: args.contactId ?? args.id,
                 firstName: args?.firstName ?? "",
                 lastName: args.lastName ?? "",
@@ -341,6 +341,10 @@ export class IPCService extends Loggable {
 
         ipcMain.handle("purge-devices", (_, __) => {
             Server().repo.devices().clear();
+        });
+
+        ipcMain.handle("delete-device", async (_, { name, identifier }) => {
+            return await Server().repo.devices().delete({ name, identifier });
         });
 
         ipcMain.handle("restart-via-terminal", (_, __) => {
