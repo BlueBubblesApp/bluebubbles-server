@@ -88,6 +88,19 @@ struct OnboardingPlanTests {
     #expect(ids([.webhooks]).contains(.connection))
   }
 
+  @Test("An AI agent gets the API and a connection method, and never Firebase")
+  func aiAgent() {
+    let plan = ids([.aiAgent], method: ngrok)
+    #expect(plan.contains(.connection))
+    #expect(plan.contains(.api))
+    #expect(!plan.contains(.firebase))
+    #expect(OnboardingRules.asksForPort([.aiAgent]))
+    let selections = OnboardingSelections(goals: [.aiAgent], connectionMethod: ngrok)
+    #expect(OnboardingRules.firebaseRole(for: selections) == nil)
+    // Adding a desktop client brings Firebase back for the client, not for the agent.
+    #expect(ids([.aiAgent, .desktop], method: ngrok).contains(.firebase))
+  }
+
   @Test("Nothing chosen yet still yields a walkable plan")
   func emptyGoals() {
     let plan = ids([])

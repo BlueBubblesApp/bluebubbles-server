@@ -27,7 +27,11 @@ import Foundation
 
 /// How the person intends to use the server. Several may be true at once.
 enum UsageGoal: String, CaseIterable, Identifiable, Codable, Sendable {
-  case android, desktop, api, webhooks, other
+  case android, desktop, api, webhooks
+  /// An assistant driving the server. Today that is the HTTP API; the MCP server that will
+  /// sit beside it is the next step this goal grows — see `OnboardingCatalog`.
+  case aiAgent
+  case other
 
   var id: String { rawValue }
 
@@ -37,6 +41,7 @@ enum UsageGoal: String, CaseIterable, Identifiable, Codable, Sendable {
     case .desktop: "Desktop client"
     case .api: "The REST API"
     case .webhooks: "Webhooks"
+    case .aiAgent: "AI agent"
     case .other: "Something else"
     }
   }
@@ -47,6 +52,7 @@ enum UsageGoal: String, CaseIterable, Identifiable, Codable, Sendable {
     case .desktop: "The BlueBubbles app on Windows, Linux, or another Mac."
     case .api: "Your own scripts or software talking to this Mac over HTTP."
     case .webhooks: "Push new messages and events to a URL you run."
+    case .aiAgent: "Let an assistant read and send messages through this Mac."
     case .other: "Home automation, a bot, or you're not sure yet."
     }
   }
@@ -57,6 +63,7 @@ enum UsageGoal: String, CaseIterable, Identifiable, Codable, Sendable {
     case .desktop: "desktopcomputer"
     case .api: "chevron.left.forwardslash.chevron.right"
     case .webhooks: "arrow.up.right.square"
+    case .aiAgent: "brain"
     case .other: "sparkles"
     }
   }
@@ -197,8 +204,8 @@ enum OnboardingRules {
   /// Whether anyone will connect TO this server, which is what a connection method is for.
   ///
   /// Webhooks are outbound — the server calls the URL — so a webhook-only setup never needs
-  /// to be reachable. Everything else does, including "something else": a bot or an
-  /// automation is a client.
+  /// to be reachable. Everything else does, including "something else" and an AI agent: a
+  /// bot, an automation or an assistant is a client of the HTTP API.
   static func needsConnectionMethod(_ goals: Set<UsageGoal>) -> Bool {
     !goals.isEmpty && goals != [.webhooks]
   }
@@ -227,6 +234,9 @@ enum OnboardingRules {
   }
 
   /// What Firebase would do for these selections, or nil if it would do nothing useful.
+  ///
+  /// Only the two client apps are ever a reason. The API, webhooks and an agent have no
+  /// phone to wake and find the server by the address they were given.
   static func firebaseRole(for selections: OnboardingSelections) -> FirebaseRole? {
     if selections.goals.contains(.android) { return .notifications }
     guard selections.goals.contains(.desktop) else { return nil }
@@ -339,10 +349,18 @@ enum OnboardingCatalog {
     ),
     OnboardingStep(
       .api, title: "Using the API", symbol: "chevron.left.forwardslash.chevron.right",
-      purpose: { _ in "Where to point your code, and where the reference lives." },
-      isIncluded: { $0.goals.contains(.api) },
+      purpose: { selections in
+        selections.goals.contains(.aiAgent) && !selections.goals.contains(.api)
+          ? "Where an agent points today. An MCP server that sits beside the HTTP API is "
+            + "planned; until it ships, the REST API is the way in."
+          : "Where to point your code, and where the reference lives."
+      },
+      isIncluded: { $0.goals.contains(.api) || $0.goals.contains(.aiAgent) },
       isSkippable: true
     ),
+    // ROOM TO GROW: the MCP server. When it exists as a service, it gets a step here —
+    // `.mcp`, included for `.aiAgent`, embedding that service's own form the way
+    // `.connection` embeds the tunnel's — and the API step above stops mentioning it.
     OnboardingStep(
       .privateAPI, title: "Private API", symbol: "wand.and.rays",
       purpose: { _ in

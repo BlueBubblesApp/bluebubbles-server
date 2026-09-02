@@ -420,6 +420,17 @@ report a pass.
 
 # 3. Designed but unbuilt
 
+## An MCP server beside the HTTP API, and its setup step
+
+Setup already offers "AI agent" as a use; today it routes to the HTTP API. The plan is a
+service (manifest-described, in the `.integration` category, dependent on `http`) that speaks
+the Model Context Protocol against the same interfaces layer the routes use, so an assistant
+gets typed tools rather than raw endpoints. Done looks like: the service with its own
+`ServiceFormView` fields (bind address, token), a `.mcp` case in `OnboardingStep.ID` included
+for `.aiAgent` and embedding that form the way `.connection` embeds the tunnel's, and the API
+step's "an MCP server is planned" sentence removed.
+
+
 ## `UpdateInstalling` has a seam, an endpoint, and no implementation
 
 `POST /api/v1/server/update/install` is written against a capability — `UpdateInstalling`,
