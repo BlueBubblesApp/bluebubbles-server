@@ -83,7 +83,7 @@ struct SignalOwnershipTests {
   /// not sendable across the two starts below.
   private func router(port: Int) throws -> Router<BBRequestContext> {
     let builder = HTTPAPIBuilder(
-      configuration: HTTPAPIConfiguration(host: "127.0.0.1", port: port),
+      configuration: HTTPAPIConfiguration(),
       authentication: AuthenticationStage(
         chain: AuthenticationChain(schemes: []),
         accessControl: AccessControlService()

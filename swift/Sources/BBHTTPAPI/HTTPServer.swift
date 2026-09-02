@@ -43,8 +43,6 @@ public enum RouteResult: Sendable {
 }
 
 public struct HTTPAPIConfiguration: Sendable {
-  public var host: String
-  public var port: Int
   /// Matches the current server: wide open. Locking it down would break browser-based
   /// clients we cannot enumerate, so it stays as it is and is recorded as residual risk.
   public var allowedOrigin: String
@@ -55,15 +53,11 @@ public struct HTTPAPIConfiguration: Sendable {
   public var maximumBodySize: Int
 
   public init(
-    host: String = "0.0.0.0",
-    port: Int = 1234,
     allowedOrigin: String = "*",
     requestTimeout: Duration = RouteTable.defaultRequestTimeout,
     responseTimeout: Duration = RouteTable.defaultResponseTimeout,
     maximumBodySize: Int = 100 * 1024 * 1024
   ) {
-    self.host = host
-    self.port = port
     self.allowedOrigin = allowedOrigin
     self.requestTimeout = requestTimeout
     self.responseTimeout = responseTimeout

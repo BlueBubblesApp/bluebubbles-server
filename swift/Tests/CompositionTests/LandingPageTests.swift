@@ -140,7 +140,7 @@ struct LandingPageTests {
     // Port 0: the kernel picks a free port and never picks one it has already given
     // out. See `EphemeralPort`.
     let builder = HTTPAPIBuilder(
-      configuration: HTTPAPIConfiguration(host: "127.0.0.1", port: 0),
+      configuration: HTTPAPIConfiguration(),
       authentication: AuthenticationStage(
         chain: AuthenticationChain(schemes: [
           PasswordQueryScheme(

@@ -52,7 +52,7 @@ struct SocketEndToEndTests {
     PlaceholderHandlers.fill(into: &registry, groups: RouteTable.groups)
 
     let builder = HTTPAPIBuilder(
-      configuration: HTTPAPIConfiguration(host: "127.0.0.1", port: 0),
+      configuration: HTTPAPIConfiguration(),
       authentication: AuthenticationStage(
         chain: AuthenticationChain(schemes: [
           PasswordQueryScheme(

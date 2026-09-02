@@ -36,7 +36,7 @@ struct RouteTimeoutTests {
     // fell out of the loop WITHOUT calling `body`, so the test passed having asserted
     // nothing. See `EphemeralPort`.
     let builder = HTTPAPIBuilder(
-      configuration: HTTPAPIConfiguration(host: "127.0.0.1", port: 0),
+      configuration: HTTPAPIConfiguration(),
       authentication: AuthenticationStage(
         chain: AuthenticationChain(schemes: []),
         accessControl: AccessControlService()

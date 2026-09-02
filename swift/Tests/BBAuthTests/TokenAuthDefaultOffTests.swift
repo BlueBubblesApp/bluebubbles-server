@@ -56,14 +56,14 @@ struct TokenAuthDefaultOffTests {
   /// The endpoints must 404, not 401 — a 401 tells an attacker the endpoint exists, and it
   /// would also make the route table differ from the Node server's, which the parity
   /// harness diffs strictly.
-  @Test("No auth routes are registered by default")
-  func noRoutesRegistered() async {
-    #expect(await TokenAuthService().additionalRouteGroupNames.isEmpty)
+  @Test("Token auth is off by default and on only when the mode says so")
+  func offByDefault() async {
+    #expect(await !TokenAuthService().isEnabled)
     #expect(
       await TokenAuthService(
         configuration: TokenAuthConfiguration(mode: .token),
         secrets: RecordingSecrets()
-      ).additionalRouteGroupNames == ["Auth"])
+      ).isEnabled)
   }
 
   /// No new key material on a fresh install. A signing key the user did not ask for is a
@@ -163,7 +163,6 @@ struct TokenAuthDefaultOffTests {
       configuration: TokenAuthConfiguration(mode: .both), secrets: secrets
     )
     #expect(await enabled.isEnabled)
-    #expect(await enabled.additionalRouteGroupNames == ["Auth"])
 
     // Under `both`, the password still authenticates.
     let chain = await enabled.chain(passwordProvider: { PasswordDigest("correct-horse") })

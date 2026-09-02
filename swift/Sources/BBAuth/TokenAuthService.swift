@@ -81,14 +81,6 @@ public actor TokenAuthService {
   public var isEnabled: Bool { configuration.isTokenAuthEnabled }
   public var mode: AuthMode { configuration.mode }
 
-  /// The route groups to register, beyond the base table.
-  ///
-  /// Empty under the default, which is what makes the auth endpoints 404 rather than 401.
-  /// The distinction matters: a 401 tells an attacker the endpoint exists.
-  public var additionalRouteGroupNames: [String] {
-    configuration.isTokenAuthEnabled ? ["Auth"] : []
-  }
-
   /// Builds the authentication chain for the configured mode.
   public func chain(
     passwordProvider: @escaping @Sendable () async -> PasswordDigest?

@@ -20,6 +20,7 @@
 //
 //  See `.claude/docs/database.md`.
 
+import BBCore
 import BBPersistence
 import Foundation
 import Logging
@@ -34,7 +35,7 @@ public struct SchemaProfile: Sendable {
 
   /// Which scale the date columns use. High Sierra switched chat.db from seconds to
   /// nanoseconds; getting this wrong yields dates that look plausible and are decades off.
-  public let dateUnit: AppleTimestampUnitProxy
+  public let dateUnit: AppleTimestamp.Unit
 
   private let logger = Logger(label: "bluebubbles.schema")
 
@@ -44,7 +45,7 @@ public struct SchemaProfile: Sendable {
     chatColumns: Set<String>,
     handleColumns: Set<String>,
     attachmentColumns: Set<String>,
-    dateUnit: AppleTimestampUnitProxy
+    dateUnit: AppleTimestamp.Unit
   ) {
     self.tables = tables
     self.messageColumns = messageColumns
@@ -155,11 +156,4 @@ public struct SchemaProfile: Sendable {
 
 public enum SchemaTable: String, Sendable {
   case message, chat, handle, attachment
-}
-
-/// Mirrors `AppleTimestamp.Unit` without importing BBCore into the profile's
-/// public signature, so the two can move independently.
-public enum AppleTimestampUnitProxy: Sendable {
-  case nanoseconds
-  case seconds
 }

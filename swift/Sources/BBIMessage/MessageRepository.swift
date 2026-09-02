@@ -30,9 +30,7 @@ public struct MessageRepository: Sendable {
     self.profile = profile
   }
 
-  private var dateUnit: AppleTimestamp.Unit {
-    profile.dateUnit == .nanoseconds ? .nanoseconds : .seconds
-  }
+  private var dateUnit: AppleTimestamp.Unit { profile.dateUnit }
 
   // MARK: - Column sets
   //

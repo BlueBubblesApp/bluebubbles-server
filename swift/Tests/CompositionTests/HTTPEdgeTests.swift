@@ -43,7 +43,7 @@ struct HTTPEdgeTests {
   ) async throws {
     let builder = HTTPAPIBuilder(
       configuration: configuration
-        ?? HTTPAPIConfiguration(host: "127.0.0.1", port: 0),
+        ?? HTTPAPIConfiguration(),
       // Open: this is testing the envelope, and an auth failure would mask every result.
       authentication: AuthenticationStage(
         chain: AuthenticationChain(schemes: []),
@@ -287,8 +287,7 @@ struct HTTPEdgeTests {
     let routes = [
       RouteDefinition(.post, "upload", HandlerID("edge.upload"), requires: .unauthenticated)
     ]
-    let configuration = HTTPAPIConfiguration(
-      host: "127.0.0.1", port: 0, maximumBodySize: 1024)
+    let configuration = HTTPAPIConfiguration(maximumBodySize: 1024)
 
     try await withServer(
       registry: registry, groups: [group(routes)], configuration: configuration

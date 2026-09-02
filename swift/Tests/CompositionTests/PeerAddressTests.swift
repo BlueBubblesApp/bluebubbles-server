@@ -61,7 +61,7 @@ struct PeerAddressTests {
     // Port 0 throughout: the kernel picks, and it never picks one it has already given out.
     // See `EphemeralPort` for what this replaced and why guessing was worse than it looked.
     let builder = HTTPAPIBuilder(
-      configuration: HTTPAPIConfiguration(host: "127.0.0.1", port: 0),
+      configuration: HTTPAPIConfiguration(),
       authentication: AuthenticationStage(chain: chain, accessControl: accessControl),
       privateAPI: PrivateAPIStage(isConnected: { true })
     )

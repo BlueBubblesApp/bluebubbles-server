@@ -316,3 +316,36 @@ struct LegacyNamespaceMigrationTests {
     #expect(try secrets.get("password") == "legacy-password")
   }
 }
+
+// MARK: - Legacy keys stay in the migration
+
+@Suite("Legacy settings keys")
+struct LegacySettingsKeyTests {
+
+  /// The Electron server's keys exist here so the one-time import can read them. Nothing
+  /// else may: a legacy key read at runtime is a setting with two spellings, and the UI
+  /// renders neither.
+  @Test("A legacy key is spelled only in the registry and the migration")
+  func legacyKeysAreReadOnlyByTheMigration() throws {
+    let sources = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()  // BBSettingsTests
+      .deletingLastPathComponent()  // Tests
+      .deletingLastPathComponent()  // swift
+      .appendingPathComponent("Sources")
+    let allowed: Set<String> = ["LegacyConfigMigration.swift", "SettingsRegistry.swift"]
+    let keys = Settings.Legacy.all.map(\.key)
+
+    var offenders: [String] = []
+    let enumerator = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
+    while let url = enumerator?.nextObject() as? URL {
+      guard url.pathExtension == "swift", !allowed.contains(url.lastPathComponent) else {
+        continue
+      }
+      let text = try String(contentsOf: url, encoding: .utf8)
+      for key in keys where text.contains("\"\(key)\"") || text.contains("Legacy.") {
+        offenders.append("\(url.lastPathComponent): \(key)")
+      }
+    }
+    #expect(offenders.isEmpty, "legacy keys read outside the migration: \(offenders)")
+  }
+}
