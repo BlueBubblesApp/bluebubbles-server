@@ -76,7 +76,11 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
 
     let runtime = PrivateAPIRuntime(
       configuration: configuration,
-      alerts: PrivateAPIAlertBridge(alerts: context.alerts),
+      // Coalesced: injection retries, and a failing retry loop would otherwise produce one
+      // alert per attempt.
+      alerts: AlertCenterReporter(
+        center: context.alerts, source: "PrivateAPI", dedupeKey: "private-api.injection"
+      ),
       logger: context.logger
     )
     await self.runtime.set(runtime)
@@ -295,25 +299,5 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
     // Nil means "listen, but do not manage injection" — a helper installed some other
     // way still connects. That is a supported configuration, not a failure.
     return nil
-  }
-}
-
-/// Routes the runtime's failures into the alert centre without giving BBPrivateAPI a
-/// dependency on BBDiagnostics.
-struct PrivateAPIAlertBridge: PrivateAPIAlerting {
-  let alerts: AlertCenter
-
-  func raise(title: String, detail: String) async {
-    await alerts.raise(
-      UserAlert(
-        severity: .error,
-        title: title,
-        body: detail,
-        source: "PrivateAPI",
-        // Coalesced: injection retries, and a failing retry loop would otherwise
-        // produce one alert per attempt.
-        dedupeKey: "private-api.injection"
-      )
-    )
   }
 }

@@ -53,6 +53,11 @@ method on an interface.
 
 ## Reading a request
 
+Every request-reading helper — body values, path parameters, query parameters (`integer`,
+`date`, `truthy`, `wants`) — lives in `RequestValues.swift`. Do not write a private
+`pathParameter`/`intQuery` in a handler file; three handler groups did, each with its own
+error sentence and one without percent-decoding.
+
 `try request.values()` parses the body once and hands back `RequestValues`. Use
 `requireString(_:)` rather than writing the guard: it produces the `` `key` is required ``
 sentence that eighteen of the twenty-four hand-written guards already used.

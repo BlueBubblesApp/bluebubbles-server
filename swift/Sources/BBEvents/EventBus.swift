@@ -13,7 +13,6 @@
 //  See `docs/EVENTS.md`.
 
 import BBCore
-import BBDiagnostics
 import Foundation
 import Logging
 
@@ -63,15 +62,11 @@ public actor EventBus {
   /// A sink that hangs must not hold a delivery task forever.
   private let deliveryTimeout: Duration
 
-  /// - Parameter alerts: accepted and unused. Delivery failures are LOGGED here, never
-  ///   raised: one failed webhook POST is not worth interrupting anyone over, and the sink
-  ///   itself raises once a failure becomes persistent — it is the only thing that knows
-  ///   the difference. Kept in the signature because the composition root passes it and
-  ///   removing it would read as a decision to stop alerting rather than as a statement of
-  ///   where alerting belongs.
+  /// No alert centre here, deliberately. Delivery failures are LOGGED, never raised: one
+  /// failed webhook POST is not worth interrupting anyone over, and the sink itself raises
+  /// once a failure becomes persistent — it is the only thing that knows the difference.
   public init(
     logger: Logger = Logger(label: "bluebubbles.events"),
-    alerts: (any AlertRaising)? = nil,
     deliveryTimeout: Duration = .seconds(30)
   ) {
     self.logger = logger

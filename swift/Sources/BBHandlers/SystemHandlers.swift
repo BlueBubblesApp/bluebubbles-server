@@ -100,7 +100,7 @@ public enum SystemHandlers {
     context: some ApplicationRestarting & PrivateAPIProviding
   ) {
     registry.register(.icloudAccountInfo) { _ in
-      let api = try await requirePrivateAPI(context, for: "reading account information")
+      let api = try await context.requirePrivateAPI(for: "reading account information")
       let info = try await api.accountInfo()
       return .data(
         .object([
@@ -124,7 +124,7 @@ public enum SystemHandlers {
     // one with missing keys. They stay on the contract because the socket layer and future
     // v2 surface can use them.
     registry.register(.icloudContactCard) { request in
-      let api = try await requirePrivateAPI(context, for: "reading a contact card")
+      let api = try await context.requirePrivateAPI(for: "reading a contact card")
       // Absent means the local user's own card. The reference takes it from the query
       // string and passes undefined straight through, so an empty value is the default
       // rather than an error.
@@ -141,14 +141,14 @@ public enum SystemHandlers {
     // name and no photo, and a person who shared nothing at all, both reduce to an empty
     // `data` object in v1; here they differ.
     registry.register(.icloudContactCardV2) { request in
-      let api = try await requirePrivateAPI(context, for: "reading a contact card")
+      let api = try await context.requirePrivateAPI(for: "reading a contact card")
       let address = request.queryParameters["address"].flatMap { $0.isEmpty ? nil : $0 }
       let card = try await api.nicknameInfo(for: address)
       return .data(.object(contactCardPayload(card, includingExtendedKeys: true)))
     }
 
     registry.register(.icloudChangeAlias) { request in
-      let api = try await requirePrivateAPI(context, for: "changing the active alias")
+      let api = try await context.requirePrivateAPI(for: "changing the active alias")
       let values = try request.values()
       let alias = try values.requireString("alias")
       // Checked against the vetted list first. IMCore accepts an unvetted alias and
@@ -183,16 +183,4 @@ public enum SystemHandlers {
     }
   }
 
-  private static func requirePrivateAPI(
-    _ context: some ApplicationRestarting & PrivateAPIProviding,
-    for feature: String
-  ) async throws -> any PrivateAPI {
-    guard let api = await context.privateAPIClient() else {
-      throw IMessageError(
-        IMessageError.helperUnavailable().errorMessage,
-        data: .object(["feature": .string(feature)])
-      )
-    }
-    return api
-  }
 }

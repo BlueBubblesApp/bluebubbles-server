@@ -35,12 +35,7 @@ public enum MediaHandlers {
     registry.register(.attachmentForceDownload) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
-      guard let api = await context.privateAPIClient() else {
-        throw IMessageError(
-          IMessageError.helperUnavailable().errorMessage,
-          data: .object(["feature": .string("downloading a purged attachment")])
-        )
-      }
+      let api = try await context.requirePrivateAPI(for: "downloading a purged attachment")
       let path = try await api.downloadPurgedAttachment(guid: guid)
       let metadata = try await interfaces.attachment.find(guid: guid)
       return .file(
@@ -97,12 +92,7 @@ public enum MediaHandlers {
 
     registry.register(.chatRemoveGroupIcon) { request in
       let guid = try request.requirePathParameter("guid")
-      guard let api = await context.privateAPIClient() else {
-        throw IMessageError(
-          IMessageError.helperUnavailable().errorMessage,
-          data: .object(["feature": .string("removing a group photo")])
-        )
-      }
+      let api = try await context.requirePrivateAPI(for: "removing a group photo")
       // An empty path is how IMCore is told to clear the photo rather than set one.
       try await api.updateGroupPhoto(chat: ChatGUID(guid), imagePath: "")
       return .data(nil)
@@ -354,14 +344,14 @@ public enum MediaHandlers {
     context: some InterfaceProviding & PrivateAPIProviding
   ) {
     registry.register(.chatShouldShareContact) { request in
-      let api = try await requirePrivateAPI(context, for: "contact sharing")
+      let api = try await context.requirePrivateAPI(for: "contact sharing")
       let guid = try request.requirePathParameter("guid")
       let should = try await api.shouldOfferNicknameSharing(chat: ChatGUID(guid))
       return .data(.object(["shouldShare": .bool(should)]))
     }
 
     registry.register(.chatShareContact) { request in
-      let api = try await requirePrivateAPI(context, for: "contact sharing")
+      let api = try await context.requirePrivateAPI(for: "contact sharing")
       let guid = try request.requirePathParameter("guid")
       try await api.shareNickname(chat: ChatGUID(guid))
       return .data(nil)
@@ -398,16 +388,4 @@ public enum MediaHandlers {
     }
   }
 
-  private static func requirePrivateAPI(
-    _ context: some InterfaceProviding & PrivateAPIProviding,
-    for feature: String
-  ) async throws -> any PrivateAPI {
-    guard let api = await context.privateAPIClient() else {
-      throw IMessageError(
-        IMessageError.helperUnavailable().errorMessage,
-        data: .object(["feature": .string(feature)])
-      )
-    }
-    return api
-  }
 }

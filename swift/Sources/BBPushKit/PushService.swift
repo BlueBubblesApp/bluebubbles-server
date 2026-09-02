@@ -9,6 +9,7 @@
 //
 //  See `docs/EVENTS.md`.
 
+import BBCore
 import BBDiagnostics
 import BBSettings
 import Foundation
@@ -69,7 +70,7 @@ public actor PushService {
   private var configuration: PushConfiguration
   private let http: any HTTPPerforming
   private let logger: Logger
-  private let alerts: (any PushAlerting)?
+  private let alerts: (any AlertReporting)?
   private let onRestart: @Sendable () async -> Void
   /// Called with tokens FCM reported dead, so they are pruned at once rather than in a
   /// monthly sweep.
@@ -92,7 +93,7 @@ public actor PushService {
     credentials: PushCredentialStore,
     configuration: PushConfiguration = PushConfiguration(),
     http: any HTTPPerforming = AsyncHTTPPerformer(),
-    alerts: (any PushAlerting)? = nil,
+    alerts: (any AlertReporting)? = nil,
     logger: Logger = Logger(label: "bluebubbles.push"),
     onRestart: @escaping @Sendable () async -> Void = {},
     pruneTokens: @escaping @Sendable ([String]) async -> Void = { _ in },
@@ -438,7 +439,3 @@ public actor PushService {
   }
 }
 
-/// How push reports things the user should see, without depending on the alert centre's type.
-public protocol PushAlerting: Sendable {
-  func raise(title: String, detail: String) async
-}

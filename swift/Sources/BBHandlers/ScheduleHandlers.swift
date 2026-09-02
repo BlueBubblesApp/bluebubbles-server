@@ -37,12 +37,3 @@ public enum ScheduleHandlers {
     }
   }
 }
-
-extension APIRequestContext {
-  /// The `:id` path parameter as a number.
-  func identifier() throws -> Int64 {
-    let raw = try requirePathParameter("id")
-    guard let id = Int64(raw) else { throw BadRequest("`id` must be a number") }
-    return id
-  }
-}

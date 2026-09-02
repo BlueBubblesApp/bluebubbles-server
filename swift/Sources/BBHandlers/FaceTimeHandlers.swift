@@ -41,7 +41,7 @@ public enum FaceTimeHandlers {
   ) {
     registry.register(.facetimeNewSession) { _ in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "creating a FaceTime link")
+      let api = try await context.requirePrivateAPI(for: "creating a FaceTime link")
       let link = try await api.generateFaceTimeLink(invitedAddresses: [])
       await context.faceTime().links.record(url: link.url, groupUUID: link.groupUUID)
       return .data(inheritedLinkPayload(link))
@@ -49,8 +49,8 @@ public enum FaceTimeHandlers {
 
     registry.register(.facetimeAnswer) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "answering a FaceTime call")
-      let callUUID = try pathCallUUID(request)
+      let api = try await context.requirePrivateAPI(for: "answering a FaceTime call")
+      let callUUID = try request.requirePathParameter("call_uuid")
       try await api.answerFaceTimeCall(callUUID: callUUID)
       // Answering a 1:1 call and minting a link upgrades it to a joinable conversation.
       let link = try await api.generateFaceTimeLinkForCall(callUUID: callUUID)
@@ -59,8 +59,8 @@ public enum FaceTimeHandlers {
 
     registry.register(.facetimeLeave) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "leaving a FaceTime call")
-      try await api.leaveFaceTimeCall(callUUID: try pathCallUUID(request))
+      let api = try await context.requirePrivateAPI(for: "leaving a FaceTime call")
+      try await api.leaveFaceTimeCall(callUUID: try request.requirePathParameter("call_uuid"))
       // The inherited route replies 201 "No Data" — asserted by the parity harness.
       return .noData
     }
@@ -76,7 +76,7 @@ public enum FaceTimeHandlers {
     // Flow A — a bare link.
     registry.register(.facetimeGenerateLink) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "creating a FaceTime link")
+      let api = try await context.requirePrivateAPI(for: "creating a FaceTime link")
       // `{ "addresses": [...] }` pre-invites those people onto the link.
       //
       // NO MEDIA OPTION, deliberately. A `TUConversationLink` carries no media type —
@@ -94,7 +94,7 @@ public enum FaceTimeHandlers {
     // Hang up the Mac's side of a call, by UUID in the body.
     registry.register(.facetimeLeaveCall) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "leaving a FaceTime call")
+      let api = try await context.requirePrivateAPI(for: "leaving a FaceTime call")
       let values = try request.values()
       guard let callUUID = values["callUUID"]?.stringValue ?? values["call_uuid"]?.stringValue,
         !callUUID.isEmpty
@@ -108,7 +108,7 @@ public enum FaceTimeHandlers {
     // Invalidate active links — user-driven cleanup.
     registry.register(.facetimeInvalidateLinks) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "invalidating FaceTime links")
+      let api = try await context.requirePrivateAPI(for: "invalidating FaceTime links")
       let body = (try? request.jsonBody()) ?? nil
       let urls = body?["urls"]?.arrayValue?.compactMap(\.stringValue)
       let invalidated = try await api.invalidateFaceTimeLinks(urls: urls)
@@ -128,7 +128,7 @@ public enum FaceTimeHandlers {
     // bare link it asks for one, at `POST facetime/link`.
     registry.register(.facetimeCall) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "starting a FaceTime call")
+      let api = try await context.requirePrivateAPI(for: "starting a FaceTime call")
       let values = try request.values()
       let addresses =
         values["addresses"]?.arrayValue?.compactMap(\.stringValue)
@@ -200,8 +200,8 @@ public enum FaceTimeHandlers {
     // Admit a knocker. `:group_uuid` is the conversation; the address is in the body.
     registry.register(.facetimeAdmit) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "admitting a FaceTime participant")
-      let group = try pathParameter(request, "group_uuid")
+      let api = try await context.requirePrivateAPI(for: "admitting a FaceTime participant")
+      let group = try request.requirePathParameter("group_uuid")
       let values = try request.values()
       let address = try values.requireString("address")
       try await api.admitFaceTimeParticipant(conversationUUID: group, handle: address)
@@ -211,9 +211,9 @@ public enum FaceTimeHandlers {
     // Read who is in a conversation, and who is knocking.
     registry.register(.facetimeMembers) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let api = try await requirePrivateAPI(context, for: "reading FaceTime members")
+      let api = try await context.requirePrivateAPI(for: "reading FaceTime members")
       let members = try await api.faceTimeMembers(
-        conversationUUID: try pathParameter(request, "group_uuid")
+        conversationUUID: try request.requirePathParameter("group_uuid")
       )
       return .data(.array(members.map(memberObject)))
     }
@@ -226,8 +226,8 @@ public enum FaceTimeHandlers {
 
     registry.register(.facetimeRecents) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      let limit = min(max(intQuery(request, "limit") ?? 50, 1), 500)
-      let offset = max(intQuery(request, "offset") ?? 0, 0)
+      let limit = min(max(request.integer("limit") ?? 50, 1), 500)
+      let offset = max(request.integer("offset") ?? 0, 0)
       let faceTimeOnly = request.queryParameters["service"]?.lowercased() != "all"
 
       // A Mac with no call log is not an error — it is a Mac that has never placed a
@@ -257,7 +257,7 @@ public enum FaceTimeHandlers {
     // settings button as well as this route. Only ever touches links the SERVER minted.
     registry.register(.facetimeCleanup) { _ in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-      _ = try await requirePrivateAPI(context, for: "cleaning up FaceTime state")
+      _ = try await context.requirePrivateAPI(for: "cleaning up FaceTime state")
       // The route means "clear them now", not "clear the old ones".
       let result = await context.faceTime().cleanUp(clearAll: true)
       var fields: [String: JSONValue] = [
@@ -275,8 +275,8 @@ public enum FaceTimeHandlers {
     // Flow C — answer an incoming call, hand back a link, admit joiners, then drop.
     registry.register(.facetimeHandoff) { request in
       try await requireFaceTimeSetting(Settings.faceTimeIncomingHandoff, context)
-      let api = try await requirePrivateAPI(context, for: "handing off a FaceTime call")
-      let callUUID = try pathCallUUID(request)
+      let api = try await context.requirePrivateAPI(for: "handing off a FaceTime call")
+      let callUUID = try request.requirePathParameter("call_uuid")
 
       try await api.answerFaceTimeCall(callUUID: callUUID)
       let link = try await api.generateFaceTimeLinkForCall(callUUID: callUUID)
@@ -373,10 +373,6 @@ public enum FaceTimeHandlers {
     }
   }
 
-  private static func intQuery(_ request: APIRequestContext, _ name: String) -> Int? {
-    request.queryParameters[name].flatMap(Int.init)
-  }
-
   /// One call-log entry, in the shape the rest of the FaceTime API uses.
   ///
   /// The database's vocabulary is NOT the wire's, and the mapping is deliberate:
@@ -448,17 +444,6 @@ public enum FaceTimeHandlers {
 
   // MARK: - Shared
 
-  private static func pathCallUUID(_ request: APIRequestContext) throws -> String {
-    try pathParameter(request, "call_uuid")
-  }
-
-  private static func pathParameter(_ request: APIRequestContext, _ name: String) throws -> String {
-    guard let value = request.pathParameters[name], !value.isEmpty else {
-      throw BadRequest("`\(name)` is required in the path")
-    }
-    return value
-  }
-
   /// Gate on a user-facing SETTING rather than a developer feature flag.
   ///
   /// FaceTime is a capability a user turns on, exactly like the Messages Private API — so it
@@ -474,31 +459,6 @@ public enum FaceTimeHandlers {
           + "Enable `\(setting.key)` in the server settings to use it."
       )
     }
-  }
-
-  private static func requireFeature(
-    _ flag: FeatureFlag,
-    _ context: some FaceTimeProviding & LoggerProviding & PrivateAPIProviding & SettingsProviding
-  ) async throws {
-    guard await context.settings.isEnabled(flag) else {
-      throw Forbidden(
-        "\(flag.summary) is disabled on this server. \(flag.rationale) "
-          + "Enable `\(flag.key)` in the server settings to use it."
-      )
-    }
-  }
-
-  private static func requirePrivateAPI(
-    _ context: some FaceTimeProviding & LoggerProviding & PrivateAPIProviding & SettingsProviding,
-    for feature: String
-  ) async throws -> any PrivateAPI {
-    guard let api = await context.privateAPIClient() else {
-      throw IMessageError(
-        IMessageError.helperUnavailable().errorMessage,
-        data: .object(["feature": .string(feature)])
-      )
-    }
-    return api
   }
 
   // MARK: - Debug-only diagnostics
@@ -520,16 +480,16 @@ public enum FaceTimeHandlers {
     #if DEBUG
       registry.register(.facetimeDebug) { request in
         try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-        let api = try await requirePrivateAPI(context, for: "reading FaceTime debug state")
+        let api = try await context.requirePrivateAPI(for: "reading FaceTime debug state")
         let state = try await api.faceTimeDebugState(
-          conversationUUID: try pathParameter(request, "group_uuid")
+          conversationUUID: try request.requirePathParameter("group_uuid")
         )
         return .data(.object(state.mapValues(JSONValue.string)))
       }
 
       registry.register(.facetimeWindows) { _ in
         try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-        let api = try await requirePrivateAPI(context, for: "inspecting FaceTime windows")
+        let api = try await context.requirePrivateAPI(for: "inspecting FaceTime windows")
         return .data(
           .object([
             "windows": .array(
@@ -542,7 +502,7 @@ public enum FaceTimeHandlers {
       // address on the contact card. Production gets this automatically via FaceTimeCleanup.
       registry.register(.facetimeDismissAlert) { _ in
         try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
-        let api = try await requirePrivateAPI(context, for: "dismissing a FaceTime alert")
+        let api = try await context.requirePrivateAPI(for: "dismissing a FaceTime alert")
         let dismissed = try await api.dismissFaceTimeAlert()
         return .data(
           .object([

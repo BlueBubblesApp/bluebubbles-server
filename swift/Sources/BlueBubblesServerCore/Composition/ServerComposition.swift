@@ -235,8 +235,7 @@ public struct ServerComposition {
       secrets: authMode == .password ? nil : KeychainAuthSecrets(store: secrets)
     )
 
-    // AlertCenter already conforms to AlertRaising, so no adapter is needed.
-    let events = EventBus(alerts: alerts)
+    let events = EventBus()
 
     // MARK: Socket
     //

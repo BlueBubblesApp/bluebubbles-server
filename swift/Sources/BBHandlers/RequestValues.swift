@@ -48,12 +48,61 @@ extension APIRequestContext {
     return value
   }
 
+  /// The `:id` path parameter as a number.
+  func identifier() throws -> Int64 {
+    let raw = try requirePathParameter("id")
+    guard let id = Int64(raw) else { throw BadRequest("`id` must be a number") }
+    return id
+  }
+
+  // MARK: Query parameters
+  //
+  // Every one of these was being written slightly differently at each call site, and "did
+  // this route accept `chatGuid` or `chat_guid`" is exactly the kind of drift the parity
+  // harness cannot see. This is the one place.
+
   /// A query parameter as an integer, or nil when absent or unparsable.
   ///
   /// Lenient by the same rule as the body accessors: a client sending a limit that is not a
   /// number gets the route's default rather than a rejection.
   func integer(_ name: String) -> Int? {
     queryParameters[name].flatMap(Int.init)
+  }
+  /// A query parameter as a date. Epoch MILLISECONDS, matching the wire format.
+  func date(_ name: String) -> Date? {
+    guard let raw = queryParameters[name], let milliseconds = Double(raw) else { return nil }
+    return Date(timeIntervalSince1970: milliseconds / 1000)
+  }
+
+  func has(_ name: String) -> Bool {
+    queryParameters[name] != nil
+  }
+
+  func decimal(_ name: String) -> Double? {
+    queryParameters[name].flatMap(Double.init)
+  }
+
+  /// A boolean query parameter, matching `isTruthyBool` in the current server.
+  ///
+  /// Clients spell these several ways and have for years — `?original=1`, `?original=true`,
+  /// and a bare `?original` with no value. Accepting only `"true"` would silently ignore
+  /// two of the three and serve a converted file to a caller who asked for the original.
+  func truthy(_ name: String) -> Bool {
+    guard let raw = queryParameters[name] else { return false }
+    // Present but empty is `?original`, which is an assertion, not an absence.
+    if raw.isEmpty { return true }
+    return ["1", "true", "yes"].contains(raw.lowercased())
+  }
+
+  /// Whether the `with` parameter asks for a relation.
+  ///
+  /// Substring rather than equality: clients spell the same relation several ways —
+  /// `chat`, `chats`, `chat.participants` — and the current server accepts all of them.
+  func wants(_ relation: String) -> Bool {
+    guard let raw = queryParameters["with"] else { return false }
+    return raw.lowercased()
+      .split(separator: ",")
+      .contains { $0.trimmingCharacters(in: .whitespaces).contains(relation) }
   }
 }
 

@@ -7,6 +7,7 @@
 //
 //  See `.claude/docs/private-api.md`.
 
+import BBCore
 import BBDiagnostics
 import BBPrivateAPIContract
 import BBServiceKit
@@ -48,7 +49,7 @@ public actor PrivateAPIRuntime {
 
   private let configuration: PrivateAPIConfiguration
   private let logger: Logger
-  private let alerts: (any PrivateAPIAlerting)?
+  private let alerts: (any AlertReporting)?
 
   private let transport: SocketTransport
   public let client: PrivateAPIClient
@@ -68,7 +69,7 @@ public actor PrivateAPIRuntime {
 
   public init(
     configuration: PrivateAPIConfiguration,
-    alerts: (any PrivateAPIAlerting)? = nil,
+    alerts: (any AlertReporting)? = nil,
     logger: Logger = Logger(label: "bluebubbles.privateapi.service")
   ) {
     self.configuration = configuration
@@ -430,13 +431,4 @@ public actor PrivateAPIRuntime {
       return String(describing: error)
     }
   }
-}
-
-/// How the runtime reports trouble without depending on the alert centre's concrete type.
-///
-/// Named for its module rather than `AlertRaising`, which BBDiagnostics already uses for a
-/// wider protocol. Two same-named protocols in one program compile and then collide at the
-/// first file that imports both — and the composition root imports everything.
-public protocol PrivateAPIAlerting: Sendable {
-  func raise(title: String, detail: String) async
 }

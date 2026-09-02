@@ -1,6 +1,7 @@
 //  PushDeliveryService
 //  Firebase Cloud Messaging as a registry service. Optional: declines when unconfigured.
 
+import BBDiagnostics
 import BBEvents
 import BBPushKit
 import BBServiceKit
@@ -27,6 +28,9 @@ final class PushDeliveryService: ContextualService, GatedService, ConfigurableSe
     self.credentials = credentials
     self.push = PushService(
       credentials: credentials,
+      // Push's own notices — credentials moved to the Keychain, a project Google says is
+      // gone, insecure rules repaired. Each is a distinct event, so no dedupe key.
+      alerts: AlertCenterReporter(center: app.alerts, source: "Push", severity: .warning),
       onRestart: { await app.requestRestart() },
       pruneTokens: { tokens in await app.deviceDirectory.prune(tokens: tokens) },
       persistLastRestart: { timestamp in

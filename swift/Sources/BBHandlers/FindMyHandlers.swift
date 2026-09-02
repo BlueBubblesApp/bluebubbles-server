@@ -88,7 +88,7 @@ public enum FindMyHandlers {
     }
 
     registry.register(.findmyRefreshFriends) { _ in
-      let api = try await requirePrivateAPI(context, for: "refreshing FindMy friends")
+      let api = try await context.requirePrivateAPI(for: "refreshing FindMy friends")
 
       // Gated GLOBALLY, not per client.
       //
@@ -125,7 +125,7 @@ public enum FindMyHandlers {
     // MARK: Additive
 
     registry.register(.findmyRefreshFriend) { request in
-      let api = try await requirePrivateAPI(context, for: "refreshing a FindMy location")
+      let api = try await context.requirePrivateAPI(for: "refreshing a FindMy location")
       let address = try address(in: request)
 
       switch await context.findMyHandleRefreshGate.attempt() {
@@ -151,7 +151,7 @@ public enum FindMyHandlers {
     }
 
     registry.register(.findmyRequestShare) { request in
-      let api = try await requirePrivateAPI(context, for: "requesting a location share")
+      let api = try await context.requirePrivateAPI(for: "requesting a location share")
       let address = try address(in: request)
       try await api.requestFindMyLocationShare(handle: address)
       // No location comes back, and none should: the invite has been sent, and whether
@@ -237,7 +237,7 @@ public enum FindMyHandlers {
       // route's gate is the only gate is one refactor away from being reachable, and
       // this particular one transmits someone's home address.
       try await requireFeature(Features.findMyLocationSharing, context)
-      let api = try await requirePrivateAPI(context, for: "sharing a FindMy location")
+      let api = try await context.requirePrivateAPI(for: "sharing a FindMy location")
 
       let values = try request.values()
       let chatGUID = try values.requireString("chatGuid")
@@ -265,7 +265,7 @@ public enum FindMyHandlers {
 
     registry.register(.findmyStopSharing) { request in
       try await requireFeature(Features.findMyLocationSharing, context)
-      let api = try await requirePrivateAPI(context, for: "stopping a FindMy share")
+      let api = try await context.requirePrivateAPI(for: "stopping a FindMy share")
 
       let values = try request.values()
       let chatGUID = try values.requireString("chatGuid")
@@ -385,16 +385,4 @@ public enum FindMyHandlers {
     }
   }
 
-  private static func requirePrivateAPI(
-    _ context: some FindMyProviding & PrivateAPIProviding & SettingsProviding,
-    for feature: String
-  ) async throws -> any PrivateAPI {
-    guard let api = await context.privateAPIClient() else {
-      throw IMessageError(
-        IMessageError.helperUnavailable().errorMessage,
-        data: .object(["feature": .string(feature)])
-      )
-    }
-    return api
-  }
 }
