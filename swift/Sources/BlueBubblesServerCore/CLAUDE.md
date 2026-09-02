@@ -13,7 +13,10 @@ Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architec
 ## Layout
 
 - `Composition/Services/` — one file per service. `ContextualService.swift` holds the shared
-  protocol, the `ServiceID` constants, `TaskBox`/`RuntimeBox` and `ServiceStartupError`.
+  protocol, the `ServiceID` constants and `ServiceStartupError`. A service is an `actor` —
+  `Service` requires it — so its own mutable state is a `private var`, not a box. The two
+  boxes that used to hold a `Task` and the Private API runtime were deleted with their last
+  caller.
 - `Composition/Services/Proxy/` — `ProxyService<Method>` plus one file per connection method.
 - Everything else in `Composition/` is wiring: the context, the composition, the lifecycle,
   the settings bridge and propagation.

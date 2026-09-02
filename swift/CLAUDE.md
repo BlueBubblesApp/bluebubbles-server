@@ -97,7 +97,7 @@ improvising the order:**
 | A table in `app.db` | A `SchemaContributor` in the module that owns it, then append it to `AppSchema.contributors`. **Not** `AppDatabase` — see [`Sources/BBPersistence/CLAUDE.md`](Sources/BBPersistence/CLAUDE.md) |
 | An event | `Sources/BBEvents/ServerEvent.swift` plus its per-sink projection |
 | A user-visible alert | Raise it explicitly through `BBDiagnostics`. Logging must never produce one |
-| A Private API call | `Helper/BBPrivateAPIContract` first, then `Helper/BlueBubblesHelper`. Go through `IMCoreRuntime`, never IMCore directly |
+| A Private API call | `Helper/BBPrivateAPIContract` first — a case on `MessagesHelperAction` or `FaceTimeHelperAction`, then the contract method — then `Helper/BlueBubblesHelper`. Each dispatch is exhaustive over its enum, so the helper side will not compile until you handle it. Go through `IMCoreRuntime`, never IMCore directly |
 | An external binary a service runs | A `ManagedToolDescriptor` on its manifest (`BuiltInTools.swift`). Do not write a downloader |
 
 ---
@@ -106,6 +106,14 @@ improvising the order:**
 
 - **Never construct `Process`.** Use `BBCore/Subprocess.swift`. Its timeout argument is
   required on purpose. The one exception is `BBProxy/DaemonProcess`, and it stays the exception.
+- **Never hand-roll a timeout.** `BBCore/Timeout.swift` has `withTimeout(_:operation:)`. Six
+  copies of the same task group existed before it; two shapes that genuinely differ stay where
+  they are and say why in place — the permission probe races a `Thread` and answers rather than
+  throwing, and the readiness waits resume a stored continuation.
+- **Error text a person will read goes through `DiagnosticText.sentence(for:)`.**
+  `String(describing: error)` in an alert body prints a Swift enum at the user;
+  `BBError.body` is the sentence written for them. Raw dumps are correct in LOG metadata and
+  inside a typed error's own `reason`, and nowhere else.
 - **Never log a secret.** Anything from a setting marked `isSecret` is wrapped as
   `DiagnosticValue.secret` and renders as `••••`. Keep it that way.
 - **Migrations are append-only.** Never edit a released one. Rename via a new migration.

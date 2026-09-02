@@ -126,8 +126,10 @@ declared twice, so a dependency cannot silently name a service that does not exi
 A settings change is routed only to services whose `watchedSettings` intersect it; the returned
 `ReloadAction`s are coalesced, and restarting a service restarts its dependents automatically.
 
-Each service is an `actor` (or `@MainActor` where it touches AppKit). If you are reaching for a
-lock, you are probably in the wrong type.
+Each service is an `actor` — `Service` refines `Actor`, so this is checked rather than asked
+for — or `@MainActor` where it touches AppKit. Its own state is an ordinary `private var`. If
+you are reaching for a lock, or for a single-purpose actor to hold one `Task`, you are
+probably in the wrong type.
 
 ### Adding a service
 

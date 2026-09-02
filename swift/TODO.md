@@ -823,10 +823,26 @@ The standalone Notifications page (now the toolbar bell); the Permissions and Se
 
 Three `nonisolated(unsafe)` statics remain (`HelperMain`/`FaceTimeHelperMain.client` and
 `started`, `EventObservation.emit`/`handler`/`rung`, `FaceTimeBridge.emit`/
-`lastLinkSnapshotCount`). Each is written once at load before any listener exists and says
-so; none is a latch. 24 `@unchecked Sendable` conformances remain; the ones touched in the
-lock pass now carry a precise comment, the rest were not re-read. Done looks like: each
+`lastLinkSnapshotCount`) — 11 declarations, all inside the injected helpers and none in the
+server. Each is written once at load before any listener exists and says so; none is a latch.
+25 `@unchecked Sendable` conformances remain in `Sources`+`Helper`; the ones touched in the
+lock pass now carry a precise comment, the rest were not re-read. The services no longer
+contribute: `Service` refines `Actor`, so each holds its own state and `TaskBox`/`RuntimeBox`
+are gone. Done looks like: each
 `@unchecked` names the invariant that makes it safe, or becomes an `OSAllocatedUnfairLock`.
+
+## Two structural findings the audit left open
+
+Both are preferences on working code, and both were checked before being left:
+
+- **`AppContext`'s publish/withdraw slots.** The cached `interfaces()` value is invalidated by
+  hand, and every mutable input has a matching invalidation site — verified, so this is not a
+  latent bug. Folding the slots into one runtime registry with a snapshot and a change stream
+  would make invalidation follow from the data. Worth doing when something else opens this area.
+- **`BBInterfaces` holds repositories that belong elsewhere.** Devices and webhooks with events,
+  alerts with diagnostics, schedules with their service. The build-time argument for splitting
+  it does not survive measurement: touching `BBInterfaces` rebuilds in 7.9s against 3.4s for
+  `BBCore`. Do it if the module is being opened up anyway, not on its own.
 
 ## `AppModel` still owns tool-status observation
 

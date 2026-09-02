@@ -219,5 +219,12 @@ encrypted; the presence of a client ack callback changes delivery from channel-e
 rather than being special-cased, which is what keeps the surface honest — if it cannot express the
 built-ins, it is not good enough.
 
-A new delivery route is a new sink: conform, declare a `SinkID`, and register it. Registration is
-the on-switch, so a sink with no configuration is simply never registered.
+A new delivery route is a new sink: conform, declare a `SinkID` **and a `SinkRouting`**, and
+register it. Registration is the on-switch, so a sink with no configuration is simply never
+registered.
+
+`SinkRouting` — `.socket`, `.push` or `.webhook` — is which suppression rules the sink obeys,
+and it deliberately has no default. The bus used to infer it by switching on `SinkID`, which
+is a string wrapper, so the switch needed a `default` and every sink outside the four known
+constants silently inherited webhook routing. Saying which class you are in is one line;
+inheriting the wrong one is invisible.

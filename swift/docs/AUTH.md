@@ -82,6 +82,15 @@ able to reach it, and a failed credential is **not** an error there. Marking it 
 instead makes the password half unreachable — the router only populates `principal` when it
 authenticates, so the handler sees `nil` and demands a code that nothing issues.
 
+**Optional about the credential, never about the blocklist.** `AuthenticationStage` is two
+calls: `admit` resolves the caller's identity and applies the blocklist and rate limiter, and
+`verifyCredential` checks what they presented. Every route runs both; this flag wraps only the
+second in `try?`. They were one method for a while, and the single `try?` swallowed the
+blocklist along with the credential — so a blocked address was refused everywhere except the
+one endpoint that accepts the server password in its body, and could go on guessing there with
+every failure counted and none enforced. `Tests/CompositionTests/OptionalAuthenticationTests`
+drives the real router and asserts a blocked caller never reaches the handler.
+
 ### Secrets are hashed with scrypt, not Argon2id
 
 swift-crypto ships no Argon2, and adding a dependency for one would put unaudited crypto in the

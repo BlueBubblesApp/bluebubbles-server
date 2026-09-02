@@ -85,7 +85,14 @@ statics left are written once at load, before any listener is installed, and eac
 ## Order of work
 
 **Contract first, implementation second.** Add to `BBPrivateAPIContract`, then implement in
-`BlueBubblesHelper`. The server compiles against the contract, so each method can land
+`BlueBubblesHelper`. Command NAMES live in the contract too, as `MessagesHelperAction` and
+`FaceTimeHelperAction` — two enums because there are two helpers in two processes with two
+sockets and their vocabularies do not overlap. Each dispatch switches over its own with no
+`default`, so **a command added to the contract does not compile until both ends handle it**,
+and the typed transport overloads route a FaceTime action to the FaceTime helper from the type
+alone rather than from a `process:` argument every call site has to remember.
+
+The server compiles against the contract, so each method can land
 independently — an unimplemented method in `IMCoreBridge` throws `notImplemented` and the server
 reports it as unavailable rather than failing to build.
 

@@ -137,6 +137,27 @@ attachment, and start both a 1:1 and a group chat with the helper absent, assert
 
 ---
 
+## What the audit pass added
+
+Five suites, each written against a specific way the code could go wrong again:
+
+- `SocketTransportTests` — the Private API event stream fans out. Two subscribers taken before
+  a helper registration both receive it. Against the previous single-shared-`AsyncStream` this
+  fails, with one subscriber never served.
+- `DeviceRegistrationTests` — the push registration WRITE runs. Nothing had ever executed it,
+  which is how it kept inserting into a column a frozen migration had renamed. One test pins
+  the migrated column name directly.
+- `OptionalAuthenticationTests` — drives the real listener and asserts a blocked caller is
+  refused on the one route whose credential check is optional, and never reaches the handler.
+- `HelperVocabularyTests` — what the compiler cannot check about the helper command enums:
+  the two stay disjoint, raw values stay kebab-case and unique, and the client keeps sending
+  cases rather than strings. Exhaustiveness is the build's job and is deliberately not
+  restated here.
+- `PrivateAPIPumpOrderTests` — structural, and says so: the event pump must be attached before
+  the runtime starts, and no service may replace a running task without cancelling it. The
+  behaviour needs a real injection to reproduce, so the order is asserted in the source in the
+  same shape as `NamingConventionTests`.
+
 ## Per-subsystem assertions
 
 **Messages-backed interfaces.** Every operation carried out by Messages reports a backend refusal

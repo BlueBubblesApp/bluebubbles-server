@@ -185,9 +185,18 @@ closed by default. Opening it is a security decision to make deliberately, not a
 
 ## Two JSON value types, two chat identifier types — on purpose
 
-`BBSerialization.JSONValue` is the client wire contract; `BBPrivateAPI.WireJSON` is the helper
-protocol's dynamic half. They stay separate so the Private API transport is not tied to the
-read path; `WireJSON` already writes whole numbers as integers, which is the one place the two
-could disagree on the wire. Likewise `BBCore.ChatGUID` (comparison of `chat.db` values) and
+`BBSerialization.JSONValue` is the client wire contract; `BBPrivateAPIContract.WireJSON` is the
+helper protocol's dynamic half. They stay separate so the Private API transport is not tied to
+the read path, and because only one of them is frozen: `JSONValue` keeps `int` and `int64`
+apart since what it renders is the JSON shipped clients parse, where `1` and `1.0` are
+different bytes and the parity harness holds us to the ones already in the field. `WireJSON`
+carries a `Double` and writes whole numbers back as integers, which is the one place the two
+could disagree on the wire.
+
+There were briefly **three**. The helper had its own copy, `HelperProtocol.WireValue` — the
+same six cases and the same coercions, written separately because it lives in another target.
+It was deleted and `WireJSON` moved into `BBPrivateAPIContract`, which both ends already
+depend on. Two spellings of one wire format is a drift waiting to happen; two DIFFERENT wire
+formats, which is what `JSONValue` and `WireJSON` are, is not. Likewise `BBCore.ChatGUID` (comparison of `chat.db` values) and
 `BBPrivateAPIContract.ChatIdentifier` (the opaque handle the helper takes) are different
 things with different rules, and were renamed apart rather than merged.

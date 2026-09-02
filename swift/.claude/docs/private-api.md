@@ -101,6 +101,15 @@ read message content in flight, and forge replies.
 There is **one transport with one framing** (4-byte length prefix). Adding a second — a TCP
 fallback, a routing layer, newline framing — reopens that hole.
 
+And **one vocabulary over it**, typed on both ends: `MessagesHelperAction` and
+`FaceTimeHelperAction` in `BBPrivateAPIContract`, with each helper's dispatch switching over
+its own enum with no `default`. A command added to the contract does not compile until both
+sides handle it. Before that the 63 names were string literals written out twice, once per
+target, with nothing connecting them — they happened to agree, and nothing was keeping them
+that way. Two enums rather than one because the vocabularies are disjoint, which also lets
+the transport pick the target helper from the action's type instead of a `process:` argument
+every FaceTime call site had to remember.
+
 ### Why not XPC
 
 **The injected dylib cannot be an XPC listener.** `NSXPCListener(machServiceName:)` requires the
