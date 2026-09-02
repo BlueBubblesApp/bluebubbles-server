@@ -438,4 +438,3 @@ public actor PushService {
     await restartWatcher?.noteClientActivity()
   }
 }
-
