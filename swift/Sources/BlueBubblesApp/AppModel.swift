@@ -69,9 +69,19 @@ final class AppModel {
   private(set) var phase: ServerPhase = .idle
   private(set) var server: RunningServer?
 
-  /// Which service each exclusive category has selected, and which additive ones are off.
-  var selectedConnectionMethod: String = ""
-  var disabledServices: Set<String> = []
+  /// The four concerns with their own state and lifetime. Each attaches to the running
+  /// server in `start` and detaches in `stop`; the views reach them as `model.alerts` etc.
+  let permissions = PermissionsModel()
+  let alerts = AlertsModel()
+  let updates = UpdatesModel()
+  let integrations = IntegrationsModel()
+
+  init() {
+    alerts.onUnreadCountChanged = { [weak self] in await self?.applyAppearance() }
+    integrations.onFailure = { [weak self] error, action in
+      await self?.report(error, while: action)
+    }
+  }
 
   /// What the detail column has pushed on top of the selected page.
   ///
@@ -95,21 +105,10 @@ final class AppModel {
   /// the user clicking the sidebar cannot be offered by a notification.
   var selection: Destination = .home
 
-  /// Live permission state, refreshed continuously while the Permissions page is open.
-  ///
-  /// The single biggest usability gap in the current app: today a permission granted in
-  /// System Settings is not reflected until the user navigates away and back, so people
-  /// grant a permission, see no change, and conclude it did not work.
-  private(set) var permissions: [PermissionID: PermissionStatus] = [:]
-  private(set) var permissionsCheckedAt: Date?
-
   /// Resolved once at start. `AppContext` is an actor, so reaching the store per settings
   /// row would serialise every row's load behind one actor hop.
   private(set) var settingsStore: SettingsStore?
   var logSink: FileSink? { server?.logSink }
-
-  private(set) var alerts: [UserAlert] = []
-  private(set) var unreadAlertCount = 0
 
   /// Firebase setup state and its in-flight work.
   ///
@@ -189,8 +188,6 @@ final class AppModel {
   /// How many views are currently watching tool status. See `beginObservingTools`.
   var toolObservers = 0
 
-  private var permissionsTask: Task<Void, Never>?
-  private var alertsTask: Task<Void, Never>?
   private var appearanceTask: Task<Void, Never>?
 
   /// The app-level settings that take effect immediately.
@@ -219,6 +216,8 @@ final class AppModel {
       // settings screen should still open, so someone who set the delay too high can
       // reach the row that sets it.
       settingsStore = built.context.settings
+      updates.attach(built.context.settings)
+      integrations.attach(built.context.settings)
 
       if let delay = AppBehaviourPolicy.startDelay(
         await built.context.settings.get(Settings.startDelay), isAutomatic: isAutomatic
@@ -235,11 +234,13 @@ final class AppModel {
       // refreshed from `toggle` and `select` alone, so on every launch the app started
       // with an empty disabled set — every service rendered as enabled until you
       // touched one, whatever the settings actually said.
-      await refreshIntegrationState()
-      beginObserving(built)
-      beginObservingAppearance(built.context.settings)
+      await integrations.refresh()
+      let context = built.context
+      permissions.attach(context.permissions) { await context.hasMessageAccess }
+      alerts.attach(context.alerts)
+      beginObservingAppearance(context.settings)
       await applyStartupBehaviour()
-      beginUpdateChecks()
+      updates.beginChecks()
     } catch {
       // Kept in the UI rather than only logged. A server that failed to start is the
       // one moment the user most needs to be told why, and the log viewer is itself
@@ -304,7 +305,7 @@ final class AppModel {
     guard let store = settingsStore else { return }
     AppBehaviour.applyDockVisibility(hidden: await store.get(Settings.hideDockIcon))
     AppBehaviour.applyDockBadge(
-      count: unreadAlertCount,
+      count: alerts.unreadCount,
       enabled: await store.get(Settings.dockBadge)
     )
   }
@@ -312,10 +313,11 @@ final class AppModel {
   func stop() async {
     guard let server else { return }
     phase = .stopping
-    permissionsTask?.cancel()
-    alertsTask?.cancel()
+    permissions.detach()
+    alerts.detach()
+    updates.detach()
+    integrations.detach()
     appearanceTask?.cancel()
-    updateCheckTask?.cancel()
     await server.stop()
     self.server = nil
     settingsStore = nil
@@ -332,188 +334,6 @@ final class AppModel {
     return false
   }
 
-  // MARK: - Observation
-
-  private func beginObserving(_ server: RunningServer) {
-    // `AppContext` is an actor, so these hops are real. Reading the two services once
-    // here rather than per iteration keeps the polling loop below off the actor.
-    let context = server.context
-
-    // Polled rather than pushed: macOS does not notify on a TCC change, so there is
-    // nothing to subscribe to. Two seconds is fast enough to feel immediate when the
-    // user tabs back from System Settings, and each check is cheap — the expensive one
-    // (Full Disk Access) is an attempted file open.
-    permissionsTask = Task { [weak self] in
-      let permissionsService = context.permissions
-      while !Task.isCancelled {
-        let states = await permissionsService.checkAll()
-        await MainActor.run {
-          self?.permissions = states
-          self?.permissionsCheckedAt = Date()
-        }
-        try? await Task.sleep(for: .seconds(2))
-      }
-    }
-
-    alertsTask = Task { [weak self] in
-      let center = context.alerts
-      // Seeded first, so the drawer is populated on open rather than only after the
-      // next alert arrives.
-      let existing = await center.all(limit: 200)
-      let unread = await center.badgeCount()
-      await MainActor.run {
-        self?.alerts = existing
-        self?.unreadAlertCount = unread
-      }
-
-      for await alert in await center.stream() {
-        await MainActor.run {
-          self?.alerts.insert(alert, at: 0)
-          self?.unreadAlertCount += 1
-          // The badge is a view of this number, so it moves with it rather than
-          // only at startup.
-          Task { await self?.applyAppearance() }
-        }
-      }
-    }
-  }
-
-  /// The declared permission list, in onboarding order.
-  var permissionList: [Permission] {
-    server?.context.permissions.permissions ?? []
-  }
-
-  /// Required permissions currently unmet. Drives the sidebar badge and the banner.
-  var unsatisfiedRequiredCount: Int {
-    permissionList.filter { permission in
-      permission.requirement.isRequired
-        && (permissions[permission.id] ?? .notDetermined) != .granted
-    }.count
-  }
-
-  /// Whether Full Disk Access has been granted since this process started.
-  ///
-  /// The grant applies at process launch, so a running server that was started without it
-  /// still cannot read chat.db — the permission reads as granted while the database stays
-  /// shut. Offering a relaunch is the only thing that resolves it, and not saying so is
-  /// how "I granted it and nothing happened" happens.
-  var needsRelaunch: Bool {
-    permissions[.fullDiskAccess] == .granted && hasMessageAccess == false
-  }
-
-  private(set) var hasMessageAccess: Bool?
-
-  /// Records that setup proceeded without a required permission.
-  ///
-  /// Kept so a later support conversation can distinguish "was never asked" from "was
-  /// asked and chose to continue" — which are different problems with different fixes.
-  func recordOnboardingSkip(_ ids: [String]) {
-    UserDefaults.standard.set(ids, forKey: "onboardingSkippedPermissions")
-    UserDefaults.standard.set(Date(), forKey: "onboardingSkippedAt")
-  }
-
-  func request(_ id: PermissionID) async {
-    guard let context = server?.context else { return }
-    await context.permissions.request(id)
-  }
-
-  private var updateCheckTask: Task<Void, Never>?
-
-  /// How often an automatic check runs.
-  ///
-  /// Daily. An appcast is a static file and a server that runs for months should learn about
-  /// a release without being restarted, but nothing about this is urgent enough to poll more
-  /// often than a person would look.
-  static let updateCheckInterval: Duration = .seconds(24 * 60 * 60)
-
-  /// Starts the periodic check, if the user asked for one.
-  ///
-  /// This is what the automatic-update-check setting controls; without it the toggle
-  /// governs nothing and only the "Check for Updates…" menu item does anything. Re-read on
-  /// every tick rather than captured, so turning it off stops the next check rather than
-  /// needing a restart.
-  func beginUpdateChecks() {
-    updateCheckTask?.cancel()
-    updateCheckTask = Task { [weak self] in
-      // A short settle before the first check: launch is busy, and an update banner is
-      // the least urgent thing competing for that moment.
-      try? await Task.sleep(for: .seconds(30))
-      while !Task.isCancelled {
-        guard let self, let store = self.settingsStore else { return }
-        if await store.get(Settings.checkForUpdates) {
-          await self.checkForUpdates()
-        }
-        try? await Task.sleep(for: Self.updateCheckInterval)
-      }
-    }
-  }
-
-  func checkForUpdates() async {
-    // Routed through the same checker the API uses, so the menu item and
-    // GET /server/update/check can never disagree about whether an update exists.
-    guard let store = settingsStore else { return }
-    updateCheck = .checking
-    do {
-      let checker = UpdateChecker(
-        feedURL: await store.get(Settings.updateFeedURL),
-        currentVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"]
-          as? String ?? "0.0.0-dev"
-      )
-      let result = try await checker.check()
-      updateCheck =
-        result.isAvailable
-        ? .available(result.item?.shortVersion ?? "?")
-        : .upToDate
-    } catch {
-      updateCheck = .failed(String(describing: error))
-    }
-  }
-
-  private(set) var updateCheck: UpdateCheckState = .idle
-
-  enum UpdateCheckState: Equatable {
-    case idle, checking, upToDate
-    case available(String)
-    case failed(String)
-  }
-
-  func refreshPermissions() async {
-    guard let context = server?.context else { return }
-    permissions = await context.permissions.checkAll()
-    hasMessageAccess = await context.hasMessageAccess
-    permissionsCheckedAt = Date()
-  }
-
-  func markAlertsRead() async {
-    guard let center = server?.context.alerts else { return }
-    await center.markAllRead()
-    unreadAlertCount = 0
-    alerts = await center.all(limit: 200)
-  }
-
-  /// Marks one alert read or unread, for the drawer's per-row toggle.
-  ///
-  /// Re-reads the count from the centre rather than adjusting it by one. The centre's
-  /// badge counts warnings and above only, so an info alert changing state moves the list
-  /// without moving the badge — arithmetic here would drift out of step with it on the
-  /// first such alert and stay wrong until the next restart.
-  func setAlertRead(_ id: UUID, _ isRead: Bool) async {
-    guard let center = server?.context.alerts else { return }
-    if isRead {
-      await center.markRead([id])
-    } else {
-      await center.markUnread([id])
-    }
-    alerts = await center.all(limit: 200)
-    unreadAlertCount = await center.badgeCount()
-    await applyAppearance()
-  }
-
-  /// Relaunches the app.
-  ///
-  /// Full Disk Access does not take effect until the process restarts — the grant applies
-  /// at open time — so "grant it and nothing happens" is the single most common way users
-  /// get this wrong. The Permissions page offers this button once the grant is detected.
   /// Restarts one service by name, for an alert's `.retry` action.
   ///
   /// The registry already supervises services with backoff; this is the manual override for
@@ -533,58 +353,12 @@ final class AppModel {
     await context.accessControl.unblock(address: address)
   }
 
-  // MARK: - Integrations
+  // MARK: - Navigation
 
-  /// Whether a service is currently enabled.
-  ///
-  /// Two different questions behind one word, which is why this branches. In an EXCLUSIVE
-  /// category "enabled" means "this is the one selected" — there is a single value naming a
-  /// winner. Everywhere else it is an independent switch with its own stored flag.
-  func isEnabled(_ manifest: ServiceManifest) -> Bool {
-    if manifest.category.isExclusive {
-      return selectedConnectionMethod == manifest.id.rawValue
-    }
-    return !disabledServices.contains(manifest.id.rawValue)
-  }
-
-  /// Picks a service within an exclusive category.
   /// Opens a service's own page.
   func open(_ id: ServiceIdentifier) {
     selection = .integrations
     detailPath = [id]
-  }
-
-  func select(_ manifest: ServiceManifest) async {
-    guard let store = settingsStore, manifest.category.isExclusive else { return }
-    do {
-      try await store.set(Settings.connectionMethod, to: manifest.id.rawValue)
-    } catch {
-      await report(error, while: "change the connection method")
-    }
-    await refreshIntegrationState()
-  }
-
-  /// Turns an additive service on or off.
-  func toggle(_ manifest: ServiceManifest) async {
-    guard let store = settingsStore else { return }
-    var disabled = disabledServices
-    if disabled.contains(manifest.id.rawValue) {
-      disabled.remove(manifest.id.rawValue)
-    } else {
-      disabled.insert(manifest.id.rawValue)
-    }
-    do {
-      try await store.set(
-        disabled.sorted().joined(separator: ","),
-        forKey: Settings.disabledServicesKey,
-        isSecret: false
-      )
-    } catch {
-      await report(
-        error,
-        while: "turn \(manifest.name) \(disabled.contains(manifest.id.rawValue) ? "off" : "on")")
-    }
-    await refreshIntegrationState()
   }
 
   /// Surfaces a failure the person caused and would otherwise never see — a settings
@@ -601,28 +375,14 @@ final class AppModel {
       source: "app",
       dedupeKey: nil
     )
-    if let center = server?.context.alerts {
-      await center.raise(alert)
-    } else {
-      alerts.insert(alert, at: 0)
-    }
+    await alerts.raise(alert)
   }
 
-  /// Re-reads what is enabled.
+  /// Relaunches the app.
   ///
-  /// Kept as observable state rather than read per row: SwiftUI evaluates `isEnabled` for
-  /// every visible service on every redraw, and an `await` per row would make the list
-  /// flicker as each resolved.
-  func refreshIntegrationState() async {
-    guard let store = settingsStore else { return }
-    selectedConnectionMethod = await store.get(Settings.connectionMethod)
-    disabledServices = Set(
-      (await store.string(forKey: Settings.disabledServicesKey) ?? "")
-        .split(separator: ",")
-        .map(String.init)
-    )
-  }
-
+  /// Full Disk Access does not take effect until the process restarts — the grant applies
+  /// at open time — so "grant it and nothing happens" is the single most common way users
+  /// get this wrong. The Permissions page offers this button once the grant is detected.
   func relaunch() {
     let url = Bundle.main.bundleURL
     let configuration = NSWorkspace.OpenConfiguration()

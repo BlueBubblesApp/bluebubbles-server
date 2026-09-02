@@ -43,7 +43,7 @@ struct FeatureDisabledNotice: View {
         // Turned back on from HERE, without a trip to another screen: the person
         // reading this is on this page because they wanted to use the feature.
         Button("Turn On \(manifest.name)") {
-          Task { await model.toggle(manifest) }
+          Task { await model.integrations.toggle(manifest) }
         }
         .buttonStyle(.borderedProminent)
 

@@ -40,11 +40,11 @@ struct HomeView: View {
           StatCard(title: "Attachments", value: number(\.attachments))
         }
 
-        if model.unsatisfiedRequiredCount > 0 {
+        if model.permissions.unsatisfiedRequiredCount > 0 {
           GlassCard {
             HStack {
               Label(
-                "\(model.unsatisfiedRequiredCount) required permission(s) missing",
+                "\(model.permissions.unsatisfiedRequiredCount) required permission(s) missing",
                 systemImage: "exclamationmark.triangle.fill"
               )
               .foregroundStyle(.orange)

@@ -157,7 +157,8 @@ struct RootView: View {
     // actually reach it. Losing the count entirely would remove the only prompt telling
     // someone a required grant is missing.
     case .settings:
-      model.unsatisfiedRequiredCount > 0 ? model.unsatisfiedRequiredCount : nil
+      model.permissions.unsatisfiedRequiredCount > 0
+        ? model.permissions.unsatisfiedRequiredCount : nil
     default:
       nil
     }
@@ -237,8 +238,8 @@ struct MenuBarContent: View {
   var body: some View {
     Text("BlueBubbles — \(model.phase.label)")
 
-    if model.unreadAlertCount > 0 {
-      Text("\(model.unreadAlertCount) notification(s)")
+    if model.alerts.unreadCount > 0 {
+      Text("\(model.alerts.unreadCount) notification(s)")
     }
 
     Divider()

@@ -102,7 +102,7 @@ struct IntegrationsView: View {
         HStack(spacing: 8) {
           Text(manifest.name).font(.body.weight(.medium))
           if manifest.isBuiltIn { Tag("built-in") }
-          if model.isEnabled(manifest) { Tag("enabled") }
+          if model.integrations.isEnabled(manifest) { Tag("enabled") }
         }
         Text(manifest.summary)
           .font(.callout).foregroundStyle(.secondary)
@@ -194,10 +194,10 @@ struct IntegrationDetailView: View {
       // In an exclusive category, enabling is a CHOICE between siblings rather than a
       // switch — a toggle would leave "off" meaning "nothing is selected", which for a
       // connection method is a server nobody can reach.
-      if model.isEnabled(manifest) {
+      if model.integrations.isEnabled(manifest) {
         Text("Selected").font(.caption.weight(.medium)).foregroundStyle(.green)
       } else {
-        Button("Use This") { Task { await model.select(manifest) } }
+        Button("Use This") { Task { await model.integrations.select(manifest) } }
           .controlSize(.small)
       }
     } else {
@@ -207,14 +207,16 @@ struct IntegrationDetailView: View {
       Toggle(
         "Enabled",
         isOn: Binding(
-          get: { model.isEnabled(manifest) },
+          get: { model.integrations.isEnabled(manifest) },
           set: { _ in
             // Switching something ON is never surprising, so it never asks. Only the
             // off direction can have a consequence someone cannot see from here.
-            if model.isEnabled(manifest), IntegrationCatalog.disableWarning(for: manifest) != nil {
+            if model.integrations.isEnabled(manifest),
+              IntegrationCatalog.disableWarning(for: manifest) != nil
+            {
               isConfirmingDisable = true
             } else {
-              Task { await model.toggle(manifest) }
+              Task { await model.integrations.toggle(manifest) }
             }
           }
         )
@@ -228,7 +230,7 @@ struct IntegrationDetailView: View {
         titleVisibility: .visible
       ) {
         Button("Turn Off", role: .destructive) {
-          Task { await model.toggle(manifest) }
+          Task { await model.integrations.toggle(manifest) }
         }
         Button("Cancel", role: .cancel) {}
       } message: {

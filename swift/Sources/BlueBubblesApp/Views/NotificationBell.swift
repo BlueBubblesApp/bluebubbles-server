@@ -28,16 +28,16 @@ struct NotificationBell: View {
       // The badge is the whole point of a bell: it has to say "something needs you"
       // without being opened. An unread count of zero shows a plain bell rather than a
       // zero, because a permanent "0" trains people to stop looking.
-      Image(systemName: model.unreadAlertCount > 0 ? "bell.badge.fill" : "bell")
-        .symbolRenderingMode(model.unreadAlertCount > 0 ? .palette : .monochrome)
+      Image(systemName: model.alerts.unreadCount > 0 ? "bell.badge.fill" : "bell")
+        .symbolRenderingMode(model.alerts.unreadCount > 0 ? .palette : .monochrome)
         .foregroundStyle(
-          model.unreadAlertCount > 0 ? AnyShapeStyle(.red) : AnyShapeStyle(.primary),
+          model.alerts.unreadCount > 0 ? AnyShapeStyle(.red) : AnyShapeStyle(.primary),
           AnyShapeStyle(.primary)
         )
     }
     .help(
-      model.unreadAlertCount > 0
-        ? "\(model.unreadAlertCount) unread notification\(model.unreadAlertCount == 1 ? "" : "s")"
+      model.alerts.unreadCount > 0
+        ? "\(model.alerts.unreadCount) unread notification\(model.alerts.unreadCount == 1 ? "" : "s")"
         : "Notifications"
     )
     .popover(isPresented: $isShowing, arrowEdge: .bottom) {
@@ -60,25 +60,25 @@ struct NotificationsPopover: View {
         // Repeats the bell's badge inside the popover. Opening the popover is exactly
         // when the badge stops being visible, and "how many of these are new" is the
         // first thing anyone wants to know on opening it.
-        if model.unreadAlertCount > 0 {
-          Text("\(model.unreadAlertCount)")
+        if model.alerts.unreadCount > 0 {
+          Text("\(model.alerts.unreadCount)")
             .font(.caption.weight(.semibold).monospacedDigit())
             .foregroundStyle(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Capsule().fill(.red))
-            .accessibilityLabel("\(model.unreadAlertCount) unread")
+            .accessibilityLabel("\(model.alerts.unreadCount) unread")
         }
         Spacer()
-        Button("Mark All Read") { Task { await model.markAlertsRead() } }
+        Button("Mark All Read") { Task { await model.alerts.markAllRead() } }
           .controlSize(.small)
-          .disabled(model.unreadAlertCount == 0)
+          .disabled(model.alerts.unreadCount == 0)
       }
       .padding(12)
 
       Divider()
 
-      if model.alerts.isEmpty {
+      if model.alerts.items.isEmpty {
         ContentUnavailableView(
           "Nothing to report",
           systemImage: "bell.slash",

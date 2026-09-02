@@ -95,7 +95,7 @@ struct WebhooksView: View {
       // Re-read on appear: the switch lives on another screen, and a page that decides
       // whether a feature is on when the app launched would show a stale answer for the
       // rest of the session.
-      await model.refreshIntegrationState()
+      await model.integrations.refresh()
       await screen.reload()
     }
     // Delivery outcomes change without anything on this page doing anything — an event
@@ -144,7 +144,7 @@ struct WebhooksView: View {
           VStack(alignment: .leading, spacing: 6) {
             Text("API address").font(.headline)
 
-            if let manifest = httpManifest, !model.isEnabled(manifest) {
+            if let manifest = httpManifest, !model.integrations.isEnabled(manifest) {
               // The address is deliberately not shown here. Copying an address
               // that nothing is listening on is the one action this card exists
               // for, and it would fail silently on the client's side.
@@ -198,7 +198,7 @@ struct WebhooksView: View {
           VStack(alignment: .leading, spacing: 10) {
             Text("Webhooks").font(.headline)
 
-            if let manifest = webhooksManifest, !model.isEnabled(manifest) {
+            if let manifest = webhooksManifest, !model.integrations.isEnabled(manifest) {
               FeatureDisabledNotice(
                 manifest: manifest,
                 model: model,
@@ -244,7 +244,7 @@ struct WebhooksView: View {
 
   private var webhooksEnabled: Bool {
     guard let webhooksManifest else { return true }
-    return model.isEnabled(webhooksManifest)
+    return model.integrations.isEnabled(webhooksManifest)
   }
 
   private var webhooksManifest: ServiceManifest? {

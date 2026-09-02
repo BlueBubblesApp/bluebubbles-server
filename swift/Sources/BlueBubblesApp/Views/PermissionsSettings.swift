@@ -32,8 +32,8 @@ struct PermissionsSettings: View {
   var body: some View {
     Group {
       if model.phase.isRunning {
-        content(permissions: model.permissionList)
-          .task { await model.refreshPermissions() }
+        content(permissions: model.permissions.list)
+          .task { await model.permissions.refresh() }
       } else {
         SettingsSection(
           "Permissions",
@@ -59,7 +59,7 @@ struct PermissionsSettings: View {
         + "change it in System Settings.",
       // Stated so a stale page is visibly stale. Without it, a page that stopped
       // refreshing looks identical to one reporting fresh results.
-      trailing: model.permissionsCheckedAt.map { checkedAt in
+      trailing: model.permissions.checkedAt.map { checkedAt in
         AnyView(
           Text("Checked \(checkedAt.formatted(date: .omitted, time: .standard))")
             .font(.callout)
@@ -67,10 +67,10 @@ struct PermissionsSettings: View {
         )
       }
     ) {
-      if model.unsatisfiedRequiredCount > 0 {
+      if model.permissions.unsatisfiedRequiredCount > 0 {
         SettingsFootnote(
-          text: "\(model.unsatisfiedRequiredCount) required permission"
-            + "\(model.unsatisfiedRequiredCount == 1 ? " is" : "s are") missing. "
+          text: "\(model.permissions.unsatisfiedRequiredCount) required permission"
+            + "\(model.permissions.unsatisfiedRequiredCount == 1 ? " is" : "s are") missing. "
             + "The server will run, but the features below will not work.",
           symbol: "exclamationmark.triangle.fill",
           tone: .warning
@@ -83,7 +83,7 @@ struct PermissionsSettings: View {
         if index > 0 { SettingsDivider() }
         PermissionRow(
           permission: permission,
-          status: model.permissions[permission.id] ?? .notDetermined,
+          status: model.permissions.statuses[permission.id] ?? .notDetermined,
           model: model
         )
       }
@@ -129,8 +129,8 @@ struct PermissionRow: View {
           if permission.canPrompt, status == .notDetermined {
             Button("Request Access") {
               Task {
-                await model.request(permission.id)
-                await model.refreshPermissions()
+                await model.permissions.request(permission.id)
+                await model.permissions.refresh()
               }
             }
             .buttonStyle(.borderedProminent)
@@ -151,7 +151,7 @@ struct PermissionRow: View {
             }
           }
         }
-      } else if permission.requiresRelaunch, model.needsRelaunch {
+      } else if permission.requiresRelaunch, model.permissions.needsRelaunch {
         // Only once the grant is actually detected. Offering a relaunch before
         // then would restart the app to no effect and lose the user's place.
         HStack(spacing: 10) {

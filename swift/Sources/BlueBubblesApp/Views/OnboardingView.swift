@@ -56,7 +56,7 @@ struct OnboardingView: View {
       footer
     }
     .frame(width: 620, height: 560)
-    .task { await model.refreshPermissions() }
+    .task { await model.permissions.refresh() }
   }
 
   private var header: some View {
@@ -102,12 +102,12 @@ struct OnboardingView: View {
         // would float on the onboarding sheet with no surface under it.
         GlassCard {
           VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(model.permissionList.enumerated()), id: \.element.id) {
+            ForEach(Array(model.permissions.list.enumerated()), id: \.element.id) {
               index, permission in
               if index > 0 { SettingsDivider() }
               PermissionRow(
                 permission: permission,
-                status: model.permissions[permission.id] ?? .notDetermined,
+                status: model.permissions.statuses[permission.id] ?? .notDetermined,
                 model: model
               )
             }
@@ -143,7 +143,7 @@ struct OnboardingView: View {
         )
         .foregroundStyle(.secondary)
 
-        let sipStatus = model.permissions[.systemIntegrityProtection] ?? .notDetermined
+        let sipStatus = model.permissions.statuses[.systemIntegrityProtection] ?? .notDetermined
         StatusDot(
           level: sipStatus == .granted ? .ok : .unknown,
           label: sipStatus == .granted
@@ -252,9 +252,9 @@ struct OnboardingView: View {
   }
 
   private var unmetRequired: [Permission] {
-    model.permissionList.filter { permission in
+    model.permissions.list.filter { permission in
       permission.requirement.isRequired
-        && (model.permissions[permission.id] ?? .notDetermined) != .granted
+        && (model.permissions.statuses[permission.id] ?? .notDetermined) != .granted
     }
   }
 
@@ -274,7 +274,7 @@ struct OnboardingView: View {
     // Applied now rather than at the next launch: the periodic task re-reads the setting
     // on each tick, but starting it here means someone who says yes gets their first
     // check today.
-    model.beginUpdateChecks()
+    model.updates.beginChecks()
   }
 
   private func saveStartAtLogin(_ enabled: Bool) async {
@@ -337,7 +337,7 @@ struct OnboardingView: View {
       // Recorded, so a later support conversation can establish that the user chose to
       // proceed without a required permission rather than never being asked.
       if !unmetRequired.isEmpty {
-        model.recordOnboardingSkip(unmetRequired.map(\.id.rawValue))
+        model.permissions.recordOnboardingSkip(unmetRequired.map(\.id.rawValue))
       }
       isPresented = false
       return

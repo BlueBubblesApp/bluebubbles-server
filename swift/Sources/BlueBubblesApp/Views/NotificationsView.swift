@@ -20,7 +20,7 @@ struct NotificationsView: View {
 
   var body: some View {
     Group {
-      if model.alerts.isEmpty {
+      if model.alerts.items.isEmpty {
         ContentUnavailableView(
           "Nothing to report",
           systemImage: "bell.slash",
@@ -35,7 +35,7 @@ struct NotificationsView: View {
   private var list: some View {
     ScrollView {
       VStack(spacing: 10) {
-        ForEach(model.alerts) { alert in
+        ForEach(model.alerts.items) { alert in
           row(for: alert)
         }
       }
@@ -153,7 +153,7 @@ struct NotificationsView: View {
   /// gutter stays the same width in both states.
   private func readToggle(for alert: UserAlert, isUnread: Bool) -> some View {
     Button {
-      Task { await model.setAlertRead(alert.id, isUnread) }
+      Task { await model.alerts.setRead(alert.id, isUnread) }
     } label: {
       Circle()
         .fill(isUnread ? AnyShapeStyle(colour(alert.severity)) : AnyShapeStyle(.clear))
@@ -200,7 +200,7 @@ struct NotificationsView: View {
     // Acting on an alert is the strongest possible statement that it has been seen, so it
     // does not also need clicking. This is most of why the toggle rarely has to be touched:
     // the alerts carrying a remedy mark themselves off as you work through them.
-    await model.setAlertRead(alert.id, true)
+    await model.alerts.setRead(alert.id, true)
 
     switch action {
     case .openSettings(let section):

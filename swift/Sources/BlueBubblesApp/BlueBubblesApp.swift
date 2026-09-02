@@ -79,7 +79,7 @@ struct BlueBubblesApp: App {
       CommandGroup(replacing: .newItem) {}
       CommandGroup(after: .appInfo) {
         Button("Check for Updates…") {
-          Task { await model.checkForUpdates() }
+          Task { await model.updates.check() }
         }
         .disabled(!model.phase.isRunning)
       }

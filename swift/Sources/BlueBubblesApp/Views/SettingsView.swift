@@ -44,7 +44,7 @@ struct SettingsView: View {
             symbol: tab.symbol,
             // Permissions live in settings rather than the sidebar, and this badge is the
             // one signal telling someone to look.
-            badge: tab == .permissions ? model.unsatisfiedRequiredCount : 0
+            badge: tab == .permissions ? model.permissions.unsatisfiedRequiredCount : 0
           )
         }
       )
