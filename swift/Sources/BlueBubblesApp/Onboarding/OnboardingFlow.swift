@@ -135,6 +135,9 @@ struct OnboardingProgress: Equatable, Sendable {
   var acknowledgedPermissionSkip = false
   /// Nil when the typed password passes policy; empty when nothing has been typed.
   var passwordProblem: String? = ""
+  /// Whether a connection method has to be chosen on this walk. See
+  /// `OnboardingRules.needsConnectionMethod`.
+  var requiresConnectionMethod = true
   var connectionMethod: String?
   var connectionMethodName: String?
   var missingConnectionFields: [String] = []
@@ -147,8 +150,8 @@ struct OnboardingProgress: Equatable, Sendable {
 struct OnboardingStep: Identifiable, Sendable {
 
   enum ID: String, CaseIterable, Sendable {
-    case welcome, goals, permissions, password, connection, firebase, webhooks, api
-    case privateAPI, finish
+    case welcome, goals, permissions, connection, firebase, webhooks, api, privateAPI
+    case finish
   }
 
   let id: ID
@@ -244,8 +247,8 @@ enum OnboardingRules {
         + "to continue without them.")
   }
 
-  /// The password gate. An empty password is not "no authentication" — the server refuses
-  /// every request — so this step cannot be walked past.
+  /// The password half of the connection gate. An empty password is not "no
+  /// authentication" — the server refuses every request — so this cannot be walked past.
   static func passwordGate(_ progress: OnboardingProgress) -> OnboardingGate {
     guard let problem = progress.passwordProblem else { return .open }
     return .blocked(
@@ -253,10 +256,14 @@ enum OnboardingRules {
         ? "A password is required. Without one the server rejects every client." : problem)
   }
 
-  /// The connection gate: a method must be chosen and its required fields filled. A missing
-  /// binary is a note rather than a block — it can be downloaded later, and the tunnel
-  /// reports itself as not started until then.
+  /// The connection gate: the password must pass, and where something will connect a
+  /// method must be chosen with its required fields filled. A missing binary is a note
+  /// rather than a block — it can be downloaded later, and the tunnel reports itself as not
+  /// started until then.
   static func connectionGate(_ progress: OnboardingProgress) -> OnboardingGate {
+    let password = passwordGate(progress)
+    guard password.isOpen else { return password }
+    guard progress.requiresConnectionMethod else { return .open }
     guard let name = progress.connectionMethodName, progress.connectionMethod != nil else {
       return .blocked("Choose how clients will reach this Mac.")
     }
@@ -297,24 +304,18 @@ enum OnboardingCatalog {
       gate: OnboardingRules.permissionsGate
     ),
     OnboardingStep(
-      .password, title: "Server password", symbol: "key",
-      purpose: { selections in
-        OnboardingRules.asksForPort(selections.goals)
-          ? "Every client authenticates with this. It is the only thing between the "
-            + "internet and your messages."
-          : "Required even when nothing connects yet: the server refuses every request "
-            + "without one, and it protects the API the moment something does."
-      },
-      gate: OnboardingRules.passwordGate
-    ),
-    OnboardingStep(
       .connection, title: "Connection", symbol: "network",
       purpose: { selections in
-        selections.goals.contains(.android)
-          ? "A phone leaves the house, so it needs a way to reach this Mac from anywhere."
-          : "How clients reach this Mac: on your network, or through a tunnel."
+        if !OnboardingRules.needsConnectionMethod(selections.goals) {
+          return "A password is required even when nothing connects yet: the server refuses "
+            + "every request without one, and it protects the API the moment something does."
+        }
+        return selections.goals.contains(.android)
+          ? "The password every client authenticates with, and a way for a phone to reach "
+            + "this Mac from anywhere."
+          : "The password every client authenticates with, and how clients reach this Mac: "
+            + "on your network, or through a tunnel."
       },
-      isIncluded: { OnboardingRules.needsConnectionMethod($0.goals) },
       gate: OnboardingRules.connectionGate
     ),
     OnboardingStep(

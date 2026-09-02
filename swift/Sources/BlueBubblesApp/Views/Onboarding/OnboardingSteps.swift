@@ -31,12 +31,11 @@ struct OnboardingStepView: View {
     case .welcome: WelcomeStep()
     case .goals: GoalsStep(onboarding: model.onboarding)
     case .permissions: PermissionsStep(model: model, acknowledgedSkip: $acknowledgedSkip)
-    case .password:
-      ConnectionStep(
+    case .connection:
+      ConnectionStepView(
         model: model, password: $password, port: $port,
-        rejection: passwordRejection, saveError: connectionError,
-        showsPort: OnboardingRules.asksForPort(model.onboarding.selections.goals))
-    case .connection: ConnectionMethodStep(model: model, onChanged: onConnectionChanged)
+        passwordRejection: passwordRejection, saveError: connectionError,
+        onChanged: onConnectionChanged)
     case .firebase: FirebaseStep(model: model)
     case .webhooks: WebhooksView(model: model)
     case .api: APIStep(model: model)
@@ -145,9 +144,35 @@ private struct PermissionsStep: View {
   }
 }
 
-// MARK: - Connection method
+// MARK: - Connection
 
-private struct ConnectionMethodStep: View {
+/// Password first, then — when something will connect — how it reaches this Mac.
+private struct ConnectionStepView: View {
+  @Bindable var model: AppModel
+  @Binding var password: String
+  @Binding var port: Int
+  let passwordRejection: String?
+  let saveError: String?
+  let onChanged: () -> Void
+
+  private var goals: Set<UsageGoal> { model.onboarding.selections.goals }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 22) {
+      PasswordCard(
+        model: model, password: $password, port: $port,
+        rejection: passwordRejection, saveError: saveError,
+        showsPort: OnboardingRules.asksForPort(goals))
+      if OnboardingRules.needsConnectionMethod(goals) {
+        Text("How will clients reach this Mac?")
+          .font(.title3.weight(.semibold))
+        ConnectionMethodPicker(model: model, onChanged: onChanged)
+      }
+    }
+  }
+}
+
+private struct ConnectionMethodPicker: View {
   @Bindable var model: AppModel
   let onChanged: () -> Void
 

@@ -37,8 +37,7 @@ struct OnboardingPlanTests {
   func androidPlan() {
     #expect(
       ids([.android]) == [
-        .welcome, .goals, .permissions, .password, .connection, .firebase, .privateAPI,
-        .finish,
+        .welcome, .goals, .permissions, .connection, .firebase, .privateAPI, .finish,
       ])
   }
 
@@ -64,11 +63,12 @@ struct OnboardingPlanTests {
     }
   }
 
-  @Test("Webhooks alone need no connection method and no Firebase")
+  @Test("Webhooks alone need no connection method and no Firebase, but still a password")
   func webhooksOnly() {
     let plan = ids([.webhooks])
     #expect(plan.contains(.webhooks))
-    #expect(!plan.contains(.connection))
+    #expect(plan.contains(.connection))
+    #expect(!OnboardingRules.needsConnectionMethod([.webhooks]))
     #expect(!plan.contains(.firebase))
   }
 
@@ -85,7 +85,7 @@ struct OnboardingPlanTests {
     #expect(!OnboardingRules.asksForPort([.webhooks]))
     #expect(OnboardingRules.asksForPort([.api]))
     #expect(OnboardingRules.asksForPort([.webhooks, .desktop]))
-    #expect(ids([.webhooks]).contains(.password))
+    #expect(ids([.webhooks]).contains(.connection))
   }
 
   @Test("Nothing chosen yet still yields a walkable plan")
@@ -93,7 +93,7 @@ struct OnboardingPlanTests {
     let plan = ids([])
     #expect(plan.first == .welcome)
     #expect(plan.last == .finish)
-    #expect(plan.contains(.password))
+    #expect(plan.contains(.connection))
   }
 
   @Test("Address stability is read from the manifest, not a list of names")
@@ -132,10 +132,18 @@ struct OnboardingGateTests {
     #expect(OnboardingRules.passwordGate(OnboardingProgress(passwordProblem: nil)) == .open)
   }
 
-  @Test("The connection gate needs a method and its fields; a missing binary only warns")
+  @Test("The connection gate: password, then method and fields; a missing binary only warns")
   func connection() {
+    // No password typed: blocked before the method is even considered.
     #expect(!OnboardingRules.connectionGate(OnboardingProgress()).isOpen)
-    var progress = OnboardingProgress(connectionMethod: "ngrok", connectionMethodName: "ngrok")
+    // Password fine, nothing connects: open with no method at all.
+    let outbound = OnboardingProgress(passwordProblem: nil, requiresConnectionMethod: false)
+    #expect(OnboardingRules.connectionGate(outbound) == .open)
+    // Password fine, something connects, no method yet.
+    var progress = OnboardingProgress(passwordProblem: nil)
+    #expect(!OnboardingRules.connectionGate(progress).isOpen)
+    progress.connectionMethod = "ngrok"
+    progress.connectionMethodName = "ngrok"
     progress.missingConnectionFields = ["Auth Token"]
     #expect(OnboardingRules.connectionGate(progress) == .blocked("ngrok needs: Auth Token"))
     progress.missingConnectionFields = []
@@ -153,7 +161,6 @@ struct OnboardingGateTests {
     let steps = Dictionary(uniqueKeysWithValues: OnboardingCatalog.steps.map { ($0.id, $0) })
     let blocked = OnboardingProgress(unmetRequiredPermissions: ["Contacts"])
     #expect(steps[.permissions]?.gate(blocked).isOpen == false)
-    #expect(steps[.password]?.gate(OnboardingProgress()).isOpen == false)
     #expect(steps[.connection]?.gate(OnboardingProgress()).isOpen == false)
     #expect(steps[.welcome]?.gate(OnboardingProgress()) == .open)
     #expect(steps[.finish]?.gate(OnboardingProgress()) == .open)
@@ -187,9 +194,9 @@ struct OnboardingModelTests {
     let model = OnboardingModel(defaults: freshDefaults())
     model.advance()  // goals
     model.selections.goals = [.webhooks]
-    #expect(!model.plan.map(\.id).contains(.connection))
+    #expect(!model.plan.map(\.id).contains(.firebase))
     model.selections.goals = [.android]
-    #expect(model.plan.map(\.id).contains(.connection))
+    #expect(model.plan.map(\.id).contains(.firebase))
     model.advance()
     model.advance()
     model.jump(to: .goals)

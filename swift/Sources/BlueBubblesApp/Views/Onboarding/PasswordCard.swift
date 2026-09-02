@@ -1,8 +1,8 @@
-//  ConnectionStep
-//  The password step's form: the port a client will use, and the password.
+//  PasswordCard
+//  The top of the connection step: the password, and the port a client will use.
 //
 //  Has no Save button. Its state belongs to `OnboardingView`, which writes it when Continue
-//  is pressed — see `saveConnection`. A step that saved for itself could be walked straight
+//  is pressed — see `saveCredentials`. A card that saved for itself could be walked straight
 //  past, and was.
 //
 //  Not the generated `SettingRow`, deliberately: that row commits on focus loss, and the
@@ -12,7 +12,7 @@
 import BBSettings
 import SwiftUI
 
-struct ConnectionStep: View {
+struct PasswordCard: View {
 
   @Bindable var model: AppModel
   @Binding var password: String

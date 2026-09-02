@@ -200,6 +200,8 @@ struct OnboardingView: View {
       unmetRequiredPermissions: unmetRequired.map(\.title),
       acknowledgedPermissionSkip: acknowledgedSkip,
       passwordProblem: passwordRejection,
+      requiresConnectionMethod: OnboardingRules.needsConnectionMethod(
+        onboarding.selections.goals),
       connectionMethod: onboarding.selections.connectionMethod,
       connectionMethodName: connectionManifest?.name,
       missingConnectionFields: missingConnectionFields.map(\.label),
@@ -239,19 +241,15 @@ struct OnboardingView: View {
   // MARK: - Moving on
 
   private func advance() async {
-    switch step.id {
-    case .password:
+    if step.id == .connection {
       // Saved on the way out of the step rather than by a button inside it. A password
       // that was typed and not saved is indistinguishable, on every later screen, from
       // one that was never set.
-      guard await saveConnection() else { return }
-    case .connection:
-      // Re-checked at the moment of leaving, not only from the last render: the form
-      // inside the step saves on focus loss, and the Continue click is what blurs it.
+      guard await saveCredentials() else { return }
+      // Re-checked at the moment of leaving, not only from the last render: the service
+      // form inside the step saves on focus loss, and the Continue click is what blurs it.
       await refreshConnectionState()
       guard step.gate(progress).isOpen else { return }
-    default:
-      break
     }
 
     guard !onboarding.isAtEnd else {
@@ -267,7 +265,7 @@ struct OnboardingView: View {
   }
 
   /// Writes the password and port. Returns false if the store refused, leaving the step up.
-  private func saveConnection() async -> Bool {
+  private func saveCredentials() async -> Bool {
     guard let store = model.settingsStore else {
       connectionError = "Settings are not available yet. Try again in a moment."
       return false
