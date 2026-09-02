@@ -2,7 +2,6 @@
 //  The contact index, and a way to re-read the address book.
 
 import BBContacts
-import BBHandlers
 import BBInterfaces
 import BlueBubblesServerCore
 import SwiftUI

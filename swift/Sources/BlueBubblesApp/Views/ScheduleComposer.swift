@@ -26,7 +26,6 @@
 //
 //  See `.claude/docs/architecture.md`.
 
-import BBHandlers
 import BBInterfaces
 import BBSerialization
 import BlueBubblesServerCore

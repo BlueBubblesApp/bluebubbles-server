@@ -9,7 +9,6 @@
 //  Firebase model takes a two-line stub. Taking an `AppContext?` instead would require
 //  standing up a server to exercise a model that uses one member of it.
 
-import BBHandlers
 import BBInterfaces
 import BBPersistence
 import BBPushKit

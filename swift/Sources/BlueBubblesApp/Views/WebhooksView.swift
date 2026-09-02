@@ -12,7 +12,6 @@
 //  endpoint to everything. See `WebhookEditor`.
 
 import BBEvents
-import BBHandlers
 import BBInterfaces
 import BBOpenAPI
 import BBServiceKit

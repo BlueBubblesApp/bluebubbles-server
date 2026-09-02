@@ -1,20 +1,24 @@
-//  HandlerCapabilities
-//  What a controller is allowed to reach.
+//  Capabilities
+//  What a consumer of the interfaces layer is allowed to reach.
 //
-//  Taking the whole `AppContext` — roughly forty-five properties spanning storage, domain,
-//  delivery and cross-cutting concerns — in order to use two or three of them is an
-//  undeclared dependency in the same way the `Server()` global was: the signature says
-//  "everything", so nothing states what a controller actually needs, nothing can be
-//  constructed without constructing all of it, and a controller cannot be exercised without a
-//  running server behind it.
+//  Taking the whole application context — roughly forty-five properties spanning storage,
+//  domain, delivery and cross-cutting concerns — in order to use two or three of them is an
+//  undeclared dependency: the signature says "everything", so nothing states what the caller
+//  actually needs, nothing can be constructed without constructing all of it, and the caller
+//  cannot be exercised without a running server behind it.
 //
-//  These are the capabilities instead. Each is small and named for what it offers; a handler
-//  group composes the ones it uses (`some InterfaceProviding & AlertProviding`), and that
-//  composition IS the dependency list. `AppContext` conforms to all of them, so the
-//  composition root is unchanged — but a test can now stand up one struct with two members
-//  rather than two databases and a service registry.
+//  These are the capabilities instead. Each is small and named for what it offers; a caller
+//  composes the ones it uses (`some InterfaceProviding & AlertProviding`), and that
+//  composition IS its dependency list. The composition root's container conforms to all of
+//  them, so wiring is unchanged — but a test can stand up one struct with two members rather
+//  than two databases and a service registry.
 //
-//  Isolation note: `AppContext` is an actor, so a requirement it satisfies with an isolated
+//  They live HERE, in the domain layer, rather than beside the HTTP controllers, because
+//  three consumers compose them: the controllers, the composition root, and the SwiftUI app.
+//  Only one of those is an HTTP concern, and putting the protocols in the controller module
+//  made the app link the HTTP layer purely to name `PushSetupProviding`.
+//
+//  Isolation note: the container is an actor, so a requirement it satisfies with an isolated
 //  member has to be `async` — a synchronous requirement can only be witnessed by a
 //  `nonisolated` one. That is why the split below looks arbitrary and is not: the `async`
 //  members are the genuinely isolated state, and the rest are `nonisolated let` bindings to
@@ -25,15 +29,12 @@ import BBContacts
 import BBCore
 import BBDiagnostics
 import BBEvents
-import BBIMessage
-import BBInterfaces
-import BBPersistence
 import BBPrivateAPI
 import BBPrivateAPIContract
-import BBSerialization
 import BBSettings
 import BBSystem
 import BBTooling
+import BBUpdates
 import Foundation
 import Logging
 
@@ -41,7 +42,7 @@ import Logging
 
 public protocol InterfaceProviding: Sendable {
   func interfaces() async -> ServerInterfaces?
-  /// The interfaces, or a 503 explaining why not.
+  /// The interfaces, or a failure explaining why not.
   func requireInterfaces() async throws -> ServerInterfaces
 }
 
@@ -74,9 +75,9 @@ public protocol ScheduleProviding: Sendable {
   var schedule: ScheduleInterface { get }
 }
 
-/// Push registration. `secrets` is here rather than on its own because the only handler that
-/// wants it is the one serving the Firebase client configuration next to the device it just
-/// registered.
+/// Push registration. `secrets` is here rather than on its own because the only consumer
+/// that wants it is the one serving the Firebase client configuration next to the device it
+/// just registered.
 public protocol DeviceRegistering: Sendable {
   var devices: DeviceRepository { get }
   var secrets: any SecretStore { get }
@@ -91,6 +92,21 @@ public protocol DeviceRegistering: Sendable {
 /// helper restart, and every Private API route would report it as unavailable.
 public protocol PrivateAPIProviding: Sendable {
   func privateAPIClient() async -> (any PrivateAPI)?
+}
+
+extension PrivateAPIProviding {
+  /// The helper, or the refusal the interfaces layer raises when it is absent.
+  ///
+  /// One implementation for every caller. Three handler groups each carried a private copy
+  /// that built an `IMessageError` by hand; this is the single place the "no helper
+  /// connected" answer is decided, and the HTTP projection of `.helperUnavailable` is what
+  /// produces the fixed message clients match on.
+  public func requirePrivateAPI(for feature: String) async throws -> any PrivateAPI {
+    guard let api = await privateAPIClient() else {
+      throw InterfaceError.helperUnavailable(feature: feature)
+    }
+    return api
+  }
 }
 
 /// The injection runtime, when the server manages it. Distinct from `PrivateAPIProviding`:
@@ -117,10 +133,6 @@ public protocol FindMyProviding: Sendable {
 }
 
 /// The external programs services depend on.
-///
-/// Added for the APP, not for a handler — the tool rows and the connection-method picker
-/// drive `ToolManager` directly, and until this existed the only way to reach it from a view
-/// was the whole `AppContext`.
 public protocol ToolProviding: Sendable {
   var tools: ToolManager { get }
 }
@@ -144,9 +156,6 @@ public protocol PushSetupProviding: Sendable {
 ///
 /// Separate from `ServerInterfaceProviding`, which owns the registrations themselves. This is
 /// the OBSERVED behaviour of those registrations, and only the webhooks screen wants it.
-///
-/// `webhookDeliveries` is `async` because it is isolated to `AppContext` — see the note at
-/// the top of this file about which requirements can be synchronous.
 public protocol WebhookAdministering: Sendable {
   var webhooks: WebhookDirectory { get }
 }
@@ -163,6 +172,15 @@ public protocol TokenAuthProviding: Sendable {
   var tokenAuth: TokenAuthService { get }
 }
 
+/// How the hosting application performs an update.
+///
+/// Implemented by the SwiftUI app, which owns the updater. The seam exists so the endpoint
+/// and the menu item are written once against a capability rather than against a specific
+/// host.
+public protocol UpdateInstalling: Sendable {
+  func beginUpdate(to item: AppcastItem) async
+}
+
 public protocol UpdateInstallerProviding: Sendable {
   var updateInstaller: (any UpdateInstalling)? { get async }
 }
@@ -170,7 +188,7 @@ public protocol UpdateInstallerProviding: Sendable {
 // MARK: - Server control and status
 
 /// Restarting. Both are hard to reverse, which is why they are their own capability rather
-/// than something every handler that happens to hold a context can reach.
+/// than something every caller that happens to hold a context can reach.
 public protocol ServerControlling: Sendable {
   func requestRestart() async
   /// Replaces the process with `execv`, so the supervisor keeps watching the same PID.

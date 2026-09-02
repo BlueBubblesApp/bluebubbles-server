@@ -19,7 +19,6 @@
 //
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
-import BBHandlers
 import BBInterfaces
 import BBServiceKit
 import BBSettings

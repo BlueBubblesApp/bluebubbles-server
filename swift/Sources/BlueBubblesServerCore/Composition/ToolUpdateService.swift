@@ -14,7 +14,6 @@
 //  See `.claude/docs/imessage.md`.
 
 import BBDiagnostics
-import BBHandlers
 import BBInterfaces
 import BBServiceKit
 import BBSettings

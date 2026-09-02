@@ -20,7 +20,6 @@
 
 import BBContacts
 import BBHTTPAPI
-import BBHandlers
 import BBInterfaces
 import BBPrivateAPIContract
 import BBServiceKit

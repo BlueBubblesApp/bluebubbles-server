@@ -12,7 +12,6 @@
 //  Deliberately hand-parsed rather than ArgumentParser: an `App` owns `main`, so there is no
 //  `ParsableCommand` entry point to hang off, and this is a dozen lines.
 
-import BBHandlers
 import BBInterfaces
 import BlueBubblesServerCore
 import Foundation

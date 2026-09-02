@@ -13,7 +13,6 @@
 //
 //  See `docs/EVENTS.md`.
 
-import BBHandlers
 import BBInterfaces
 import BBServiceKit
 import BBSettings

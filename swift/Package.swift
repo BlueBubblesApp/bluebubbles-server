@@ -374,6 +374,10 @@ let package = Package(
                 "BBIMessage", "BBContacts", "BBSerialization", "BBPersistence",
                 "BBPrivateAPI", "BBPrivateAPIContract", "BBAppleScript", "BBShortcuts",
                 "BBSystem", "BBSettings", "BBPushKit", "BBEvents", "BBDiagnostics",
+                // `Capabilities.swift` names the access-control service, the tool manager
+                // and the appcast item, so the modules that define them are reachable from
+                // here. None of the three depends on this target.
+                "BBAuth", "BBTooling", "BBUpdates",
                 "BBCore",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "GRDB", package: "GRDB.swift")
@@ -394,8 +398,8 @@ let package = Package(
                 "BBInterfaces",
                 "BBHTTPAPI", "BBSerialization", "BBAuth", "BBSettings", "BBIMessage",
                 "BBContacts", "BBPrivateAPI", "BBPrivateAPIContract", "BBSystem",
-                "BBDiagnostics", "BBEvents", "BBPushKit", "BBTooling", "BBUpdates",
-                "BBPersistence", "BBCore",
+                "BBDiagnostics", "BBEvents", "BBPushKit", "BBUpdates",
+                "BBPersistence",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "GRDB", package: "GRDB.swift")
             ],
@@ -617,7 +621,7 @@ let package = Package(
         .executableTarget(
             name: "BlueBubblesApp",
             dependencies: [
-                "BlueBubblesServerCore", "BBInterfaces", "BBHandlers", "BBSettings", "BBSystem", "BBAuth",
+                "BlueBubblesServerCore", "BBInterfaces", "BBSettings", "BBSystem", "BBAuth",
                 "BBServiceKit", "BBDiagnostics", "BBUpdates", "BBSerialization",
                 // The Private API status card and the FaceTime maintenance screen name
                 // `PrivateAPIRuntime.StartOutcome` and the contract's reply types directly.

@@ -28,7 +28,6 @@
 //  programmatic route would be writing to the private Core Data store of a running
 //  application — not a trade worth making to save one click.
 
-import BBHandlers
 import BBInterfaces
 import BBShortcuts
 import BlueBubblesServerCore

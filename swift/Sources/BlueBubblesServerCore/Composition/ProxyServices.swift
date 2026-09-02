@@ -31,7 +31,6 @@
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
 import BBDiagnostics
-import BBHandlers
 import BBInterfaces
 import BBPrivateAPIContract
 import BBProxy

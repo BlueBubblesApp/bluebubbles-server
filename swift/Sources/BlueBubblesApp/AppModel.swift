@@ -9,7 +9,6 @@
 import BBAuth
 import BBContacts
 import BBDiagnostics
-import BBHandlers
 import BBInterfaces
 import BBPrivateAPI
 import BBServiceKit

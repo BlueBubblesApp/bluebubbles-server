@@ -18,7 +18,6 @@
 //  reasoning about Scalar's network defaults lives. The short version is that several of
 //  them reach scalar.com and the page turns all of them off twice.
 
-import BBHandlers
 import BBInterfaces
 import BBOpenAPI
 import BBSettings

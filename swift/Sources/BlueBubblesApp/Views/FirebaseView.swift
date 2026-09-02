@@ -18,7 +18,6 @@
 //  All state lives on `FirebaseSetupModel`, not in `@State` here — see that file.
 
 import AppKit
-import BBHandlers
 import BBInterfaces
 import BBPushKit
 import BlueBubblesServerCore

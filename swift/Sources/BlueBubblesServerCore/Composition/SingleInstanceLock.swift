@@ -20,7 +20,6 @@
 //  have separate home directories and therefore separate locks, which is the supported setup
 //  the port-conflict message already refers to.
 
-import BBHandlers
 import BBInterfaces
 import BBPrivateAPIContract
 import Darwin

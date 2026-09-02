@@ -14,7 +14,6 @@
 //
 //  See `docs/EVENTS.md`.
 
-import BBHandlers
 import BBInterfaces
 import BBPushKit
 import BlueBubblesServerCore

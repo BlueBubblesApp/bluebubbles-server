@@ -71,11 +71,3 @@ public enum UpdateHandlers {
   }
 }
 
-/// How the hosting application performs an update.
-///
-/// Declared here and implemented by the SwiftUI app (Phase 10), which owns the Sparkle
-/// updater. The seam exists so this endpoint is written once against a capability rather than
-/// against a specific host — the same reason the interfaces layer exists.
-public protocol UpdateInstalling: Sendable {
-  func beginUpdate(to item: AppcastItem) async
-}

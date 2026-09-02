@@ -20,7 +20,6 @@
 //  See `.claude/docs/architecture.md`.
 
 import BBDiagnostics
-import BBHandlers
 import BBInterfaces
 import BBServiceKit
 import BBSettings

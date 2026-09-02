@@ -3,7 +3,6 @@
 //
 //  Replaces the Electron main process, the tray, and the renderer. See `.claude/docs/architecture.md`.
 
-import BBHandlers
 import BBInterfaces
 import BlueBubblesServerCore
 import Logging

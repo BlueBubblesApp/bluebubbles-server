@@ -19,7 +19,6 @@
 //
 //  See `.claude/docs/architecture.md`.
 
-import BBHandlers
 import BBInterfaces
 import BlueBubblesServerCore
 import SwiftUI

@@ -1,14 +1,13 @@
 //  AppContextCapabilities
 //  Which capabilities `AppContext` satisfies.
 //
-//  The protocols live in BBHandlers, because they describe what a HANDLER may reach. The
-//  conformances live here, because `AppContext` is the composition root's type — and this file
-//  is the whole of what connects the two. It is deliberately nothing but a list: every member
+//  The protocols live in BBInterfaces, because the controllers, the composition root and the
+//  SwiftUI app all compose them. The conformances live here, because `AppContext` is the
+//  composition root's type — and this file is the whole of what connects the two. It is deliberately nothing but a list: every member
 //  already exists on the context, so a conformance that stops compiling means a capability
 //  gained a requirement the container does not meet, which is exactly the failure worth
 //  seeing.
 
-import BBHandlers
 import BBInterfaces
 
 // MARK: - Conformance

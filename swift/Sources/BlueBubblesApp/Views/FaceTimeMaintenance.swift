@@ -9,7 +9,6 @@
 //
 //  It only ever clears links the SERVER created, and never a link made in FaceTime.app.
 
-import BBHandlers
 import BBInterfaces
 import BBPrivateAPIContract
 import BBSettings

@@ -18,7 +18,6 @@ import BBCore
 import BBDiagnostics
 import BBEvents
 import BBHTTPAPI
-import BBHandlers
 import BBIMessage
 import BBInterfaces
 import BBPrivateAPI

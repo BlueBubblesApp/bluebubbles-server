@@ -13,7 +13,6 @@
 //  Search is here too, because the list shows one spelling of a conversation and people search
 //  with the others — the pasted +1-number, the formatted one, the GUID out of a log.
 
-import BBHandlers
 import BBInterfaces
 import BBSerialization
 import BlueBubblesServerCore
