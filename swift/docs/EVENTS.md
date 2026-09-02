@@ -78,7 +78,10 @@ install completes setup with no Firebase prompt and no warning banner.
 `EventBus.emit` returns once every sink has finished **or timed out** (30 s default). There is no
 subscriber buffering and no backpressure valve.
 
-**Anything that must not block emits from a detached task** — the message poller above all.
+**`emit` never waits for delivery.** Each sink has its own lane — a serial queue with a
+per-event timeout — so the caller returns once the event is queued, order is kept per sink,
+and a slow webhook delays only itself. Tests that need to observe delivery call
+`bus.settle()`; shutdown calls `flushPending()`, which flushes the rate limiter and settles.
 Delivery latency is a sink's problem, never the detector's.
 
 Delivery failures are **logged, not raised**. One failed webhook POST is not worth interrupting

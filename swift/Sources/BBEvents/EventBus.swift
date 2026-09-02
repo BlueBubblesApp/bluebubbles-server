@@ -8,7 +8,10 @@
 //
 //  The property that matters most operationally: one sink failing must not affect another.
 //  A webhook endpoint that hangs cannot delay socket delivery, and an FCM outage cannot stop
-//  webhooks. Each sink is delivered to in its own task with its own timeout.
+//  webhooks. Each sink has its own delivery lane — a serial queue with a per-event timeout —
+//  so `emit` returns once the event is queued, order is kept per sink, and a slow sink only
+//  ever delays itself. The message poller used to wait for the slowest sink before the next
+//  change could be sent; the socket paid for every slow webhook.
 //
 //  See `docs/EVENTS.md`.
 
@@ -51,6 +54,15 @@ public protocol CustomEventSink: EventSink {}
 public actor EventBus {
 
   private var sinks: [SinkID: any EventSink] = [:]
+  /// One per registered sink. The continuation feeds it; the task drains it in order.
+  private struct Lane {
+    let continuation: AsyncStream<ServerEvent>.Continuation
+    let task: Task<Void, Never>
+  }
+  private var lanes: [SinkID: Lane] = [:]
+  /// Events queued on a lane and not yet delivered (or timed out). Zero means quiet.
+  private var inFlight = 0
+  private var settleWaiters: [CheckedContinuation<Void, Never>] = []
   private let logger: Logger
   /// Spacing for events that declare a `minimumInterval`.
   ///
@@ -77,20 +89,33 @@ public actor EventBus {
   /// registered — not registered-and-disabled, which is what turns "no Firebase" into a
   /// warning state rather than a valid deployment.
   public func register(_ sink: any EventSink) {
+    unregister(sink.id)
     sinks[sink.id] = sink
+
+    let (stream, continuation) = AsyncStream.makeStream(of: ServerEvent.self)
+    let task = Task { [weak self, logger, deliveryTimeout] in
+      for await event in stream {
+        await Self.deliver(event, to: sink, timeout: deliveryTimeout, logger: logger)
+        await self?.completed()
+      }
+    }
+    lanes[sink.id] = Lane(continuation: continuation, task: task)
   }
 
+  /// Stops routing to a sink. Anything already queued for it is still delivered: the lane
+  /// is finished, not cancelled, so an event accepted before the unregister is not lost.
   public func unregister(_ id: SinkID) {
     sinks.removeValue(forKey: id)
+    lanes.removeValue(forKey: id)?.continuation.finish()
   }
 
   public var activeSinks: [SinkID] { Array(sinks.keys).sorted { $0.rawValue < $1.rawValue } }
 
   /// Fan out one event.
   ///
-  /// Returns once every sink has finished or timed out. Callers that must not block —
-  /// the message poller, chiefly — should emit from a detached task; delivery latency is
-  /// a sink's problem, never the detector's.
+  /// Returns once the event is queued on every eligible lane — not when it is delivered.
+  /// Delivery latency is a sink's problem, never the caller's; a test that needs to observe
+  /// delivery calls `settle()`.
   /// - Parameter now: The instant to rate-limit against. Injectable because the alternative
   ///   is asserting on real elapsed time, and under a loaded test run two back-to-back
   ///   emits can genuinely fall more than the interval apart — which makes the rate-limit
@@ -114,7 +139,15 @@ public actor EventBus {
       return
     }
 
-    await fanOut(event, routing: routing)
+    fanOut(event, routing: routing)
+  }
+
+  /// Suspends until every queued event has been delivered or has timed out.
+  ///
+  /// For tests, and for shutdown through `flushPending`. Not for the request path.
+  public func settle() async {
+    guard inFlight > 0 else { return }
+    await withCheckedContinuation { settleWaiters.append($0) }
   }
 
   /// Built lazily and reused, because it holds the per-key timing state that IS the rate
@@ -134,42 +167,52 @@ public actor EventBus {
     return created
   }
 
-  /// Delivers to every eligible sink. The rate limit is applied before this, never inside.
-  private func fanOut(_ event: ServerEvent, routing: EventRouting) async {
-    let eligible = sinks.values.filter { routing.allows($0.id) }
-    guard !eligible.isEmpty else { return }
-
-    await withTaskGroup(of: Void.self) { group in
-      for sink in eligible {
-        group.addTask { [logger, deliveryTimeout] in
-          guard await sink.accepts(event) else { return }
-          do {
-            try await withTimeout(deliveryTimeout) {
-              try await sink.deliver(event)
-            }
-          } catch {
-            // Logged, not raised. A single failed webhook POST is not something
-            // to interrupt the user about; the sink itself raises an alert once
-            // a failure becomes persistent.
-            logger.warning(
-              "Sink delivery failed",
-              metadata: [
-                "sink": .string(sink.id.rawValue),
-                "event": .string(event.name.rawValue),
-                "error": .string(String(describing: error)),
-              ])
-          }
-        }
-      }
+  /// Queues on every eligible lane. The rate limit is applied before this, never inside.
+  private func fanOut(_ event: ServerEvent, routing: EventRouting) {
+    for (id, lane) in lanes where routing.allows(id) {
+      inFlight += 1
+      lane.continuation.yield(event)
     }
   }
 
-  /// Delivers anything a rate limit is currently holding.
+  private func completed() {
+    inFlight -= 1
+    guard inFlight == 0 else { return }
+    let waiters = settleWaiters
+    settleWaiters = []
+    for waiter in waiters { waiter.resume() }
+  }
+
+  /// One delivery, off the actor: the sink's own work must not hold the bus.
+  private static func deliver(
+    _ event: ServerEvent, to sink: any EventSink, timeout: Duration, logger: Logger
+  ) async {
+    guard await sink.accepts(event) else { return }
+    do {
+      try await withTimeout(timeout) {
+        try await sink.deliver(event)
+      }
+    } catch {
+      // Logged, not raised. A single failed webhook POST is not something to interrupt
+      // the user about; the sink itself raises an alert once a failure becomes persistent.
+      logger.warning(
+        "Sink delivery failed",
+        metadata: [
+          "sink": .string(sink.id.rawValue),
+          "event": .string(event.name.rawValue),
+          "error": .string(String(describing: error)),
+        ])
+    }
+  }
+
+  /// Delivers anything a rate limit is currently holding, then waits for the lanes to drain.
   ///
   /// Called on shutdown so a position held for its interval is not simply lost when the
-  /// server stops — that value is the newest one there is.
+  /// server stops — that value is the newest one there is. Bounded by the per-event
+  /// delivery timeout, so a hung webhook cannot hold shutdown open indefinitely.
   public func flushPending() async {
     await limiter?.flushAll()
+    await settle()
   }
 }
 

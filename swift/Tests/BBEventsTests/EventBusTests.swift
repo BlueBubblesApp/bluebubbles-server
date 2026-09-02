@@ -102,6 +102,7 @@ struct EventRoutingTests {
     await bus.register(push)
 
     await bus.emit(makeEvent(.typingIndicator))
+    await bus.settle()
 
     #expect(await socket.names() == [.typingIndicator])
     #expect(await push.names().isEmpty)
@@ -119,11 +120,13 @@ struct EventRoutingTests {
     // what it is checking.
     let instant = ContinuousClock.now
     await bus.emit(makeEvent(.newFindMyLocation), rateLimitKey: "device-a", now: instant)
+    await bus.settle()
     await bus.emit(
       makeEvent(.newFindMyLocation), rateLimitKey: "device-a",
       now: instant.advanced(by: .milliseconds(10))
     )
     await bus.emit(makeEvent(.newFindMyLocation), rateLimitKey: "device-b", now: instant)
+    await bus.settle()
 
     // ONE, and the key is ignored. FindMy's limit is global on purpose: it exists to
     // keep this server from polling Apple too hard, and Apple does not care which of our
@@ -164,6 +167,7 @@ struct ProjectionTests {
     await bus.register(push)
 
     await bus.emit(makeEvent(.newMessage))
+    await bus.settle()
 
     guard case .object(let socketPayload)? = await socket.payloads.first,
       case .object(let pushPayload)? = await push.payloads.first
@@ -187,10 +191,37 @@ struct ProjectionTests {
 @Suite("Sink independence")
 struct SinkIndependenceTests {
 
+  @Test("emit returns before delivery, and each lane keeps its order")
+  func emitDoesNotWaitAndLanesAreOrdered() async {
+    // The message poller emits from its loop. If emit waited for delivery, one slow
+    // webhook would hold back the next new-message event for every socket client.
+    let bus = EventBus(deliveryTimeout: .seconds(5))
+    let slow = RecordingSink(id: .webhook)
+    await slow.setDelay(.milliseconds(150))
+    await bus.register(slow)
+
+    let started = ContinuousClock.now
+    await bus.emit(makeEvent(.newMessage))
+    await bus.emit(makeEvent(.updatedMessage))
+    let queued = ContinuousClock.now - started
+    #expect(queued < .milliseconds(100), "emit waited on the sink for \(queued)")
+
+    await bus.settle()
+    #expect(await slow.names() == [.newMessage, .updatedMessage])
+  }
+
+  @Test("settle on an idle bus returns at once")
+  func settleWhenIdle() async {
+    let bus = EventBus()
+    await bus.register(RecordingSink(id: .socket, projection: .full))
+    await bus.settle()
+    #expect(await bus.activeSinks == [.socket])
+  }
+
   @Test("One sink hanging does not block another")
   func slowSinkDoesNotBlockOthers() async {
-    // A webhook endpoint that hangs must not delay socket delivery. The bus fans out in
-    // a task group with a per-sink timeout, so the socket lands while the webhook waits.
+    // A webhook endpoint that hangs must not delay socket delivery. Each sink has its own
+    // lane with a per-event timeout, so the socket lands while the webhook waits.
     let bus = EventBus(deliveryTimeout: .milliseconds(200))
     let socket = RecordingSink(id: .socket, projection: .full)
     let webhook = RecordingSink(id: .webhook)
@@ -200,6 +231,7 @@ struct SinkIndependenceTests {
 
     let started = ContinuousClock.now
     await bus.emit(makeEvent(.newMessage))
+    await bus.settle()
     let elapsed = ContinuousClock.now - started
 
     #expect(await socket.names() == [.newMessage])
@@ -225,6 +257,7 @@ struct SinkIndependenceTests {
     await bus.register(FailingSink())
 
     await bus.emit(makeEvent(.newMessage))
+    await bus.settle()
     #expect(await socket.names() == [.newMessage])
   }
 
@@ -239,6 +272,7 @@ struct SinkIndependenceTests {
 
     #expect(await bus.activeSinks == [.socket])
     await bus.emit(makeEvent(.newMessage))
+    await bus.settle()
     #expect(await socket.names() == [.newMessage])
   }
 }

@@ -64,6 +64,7 @@ struct EventDeliveryWiringTests {
     await bus.register(sink)
 
     await bus.emit(event())
+    await bus.settle()
     #expect(await sink.received == [.newMessage])
   }
 
@@ -75,6 +76,7 @@ struct EventDeliveryWiringTests {
     let sink = CountingSink(id: .webhook)
 
     await bus.emit(event())
+    await bus.settle()
     #expect(await sink.received.isEmpty)
     #expect(await bus.activeSinks.isEmpty)
   }
@@ -87,9 +89,11 @@ struct EventDeliveryWiringTests {
     let sink = CountingSink(id: .push)
     await bus.register(sink)
     await bus.emit(event())
+    await bus.settle()
 
     await bus.unregister(.push)
     await bus.emit(event())
+    await bus.settle()
 
     #expect(await sink.received.count == 1)
     #expect(await bus.activeSinks.isEmpty)
@@ -106,6 +110,7 @@ struct EventDeliveryWiringTests {
     for sink in [socket, push, webhook] { await bus.register(sink) }
 
     await bus.emit(event())
+    await bus.settle()
 
     #expect(await socket.received == [.newMessage])
     #expect(await push.received == [.newMessage])
@@ -132,6 +137,7 @@ struct EventDeliveryWiringTests {
     await bus.register(socket)
 
     await bus.emit(event())
+    await bus.settle()
     #expect(await socket.received == [.newMessage])
   }
 

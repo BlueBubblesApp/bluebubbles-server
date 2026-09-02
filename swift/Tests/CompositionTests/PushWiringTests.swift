@@ -175,6 +175,7 @@ struct PushWiringTests {
         priority: .high
       )
     )
+    await bus.settle()
 
     #expect(await sink.received.first?.name == .newServer)
     #expect(await sink.received.first?.fullPayload.stringValue == "https://example.ngrok.io")

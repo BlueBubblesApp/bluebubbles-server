@@ -131,9 +131,9 @@ which `cloudflared` can produce.
 - **GRDB's async `read` silently resolves to the synchronous overload** when the closure's result
   is not `Sendable` — it blocks while still reading as `await`. This is why `AppDatabase` does not
   expose its queue. See [`database.md`](database.md).
-- **`EventBus.emit` blocks until every sink finishes or times out** (30s default). Nothing
-  buffers on the caller's behalf, so **the message poller and anything else that must not stall
-  emits from a detached task.** Delivery latency is a sink's problem, never the detector's.
+- **`EventBus.emit` queues and returns.** Each sink drains its own lane with a per-event
+  timeout (30s default), so the message poller never waits on a webhook. Do not spawn a
+  detached task to emit; the bus already does not block.
 
 ---
 

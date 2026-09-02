@@ -683,6 +683,9 @@ public struct RunningServer: Sendable {
   /// Stops everything, in exactly the reverse of the start order.
   public func stop() async {
     await propagation.stop()
+    // Before the sinks stop: a FindMy position held by the rate limiter is the newest one
+    // there is, and it can only reach a socket that is still open.
+    await context.events.flushPending()
     await registry.stopAll()
     logger.info("Server stopped")
   }

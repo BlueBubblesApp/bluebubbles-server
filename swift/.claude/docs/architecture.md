@@ -177,9 +177,10 @@ Two events suppress push while keeping the socket — `typing-indicator` and `ne
 (`EventRouting.policy(for:)`). Nothing else suppresses anything, and webhooks have no suppression
 flag at all.
 
-**`emit` returns only once every sink has finished or timed out** (30 s default). Nothing buffers
-on the caller's behalf, so **anything that must not block — the message poller above all — emits
-from a detached task.** Delivery latency is a sink's problem, never the detector's.
+**`emit` returns once the event is queued, never once it is delivered.** Each sink has its own
+lane — a serial queue with a per-event timeout (30 s default) — so order is kept per sink and a
+slow webhook delays only itself. Nothing emits from a detached task to get around the bus; a
+test that must observe delivery calls `settle()`, and shutdown calls `flushPending()`.
 
 Rate-limited events **coalesce rather than drop**, keyed per chat or device so a busy one cannot
 starve a quiet one. `new-findmy-location` is limited *globally* instead, because the server is one
