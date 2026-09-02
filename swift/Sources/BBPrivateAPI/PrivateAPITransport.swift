@@ -82,6 +82,44 @@ extension PrivateAPITransport {
       action: action, data: data, timeout: Self.defaultTimeout, process: process
     )
   }
+
+  // MARK: - Typed vocabulary
+  //
+  // The string overloads above stay: they are the wire, and the frame decoder deals in raw
+  // names. Everything that ORIGINATES a command goes through these instead, so an action
+  // that no helper implements is a compile error rather than a rejection at runtime.
+
+  /// Deliberately UNtargeted, matching what these call sites did as strings.
+  ///
+  /// Naming `HelperHost.messages` here would be the obvious tidy-up and is a behaviour
+  /// change, not a typing one: a targeted write fails outright when the named helper has not
+  /// yet sent its registration ping, where the untargeted path falls back to the newest
+  /// connection. That trade is worth making — with FaceTime also connected, "newest" can be
+  /// the wrong helper — but it belongs in a change that can be judged on its own.
+  @discardableResult
+  public func request(
+    action: MessagesHelperAction,
+    data: WireJSON,
+    timeout: Duration = Self.defaultTimeout
+  ) async throws -> WireJSON? {
+    try await request(action: action.rawValue, data: data, timeout: timeout)
+  }
+
+  /// Routed to the FaceTime helper by the action's type.
+  ///
+  /// The target used to be a `process:` argument on all fifteen FaceTime call sites, which
+  /// made "send a FaceTime command to the Messages helper" a plausible typo. It is not
+  /// expressible here.
+  @discardableResult
+  public func request(
+    action: FaceTimeHelperAction,
+    data: WireJSON,
+    timeout: Duration = Self.defaultTimeout
+  ) async throws -> WireJSON? {
+    try await request(
+      action: action.rawValue, data: data, timeout: timeout, process: HelperHost.faceTime
+    )
+  }
 }
 
 // MARK: - Transactions

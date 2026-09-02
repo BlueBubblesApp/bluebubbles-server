@@ -1,6 +1,11 @@
 //  ContextualService
-//  What every built-in service shares: the host it is built from, its registry key, and the
-//  two small actors that hold a task or a runtime across `start`, `stop` and `health`.
+//  What every built-in service shares: the host it is built from and its registry key.
+//
+//  There were two more things here — `TaskBox` and `RuntimeBox`, single-purpose actors that
+//  held a `Task` and the Private API runtime so a service could keep mutable state without
+//  `@unchecked Sendable`. `Service` requires `Actor` now, so a service IS an isolation
+//  domain and holds that state as an ordinary `private var`. Both boxes were deleted with
+//  their last caller.
 //
 //  Each service lives in its own file in this directory. What a service adds over the module
 //  that does the work is its identity, its dependencies and its restart policy — the three
@@ -48,29 +53,6 @@ extension ContextualService {
   public var scoped: ScopedSettings {
     context.scopedSettings(for: Self.manifest)
   }
-}
-
-/// Holds the Private API runtime across `start`, `stop` and `health`.
-///
-/// An actor rather than a bare `var` behind `@unchecked Sendable`. The registry does
-/// serialise lifecycle calls today, so the race was not reachable — but that is an
-/// invariant of the CALLER, nothing in this type said so, and the annotation that would
-/// have flagged it was the one suppressing the check. Removing the annotation is what
-/// surfaced it.
-actor RuntimeBox {
-  private var runtime: PrivateAPIRuntime?
-  func set(_ runtime: PrivateAPIRuntime?) { self.runtime = runtime }
-  var current: PrivateAPIRuntime? { runtime }
-}
-
-actor TaskBox {
-  private var task: Task<Void, Never>?
-  func set(_ task: Task<Void, Never>) { self.task = task }
-  func cancel() {
-    task?.cancel()
-    task = nil
-  }
-  var isRunning: Bool { task != nil }
 }
 
 public enum ServiceStartupError: BBError, CustomStringConvertible {

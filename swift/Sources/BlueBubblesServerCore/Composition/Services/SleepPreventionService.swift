@@ -5,7 +5,7 @@ import BBServiceKit
 import BBSettings
 import BBSystem
 
-final class SleepPreventionService: ContextualService, ConfigurableService, GatedService {
+actor SleepPreventionService: ContextualService, ConfigurableService, GatedService {
   static let manifest = BuiltInManifests.sleepPrevention
   static let watchedSettings: Set<String> = [Settings.autoCaffeinate.key]
 

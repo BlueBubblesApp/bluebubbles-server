@@ -32,9 +32,18 @@ enum FaceTimeDispatch {
     }
     func optionalString(_ key: String) -> String? { data[key]?.stringValue }
 
-    switch request.action {
+    guard let action = FaceTimeHelperAction(rawValue: request.action) else {
+      // A protocol mismatch, not a missing feature. The server should not be routing a
+      // non-FaceTime action here at all — the typed transport overloads make that
+      // unexpressible — so this is version skew between server and helper.
+      throw PrivateAPIError.rejectedByMessages(
+        reason: "unknown action '\(request.action)'"
+      )
+    }
 
-    case "generate-link":
+    switch action {
+
+    case .generateLink:
       // `callUUID` present → a link for an existing call (Flow B/C); absent → a fresh
       // link (Flow A). One action for both, matching the shipping helper.
       if let callUUID = optionalString("callUUID") {
@@ -43,71 +52,65 @@ enum FaceTimeDispatch {
       let invited = (data["addresses"]?.arrayValue ?? []).compactMap(\.stringValue)
       return encode(try await FaceTimeBridge.generateLink(invitedAddresses: invited))
 
-    case "dial-facetime":
+    case .dialFaceTime:
       let addresses = (data["addresses"]?.arrayValue ?? []).compactMap(\.stringValue)
       let call = try await FaceTimeBridge.dial(
         FaceTimeStartRequest(addresses: addresses, video: data["video"]?.boolValue ?? true)
       )
       return ["call": encode(call)]
 
-    case "answer-call":
+    case .answerCall:
       try await FaceTimeBridge.answer(callUUID: try string("callUUID"))
       return nil
 
-    case "leave-call":
+    case .leaveCall:
       try await FaceTimeBridge.leave(callUUID: try string("callUUID"))
       return nil
 
-    case "admit-pending-member":
+    case .admitPendingMember:
       try await FaceTimeBridge.admit(
         conversationUUID: try string("conversationUUID"),
         handle: try string("handleUUID")
       )
       return nil
 
-    case "facetime-members":
+    case .faceTimeMembers:
       let members = try await FaceTimeBridge.members(
         conversationUUID: try string("conversationUUID")
       )
       return ["members": members.map(encode)]
 
-    case "facetime-active-calls":
+    case .faceTimeActiveCalls:
       return ["calls": try await FaceTimeBridge.activeCalls().map(encode)]
 
-    case "facetime-call-status":
+    case .faceTimeCallStatus:
       return [
         "callStatus": try await FaceTimeBridge.callStatus(
           callUUID: try string("callUUID")
         ).rawValue
       ]
 
-    case "facetime-windows":
+    case .faceTimeWindows:
       return ["windows": await MainActor.run { FaceTimeBridge.windowSummaries() }]
 
-    case "facetime-dismiss-alert":
+    case .faceTimeDismissAlert:
       return ["dismissed": await MainActor.run { FaceTimeBridge.dismissBlockingAlerts() }]
 
-    case "facetime-debug":
+    case .faceTimeDebug:
       return try await FaceTimeBridge.debugState(
         conversationUUID: try string("conversationUUID")
       )
 
-    case "silence-facetime-call":
+    case .silenceFaceTimeCall:
       let state = try await FaceTimeBridge.silence(callUUID: try string("callUUID"))
       return ["muted": state.muted, "sendingVideo": state.sendingVideo]
 
-    case "invalidate-facetime-links":
+    case .invalidateFaceTimeLinks:
       // `urls` absent → invalidate all created links.
       let urls = data["urls"]?.arrayValue?.compactMap(\.stringValue)
       let invalidated = try await FaceTimeBridge.invalidateLinks(matching: urls)
       return ["invalidated": invalidated]
 
-    default:
-      // A protocol mismatch, not a missing feature: this helper has never heard of the
-      // action. The server should not be routing a non-FaceTime action here.
-      throw PrivateAPIError.rejectedByMessages(
-        reason: "unknown action '\(request.action)'"
-      )
     }
   }
 

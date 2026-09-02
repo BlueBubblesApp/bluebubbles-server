@@ -20,7 +20,7 @@ import BBSettings
 import BBTooling
 import Foundation
 
-final class ToolUpdateService: ContextualService, GatedService, ConfigurableService {
+actor ToolUpdateService: ContextualService, GatedService, ConfigurableService {
 
   static let manifest = BuiltInManifests.toolUpdates
   static let watchedSettings: Set<String> = [Settings.checkForUpdates.key]
@@ -38,7 +38,7 @@ final class ToolUpdateService: ContextualService, GatedService, ConfigurableServ
   let context: AppContext
   /// The shared one from `Services.swift`: every polling service in this module uses it,
   /// and a second implementation here would be a second place for the cancellation bug.
-  private let checks = TaskBox()
+  private var checks: Task<Void, Never>?
 
   init(host: AppContext) { self.context = host }
 
@@ -53,23 +53,24 @@ final class ToolUpdateService: ContextualService, GatedService, ConfigurableServ
 
   func start() async throws {
     let tools = context.tools
-    await checks.set(
-      Task {
-        try? await Task.sleep(for: Self.initialDelay)
-        while !Task.isCancelled {
-          await tools.checkAllForUpdates()
-          try? await Task.sleep(for: Self.interval)
-        }
-      })
+    checks?.cancel()
+    checks = Task {
+      try? await Task.sleep(for: Self.initialDelay)
+      while !Task.isCancelled {
+        await tools.checkAllForUpdates()
+        try? await Task.sleep(for: Self.interval)
+      }
+    }
   }
 
   func stop() async {
-    await checks.cancel()
+    checks?.cancel()
+    checks = nil
   }
 
   func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
 
   var health: ServiceHealth {
-    get async { await checks.isRunning ? .running : .stopped }
+    get async { checks != nil ? .running : .stopped }
   }
 }

@@ -26,34 +26,44 @@ struct TestContext: Sendable {
   let recorder: LifecycleRecorder
 }
 
-class RecordingService: Service, @unchecked Sendable {
-  class var manifest: ServiceManifest { .minimal(id: "recording") }
-  let recorder: LifecycleRecorder
+/// Shared lifecycle recording for the fakes below.
+///
+/// A protocol with default implementations rather than a base class, because `Service`
+/// requires `Actor` and actors do not inherit. Each fake is now four lines and none of them
+/// needs `@unchecked Sendable`, which is the same trade the product services made.
+protocol RecordingService: Service where Host == TestContext {
   // Typed, so the recorder arrives instead of being fished out of an existential with a
   // silent fallback that hid a mis-wired context behind a fresh empty recorder.
-  required init(host: TestContext) {
-    recorder = host.recorder
-  }
+  var recorder: LifecycleRecorder { get }
+}
+
+extension RecordingService {
   func start() async throws { await recorder.record("start:\(Self.id.rawValue)") }
   func stop() async { await recorder.record("stop:\(Self.id.rawValue)") }
   var health: ServiceHealth { get async { .running } }
 }
 
-final class DatabaseService: RecordingService, @unchecked Sendable {
-  override class var manifest: ServiceManifest { .minimal(id: "database") }
+actor DatabaseService: RecordingService {
+  static var manifest: ServiceManifest { .minimal(id: "database") }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
 }
 
-final class HTTPService: RecordingService, @unchecked Sendable {
-  override class var manifest: ServiceManifest {
+actor HTTPService: RecordingService {
+  static var manifest: ServiceManifest {
     .minimal(id: "http", dependencies: [ServiceIdentifier("database")])
   }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
 }
 
 /// Depends on http, so a restart of http must cascade to it.
-final class ProxyService: RecordingService, @unchecked Sendable {
-  override class var manifest: ServiceManifest {
+actor ProxyService: RecordingService {
+  static var manifest: ServiceManifest {
     .minimal(id: "proxy", dependencies: [ServiceIdentifier("http")])
   }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
 }
 
 // MARK: - Ordering
@@ -104,15 +114,19 @@ struct OrderingTests {
   /// A cycle is a programming error and must fail loudly at launch rather than deadlock.
   @Test("A dependency cycle is rejected")
   func cycleIsDetected() async throws {
-    final class A: RecordingService, @unchecked Sendable {
-      override class var manifest: ServiceManifest {
+    actor A: RecordingService {
+      static var manifest: ServiceManifest {
         .minimal(id: "a", dependencies: [ServiceIdentifier("b")])
       }
+      let recorder: LifecycleRecorder
+      init(host: TestContext) { recorder = host.recorder }
     }
-    final class B: RecordingService, @unchecked Sendable {
-      override class var manifest: ServiceManifest {
+    actor B: RecordingService {
+      static var manifest: ServiceManifest {
         .minimal(id: "b", dependencies: [ServiceIdentifier("a")])
       }
+      let recorder: LifecycleRecorder
+      init(host: TestContext) { recorder = host.recorder }
     }
 
     let recorder = LifecycleRecorder()
@@ -127,10 +141,12 @@ struct OrderingTests {
 
   @Test("An unknown dependency is rejected")
   func unknownDependencyIsRejected() async throws {
-    final class Orphan: RecordingService, @unchecked Sendable {
-      override class var manifest: ServiceManifest {
+    actor Orphan: RecordingService {
+      static var manifest: ServiceManifest {
         .minimal(id: "orphan", dependencies: [ServiceIdentifier("does-not-exist")])
       }
+      let recorder: LifecycleRecorder
+      init(host: TestContext) { recorder = host.recorder }
     }
     let recorder = LifecycleRecorder()
     let registry = ServiceRegistry(host: TestContext(recorder: recorder))
@@ -144,10 +160,12 @@ struct OrderingTests {
 // MARK: - Settings changes
 
 /// Watches socket_port and asks for a restart, like the real HTTP service.
-final class ConfigurableHTTPService: RecordingService, ConfigurableService, @unchecked Sendable {
-  override class var manifest: ServiceManifest {
+actor ConfigurableHTTPService: RecordingService, ConfigurableService {
+  static var manifest: ServiceManifest {
     .minimal(id: "http", dependencies: [ServiceIdentifier("database")])
   }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
   static var watchedSettings: Set<String> { ["socket_port", "use_custom_certificate"] }
 
   func apply(_ change: SettingsChange) async throws -> ReloadAction {
@@ -157,8 +175,10 @@ final class ConfigurableHTTPService: RecordingService, ConfigurableService, @unc
 }
 
 /// Watches nothing relevant, so it must not be consulted.
-final class UninterestedService: RecordingService, ConfigurableService, @unchecked Sendable {
-  override class var manifest: ServiceManifest { .minimal(id: "uninterested") }
+actor UninterestedService: RecordingService, ConfigurableService {
+  static var manifest: ServiceManifest { .minimal(id: "uninterested") }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
   static var watchedSettings: Set<String> { ["auto_caffeinate"] }
 
   func apply(_ change: SettingsChange) async throws -> ReloadAction {
@@ -239,15 +259,17 @@ struct ChangeRoutingTests {
 
 // MARK: - Gating and permissions
 
-final class DecliningService: RecordingService, GatedService, @unchecked Sendable {
-  override class var manifest: ServiceManifest { .minimal(id: "declining") }
+actor DecliningService: RecordingService, GatedService {
+  static var manifest: ServiceManifest { .minimal(id: "declining") }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
   func canRun() async -> Bool { false }
 }
 
-final class PermissionGatedService: RecordingService, PermissionDependentService,
-  @unchecked Sendable
-{
-  override class var manifest: ServiceManifest { .minimal(id: "needs-fda") }
+actor PermissionGatedService: RecordingService, PermissionDependentService {
+  static var manifest: ServiceManifest { .minimal(id: "needs-fda") }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
   static var requiredPermissions: [PermissionID] { [.fullDiskAccess] }
 }
 
@@ -295,7 +317,7 @@ struct GatingTests {
 
 // MARK: - Supervision
 
-final class FailingService: Service, @unchecked Sendable {
+actor FailingService: Service {
   static var manifest: ServiceManifest { .minimal(id: "failing") }
   static var restartPolicy: RestartPolicy {
     .backoff(base: .milliseconds(1), max: .milliseconds(5), attempts: 3)
@@ -303,7 +325,7 @@ final class FailingService: Service, @unchecked Sendable {
   let recorder: LifecycleRecorder
   // Typed, so the recorder arrives instead of being fished out of an existential with a
   // silent fallback that hid a mis-wired context behind a fresh empty recorder.
-  required init(host: TestContext) {
+  init(host: TestContext) {
     recorder = host.recorder
   }
   func start() async throws {

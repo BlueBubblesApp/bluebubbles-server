@@ -43,7 +43,7 @@ enum RecurrenceInterval: String, Sendable {
   }
 }
 
-final class ScheduledMessageService: ContextualService {
+actor ScheduledMessageService: ContextualService {
 
   static let manifest = BuiltInManifests.scheduledMessages
   /// A failure here is a failure to read the database, and retrying immediately fails the
@@ -56,7 +56,7 @@ final class ScheduledMessageService: ContextualService {
   static let pollInterval: Duration = .seconds(60)
 
   let context: AppContext
-  private let pump = TaskBox()
+  private var pump: Task<Void, Never>?
 
   /// The only path this service takes to the table — it runs no SQL of its own.
   private var store: ScheduledMessageRepository {
@@ -72,18 +72,21 @@ final class ScheduledMessageService: ContextualService {
     // calling `dispatchDue()` here as well ran it twice within the same second, and the
     // second pass could read a row the first had not finished marking — which sends the
     // same message to a real person twice.
-    await pump.set(
-      Task { [weak self] in
-        while !Task.isCancelled {
-          await self?.dispatchDue()
-          try? await Task.sleep(for: interval)
-        }
-      })
+    pump?.cancel()
+    pump = Task { [weak self] in
+      while !Task.isCancelled {
+        await self?.dispatchDue()
+        try? await Task.sleep(for: interval)
+      }
+    }
   }
 
-  func stop() async { await pump.cancel() }
+  func stop() async {
+    pump?.cancel()
+    pump = nil
+  }
 
-  var health: ServiceHealth { get async { await pump.isRunning ? .running : .stopped } }
+  var health: ServiceHealth { get async { pump != nil ? .running : .stopped } }
 
   // MARK: - Dispatch
 

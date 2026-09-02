@@ -8,7 +8,7 @@ import BBServiceKit
 import BBSettings
 
 /// Watches chat.db and turns writes into events.
-final class ChangeDetectionService: ContextualService, PermissionDependentService,
+actor ChangeDetectionService: ContextualService, PermissionDependentService,
   ConfigurableService
 {
   static let manifest = BuiltInManifests.changeDetection
@@ -26,7 +26,7 @@ final class ChangeDetectionService: ContextualService, PermissionDependentServic
 
   let context: AppContext
   /// Held so it can be cancelled. The detector's stream ends when the task does.
-  private let pump = TaskBox()
+  private var pump: Task<Void, Never>?
 
   init(host: AppContext) { self.context = host }
 
@@ -47,24 +47,24 @@ final class ChangeDetectionService: ContextualService, PermissionDependentServic
 
     // Started before `start()` returns, so a change written while the rest of the
     // services are still coming up is not missed.
-    await pump.set(
-      Task {
-        for await changes in await detector.changes(watching: ChatDatabase.defaultPath) {
-          for change in changes {
-            guard let event = Self.event(for: change, serializer: serializer) else {
-              continue
-            }
-            // Rate-limited per chat where the policy asks for it, so a busy
-            // conversation cannot starve a quiet one. `cacheRoomnames` is the chat
-            // the row belongs to as chat.db records it; a message with none is
-            // rate-limited globally, which is correct — it has no chat to key on.
-            await events.emit(
-              event, rateLimitKey: change.message.cacheRoomnames
-            )
+    pump?.cancel()
+    pump = Task {
+      for await changes in await detector.changes(watching: ChatDatabase.defaultPath) {
+        for change in changes {
+          guard let event = Self.event(for: change, serializer: serializer) else {
+            continue
           }
+          // Rate-limited per chat where the policy asks for it, so a busy
+          // conversation cannot starve a quiet one. `cacheRoomnames` is the chat
+          // the row belongs to as chat.db records it; a message with none is
+          // rate-limited globally, which is correct — it has no chat to key on.
+          await events.emit(
+            event, rateLimitKey: change.message.cacheRoomnames
+          )
         }
-        logger.debug("Change detection stopped")
-      })
+      }
+      logger.debug("Change detection stopped")
+    }
 
     let pollInterval = await context.settings.get(Settings.dbPollInterval)
     context.logger.info(
@@ -79,7 +79,8 @@ final class ChangeDetectionService: ContextualService, PermissionDependentServic
   func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
 
   func stop() async {
-    await pump.cancel()
+    pump?.cancel()
+    pump = nil
   }
 
   /// Maps a detected change onto the client-facing event vocabulary.

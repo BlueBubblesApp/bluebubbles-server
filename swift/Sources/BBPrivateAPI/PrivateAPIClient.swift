@@ -61,7 +61,8 @@ public actor PrivateAPIClient: PrivateAPI {
       // 0/1 rather than a boolean: the helper reads it as a number.
       "ddScan": .number(request.scanForLinks ? 1 : 0),
     ])
-    let result = try await transport.request(action: "send-message", data: payload)
+    let result = try await transport.request(
+      action: .sendMessage, data: payload)
     return try sentMessage(from: result, chat: request.chat)
   }
 
@@ -81,7 +82,8 @@ public actor PrivateAPIClient: PrivateAPI {
       "selectedMessageGuid": request.replyTo.map { .string($0.rawValue) },
       "partIndex": .number(Double(request.replyPartIndex ?? 0)),
     ])
-    let result = try await transport.request(action: "send-multipart", data: payload)
+    let result = try await transport.request(
+      action: .sendMultipart, data: payload)
     return try sentMessage(from: result, chat: request.chat)
   }
 
@@ -98,13 +100,14 @@ public actor PrivateAPIClient: PrivateAPI {
       "filePath": .string(request.filePath),
       "isAudioMessage": .number(request.isAudioMessage ? 1 : 0),
     ])
-    let result = try await transport.request(action: "send-attachment", data: payload)
+    let result = try await transport.request(
+      action: .sendAttachment, data: payload)
     return try sentMessage(from: result, chat: request.chat)
   }
 
   public func react(_ request: ReactionRequest) async throws {
     try await transport.request(
-      action: "send-reaction",
+      action: .sendReaction,
       data: .object([
         "chatGuid": .string(request.chat.rawValue),
         "selectedMessageGuid": .string(request.target.rawValue),
@@ -127,7 +130,7 @@ public actor PrivateAPIClient: PrivateAPI {
     backwardCompatibilityText: String
   ) async throws {
     try await transport.request(
-      action: "edit-message",
+      action: .editMessage,
       data: .object([
         "chatGuid": .string(chat.rawValue),
         "messageGuid": .string(guid.rawValue),
@@ -141,7 +144,7 @@ public actor PrivateAPIClient: PrivateAPI {
     async throws
   {
     try await transport.request(
-      action: "unsend-message",
+      action: .unsendMessage,
       data: .object([
         "chatGuid": .string(chat.rawValue),
         "messageGuid": .string(guid.rawValue),
@@ -151,7 +154,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func deleteMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
     try await transport.request(
-      action: "delete-message",
+      action: .deleteMessage,
       data: .object([
         "chatGuid": .string(chat.rawValue),
         "messageGuid": .string(guid.rawValue),
@@ -160,7 +163,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func notifyAnyways(_ guid: MessageGUID) async throws {
     try await transport.request(
-      action: "notify-anyways",
+      action: .notifyAnyways,
       data: .object([
         "messageGuid": .string(guid.rawValue)
       ]))
@@ -168,7 +171,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func searchMessages(_ request: MessageSearchRequest) async throws -> [MessageGUID] {
     let result = try await transport.request(
-      action: "search-messages",
+      action: .searchMessages,
       data: .object([
         "query": .string(request.query),
         "matchType": .string("contains"),
@@ -179,7 +182,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func balloonBundleMediaPath(for guid: MessageGUID) async throws -> String {
     let result = try await transport.request(
-      action: "balloon-bundle-media-path",
+      action: .balloonBundleMediaPath,
       data: .object(["messageGuid": .string(guid.rawValue)])
     )
     guard let path = result?["path"]?.stringValue ?? result?.stringValue else {
@@ -196,7 +199,7 @@ public actor PrivateAPIClient: PrivateAPI {
     message: String?
   ) async throws -> ChatIdentifier {
     let result = try await transport.request(
-      action: "create-chat",
+      action: .createChat,
       data: .object(dropping: [
         "addresses": .array(addresses.map { .string($0) }),
         "service": .string(service),
@@ -216,16 +219,16 @@ public actor PrivateAPIClient: PrivateAPI {
   }
 
   public func deleteChat(_ chat: ChatIdentifier) async throws {
-    try await chatAction("delete-chat", chat)
+    try await chatAction(.deleteChat, chat)
   }
 
   public func leaveChat(_ chat: ChatIdentifier) async throws {
-    try await chatAction("leave-chat", chat)
+    try await chatAction(.leaveChat, chat)
   }
 
   public func setDisplayName(chat: ChatIdentifier, to name: String) async throws {
     try await transport.request(
-      action: "set-display-name",
+      action: .setDisplayName,
       data: .object([
         "chatGuid": .string(chat.rawValue),
         "newName": .string(name),
@@ -234,7 +237,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func updateGroupPhoto(chat: ChatIdentifier, imagePath: String) async throws {
     try await transport.request(
-      action: "update-group-photo",
+      action: .updateGroupPhoto,
       data: .object([
         "chatGuid": .string(chat.rawValue),
         "filePath": .string(imagePath),
@@ -242,11 +245,11 @@ public actor PrivateAPIClient: PrivateAPI {
   }
 
   public func addParticipant(_ address: String, to chat: ChatIdentifier) async throws {
-    try await participantAction("add-participant", address: address, chat: chat)
+    try await participantAction(.addParticipant, address: address, chat: chat)
   }
 
   public func removeParticipant(_ address: String, from chat: ChatIdentifier) async throws {
-    try await participantAction("remove-participant", address: address, chat: chat)
+    try await participantAction(.removeParticipant, address: address, chat: chat)
   }
 
   /// Pinning has no route in the Node server, so it reaches the API only through the
@@ -254,7 +257,7 @@ public actor PrivateAPIClient: PrivateAPI {
   /// (`update-chat-pinned`) so an older helper understands it too.
   public func setPinned(chat: ChatIdentifier, pinned: Bool) async throws {
     try await transport.request(
-      action: "update-chat-pinned",
+      action: .updateChatPinned,
       data: .object([
         "chatGuid": .string(chat.rawValue),
         "pinned": .bool(pinned),
@@ -269,7 +272,8 @@ public actor PrivateAPIClient: PrivateAPI {
   /// helper cannot tell you" are different answers, and a client syncing pins would treat
   /// the first as instruction to unpin everything.
   public func pinnedChats() async throws -> [ChatIdentifier] {
-    let reply = try await transport.request(action: "get-pinned-chats", data: .object([:]))
+    let reply = try await transport.request(
+      action: .getPinnedChats, data: .object([:]))
     return (reply?["chats"]?.arrayValue ?? [])
       .compactMap(\.stringValue)
       .compactMap { ChatIdentifier($0) }
@@ -280,7 +284,8 @@ public actor PrivateAPIClient: PrivateAPI {
   public func muteState(chat: ChatIdentifier) async throws -> ChatMuteState {
     try Self.muteState(
       from: await transport.request(
-        action: "get-chat-mute", data: .object(["chatGuid": .string(chat.rawValue)])
+        action: .getChatMute,
+        data: .object(["chatGuid": .string(chat.rawValue)])
       ))
   }
 
@@ -296,14 +301,14 @@ public actor PrivateAPIClient: PrivateAPI {
     ])
     return try Self.muteState(
       from: await transport.request(
-        action: "set-chat-mute", data: payload
+        action: .setChatMute, data: payload
       ))
   }
 
   public func unmute(chat: ChatIdentifier, syncToPairedDevice: Bool) async throws -> ChatMuteState {
     try Self.muteState(
       from: await transport.request(
-        action: "unmute-chat",
+        action: .unmuteChat,
         data: .object([
           "chatGuid": .string(chat.rawValue),
           "syncToPairedDevice": .bool(syncToPairedDevice),
@@ -333,7 +338,8 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func clearChatHistory(_ chat: ChatIdentifier) async throws -> Bool {
     let reply = try await transport.request(
-      action: "clear-chat-history", data: .object(["chatGuid": .string(chat.rawValue)])
+      action: .clearChatHistory,
+      data: .object(["chatGuid": .string(chat.rawValue)])
     )
     // An older helper answers nothing at all. Reported as true rather than false: the
     // action reached a helper that did not report "unknown action", so the clear
@@ -345,7 +351,8 @@ public actor PrivateAPIClient: PrivateAPI {
   public func chatFilterState(chat: ChatIdentifier) async throws -> ChatFilterState {
     try Self.filterState(
       from: await transport.request(
-        action: "get-chat-filter", data: .object(["chatGuid": .string(chat.rawValue)])
+        action: .getChatFilter,
+        data: .object(["chatGuid": .string(chat.rawValue)])
       ))
   }
 
@@ -354,7 +361,7 @@ public actor PrivateAPIClient: PrivateAPI {
   ) async throws -> ChatFilterState {
     try Self.filterState(
       from: await transport.request(
-        action: "mark-sender-known",
+        action: .markSenderKnown,
         data: .object([
           "chatGuid": .string(chat.rawValue),
           "saveInContacts": .bool(saveInContacts),
@@ -365,21 +372,21 @@ public actor PrivateAPIClient: PrivateAPI {
   public func markChatAsSpam(_ request: ChatSpamRequest) async throws -> ChatSpamResult {
     try Self.spamResult(
       from: await transport.request(
-        action: "mark-chat-spam", data: Self.spamPayload(request)
+        action: .markChatSpam, data: Self.spamPayload(request)
       ))
   }
 
   public func reportChatAsJunk(_ request: ChatSpamRequest) async throws -> ChatSpamResult {
     try Self.spamResult(
       from: await transport.request(
-        action: "report-chat-junk", data: Self.spamPayload(request)
+        action: .reportChatJunk, data: Self.spamPayload(request)
       ))
   }
 
   public func setChatFilter(chat: ChatIdentifier, category: Int) async throws -> ChatFilterState {
     try Self.filterState(
       from: await transport.request(
-        action: "set-chat-filter",
+        action: .setChatFilter,
         data: .object([
           "chatGuid": .string(chat.rawValue),
           "category": .number(Double(category)),
@@ -423,33 +430,33 @@ public actor PrivateAPIClient: PrivateAPI {
   // MARK: - Chat background
 
   public func refetchChatBackground(chat: ChatIdentifier) async throws {
-    try await chatAction("refetch-chat-background", chat)
+    try await chatAction(.refetchChatBackground, chat)
   }
 
   // MARK: - Presence
 
   public func startTyping(chat: ChatIdentifier) async throws {
-    try await chatAction("start-typing", chat)
+    try await chatAction(.startTyping, chat)
   }
 
   public func stopTyping(chat: ChatIdentifier) async throws {
-    try await chatAction("stop-typing", chat)
+    try await chatAction(.stopTyping, chat)
   }
 
   public func checkTypingStatus(chat: ChatIdentifier) async throws -> Bool {
     let result = try await transport.request(
-      action: "check-typing-status",
+      action: .checkTypingStatus,
       data: .object(["chatGuid": .string(chat.rawValue)])
     )
     return result?["typing"]?.boolValue ?? result?.boolValue ?? false
   }
 
   public func markRead(chat: ChatIdentifier) async throws {
-    try await chatAction("mark-chat-read", chat)
+    try await chatAction(.markChatRead, chat)
   }
 
   public func markUnread(chat: ChatIdentifier) async throws {
-    try await chatAction("mark-chat-unread", chat)
+    try await chatAction(.markChatUnread, chat)
   }
 
   // MARK: - Handles
@@ -464,7 +471,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func checkFocusStatus(address: String) async throws -> String {
     let result = try await transport.request(
-      action: "check-focus-status",
+      action: .checkFocusStatus,
       data: .object(["address": .string(address)])
     )
     return result?["status"]?.stringValue ?? result?.stringValue ?? "unknown"
@@ -473,7 +480,8 @@ public actor PrivateAPIClient: PrivateAPI {
   // MARK: - Account
 
   public func accountInfo() async throws -> AccountInfo {
-    let result = try await transport.request(action: "get-account-info", data: .object([:]))
+    let result = try await transport.request(
+      action: .getAccountInfo, data: .object([:]))
     return AccountInfo(
       appleId: result?["appleId"]?.stringValue,
       activeAlias: result?["activeAlias"]?.stringValue,
@@ -487,7 +495,7 @@ public actor PrivateAPIClient: PrivateAPI {
     // reads it with `optionalString`, and an explicit null would be indistinguishable from
     // a caller that meant to send one.
     let result = try await transport.request(
-      action: "get-nickname-info",
+      action: .getNicknameInfo,
       data: .object(address.map { ["address": .string($0)] } ?? [:])
     )
     return NicknameInfo(
@@ -500,19 +508,19 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func shouldOfferNicknameSharing(chat: ChatIdentifier) async throws -> Bool {
     let result = try await transport.request(
-      action: "should-offer-nickname-sharing",
+      action: .shouldOfferNicknameSharing,
       data: .object(["chatGuid": .string(chat.rawValue)])
     )
     return result?["shouldOffer"]?.boolValue ?? result?.boolValue ?? false
   }
 
   public func shareNickname(chat: ChatIdentifier) async throws {
-    try await chatAction("share-nickname", chat)
+    try await chatAction(.shareNickname, chat)
   }
 
   public func modifyActiveAlias(_ alias: String) async throws {
     try await transport.request(
-      action: "modify-active-alias",
+      action: .modifyActiveAlias,
       data: .object([
         "alias": .string(alias)
       ]))
@@ -522,7 +530,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func downloadPurgedAttachment(guid: String) async throws -> String {
     let result = try await transport.request(
-      action: "download-purged-attachment",
+      action: .downloadPurgedAttachment,
       data: .object(["attachmentGuid": .string(guid)])
     )
     guard let path = result?["path"]?.stringValue ?? result?.stringValue else {
@@ -538,25 +546,28 @@ public actor PrivateAPIClient: PrivateAPI {
   // here is therefore total: every field is one the contract declares.
 
   public func findMyStatus() async throws -> FindMyStatus {
-    let result = try await transport.request(action: "findmy-status", data: .object([:]))
+    let result = try await transport.request(
+      action: .findMyStatus, data: .object([:]))
     return Self.status(from: result) ?? .unavailable
   }
 
   public func findMyFriends() async throws -> [FindMyFriend] {
-    let result = try await transport.request(action: "findmy-friends", data: .object([:]))
+    let result = try await transport.request(
+      action: .findMyFriends, data: .object([:]))
     return Self.friends(from: result)
   }
 
   public func refreshFindMyFriends() async throws -> [FindMyFriend] {
     let result = try await transport.request(
-      action: "refresh-findmy-friends", data: .object([:])
+      action: .refreshFindMyFriends, data: .object([:])
     )
     return Self.friends(from: result)
   }
 
   public func refreshFindMyLocation(handle: String) async throws -> FindMyFriend {
     let result = try await transport.request(
-      action: "refresh-findmy-location", data: .object(["address": .string(handle)])
+      action: .refreshFindMyLocation,
+      data: .object(["address": .string(handle)])
     )
     guard let friend = (result?["friend"]).flatMap(Self.friend(from:)) else {
       throw PrivateAPIError.rejectedByMessages(
@@ -568,14 +579,14 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func requestFindMyLocationShare(handle: String) async throws {
     try await transport.request(
-      action: "request-findmy-location-share",
+      action: .requestFindMyLocationShare,
       data: .object(["address": .string(handle)])
     )
   }
 
   public func startSharingFindMyLocation(_ request: FindMyShareRequest) async throws {
     try await transport.request(
-      action: "start-sharing-findmy-location",
+      action: .startSharingFindMyLocation,
       data: .object(dropping: [
         "chatGuid": .string(request.chat.rawValue),
         "address": request.address.map(WireJSON.string),
@@ -586,7 +597,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func stopSharingFindMyLocation(chat: ChatIdentifier, address: String?) async throws {
     try await transport.request(
-      action: "stop-sharing-findmy-location",
+      action: .stopSharingFindMyLocation,
       data: .object(dropping: [
         "chatGuid": .string(chat.rawValue),
         "address": address.map(WireJSON.string),
@@ -665,26 +676,25 @@ public actor PrivateAPIClient: PrivateAPI {
       ? .object([:])
       : .object(["addresses": .array(invitedAddresses.map(WireJSON.string))])
     let result = try await transport.request(
-      action: "generate-link", data: data, process: HelperHost.faceTime
+      action: .generateLink, data: data
     )
     return try Self.requireLink(from: result)
   }
 
   public func generateFaceTimeLinkForCall(callUUID: String) async throws -> FaceTimeLink {
     let result = try await transport.request(
-      action: "generate-link", data: .object(["callUUID": .string(callUUID)]),
-      process: HelperHost.faceTime
+      action: .generateLink, data: .object(["callUUID": .string(callUUID)])
     )
     return try Self.requireLink(from: result)
   }
 
   public func dialFaceTime(_ request: FaceTimeStartRequest) async throws -> FaceTimeCall {
     let result = try await transport.request(
-      action: "dial-facetime",
+      action: .dialFaceTime,
       data: .object([
         "addresses": .array(request.addresses.map { .string($0) }),
         "video": .bool(request.video),
-      ]), process: HelperHost.faceTime)
+      ]))
     guard let call = (result?["call"]).flatMap(Self.call(from:)) ?? Self.call(from: result) else {
       throw PrivateAPIError.rejectedByMessages(reason: "the helper placed no call")
     }
@@ -693,33 +703,30 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func answerFaceTimeCall(callUUID: String) async throws {
     try await transport.request(
-      action: "answer-call", data: .object(["callUUID": .string(callUUID)]),
-      process: HelperHost.faceTime
+      action: .answerCall, data: .object(["callUUID": .string(callUUID)])
     )
   }
 
   public func leaveFaceTimeCall(callUUID: String) async throws {
     try await transport.request(
-      action: "leave-call", data: .object(["callUUID": .string(callUUID)]),
-      process: HelperHost.faceTime
+      action: .leaveCall, data: .object(["callUUID": .string(callUUID)])
     )
   }
 
   public func admitFaceTimeParticipant(conversationUUID: String, handle: String) async throws {
     try await transport.request(
-      action: "admit-pending-member",
+      action: .admitPendingMember,
       data: .object([
         // Field spellings are the shipping helper's: `conversationUUID` / `handleUUID`.
         "conversationUUID": .string(conversationUUID),
         "handleUUID": .string(handle),
-      ]), process: HelperHost.faceTime)
+      ]))
   }
 
   public func faceTimeMembers(conversationUUID: String) async throws -> [FaceTimeMember] {
     let result = try await transport.request(
-      action: "facetime-members",
-      data: .object(["conversationUUID": .string(conversationUUID)]),
-      process: HelperHost.faceTime
+      action: .faceTimeMembers,
+      data: .object(["conversationUUID": .string(conversationUUID)])
     )
     return (result?["members"]?.arrayValue ?? []).compactMap(Self.member(from:))
   }
@@ -728,9 +735,8 @@ public actor PrivateAPIClient: PrivateAPI {
     muted: Bool, sendingVideo: Bool
   ) {
     let result = try await transport.request(
-      action: "silence-facetime-call",
-      data: .object(["callUUID": .string(callUUID)]),
-      process: HelperHost.faceTime
+      action: .silenceFaceTimeCall,
+      data: .object(["callUUID": .string(callUUID)])
     )
     return (
       muted: result?["muted"]?.boolValue ?? false,
@@ -740,39 +746,37 @@ public actor PrivateAPIClient: PrivateAPI {
 
   public func faceTimeActiveCalls() async throws -> [FaceTimeCall] {
     let result = try await transport.request(
-      action: "facetime-active-calls", data: .object([:]), process: HelperHost.faceTime
+      action: .faceTimeActiveCalls, data: .object([:])
     )
     return (result?["calls"]?.arrayValue ?? []).compactMap(Self.call(from:))
   }
 
   public func faceTimeCallStatus(callUUID: String) async throws -> FaceTimeCallStatus {
     let result = try await transport.request(
-      action: "facetime-call-status",
-      data: .object(["callUUID": .string(callUUID)]),
-      process: HelperHost.faceTime
+      action: .faceTimeCallStatus,
+      data: .object(["callUUID": .string(callUUID)])
     )
     return FaceTimeCallStatus(raw: result?["callStatus"]?.intValue ?? 0)
   }
 
   public func faceTimeWindows() async throws -> [String] {
     let result = try await transport.request(
-      action: "facetime-windows", data: .object([:]), process: HelperHost.faceTime
+      action: .faceTimeWindows, data: .object([:])
     )
     return result?["windows"]?.arrayValue?.compactMap(\.stringValue) ?? []
   }
 
   public func dismissFaceTimeAlert() async throws -> Int {
     let result = try await transport.request(
-      action: "facetime-dismiss-alert", data: .object([:]), process: HelperHost.faceTime
+      action: .faceTimeDismissAlert, data: .object([:])
     )
     return result?["dismissed"]?.intValue ?? 0
   }
 
   public func faceTimeDebugState(conversationUUID: String) async throws -> [String: String] {
     let result = try await transport.request(
-      action: "facetime-debug",
-      data: .object(["conversationUUID": .string(conversationUUID)]),
-      process: HelperHost.faceTime
+      action: .faceTimeDebug,
+      data: .object(["conversationUUID": .string(conversationUUID)])
     )
     guard case .object(let fields)? = result else { return [:] }
     return fields.compactMapValues(\.stringValue)
@@ -784,7 +788,7 @@ public actor PrivateAPIClient: PrivateAPI {
         WireJSON.object(["urls": .array(list.map(WireJSON.string))])
       } ?? .object([:])
     let result = try await transport.request(
-      action: "invalidate-facetime-links", data: data, process: HelperHost.faceTime
+      action: .invalidateFaceTimeLinks, data: data
     )
     return result?["invalidated"]?.arrayValue?.compactMap(\.stringValue) ?? []
   }
@@ -849,13 +853,15 @@ public actor PrivateAPIClient: PrivateAPI {
 
   // MARK: - Shared shapes
 
-  private func chatAction(_ action: String, _ chat: ChatIdentifier) async throws {
+  private func chatAction(_ action: MessagesHelperAction, _ chat: ChatIdentifier) async throws {
     try await transport.request(
       action: action, data: .object(["chatGuid": .string(chat.rawValue)])
     )
   }
 
-  private func participantAction(_ action: String, address: String, chat: ChatIdentifier)
+  private func participantAction(
+    _ action: MessagesHelperAction, address: String, chat: ChatIdentifier
+  )
     async throws
   {
     try await transport.request(

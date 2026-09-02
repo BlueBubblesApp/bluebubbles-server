@@ -8,6 +8,7 @@
 //
 //  NO REAL ADDRESSES — see CONTRIBUTING.md.
 
+import BBPrivateAPIContract
 import Foundation
 import Testing
 

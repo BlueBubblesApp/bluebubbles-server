@@ -26,7 +26,7 @@ import BBSettings
 import BBSystem
 import Foundation
 
-final class LaunchAtLoginService: ContextualService, ConfigurableService {
+actor LaunchAtLoginService: ContextualService, ConfigurableService {
 
   static let manifest = BuiltInManifests.launchAtLogin
   static let watchedSettings: Set<String> = [Settings.autoStartMethod.key]

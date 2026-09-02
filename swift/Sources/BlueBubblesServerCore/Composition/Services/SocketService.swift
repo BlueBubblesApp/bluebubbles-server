@@ -5,7 +5,7 @@ import BBServiceKit
 import BBSettings
 import BBSocketIO
 
-final class SocketService: ContextualService, ConfigurableService {
+actor SocketService: ContextualService, ConfigurableService {
   static let watchedSettings: Set<String> = [Settings.password.key]
 
   static let manifest = BuiltInManifests.socket

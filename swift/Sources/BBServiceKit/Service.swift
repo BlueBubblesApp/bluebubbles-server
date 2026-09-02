@@ -46,7 +46,19 @@ public enum RestartPolicy: Sendable, Equatable {
   case backoff(base: Duration, max: Duration, attempts: Int)
 }
 
-public protocol Service: AnyObject, Sendable {
+/// A service is an actor.
+///
+/// It was `AnyObject & Sendable`, which left every service to arrange its own isolation.
+/// They arranged it by pushing each piece of mutable state into a private single-purpose
+/// actor — one to hold a `Task`, one to hold the Private API runtime — so a service that
+/// owned a pump was two objects and every read of its own state was a hop. The alternative
+/// on offer was `@unchecked Sendable` over a bare `var`, which is what those boxes were
+/// written to avoid.
+///
+/// Requiring `Actor` here makes the service its own isolation domain, so a plain `private
+/// var` is both safe and checked. The registry already awaited every call into a service, so
+/// nothing above changed shape.
+public protocol Service: Actor {
 
   /// What this service is, declared as data.
   ///

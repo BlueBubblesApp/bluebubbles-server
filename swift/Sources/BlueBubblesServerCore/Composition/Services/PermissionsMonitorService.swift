@@ -4,7 +4,7 @@
 import BBServiceKit
 
 /// Starts first, because everything else's permission gate reads from it.
-final class PermissionsMonitorService: ContextualService {
+actor PermissionsMonitorService: ContextualService {
   static let manifest = BuiltInManifests.permissions
   /// Never worth restarting: a failure here is a failure to read system state, and
   /// retrying immediately would just fail the same way.

@@ -397,55 +397,8 @@ public enum HelperProtocol {
     public let transactionId: String?
     /// Left as raw JSON: dispatch decodes it per action, so an action this helper does
     /// not know cannot fail to decode before it can be reported as unimplemented.
-    public let data: [String: WireValue]?
+    public let data: [String: WireJSON]?
   }
 
   /// Minimal dynamic JSON, so the helper carries no serialization dependency.
-  public enum WireValue: Decodable, Sendable {
-    case null
-    case bool(Bool)
-    case number(Double)
-    case string(String)
-    case array([WireValue])
-    case object([String: WireValue])
-
-    public init(from decoder: any Decoder) throws {
-      let container = try decoder.singleValueContainer()
-      if container.decodeNil() {
-        self = .null
-      } else if let value = try? container.decode(Bool.self) {
-        self = .bool(value)
-      } else if let value = try? container.decode(Double.self) {
-        self = .number(value)
-      } else if let value = try? container.decode(String.self) {
-        self = .string(value)
-      } else if let value = try? container.decode([WireValue].self) {
-        self = .array(value)
-      } else if let value = try? container.decode([String: WireValue].self) {
-        self = .object(value)
-      } else {
-        self = .null
-      }
-    }
-
-    public var stringValue: String? {
-      if case .string(let value) = self { return value }
-      return nil
-    }
-    public var intValue: Int? {
-      if case .number(let value) = self { return Int(value) }
-      return nil
-    }
-    public var boolValue: Bool? {
-      switch self {
-      case .bool(let value): value
-      case .number(let value): value != 0
-      default: nil
-      }
-    }
-    public var arrayValue: [WireValue]? {
-      if case .array(let values) = self { return values }
-      return nil
-    }
-  }
 }

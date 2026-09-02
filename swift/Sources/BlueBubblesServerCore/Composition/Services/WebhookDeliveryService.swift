@@ -11,7 +11,7 @@ import BBSettings
 /// and a webhook-only install is a first-class deployment — several users run ntfy and no
 /// Firebase at all. `WebhookSink` had been written, tested and never constructed, so every
 /// webhook subscription in the database was inert.
-final class WebhookDeliveryService: ContextualService, ConfigurableService {
+actor WebhookDeliveryService: ContextualService, ConfigurableService {
   static let manifest = BuiltInManifests.webhooks
   /// A failing endpoint is the endpoint's problem, not ours; the sink alerts once a
   /// failure becomes persistent and there is nothing here to restart.

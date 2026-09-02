@@ -4,7 +4,7 @@
 import BBContacts
 import BBServiceKit
 
-final class ContactsService: ContextualService, PermissionDependentService {
+actor ContactsService: ContextualService, PermissionDependentService {
   static let manifest = BuiltInManifests.contacts
   /// Recommended rather than required — the server runs without Contacts, it just shows
   /// numbers instead of names.
@@ -15,7 +15,7 @@ final class ContactsService: ContextualService, PermissionDependentService {
   /// `stop()` could not stop it: restarting the service — which a settings change now
   /// genuinely does — left the previous reindex running and started a second one on top,
   /// two writers walking the same address book.
-  private let ingest = TaskBox()
+  private var ingest: Task<Void, Never>?
 
   init(host: AppContext) { self.context = host }
 
@@ -33,42 +33,45 @@ final class ContactsService: ContextualService, PermissionDependentService {
     let ingestor = ContactsIngestor(index: contacts)
     await context.publish(contactsIngestor: ingestor)
 
-    await ingest.set(
-      Task {
-        do {
-          let result = try await ingestor.reindexAll()
-          logger.info(
-            "Indexed the address book",
-            metadata: [
-              "indexed": .stringConvertible(result.indexed),
-              "skipped": .stringConvertible(result.skipped),
-            ])
-        } catch let error as ContactsIngestError {
-          // Reported, not swallowed. This was `try?`, so the single most likely failure
-          // — no Contacts permission — produced an empty index, no log line, and a
-          // server that showed phone numbers for every message with no way to tell why.
-          // Not an alert: running without Contacts is a supported configuration, and
-          // the Permissions page is where a user acts on it.
-          logger.warning(
-            "Could not index the address book",
-            metadata: [
-              "reason": .string(String(describing: error))
-            ])
-        } catch is CancellationError {
-          // Ordinary: `stop()` cancels the ingest.
-        } catch {
-          logger.error(
-            "The address-book index failed",
-            metadata: [
-              "error": .string(String(describing: error))
-            ])
-        }
-      })
+    ingest?.cancel()
+    ingest = Task {
+      do {
+        let result = try await ingestor.reindexAll()
+        logger.info(
+          "Indexed the address book",
+          metadata: [
+            "indexed": .stringConvertible(result.indexed),
+            "skipped": .stringConvertible(result.skipped),
+          ])
+      } catch let error as ContactsIngestError {
+        // Reported, not swallowed. This was `try?`, so the single most likely failure
+        // — no Contacts permission — produced an empty index, no log line, and a
+        // server that showed phone numbers for every message with no way to tell why.
+        // Not an alert: running without Contacts is a supported configuration, and
+        // the Permissions page is where a user acts on it.
+        logger.warning(
+          "Could not index the address book",
+          metadata: [
+            "reason": .string(String(describing: error))
+          ])
+      } catch is CancellationError {
+        // Ordinary: `stop()` cancels the ingest.
+      } catch {
+        logger.error(
+          "The address-book index failed",
+          metadata: [
+            "error": .string(String(describing: error))
+          ])
+      }
+    }
   }
 
-  func stop() async { await ingest.cancel() }
+  func stop() async {
+    ingest?.cancel()
+    ingest = nil
+  }
 
   var health: ServiceHealth {
-    get async { await ingest.isRunning ? .running : .inactive(reason: "not started") }
+    get async { ingest != nil ? .running : .inactive(reason: "not started") }
   }
 }

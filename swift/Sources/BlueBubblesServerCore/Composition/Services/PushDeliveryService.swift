@@ -7,7 +7,7 @@ import BBPushKit
 import BBServiceKit
 import BBSettings
 
-final class PushDeliveryService: ContextualService, GatedService, ConfigurableService {
+actor PushDeliveryService: ContextualService, GatedService, ConfigurableService {
   static let manifest = BuiltInManifests.push
 
   let context: AppContext

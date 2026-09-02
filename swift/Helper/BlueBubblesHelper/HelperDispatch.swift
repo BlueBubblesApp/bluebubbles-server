@@ -51,11 +51,19 @@ enum HelperDispatch {
     }
     func flag(_ key: String) -> Bool { data[key]?.boolValue ?? false }
 
-    switch request.action {
+    guard let action = MessagesHelperAction(rawValue: request.action) else {
+      // A protocol mismatch, not a missing feature: this helper has never heard of the
+      // action. Reported distinctly so a version skew does not look like a bug.
+      throw PrivateAPIError.rejectedByMessages(
+        reason: "unknown action '\(request.action)'"
+      )
+    }
+
+    switch action {
 
     // MARK: Messages
 
-    case "send-message":
+    case .sendMessage:
       let sent = try await bridge.sendMessage(
         SendMessageRequest(
           chat: try chat(),
@@ -69,7 +77,7 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
-    case "send-multipart":
+    case .sendMultipart:
       let parts = (data["parts"]?.arrayValue ?? []).map { part -> MessagePart in
         guard case .object(let fields) = part else { return MessagePart() }
         return MessagePart(
@@ -90,7 +98,7 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
-    case "send-attachment":
+    case .sendAttachment:
       let sent = try await bridge.sendAttachment(
         SendAttachmentRequest(
           chat: try chat(),
@@ -100,7 +108,7 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
-    case "send-reaction":
+    case .sendReaction:
       guard let reaction = ReactionType(rawValue: try string("reactionType")) else {
         throw PrivateAPIError.rejectedByMessages(reason: "unknown reaction type")
       }
@@ -114,7 +122,7 @@ enum HelperDispatch {
       )
       return nil
 
-    case "edit-message":
+    case .editMessage:
       try await bridge.editMessage(
         try message(),
         in: try chat(),
@@ -124,32 +132,32 @@ enum HelperDispatch {
       )
       return nil
 
-    case "unsend-message":
+    case .unsendMessage:
       try await bridge.unsendMessage(
         try message(), in: try chat(), partIndex: integer("partIndex")
       )
       return nil
 
-    case "delete-message":
+    case .deleteMessage:
       try await bridge.deleteMessage(try message(), in: try chat())
       return nil
 
-    case "notify-anyways":
+    case .notifyAnyways:
       try await bridge.notifyAnyways(try message())
       return nil
 
-    case "search-messages":
+    case .searchMessages:
       let results = try await bridge.searchMessages(
         MessageSearchRequest(query: try string("query"), limit: data["limit"]?.intValue)
       )
       return ["results": results.map(\.rawValue)]
 
-    case "balloon-bundle-media-path":
+    case .balloonBundleMediaPath:
       return ["path": try await bridge.balloonBundleMediaPath(for: try message())]
 
     // MARK: Chats
 
-    case "create-chat":
+    case .createChat:
       let addresses = (data["addresses"]?.arrayValue ?? []).compactMap(\.stringValue)
       let created = try await bridge.createChat(
         addresses: addresses,
@@ -158,38 +166,38 @@ enum HelperDispatch {
       )
       return ["identifier": created.rawValue]
 
-    case "delete-chat":
+    case .deleteChat:
       try await bridge.deleteChat(try chat())
       return nil
 
-    case "leave-chat":
+    case .leaveChat:
       try await bridge.leaveChat(try chat())
       return nil
 
-    case "set-display-name":
+    case .setDisplayName:
       try await bridge.setDisplayName(chat: try chat(), to: try string("newName"))
       return nil
 
-    case "update-group-photo":
+    case .updateGroupPhoto:
       try await bridge.updateGroupPhoto(chat: try chat(), imagePath: try string("filePath"))
       return nil
 
-    case "add-participant":
+    case .addParticipant:
       try await bridge.addParticipant(try string("address"), to: try chat())
       return nil
 
-    case "remove-participant":
+    case .removeParticipant:
       try await bridge.removeParticipant(try string("address"), from: try chat())
       return nil
 
-    case "update-chat-pinned":
+    case .updateChatPinned:
       try await bridge.setPinned(chat: try chat(), pinned: flag("pinned"))
       return nil
 
     // An ARRAY, because pins render in this order and a client syncing them has to keep
     // it. Wrapped in an object rather than returned bare so the reply can grow a field
     // later without becoming a different type.
-    case "get-pinned-chats":
+    case .getPinnedChats:
       return ["chats": try await bridge.pinnedChats().map(\.rawValue)]
 
     // MARK: Mute
@@ -198,10 +206,10 @@ enum HelperDispatch {
     // ABSENT `mutedUntil` means indefinitely — which is not the same as sending a null,
     // and is why the key is read with `map` rather than defaulted.
 
-    case "get-chat-mute":
+    case .getChatMute:
       return encode(try await bridge.muteState(chat: try chat()))
 
-    case "set-chat-mute":
+    case .setChatMute:
       let until = data["mutedUntil"]?.intValue
         .map { Date(timeIntervalSince1970: Double($0) / 1000) }
       return encode(
@@ -215,7 +223,7 @@ enum HelperDispatch {
           )
         ))
 
-    case "unmute-chat":
+    case .unmuteChat:
       return encode(
         try await bridge.unmute(
           chat: try chat(),
@@ -224,19 +232,19 @@ enum HelperDispatch {
 
     // MARK: History and filtering
 
-    case "clear-chat-history":
+    case .clearChatHistory:
       return ["deleted": try await bridge.clearChatHistory(try chat())]
 
-    case "get-chat-filter":
+    case .getChatFilter:
       return encode(try await bridge.chatFilterState(chat: try chat()))
 
-    case "mark-sender-known":
+    case .markSenderKnown:
       return encode(
         try await bridge.markSenderKnown(
           chat: try chat(), saveInContacts: flag("saveInContacts")
         ))
 
-    case "mark-chat-spam":
+    case .markChatSpam:
       return encode(
         try await bridge.markChatAsSpam(
           ChatSpamRequest(
@@ -246,7 +254,7 @@ enum HelperDispatch {
           )
         ))
 
-    case "report-chat-junk":
+    case .reportChatJunk:
       return encode(
         try await bridge.reportChatAsJunk(
           ChatSpamRequest(
@@ -256,7 +264,7 @@ enum HelperDispatch {
           )
         ))
 
-    case "set-chat-filter":
+    case .setChatFilter:
       guard let category = data["category"]?.intValue else {
         throw PrivateAPIError.rejectedByMessages(
           reason: "set-chat-filter requires 'category'"
@@ -266,53 +274,53 @@ enum HelperDispatch {
 
     // MARK: Chat background
 
-    case "refetch-chat-background":
+    case .refetchChatBackground:
       try await bridge.refetchChatBackground(chat: try chat())
       return nil
 
     // MARK: Presence
 
-    case "start-typing":
+    case .startTyping:
       try await bridge.startTyping(chat: try chat())
       return nil
 
-    case "stop-typing":
+    case .stopTyping:
       try await bridge.stopTyping(chat: try chat())
       return nil
 
-    case "check-typing-status":
+    case .checkTypingStatus:
       return ["typing": try await bridge.checkTypingStatus(chat: try chat())]
 
-    case "mark-chat-read":
+    case .markChatRead:
       try await bridge.markRead(chat: try chat())
       return nil
 
-    case "mark-chat-unread":
+    case .markChatUnread:
       try await bridge.markUnread(chat: try chat())
       return nil
 
     // MARK: Handles
 
-    case "check-imessage-availability":
+    case .checkIMessageAvailability:
       return [
         "available": try await bridge.checkIMessageAvailability(
           address: try string("address")
         )
       ]
 
-    case "check-facetime-availability":
+    case .checkFaceTimeAvailability:
       return [
         "available": try await bridge.checkFaceTimeAvailability(
           address: try string("address")
         )
       ]
 
-    case "check-focus-status":
+    case .checkFocusStatus:
       return ["status": try await bridge.checkFocusStatus(address: try string("address"))]
 
     // MARK: Account
 
-    case "get-account-info":
+    case .getAccountInfo:
       let info = try await bridge.accountInfo()
       return [
         "appleId": info.appleId as Any,
@@ -321,7 +329,7 @@ enum HelperDispatch {
         "vettedAliases": info.vettedAliases,
       ].compactMapValues { $0 is NSNull ? nil : $0 }
 
-    case "get-nickname-info":
+    case .getNicknameInfo:
       // OPTIONAL, deliberately. An absent address means the local user's own contact card,
       // which is the default form of `GET /api/v1/icloud/contact` and the one the
       // reference server's fixture records. Requiring the key would turn that into a 400.
@@ -333,20 +341,20 @@ enum HelperDispatch {
         "avatar_path": info.avatarPath as Any,
       ].compactMapValues { $0 is NSNull ? nil : $0 }
 
-    case "should-offer-nickname-sharing":
+    case .shouldOfferNicknameSharing:
       return ["shouldOffer": try await bridge.shouldOfferNicknameSharing(chat: try chat())]
 
-    case "share-nickname":
+    case .shareNickname:
       try await bridge.shareNickname(chat: try chat())
       return nil
 
-    case "modify-active-alias":
+    case .modifyActiveAlias:
       try await bridge.modifyActiveAlias(try string("alias"))
       return nil
 
     // MARK: Attachments and FindMy
 
-    case "download-purged-attachment":
+    case .downloadPurgedAttachment:
       return [
         "path": try await bridge.downloadPurgedAttachment(
           guid: try string("attachmentGuid")
@@ -360,27 +368,27 @@ enum HelperDispatch {
     // would travel just as easily and identifies an Apple account, so it never leaves
     // this process.
 
-    case "findmy-status":
+    case .findMyStatus:
       return encode(try await bridge.findMyStatus())
 
-    case "findmy-friends":
+    case .findMyFriends:
       return ["friends": try await bridge.findMyFriends().map(encode)]
 
-    case "refresh-findmy-friends":
+    case .refreshFindMyFriends:
       return ["friends": try await bridge.refreshFindMyFriends().map(encode)]
 
-    case "refresh-findmy-location":
+    case .refreshFindMyLocation:
       return [
         "friend": encode(
           try await bridge.refreshFindMyLocation(handle: try string("address"))
         )
       ]
 
-    case "request-findmy-location-share":
+    case .requestFindMyLocationShare:
       try await bridge.requestFindMyLocationShare(handle: try string("address"))
       return nil
 
-    case "start-sharing-findmy-location":
+    case .startSharingFindMyLocation:
       let requestedDuration = try string("duration")
       guard let duration = FindMyShareDuration(rawValue: requestedDuration) else {
         throw PrivateAPIError.rejectedByMessages(
@@ -395,18 +403,12 @@ enum HelperDispatch {
       )
       return nil
 
-    case "stop-sharing-findmy-location":
+    case .stopSharingFindMyLocation:
       try await bridge.stopSharingFindMyLocation(
         chat: try chat(), address: optionalString("address")
       )
       return nil
 
-    default:
-      // A protocol mismatch, not a missing feature: this helper has never heard of the
-      // action. Reported distinctly so a version skew does not look like a bug.
-      throw PrivateAPIError.rejectedByMessages(
-        reason: "unknown action '\(request.action)'"
-      )
     }
   }
 

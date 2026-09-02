@@ -10,7 +10,7 @@ import BBServiceKit
 import BBSettings
 import Foundation
 
-final class PrivateAPIGatedService: ContextualService, GatedService, ConfigurableService {
+actor PrivateAPIGatedService: ContextualService, GatedService, ConfigurableService {
   static let manifest = BuiltInManifests.privateAPI
   static let watchedSettings: Set<String> = [
     Settings.enablePrivateAPI.key, Settings.privateAPIHelperPath.key,
@@ -28,9 +28,9 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
   /// never opens a socket and never injects, so the helper has nothing to connect to and
   /// every Private API endpoint reports the helper as unavailable on a machine where it
   /// would work.
-  private let runtime = RuntimeBox()
+  private var runtime: PrivateAPIRuntime?
   /// Forwards helper events onto the event bus. Held so it stops with the service.
-  private let pump = TaskBox()
+  private var pump: Task<Void, Never>?
 
   init(host: AppContext) {
     self.context = host
@@ -83,14 +83,12 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
       ),
       logger: context.logger
     )
-    await self.runtime.set(runtime)
+    self.runtime = runtime
 
     // Attached BEFORE start: injection quits and relaunches Messages and can take tens
     // of seconds, and the interfaces should hold the client for that whole time rather
     // than reporting "no Private API" until it finishes.
     await context.publishPrivateAPI(client: runtime.client, runtime: runtime)
-
-    try await runtime.start()
 
     // Helper events onto the bus.
     //
@@ -99,32 +97,42 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
     // matched `helperRegistered` and discarded the rest. So a whole family of
     // client-visible events was decoded correctly and thrown away — typing indicators in
     // particular are the most visible thing the Private API provides.
+    //
+    // SUBSCRIBED BEFORE `runtime.start()`, and the order is load-bearing. Injection happens
+    // inside that call, and both helpers register while it runs. A subscription taken after
+    // it returns misses those registrations on every cold start — which silently disabled
+    // the FaceTime link sweep below, and with it the `facetime_link_ttl_hours` setting,
+    // because registration is the only trigger that sweep has. It survived review because
+    // it is invisible after startup: a FaceTime restart later re-registers and does sweep.
     let client = await runtime.client
     let events = context.events
     let logger = context.logger
     let cleanupContext = context
-    await pump.set(
-      Task {
-        for await event in client.events {
-          // The FaceTime helper registering is the ONLY moment stray links can be
-          // cleared: invalidation needs link objects, and the list that holds them is
-          // populated at FaceTime's process start and never refreshed (the delegate that
-          // would refresh it crashes FaceTime.app). So the sweep rides on registration
-          // rather than a timer — a timer would find nothing, every time.
-          if case .helperRegistered(let process, _, _) = event,
-            process == HelperHost.faceTime
-          {
-            await Self.sweepFaceTime(context: cleanupContext)
-          }
-          guard let (server, key) = Self.serverEvent(for: event) else { continue }
-          await events.emit(server, rateLimitKey: key)
+    pump?.cancel()
+    pump = Task {
+      for await event in client.events {
+        // The FaceTime helper registering is the ONLY moment stray links can be
+        // cleared: invalidation needs link objects, and the list that holds them is
+        // populated at FaceTime's process start and never refreshed (the delegate that
+        // would refresh it crashes FaceTime.app). So the sweep rides on registration
+        // rather than a timer — a timer would find nothing, every time.
+        if case .helperRegistered(let process, _, _) = event,
+          process == HelperHost.faceTime
+        {
+          await Self.sweepFaceTime(context: cleanupContext)
         }
-        logger.debug("Private API event pump stopped")
-      })
+        guard let (server, key) = Self.serverEvent(for: event) else { continue }
+        await events.emit(server, rateLimitKey: key)
+      }
+      logger.debug("Private API event pump stopped")
+    }
+
+    try await runtime.start()
   }
 
   func stop() async {
-    await pump.cancel()
+    pump?.cancel()
+    pump = nil
     // The hand-off watchers and any pending app restart poll the helper that is about to go
     // away. Cancelled here because this service is the helper's lifecycle.
     await context.faceTime().stop()
@@ -133,8 +141,8 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
     // separately either side of `stop()` left the client published against a runtime that
     // was already gone.
     await context.withdrawPrivateAPI()
-    await self.runtime.current?.stop()
-    await self.runtime.set(nil)
+    await self.runtime?.stop()
+    self.runtime = nil
   }
 
   /// Maps a helper event onto the client-facing vocabulary.
@@ -255,7 +263,7 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
 
   var health: ServiceHealth {
     get async {
-      guard let runtime = await runtime.current else {
+      guard let runtime else {
         return .degraded(reason: "not started")
       }
       guard await runtime.isConnected else {

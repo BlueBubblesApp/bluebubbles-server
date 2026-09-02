@@ -12,17 +12,19 @@ import Testing
 
 @testable import BBServiceKit
 
-private final class GatedRecordingService: RecordingService, GatedService, @unchecked Sendable {
-  override class var manifest: ServiceManifest { .minimal(id: "gated") }
+private actor GatedRecordingService: RecordingService, GatedService {
+  static var manifest: ServiceManifest { .minimal(id: "gated") }
   /// Always declines, which is how a disabled feature behaves.
   func canRun() async -> Bool { false }
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
 }
 
-private final class PermissionedService: RecordingService, PermissionDependentService,
-  @unchecked Sendable
-{
-  override class var manifest: ServiceManifest { .minimal(id: "permissioned") }
+private actor PermissionedService: RecordingService, PermissionDependentService {
+  static var manifest: ServiceManifest { .minimal(id: "permissioned") }
   static let requiredPermissions: [PermissionID] = [.fullDiskAccess]
+  let recorder: LifecycleRecorder
+  init(host: TestContext) { recorder = host.recorder }
 }
 
 @Suite("Inactive service reporting")

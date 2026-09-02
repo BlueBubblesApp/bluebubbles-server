@@ -1,14 +1,20 @@
 //  WireJSON
-//  The dynamic half of the legacy helper protocol.
+//  The value type of the helper protocol, shared by both ends of the socket.
 //
-//  Requests are typed — each action has a Codable payload — but RESPONSES cannot be, because
-//  the shipping Objective-C helper answers with whatever shape the action happens to produce
-//  and the server strips known keys off the rest. That rule is reproduced verbatim in
-//  `HelperResponse.result`, so this needs a value type that can hold arbitrary JSON.
+//  It existed twice: `WireJSON` in the server's transport and `HelperProtocol.WireValue`
+//  inside the injected helper — same six cases, same coercions, same decoder, written
+//  separately because the two live in different targets. Two spellings of one wire format is
+//  a drift waiting to happen: the day one side starts treating a number as a boolean and the
+//  other does not, the difference shows up as a helper "rejecting" a request nobody can see
+//  anything wrong with.
 //
-//  Deliberately local to this module rather than reusing BBSerialization's `JSONValue`: that
-//  type is the *client* wire contract and lives downstream of chat.db. Sharing it would tie
-//  the Private API transport to the read path for no reason beyond avoiding sixty lines.
+//  Here, in the contract both sides already depend on, there is one of it.
+//
+//  NOT the same type as `BBSerialization.JSONValue`, and deliberately not merged with it.
+//  That one carries `int` and `int64` separately because the numbers it renders are the
+//  CLIENT-facing JSON, where `1` and `1.0` are different bytes and the parity harness holds
+//  us to the ones shipped clients already parse. This type talks to our own helper, where a
+//  double is all the wire has ever carried.
 
 import Foundation
 

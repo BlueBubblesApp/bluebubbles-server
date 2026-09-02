@@ -9,7 +9,7 @@ import BBSocketIO
 import BBSystem
 import Hummingbird
 
-final class HTTPService: ContextualService, ConfigurableService {
+actor HTTPService: ContextualService, ConfigurableService {
   static let manifest = BuiltInManifests.http
   /// A port change or a certificate change means rebinding, which is a restart.
   static let watchedSettings: Set<String> = [

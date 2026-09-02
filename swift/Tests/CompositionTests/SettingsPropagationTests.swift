@@ -36,12 +36,12 @@ private struct LogContext: Sendable {
 }
 
 /// Watches the port, and asks for a restart when it moves — the shape `HTTPService` has.
-private final class WatchingService: Service, ConfigurableService, @unchecked Sendable {
+private actor WatchingService: Service, ConfigurableService {
   static var manifest: ServiceManifest { .minimal(id: "watching") }
   static let watchedSettings: Set<String> = ["socket_port"]
 
   private let log: RestartLog
-  required init(host: LogContext) {
+  init(host: LogContext) {
     log = host.log
   }
 
@@ -55,12 +55,12 @@ private final class WatchingService: Service, ConfigurableService, @unchecked Se
 }
 
 /// Watches nothing relevant. Must not be woken.
-private final class IndifferentService: Service, ConfigurableService, @unchecked Sendable {
+private actor IndifferentService: Service, ConfigurableService {
   static var manifest: ServiceManifest { .minimal(id: "indifferent") }
   static let watchedSettings: Set<String> = ["log_level"]
 
   private let log: RestartLog
-  required init(host: LogContext) {
+  init(host: LogContext) {
     log = host.log
   }
 
@@ -260,13 +260,13 @@ struct StartupReentrancyTests {
 
   /// Writes a setting from inside its own `start()`, which the proxy service genuinely
   /// does when it publishes the tunnel address.
-  private final class SelfWritingService: Service, ConfigurableService, @unchecked Sendable {
+  private actor SelfWritingService: Service, ConfigurableService {
     static var manifest: ServiceManifest { .minimal(id: "self-writing") }
     static let watchedSettings: Set<String> = ["socket_port"]
 
     nonisolated(unsafe) static var store: SettingsStore?
     private let log: RestartLog
-    required init(host: LogContext) {
+    init(host: LogContext) {
       log = host.log
     }
 

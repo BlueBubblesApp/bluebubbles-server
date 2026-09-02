@@ -124,7 +124,7 @@ struct ProxyHost: Sendable {
 }
 
 /// One connection method, running. Generic over the method so there is nothing to override.
-final class ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableService,
+actor ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableService,
   GatedService
 {
 
