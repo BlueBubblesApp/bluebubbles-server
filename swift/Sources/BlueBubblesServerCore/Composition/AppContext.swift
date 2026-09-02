@@ -153,20 +153,49 @@ public actor AppContext {
   /// routes, the legacy socket commands, and the SwiftUI app. Sharing it is what makes the
   /// current implementation's 68 IPC channels unnecessary.
   private var cachedInterfaces: Interfaces?
-  /// The push delivery object, once the push service has started it.
-  ///
-  /// A `PushService` — a BBPushKit type — rather than a lookup of `PushDeliveryService`.
-  /// Reaching for the concrete SERVICE made the container depend on the services that depend
-  /// on it, which is a cycle the single-target build hides and a module split would not. The
-  /// service hands over what it owns; this holds a reference to a type it already depends on.
-  private var pushDelivery: PushService?
 
-  /// Set once the Private API service is running. Nil is a normal state, not a failure:
-  /// the Private API is an enhancement and AppleScript covers the send path without it.
-  private var privateAPI: (any PrivateAPI)?
-  /// `private(set)` rather than `private` so a test can assert it was published. It went
-  /// unpublished for the life of the project precisely because nothing could look.
-  private(set) var contactsIngestor: ContactsIngestor?
+  /// Everything a service publishes into the container while it runs, as ONE value.
+  ///
+  /// The cache above is derived from these, and the `didSet` is what keeps that true. They
+  /// used to be four separate `var`s with `cachedInterfaces = nil` written out at each of the
+  /// three sites that changed one — correct, but correct by hand: the invariant lived in
+  /// whoever remembered to add the fourth line, and a stale interface is silent. An interface
+  /// built before the helper connected holds a nil reference and goes on reporting the
+  /// Private API as unavailable for the life of the process, which is the bug where a working
+  /// helper looks broken.
+  ///
+  /// Adding a field here cannot reintroduce that. Mutating any part of the struct invalidates
+  /// the cache, whether or not the author thought about it.
+  private var published = PublishedRuntime() {
+    didSet { cachedInterfaces = nil }
+  }
+
+  /// The published half of the container's state. See `published`.
+  struct PublishedRuntime: Sendable {
+    /// The push delivery object, once the push service has started it.
+    ///
+    /// A `PushService` — a BBPushKit type — rather than a lookup of `PushDeliveryService`.
+    /// Reaching for the concrete SERVICE made the container depend on the services that
+    /// depend on it, which is a cycle the single-target build hides and a module split would
+    /// not. The service hands over what it owns; this holds a reference to a type it already
+    /// depends on.
+    var pushDelivery: PushService?
+
+    /// Set once the Private API service is running. Nil is a normal state, not a failure:
+    /// the Private API is an enhancement and AppleScript covers the send path without it.
+    var privateAPI: (any PrivateAPI)?
+
+    /// The process control that goes with `privateAPI`. Published and withdrawn together —
+    /// see `publishPrivateAPI` for why that is a fix rather than a tidy-up.
+    var privateAPIRuntime: PrivateAPIRuntime?
+
+    /// The address-book reader, published by `ContactsService` once it exists.
+    var contactsIngestor: ContactsIngestor?
+  }
+
+  /// Readable so a test can assert a service published what it owns. They went unpublished
+  /// for the life of the project precisely because nothing could look.
+  var contactsIngestor: ContactsIngestor? { published.contactsIngestor }
   /// Group chat creation without the Private API.
   ///
   /// Owned here rather than constructed per interface because it caches whether the user's
@@ -304,15 +333,15 @@ public actor AppContext {
   /// Held so the restart endpoints can relaunch an app WITH its helper inserted. Restarting
   /// Messages without injection silently drops the Private API: the app comes back looking
   /// healthy while every Private API route reports the helper as unavailable.
-  public private(set) var privateAPIRuntime: PrivateAPIRuntime?
+  public var privateAPIRuntime: PrivateAPIRuntime? { published.privateAPIRuntime }
 
   func publish(pushDelivery: PushService) {
-    self.pushDelivery = pushDelivery
+    published.pushDelivery = pushDelivery
     clientActivity.setForwarder { await pushDelivery.noteClientActivity() }
   }
 
   func withdrawPushDelivery() {
-    self.pushDelivery = nil
+    published.pushDelivery = nil
     clientActivity.setForwarder(nil)
   }
 
@@ -324,20 +353,16 @@ public actor AppContext {
   /// client was still published, so `isHelperConnected` could answer "yes" for a helper that
   /// was being torn down. Setting both under one actor-isolated call closes that window.
   ///
-  /// Invalidates the interface cache, because an interface built before the helper connected
-  /// holds a nil reference and would go on reporting the Private API as unavailable for the
-  /// life of the process — exactly the bug where a working helper looks broken.
+  /// The interface cache is invalidated by the write itself. See `published`.
   func publishPrivateAPI(client: any PrivateAPI, runtime: PrivateAPIRuntime?) {
-    self.privateAPI = client
-    self.privateAPIRuntime = runtime
-    self.cachedInterfaces = nil
+    published.privateAPI = client
+    published.privateAPIRuntime = runtime
   }
 
   /// Withdraws both halves at once. See `publishPrivateAPI`.
   func withdrawPrivateAPI() {
-    self.privateAPI = nil
-    self.privateAPIRuntime = nil
-    self.cachedInterfaces = nil
+    published.privateAPI = nil
+    published.privateAPIRuntime = nil
   }
 
   /// The address-book reader, published by `ContactsService` once it exists.
@@ -349,8 +374,7 @@ public actor AppContext {
   /// answers "contact access has not been granted to this server" on servers where it has.
   /// A separate call is what makes forgetting it visible.
   func publish(contactsIngestor ingestor: ContactsIngestor) {
-    self.contactsIngestor = ingestor
-    self.cachedInterfaces = nil
+    published.contactsIngestor = ingestor
   }
 
   /// The interfaces, or nil when chat.db is not readable.
@@ -364,15 +388,15 @@ public actor AppContext {
 
     let built = ServerInterfaces(
       message: MessageInterface(
-        repository: messages, serializer: serializer, privateAPI: privateAPI
+        repository: messages, serializer: serializer, privateAPI: published.privateAPI
       ),
       chat: ChatInterface(
-        repository: messages, serializer: serializer, privateAPI: privateAPI,
+        repository: messages, serializer: serializer, privateAPI: published.privateAPI,
         shortcuts: groupChatShortcutsBacking
       ),
-      handle: HandleInterface(repository: messages, privateAPI: privateAPI),
-      attachment: AttachmentInterface(repository: messages, privateAPI: privateAPI),
-      contact: ContactInterface(index: contacts, ingestor: contactsIngestor)
+      handle: HandleInterface(repository: messages, privateAPI: published.privateAPI),
+      attachment: AttachmentInterface(repository: messages, privateAPI: published.privateAPI),
+      contact: ContactInterface(index: contacts, ingestor: published.contactsIngestor)
     )
     cachedInterfaces = built
     return built
@@ -414,7 +438,7 @@ public actor AppContext {
     PushInterface(
       credentials: PushCredentialStore(secrets: secrets),
       settings: settings,
-      service: pushDelivery,
+      service: published.pushDelivery,
       deviceTokens: { [weak self] in await self?.deviceDirectory.tokens() ?? [] },
       reloadPush: { [weak self] in
         // Through the REGISTRY, not through the service instance, and the difference
@@ -465,7 +489,7 @@ public actor AppContext {
   /// Distinct from `enable_private_api`, which is only what the user asked for. A client
   /// needs both: the setting says the feature is meant to work, this says it does.
   public var isHelperConnected: Bool {
-    get async { await privateAPI?.isConnected ?? false }
+    get async { await published.privateAPI?.isConnected ?? false }
   }
 
   /// Supplied by the hosting application, which owns the updater.
@@ -483,7 +507,7 @@ public actor AppContext {
   ///
   /// Nil is a normal state: the Private API is an enhancement, and every caller here is
   /// expected to say so rather than treat it as a failure.
-  public func privateAPIClient() -> (any PrivateAPI)? { privateAPI }
+  public func privateAPIClient() -> (any PrivateAPI)? { published.privateAPI }
 
   /// The interfaces, or a 503 explaining why not.
   public func requireInterfaces() throws -> Interfaces {
@@ -508,7 +532,7 @@ public actor AppContext {
   public func announce(serverAddress: String) async {
     let announcer = addressAnnouncer ?? ServerAddressAnnouncer(events: events, logger: logger)
     addressAnnouncer = announcer
-    await announcer.announce(serverAddress) { [pushDelivery] address in
+    await announcer.announce(serverAddress) { [pushDelivery = published.pushDelivery] address in
       // Forced, because this is only reached when the address CHANGED and the publisher's
       // own "unchanged" memory is about what this process wrote, not about what the
       // document says.

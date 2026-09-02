@@ -835,14 +835,16 @@ are gone. Done looks like: each
 
 Both are preferences on working code, and both were checked before being left:
 
-- **`AppContext`'s publish/withdraw slots.** The cached `interfaces()` value is invalidated by
-  hand, and every mutable input has a matching invalidation site — verified, so this is not a
-  latent bug. Folding the slots into one runtime registry with a snapshot and a change stream
-  would make invalidation follow from the data. Worth doing when something else opens this area.
-- **`BBInterfaces` holds repositories that belong elsewhere.** Devices and webhooks with events,
-  alerts with diagnostics, schedules with their service. The build-time argument for splitting
-  it does not survive measurement: touching `BBInterfaces` rebuilds in 7.9s against 3.4s for
-  `BBCore`. Do it if the module is being opened up anyway, not on its own.
+- ~~**`AppContext`'s publish/withdraw slots.**~~ DONE, and smaller than the plan: the four
+  slots became one `PublishedRuntime` value with a `didSet` clearing the interface cache, so
+  invalidation follows from the data without a separate registry actor or a change stream.
+  Three tests assert the rebuild and fail without it.
+- **`BBInterfaces` holds repositories that belong elsewhere** — RETRACTED, do not do this.
+  Moving them would push GRDB into `BBDiagnostics`, `BBEvents` and `BBPushKit`, none of which
+  has a persistence dependency today. `BBDiagnostics` declares `AlertStoring` and
+  `AlertRepository` implements it from up here; that is dependency inversion working, not a
+  misplaced file. The build-time argument was separately wrong: touching `BBInterfaces`
+  rebuilds in 7.9s against 3.4s for `BBCore`.
 
 ## `AppModel` still owns tool-status observation
 

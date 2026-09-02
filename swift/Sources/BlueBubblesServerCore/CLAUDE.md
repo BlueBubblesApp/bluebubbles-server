@@ -28,6 +28,13 @@ Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architec
   are optionals for that reason. Do not construct a disabled stand-in.
 - **The SwiftUI app must not touch `AppContext`.** It reaches state through narrow accessors on
   `AppModel`, and `AppContext` is private to keep that true.
+- **Published state is ONE value.** What services publish while they run — the Private API
+  client and runtime, the push service, the contacts ingestor — lives in `PublishedRuntime`,
+  and `interfaces()` is cached from it behind a `didSet` that clears the cache on any write.
+  Add a field there rather than a fourth `private var`: the invalidation used to be a line
+  written by hand at each publishing site, which was correct only for as long as everyone
+  remembered it, and a stale interface is silent — an interface built before the helper
+  connected reports the Private API as unavailable for the life of the process.
 - **It holds references; it does not act.** Whole-server verbs — restart, process replacement —
   live in `ServerLifecycle`. A container that can `execv` is not a container. Device and webhook
   administration live on `DeviceDirectory` and `WebhookDirectory`, FaceTime hand-offs on

@@ -19,6 +19,7 @@ import BBDiagnostics
 import BBEvents
 import BBHTTPAPI
 import BBPersistence
+import BBSerialization
 import BBSettings
 import BBSocketIO
 import BBSystem
@@ -31,7 +32,11 @@ import Logging
 enum AppContextFixture {
 
   /// An unwired context: built, but `finishWiring` has not run.
-  static func make() async throws -> AppContext {
+  /// - Parameter withMessageAccess: supplies an EMPTY message repository and serializer, so
+  ///   `interfaces()` returns something instead of nil. The default stays nil because that is
+  ///   the no-Full-Disk-Access configuration and the one most of these suites want; pass true
+  ///   for a test about the interfaces themselves rather than about the container.
+  static func make(withMessageAccess: Bool = false) async throws -> AppContext {
     let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let secrets = InMemorySecretStore()
     let settings = try await SettingsStore(database: database, secrets: secrets)
@@ -45,10 +50,12 @@ enum AppContextFixture {
       chatDatabase: nil,
       settings: settings,
       secrets: secrets,
-      schemaProfile: nil,
-      messages: nil,
+      schemaProfile: withMessageAccess ? InterfaceFixtures.emptyProfile : nil,
+      messages: withMessageAccess ? try InterfaceFixtures.repository() : nil,
       contacts: ContactIndex(database: database),
-      serializer: nil,
+      serializer: withMessageAccess
+        ? MessageSerializer(profile: InterfaceFixtures.emptyProfile)
+        : nil,
       events: EventBus(),
       codecs: .legacyOnly(),
       socketServer: socketServer,

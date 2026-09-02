@@ -81,6 +81,67 @@ struct AppContextWiringTests {
     #expect(await context.isHelperConnected == false)
   }
 
+  // MARK: - The cache the published state feeds
+
+  /// REGRESSION GUARD, for a bug that has not happened. `interfaces()` caches, and what it
+  /// caches holds whatever the Private API was when it was built. An interface built before
+  /// the helper connected holds nil and would go on reporting the Private API as unavailable
+  /// for the life of the process — a working helper that looks broken.
+  ///
+  /// The invalidation used to be a line written by hand at each site that changed the
+  /// published state. It is now a `didSet` on the one value those sites write, so a new field
+  /// cannot forget it. This asserts the behaviour that arrangement exists to guarantee.
+  @Test("Interfaces built before the Private API arrives are rebuilt after it does")
+  func publishingRebuildsTheInterfaces() async throws {
+    let context = try await AppContextFixture.make(withMessageAccess: true)
+
+    let before = try #require(await context.interfaces())
+    #expect(await before.message.availableBackend() == .appleScript)
+
+    await context.publishPrivateAPI(client: FailingPrivateAPI(), runtime: nil)
+
+    let after = try #require(await context.interfaces())
+    #expect(await after.message.availableBackend() == .privateAPI)
+  }
+
+  /// And back, so a helper going away is equally visible. Withdrawing without invalidating
+  /// would leave every interface holding a client whose transport has stopped.
+  @Test("Withdrawing the Private API rebuilds them again")
+  func withdrawingRebuildsTheInterfaces() async throws {
+    let context = try await AppContextFixture.make(withMessageAccess: true)
+    await context.publishPrivateAPI(client: FailingPrivateAPI(), runtime: nil)
+    _ = await context.interfaces()
+
+    await context.withdrawPrivateAPI()
+
+    let after = try #require(await context.interfaces())
+    #expect(await after.message.availableBackend() == .appleScript)
+  }
+
+  /// The same property for the other published slot, and the one whose absence actually
+  /// shipped: `contact/refresh` refused on every server because the ingestor was never
+  /// published. Publishing it after the interfaces exist has to reach them.
+  @Test("Publishing the contacts ingestor reaches an already-built interface")
+  func publishingIngestorRebuildsTheInterfaces() async throws {
+    let context = try await AppContextFixture.make(withMessageAccess: true)
+
+    let before = try #require(await context.interfaces())
+    await #expect(throws: InterfaceError.self) { _ = try await before.contact.refresh() }
+
+    await context.publish(contactsIngestor: ContactsIngestor(index: context.contacts))
+
+    let after = try #require(await context.interfaces())
+    // Reaches the ingestor now. It may still fail for its own reason — a test process has no
+    // Contacts access — but no longer with the nil path's "not granted to this server".
+    do {
+      _ = try await after.contact.refresh()
+    } catch let error as InterfaceError {
+      #expect(error != .unavailable("contact access has not been granted to this server"))
+    } catch {
+      // Any other error means it got past the nil check, which is what is being asserted.
+    }
+  }
+
   // MARK: - The two that were never called
 
   /// REGRESSION. `contact/refresh` — the API route and the app's "Refresh from Address
