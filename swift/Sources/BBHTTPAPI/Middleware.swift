@@ -102,6 +102,19 @@ public struct AuthenticationStage: Sendable {
   }
 
   public func authenticate(_ context: inout APIRequestContext) async throws {
+    try await admit(&context)
+    try await verifyCredential(&context)
+  }
+
+  /// Resolves who is calling and applies the blocklist and rate limiter.
+  ///
+  /// Split out from the credential check because the two halves are optional in different
+  /// ways. A route marked `.optionalAuthentication` deliberately tolerates a caller with no
+  /// credential — that is what enrolment means — but it must NOT tolerate a caller the
+  /// access controller has blocked. Running both halves under one `try?` let a blocked
+  /// address keep guessing the server password against `auth/register` for as long as it
+  /// liked, with every guess counted and none of them enforced.
+  public func admit(_ context: inout APIRequestContext) async throws {
     let identity = await accessControl.identity(
       peerAddress: context.peerAddress,
       forwardedFor: context.header("X-Forwarded-For")
@@ -122,6 +135,14 @@ public struct AuthenticationStage: Sendable {
         ])
       throw Unauthorized()
     }
+  }
+
+  /// Checks the presented credential and records the attempt.
+  ///
+  /// Reads `context.identity`, so `admit` runs first — it is what resolves the identity a
+  /// failure is counted against.
+  public func verifyCredential(_ context: inout APIRequestContext) async throws {
+    let identity = context.identity
 
     let presentation = CredentialPresentation(
       queryParameters: context.queryParameters,

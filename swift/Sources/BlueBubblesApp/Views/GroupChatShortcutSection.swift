@@ -27,8 +27,14 @@
 //  Removal is a person, in the Shortcuts app. The CLI has no `delete`, and the only
 //  programmatic route would be writing to the private Core Data store of a running
 //  application — not a trade worth making to save one click.
+//
+//  SHOWN ONLY WHILE THE PRIVATE API IS OFF FOR MESSAGES. With it on, the helper creates
+//  groups directly and an install button here would be a second answer to a question that
+//  already has one. The same rule puts the step into setup: `OnboardingRules
+//  .needsGroupChatShortcut`.
 
 import BBInterfaces
+import BBSettings
 import BBShortcuts
 import BlueBubblesServerCore
 import SwiftUI
@@ -46,9 +52,20 @@ struct GroupChatShortcutSection: View {
   /// send has somewhere to go. Empty is the normal, invisible case.
   @State private var testAddress = ""
   @State private var needsAddress = false
-  @State private var helperConnected = false
+  /// Nil until the setting has been read; nothing renders until it has, so the section
+  /// does not flash in and out on a server with the Private API on.
+  @State private var privateAPIEnabled: Bool?
 
   var body: some View {
+    if privateAPIEnabled == false {
+      section
+    } else {
+      Color.clear.frame(height: 0)
+        .task { await readPrivateAPIState() }
+    }
+  }
+
+  private var section: some View {
     SettingsSection(
       "Group Chat Creation",
       subtitle: subtitle,
@@ -102,20 +119,16 @@ struct GroupChatShortcutSection: View {
     .task { await refresh() }
   }
 
-  /// Leads with what the user can do, not with what they lack.
-  ///
-  /// A server WITH the Private API needs none of this, and telling that user their setup is
-  /// missing something would be false — so the sentence changes rather than the section
-  /// disappearing, which would leave "why can I not make a group?" unanswerable.
   private var subtitle: String {
-    if helperConnected {
-      return
-        "The Private API creates group chats directly. This Shortcut is a fallback for "
-        + "servers running without it."
-    }
-    return
-      "Without the Private API, macOS gives no way to create a group chat except a "
+    "Without the Private API, macOS gives no way to create a group chat except a "
       + "Shortcut. Install it once to turn the feature on."
+  }
+
+  /// Read on appear rather than observed: the toggle lives on another tab, and switching
+  /// back here re-creates this view.
+  private func readPrivateAPIState() async {
+    guard let store = model.settingsStore else { return }
+    privateAPIEnabled = await store.get(Settings.enablePrivateAPI)
   }
 
   @ViewBuilder private var statusTag: some View {
@@ -142,7 +155,6 @@ struct GroupChatShortcutSection: View {
     guard let shortcuts = await model.groupChatShortcuts() else { return }
     let status = await shortcuts.status(forceRefresh: true)
     isInstalled = status.isInstalled
-    helperConnected = await model.isHelperConnected
     hasChecked = true
     if !isInstalled { needsAddress = false }
   }

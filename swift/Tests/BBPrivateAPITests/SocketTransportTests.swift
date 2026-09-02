@@ -261,3 +261,143 @@ struct PeerIdentityTests {
     }
   }
 }
+
+/// Returns the first event a subscription yields, or nil if none arrives in time.
+///
+/// A timeout rather than an open `for await`: the failure this guards against is an event
+/// that never arrives, and without a deadline that failure is a hung test rather than a
+/// red one.
+private func firstEvent(
+  in stream: AsyncStream<PrivateAPIEvent>,
+  timeout: Duration = .seconds(5)
+) async -> PrivateAPIEvent? {
+  await withTaskGroup(of: PrivateAPIEvent?.self) { group in
+    group.addTask {
+      for await event in stream { return event }
+      return nil
+    }
+    group.addTask {
+      try? await Task.sleep(for: timeout)
+      return nil
+    }
+    let first = await group.next() ?? nil
+    group.cancelAll()
+    return first
+  }
+}
+
+@Suite("Private API event fan-out")
+struct PrivateAPIEventFanOutTests {
+
+  /// The regression. There are two consumers of this stream in the shipping server — the
+  /// runtime waiting for `helperRegistered` to confirm an injection took, and the service
+  /// that forwards everything to the event bus — and for a while both iterated ONE
+  /// `AsyncStream`. An `AsyncStream` hands each element to a single waiting iterator, so the
+  /// two loops split the events between them: the registration wait timed out while the
+  /// helper was plainly connected, and typing indicators reached clients only sometimes.
+  ///
+  /// Which loop won was a race, which is why it presented as flakiness rather than a
+  /// reproducible failure. Two subscribers, one event, both must see it.
+  @Test("Every subscriber receives every event")
+  func everySubscriberSeesEveryEvent() async throws {
+    let group = MultiThreadedEventLoopGroup(numberOfThreads: 2)
+    let path = temporarySocketPath()
+    let transport = SocketTransport(
+      socketPath: path, validator: PermissivePeerValidator(), group: group
+    )
+    try await transport.start()
+
+    // Both subscriptions are taken BEFORE the event is sent. The buffering is unbounded, so
+    // this pins the fan-out and not merely the timing of two readers.
+    let runtimeStream = await transport.events
+    let busStream = await transport.events
+    #expect(await transport.subscriberCount == 2)
+
+    let helper = FakeSocketHelper(group: group)
+    try await helper.connect(path: path)
+    for _ in 0..<200 where await !transport.isConnected {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+
+    try await helper.write(json: [
+      "event": "ping",
+      "process": HelperHost.messages,
+      "protocolVersion": 2,
+      "events": "daemon-listener",
+    ])
+
+    async let runtimeEvent = firstEvent(in: runtimeStream)
+    async let busEvent = firstEvent(in: busStream)
+
+    for event in [await runtimeEvent, await busEvent] {
+      guard case .helperRegistered(let process, let version, let rung) = event else {
+        Issue.record("a subscriber did not receive the registration: \(String(describing: event))")
+        continue
+      }
+      #expect(process == HelperHost.messages)
+      #expect(version == 2)
+      #expect(rung == "daemon-listener")
+    }
+
+    try await helper.disconnect()
+    await transport.stop()
+    try? await group.shutdownGracefully()
+  }
+
+  /// Fan-out means a continuation per reader, so it also means a way to let one go. Without
+  /// this the transport accumulates a dead continuation for every subscription ever taken,
+  /// and yielding walks all of them.
+  @Test("A subscription that ends is dropped")
+  func endedSubscriptionIsDropped() async throws {
+    let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    let path = temporarySocketPath()
+    let transport = SocketTransport(
+      socketPath: path, validator: PermissivePeerValidator(), group: group
+    )
+    try await transport.start()
+
+    do {
+      let stream = await transport.events
+      #expect(await transport.subscriberCount == 1)
+      // Released here without ever being iterated. Dropping the stream is what signals
+      // termination, and the subscription has to go with it.
+      withExtendedLifetime(stream) {}
+    }
+
+    // Termination is delivered asynchronously, so poll rather than assert immediately.
+    for _ in 0..<200 where await transport.subscriberCount != 0 {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await transport.subscriberCount == 0)
+
+    await transport.stop()
+    try? await group.shutdownGracefully()
+  }
+
+  /// A stopped transport will never yield again, so a reader still parked on `for await`
+  /// would wait for the life of the process.
+  @Test("Stopping the transport ends every subscription")
+  func stopFinishesSubscriptions() async throws {
+    let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    let path = temporarySocketPath()
+    let transport = SocketTransport(
+      socketPath: path, validator: PermissivePeerValidator(), group: group
+    )
+    try await transport.start()
+
+    let stream = await transport.events
+    let drained = Task {
+      var count = 0
+      for await _ in stream { count += 1 }
+      return count
+    }
+
+    await transport.stop()
+
+    // Completes only because the stream finished; a leaked continuation hangs here.
+    #expect(await drained.value == 0)
+    #expect(await transport.subscriberCount == 0)
+
+    try? await group.shutdownGracefully()
+  }
+}

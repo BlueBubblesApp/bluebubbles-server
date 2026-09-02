@@ -339,11 +339,16 @@ public struct HTTPAPIBuilder: Sendable {
       let requirements = group.requirements.union(route.requirements)
 
       if requirements.contains(.optionalAuthentication) {
-        // Best effort. A caller with a valid password gets a principal and the handler can
-        // act on it; one enrolling with a one-time code has no password to send and must
-        // still reach the handler. Swallowing the failure is the whole point — the handler
-        // decides, because only it knows which of the two doors this caller is using.
-        try? await authentication.authenticate(&context)
+        // The blocklist is never optional. A blocked address is refused here, on the same
+        // terms as everywhere else, before the credential question is even asked.
+        try await authentication.admit(&context)
+
+        // The CREDENTIAL is best effort. A caller with a valid password gets a principal
+        // and the handler can act on it; one enrolling with a one-time code has no password
+        // to send and must still reach the handler. Swallowing that failure is the whole
+        // point — the handler decides, because only it knows which of the two doors this
+        // caller is using.
+        try? await authentication.verifyCredential(&context)
         if context.principal != nil { await onClientActivity() }
       } else if !requirements.contains(.unauthenticated) {
         try await authentication.authenticate(&context)

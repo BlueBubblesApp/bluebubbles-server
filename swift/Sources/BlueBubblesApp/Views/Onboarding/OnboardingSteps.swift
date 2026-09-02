@@ -40,6 +40,7 @@ struct OnboardingStepView: View {
     case .webhooks: WebhooksView(model: model)
     case .api: APIStep(model: model)
     case .privateAPI: PrivateAPIStep(model: model)
+    case .groupShortcut: GroupShortcutStep(model: model)
     case .finish: FinishStep(model: model)
     }
   }
@@ -339,6 +340,28 @@ private struct PrivateAPIStep: View {
         .font(.callout)
         .foregroundStyle(.secondary)
       }
+    }
+  }
+}
+
+// MARK: - Group chat Shortcut
+
+private struct GroupShortcutStep: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text(
+        "Two clicks, both of which macOS insists a person makes: confirm the Shortcut when "
+          + "the Shortcuts app asks, then send one test message and choose **Always "
+          + "Allow** when prompted. That grant is what lets the server create groups "
+          + "from then on."
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+      // The same panel Settings › General shows when the Private API is off.
+      GroupChatShortcutSection(model: model)
     }
   }
 }

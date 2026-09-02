@@ -162,8 +162,17 @@ public actor SocketTransport: PrivateAPITransport {
   private var registeredProcesses: [String: ObjectIdentifier] = [:]
 
   private let transactions: TransactionStore
-  private let eventStream: AsyncStream<PrivateAPIEvent>
-  private let eventContinuation: AsyncStream<PrivateAPIEvent>.Continuation
+
+  /// One continuation per subscriber, keyed by subscription.
+  ///
+  /// There is more than one consumer of this stream and there always has been: the runtime
+  /// watches for `helperRegistered` to know an injection took, and the service that owns the
+  /// event bus forwards everything to the sinks. A single shared `AsyncStream` cannot serve
+  /// both — an element goes to whichever iterator happens to be waiting, so the two loops
+  /// divide the events between them rather than each seeing all of them. That presents as a
+  /// helper that "never registered" while it is plainly connected, and as typing indicators
+  /// that arrive only sometimes.
+  private var subscribers: [UUID: AsyncStream<PrivateAPIEvent>.Continuation] = [:]
 
   /// The default location: inside a `0700` directory under Application Support.
   /// Delegates to the shared derivation, which both the server and the injected helper
@@ -209,15 +218,33 @@ public actor SocketTransport: PrivateAPITransport {
       self.ownsGroup = true
     }
     self.transactions = TransactionStore(logger: logger)
-
-    var continuation: AsyncStream<PrivateAPIEvent>.Continuation!
-    self.eventStream = AsyncStream(bufferingPolicy: .unbounded) { continuation = $0 }
-    self.eventContinuation = continuation
   }
 
   public var isConnected: Bool { !clients.isEmpty }
   public var connectedProcesses: Set<String> { Set(registeredProcesses.keys) }
-  public var events: AsyncStream<PrivateAPIEvent> { eventStream }
+
+  /// A new stream per caller. Every subscriber sees every event.
+  ///
+  /// Each access mints a subscription, so this is a `get` with a side effect — deliberately,
+  /// because the protocol requirement is a property and every existing caller reads it once
+  /// to drive one `for await`. The stream ends when the subscriber stops iterating or the
+  /// transport stops.
+  public var events: AsyncStream<PrivateAPIEvent> {
+    let id = UUID()
+    return AsyncStream(bufferingPolicy: .unbounded) { continuation in
+      subscribers[id] = continuation
+      continuation.onTermination = { [weak self] _ in
+        Task { await self?.removeSubscriber(id) }
+      }
+    }
+  }
+
+  private func removeSubscriber(_ id: UUID) {
+    subscribers[id] = nil
+  }
+
+  /// Visible for tests: how many live subscriptions there are.
+  var subscriberCount: Int { subscribers.count }
   /// The primary path. Kept singular because callers report "where the socket is"; the
   /// full set is `paths`.
   public var path: String { socketPaths.first ?? "" }
@@ -339,6 +366,15 @@ public actor SocketTransport: PrivateAPITransport {
     if ownsGroup {
       try? await group.shutdownGracefully()
     }
+
+    // End every subscription rather than leaving its `for await` parked on a transport
+    // that will never yield again. Callers cancel their own pumps too, but a stream that
+    // outlives the thing feeding it is a leak waiting for the one caller that forgets.
+    for continuation in subscribers.values {
+      continuation.finish()
+    }
+    subscribers.removeAll()
+
     logger.info("Private API socket stopped")
   }
 
@@ -581,7 +617,9 @@ public actor SocketTransport: PrivateAPITransport {
       logger.debug("Unhandled helper event", metadata: ["event": .string(name)])
       return
     }
-    eventContinuation.yield(event)
+    for continuation in subscribers.values {
+      continuation.yield(event)
+    }
   }
 }
 

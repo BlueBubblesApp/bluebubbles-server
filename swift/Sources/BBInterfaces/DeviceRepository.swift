@@ -66,18 +66,25 @@ public struct DeviceRepository: Sendable {
   /// every FCM token rotation, so a plain insert would fail the unique constraint on the
   /// common path — which reads to the user as "the server rejected my phone".
   ///
-  /// Only `name` and `last_active` are overwritten on conflict: `supported_codecs` and
+  /// Only `name` and `last_active_at` are overwritten on conflict: `supported_codecs` and
   /// `public_key` are negotiated separately and must survive a re-registration that does
-  /// not carry them.
+  /// not carry them. That targeted conflict clause is why this is hand-written SQL rather
+  /// than a record upsert, which would blank both.
+  ///
+  /// The column is `last_active_at`, not `last_active`. `createDevices` creates the short
+  /// name and `normaliseTimestampColumnNames` — which runs after every contributor — renames
+  /// it, so the short name exists in no database this code will ever open. Spelling it here
+  /// made every push registration fail at prepare time, and nothing caught it because
+  /// nothing called this method.
   public func register(name: String, identifier: String, at moment: Date = Date()) async throws {
     try await database.write { db in
       try db.execute(
         sql: """
-          INSERT INTO device (name, identifier, last_active)
+          INSERT INTO device (name, identifier, last_active_at)
           VALUES (?, ?, ?)
           ON CONFLICT(identifier) DO UPDATE SET
               name = excluded.name,
-              last_active = excluded.last_active
+              last_active_at = excluded.last_active_at
           """,
         arguments: [name, identifier, moment]
       )

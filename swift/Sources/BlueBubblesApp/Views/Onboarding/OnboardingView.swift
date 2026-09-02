@@ -46,6 +46,7 @@ struct OnboardingView: View {
     .frame(width: 900, height: 640)
     .task { await model.permissions.refresh() }
     .task(id: onboarding.selections.connectionMethod) { await refreshConnectionState() }
+    .task { await mirrorPrivateAPIState() }
     .task(id: model.integrations.selectedConnectionMethod) {
       // The connection step writes through `IntegrationsModel`; mirror what it holds so the
       // plan and the gate see the same answer.
@@ -226,6 +227,17 @@ struct OnboardingView: View {
       return rejection.userMessage
     } catch {
       return String(describing: error)
+    }
+  }
+
+  /// Keeps the Private API answer in step with the store, so the plan drops or adds the
+  /// group-chat Shortcut step the moment the toggle on the Private API step moves.
+  private func mirrorPrivateAPIState() async {
+    guard let store = model.settingsStore else { return }
+    onboarding.selections.messagesPrivateAPI = await store.get(Settings.enablePrivateAPI)
+    for await change in await store.changes() {
+      guard change.changedKeys.contains(Settings.enablePrivateAPI.key) else { continue }
+      onboarding.selections.messagesPrivateAPI = await store.get(Settings.enablePrivateAPI)
     }
   }
 

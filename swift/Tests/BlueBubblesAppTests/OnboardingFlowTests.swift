@@ -37,7 +37,8 @@ struct OnboardingPlanTests {
   func androidPlan() {
     #expect(
       ids([.android]) == [
-        .welcome, .goals, .permissions, .connection, .firebase, .privateAPI, .finish,
+        .welcome, .goals, .permissions, .connection, .firebase, .privateAPI, .groupShortcut,
+        .finish,
       ])
   }
 
@@ -99,6 +100,19 @@ struct OnboardingPlanTests {
     #expect(OnboardingRules.firebaseRole(for: selections) == nil)
     // Adding a desktop client brings Firebase back for the client, not for the agent.
     #expect(ids([.aiAgent, .desktop], method: ngrok).contains(.firebase))
+  }
+
+  @Test("The group-chat Shortcut step appears exactly when the Private API is off for Messages")
+  func groupShortcut() {
+    var selections = OnboardingSelections(goals: [.android])
+    #expect(OnboardingPlan.steps(for: selections).map(\.id).contains(.groupShortcut))
+    selections.messagesPrivateAPI = false
+    let plan = OnboardingPlan.steps(for: selections).map(\.id)
+    #expect(plan.contains(.groupShortcut))
+    // Right after the Private API offer, so the answer there decides it.
+    #expect(plan.firstIndex(of: .groupShortcut) == plan.firstIndex(of: .privateAPI).map { $0 + 1 })
+    selections.messagesPrivateAPI = true
+    #expect(!OnboardingPlan.steps(for: selections).map(\.id).contains(.groupShortcut))
   }
 
   @Test("Nothing chosen yet still yields a walkable plan")

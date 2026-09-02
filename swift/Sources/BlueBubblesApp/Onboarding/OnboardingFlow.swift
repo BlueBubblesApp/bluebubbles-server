@@ -79,6 +79,9 @@ struct OnboardingSelections: Equatable, Codable, Sendable {
   /// settings store rather than trusted from memory, because the settings screen can change
   /// it too.
   var connectionMethod: String?
+  /// Whether the Private API is on for Messages, mirrored from the settings store. Nil
+  /// until read. Decides whether the group-chat Shortcut step is needed.
+  var messagesPrivateAPI: Bool?
 
   static let defaultsKey = "onboardingSelections"
 }
@@ -158,7 +161,7 @@ struct OnboardingStep: Identifiable, Sendable {
 
   enum ID: String, CaseIterable, Sendable {
     case welcome, goals, permissions, connection, firebase, webhooks, api, privateAPI
-    case finish
+    case groupShortcut, finish
   }
 
   let id: ID
@@ -242,6 +245,15 @@ enum OnboardingRules {
     guard selections.goals.contains(.desktop) else { return nil }
     return addressCanChange(connectionMethod: selections.connectionMethod)
       ? .addressUpdates : nil
+  }
+
+  /// Whether group chat creation needs the Shortcut.
+  ///
+  /// Without the Private API for Messages, macOS gives no way to create a group chat except
+  /// a Shortcut — AppleScript lost its group path three releases below our floor. Unknown
+  /// counts as "not on": the step is cheap to skip and expensive to have missed.
+  static func needsGroupChatShortcut(_ selections: OnboardingSelections) -> Bool {
+    selections.messagesPrivateAPI != true
   }
 
   /// The permission gate: unmet required permissions block until the skip is acknowledged.
@@ -367,6 +379,15 @@ enum OnboardingCatalog {
         "Reactions, editing, unsending, typing indicators and group management. Optional, "
           + "and it needs System Integrity Protection disabled."
       },
+      isSkippable: true
+    ),
+    OnboardingStep(
+      .groupShortcut, title: "Group chats", symbol: "person.3",
+      purpose: { _ in
+        "Without the Private API, the only way this Mac can create a group chat is a "
+          + "Shortcut. Install it now so the feature works from the first message."
+      },
+      isIncluded: OnboardingRules.needsGroupChatShortcut,
       isSkippable: true
     ),
     OnboardingStep(
