@@ -17,8 +17,8 @@
 //       fails obscurely at first use. `ServiceRegistry` refuses to start it and says why.
 //
 //  **Accessibility is deliberately absent.** It existed solely for the UI-automation scripts
-//  dropped in § 14 — one fewer alarming permission in onboarding, and a direct dividend of
-//  that decision.
+//  that were dropped — one fewer alarming permission in onboarding, and a direct dividend
+//  of that decision.
 //
 //  See `docs/AUTH.md`.
 

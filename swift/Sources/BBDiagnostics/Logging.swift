@@ -193,11 +193,11 @@ public enum LoggingSystemBootstrap {
 
   /// Changes the level every logger uses, immediately.
   ///
-  /// This is what makes the Log Level setting mean something. It previously did nothing at
-  /// all: the level came from `ServerComposition.Options`, which nothing populated from the
-  /// store — so a user turned on debug logging, saw no new lines, and reasonably concluded
-  /// logging was broken. It is also the setting people reach for at precisely the moment
-  /// they are trying to diagnose something else.
+  /// This is what makes the Log Level setting mean something. Without it the level comes
+  /// from `ServerComposition.Options`, which nothing populates from the store — so a user
+  /// turns on debug logging, sees no new lines, and reasonably concludes logging is broken.
+  /// It is also the setting people reach for at precisely the moment they are trying to
+  /// diagnose something else.
   public static func setLevel(_ level: Logger.Level) {
     lock.lock()
     defer { lock.unlock() }

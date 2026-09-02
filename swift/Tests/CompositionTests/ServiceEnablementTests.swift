@@ -99,7 +99,7 @@ struct ServiceEnablementTests {
     // string on disk — an encoding difference between the two sides would show up as a
     // switch that visibly moves and changes nothing, which is the exact bug this whole
     // change exists to fix.
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let store = try await SettingsStore(
       database: database, secrets: InMemorySecretStore()
     )

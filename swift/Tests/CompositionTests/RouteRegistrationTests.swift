@@ -158,11 +158,11 @@ struct RouteRegistrationTests {
     // Status must NOT require the helper: it is the call that tells a client whether the
     // helper is usable, so failing it when the helper is absent withholds the answer
     // being asked for.
-    let status = findMy?.routes.first { $0.handlerID == "findmy.status" }
+    let status = findMy?.routes.first { $0.handlerID == .findmyStatus }
     #expect(status?.requirements.contains(.privateAPI) == false)
     // Everything else does.
     #expect(
-      findMy?.routes.filter { $0.handlerID != "findmy.status" }
+      findMy?.routes.filter { $0.handlerID != .findmyStatus }
         .allSatisfy { $0.requirements.contains(.privateAPI) } == true)
   }
 
@@ -255,10 +255,10 @@ struct RouteRegistrationTests {
     //   - `recents` reads the macOS call log from disk, so it needs no helper AT ALL.
     //     That is the point of it: recents work on a server with no injection.
     let enhanced = groups.first { $0.name == "FaceTime Enhanced" }
-    let readsTheDatabase: [HandlerID] = ["facetime.recents", "facetime.restart"]
+    let readsTheDatabase: [HandlerID] = [.facetimeRecents, .facetimeRestart]
     // `dismissAlert` is debug-only and write-scoped; the other two are read-only.
     let readOnly: [HandlerID] = [
-      "facetime.members", "facetime.recents", "facetime.debug", "facetime.windows",
+      .facetimeMembers, .facetimeRecents, .facetimeDebug, .facetimeWindows,
     ]
     #expect(
       enhanced?.routes
@@ -270,7 +270,7 @@ struct RouteRegistrationTests {
         .allSatisfy { !$0.requirements.contains(.privateAPI) } == true)
     // `restart` relaunches an APP rather than touching chats, so it carries the admin
     // scope its inherited sibling `mac/imessage/restart` does.
-    let adminScoped: [HandlerID] = ["facetime.restart", "facetime.cleanup"]
+    let adminScoped: [HandlerID] = [.facetimeRestart, .facetimeCleanup]
     #expect(
       enhanced?.routes
         .filter { !readOnly.contains($0.handlerID) && !adminScoped.contains($0.handlerID) }
@@ -299,7 +299,7 @@ struct RouteRegistrationTests {
     )
     let handlers = Set(groups.flatMap { $0.routes.map(\.handlerID) })
     let diagnostics: [HandlerID] = [
-      "facetime.debug", "facetime.windows", "facetime.dismissAlert",
+      .facetimeDebug, .facetimeWindows, .facetimeDismissAlert,
     ]
     #if DEBUG
       for diagnostic in diagnostics {
@@ -319,7 +319,7 @@ struct RouteRegistrationTests {
       authMode: .password, codecs: .legacyOnly(), faceTime: true
     )
     let diagnostics = groups.flatMap(\.routes).filter {
-      $0.handlerID == "facetime.debug" || $0.handlerID == "facetime.windows"
+      $0.handlerID == .facetimeDebug || $0.handlerID == .facetimeWindows
     }
     #expect(diagnostics.allSatisfy { $0.scope != Scope.serverAdmin })
     #expect(diagnostics.allSatisfy { $0.requirements.contains(.privateAPI) })
@@ -527,14 +527,14 @@ struct RouteRegistrationTests {
   @Test("Every additive route has a handler when its group is registered")
   func additiveRoutesAreCovered() {
     // The handler IDs the additive groups reference.
-    let authHandlers = Set(AdditiveRoutes.auth.routes.map(\.handlerID.rawValue))
-    let hydrationHandlers = Set(AdditiveRoutes.hydration.routes.map(\.handlerID.rawValue))
+    let authHandlers = Set(AdditiveRoutes.auth.routes.map(\.handlerID))
+    let hydrationHandlers = Set(AdditiveRoutes.hydration.routes.map(\.handlerID))
 
     #expect(
       authHandlers == [
-        "auth.register", "auth.token", "auth.rotate", "auth.revoke",
+        .authRegister, .authToken, .authRotate, .authRevoke,
       ])
-    #expect(hydrationHandlers == ["message.hydrate"])
+    #expect(hydrationHandlers == [.messageHydrate])
   }
 }
 

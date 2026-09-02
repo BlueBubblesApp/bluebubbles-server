@@ -6,9 +6,9 @@
 //  resolved every request to `.unresolved`, `AccessControlService` declined to block anyone,
 //  and `X-Forwarded-For` was never consulted because the peer was never a trusted proxy.
 //
-//  So the block list, the lockout escalation and the whole per-client half of § 17 were
-//  present, tested in isolation, and unreachable in the running server. Nothing failed —
-//  the throttle simply never fired.
+//  So the block list, the lockout escalation and the whole per-client half of access
+//  control were present, tested in isolation, and unreachable in the running server.
+//  Nothing failed — the throttle simply never fired.
 //
 //  Like PathParameterTests, these run a real Hummingbird instance: the defect was in what
 //  the router handed the context, and a hand-rolled harness would reproduce the fixed
@@ -37,8 +37,8 @@ struct PeerAddressTests {
   private static let echoGroup = RouteGroup(
     "Test", prefix: "test",
     routes: [
-      .init(.get, "peer", "test.peer", requires: .unauthenticated),
-      .init(.get, "guarded", "test.guarded"),
+      .init(.get, "peer", HandlerID("test.peer"), requires: .unauthenticated),
+      .init(.get, "guarded", HandlerID("test.guarded")),
     ])
 
   private func withServer(
@@ -54,8 +54,8 @@ struct PeerAddressTests {
           "identity": .string(String(describing: request.identity)),
         ]))
     }
-    registry.register("test.peer", echo)
-    registry.register("test.guarded", echo)
+    registry.register(HandlerID("test.peer"), echo)
+    registry.register(HandlerID("test.guarded"), echo)
     PlaceholderHandlers.fill(into: &registry, groups: RouteTable.groups)
 
     // Port 0 throughout: the kernel picks, and it never picks one it has already given out.

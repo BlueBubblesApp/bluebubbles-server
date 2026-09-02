@@ -2,8 +2,8 @@
 //  Actually binding the port.
 //
 //  Everything else in the HTTP layer — the route table, the middleware chain, mount-time
-//  handler validation — has existed since Phase 3. This is the part that turns it into a
-//  socket somebody can connect to, and it is deliberately separate from `HTTPService` so the
+//  handler validation — lives elsewhere. This is the part that turns it into a socket
+//  somebody can connect to, and it is deliberately separate from `HTTPService` so the
 //  lifecycle (bind, wait, shut down) is readable on its own.
 //
 //  See `.claude/docs/api.md`.

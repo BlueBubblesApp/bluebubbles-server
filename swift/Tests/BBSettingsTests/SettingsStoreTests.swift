@@ -12,7 +12,7 @@ struct SettingsStoreTests {
     configFile: [String: String] = [:],
     commandLine: [String: String] = [:]
   ) async throws -> (SettingsStore, InMemorySecretStore) {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
     let secrets = InMemorySecretStore()
     let store = try await SettingsStore(
       database: database,

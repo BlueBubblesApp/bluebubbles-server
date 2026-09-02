@@ -3,7 +3,7 @@
 One rule per namespace, and the reason for it. Where a namespace is inconsistent, this
 document says whether that is a contract we are bound to or a bug to fix.
 
-`Tests/CompositionTests/NamingConventionTests.swift` enforces the parts a test can see.
+`Tests/CompatibilityTests/NamingConventionTests.swift` enforces the parts a test can see.
 If you are adding a key and the test fails, this file is why.
 
 ## The short version

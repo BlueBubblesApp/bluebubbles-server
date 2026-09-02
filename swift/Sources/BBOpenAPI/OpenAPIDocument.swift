@@ -13,8 +13,8 @@
 //      `data` unconstrained. Filling those in is a separate job with its own source of truth
 //      (the recorded fixtures) — see `FixtureCoverage`.
 //
-//  Two things that USED to be missing are now declared beside the table rather than inferred,
-//  because neither could ever come from a recording:
+//  Two things are declared beside the table rather than inferred, because neither could ever
+//  come from a recording:
 //    - QUERY PARAMETERS — `QueryParameters`, keyed by handler.
 //    - MULTIPART BODIES and NON-JSON RESPONSES — `MultipartBodies` and `NonJSONResponses`.
 //      The latter also carries the one route whose success is 201 rather than 200, derived

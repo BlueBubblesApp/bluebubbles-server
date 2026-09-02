@@ -75,10 +75,10 @@ public actor PrivateAPIRuntime {
     self.alerts = alerts
     self.logger = logger
 
-    // ONE transport, and it is the verifiable one. The loopback TCP bridge that used to
-    // sit alongside this is gone: it could not identify its peer, so any local process
-    // could connect and drive the Private API. The socket now lives inside Messages'
-    // container, where a sandboxed helper can reach it — see `SocketLocation`.
+    // ONE transport, and it is the verifiable one. There is deliberately no loopback TCP
+    // alternative: it cannot identify its peer, so any local process could connect and drive
+    // the Private API. The socket lives inside Messages' container, where a sandboxed helper
+    // can reach it — see `SocketLocation`.
     self.transport = SocketTransport(
       socketPath: configuration.socketPath,
       validator: configuration.peerRequirement.map {
@@ -357,13 +357,12 @@ public actor PrivateAPIRuntime {
     }
   }
 
-  /// Waits for ONE named helper.
+  /// Waits for a registration of `process` newer than `after`.
   ///
-  /// Previously this waited for any registration at all and short-circuited whenever
-  /// anything was connected. With two helpers that is wrong in both directions: injecting
+  /// ONE named helper, never "any registration at all". Short-circuiting on whatever happens
+  /// to be connected is wrong in both directions once there are two helpers: injecting
   /// FaceTime would report instant success because Messages was already registered, and a
   /// genuine FaceTime failure would look like a success.
-  /// Waits for a registration of `process` newer than `after`.
   private func awaitRegistration(
     process: String, after baseline: Int, timeout: Duration
   ) async -> Bool {

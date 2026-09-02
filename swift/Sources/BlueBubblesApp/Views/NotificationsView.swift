@@ -1,9 +1,9 @@
 //  NotificationsView
 //  The notifications drawer, with expandable diagnostics.
 //
-//  Two things the Electron app cannot do, both from § 3: an alert carries structured
-//  diagnostics rather than a string, and Copy Diagnostic Report produces something a
-//  maintainer can actually read — with secrets redacted, so pasting it into an issue is safe.
+//  An alert carries structured diagnostics rather than a string, and Copy Diagnostic Report
+//  produces something a maintainer can actually read — with secrets redacted, so pasting it
+//  into an issue is safe.
 
 import AppKit
 import BBCore
@@ -97,13 +97,11 @@ struct NotificationsView: View {
 
           // The remedy, offered where the problem is reported.
           //
-          // `AlertAction` has existed since § 3 and two call sites populate
-          // it — a blocked client carries `.unblock(address:)`, a failing
-          // webhook carries `.openSettings`. Nothing rendered them, so every
-          // one of those remedies was unreachable and the design was inert:
-          // a user locked out by the rate limiter had to find the Security
-          // page themselves, which is the hunt § 17 says this exists to
-          // avoid.
+          // Two call sites populate `AlertAction` — a blocked client carries
+          // `.unblock(address:)`, a failing webhook carries `.openSettings`.
+          // Rendering them here is what makes those remedies reachable: a
+          // user locked out by the rate limiter would otherwise have to find
+          // the Security page themselves.
           //
           // These keep full strength on a read alert. Read means "you have seen
           // this", not "this is over" — the blocked client is still blocked, and

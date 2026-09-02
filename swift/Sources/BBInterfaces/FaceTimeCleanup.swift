@@ -16,7 +16,6 @@
 //  (`locallyCreated` is true for both), so the ledger is the only safe basis, and deleting
 //  somebody's own link is unrecoverable.
 
-import BBInterfaces
 import BBPrivateAPIContract
 import BBSettings
 import BBSystem

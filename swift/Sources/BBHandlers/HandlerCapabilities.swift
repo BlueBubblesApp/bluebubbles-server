@@ -1,12 +1,12 @@
 //  HandlerCapabilities
 //  What a controller is allowed to reach.
 //
-//  Every handler group used to take the whole `AppContext` — roughly forty-five properties
-//  spanning storage, domain, delivery and cross-cutting concerns — and then use two or three
-//  of them. That is an undeclared dependency in the same way the `Server()` global was: the
-//  signature says "everything", so nothing states what a controller actually needs, nothing
-//  can be constructed without constructing all of it, and a controller cannot be exercised
-//  without a running server behind it.
+//  Taking the whole `AppContext` — roughly forty-five properties spanning storage, domain,
+//  delivery and cross-cutting concerns — in order to use two or three of them is an
+//  undeclared dependency in the same way the `Server()` global was: the signature says
+//  "everything", so nothing states what a controller actually needs, nothing can be
+//  constructed without constructing all of it, and a controller cannot be exercised without a
+//  running server behind it.
 //
 //  These are the capabilities instead. Each is small and named for what it offers; a handler
 //  group composes the ones it uses (`some InterfaceProviding & AlertProviding`), and that

@@ -371,11 +371,11 @@ public actor PushService {
         await alerts?.raise(title: title, detail: detail)
       },
       // Persisted when a command is HONOURED, which is the only moment the value
-      // changes. This used to be read once immediately after `start()` returned — and
-      // `start()` returns as soon as the poll task is spawned, so it persisted the
-      // value the watcher was constructed with and never the one it acted on. The
-      // replay guard was therefore written but never saved, and a restart honoured at
-      // 10:00 was honoured again at 10:00:05 when the server came back.
+      // changes. Reading it once after `start()` returns does not work: `start()` returns
+      // as soon as the poll task is spawned, so it would persist the value the watcher was
+      // constructed with and never the one it acted on. The replay guard would be written
+      // but never saved, and a restart honoured at 10:00 honoured again at 10:00:05 when
+      // the server came back.
       onHonoured: { timestamp in
         await persist(timestamp)
       }

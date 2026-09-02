@@ -43,8 +43,9 @@ struct MultiUserTests {
   @Test("The socket lives inside Messages' container")
   func socketIsInsideTheContainer() {
     // Load-bearing, not incidental. The sandbox refuses a connect to a Unix socket
-    // OUTSIDE the container — measured, see § 15 — so moving this back to the server's
-    // own Application Support directory silently breaks the Private API for everyone.
+    // OUTSIDE the container — measured, see `.claude/docs/private-api.md` § "The sandbox,
+    // and where the socket must live" — so moving this back to the server's own Application
+    // Support directory silently breaks the Private API for everyone.
     #expect(SocketLocation.privateAPISocket.hasPrefix(SocketLocation.messagesContainer))
   }
 

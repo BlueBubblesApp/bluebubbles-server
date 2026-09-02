@@ -30,7 +30,7 @@ public enum LandingHandlers {
 
   public static func register(into registry: inout HandlerRegistry, context: some SettingsProviding)
   {
-    registry.register("ui.index") { _ in
+    registry.register(.uiIndex) { _ in
       page(configuredPath: await context.settings.get(Settings.landingPagePath))
     }
   }

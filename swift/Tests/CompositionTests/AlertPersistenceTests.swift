@@ -37,7 +37,7 @@ struct AlertPersistenceTests {
 
   @Test("A durable alert survives a restart, unread")
   func durableAlertSurvives() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
 
     let first = await centre(on: database)
     await first.raise(
@@ -59,7 +59,7 @@ struct AlertPersistenceTests {
 
   @Test("A transient alert is kept but restored already read")
   func transientAlertDoesNotClamour() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
 
     let first = await centre(on: database)
     await first.raise(
@@ -81,7 +81,7 @@ struct AlertPersistenceTests {
 
   @Test("Occurrence counts accumulate across restarts")
   func occurrencesAccumulate() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
 
     let first = await centre(on: database)
     for _ in 1...3 {
@@ -111,7 +111,7 @@ struct AlertPersistenceTests {
 
   @Test("Reading an alert sticks across a restart")
   func readStatePersists() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
 
     let first = await centre(on: database)
     await first.raise(
@@ -129,7 +129,7 @@ struct AlertPersistenceTests {
 
   @Test("Marking an alert unread again sticks across a restart")
   func unreadStatePersists() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
 
     let first = await centre(on: database)
     await first.raise(
@@ -153,7 +153,7 @@ struct AlertPersistenceTests {
 
   @Test("Dismissing removes it for good")
   func dismissalPersists() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
 
     let first = await centre(on: database)
     await first.raise(
@@ -168,7 +168,7 @@ struct AlertPersistenceTests {
 
   @Test("Sequence numbers keep climbing across restarts")
   func sequencesDoNotRepeat() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
 
     let first = await centre(on: database)
     await first.raise(UserAlert(severity: .info, title: "One", body: "b", source: "s"))
@@ -185,7 +185,7 @@ struct AlertPersistenceTests {
 
   @Test("Alerts past the retention window are not restored")
   func retentionIsHonoured() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let clock = ManualClock(Date(timeIntervalSince1970: 1_700_000_000))
 
     let first = await centre(on: database, clock: clock, retention: .seconds(60 * 60))

@@ -1,9 +1,9 @@
 //  MemoryFootprint
-//  What this process is actually using, for the budget § 10 sets.
+//  What this process is actually using, measured against the memory budget.
 //
-//  § 10 makes memory a design constraint with a numeric budget, and § 19 says CI asserts it.
-//  Nothing measured it — so the budget was a table in a document, every tactic under it was
-//  unverified, and "flat memory curve" had no definition a test could fail on.
+//  The budget is a design constraint with numbers — under 60 MB idle, and no more than
+//  +40 MB over idle for a 1000-message query — and CI asserts it. Without a measurement
+//  from the kernel, "flat memory curve" has no definition a test can fail on.
 //
 //  `phys_footprint` is the number to use, not `resident_size`. Resident size counts pages
 //  shared with other processes — the dyld shared cache alone is hundreds of megabytes of
@@ -45,7 +45,7 @@ public enum MemoryFootprint {
 
   /// Runs `body` and reports how much the footprint grew while it ran.
   ///
-  /// The measurement is deliberately taken AFTER a drain rather than at the peak: § 10's
+  /// The measurement is deliberately taken AFTER a drain rather than at the peak: the
   /// query budget is "+40 MB over idle, **returning to baseline afterwards**", and transient
   /// peak allocation is not what that asserts. A peak measurement would also be dominated by
   /// whatever the allocator had not yet returned, which is noise rather than growth.

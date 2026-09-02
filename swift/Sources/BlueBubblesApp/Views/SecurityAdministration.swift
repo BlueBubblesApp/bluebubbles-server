@@ -21,12 +21,41 @@ struct SecurityAdministration: View {
 
   @Bindable var model: AppModel
 
-  @State private var blocked: [BlockedClient] = []
-  @State private var allowed: [AllowedClient] = []
-  @State private var failures: [AuthFailureRecord] = []
+  @State private var screen: ScreenModel<AccessControlSnapshot>
   @State private var newAllowEntry = ""
   @State private var newAllowNote = ""
-  @State private var error: String?
+
+  /// The three lists as one value.
+  ///
+  /// They describe one subject from three angles — who is blocked, who is exempt, and who
+  /// is failing without yet being either — and they were read as three separate
+  /// statements, so a failure partway through left the page mixing a fresh list with two
+  /// stale ones. On a security screen that is worse than showing nothing: an allowlist
+  /// that did not re-read looks like an allowlist that did not apply.
+  struct AccessControlSnapshot: Sendable {
+    var blocked: [BlockedClient] = []
+    var allowed: [AllowedClient] = []
+    var failures: [AuthFailureRecord] = []
+  }
+
+  init(model: AppModel) {
+    self.model = model
+    _screen = State(initialValue: ScreenModel { await Self.read(model) })
+  }
+
+  @MainActor
+  private static func read(_ model: AppModel) async -> AccessControlSnapshot? {
+    guard let service = model.accessControl else { return nil }
+    return AccessControlSnapshot(
+      blocked: await service.blockedClients(),
+      allowed: await service.allowedClients(),
+      failures: await service.failures(limit: 100)
+    )
+  }
+
+  private var blocked: [BlockedClient] { screen.state.value?.blocked ?? [] }
+  private var allowed: [AllowedClient] { screen.state.value?.allowed ?? [] }
+  private var failures: [AuthFailureRecord] { screen.state.value?.failures ?? [] }
 
   var body: some View {
     Group {
@@ -52,7 +81,7 @@ struct SecurityAdministration: View {
         }
       }
     }
-    .task { await reload() }
+    .task { await screen.reload() }
   }
 
   // MARK: - Blocklist
@@ -179,8 +208,8 @@ struct SecurityAdministration: View {
           Button("Add") { add() }
             .disabled(newAllowEntry.trimmingCharacters(in: .whitespaces).isEmpty)
         }
-        if let error {
-          SettingsFootnote(text: error, symbol: "xmark.circle", tone: .error)
+        if let message = screen.problem {
+          SettingsFootnote(text: message, symbol: "xmark.circle", tone: .error)
         }
       }
 
@@ -260,19 +289,15 @@ struct SecurityAdministration: View {
 
   // MARK: - Plumbing
 
-  private func reload() async {
-    guard let service = model.accessControl else { return }
-    blocked = await service.blockedClients()
-    allowed = await service.allowedClients()
-    failures = await service.failures(limit: 100)
-  }
-
   /// Applies a change and re-reads. Reading back rather than mutating local state keeps
   /// the page showing what the service actually holds — including a block that expired
   /// while the window was open.
-  private func mutate(_ body: (AccessControlService) async -> Void) async {
+  ///
+  /// The service's own methods do not throw — access control answers "no" by returning a
+  /// result rather than by failing — so this stays a non-throwing body. It goes through
+  /// `perform` regardless, for the refresh and for the in-flight flag.
+  private func mutate(_ body: @MainActor (AccessControlService) async -> Void) async {
     guard let service = model.accessControl else { return }
-    await body(service)
-    await reload()
+    await screen.perform { await body(service) }
   }
 }

@@ -1,12 +1,11 @@
 //  RemoteRestartWatcher
-//  The "restart server" button in the app, and the DoS it used to be.
+//  The "restart server" button in the app, and the DoS it would otherwise be.
 //
 //  The problem
 //  -----------
 //  Clients ask for a restart by writing a timestamp to Firebase, and the published rules make
 //  that document world-writable. Vulnerability #4: anyone who enumerates a project ID can
-//  force-restart that user's server in a loop, unauthenticated, forever. The current server
-//  reacts to every write, instantly and silently.
+//  force-restart that user's server in a loop, unauthenticated, forever.
 //
 //  Locking the document would close it and also break the button, which the compatibility
 //  contract forbids. So the channel stays open and the DAMAGE is bounded here, where no
@@ -16,9 +15,9 @@
 //      single restart per hour; a user pressing the button once is unaffected.
 //    - **Freshness checked** — a command is honoured only if it is newer than the last one
 //      acted on AND recent in absolute terms, so a stale or replayed value does nothing.
-//    - **Visible** — every remote restart raises an alert. Today this happens silently; a
-//      user under attack now sees it, which turns an invisible DoS into a reported one.
-//    - **Switchable off** entirely, defaulting to on so behaviour matches today.
+//    - **Visible** — every remote restart raises an alert, which turns an invisible DoS
+//      into a reported one.
+//    - **Switchable off** entirely, defaulting to on so the button keeps working.
 //
 //  Why polling
 //  -----------
@@ -28,7 +27,8 @@
 //  while a client has been active recently, and back off hard when nobody is around. The
 //  button keeps feeling immediate, and an idle server costs a handful of requests an hour.
 //
-//  See `docs/EVENTS.md` and § Security hardening.
+//  See `docs/EVENTS.md` and `.claude/docs/decisions.md` § "2. Security work that shipped,
+//  and what it deliberately did not close".
 
 import BBCore
 import Foundation

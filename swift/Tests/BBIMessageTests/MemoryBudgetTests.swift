@@ -1,10 +1,8 @@
 //  MemoryBudgetTests
-//  § 10's budget, asserted rather than aspired to.
+//  The memory budget, asserted rather than aspired to.
 //
-//  § 10 makes memory a design constraint with numbers, and § 19 says CI asserts them. Nothing
-//  did — so the budget was a table in a document, every tactic listed under it was unverified,
-//  and "flat memory curve" had no definition anything could fail on. That matters more here
-//  than in most projects: the stated target is an OLD MAC MINI, and the two named regressions
+//  The budget makes memory a design constraint with numbers, and CI asserts it. That matters
+//  more here than in most projects: the stated target is an OLD MAC MINI, and the two named regressions
 //  in the git history (`fix: potential memory leak with poller`, `fix: improved cache pruning`)
 //  are exactly what a budget test exists to stop recurring.
 //
@@ -12,7 +10,7 @@
 //  baseline. What they deliberately do NOT assert is absolute idle footprint, because a test
 //  runner hosts XCTest, the Testing library and the whole package's symbols, so "idle" here is
 //  nothing like the idle of a shipped headless server. Measuring it would produce a number
-//  that fails for reasons unrelated to the server. § 10's < 60 MB idle target needs the real
+//  that fails for reasons unrelated to the server. The under-60 MB idle target needs the real
 //  binary, and that belongs in the soak test, not here.
 //
 //  See `.claude/docs/performance.md` and `.claude/docs/workflow.md`.
@@ -26,7 +24,8 @@ import Testing
 @Suite("Memory budget", .serialized)
 struct MemoryBudgetTests {
 
-  /// § 10: "Serving a 1000-message query — no more than +40 MB over idle".
+  /// The budget: "Serving a 1000-message query — no more than +40 MB over idle".
+  /// See `.claude/docs/performance.md` § "Memory budget".
   static let queryBudgetBytes: Int64 = 40 * 1_048_576
 
   /// Measured as a delta over a warmed baseline, never as an absolute.
@@ -69,7 +68,7 @@ struct MemoryBudgetTests {
     #expect(rows.count == 1000, "the fixture should have produced a full page")
     #expect(
       grewBy < Self.queryBudgetBytes,
-      "a 1000-message query grew the footprint by \(grewBy / 1_048_576) MB; § 10 budgets 40 MB"
+      "a 1000-message query grew the footprint by \(grewBy / 1_048_576) MB; the budget is 40 MB"
     )
   }
 

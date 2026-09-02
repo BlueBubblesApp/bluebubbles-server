@@ -476,8 +476,8 @@ public protocol PrivateAPI: Sendable {
   /// Deletes every message in a conversation, leaving the conversation itself.
   ///
   /// NOT `deleteChat`, which removes the conversation through `CKConversationList`. Returns
-  /// whether IMCore reported having deleted anything — a BOOL that used to be dropped on
-  /// the floor before `BBInvoke` learned to box scalar returns.
+  /// whether IMCore reported having deleted anything — a scalar return, which `BBInvoke`
+  /// boxes rather than dropping.
   func clearChatHistory(_ chat: ChatGUID) async throws -> Bool
 
   /// Where a conversation sits in Messages' filtering.
@@ -633,7 +633,8 @@ public enum PrivateAPIError: Error, Sendable, Equatable, LocalizedError {
   case notConnected
   case timedOut(method: String)
   case rejectedByMessages(reason: String)
-  /// The connecting peer failed code-signature validation. See § 15 on transport.
+  /// The connecting peer failed code-signature validation.
+  /// See `.claude/docs/private-api.md` § "Peer verification: audit token, never pid".
   case untrustedPeer(pid: pid_t)
   /// The IMCore selector this method depends on is absent on the running macOS version.
   /// Distinct from `notImplemented`: this one will never work here, whereas that one is

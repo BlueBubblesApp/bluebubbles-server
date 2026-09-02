@@ -1,10 +1,10 @@
 //  TokenAuthDefaultOffTests
 //  That the token system does not exist until it is switched on.
 //
-//  This is the most important file in Phase 8. "Available but unused" drifting into "used" is
-//  exactly the kind of change that would not announce itself: nothing would fail, the server
-//  would simply start generating key material, exposing endpoints, and evaluating headers
-//  that a default install is supposed to have no notion of.
+//  "Available but unused" drifting into "used" is exactly the kind of change that would not
+//  announce itself: nothing would fail, the server would simply start generating key
+//  material, exposing endpoints, and evaluating headers that a default install is supposed
+//  to have no notion of.
 //
 //  So the posture is asserted as facts rather than trusted as convention.
 //

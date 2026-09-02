@@ -1,11 +1,12 @@
 //  NotificationBell
 //  Alerts, reachable from anywhere without leaving what you are doing.
 //
-//  Notifications used to be a sidebar page. That is the wrong shape for them: an alert is not
-//  a place you go, it is something that happens to you — and reading one meant navigating away
-//  from whatever you were configuring and then finding your way back. Worse, the alerts that
-//  matter most arrive WHILE you are setting something up ("Cloudflare is selected but not
-//  installed"), which is exactly when you can least afford to lose your place.
+//  A popover rather than a sidebar page, because a page is the wrong shape for these: an
+//  alert is not a place you go, it is something that happens to you — and reading one from a
+//  page means navigating away from whatever you were configuring and then finding your way
+//  back. The alerts that matter most arrive WHILE you are setting something up ("Cloudflare
+//  is selected but not installed"), which is exactly when you can least afford to lose your
+//  place.
 //
 //  As a popover it is glanceable, dismissible, and available from every page — and the
 //  remedies an alert carries can be acted on without the page underneath changing.

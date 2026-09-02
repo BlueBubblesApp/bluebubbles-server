@@ -1,11 +1,9 @@
 //  FirebaseView
 //  Push notification setup — the screen that makes `FirebaseProvisioner` reachable.
 //
-//  Push is OPTIONAL and this screen says so first, before it offers anything. That is the
-//  reversal § 13 asks for: the Electron server nags about a missing Firebase configuration at
-//  every startup as though the server were broken, when a socket-only or webhook-only install
-//  is a supported deployment that works perfectly. So the empty state here is "not set up",
-//  not "misconfigured", and there is no warning colour anywhere on it.
+//  Push is OPTIONAL and this screen says so first, before it offers anything. A socket-only
+//  or webhook-only install is a supported deployment that works perfectly, so the empty state
+//  here is "not set up", not "misconfigured", and there is no warning colour anywhere on it.
 //
 //  Three ways in, matching `PushInterface`: create a project, import one, or arrive with
 //  credentials migrated from an Electron install. See `docs/EVENTS.md`.
@@ -357,7 +355,7 @@ struct FirebaseView: View {
       return "Clients receive messages while the app is closed."
     }
     // Naming the missing half, and what it costs, rather than reporting a configured
-    // server. This state used to render as complete success.
+    // server. This state must not render as complete success.
     if status.hasServiceAccount {
       return """
         This server has a service account key but no google-services.json, so it can \
@@ -554,8 +552,8 @@ struct FirebaseView: View {
             .disabled(setup.isBusy || noDevices)
             // On the control itself, so hovering the greyed-out button answers
             // "why is this disabled?" where the question is actually asked. The
-            // explanation used to sit only in body text below, which reads as
-            // unrelated commentary rather than as the reason.
+            // explanation in body text below reads as unrelated commentary rather
+            // than as the reason.
             .help(
               noDevices
                 ? "No device has registered for notifications yet, so there is "

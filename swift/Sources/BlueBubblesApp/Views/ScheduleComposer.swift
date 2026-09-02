@@ -462,9 +462,9 @@ struct ScheduleComposer: View {
     /// styling should show.
     ///
     /// The two parts stay separate everywhere else: a row renders them as two `Text`s so
-    /// the address can be dimmed and truncated on its own. An earlier version returned a
-    /// single attributed string because a pop-up menu item takes a title rather than a
-    /// view — nothing renders in a menu now, and two views are the simpler thing.
+    /// the address can be dimmed and truncated on its own. A single attributed string would
+    /// only be needed for a pop-up menu item, which takes a title rather than a view —
+    /// nothing renders these in a menu, so two views are the simpler thing.
     var plain: String { address.map { "\(name)  \($0)" } ?? name }
   }
 

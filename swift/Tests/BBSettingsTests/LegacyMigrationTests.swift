@@ -38,7 +38,7 @@ struct LegacyMigrationTests {
   private func makeStore(
     _ secrets: InMemorySecretStore
   ) async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
     return try await SettingsStore(database: database, secrets: secrets)
   }
 
@@ -244,7 +244,7 @@ struct LegacyNamespaceMigrationTests {
     defer { try? FileManager.default.removeItem(at: url) }
 
     let secrets = InMemorySecretStore()
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
     let store = try await SettingsStore(database: database, secrets: secrets)
 
     _ = try await LegacyConfigMigration().run(from: url, into: store, secrets: secrets)
@@ -271,7 +271,7 @@ struct LegacyNamespaceMigrationTests {
     defer { try? FileManager.default.removeItem(at: url) }
 
     let secrets = InMemorySecretStore()
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
     let store = try await SettingsStore(database: database, secrets: secrets)
 
     _ = try await LegacyConfigMigration().run(from: url, into: store, secrets: secrets)
@@ -307,7 +307,7 @@ struct LegacyNamespaceMigrationTests {
     defer { try? FileManager.default.removeItem(at: url) }
 
     let secrets = InMemorySecretStore()
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
     let store = try await SettingsStore(database: database, secrets: secrets)
 
     _ = try await LegacyConfigMigration().run(from: url, into: store, secrets: secrets)

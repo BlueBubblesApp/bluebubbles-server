@@ -362,10 +362,10 @@ struct ExceptionBarrierTests {
 
   // MARK: - Scalar returns
   //
-  // A scalar return used to be DROPPED — `BBInvoke` read the return value only when the
-  // encoding was an object, so `-deleteAllHistory` (BOOL) and `-markAsSpam:` (a count)
-  // both came back nil, which is what a void method returns. The caller could not tell a
-  // call that did nothing from a call with nothing to say.
+  // A scalar return must not be DROPPED. Reading the return value only when the encoding
+  // is an object brings `-deleteAllHistory` (BOOL) and `-markAsSpam:` (a count) back nil,
+  // which is what a void method returns — the caller then cannot tell a call that did
+  // nothing from a call with nothing to say.
 
   @Test("a scalar return comes back boxed at its declared width")
   func scalarReturns() throws {

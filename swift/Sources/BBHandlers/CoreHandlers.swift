@@ -4,8 +4,7 @@
 //  These are the controllers that prove the pipeline is real: a request arrives, the
 //  middleware authenticates it, the route table dispatches it, a repository reads chat.db,
 //  the serializer produces the frozen wire format, and the envelope goes back out. Everything
-//  under them has been tested in isolation since Phase 2; this is the first code that runs
-//  the whole length of it.
+//  under them is tested in isolation; this is the code that runs the whole length of it.
 //
 //  **They are a small fraction of the surface.** The route table names 107 handlers and this
 //  file implements the core read set; the rest are mounted by `PlaceholderHandlers` and say
@@ -34,8 +33,8 @@ public enum CoreHandlers {
     into registry: inout HandlerRegistry,
     context: some ServerStatusProviding & SettingsProviding
   ) {
-    registry.register("general.ping") { _ in .data(.string("pong")) }
-    registry.register("server.info") { _ in try await serverInfo(context: context) }
+    registry.register(.generalPing) { _ in .data(.string("pong")) }
+    registry.register(.serverInfo) { _ in try await serverInfo(context: context) }
   }
 
   /// `GET /api/v1/server/info`.

@@ -19,7 +19,7 @@ public enum UpdateHandlers {
   public static func register(
     into registry: inout HandlerRegistry, context: some SettingsProviding & UpdateInstallerProviding
   ) {
-    registry.register("server.checkUpdate") { _ in
+    registry.register(.serverCheckUpdate) { _ in
       let checker = UpdateChecker(
         feedURL: await context.settings.get(Settings.updateFeedURL),
         currentVersion: ServerVersion.current
@@ -36,7 +36,7 @@ public enum UpdateHandlers {
     /// So this delegates to whatever is hosting the server, and says so plainly when
     /// nothing is. Returning a fake success would be worse than a clear refusal: the
     /// client would report "updating" and nothing would ever happen.
-    registry.register("server.installUpdate") { _ in
+    registry.register(.serverInstallUpdate) { _ in
       let checker = UpdateChecker(
         feedURL: await context.settings.get(Settings.updateFeedURL),
         currentVersion: ServerVersion.current
@@ -47,13 +47,16 @@ public enum UpdateHandlers {
         throw BadRequest("there is no update to install; this server is up to date")
       }
 
+      // Says what is true — no installer is available — without asserting WHY. Claiming the
+      // server is running headless would be a guess this code cannot make: a GUI app with no
+      // updater wired in reaches here too, and telling that user to "run the server inside
+      // the BlueBubbles app" names something they are already doing.
       guard let installer = await context.updateInstaller else {
         throw ServiceUnavailable(
           """
-          This server is running headless, so it cannot install its own update — \
-          Sparkle relaunches the application, and there is no application to \
-          relaunch. Download \(item.downloadURL) and install it, or run the server \
-          inside the BlueBubbles app and try again.
+          This server cannot install its own update — updating relaunches the \
+          application, and no updater is available to this process. \
+          Download \(item.downloadURL) and install it manually.
           """
         )
       }

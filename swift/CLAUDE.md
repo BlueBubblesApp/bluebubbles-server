@@ -92,6 +92,7 @@ improvising the order:**
 | Logic behind a route | `Sources/BBInterfaces/` — **not** the handler. Anything reaching Messages goes inside `throughMessages { … }` |
 | A page in the app | `Sources/BlueBubblesApp/Views/` — reach state through `AppModel`, never `AppContext` |
 | A service | Conform to `Service` in `Sources/BlueBubblesServerCore/Composition/Services.swift` and declare a manifest in `BuiltInManifests.swift`; start order is derived from `dependencies` |
+| A table in `app.db` | A `SchemaContributor` in the module that owns it, then append it to `AppSchema.contributors`. **Not** `AppDatabase` — see [`Sources/BBPersistence/CLAUDE.md`](Sources/BBPersistence/CLAUDE.md) |
 | An event | `Sources/BBEvents/ServerEvent.swift` plus its per-sink projection |
 | A user-visible alert | Raise it explicitly through `BBDiagnostics`. Logging must never produce one |
 | A Private API call | `Helper/BBPrivateAPIContract` first, then `Helper/BlueBubblesHelper`. Go through `IMCoreRuntime`, never IMCore directly |
@@ -106,6 +107,11 @@ improvising the order:**
 - **Never log a secret.** Anything from a setting marked `isSecret` is wrapped as
   `DiagnosticValue.secret` and renders as `••••`. Keep it that way.
 - **Migrations are append-only.** Never edit a released one. Rename via a new migration.
+- **The plugin manifest surface is frozen.** Third-party plugins are wanted but are not being
+  built now, so `BBServiceKit` is closed to new capability: no new entitlement kinds, no new
+  manifest fields for hypothetical plugin needs, no widening of the tool or migration
+  descriptors. A field a *built-in* service needs today is fine; a field a future plugin might
+  want is not. See the header of `Sources/BBServiceKit/ServiceManifest.swift`.
 - **`Package.swift` must match the imports.** `python3 Tools/package-graph/check.py` fails CI
   when a target declares an unused dependency or imports an undeclared module — neither is
   visible to the compiler.

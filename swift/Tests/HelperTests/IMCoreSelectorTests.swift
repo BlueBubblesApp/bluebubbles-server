@@ -416,10 +416,10 @@ struct IMCoreSelectorTests {
         on: "IMHandleAvailabilityManager",
         // The read, and the refresh the bridge tries before it.
         //
-        // The refresh was previously left unpinned on the grounds that it "is gone on
-        // macOS 26". Only the UNDERSCORED spelling is; `fetchUpdatedStatusForHandle:`
-        // is present, and the bridge tries it first. Pinned here so a future rename is
-        // a named test failure rather than a silently staler answer.
+        // The refresh is NOT gone on macOS 26 — only the UNDERSCORED spelling is.
+        // `fetchUpdatedStatusForHandle:` is present, and the bridge tries it first. Pinned
+        // here so a future rename is a named test failure rather than a silently staler
+        // answer.
         instance: [
           "availabilityForHandle:",
           "fetchUpdatedStatusForHandle:completion:",
@@ -576,7 +576,8 @@ struct IMCoreSelectorTests {
       ],
       classLevel: ["sharedInstance"]
     )
-    // The two-argument spellings the bridge used to try alone. Recorded as ABSENT, so
+    // The two-argument spellings, which the bridge must not rely on alone. Recorded as
+    // ABSENT, so
     // a macOS that brings either back is a visible change rather than a silent one.
     for legacy in [
       "allowHandlesForNicknameSharing:forChat:",

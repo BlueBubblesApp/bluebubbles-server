@@ -34,7 +34,7 @@ private actor StubProbe: PermissionProbing {
 @Suite("Permission descriptors")
 struct PermissionDescriptorTests {
 
-  /// Accessibility existed solely for the UI-automation scripts that § 14 drops. Its
+  /// Accessibility existed solely for the UI-automation scripts that were dropped. Its
   /// absence is a deliberate outcome, not an oversight — one fewer alarming permission in
   /// onboarding.
   @Test("Accessibility is not requested at all")

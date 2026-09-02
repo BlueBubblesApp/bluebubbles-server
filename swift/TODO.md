@@ -28,7 +28,7 @@ fixed. What remains from that exercise:
 
 - [ ] **Capture the socket transcript.** The HTTP half is recorded; the handshake and frame
       sequence are not. § Verification asks for frame-level equality against captured Node
-      output across both transports and both EIO versions, and `ProtocolTests` covers the codec
+      output across both transports and both EIO versions, and `BBSocketIOTests` covers the codec
       in isolation, which is a different claim. The recorder already has the capture path
       (`socket/polling-transcript.jsonl`, `websocket-transcript.jsonl`) — it needs a client
       driven through it.
@@ -398,6 +398,31 @@ report a pass.
 ---
 
 # 3. Designed but unbuilt
+
+## `UpdateInstalling` has a seam, an endpoint, and no implementation
+
+`POST /api/v1/server/update/install` is written against a capability — `UpdateInstalling`,
+declared in `BBHandlers/UpdateHandlers.swift` — that **nothing in the package conforms to**.
+`AppContext.setUpdateInstaller(_:)` exists and has no callers, so `updateInstaller` is nil in
+every configuration and the endpoint refuses on every server, GUI app included.
+
+The refusal used to blame headless operation and tell the user to run the server inside the
+BlueBubbles app — which they may already have been doing. That message now says only that no
+updater is available, because that is all this code can honestly know.
+
+The app checks for updates already (`AppModel.checkForUpdates`, sharing `UpdateChecker` with
+`GET /server/update/check`, so the menu item and the API cannot disagree). What is missing is
+the half that installs one: there is no Sparkle integration anywhere in the tree.
+
+Found while consolidating `AppContext`'s late-binding points — it is one of two capabilities
+that had a setter nobody called. The other, the contacts ingestor, was fixed;
+`Tests/CompositionTests/AppContextWiringTests.swift` now asserts this one is nil so the day
+someone implements it, a test says what changed.
+
+- [ ] Decide whether the app owns an updater at all. If yes: add Sparkle, conform something in
+      `BlueBubblesApp` to `UpdateInstalling`, call `setUpdateInstaller` during composition, and
+      update the wiring test. If no: delete the seam, the setter and the endpoint rather than
+      leaving a route that is guaranteed to refuse.
 
 ## Per-device codec negotiation never reaches FCM
 

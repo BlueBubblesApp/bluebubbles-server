@@ -79,14 +79,35 @@ jobs:
             exit 1
           fi
 
-      - name: Cache SwiftPM
+      # Dependency CLONES only. `swift/.build` is deliberately not cached, and that is a
+      # correctness fix rather than a tidy-up.
+      #
+      # Library evolution is off, so a public struct's layout is compiled into every module
+      # that stores one. Restoring build products from a previous run — which
+      # `restore-keys: spm-${{ runner.os }}-` did on every miss, from a DIFFERENT commit —
+      # let a PR that changed such a layout link modules built against the old one. It does
+      # not fail the build. It corrupts memory at runtime and surfaces as SIGBUS in an
+      # unrelated test, which reads as a flaky race in whatever the author actually touched.
+      #
+      # Reproduced deliberately: adding one stored property to `ReadOnlyDatabase` and
+      # building incrementally crashed 3 runs of 3, in `CallHistoryRepositoryTests`; the same
+      # change after `swift package clean` passed 3 of 3.
+      #
+      # The path below is also a fix on its own: `~/.cache/org.swift.swiftpm` does not exist
+      # on macOS — SwiftPM caches to `~/Library/Caches/org.swift.swiftpm` — so that entry had
+      # been caching nothing since it was written.
+      #
+      # Cost: a cold `swift build --build-tests` with the clones already present measured 85s
+      # locally. Dependencies are still not re-fetched over the network; only build products
+      # are rebuilt, which is the point.
+      - name: Cache SwiftPM dependency clones
         uses: actions/cache@v4
         with:
-          path: |
-            swift/.build
-            ~/.cache/org.swift.swiftpm
-          key: spm-${{ runner.os }}-${{ hashFiles('swift/Package.resolved', 'swift/Package.swift') }}
-          restore-keys: spm-${{ runner.os }}-
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: spm-deps-${{ runner.os }}-${{ hashFiles('swift/Package.resolved') }}
+          # Safe to fall back here, unlike for build products: a stale clone cache costs a
+          # fetch for whatever moved, and `swift package resolve` below reconciles it.
+          restore-keys: spm-deps-${{ runner.os }}-
 
       - name: Resolve dependencies
         run: swift package resolve

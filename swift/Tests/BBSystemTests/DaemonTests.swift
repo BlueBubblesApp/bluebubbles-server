@@ -684,7 +684,7 @@ struct TunnelReconnectionTests {
         executablePath: "/bin/sh",
         // Deliberately FORKS rather than execs, so `sleep` outlives the shell and goes on
         // holding the output pipe. That is what a tunnel binary with a helper process
-        // looks like, and a blocking drain used to wait the full twenty seconds for it.
+        // looks like, and a blocking drain waits the full twenty seconds for it.
         arguments: ["-c", "echo 'url=https://only.example.com'; sleep 20"],
         restartDelay: .milliseconds(50)
       ),

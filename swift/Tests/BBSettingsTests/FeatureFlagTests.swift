@@ -129,7 +129,7 @@ struct FeatureFlagTests {
   private static func makeStore(
     commandLine: [String: String] = [:]
   ) async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
     return try await SettingsStore(
       database: database,
       secrets: InMemorySecretStore(),

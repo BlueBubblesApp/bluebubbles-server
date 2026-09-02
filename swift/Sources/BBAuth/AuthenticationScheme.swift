@@ -209,11 +209,10 @@ public struct SocketHandshakeScheme: AuthenticationScheme {
   /// Rewrites a handshake query into the credentials the socket actually accepts.
   ///
   /// Exposed as a static, and used by `SocketServer.authenticate` as well as by this
-  /// scheme, so the rule has ONE implementation. It previously had none that ran: this
-  /// scheme was public, tested, and constructed nowhere, while the transport handed the
-  /// raw query to the HTTP chain — which accepts `token` and does not decode. A password
-  /// containing an `@` or a space therefore locked the user out of the socket while
-  /// working fine over HTTP, which is close to undiagnosable from a client.
+  /// scheme, so the rule has ONE implementation — and it has to be the one that RUNS. If
+  /// the transport hands the raw query to the HTTP chain instead, which accepts `token` and
+  /// does not decode, a password containing an `@` or a space locks the user out of the
+  /// socket while working fine over HTTP: close to undiagnosable from a client.
   public static func normalize(query: [String: String]) -> [String: String] {
     guard let raw = query["password"] ?? query["guid"], !raw.isEmpty else { return [:] }
 

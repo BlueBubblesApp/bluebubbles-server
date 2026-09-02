@@ -77,7 +77,14 @@ public actor SettingsPropagation {
     // `facetime_incoming_handoff` decides whether a ROUTE GROUP mounts, which is settled
     // when the composition is assembled — so it raises the restart notice rather than
     // being watched by a service that could not apply it anyway.
-    ["auth_mode", "additive_endpoints", "event_payload_codec", "facetime_incoming_handoff"]
+    // `chat_db_readers` decides what KIND of connection chat.db is opened with, and that
+    // happens once in `ServerComposition.build`. No service can apply it — the repository
+    // and every interface hold the handle that already exists — so it raises the restart
+    // notice like the rest of this list.
+    [
+      "auth_mode", "additive_endpoints", "event_payload_codec", "facetime_incoming_handoff",
+      "chat_db_readers",
+    ]
       + Features.allKeys
   )
 

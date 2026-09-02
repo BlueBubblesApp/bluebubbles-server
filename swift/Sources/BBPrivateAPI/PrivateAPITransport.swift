@@ -4,11 +4,11 @@
 //  ONE implementation: `SocketTransport`, a Unix-domain socket inside Messages' own container
 //  with the peer verified by audit token against Messages' code signature.
 //
-//  There used to be two. A loopback TCP bridge sat alongside this one, on the belief that a
-//  sandboxed Messages could not reach a Unix socket at all — it cannot reach one OUTSIDE its
-//  container, which is a different statement, and moving the socket inside settled it. The
-//  bridge could not identify its peer, so any local process could connect and drive the
-//  Private API; removing it closes that rather than defending it.
+//  Deliberately one, not two. A sandboxed Messages cannot reach a Unix socket OUTSIDE its
+//  container — a narrower statement than "cannot reach a Unix socket", and the reason the
+//  socket lives inside it. The loopback TCP alternative cannot identify its peer, so any
+//  local process could connect and drive the Private API; not having one closes that rather
+//  than defending it.
 //
 //  The protocol is kept as a protocol anyway. It is the seam a test double substitutes at,
 //  and the helper transport is exactly the kind of thing that should be swappable without

@@ -10,8 +10,8 @@
 //
 //  Conversions are CACHED on disk rather than redone per request. A client fetching a
 //  conversation's images requests each one at least once and often several times at different
-//  sizes, and re-encoding a 12-megapixel photo per request is exactly the cost § 10 is trying
-//  to keep off an old Mac mini.
+//  sizes, and re-encoding a 12-megapixel photo per request is exactly the cost the memory
+//  budget is trying to keep off an old Mac mini.
 //
 //  See `.claude/docs/imessage.md` and `.claude/docs/performance.md`.
 

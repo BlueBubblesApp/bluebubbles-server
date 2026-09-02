@@ -3,7 +3,7 @@
 //
 //  This is not a degraded mode. Most users will never disable SIP, so this is the
 //  configuration the majority actually run, and it is proven before the Private API path is
-//  built — which is why Phase 5 orders it first. See `.claude/docs/imessage.md`.
+//  built. See `.claude/docs/imessage.md`.
 
 import BBCore
 import BBDiagnostics

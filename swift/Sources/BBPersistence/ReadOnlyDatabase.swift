@@ -18,8 +18,21 @@ import Logging
 
 public struct ReadOnlyDatabase: Sendable {
 
-  /// Deliberately private. Handing out the DatabaseQueue would hand out `write`.
-  private let queue: DatabaseQueue
+  /// Deliberately private. Handing out the reader would hand out its `write`.
+  ///
+  /// Two CONCRETE cases rather than `any DatabaseReader`, and that is not a style choice.
+  /// Through the existential, `read` resolves against the protocol's requirement instead of
+  /// `DatabaseQueue`'s own overload set — the same trap `AppDatabase` documents, where a
+  /// closure returning non-`Sendable` statement storage picks a different overload than the
+  /// author intended. Here it did more than block: the whole test bundle died with SIGBUS,
+  /// reproducibly, and only in a full run. Switching on a concrete case keeps every call the
+  /// same one it has always been.
+  private enum Reader {
+    case single(DatabaseQueue)
+    case pooled(DatabasePool)
+  }
+
+  private let reader: Reader
   private let logger = Logger(label: "bluebubbles.db.readonly")
 
   public let path: String
@@ -29,21 +42,59 @@ public struct ReadOnlyDatabase: Sendable {
   /// `immutable` is deliberately NOT set. It promises SQLite the file cannot change, which
   /// is false while Messages is running, and produces stale reads or corruption. We need
   /// live WAL content, which means accepting the cost of a normal read-only open.
-  public init(path: String) throws {
+  ///
+  /// - Parameter maximumReaders: How many reads may be in flight at once. **One by default,
+  ///   which is a single `DatabaseQueue` and the behaviour this has always had.** Anything
+  ///   greater opens a `DatabasePool` instead.
+  ///
+  ///   Measured, not assumed — `Tests/BBIMessageTests/ReadConcurrencyBenchmark.swift`, on a
+  ///   40,000-message database in a release build: one connection holds ~26 page queries a
+  ///   second and does NOT move between one concurrent reader and sixteen, because every
+  ///   read serialises through it. Four readers reach ~95/second, and cost about 2 MB.
+  ///
+  ///   A read-only pool does NOT require WAL — it opens and gives real concurrency against a
+  ///   rollback-journal file too. What both shapes DO require is that a WAL database have its
+  ///   `-shm` file, which exists only while a writer holds it; without one, neither can open.
+  ///   For chat.db that means "while Messages.app is running", which is when this server
+  ///   reads it.
+  public init(path: String, maximumReaders: Int = 1) throws {
     var configuration = Configuration()
     configuration.readonly = true
-    // One connection, not a pool: lower memory on the old hardware this targets, and a
-    // reader needs no concurrency against a database it never writes.
-    configuration.maximumReaderCount = 1
+    configuration.maximumReaderCount = max(1, maximumReaders)
 
     self.path = path
-    self.queue = try DatabaseQueue(path: path, configuration: configuration)
+
+    // A pool that cannot open FALLS BACK to one connection rather than failing.
+    //
+    // Defence rather than a fix for a known case: no trigger has been reproduced. A pool was
+    // expected to refuse a rollback-journal database and does not, and the one failure that
+    // WAS found — a WAL database with no `-shm` — takes the single connection down with it,
+    // so the fallback does not help there. It is kept because the cost is one `try?` and the
+    // thing it protects is the user's entire message history: raising a performance setting
+    // must not be able to remove the read path. If a trigger is ever found, it belongs in the
+    // benchmark as a test.
+    if maximumReaders > 1, let pool = try? DatabasePool(path: path, configuration: configuration) {
+      self.reader = .pooled(pool)
+      self.readerCount = maximumReaders
+    } else {
+      var single = configuration
+      single.maximumReaderCount = 1
+      self.reader = .single(try DatabaseQueue(path: path, configuration: single))
+      self.readerCount = 1
+    }
   }
 
+  /// How many readers this actually opened with, which is not always what was asked for —
+  /// see `init`. Callers log it rather than the request, so a silent fallback is visible.
+  public let readerCount: Int
+
   /// The only way in. Note there is no `write` counterpart, and no way to obtain the
-  /// underlying queue.
+  /// underlying reader.
   public func read<T: Sendable>(_ block: @Sendable (Database) throws -> T) async throws -> T {
-    try await queue.read(block)
+    switch reader {
+    case .single(let queue): try await queue.read(block)
+    case .pooled(let pool): try await pool.read(block)
+    }
   }
 
   /// Streams rows instead of materialising them.
@@ -57,7 +108,7 @@ public struct ReadOnlyDatabase: Sendable {
     consume: @Sendable ([T]) throws -> Void,
     batchSize: Int = 200
   ) async throws {
-    try await queue.read { db in
+    try await read { db in
       let cursor = try Row.fetchCursor(db, sql: sql, arguments: arguments)
       var batch: [T] = []
       batch.reserveCapacity(batchSize)

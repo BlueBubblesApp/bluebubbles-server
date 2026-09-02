@@ -79,7 +79,7 @@ private final class IndifferentService: Service, ConfigurableService, @unchecked
 struct SettingsPropagationTests {
 
   private func makeStore() async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     return try await SettingsStore(
       database: database, secrets: InMemorySecretStore()
     )
@@ -289,7 +289,7 @@ struct StartupReentrancyTests {
     // `start(_:)` awaits each service's own `start()`, and the registry actor is free
     // during that await — so without a guard a change arriving here could stop a service
     // halfway through starting it, or restart one that had not started yet.
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let store = try await SettingsStore(
       database: database, secrets: InMemorySecretStore()
     )

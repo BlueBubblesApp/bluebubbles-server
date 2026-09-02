@@ -10,10 +10,28 @@ import SwiftUI
 struct ContactsView: View {
 
   @Bindable var model: AppModel
-  @State private var contacts: [ContactRecord] = []
+  @State private var screen: ScreenModel<[ContactRecord]>
   @State private var search = ""
-  @State private var isRefreshing = false
+  /// The outcome of the last re-index, which is a COUNT rather than a failure — "indexed
+  /// 412, skipped 3". Kept apart from the model's error channel because it is the success
+  /// message far more often than not.
   @State private var status: String?
+
+  init(model: AppModel) {
+    self.model = model
+    _screen = State(initialValue: ScreenModel { try await Self.read(model) })
+  }
+
+  @MainActor
+  private static func read(_ model: AppModel) async throws -> [ContactRecord]? {
+    guard let interfaces = await model.interfaces() else { return nil }
+    // Was `(try? …) ?? []`, so a contact index that could not be read looked exactly
+    // like an address book with nobody in it — and the empty state told the person to
+    // grant Contacts access they may already have granted.
+    return try await interfaces.contact.records(limit: 5000)
+  }
+
+  private var contacts: [ContactRecord] { screen.state.value ?? [] }
 
   var body: some View {
     Group {
@@ -34,14 +52,16 @@ struct ContactsView: View {
       } label: {
         Label("Refresh from Address Book", systemImage: "arrow.clockwise")
       }
-      .disabled(isRefreshing)
+      .disabled(screen.isPerforming)
     }
-    .task { await reload() }
+    .task { await screen.reload() }
   }
 
   private var list: some View {
     VStack(spacing: 0) {
-      if let status {
+      if let message = screen.problem {
+        ScreenErrorLine(message: message).padding(8)
+      } else if let status {
         Text(status).font(.caption).foregroundStyle(.secondary).padding(8)
       }
       if visible.isEmpty {
@@ -81,24 +101,17 @@ struct ContactsView: View {
     }
   }
 
-  private func reload() async {
-    guard let interfaces = await model.interfaces() else { return }
-    contacts = (try? await interfaces.contact.records(limit: 5000)) ?? []
-  }
-
   private func refresh() async {
     guard let interfaces = await model.interfaces() else { return }
-    isRefreshing = true
-    defer { isRefreshing = false }
-    do {
+    status = nil
+    // The likely cause, named. "Operation failed" would send someone hunting.
+    await screen.perform(
+      failureMessage: "Could not read the address book — check Contacts permission."
+    ) {
       let result = try await interfaces.contact.refresh()
       status =
         "Indexed \(result["indexed"]?.intValue ?? 0), "
         + "skipped \(result["skipped"]?.intValue ?? 0)."
-      await reload()
-    } catch {
-      // The likely cause, named. "Operation failed" would send someone hunting.
-      status = "Could not read the address book — check Contacts permission."
     }
   }
 }

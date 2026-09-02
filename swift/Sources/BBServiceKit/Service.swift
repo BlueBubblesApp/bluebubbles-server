@@ -65,10 +65,9 @@ public protocol Service: AnyObject, Sendable {
   /// registry is generic over one host and only accepts services built from it, so
   /// "this service needs the application context" is checked by the compiler.
   ///
-  /// It used to be `init(context: any ServiceContext)` — a protocol with a single member
-  /// that no service ever called. Every implementation opened with
-  /// `context as! AppContext`, which meant the abstraction bought nothing and turned a
-  /// mismatched host from a compile error into a crash. BBServiceKit still knows nothing
+  /// Deliberately not `init(context: any ServiceContext)`. A protocol with a single member
+  /// that every implementation opens by force-casting to `AppContext` buys nothing and turns
+  /// a mismatched host from a compile error into a crash. BBServiceKit still knows nothing
   /// about what a host IS; it just refuses to mix two of them.
   associatedtype Host: Sendable
 

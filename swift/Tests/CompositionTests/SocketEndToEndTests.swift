@@ -48,7 +48,7 @@ struct SocketEndToEndTests {
     var registry = HandlerRegistry()
     // A real handler for the one route the HTTP half of these tests calls, so a 200
     // means "authenticated and served" rather than "reached the 501 placeholder".
-    registry.register("general.ping") { _ in .data(.string("pong")) }
+    registry.register(.generalPing) { _ in .data(.string("pong")) }
     PlaceholderHandlers.fill(into: &registry, groups: RouteTable.groups)
 
     let builder = HTTPAPIBuilder(

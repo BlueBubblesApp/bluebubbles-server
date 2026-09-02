@@ -134,7 +134,7 @@ struct LandingPageTests {
   @Test("GET / answers with HTML and needs no password, while the API still does")
   func rootIsMountedAndUnauthenticated() async throws {
     var registry = HandlerRegistry()
-    registry.register("ui.index") { _ in LandingHandlers.page(configuredPath: "") }
+    registry.register(.uiIndex) { _ in LandingHandlers.page(configuredPath: "") }
     PlaceholderHandlers.fill(into: &registry, groups: RouteTable.groups)
 
     // Port 0: the kernel picks a free port and never picks one it has already given

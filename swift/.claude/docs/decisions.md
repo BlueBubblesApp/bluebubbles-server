@@ -160,8 +160,23 @@ silently.
 
 ## 5. Direction (not commitments)
 
-**Third-party plugins, if they ever happen, run out-of-process.** A crashing or malicious plugin
-must not be able to take down the server. In-process loading is technically possible —
+**Third-party plugins are wanted, and the manifest surface is frozen until they are built.**
+Roughly 1,700 lines across `ServiceManifest`, `ManifestValidation`, `ToolRequirement`,
+`ServiceMigration` and `SettingsScope` describe entitlements, host API versioning, tool
+signature policy and per-service settings scoping — for eleven services compiled into the
+binary. Nothing loads an external manifest; `ServiceManifest` is not `Codable` and there is no
+loader.
+
+That is an informed bet rather than an accident, and it has paid off once: `ProxyServices`
+models connection methods as manifest-described services rather than an enum, which is the only
+reason a third-party tunnel is expressible at all. But every built-in service pays manifest tax
+for a boundary no process boundary yet enforces, so the surface is now **closed to new
+capability** — no new entitlement kinds, no new fields for hypothetical plugin needs, no
+widening of the tool or migration descriptors. A field a *built-in* needs today is fine. Revisit
+when the loader is actually being built.
+
+**When they happen, they run out-of-process.** A crashing or malicious plugin must not be able
+to take down the server. In-process loading is technically possible —
 `disable-library-validation` is already enabled for the helper — which is exactly why it stays
 closed by default. Opening it is a security decision to make deliberately, not a convenience.
 

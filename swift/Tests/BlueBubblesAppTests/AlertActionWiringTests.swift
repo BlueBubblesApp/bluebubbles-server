@@ -1,11 +1,10 @@
 //  AlertActionWiringTests
 //  An alert's remedy is reachable, not just declared.
 //
-//  `AlertAction` shipped in § 3, two call sites populate it — a rate-limit block carries
-//  `.unblock(address:)`, a failing webhook carries `.openSettings` — and no view rendered
-//  them. So every remedy the design promised was unreachable: a user locked out by the
-//  throttle was told to visit the Security page and given no way to get there, which is
-//  exactly the hunt § 17 says the action exists to avoid.
+//  Two call sites populate `AlertAction` — a rate-limit block carries `.unblock(address:)`,
+//  a failing webhook carries `.openSettings`. Both have to reach a view that renders them,
+//  or the remedy is unreachable: a user locked out by the throttle is told to visit the
+//  Security page and given no way to get there.
 //
 //  Producers are asserted here rather than the SwiftUI view, because the view is not testable
 //  without a host and the half that kept breaking is "does anything produce/consume this at
@@ -35,8 +34,8 @@ struct AlertActionWiringTests {
 
   @Test("A blocked client's alert carries a one-click unblock for that address")
   func blockAlertCarriesUnblock() async throws {
-    // The specific promise § 17 makes. An alert that only said "go to Security" would
-    // still leave the user to find the address in a list they have never seen.
+    // An alert that only said "go to Security" would still leave the user to find the
+    // address in a list they have never seen.
     let collector = Collector()
     let control = AccessControlService(
       policy: AccessControlPolicy(perClientThreshold: 2),
@@ -81,10 +80,10 @@ struct AlertActionWiringTests {
 
   @Test("A section that became a settings tab routes to that tab")
   func formerPagesRouteToTheirTab() {
-    // The regression this guards: Permissions and Security used to be their own pages, and
-    // folding them into settings makes their remedies resolve to Settings — which opens on
-    // General. A button that lands on the wrong tab looks broken in exactly the way a
-    // button that does nothing does.
+    // The regression this guards: Permissions and Security are tabs inside settings, not
+    // pages of their own, so their remedies resolve to Settings — which opens on General
+    // unless the tab is carried. A button that lands on the wrong tab looks broken in
+    // exactly the way a button that does nothing does.
     //
     // Security matters most of the two: a block alert's "see the whole list" is the one
     // remedy a user follows while actively locked out.

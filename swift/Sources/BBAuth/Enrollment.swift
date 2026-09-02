@@ -229,7 +229,7 @@ public struct EnrolledDevice: Sendable, Equatable, Codable, Identifiable {
   public var platform: String
   public var scopes: Set<Scope>
   /// X25519 public key for sealed-v2, when the device registered one. This is the same key
-  /// §4 encrypts to — one handshake covering identity, codecs and encryption.
+  /// sealed-v2 encrypts to — one handshake covering identity, codecs and encryption.
   public var publicKey: Data?
   public var supportedCodecs: [String]
   public let enrolledAt: Date

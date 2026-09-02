@@ -30,7 +30,7 @@ public enum WriteHandlers {
   private static func registerSending(
     into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
   ) {
-    registry.register("message.sendText") { request in
+    registry.register(.messageSendText) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
 
@@ -61,7 +61,7 @@ public enum WriteHandlers {
       return .data(sent)
     }
 
-    registry.register("message.sendAttachment") { request in
+    registry.register(.messageSendAttachment) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let chatGUID = try values.requireString("chatGuid")
@@ -80,7 +80,7 @@ public enum WriteHandlers {
   private static func registerMultipart(
     into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
   ) {
-    registry.register("message.sendMultipart") { request in
+    registry.register(.messageSendMultipart) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let chatGUID = try values.requireString("chatGuid")
@@ -119,7 +119,7 @@ public enum WriteHandlers {
   private static func registerMessageActions(
     into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
   ) {
-    registry.register("message.react") { request in
+    registry.register(.messageReact) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       guard let chatGUID = values["chatGuid"]?.stringValue,
@@ -137,7 +137,7 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
-    registry.register("message.edit") { request in
+    registry.register(.messageEdit) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let values = try request.values()
@@ -155,7 +155,7 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
-    registry.register("message.unsend") { request in
+    registry.register(.messageUnsend) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let values = try request.values()
@@ -165,13 +165,13 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
-    registry.register("message.notify") { request in
+    registry.register(.messageNotify) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.message.notify(guid: try request.requirePathParameter("guid"))
       return .data(nil)
     }
 
-    registry.register("message.embeddedMedia") { request in
+    registry.register(.messageEmbeddedMedia) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let path = try await interfaces.message.embeddedMediaPath(guid: guid)
@@ -234,7 +234,7 @@ public enum WriteHandlers {
   private static func registerChatActions(
     into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
   ) {
-    registry.register("chat.create") { request in
+    registry.register(.chatCreate) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let addresses = values["addresses"]?.arrayValue?.compactMap(\.stringValue) ?? []
@@ -246,19 +246,19 @@ public enum WriteHandlers {
       return .data(.object(["guid": .string(guid)]))
     }
 
-    registry.register("chat.delete") { request in
+    registry.register(.chatDelete) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.delete(guid: try request.requirePathParameter("guid"))
       return .data(nil)
     }
 
-    registry.register("chat.leave") { request in
+    registry.register(.chatLeave) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.leave(guid: try request.requirePathParameter("guid"))
       return .data(nil)
     }
 
-    registry.register("chat.pinned") { request in
+    registry.register(.chatPinned) { request in
       let interfaces = try await context.requireInterfaces()
       let chats = try await interfaces.chat.pinned(
         query: ChatInterface.Query(
@@ -275,7 +275,7 @@ public enum WriteHandlers {
 
     // Two handlers over one call, so the pinned flag lives in the route rather than in
     // a body a client can omit.
-    for (name, pinned): (HandlerID, Bool) in [("chat.pin", true), ("chat.unpin", false)] {
+    for (name, pinned): (HandlerID, Bool) in [(.chatPin, true), (.chatUnpin, false)] {
       registry.register(name) { request in
         let interfaces = try await context.requireInterfaces()
         try await interfaces.chat.setPinned(
@@ -290,7 +290,7 @@ public enum WriteHandlers {
     // Three routes over one piece of state, each answering with the RESULTING state so a
     // client never has to read back to find out what it did.
 
-    registry.register("chat.muteState") { request in
+    registry.register(.chatMuteState) { request in
       let interfaces = try await context.requireInterfaces()
       let state = try await interfaces.chat.muteState(
         guid: try request.requirePathParameter("guid")
@@ -298,7 +298,7 @@ public enum WriteHandlers {
       return .data(ChatInterface.serialize(state))
     }
 
-    registry.register("chat.mute") { request in
+    registry.register(.chatMute) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let values = try request.values()
@@ -311,7 +311,7 @@ public enum WriteHandlers {
       return .data(ChatInterface.serialize(state))
     }
 
-    registry.register("chat.unmute") { request in
+    registry.register(.chatUnmute) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let state = try await interfaces.chat.unmute(
@@ -326,7 +326,7 @@ public enum WriteHandlers {
     // Grouped because they are one piece of state with four ways in: everything except
     // the read funnels through IMCore's `-updateIsFiltered:`.
 
-    registry.register("chat.filterState") { request in
+    registry.register(.chatFilterState) { request in
       let interfaces = try await context.requireInterfaces()
       let state = try await interfaces.chat.filterState(
         guid: try request.requirePathParameter("guid")
@@ -334,7 +334,7 @@ public enum WriteHandlers {
       return .data(ChatInterface.serialize(state))
     }
 
-    registry.register("chat.setFilter") { request in
+    registry.register(.chatSetFilter) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let category = try values.requireInt("category")
@@ -344,7 +344,7 @@ public enum WriteHandlers {
       return .data(ChatInterface.serialize(state))
     }
 
-    registry.register("chat.markKnown") { request in
+    registry.register(.chatMarkKnown) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let state = try await interfaces.chat.markSenderKnown(
@@ -356,7 +356,7 @@ public enum WriteHandlers {
       return .data(ChatInterface.serialize(state))
     }
 
-    for (name, isJunk): (HandlerID, Bool) in [("chat.markSpam", false), ("chat.reportJunk", true)] {
+    for (name, isJunk): (HandlerID, Bool) in [(.chatMarkSpam, false), (.chatReportJunk, true)] {
       registry.register(name) { request in
         let interfaces = try await context.requireInterfaces()
         let guid = try request.requirePathParameter("guid")
@@ -397,7 +397,7 @@ public enum WriteHandlers {
 
     /// Empties a conversation. The conversation itself stays — `chat.delete` is the one
     /// that removes it.
-    registry.register("chat.clearHistory") { request in
+    registry.register(.chatClearHistory) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let values = try request.values()
@@ -424,19 +424,19 @@ public enum WriteHandlers {
       return .data(.object(["deleted": .bool(deleted)]))
     }
 
-    registry.register("chat.markRead") { request in
+    registry.register(.chatMarkRead) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.markRead(guid: try request.requirePathParameter("guid"))
       return .data(nil)
     }
 
-    registry.register("chat.markUnread") { request in
+    registry.register(.chatMarkUnread) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.markUnread(guid: try request.requirePathParameter("guid"))
       return .data(nil)
     }
 
-    registry.register("chat.startTyping") { request in
+    registry.register(.chatStartTyping) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.setTyping(
         guid: try request.requirePathParameter("guid"), typing: true
@@ -444,7 +444,7 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
-    registry.register("chat.stopTyping") { request in
+    registry.register(.chatStopTyping) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.setTyping(
         guid: try request.requirePathParameter("guid"), typing: false
@@ -452,14 +452,14 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
-    registry.register("chat.addParticipant") { request in
+    registry.register(.chatAddParticipant) { request in
       try await participant(request, context: context, adding: true)
     }
-    registry.register("chat.removeParticipant") { request in
+    registry.register(.chatRemoveParticipant) { request in
       try await participant(request, context: context, adding: false)
     }
 
-    registry.register("chat.update") { request in
+    registry.register(.chatUpdate) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let values = try request.values()
@@ -468,7 +468,7 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
-    registry.register("chat.setGroupIcon") { request in
+    registry.register(.chatSetGroupIcon) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       // Clients send the image as a multipart `icon` part, the way the Node server
@@ -495,7 +495,7 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
-    registry.register("chat.deleteMessage") { request in
+    registry.register(.chatDeleteMessage) { request in
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.deleteMessage(
         try request.requirePathParameter("messageGuid"),

@@ -33,10 +33,9 @@ public enum BlueBubblesHelper {
   /// it rather than negotiating, because there is no channel to negotiate over yet.
   /// Delegates to the shared derivation.
   ///
-  /// This used to compute the path itself with `FileManager.urls(for:
-  /// .applicationSupportDirectory)`, which inside Messages' sandbox resolves to the
-  /// CONTAINER — so the helper connected to a path the server had never created. See
-  /// SocketLocation.
+  /// Never derive this with `FileManager.urls(for: .applicationSupportDirectory)`: inside
+  /// Messages' sandbox that resolves to the CONTAINER, so the helper would connect to a path
+  /// the server never created. See `SocketLocation`.
   static func defaultSocketPath() -> String {
     SocketLocation.privateAPISocket(for: HelperHost.messages)
   }

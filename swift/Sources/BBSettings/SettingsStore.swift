@@ -76,17 +76,16 @@ public actor SettingsStore {
   // MARK: - Schema
   //
   // The `setting` table is created by `AppDatabase.migrate()`, which owns every migration
-  // for this database. There used to be a second, byte-identical `createSettings`
-  // registration here — public, called by nothing, and holding its own copy of the schema.
-  // Two definitions of one table under the same migration identifier is a silent drift
-  // hazard: editing either one leaves the other stale with nothing to catch it.
+  // for this database, and it is NOT redeclared here. Two definitions of one table under
+  // the same migration identifier is a silent drift hazard: editing either one leaves the
+  // other stale with nothing to catch it.
   //
   // Note the explicit `type_tag` column over there: it is what removes the guessing.
 
   private func load() async throws {
     // Mapped INSIDE the read closure, because `Row` borrows the statement's storage and
-    // is not `Sendable`. Returning rows from here is now a compile error rather than the
-    // silent fallback to GRDB's synchronous overload it used to be — see `AppDatabase.queue`.
+    // is not `Sendable`. Returning rows from here is a compile error rather than a silent
+    // fallback to GRDB's synchronous overload — see `AppDatabase.queue`.
     persisted = try await database.read { db in
       var loaded: [String: StoredValue] = [:]
       for row in try Row.fetchAll(db, sql: "SELECT key, value, type_tag, is_secret FROM setting") {
@@ -377,9 +376,9 @@ public actor SettingsStore {
       throw error
     }
 
-    // ONE transaction for the whole batch. Previously each operation ran in its own,
-    // so a failure partway through committed the earlier keys AND skipped the change
-    // broadcast — leaving services configured from a state nobody was told about.
+    // ONE transaction for the whole batch. Per-operation transactions would let a failure
+    // partway through commit the earlier keys AND skip the change broadcast — leaving
+    // services configured from a state nobody was told about.
     let now = Date()
     do {
       try await database.write { db in

@@ -5,11 +5,11 @@
 //
 //  The interfaces layer exists so that one implementation serves the HTTP routes, the socket
 //  and the SwiftUI app — that sharing is what makes a parallel IPC channel layer unnecessary.
-//  But every interface used to throw `BadRequest`, `NotFound` and `ServiceUnavailable`: types
-//  carrying an HTTP status code and building a response envelope. So the layer was
-//  transport-neutral in its method signatures and transport-coupled in its failure mode, and
-//  `AppModel` — an in-process caller with no HTTP anywhere near it — caught errors carrying a
-//  400 and an envelope it had no use for.
+//  Throwing `BadRequest`, `NotFound` or `ServiceUnavailable` from here would undo that:
+//  those types carry an HTTP status code and build a response envelope, leaving the layer
+//  transport-neutral in its signatures and transport-coupled in its failure mode. `AppModel`
+//  is an in-process caller with no HTTP anywhere near it, and has no use for a 400 or an
+//  envelope.
 //
 //  These cases are the ones the layer actually distinguishes. The mapping onto status codes is
 //  one file away in `InterfaceError+HTTP.swift`, which is the only place that knows this

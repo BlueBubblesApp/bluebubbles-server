@@ -247,8 +247,8 @@ struct SocketTransportTests {
 
   @Test("A broadcast reaches a connected client's next poll")
   func broadcastIsDelivered() async {
-    // The end-to-end assertion the module could not previously make: an event goes onto
-    // the bus and comes back out of an HTTP poll as a Socket.IO EVENT frame.
+    // The end-to-end assertion: an event goes onto the bus and comes back out of an HTTP
+    // poll as a Socket.IO EVENT frame.
     let (engine, sockets) = engine()
     _ = await engine.open(
       query: ["EIO": "4", "transport": "polling", "password": "hunter2hunter2"],

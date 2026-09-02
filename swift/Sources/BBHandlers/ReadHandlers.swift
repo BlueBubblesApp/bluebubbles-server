@@ -31,7 +31,7 @@ public enum ReadHandlers {
     into registry: inout HandlerRegistry,
     context: some AttachmentConverting & InterfaceProviding
   ) {
-    registry.register("message.query") { request in
+    registry.register(.messageQuery) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let query = MessageInterface.Query.parse(values.raw)
@@ -56,7 +56,7 @@ public enum ReadHandlers {
       )
     }
 
-    registry.register("message.find") { request in
+    registry.register(.messageFind) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let query = MessageInterface.Query(
@@ -70,7 +70,7 @@ public enum ReadHandlers {
       return .data(interfaces.message.serialize(message, query: query))
     }
 
-    registry.register("message.count") { request in
+    registry.register(.messageCount) { request in
       let interfaces = try await context.requireInterfaces()
       let total = try await interfaces.message.count(
         chatGUID: request.queryParameters["chatGuid"],
@@ -80,7 +80,7 @@ public enum ReadHandlers {
       return .data(.object(["total": .int(total)]))
     }
 
-    registry.register("message.sentCount") { request in
+    registry.register(.messageSentCount) { request in
       let interfaces = try await context.requireInterfaces()
       let total = try await interfaces.message.count(
         after: request.date("after"),
@@ -90,7 +90,7 @@ public enum ReadHandlers {
       return .data(.object(["total": .int(total)]))
     }
 
-    registry.register("message.countUpdated") { request in
+    registry.register(.messageCountUpdated) { request in
       let interfaces = try await context.requireInterfaces()
       // `after` is required here, unlike on the other counts: without it this asks
       // "how many messages have ever been delivered or read", which is every message
@@ -111,7 +111,7 @@ public enum ReadHandlers {
     into registry: inout HandlerRegistry,
     context: some AttachmentConverting & InterfaceProviding
   ) {
-    registry.register("chat.query") { request in
+    registry.register(.chatQuery) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let query = ChatInterface.Query.parse(values.raw)
@@ -130,7 +130,7 @@ public enum ReadHandlers {
       )
     }
 
-    registry.register("chat.find") { request in
+    registry.register(.chatFind) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       // Participants only when ASKED for, which is the opposite of `chat/query`'s
@@ -149,7 +149,7 @@ public enum ReadHandlers {
       return .data(interfaces.chat.serialize(chat))
     }
 
-    registry.register("chat.count") { request in
+    registry.register(.chatCount) { request in
       let interfaces = try await context.requireInterfaces()
       // Absent means true, matching `withArchived`'s default. `truthy` alone would
       // read an absent parameter as false and silently exclude archived chats.
@@ -158,7 +158,7 @@ public enum ReadHandlers {
       return .data(try await interfaces.chat.countByService(includeArchived: includeArchived))
     }
 
-    registry.register("chat.messages") { request in
+    registry.register(.chatMessages) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let limit = request.integer("limit") ?? 100
@@ -198,7 +198,7 @@ public enum ReadHandlers {
     into registry: inout HandlerRegistry,
     context: some AttachmentConverting & InterfaceProviding
   ) {
-    registry.register("handle.query") { request in
+    registry.register(.handleQuery) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let limit = values["limit"]?.intValue ?? 1000
@@ -215,12 +215,12 @@ public enum ReadHandlers {
       )
     }
 
-    registry.register("handle.count") { _ in
+    registry.register(.handleCount) { _ in
       let interfaces = try await context.requireInterfaces()
       return .data(.object(["total": .int(try await interfaces.handle.count())]))
     }
 
-    registry.register("handle.find") { request in
+    registry.register(.handleFind) { request in
       let interfaces = try await context.requireInterfaces()
       // The path parameter is named `guid` in the route table, but a handle has no
       // GUID — the value is the address. Kept as-is because the route template is part
@@ -236,7 +236,7 @@ public enum ReadHandlers {
       return .data(interfaces.handle.serialize(handle))
     }
 
-    registry.register("handle.iMessageAvailability") { request in
+    registry.register(.handleIMessageAvailability) { request in
       let interfaces = try await context.requireInterfaces()
       let address = try request.requireQueryParameter("address")
       let available = try await interfaces.handle.availability(
@@ -245,7 +245,7 @@ public enum ReadHandlers {
       return .data(.object(["available": .bool(available)]))
     }
 
-    registry.register("handle.faceTimeAvailability") { request in
+    registry.register(.handleFaceTimeAvailability) { request in
       let interfaces = try await context.requireInterfaces()
       let address = try request.requireQueryParameter("address")
       let available = try await interfaces.handle.availability(
@@ -254,7 +254,7 @@ public enum ReadHandlers {
       return .data(.object(["available": .bool(available)]))
     }
 
-    registry.register("handle.focusStatus") { request in
+    registry.register(.handleFocusStatus) { request in
       let interfaces = try await context.requireInterfaces()
       let address = try request.requirePathParameter("guid")
       let status = try await interfaces.handle.focusStatus(address: address)
@@ -268,12 +268,12 @@ public enum ReadHandlers {
     into registry: inout HandlerRegistry,
     context: some AttachmentConverting & InterfaceProviding
   ) {
-    registry.register("attachment.count") { _ in
+    registry.register(.attachmentCount) { _ in
       let interfaces = try await context.requireInterfaces()
       return .data(.object(["total": .int(try await interfaces.attachment.count())]))
     }
 
-    registry.register("attachment.find") { request in
+    registry.register(.attachmentFind) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       guard let attachment = try await interfaces.attachment.find(guid: guid) else {
@@ -289,7 +289,7 @@ public enum ReadHandlers {
     // neither, so the Node server converts on download and every shipped client relies on
     // it. This handler ignored `original`, `quality`, `width` and `height` entirely and
     // served the raw file, so an Android client asking for a photo got a HEIC.
-    registry.register("attachment.download") { request in
+    registry.register(.attachmentDownload) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let path = try await interfaces.attachment.resolvePath(guid: guid)
@@ -316,7 +316,7 @@ public enum ReadHandlers {
       )
     }
 
-    registry.register("attachment.blurhash") { request in
+    registry.register(.attachmentBlurhash) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let hash = try await interfaces.attachment.blurhash(
@@ -336,7 +336,7 @@ public enum ReadHandlers {
     into registry: inout HandlerRegistry,
     context: some AttachmentConverting & InterfaceProviding
   ) {
-    registry.register("contact.list") { request in
+    registry.register(.contactList) { request in
       let interfaces = try await context.requireInterfaces()
       let contacts = try await interfaces.contact.list(
         limit: request.integer("limit") ?? 1000,
@@ -347,7 +347,7 @@ public enum ReadHandlers {
 
     /// Two shapes on one route: with `addresses`, it resolves them; without, it lists.
     /// That is what the current server does and clients rely on both.
-    registry.register("contact.query") { request in
+    registry.register(.contactQuery) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       let addresses = values["addresses"]?.arrayValue?.compactMap(\.stringValue) ?? []
@@ -361,7 +361,7 @@ public enum ReadHandlers {
       return .data(.array(contacts))
     }
 
-    registry.register("contact.avatar") { request in
+    registry.register(.contactAvatar) { request in
       let interfaces = try await context.requireInterfaces()
       let identifier = try request.requirePathParameter("id")
       let data = try await interfaces.contact.avatar(address: identifier)

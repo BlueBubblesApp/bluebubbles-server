@@ -36,66 +36,66 @@ public enum SuccessMessages {
   /// what clients receive today.
   static let byHandler: [HandlerID: String] = [
     // general
-    "general.ping": "Ping received!",
+    .generalPing: "Ping received!",
 
     // macOS
-    "mac.lock": "Successfully executed lock command!",
-    "mac.restartMessages": "Successfully restart the Messages App!",
+    .macLock: "Successfully executed lock command!",
+    .macRestartMessages: "Successfully restart the Messages App!",
 
     // iCloud
-    "icloud.accountInfo": "Successfully fetched account info!",
-    "icloud.contactCard": "Successfully fetched contact card!",
-    "icloud.contactCardV2": "Successfully fetched contact card!",
-    "icloud.changeAlias": "Successfully changed iMessage Alias!",
+    .icloudAccountInfo: "Successfully fetched account info!",
+    .icloudContactCard: "Successfully fetched contact card!",
+    .icloudContactCardV2: "Successfully fetched contact card!",
+    .icloudChangeAlias: "Successfully changed iMessage Alias!",
 
     // FindMy
-    "findmy.devices": "Successfully fetched Find My device locations!",
-    "findmy.friends": "Successfully fetched Find My friends locations!",
-    "findmy.refreshDevices": "Successfully refreshed Find My device locations!",
-    "findmy.refreshFriends": "Successfully refreshed Find My friends locations!",
+    .findmyDevices: "Successfully fetched Find My device locations!",
+    .findmyFriends: "Successfully fetched Find My friends locations!",
+    .findmyRefreshDevices: "Successfully refreshed Find My device locations!",
+    .findmyRefreshFriends: "Successfully refreshed Find My friends locations!",
 
     // Messages
-    "message.query": "Successfully fetched messages!",
-    "message.sendText": "Message sent!",
-    "message.sendAttachment": "Attachment sent!",
-    "message.sendMultipart": "Message sent!",
-    "message.sendAttachmentChunk": "Attachment sent!",
-    "message.react": "Reaction sent!",
-    "message.unsend": "Message unsent!",
-    "message.edit": "Message edited!",
+    .messageQuery: "Successfully fetched messages!",
+    .messageSendText: "Message sent!",
+    .messageSendAttachment: "Attachment sent!",
+    .messageSendMultipart: "Message sent!",
+    .messageSendAttachmentChunk: "Attachment sent!",
+    .messageReact: "Reaction sent!",
+    .messageUnsend: "Message unsent!",
+    .messageEdit: "Message edited!",
 
     // Chats
-    "chat.create": "Successfully created chat!",
-    "chat.markRead": "Successfully marked chat as read!",
-    "chat.markUnread": "Successfully marked chat as unread!",
-    "chat.setGroupIcon": "Successfully set group chat icon!",
-    "chat.removeGroupIcon": "Successfully removed group chat icon!",
+    .chatCreate: "Successfully created chat!",
+    .chatMarkRead: "Successfully marked chat as read!",
+    .chatMarkUnread: "Successfully marked chat as unread!",
+    .chatSetGroupIcon: "Successfully set group chat icon!",
+    .chatRemoveGroupIcon: "Successfully removed group chat icon!",
 
     // Scheduled messages
-    "schedule.create": "Successfully created new scheduled message!",
-    "schedule.update": "Successfully updated the scheduled message!",
-    "schedule.delete": "Successfully deleted scheduled message!",
+    .scheduleCreate: "Successfully created new scheduled message!",
+    .scheduleUpdate: "Successfully updated the scheduled message!",
+    .scheduleDelete: "Successfully deleted scheduled message!",
 
     // Webhooks
-    "webhook.list": "Successfully fetched webhooks!",
-    "webhook.create": "Successfully created webhook!",
-    "webhook.update": "Successfully updated webhook!",
-    "webhook.delete": "Successfully deleted webhook!",
+    .webhookList: "Successfully fetched webhooks!",
+    .webhookCreate: "Successfully created webhook!",
+    .webhookUpdate: "Successfully updated webhook!",
+    .webhookDelete: "Successfully deleted webhook!",
 
     // Backups
-    "backup.getSettings": "Successfully fetched settings!",
-    "backup.createSettings": "Successfully saved settings!",
-    "backup.deleteSettings": "Successfully deleted settings!",
-    "backup.getTheme": "Successfully fetched theme(s)!",
-    "backup.createTheme": "Successfully saved theme!",
-    "backup.deleteTheme": "Successfully deleted theme!",
+    .backupGetSettings: "Successfully fetched settings!",
+    .backupCreateSettings: "Successfully saved settings!",
+    .backupDeleteSettings: "Successfully deleted settings!",
+    .backupGetTheme: "Successfully fetched theme(s)!",
+    .backupCreateTheme: "Successfully saved theme!",
+    .backupDeleteTheme: "Successfully deleted theme!",
 
     // FCM
-    "fcm.registerDevice": "Successfully added device!",
+    .fcmRegisterDevice: "Successfully added device!",
 
     // Server lifecycle
-    "server.restartServices": "Successfully kicked off services restart!",
-    "server.restartAll": "Successfully kicked off re-launch process!",
+    .serverRestartServices: "Successfully kicked off services restart!",
+    .serverRestartAll: "Successfully kicked off re-launch process!",
   ]
 
   /// The message for a route, or nil to use the default.

@@ -45,9 +45,9 @@ import HelperShared
 /// This helper reads on its own `Thread` and dispatches into Swift `Task`s, which run on the
 /// cooperative pool — never main. So the guarantee has to be stated, and `@MainActor` is how
 /// Swift states it: the isolation is checked at compile time, and `await` **suspends** rather
-/// than blocking. An earlier version forced the hop with `DispatchQueue.main.sync` inside
-/// `IMCoreRuntime`; that worked but blocked a helper thread on every call and could not run
-/// under `swift test` at all, because a test host does not drain the main queue.
+/// than blocking. Forcing the hop with `DispatchQueue.main.sync` inside `IMCoreRuntime`
+/// also works, but blocks a helper thread on every call and cannot run under `swift test` at
+/// all, because a test host does not drain the main queue.
 @MainActor
 public final class IMCoreBridge: PrivateAPI {
 
@@ -105,10 +105,9 @@ public final class IMCoreBridge: PrivateAPI {
 
   /// The ChatKit conversation for a chat GUID.
   ///
-  /// Every write goes through one of these. Edits and retractions used to try to recover
-  /// the conversation from the message instead, which cannot work: an `IMMessageItem`
-  /// fetched by GUID reports `chatIdentifier = nil`. The chat GUID travels with the
-  /// request now, resolved by the server from chat.db.
+  /// Every write goes through one of these. Recovering the conversation from the message
+  /// instead cannot work: an `IMMessageItem` fetched by GUID reports `chatIdentifier = nil`.
+  /// The chat GUID travels with the request, resolved by the server from chat.db.
   private func requireConversation(_ chat: ChatGUID) throws -> CKConversation {
     guard let conversation = try CKConversationList.conversation(guid: chat.rawValue) else {
       throw PrivateAPIErrorShim.rejected(
@@ -941,7 +940,7 @@ public final class IMCoreBridge: PrivateAPI {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       let current = try conversation.filterState()
       // Leaving Junk is `recoverFromJunkTo:`; everything else is `updateIsFiltered:`.
-      // Junk is category 2 as measured on this machine — see CHAT_CONTROLS_PLAN §5.2.
+      // Junk is category 2 as measured on this machine — see `docs/CHAT_CONTROLS_PLAN.md` §5.2.
       try conversation.updateFilter(
         category: category, recovering: current.isFiltered != 0 && category == 0
       )
@@ -1076,11 +1075,11 @@ public final class IMCoreBridge: PrivateAPI {
   /// the reference server's fixture records — and the controller exposes that as
   /// `personalNickname` rather than as a lookup of one's own handle.
   ///
-  /// Both return an **`IMNickname` object, not a dictionary.** An earlier version of this
-  /// method called `currentNicknameForHandleIDs:` and then subscripted the result as
-  /// `[String: Any]`, reading `entry["name"]`. That cannot work: the values are objects, so
-  /// every lookup returned nil and the method reported "no shared nickname" for everyone.
-  /// The properties are read through `IMCoreRuntime` here, verified against the live class:
+  /// Both return an **`IMNickname` object, not a dictionary.** Subscripting the result of
+  /// `currentNicknameForHandleIDs:` as `[String: Any]` and reading `entry["name"]` cannot
+  /// work: the values are objects, so every lookup returns nil and the method reports "no
+  /// shared nickname" for everyone. The properties are read through `IMCoreRuntime` here,
+  /// verified against the live class:
   ///
   ///     IMNickname       displayName, firstName, lastName, handle, avatar
   ///     IMNicknameAvatarImage   imageFilePath, imageExists, hasImage
@@ -1233,10 +1232,9 @@ public final class IMCoreBridge: PrivateAPI {
 
   /// PORTED. ObjC: `[account setDisplayName:]` (BlueBubblesHelper.m:748).
   ///
-  /// This was previously reported as unavailable on the grounds that `IMAccount` has no
-  /// `setActiveAlias:`. It does not — and that was the wrong selector to look for. The
-  /// active sending alias IS the account's display name, which the reference sets
-  /// directly. A dump of `IMAccount` confirms `setDisplayName:` is present.
+  /// `IMAccount` has no `setActiveAlias:`, and looking for one is the wrong search: the
+  /// active sending alias IS the account's display name, which the reference sets directly.
+  /// A dump of `IMAccount` confirms `setDisplayName:` is present.
   public func modifyActiveAlias(_ alias: String) async throws {
     try translating {
       let controller = try IMCoreRuntime.sharedInstance(ofClass: "IMAccountController")
@@ -1300,12 +1298,12 @@ public final class IMCoreBridge: PrivateAPI {
 
   // MARK: - FindMy
   //
-  // PORTED, and the port corrected a wrong conclusion rather than filling a gap.
+  // PORTED.
   //
-  // These used to throw `unavailableOnThisOS` on the reasoning that Messages does not load
-  // FindMy's frameworks. `IMFMFSession` is an IMCore class and is in the address space from
-  // launch; what is genuinely absent on macOS 26 is the LEGACY family the old probe looked
-  // for. The whole finding, with the runtime evidence, is at the top of FindMyBridge.swift.
+  // Messages does not load FindMy's frameworks, which makes these look unreachable. They are
+  // not: `IMFMFSession` is an IMCore class and is in the address space from launch, and what
+  // is genuinely absent on macOS 26 is the LEGACY family. The runtime evidence is at the top
+  // of FindMyBridge.swift.
   //
   // Everything here delegates there. Keeping the IMCore calls in their own file rather than
   // inline is what makes the FindMy surface reviewable as one thing — it is the largest
@@ -1487,14 +1485,11 @@ public final class IMCoreBridge: PrivateAPI {
 //                          the event needs a decision about how often a position should be
 //                          pushed. Tracked in TODO.md.
 
-/// dyld calls this when the library is inserted into Messages.app.
+/// Exported, empty, and referenced by nothing.
 ///
-/// PORT: connect to the server's Unix domain socket, validate the peer's code signature,
-/// then serve `IMCoreBridge` over it, and install the swizzle hooks above. The ObjC helper
-/// connects over TCP to `clamp(45670 + getuid() - 501, 45670, 65535)` and sends
-/// `{event: "ping", process: <bundle id>}` on connect; the Swift transport keeps that
-/// handshake shape but moves off TCP. Rationale in `.claude/docs/private-api.md`.
+/// The dylib's constructor in `Helper/HelperBootstrap/bootstrap.c` calls
+/// `bluebubbles_helper_main` (`HelperMain.swift`), which is what connects to the server's
+/// socket and installs the hooks above. This symbol is not on that path.
 @_cdecl("bluebubbles_helper_init")
 public func bluebubblesHelperInit() {
-  // Intentionally inert until the transport lands in Phase 5.
 }

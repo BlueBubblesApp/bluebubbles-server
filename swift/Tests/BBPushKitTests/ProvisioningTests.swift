@@ -1,13 +1,10 @@
 //  ProvisioningTests
 //  The provisioning sequence, against a scripted Google.
 //
-//  This code was written in Phase 6, tested by nothing, and referenced by nothing — so it had
-//  never run in any form. Wiring it up in Phase 13 is what made its correctness matter, and
-//  the first thing that surfaced was a defect no unit test existed to catch: every
-//  long-running operation was polled against Cloud Resource Manager, whatever service had
-//  issued it. Google's operations live on the host that created them, so enabling the APIs —
-//  the second step of eight — would 404 on every poll and then time out three minutes later
-//  complaining about the wrong thing.
+//  The defect these exist to catch is polling a long-running operation against the wrong
+//  host: Google's operations live on the service that created them, so polling everything
+//  against Cloud Resource Manager makes enabling the APIs — the second step of eight — 404
+//  on every poll and then time out three minutes later complaining about the wrong thing.
 //
 //  The fake here answers by URL, which is the point: the assertions are about WHERE each
 //  request went, and a mock that ignored the URL could not have caught this.
@@ -68,9 +65,9 @@ struct ProvisioningTests {
   /// The account list `iam.googleapis.com` returns.
   ///
   /// The email carries a SUFFIX, because every real one does — `-fbsvc` on projects created
-  /// recently, five random characters before that. The provisioner used to construct a
-  /// plain `firebase-adminsdk@{project}` address, which matches no project Google has ever
-  /// created, so this fixture is what makes that difference observable.
+  /// recently, five random characters before that. A constructed plain
+  /// `firebase-adminsdk@{project}` address matches no project Google has ever created, and
+  /// this fixture is what makes that difference observable.
   static let serviceAccountsListResponse = """
     {"accounts":[
       {"name":"projects/P/serviceAccounts/firebase-adminsdk-fbsvc@P.iam.gserviceaccount.com",
@@ -86,9 +83,9 @@ struct ProvisioningTests {
 
   /// A REALISTIC `google-services.json`.
   ///
-  /// This fixture used to carry `project_info` and nothing else — which is precisely the
-  /// shape the storage defect produced, so no test built on it could ever have caught the
-  /// document being truncated. The `client` array is the part clients cannot work without.
+  /// Carrying `project_info` and nothing else is precisely the shape the storage defect
+  /// produces, so a fixture like that cannot catch the document being truncated. The
+  /// `client` array is the part clients cannot work without.
   static var clientConfigResponse: String {
     return #"{"configFileContents":"\#(Data(clientConfigJSON.utf8).base64EncodedString())"}"#
   }

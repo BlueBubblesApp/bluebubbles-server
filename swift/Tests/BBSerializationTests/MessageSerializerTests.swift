@@ -320,9 +320,9 @@ struct ChatSerializationTests {
 /// FCM rejects a data payload over 4 KB, and a rejected send is a notification the user never
 /// gets, with nothing in any log tying it to the message that was too big.
 ///
-/// The cap used to weigh the `chats` array alone — the one part of the response with no
-/// meaningful size to it. A long message therefore sailed past a limit that exists precisely
-/// for long messages. These tests weigh what FCM weighs: the whole response.
+/// Weighing the `chats` array alone measures the one part of the response with no meaningful
+/// size to it, so a long message sails past a limit that exists precisely for long messages.
+/// These tests weigh what FCM weighs: the whole response.
 ///
 /// Reference: `MessageSerializer.serializeList` (`enforceMaxSize`), and
 /// `constants.ts:17` for the 4000-byte figure.

@@ -135,8 +135,8 @@ public struct ContactInterface: Sendable {
   /// The contact's avatar bytes.
   ///
   /// Read from `CNContactStore` per contact rather than during the bulk ingest, which is why
-  /// the ingest never requests image data at all — that request is the memory pathology § 9
-  /// exists to fix. Every contact resolves this way, including the ones that reach the
+  /// the ingest never requests image data at all — bulk-loading every avatar is the memory
+  /// pathology this avoids. Every contact resolves this way, including the ones that reach the
   /// address book from Google: an account synced into Contacts is not a different kind of
   /// contact, it is a contact.
   public func avatar(address: String) async throws -> Data {

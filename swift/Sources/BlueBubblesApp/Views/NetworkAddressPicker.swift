@@ -3,8 +3,8 @@
 //
 //  The generated settings screen renders a `.picker` from options declared statically in
 //  `BBSettings`, which cannot work here: the options are this machine's live interfaces, and
-//  they change when a cable is plugged in or a VPN connects. `.custom` exists for exactly this
-//  case and § 16 anticipates "a handful of bespoke ones".
+//  they change when a cable is plugged in or a VPN connects. `.custom` exists for exactly
+//  this case — the handful of bespoke screens the generated form cannot produce.
 //
 //  Both pickers show the INTERFACE NAME alongside the address, which is the whole reason a
 //  user needs this control. "192.168.1.42" and "10.211.55.2" tell you nothing; "en0" and

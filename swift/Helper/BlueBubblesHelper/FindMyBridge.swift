@@ -1,18 +1,18 @@
 //  FindMyBridge
 //  FindMy against IMCore, from inside Messages.app.
 //
-//  THE FINDING THIS FILE REPLACES
-//  `IMCoreBridge.refreshFindMyFriends` used to throw `unavailableOnThisOS`, on the reasoning
-//  that FindMy lives in its own app and its own frameworks, which Messages never loads. That
-//  reasoning was drawn from a header dump of an iOS 16 SDK and it is wrong on two counts:
+//  WHY THIS IS REACHABLE AT ALL
+//  It looks as though it should not be — FindMy has its own app and its own frameworks, which
+//  Messages never loads. Two facts make it work anyway, and a header dump of an iOS 16 SDK
+//  will tell you the opposite:
 //
 //    - `IMFMFSession` is an **IMCore** class. It is in Messages.app's address space from
 //      launch, and `_initializeFindMySessionIfInAllowedProcess` gates on
 //      `IMIsRunningInMessagesUIProcess()`, which Messages satisfies — so the session is live.
 //    - The classes that really are absent on macOS 26 are the LEGACY ones —
 //      `FMFSessionDataManager`, `FMFSession`, `FMFHandle`. Probing for those and concluding
-//      "FindMy is unreachable" was a false negative. The modern types
-//      (`FindMyLocateSession`, `FMLHandle`, `FMLLocation`) live in
+//      "FindMy is unreachable" is a false negative, and the trap to avoid here. The modern
+//      types (`FindMyLocateSession`, `FMLHandle`, `FMLLocation`) live in
 //      `FindMyLocateObjCWrapper.framework`, which `IMFMFSession` dlopens itself.
 //
 //  Verified on macOS 26.5.2; headers in docs/headers/macos-26.5.2/.

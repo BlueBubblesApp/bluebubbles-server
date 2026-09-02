@@ -18,7 +18,7 @@ easily and recovered slowly, so the budget is asserted rather than hoped for.
 | Serving a 1000-message query | no more than **+40 MB over idle**, returning to baseline after |
 | 24-hour soak under synthetic traffic | **flat**, no upward trend |
 
-These are asserted in CI on a fixture dataset (`Tests/IMessageTests/MemoryBudgetTests.swift`,
+These are asserted in CI on a fixture dataset (`Tests/BBIMessageTests/MemoryBudgetTests.swift`,
 `Sources/BBCore/MemoryFootprint.swift`). The numbers are proposed rather than measured on real
 hardware — **the point is having a number CI can fail on**, so adjust deliberately rather than
 raising one to make a test pass.

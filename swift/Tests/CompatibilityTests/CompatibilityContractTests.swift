@@ -7,7 +7,8 @@
 //  field (?fields=extended on alerts, replay=1 on the socket, negotiated payload codecs) is
 //  proven absent from the default response instead of merely intended to be.
 //
-//  Fixtures are produced by Tools/conformance-recorder. See `.claude/docs/decisions.md` and § Verification.
+//  Fixtures are produced by Tools/conformance-recorder. See `.claude/docs/decisions.md` and
+//  `.claude/docs/workflow.md` § "The parity harness is the important one".
 
 import BBParity
 import Foundation
@@ -43,7 +44,8 @@ struct FixtureCorpusTests {
   }
 
   /// Error envelopes are contract too — the status/error-type pairing is one of the
-  /// invariants § 11 names, and a corpus of nothing but 200s would not pin it.
+  /// compatibility invariants (`.claude/docs/decisions.md` § "1. The compatibility
+  /// contract"), and a corpus of nothing but 200s would not pin it.
   ///
   /// This also guards the recorder itself: fixture names carry their status precisely
   /// because they did not, and the error cases silently overwrote the success cases
@@ -84,12 +86,11 @@ struct FixtureCorpusTests {
 
   /// The recorded corpus, which lives OUTSIDE this test target.
   ///
-  /// It used to be a bundled resource here, and it is not one any more because it stopped
-  /// being parity-only: the same recordings are what `bb-openapi` reads to report which
-  /// endpoints have a documented response, and burying them in a migration-specific test
-  /// target made that read look like a layering violation. `node-route-table.json` DID stay
-  /// a bundled resource — it is generated from `httpRoutes.ts` purely to diff route tables,
-  /// and nothing outside this target wants it.
+  /// NOT a bundled resource, because it is not parity-only: the same recordings are what
+  /// `bb-openapi` reads to report which endpoints have a documented response, and burying
+  /// them in a migration-specific test target would make that read look like a layering
+  /// violation. `node-route-table.json` IS a bundled resource — it is generated from
+  /// `httpRoutes.ts` purely to diff route tables, and nothing outside this target wants it.
   ///
   /// Reached by path from this file rather than through `Bundle.module`, because SwiftPM
   /// only bundles resources that live inside the target directory.

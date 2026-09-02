@@ -27,7 +27,7 @@ import Testing
 struct ScopedSettingsTests {
 
   private func makeStore() async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     return try await SettingsStore(database: database, secrets: InMemorySecretStore())
   }
 
@@ -55,7 +55,7 @@ struct ScopedSettingsTests {
   func ownSecretsAreStoredAsSecrets() async throws {
     // Taken from the FIELD, not from the call site — a plugin's manifest is the only place
     // that fact exists, so a caller cannot get it wrong.
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let secrets = InMemorySecretStore()
     let store = try await SettingsStore(database: database, secrets: secrets)
     let scoped = ScopedSettings(
@@ -156,7 +156,7 @@ struct ScopedSettingsTests {
 struct RequiredFieldTests {
 
   private func makeStore() async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     return try await SettingsStore(database: database, secrets: InMemorySecretStore())
   }
 
@@ -212,7 +212,7 @@ struct RequiredFieldTests {
   /// token and fails with a message about the dashboard.
   @Test("The tunnel token is stored as a secret and reads back")
   func tokenIsStoredSecretly() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let secrets = InMemorySecretStore()
     let store = try await SettingsStore(database: database, secrets: secrets)
     let manifest = BuiltInManifests.cloudflare
@@ -232,7 +232,7 @@ struct RequiredFieldTests {
 struct ResetToDefaultsTests {
 
   private func makeStore() async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     return try await SettingsStore(database: database, secrets: InMemorySecretStore())
   }
 
@@ -511,12 +511,14 @@ struct StructuralSettingsTests {
     // is indistinguishable, from outside, from never having wired them up.
     // `facetime_incoming_handoff` is here for the same reason a feature flag is: it
     // decides whether a route group mounts, and mounting happens once at assembly.
+    // `chat_db_readers` decides what kind of connection chat.db is opened with, which
+    // happens once in `build` — every interface then holds the handle that already exists.
     #expect(
       SettingsPropagation.structuralKeys
         == Set(
           [
             "auth_mode", "additive_endpoints", "event_payload_codec",
-            "facetime_incoming_handoff",
+            "facetime_incoming_handoff", "chat_db_readers",
           ] + Features.allKeys
         ))
   }
@@ -555,14 +557,14 @@ struct StructuralSettingsTests {
 
 /// Seeding a manifest's declared defaults.
 ///
-/// Toggles could not previously declare one: an unset flag reads as `false`, so a manifest
-/// could say "off unless the user turns it on" and nothing else. Anything whose SAFE position
-/// is on — a switch that disables a data-collection feature — had no way to express it.
+/// Without seeding, an unset flag reads as `false`, so a manifest can say "off unless the
+/// user turns it on" and nothing else. Anything whose SAFE position is on — a switch that
+/// disables a data-collection feature — has no way to express it.
 @Suite("Manifest defaults")
 struct ManifestDefaultSeedingTests {
 
   private func makeStore() async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     return try await SettingsStore(database: database, secrets: InMemorySecretStore())
   }
 

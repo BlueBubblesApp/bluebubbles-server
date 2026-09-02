@@ -46,7 +46,31 @@ a raw queue and both hit this — do not add a third.
 - Rename a column via a *new* migration using `table.rename(column:to:)`.
 - Add the migration and the model change in the same commit.
 
-### Naming (enforced by `Tests/CompositionTests/NamingConventionTests.swift`)
+**A new table does NOT go in `AppDatabase`.** It goes in the module that owns it, as a
+`SchemaContributor` — see `SchemaContributor.swift`. The module declares
+`schemaNamespace` and registers migrations prefixed with it (`mymodule.createThing`);
+the namespace is enforced, because identifiers are global across one `grdb_migrations`
+table. Add the type to `AppSchema.contributors` in the composition root, **at the end** —
+that list is the registration order and therefore the build order on a fresh install.
+
+**`AppDatabase` declares no tables at all.** Every one lives with its module:
+`SettingsSchema` (BBSettings), `ContactsSchema` (BBContacts), `InterfacesSchema`
+(BBInterfaces), `AccessControlSchema` (BBAuth).
+
+The one exception is `registerFrozenTail`, which holds `normaliseTimestampColumnNames` —
+a single released migration that renames columns across `device` (BBInterfaces) and
+`blocked_client`/`paired_client`/`auth_failure` (BBAuth). It cannot be split, because one
+identifier is already recorded on every install and two new ones would both re-run. It
+belongs to neither module, so it stays here, runs last, and `migrate` appends it itself so
+no caller can omit it. Each rename is guarded on the table existing — always true on a real
+database, and what lets a single module's schema be stood up alone in its own tests.
+
+Nothing new goes in the tail. Ever.
+
+`Tests/CompositionTests/SchemaContributionTests.swift` freezes the whole ordered sequence
+and simulates an upgrade from before the move. If you change schema, it will tell you.
+
+### Naming (enforced by `Tests/CompatibilityTests/NamingConventionTests.swift`)
 
 Tables `snake_case` and singular. Columns `snake_case`, `_at` for event times, `_for` for
 intended times, `is_` for booleans, `_count` for counts, `<table>_id` for foreign keys. New

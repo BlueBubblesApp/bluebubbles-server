@@ -179,10 +179,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   /// Stops the server before the process goes away.
   ///
-  /// Every quit except the menu bar's own button used to skip this: ⌘Q, `osascript`, a
-  /// logout, and now a signal all arrive here instead of at that button, and none of them
-  /// were stopping anything. What that costs is a tunnel that is never told to close, so
-  /// the remote side holds a dead session open until it times out.
+  /// Every quit except the menu bar's own button arrives HERE rather than at that button:
+  /// ⌘Q, `osascript`, a logout, a signal. Without this they stop nothing, and what that
+  /// costs is a tunnel that is never told to close, so the remote side holds a dead session
+  /// open until it times out.
   ///
   /// **Blocking, deliberately, and NOT `.terminateLater`.** That reply exists for exactly
   /// this situation and it cannot be used with Swift concurrency here: while AppKit waits

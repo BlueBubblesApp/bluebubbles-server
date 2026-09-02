@@ -49,7 +49,7 @@ struct WriteAtomicityTests {
   private func makeStore(
     secrets: any SecretStore
   ) async throws -> SettingsStore {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
     return try await SettingsStore(database: database, secrets: secrets)
   }
 

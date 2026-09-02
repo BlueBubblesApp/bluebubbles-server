@@ -21,9 +21,23 @@ import SwiftUI
 struct ScheduledMessagesView: View {
 
   @Bindable var model: AppModel
-  @State private var messages: [ScheduledMessage] = []
+  @State private var screen: ScreenModel<[ScheduledMessage]>
   @State private var isComposing = false
-  @State private var error: String?
+
+  init(model: AppModel) {
+    self.model = model
+    _screen = State(initialValue: ScreenModel { try await Self.read(model) })
+  }
+
+  @MainActor
+  private static func read(_ model: AppModel) async throws -> [ScheduledMessage]? {
+    guard let scheduling = model.scheduling else { return nil }
+    // Was `(try? …) ?? []`, which rendered a queue that could not be read as the
+    // "Nothing scheduled" empty state — complete with a button inviting you to add to it.
+    return try await scheduling.records()
+  }
+
+  private var messages: [ScheduledMessage] { screen.state.value ?? [] }
 
   var body: some View {
     Group {
@@ -33,7 +47,10 @@ struct ScheduledMessagesView: View {
           systemImage: "clock",
           description: Text("Start the server to view scheduled messages.")
         )
-      } else if messages.isEmpty {
+      } else if messages.isEmpty, screen.problem == nil {
+        // `problem == nil` guards the empty state: a queue that could not be READ also
+        // has no messages, and "Nothing scheduled" over a failed read is a lie with a
+        // button on it.
         ContentUnavailableView {
           Label("Nothing scheduled", systemImage: "clock.badge.checkmark")
         } description: {
@@ -57,17 +74,17 @@ struct ScheduledMessagesView: View {
     .sheet(isPresented: $isComposing) {
       ScheduleComposer(model: model) {
         isComposing = false
-        Task { await reload() }
+        Task { await screen.reload() }
       }
     }
-    .task { await reload() }
+    .task { await screen.reload() }
   }
 
   private var list: some View {
     SettingsPage {
-      if let error {
+      if let message = screen.problem {
         SettingsSection("Something went wrong") {
-          SettingsFootnote(text: error, symbol: "xmark.circle", tone: .error)
+          SettingsFootnote(text: message, symbol: "xmark.circle", tone: .error)
             .padding(.vertical, 4)
         }
       }
@@ -196,10 +213,10 @@ struct ScheduledMessagesView: View {
   }
 
   private func when(_ message: ScheduledMessage) -> String {
-    // A `Date` column read as a `Date`. This used to format the value to an ISO string in
-    // the interface and parse it back here, and reading it as epoch milliseconds instead —
-    // which the wire rule elsewhere would suggest — silently showed an em dash for every
-    // scheduled message. Neither failure is reachable now.
+    // A `Date` column read as a `Date` — not formatted to an ISO string in the interface
+    // and parsed back here, and not read as epoch milliseconds, which the wire rule
+    // elsewhere would suggest and which silently shows an em dash for every scheduled
+    // message.
     let date = message.scheduledFor
     // Relative for anything close, absolute otherwise: "in 20 minutes" is what you want
     // for something imminent and useless for something three months old.
@@ -211,21 +228,9 @@ struct ScheduledMessagesView: View {
 
   // MARK: - Plumbing
 
-  private func reload() async {
-    guard let scheduling = model.scheduling else { return }
-    messages = (try? await scheduling.records()) ?? []
-  }
-
   private func cancel(_ message: ScheduledMessage) async {
     guard let scheduling = model.scheduling, let id = message.id
     else { return }
-    do {
-      try await scheduling.delete(id: id)
-    } catch {
-      setError(String(describing: error))
-    }
-    await reload()
+    await screen.perform { try await scheduling.delete(id: id) }
   }
-
-  private func setError(_ message: String) { error = message }
 }

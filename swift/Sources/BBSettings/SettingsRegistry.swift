@@ -222,20 +222,21 @@ public enum Settings {
   )
   public static let privateAPIMode = Setting<String>("private_api_mode", default: "process-dylib")
 
-  // There is deliberately NO setting for the TCP bridge.
+  // There is deliberately NO setting for the helper transport, and adding one would be a
+  // mistake worth naming here.
   //
-  // One was added on the assumption that it existed only for the shipped Objective-C
-  // helper, and that an install running the Swift helper could close the port. That is
-  // backwards, and § 15 records the measurement: Messages.app is sandboxed, a Unix socket
-  // outside its container is refused, and `lsof` shows the injected helper connected over
-  // loopback TCP with no Unix socket at all. TCP is not the legacy path — it is the only
-  // path an injected helper has, whichever helper it is.
+  // `SocketTransport` is the only transport: a Unix socket inside the target app's own
+  // container. The sandbox refuses a socket by LOCATION, not by kind — one in Application
+  // Support or `/tmp` is refused, one inside the container connects — so there is no second,
+  // closeable path and no legacy fallback to switch off. A setting here could only disable
+  // the Private API outright.
   //
-  // So a switch to disable it is a switch that silently disables the Private API, with
-  // help text telling the user to do exactly that. Removed rather than re-labelled. The
-  // real problem it was reaching for — that loopback TCP cannot identify its peer, so any
-  // local process can drive the Private API — is not solved by closing the port, and is
-  // tracked in § 15 instead.
+  // The concern such a setting would be reaching for — that a transport unable to identify
+  // its peer lets any local process drive the Private API — is answered at connect time
+  // instead: the peer's audit token is checked against the host app's code signature, and an
+  // unverified peer is refused.
+  //
+  // See `.claude/docs/private-api.md` § "The sandbox, and where the socket must live".
 
   /// Where the helper dylib lives.
   ///
@@ -294,6 +295,32 @@ public enum Settings {
     },
     presentation: .init(
       label: "Startup Delay", section: "Features", control: .number(range: 0...600))
+  )
+
+  /// How many chat.db reads may be in flight at once.
+  ///
+  /// **One by default, which is what this server has always done**: a single SQLite
+  /// connection, every read serialised through it — HTTP routes, the change detector's poll
+  /// and the app alike. `Tests/BBIMessageTests/ReadConcurrencyBenchmark.swift` measures what
+  /// that costs. On a 40,000-message database, page queries stayed flat at ~26/second from
+  /// one concurrent reader to sixteen; four readers reached ~95/second. The ceiling is real,
+  /// and multi-client is the normal case here.
+  ///
+  /// The measured cost of raising it is small: four readers added about 2 MB. That is worth
+  /// stating plainly, because "lower memory on old hardware" was the original justification
+  /// for one connection and it had never been measured against the throughput it was buying.
+  ///
+  /// It stays at one by default anyway, because changing it changes behaviour on every
+  /// existing install, and the numbers above come from one synthetic workload — deep-offset
+  /// paging over a single chat — rather than from the field. Raising the default is a
+  /// decision to take on evidence from real servers, not from this benchmark alone.
+  public static let chatDatabaseReaders = Setting<Int>(
+    "chat_db_readers", default: 1,
+    presentation: .init(
+      label: "Concurrent Database Readers",
+      help: "How many message-database reads run at once. 1 is the safe default; raising it "
+        + "helps when several clients are active, and costs memory per reader.",
+      section: "Advanced", control: .number(range: 1...8))
   )
 
   /// Also a real Int. Under the current coercion a value of 0 or 1 comes back as a Bool.
@@ -463,7 +490,7 @@ public enum Settings {
     )
   )
 
-  /// Mounts the additive administration endpoints (§17) and the streaming avatar route.
+  /// Mounts the additive administration endpoints and the streaming avatar route.
   ///
   /// Default OFF, and that default is load-bearing: with default settings the route table
   /// must be byte-identical to the Node server's, which `RouteRegistrationTests` asserts.
@@ -517,7 +544,7 @@ public enum Settings {
         .init(value: "error", label: "Error"),
       ])))
 
-  // Access control (§ 17). Failure-only, so a client polling with valid credentials is
+  // Access control. Failure-only, so a client polling with valid credentials is
   // never throttled.
   /// The master switch for the automatic half of access control: counting failed logins,
   /// blocking an address that crosses the threshold, and throttling an unidentifiable
@@ -549,7 +576,7 @@ public enum Settings {
         "Never rate-limit private-range addresses. Reduces false positives on a LAN-only setup.",
       section: "Security", control: .toggle
     ))
-  // ntfy (§ 4). A first-class delivery route, not a webhook variant: several users run
+  // ntfy. A first-class delivery route, not a webhook variant: several users run
   // ntfy and no Firebase at all, and the payload is a human-readable notification rather
   // than a JSON body — which is the whole reason `NtfySink` is a separate sink.
   public static let ntfyTopic = Setting<String>(
@@ -616,7 +643,7 @@ public enum Settings {
       "socket_port", "server_address", "password", "connection_method", "use_custom_certificate",
 
       "enable_private_api", "enable_ft_private_api", "private_api_mode",
-      "start_delay", "db_poll_interval", "auto_caffeinate", "auto_start_method",
+      "start_delay", "db_poll_interval", "chat_db_readers", "auto_caffeinate", "auto_start_method",
       "start_minimized", "hide_dock_icon", "dock_badge", "auto_lock_mac",
       "open_findmy_on_startup", "start_via_terminal", "headless", "disable_gpu",
       "landing_page_path", "facetime_calling",
@@ -664,6 +691,7 @@ extension Settings {
   public static let renderable: [AnySetting] =
     [
       socketPort.erased,
+      chatDatabaseReaders.erased,
       serverAddress.erased,
       password.erased,
       connectionMethod.erased,

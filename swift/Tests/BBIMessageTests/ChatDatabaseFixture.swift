@@ -122,7 +122,9 @@ struct ChatDatabaseFixture {
   // else. Column names and types match Apple's exactly, because `SchemaProfile.select`
   // filters on presence and a renamed column here would silently drop from every query.
 
-  private static func createSchema(_ db: Database) throws {
+  /// Not private: `ReadConcurrencyBenchmark` builds a much larger database from the same
+  /// schema, and two copies of Apple's column list would drift.
+  static func createSchema(_ db: Database) throws {
     try db.execute(
       sql: """
         CREATE TABLE handle (
@@ -289,10 +291,9 @@ struct ChatDatabaseFixture {
     // Chat 5 — NO participants. Excluded everywhere: there is nobody to send to, so it is
     // not a conversation a client can act on.
     //
-    // Deliberately separate from chat 4. The two used to be one row carrying both
-    // properties, which meant "no messages" and "no participants" could not be told apart
-    // — and the moment the participant rule landed, the test that guards the empty-chat
-    // sort would have passed for the wrong reason.
+    // Deliberately separate from chat 4. One row carrying both properties makes "no
+    // messages" and "no participants" indistinguishable, and the test that guards the
+    // empty-chat sort then passes for the wrong reason once the participant rule applies.
     try db.execute(
       sql: """
         INSERT INTO chat (guid, style, chat_identifier, display_name, is_archived, service_name)

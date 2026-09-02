@@ -142,7 +142,7 @@ struct OpenAPIDocumentTests {
     // `POST :guid/participant` and `POST :guid/participant/add` share a handler on
     // purpose. Both must appear: a client on the older path needs to find it documented.
     let ids = RouteCatalog.routes
-      .filter { $0.route.handlerID.rawValue == "chat.addParticipant" }
+      .filter { $0.route.handlerID == .chatAddParticipant }
       .map { OpenAPIDocument.operationID(for: $0) }
     #expect(ids.count == 2)
     #expect(Set(ids).count == 2)

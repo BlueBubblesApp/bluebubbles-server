@@ -1,10 +1,10 @@
 //  EphemeralPort
 //  Binding a listener in a test without guessing a port.
 //
-//  Eight suites here start a real listener, and every one of them used to pick
+//  Eight suites here start a real listener, and none of them may pick
 //  `Int.random(in: 20_000..<60_000)` and hope. That is a birthday problem against every other
-//  test in the run and against whatever else the machine is doing, and it produced exactly the
-//  failure it looks like it would: `SignalOwnershipTests` and `PeerAddressTests` failing
+//  test in the run and against whatever else the machine is doing, and it produces exactly
+//  the failure it looks like it would: `SignalOwnershipTests` and `PeerAddressTests` failing
 //  intermittently with "Port N is already in use", roughly once in a few hundred runs — often
 //  enough to be seen, rarely enough to be re-run and ignored.
 //

@@ -153,7 +153,7 @@ struct ServiceManifestTests {
   @Test("Sensitive capabilities are refused to third-party plugins for now")
   func thirdPartyCannotReadMessagesYet() {
     // Not because the request is unreasonable — a bridge legitimately needs it — but
-    // because § 12 has not decided how a user grants it, and defaulting to allowed would
+    // because how a user grants it is not yet decided, and defaulting to allowed would
     // decide that by accident.
     let problems = ManifestValidator.validate(
       manifest(entitlements: [.readMessages], isBuiltIn: false),

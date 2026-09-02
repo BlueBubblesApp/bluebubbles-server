@@ -72,7 +72,7 @@ struct RenderableSettingsTests {
     // the point of enumerating them — and the count still fails when someone adds a
     // presented setting and forgets `renderable`.
     #expect(
-      Settings.renderable.count == 36 + Features.all.count,
+      Settings.renderable.count == 37 + Features.all.count,
       """
       The renderable list has \(Settings.renderable.count) entries. If you added a \
       setting with a `presentation:`, add it to `Settings.renderable` too — otherwise \

@@ -51,9 +51,8 @@ struct HTTPEdgeTests {
       ),
       privateAPI: PrivateAPIStage(isConnected: { true })
     )
-    // Port 0. This used to retry a random port eight times, which is where the comment
-    // about intermittent "Port N is already in use" failures came from — retrying makes a
-    // collision rarer and slower, it does not remove it. See `EphemeralPort`.
+    // Port 0, NOT a random port with retries: retrying makes a collision rarer and slower,
+    // it does not remove it. See `EphemeralPort`.
     let listener = HTTPListener()
     let router = try builder.buildRouter(registry: registry, additionalGroups: groups)
     try await listener.start(router: router, host: "127.0.0.1", port: 0)
@@ -104,8 +103,8 @@ struct HTTPEdgeTests {
 
   @Test("A success carries status, message and data at the top level")
   func successEnvelope() async throws {
-    let registry = registry("edge.ok") { _ in .data(.object(["value": .int(1)])) }
-    let routes = [RouteDefinition(.get, "ok", "edge.ok", requires: .unauthenticated)]
+    let registry = registry(HandlerID("edge.ok")) { _ in .data(.object(["value": .int(1)])) }
+    let routes = [RouteDefinition(.get, "ok", HandlerID("edge.ok"), requires: .unauthenticated)]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(port: port, path: "/api/v1/edge/ok")
@@ -120,14 +119,14 @@ struct HTTPEdgeTests {
 
   @Test("Pagination metadata reaches the envelope under the keys clients page on")
   func paginationMetadata() async throws {
-    let registry = registry("edge.page") { _ in
+    let registry = registry(HandlerID("edge.page")) { _ in
       .data(
         .array([.int(1), .int(2)]),
         metadata: .object([
           "offset": .int(0), "limit": .int(2), "total": .int(9), "count": .int(2),
         ]))
     }
-    let routes = [RouteDefinition(.get, "page", "edge.page", requires: .unauthenticated)]
+    let routes = [RouteDefinition(.get, "page", HandlerID("edge.page"), requires: .unauthenticated)]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(port: port, path: "/api/v1/edge/page")
@@ -176,10 +175,10 @@ struct HTTPEdgeTests {
   /// more correct that would be.
   @Test("An iMessage error carries its payload in data alongside the error")
   func iMessageErrorCarriesData() async throws {
-    let registry = registry("edge.send") { _ in
+    let registry = registry(HandlerID("edge.send")) { _ in
       throw IMessageError("send failed", data: .object(["guid": .string("x")]))
     }
-    let routes = [RouteDefinition(.get, "send", "edge.send", requires: .unauthenticated)]
+    let routes = [RouteDefinition(.get, "send", HandlerID("edge.send"), requires: .unauthenticated)]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(port: port, path: "/api/v1/edge/send")
@@ -192,8 +191,8 @@ struct HTTPEdgeTests {
   @Test("An unrecognised error becomes a 500 rather than escaping as a crash")
   func unknownErrorBecomesServerError() async throws {
     struct Boom: Error {}
-    let registry = registry("edge.boom") { _ in throw Boom() }
-    let routes = [RouteDefinition(.get, "boom", "edge.boom", requires: .unauthenticated)]
+    let registry = registry(HandlerID("edge.boom")) { _ in throw Boom() }
+    let routes = [RouteDefinition(.get, "boom", HandlerID("edge.boom"), requires: .unauthenticated)]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(port: port, path: "/api/v1/edge/boom")
@@ -215,19 +214,21 @@ struct HTTPEdgeTests {
     }
   }
 
-  /// The bridge added for the audit's finding 01.
+  /// The bridge from `BBError` to the wire.
   ///
-  /// Thirty-seven types conform to `BBError` and none of them is an `HTTPError`, so every one
-  /// of them used to fall through to `String(describing:)` — the case name, on the wire, to a
-  /// client. `MessageSendError` worked around it by adopting `CustomStringConvertible`; the
-  /// other thirty-six did not. The renderer reads `body` now, which is the field the protocol
+  /// Thirty-seven types conform to `BBError` and none of them is an `HTTPError`, so without
+  /// this every one of them falls through to `String(describing:)` — the case name, on the
+  /// wire, to a client. Only `MessageSendError` escapes that, by adopting
+  /// `CustomStringConvertible`. The renderer reads `body`, which is the field the protocol
   /// already requires to be a sentence a person can act on.
   @Test("A BBError reaches the client as its body rather than as its enum case")
   func bbErrorRendersItsBody() async throws {
-    let registry = registry("edge.domain") { _ in
+    let registry = registry(HandlerID("edge.domain")) { _ in
       throw SampleDomainError.refused(reason: "Messages said no")
     }
-    let routes = [RouteDefinition(.get, "domain", "edge.domain", requires: .unauthenticated)]
+    let routes = [
+      RouteDefinition(.get, "domain", HandlerID("edge.domain"), requires: .unauthenticated)
+    ]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(port: port, path: "/api/v1/edge/domain")
@@ -246,10 +247,12 @@ struct HTTPEdgeTests {
   /// first.
   @Test("Bridging a BBError does not move its status or error type")
   func bbErrorKeepsItsStatus() async throws {
-    let registry = registry("edge.severity") { _ in
+    let registry = registry(HandlerID("edge.severity")) { _ in
       throw SampleDomainError.refused(reason: "warning-level, still a 500")
     }
-    let routes = [RouteDefinition(.get, "severity", "edge.severity", requires: .unauthenticated)]
+    let routes = [
+      RouteDefinition(.get, "severity", HandlerID("edge.severity"), requires: .unauthenticated)
+    ]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(port: port, path: "/api/v1/edge/severity")
@@ -280,8 +283,10 @@ struct HTTPEdgeTests {
   /// suite does not move a hundred megabytes to prove it.
   @Test("A body past the ceiling is refused with 413, not buffered")
   func bodyLimitIsEnforced() async throws {
-    let registry = registry("edge.upload") { _ in .data(nil) }
-    let routes = [RouteDefinition(.post, "upload", "edge.upload", requires: .unauthenticated)]
+    let registry = registry(HandlerID("edge.upload")) { _ in .data(nil) }
+    let routes = [
+      RouteDefinition(.post, "upload", HandlerID("edge.upload"), requires: .unauthenticated)
+    ]
     let configuration = HTTPAPIConfiguration(
       host: "127.0.0.1", port: 0, maximumBodySize: 1024)
 
@@ -300,11 +305,11 @@ struct HTTPEdgeTests {
 
   @Test("A handler past its response deadline produces the 504 body, with the elapsed time")
   func responseTimeoutProduces504() async throws {
-    let registry = registry("edge.slow") { _ in
+    let registry = registry(HandlerID("edge.slow")) { _ in
       try await Task.sleep(for: .seconds(30))
       return .data(nil)
     }
-    let routes = [RouteDefinition(.get, "slow", "edge.slow", requires: .unauthenticated)]
+    let routes = [RouteDefinition(.get, "slow", HandlerID("edge.slow"), requires: .unauthenticated)]
 
     try await withServer(
       registry: registry, groups: [group(routes, responseTimeout: .milliseconds(250))]
@@ -325,8 +330,8 @@ struct HTTPEdgeTests {
   /// about.
   @Test("Every response carries the permissive origin header")
   func corsOnNormalResponses() async throws {
-    let registry = registry("edge.cors") { _ in .data(nil) }
-    let routes = [RouteDefinition(.get, "cors", "edge.cors", requires: .unauthenticated)]
+    let registry = registry(HandlerID("edge.cors")) { _ in .data(nil) }
+    let routes = [RouteDefinition(.get, "cors", HandlerID("edge.cors"), requires: .unauthenticated)]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(port: port, path: "/api/v1/edge/cors")
@@ -337,11 +342,11 @@ struct HTTPEdgeTests {
 
   @Test("A preflight is answered without reaching the handler")
   func corsPreflight() async throws {
-    let registry = registry("edge.pre") { _ in
+    let registry = registry(HandlerID("edge.pre")) { _ in
       Issue.record("a preflight reached the handler")
       return .data(nil)
     }
-    let routes = [RouteDefinition(.get, "pre", "edge.pre", requires: .unauthenticated)]
+    let routes = [RouteDefinition(.get, "pre", HandlerID("edge.pre"), requires: .unauthenticated)]
 
     try await withServer(registry: registry, groups: [group(routes)]) { port in
       let reply = try await Self.send(

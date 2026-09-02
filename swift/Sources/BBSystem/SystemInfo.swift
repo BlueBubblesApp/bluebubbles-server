@@ -132,7 +132,8 @@ public enum SystemInfo {
 
   /// Seconds this Mac's clock differs from Apple's time server, or nil.
   ///
-  /// **The one thing in § 14's table that stays a subprocess.** There is no NTP client in
+  /// **The one subprocess that stays** (`.claude/docs/performance.md` § "Never construct
+  /// `Process`"). There is no NTP client in
   /// any Apple framework — `SNTP` is not public API and `systemsetup -getnetworktimeserver`
   /// reports configuration rather than drift — so this parses `sntp`, as the current server
   /// does, using the same regular expression.

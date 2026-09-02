@@ -1,16 +1,16 @@
 //  AccessControlStore
 //  The durable half of access control.
 //
-//  The tables have existed since the Phase 3 migration and nothing ever read or wrote them.
-//  Three things followed from that, and all three were invisible:
+//  Blocks and allowlists live in `app.db` and are read and written here. Durability is the
+//  whole point of this type, and each thing it buys is invisible until it is missing:
 //
-//    - An allowlist an administrator curated was lost on every restart, which makes the
-//      feature worse than not having it: it appears to work, then quietly stops.
-//    - "Restart the server" became an accidental unblock-everyone, so a block was only ever
-//      as durable as the process.
+//    - An allowlist an administrator curated survives a restart. Without that the feature is
+//      worse than not having it: it appears to work, then quietly stops.
+//    - "Restart the server" is not an accidental unblock-everyone — a block outlives the
+//      process.
 //    - `--clear-blocklist` — the documented lockout recovery, and the stated reason the
-//      Security admin routes can stay off by default — built a fresh in-memory service,
-//      cleared its empty blocklist, and printed success. It could not have worked.
+//      Security admin routes can stay off by default — operates on the stored blocklist. A
+//      fresh in-memory service would clear nothing and print success.
 //
 //  See `docs/AUTH.md`.
 

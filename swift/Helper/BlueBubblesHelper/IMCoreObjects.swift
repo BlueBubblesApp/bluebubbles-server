@@ -171,9 +171,8 @@ struct IMChat {
   /// `delete-chat`. It removes the messages; the conversation row itself is the daemon's
   /// to reap. Naming that here rather than pretending the chat vanishes.
   ///
-  /// Returns IMCore's own BOOL. It used to be discarded — `BBInvoke` read a return value
-  /// only when it was an object — so a clear that deleted nothing was indistinguishable
-  /// from one that emptied the conversation.
+  /// Returns IMCore's own BOOL, which must not be discarded: without it a clear that
+  /// deleted nothing is indistinguishable from one that emptied the conversation.
   @discardableResult
   func deleteAllHistory() throws -> Bool {
     try IMCoreRuntime.callReturningBool(object, "deleteAllHistory")
@@ -385,8 +384,8 @@ enum IMMutedChats {
   ///
   /// Takes an argument, so it cannot go through `IMCoreRuntime.bool` — that one uses a
   /// typed IMP and only handles zero-argument getters. This is the first caller of
-  /// `callReturningBool`, which exists because a dropped BOOL return used to be
-  /// indistinguishable from a void method.
+  /// `callReturningBool`, which exists because a dropped BOOL return is indistinguishable
+  /// from a void method.
   static func isMuted(_ chat: IMChat) throws -> Bool {
     try IMCoreRuntime.callReturningBool(try list(), "isMutedChat:", [chat.object])
   }
@@ -568,10 +567,10 @@ enum CKChatControllers {
   /// ObjC: `[[CKChatController alloc] initWithConversation:convo]`
   /// (BlueBubblesHelper.m, `getCKChatControllerFromConversation:`).
   ///
-  /// The controller is CONSTRUCTED, not looked up. An earlier version of this reached for
-  /// `chatControllerForConversation:` and a `chatController` accessor; neither exists on
-  /// macOS 26, so every delete failed with "could not reach the chat controller". Messages
-  /// makes a controller per conversation view, so there is no registry to ask.
+  /// The controller is CONSTRUCTED, not looked up. Neither `chatControllerForConversation:`
+  /// nor a `chatController` accessor exists on macOS 26 — reaching for either fails every
+  /// delete with "could not reach the chat controller". Messages makes a controller per
+  /// conversation view, so there is no registry to ask.
   static func forConversation(_ conversation: CKConversation) throws -> AnyObject {
     let type: AnyClass = try IMCoreRuntime.requireClass("CKChatController")
     guard let allocated = try IMCoreRuntime.invoke(type as AnyObject, "alloc", []),
@@ -1245,12 +1244,12 @@ enum IMCoreQueries {
 
     // The refresh is OPTIONAL — a stale-but-real status beats refusing to answer, because
     // most callers want to know whether someone is silenced rather than to force a network
-    // round trip. But it is not as optional as this code used to assume.
+    // round trip. But it is less optional than it looks.
     //
-    // TWO spellings, newest first. An earlier pass looked only for the UNDERSCORED
-    // `_fetchUpdatedStatusForHandle:completion:` — what the reference calls — found it
-    // absent on macOS 26.5.2, and concluded the refresh was gone. It is not: the same
-    // method is there without the underscore, so every focus read was returning cached
+    // TWO spellings, newest first. Looking only for the UNDERSCORED
+    // `_fetchUpdatedStatusForHandle:completion:` — what the reference calls — finds it
+    // absent on macOS 26.5.2 and suggests the refresh is gone. It is not: the same method
+    // is there without the underscore, and missing it makes every focus read return cached
     // data that did not need to be cached. See `docs/SEQUOIA_COMPATIBILITY.md` §5.2.
     let refreshSelector = [
       "fetchUpdatedStatusForHandle:completion:",

@@ -103,20 +103,58 @@ Notes that save a confusing failure:
 
 ---
 
+## When a crash appears out of nowhere
+
+If `swift test` starts dying with **SIGBUS or SIGSEGV in a test that has nothing to do with
+your change** — a destroy, a `RefCounts::doDecrementSlow`, an unrelated module's repository —
+suspect the incremental build before you suspect your code:
+
+```bash
+swift package clean && swift build && swift test
+```
+
+Library evolution is off, so a public struct's LAYOUT is baked into every module that stores
+one. Change a stored property on, say, `ReadOnlyDatabase`, and SwiftPM may not rebuild
+`BBSystem` — which stores one inside `CallHistoryRepository` — leaving it reading the old
+layout and corrupting memory on release. It presents as a flaky crash in a distant test, and
+it survives repeated runs, which makes it look like a race in whatever you touched.
+
+Reproduced deliberately, twice over: adding one stored property to `ReadOnlyDatabase` and
+building incrementally crashed 3 runs out of 3; the same change after `swift package clean`
+passed 3 out of 3. The crash lands in `CallHistoryRepositoryTests`, which stores a
+`CallHistoryRepository`, which stores a `ReadOnlyDatabase` — a module nothing about the change
+mentions.
+
+**CI is exposed to the same thing.** `swift-pr.yml` caches `swift/.build` with
+`restore-keys: spm-${{ runner.os }}-`, so a run restores build products from a previous run at
+a *different commit* and builds incrementally on top of them. A PR that changes a public
+struct's layout without touching `Package.swift` can therefore produce a phantom SIGBUS in an
+unrelated test. Caching only the dependency checkouts (`~/.cache/org.swift.swiftpm`, and at
+most `swift/.build/checkouts`) rather than the build products removes the class entirely, at
+the cost of some build time.
+
 ## The test suites
 
 | Suite | Covers |
 |---|---|
 | `CompatibilityTests` | The contract: route table diff, naming conventions, **test-data policy** |
 | `BBParityTests` | Response diffing against the recorded Node corpus |
-| `CompositionTests` | The graph: manifests, capabilities, alert wiring, naming |
+| `CompositionTests` | **Wiring only** — the graph: manifests, capabilities, alert wiring, service start order, end-to-end routes |
 | `BBOpenAPITests` | Document generation, schema inference, fixture coverage |
-| `IMessageTests` | `chat.db` repositories, change detection, schema profiles, **memory budget** (see [`performance.md`](performance.md)) |
-| `SerializationTests` | Wire format, attributed body, message serializer |
-| `ProtocolTests` | Socket codec and transport, multipart |
+| `BBIMessageTests` | `chat.db` repositories, change detection, schema profiles, **memory budget** (see [`performance.md`](performance.md)) |
+| `BBSerializationTests` | Wire format, attributed body, message serializer |
+| `BBSocketIOTests` | Socket codec and transport |
+| `BBHTTPAPITests` | Multipart, request bodies |
+| `BBHandlersTests` | Request parsing and the controller helpers |
+| `BlueBubblesAppTests` | The SwiftUI layer: screen models, launch options, catalogs |
 | `BBPrivateAPITests` | Helper protocol round-trips against `FakeHelper` |
 | `HelperTests` | `IMCoreRuntime`, selector existence, socket location |
 | Per-module `BB*Tests` | The module |
+
+**One rule: a unit test goes in `<Module>Tests`.** `CompositionTests` is for assertions that
+cannot live in any single module — that the composition root wires something up, that services
+start in the right order, that a request survives the whole stack. If a test only needs one
+module, it does not belong there.
 
 ### The parity harness is the important one
 

@@ -1,11 +1,10 @@
 //  RequestValues
 //  Reading a request's inputs once, the same way everywhere.
 //
-//  Handlers used to reach into the parsed body by hand — 101 `body["key"]?.stringValue` reads
-//  and 35 separately-written required-field guards, each re-deciding what to throw and what to
-//  say. Most agreed on `"`key` is required"` and a few did not, `ValidationFailure` was used
-//  once in the whole codebase, and every new handler copied whichever neighbour it was written
-//  next to.
+//  Reaching into the parsed body by hand — `body["key"]?.stringValue` plus a hand-written
+//  guard per required field — leaves every call site re-deciding what to throw and what to
+//  say, and every new handler copying whichever neighbour it sits next to. These accessors
+//  are the one place that decision is made.
 //
 //  **These accessors are lenient on purpose, and that is the reason this is not `Codable`.**
 //  The obvious move is a decodable struct per request, and it would be wrong here: `Codable`
@@ -14,9 +13,6 @@
 //  currently falls back to the default; under `Codable` it would throw, and a request that has
 //  worked for years would start failing. Leniency is the compatibility contract, so the
 //  accessors preserve it and only the REQUIRED checks are standardised.
-//
-//  The path and query helpers moved here from the bottom of `ReadHandlers.swift`, where they
-//  were shared infrastructure living inside one handler group by accident.
 //
 //  See `.claude/docs/api.md`.
 
@@ -100,9 +96,8 @@ struct RequestValues {
 
   /// A required string, rejected when absent OR empty.
   ///
-  /// Empty counts as missing because every caller that used to write this guard by hand
-  /// treated it that way for identifiers, and an empty GUID reaches the database as a lookup
-  /// that cannot match rather than as a request anybody meant to send.
+  /// Empty counts as missing: an empty GUID reaches the database as a lookup that cannot
+  /// match rather than as a request anybody meant to send.
   ///
   /// `message` overrides the standard sentence for the three fields whose refusal needs more
   /// context than the key name — "`chatGuid` is required on the final chunk" is the reference's

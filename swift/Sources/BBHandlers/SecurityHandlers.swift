@@ -18,20 +18,20 @@ public enum SecurityHandlers {
   public static func register(
     into registry: inout HandlerRegistry, context: some AccessControlProviding
   ) {
-    registry.register("security.listBlocked") { _ in
+    registry.register(.securityListBlocked) { _ in
       .data(.array(await context.accessControl.blockedClients().map(encode)))
     }
-    registry.register("security.unblock") { request in
+    registry.register(.securityUnblock) { request in
       guard let raw = request.pathParameters["id"], let id = UUID(uuidString: raw) else {
         throw BadRequest("a valid id is required")
       }
       await context.accessControl.unblock(id: id)
       return .data(nil)
     }
-    registry.register("security.listAllowed") { _ in
+    registry.register(.securityListAllowed) { _ in
       .data(.array(await context.accessControl.allowedClients().map(encode)))
     }
-    registry.register("security.allow") { request in
+    registry.register(.securityAllow) { request in
       let values = try request.values()
       let cidr = try values.requireString(
         "cidr", or: "address", message: "`cidr` or `address` is required")
@@ -40,18 +40,18 @@ public enum SecurityHandlers {
       )
       return .data(encode(entry))
     }
-    registry.register("security.disallow") { request in
+    registry.register(.securityDisallow) { request in
       guard let raw = request.pathParameters["id"], let id = UUID(uuidString: raw) else {
         throw BadRequest("a valid id is required")
       }
       await context.accessControl.disallow(id: id)
       return .data(nil)
     }
-    registry.register("security.clearBlocked") { _ in
+    registry.register(.securityClearBlocked) { _ in
       await context.accessControl.clearAllBlocks()
       return .data(nil)
     }
-    registry.register("security.recentFailures") { _ in
+    registry.register(.securityRecentFailures) { _ in
       // Covers addresses that are NOT blocked, so an attack is visible before it trips
       // anything — which is the difference between noticing and finding out.
       .data(.array(await context.accessControl.failures().map(encode)))

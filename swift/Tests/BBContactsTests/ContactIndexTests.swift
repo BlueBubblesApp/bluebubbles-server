@@ -17,7 +17,7 @@ import Testing
 private func makeIndex() throws -> ContactIndex {
   let queue = try DatabaseQueue()
   let database = AppDatabase(queue: queue)
-  try database.migrate()
+  try database.migrate(contributors: [ContactsSchema.self])
   return ContactIndex(database: database)
 }
 
@@ -211,7 +211,7 @@ struct ContactIndexCostTests {
     // Mac with a large address book, because this runs once per handle per message.
     let queue = try DatabaseQueue()
     let database = AppDatabase(queue: queue)
-    try database.migrate()
+    try database.migrate(contributors: [ContactsSchema.self])
     let index = ContactIndex(database: database)
 
     var contacts: [ContactRecord] = []
@@ -297,7 +297,7 @@ struct ContactsIngestSafetyTests {
 
     let queue = try DatabaseQueue()
     let database = AppDatabase(queue: queue)
-    try database.migrate()
+    try database.migrate(contributors: [ContactsSchema.self])
     let index = ContactIndex(database: database)
 
     try await index.upsert([
@@ -320,7 +320,7 @@ struct ContactsIngestSafetyTests {
 struct RawAddressTests {
 
   private func makeIndex() throws -> (ContactIndex, AppDatabase) {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [ContactsSchema.self])
     return (ContactIndex(database: database), database)
   }
 

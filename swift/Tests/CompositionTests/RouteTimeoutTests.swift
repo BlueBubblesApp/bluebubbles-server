@@ -76,7 +76,7 @@ struct RouteTimeoutTests {
       "Test", prefix: "timeout",
       routes: [
         .init(
-          .get, "slow", "timeout.slow",
+          .get, "slow", HandlerID("timeout.slow"),
           requires: .unauthenticated,
           // Far below the sleep below, so the race has no chance of going the other way.
           responseTimeout: .milliseconds(200)
@@ -84,7 +84,7 @@ struct RouteTimeoutTests {
       ])
 
     try await withServer(
-      registry: stalling("timeout.slow", for: .seconds(30)), groups: [group]
+      registry: stalling(HandlerID("timeout.slow"), for: .seconds(30)), groups: [group]
     ) { port in
       let (status, body) = try await Self.get(port: port, path: "/api/v1/timeout/slow")
       #expect(status == 504)
@@ -105,14 +105,14 @@ struct RouteTimeoutTests {
       "Test", prefix: "timeout",
       routes: [
         .init(
-          .get, "quick", "timeout.quick",
+          .get, "quick", HandlerID("timeout.quick"),
           requires: .unauthenticated,
           responseTimeout: .seconds(30)
         )
       ])
 
     try await withServer(
-      registry: stalling("timeout.quick", for: .milliseconds(1)), groups: [group]
+      registry: stalling(HandlerID("timeout.quick"), for: .milliseconds(1)), groups: [group]
     ) { port in
       let (status, body) = try await Self.get(port: port, path: "/api/v1/timeout/quick")
       #expect(status == 200)
@@ -127,8 +127,9 @@ struct RouteTimeoutTests {
     let group = RouteGroup(
       "Test", prefix: "t", responseTimeout: .seconds(30),
       routes: [
-        .init(.get, "a", "t.a", requires: .unauthenticated),
-        .init(.get, "b", "t.b", requires: .unauthenticated, responseTimeout: .seconds(90)),
+        .init(.get, "a", HandlerID("t.a"), requires: .unauthenticated),
+        .init(
+          .get, "b", HandlerID("t.b"), requires: .unauthenticated, responseTimeout: .seconds(90)),
       ])
 
     #expect(HTTPAPIBuilder.responseTimeout(for: group.routes[0], in: group) == .seconds(30))
@@ -136,7 +137,7 @@ struct RouteTimeoutTests {
 
     let ungrouped = RouteGroup(
       "U", prefix: "u",
-      routes: [.init(.get, "c", "u.c", requires: .unauthenticated)]
+      routes: [.init(.get, "c", HandlerID("u.c"), requires: .unauthenticated)]
     )
     #expect(
       HTTPAPIBuilder.responseTimeout(for: ungrouped.routes[0], in: ungrouped)

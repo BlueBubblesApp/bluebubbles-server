@@ -94,15 +94,12 @@ public struct ChatInterface: MessagesBackedInterface {
 
   /// Just enough of a chat to offer it in a picker.
   ///
-  /// This used to exist because `query` returned SERIALIZED chats, so the composer was
-  /// paying for every wire field of every chat in order to read a GUID and a name back out
-  /// by string key. That argument is now gone: `query` returns `ChatProjection` values and
-  /// serializes nothing unless someone asks it to.
+  /// Three fields against a whole `ChatRow`, and no last-message load. `query` already
+  /// returns `ChatProjection` values and serializes nothing unless asked, so this exists for
+  /// the narrowness alone.
   ///
-  /// What remains is narrower and still worth it — three fields against a whole `ChatRow`,
-  /// and no last-message load. A caller that wants more should use `query` directly rather
-  /// than growing this type, which is the trap the typed-twin version of this layer fell
-  /// into the first time.
+  /// A caller that wants more should use `query` directly rather than growing this type —
+  /// growing it is how this layer ends up with a second, parallel set of chat types.
   public struct ChatSummary: Sendable, Identifiable {
     public let guid: String
     public let displayName: String?

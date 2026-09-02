@@ -21,10 +21,9 @@
 //  `responds-to` for `make`. The participant element's "may be specified at time of
 //  creation" is leftover iChat-era text.
 //
-//  A `bbStartChat` handler used to live here. It compiled, so it looked fine, and it failed
-//  at runtime — nothing called it, and `send-probe` only exercises `bbSendToChat`, which is
-//  why that went unnoticed. **Do not add it back, and do not add a version gate for it:**
-//  there is no supported macOS on which it would run.
+//  **Do not add a `bbStartChat` handler, and do not add a version gate for one:** there is
+//  no supported macOS on which it would run. One compiles, so it looks fine, and fails at
+//  runtime — and `send-probe` exercises only `bbSendToChat`, so nothing would catch it.
 //
 //  What still works without the helper is the ONE-TO-ONE case, and only because it does not
 //  create anything explicitly: sending to a participant that has no conversation yet makes

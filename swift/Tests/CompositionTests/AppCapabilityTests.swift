@@ -2,15 +2,12 @@
 //  What narrowing the app layer actually bought.
 //
 //  `HandlerCapabilities` exists so a component states what it needs instead of taking the
-//  whole `AppContext`. The HTTP controllers have worked that way since the beginning; the
-//  SwiftUI app — the other consumer of the same interfaces layer — did not. It reached
-//  `model.context` thirty-five times across thirteen view files, and `FirebaseSetupModel`
-//  took an `AppContext?` on twelve methods while using exactly one member of it.
+//  whole `AppContext` — the HTTP controllers and the SwiftUI app alike, since both consume
+//  the same interfaces layer.
 //
-//  The test below is the point of the change rather than a check on it: driving the guided
-//  Firebase model USED to require standing up a server, because that is what `AppContext?`
-//  asks for. It now requires a two-line stub, and this file is where that stops being a
-//  claim.
+//  The test below is what that buys, asserted rather than claimed: driving the guided
+//  Firebase model takes a two-line stub. Taking an `AppContext?` instead would require
+//  standing up a server to exercise a model that uses one member of it.
 
 import BBHandlers
 import BBInterfaces
@@ -38,7 +35,7 @@ struct AppCapabilityTests {
   @Test("The Firebase setup model runs against a stub capability, with no server behind it")
   @MainActor
   func firebaseSetupNeedsOnlyPushSetup() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let secrets = InMemorySecretStore()
     let interface = PushInterface(
       credentials: PushCredentialStore(secrets: secrets),

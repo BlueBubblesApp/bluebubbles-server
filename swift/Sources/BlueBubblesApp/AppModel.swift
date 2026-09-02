@@ -429,10 +429,10 @@ final class AppModel {
 
   /// Starts the periodic check, if the user asked for one.
   ///
-  /// The setting was previously read by nothing: there was no automatic check at all, only
-  /// the "Check for Updates…" menu item, so the toggle controlled something that did not
-  /// exist. Re-read on every tick rather than captured, so turning it off stops the next
-  /// check rather than needing a restart.
+  /// This is what the automatic-update-check setting controls; without it the toggle
+  /// governs nothing and only the "Check for Updates…" menu item does anything. Re-read on
+  /// every tick rather than captured, so turning it off stops the next check rather than
+  /// needing a restart.
   func beginUpdateChecks() {
     updateCheckTask?.cancel()
     updateCheckTask = Task { [weak self] in
@@ -527,8 +527,8 @@ final class AppModel {
 
   /// Lifts a rate-limit block, for an alert's `.unblock` action.
   ///
-  /// This is the payoff § 17 describes: an accidental lockout is one click where the
-  /// problem was reported, rather than a hunt through the Security page.
+  /// An accidental lockout is one click where the problem was reported, rather than a hunt
+  /// through the Security page.
   func unblock(address: String) async {
     guard let context = server?.context else { return }
     await context.accessControl.unblock(address: address)

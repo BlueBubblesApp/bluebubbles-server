@@ -87,9 +87,9 @@ struct PathParameterTests {
     let group = RouteGroup(
       "Test", prefix: "test",
       routes: [
-        .init(.get, ":id", "test.one", requires: .unauthenticated)
+        .init(.get, ":id", HandlerID("test.one"), requires: .unauthenticated)
       ])
-    try await withServer(registry: echoing("test.one"), groups: [group]) { port in
+    try await withServer(registry: echoing(HandlerID("test.one")), groups: [group]) { port in
       let body = try await Self.get(port: port, path: "/api/v1/test/42")
       #expect(body["data"]?["id"]?.stringValue == "42")
     }
@@ -100,9 +100,9 @@ struct PathParameterTests {
     let group = RouteGroup(
       "Test", prefix: "test",
       routes: [
-        .init(.get, ":guid/:messageGuid", "test.two", requires: .unauthenticated)
+        .init(.get, ":guid/:messageGuid", HandlerID("test.two"), requires: .unauthenticated)
       ])
-    try await withServer(registry: echoing("test.two"), groups: [group]) { port in
+    try await withServer(registry: echoing(HandlerID("test.two")), groups: [group]) { port in
       let body = try await Self.get(port: port, path: "/api/v1/test/CHAT-1/MSG-2")
       #expect(body["data"]?["guid"]?.stringValue == "CHAT-1")
       #expect(body["data"]?["messageGuid"]?.stringValue == "MSG-2")
@@ -118,9 +118,9 @@ struct PathParameterTests {
     let group = RouteGroup(
       "Test", prefix: "test",
       routes: [
-        .init(.get, ":guid", "test.guid", requires: .unauthenticated)
+        .init(.get, ":guid", HandlerID("test.guid"), requires: .unauthenticated)
       ])
-    try await withServer(registry: echoing("test.guid"), groups: [group]) { port in
+    try await withServer(registry: echoing(HandlerID("test.guid")), groups: [group]) { port in
       let body = try await Self.get(
         port: port, path: "/api/v1/test/iMessage%3B-%3B%2B15555550101"
       )
@@ -135,8 +135,8 @@ struct PathParameterTests {
   @Test("a literal segment wins over a parameter")
   func literalPrecedence() async throws {
     var registry = HandlerRegistry()
-    registry.register("test.literal") { _ in .data(.string("literal")) }
-    registry.register("test.parameter") { request in
+    registry.register(HandlerID("test.literal")) { _ in .data(.string("literal")) }
+    registry.register(HandlerID("test.parameter")) { request in
       .data(.string("parameter:\(request.pathParameters["guid"] ?? "?")"))
     }
     PlaceholderHandlers.fill(into: &registry, groups: RouteTable.groups)
@@ -144,8 +144,8 @@ struct PathParameterTests {
     let group = RouteGroup(
       "Test", prefix: "test",
       routes: [
-        .init(.get, "count", "test.literal", requires: .unauthenticated),
-        .init(.get, ":guid", "test.parameter", requires: .unauthenticated),
+        .init(.get, "count", HandlerID("test.literal"), requires: .unauthenticated),
+        .init(.get, ":guid", HandlerID("test.parameter"), requires: .unauthenticated),
       ])
 
     try await withServer(registry: registry, groups: [group]) { port in

@@ -1,10 +1,10 @@
 //  LaunchOptionsTests
 //
-//  These exist because the app previously accepted every one of these arguments and applied
-//  none of them: it built `ServerComposition.Options()` with no values at all, so an operator
-//  passing `--set password=…` got a server running on its stored settings with no indication
-//  anything had been ignored. A login item, which is configured only by its arguments, would
-//  have been silently misconfigured.
+//  Accepting these arguments and applying none of them is a silent failure: building
+//  `ServerComposition.Options()` with no values leaves an operator passing `--set password=…`
+//  with a server running on its stored settings and no indication anything was ignored. A
+//  login item, which is configured only by its arguments, would be misconfigured with nothing
+//  to show for it.
 
 import Testing
 

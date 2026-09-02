@@ -207,8 +207,8 @@ public enum ManifestValidator {
       case .readMessages, .sendMessages, .readContacts, .spawnProcess:
         // Available to built-ins now. A third-party plugin asking for these is not
         // refused because the request is unreasonable — a bridge legitimately needs
-        // to read messages — but because § 12 has not yet decided how a user grants
-        // them, and defaulting to "allowed" would decide it by accident.
+        // to read messages — but because how a user grants them is not yet decided,
+        // and defaulting to "allowed" would decide it by accident.
         if !manifest.isBuiltIn {
           problems.append(
             .entitlementReservedForBuiltIns(

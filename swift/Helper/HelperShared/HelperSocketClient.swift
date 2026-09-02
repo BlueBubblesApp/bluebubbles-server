@@ -116,27 +116,14 @@ public final class HelperSocketClient: @unchecked Sendable {
     }
   }
 
-  /// Tries the Unix socket, then the TCP bridge.
-  ///
-  /// Both, and in that order, because which one works depends on the HOST process rather
-  /// than on configuration. Messages.app is sandboxed (`com.apple.security.app-sandbox`),
-  /// and a Unix socket outside its container is subject to the sandbox's file rules — so
-  /// the connect can be refused outright. It also holds
-  /// `com.apple.security.network.client`, which permits an outbound TCP connection to
-  /// localhost. That asymmetry is why the shipping Objective-C helper uses TCP, and it is
-  /// not something the server can decide on the helper's behalf.
-  ///
-  /// The Unix socket is still preferred where it works: it carries the peer's audit token,
-  /// which is what lets the server verify who connected. TCP on localhost cannot, so the
-  /// server treats a TCP peer as the lower-trust path — see SocketTransport.
   /// Connects to the server's Unix socket inside Messages' container.
   ///
-  /// One transport. There used to be a loopback TCP fallback, on the belief that the
-  /// sandbox refused Unix sockets outright — it refuses them OUTSIDE the container, and the
-  /// socket now lives inside it. See `SocketLocation`.
+  /// ONE transport, with no loopback TCP fallback. The sandbox refuses Unix sockets OUTSIDE
+  /// the container, not Unix sockets as such, which is why the socket lives inside it — see
+  /// `SocketLocation`.
   ///
-  /// Removing TCP is what makes the connection verifiable: a Unix socket carries the peer's
-  /// audit token, so the server can confirm this really is Messages, and loopback TCP
+  /// Having no TCP path is what makes the connection verifiable: a Unix socket carries the
+  /// peer's audit token, so the server can confirm this really is Messages. Loopback TCP
   /// cannot — any local process could connect to it and drive the Private API.
   private func connect() -> Bool {
     connectUnixSocket()

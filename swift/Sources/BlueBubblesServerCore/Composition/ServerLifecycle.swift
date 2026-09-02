@@ -2,11 +2,11 @@
 //  Stopping, starting and replacing the server, as a thing rather than as a method on the
 //  container.
 //
-//  These three verbs used to live on `AppContext`, and `requestFullRestart` is why moving them
-//  matters more than tidiness: it calls `execv` and REPLACES THE PROCESS IMAGE. A dependency
-//  container that can do that is not a container any more, and its type no longer tells a
-//  reader what it is for. `AppContext` is now what its name says — long-lived references, held
-//  once — and everything that ACTS on the server as a whole is here.
+//  These three verbs are deliberately NOT on `AppContext`, and `requestFullRestart` is why
+//  that matters more than tidiness: it calls `execv` and REPLACES THE PROCESS IMAGE. A
+//  dependency container that can do that is not a container any more, and its type no longer
+//  tells a reader what it is for. `AppContext` stays what its name says — long-lived
+//  references, held once — and everything that ACTS on the server as a whole is here.
 //
 //  Held by `AppContext` and reachable through `ServerControlling`, so the handlers that offer
 //  a restart button are unchanged.

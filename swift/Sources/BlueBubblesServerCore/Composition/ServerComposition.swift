@@ -77,7 +77,7 @@ public struct ServerComposition {
     let logger = Logger(label: "bluebubbles")
 
     // MARK: Storage
-    let appDatabase = try AppDatabase.open()
+    let appDatabase = try AppDatabase.open(contributors: AppSchema.contributors)
     let secrets = KeychainSecretStore()
     let settings = try await SettingsStore(
       database: appDatabase,
@@ -90,20 +90,19 @@ public struct ServerComposition {
     //
     // After the store rather than at bootstrap, because the level LIVES in the store — the
     // handful of lines logged before this point are start-up chatter at the default level.
-    // The setting was previously read by nothing at all, so turning on debug logging did
-    // nothing and gave no hint why.
+    // Without this the setting is read by nothing, so turning on debug logging does nothing
+    // and gives no hint why.
     LoggingSystemBootstrap.setLevel(
       Settings.logLevel(from: await settings.get(Settings.logLevel))
     )
 
     // Bring an Electron install's settings across, once, before anything reads one.
     //
-    // `LegacyConfigMigration` was written and unit-tested in Phase 1 and CALLED FROM
-    // NOWHERE, so an upgrading user's port, password, proxy provider, ngrok key and
-    // tunnel configuration were all silently discarded — the Swift server came up on
-    // defaults, on a different port, with no password, and nothing said why. It reads
-    // `config.db` READ-ONLY and never touches the Electron server's copy, so running both
-    // during a transition is safe.
+    // Without this call an upgrading user's port, password, proxy provider, ngrok key and
+    // tunnel configuration are all silently discarded — the server comes up on defaults, on
+    // a different port, with no password, and nothing says why. It reads `config.db`
+    // READ-ONLY and never touches the Electron server's copy, so running both during a
+    // transition is safe.
     //
     // Ordered here deliberately: after the store exists, before any service reads a
     // setting. Migrating later would have services configured from defaults and then
@@ -140,7 +139,12 @@ public struct ServerComposition {
     var serializer: MessageSerializer?
 
     do {
-      let database = try ReadOnlyDatabase(path: ChatDatabase.defaultPath)
+      // Read before the open, because it decides which KIND of connection to make. One is
+      // the default and the shape this has always had; see `Settings.chatDatabaseReaders`
+      // and the benchmark it points at.
+      let database = try ReadOnlyDatabase(
+        path: ChatDatabase.defaultPath,
+        maximumReaders: await settings.get(Settings.chatDatabaseReaders))
       let profile = try await SchemaProfile.detect(
         in: database, osMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion
       )
@@ -151,7 +155,12 @@ public struct ServerComposition {
       logger.info(
         "Opened chat.db",
         metadata: [
-          "dateUnit": .string(String(describing: profile.dateUnit))
+          "dateUnit": .string(String(describing: profile.dateUnit)),
+          "readers": .stringConvertible(database.readerCount),
+          // What it OPENED with, not what was asked for: a pool that could not open falls
+          // back to one connection, and a setting that silently did nothing is worse than
+          // one that did nothing loudly.
+
         ])
     } catch {
       // Reported, not fatal.
@@ -324,8 +333,8 @@ public struct ServerComposition {
         )
       }
     )
-    await context.attach(registry: registry)
-    await context.attach(
+    await context.finishWiring(
+      registry: registry,
       handlers: buildHandlers(
         context: context,
         authMode: authMode,
@@ -491,7 +500,7 @@ public struct ServerComposition {
     if additiveEndpoints {
       groups.append(AdditiveRoutes.security)
       // The richer alert shape. Additive because v1's is frozen at the reference's six
-      // keys — this is where everything § 3 designed becomes reachable.
+      // keys — this is where the full alert shape becomes reachable.
       groups.append(AdditiveRoutes.alerts)
       // A second way to get an avatar the contact payload already carries.
       groups.append(AdditiveRoutes.contactAvatar)

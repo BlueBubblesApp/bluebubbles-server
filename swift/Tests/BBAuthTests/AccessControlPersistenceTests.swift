@@ -1,9 +1,9 @@
 //  AccessControlPersistenceTests
 //  Blocks and allowlists have to outlive the process.
 //
-//  The tables were created by the Phase 3 migration and never read or written. Nothing
-//  failed — the feature simply reset every launch, and the CLI recovery path built a fresh
-//  in-memory service, cleared nothing, and printed success.
+//  Unpersisted, nothing fails visibly — the feature simply resets every launch, and the CLI
+//  recovery path builds a fresh in-memory service, clears nothing, and prints success. So
+//  the storage round trip is asserted rather than assumed.
 
 import BBCore
 import BBPersistence
@@ -41,7 +41,7 @@ struct AccessControlPersistenceTests {
 
   @Test("A block survives a restart")
   func blocksArePersisted() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [AccessControlSchema.self])
     let clock = ManualClock()
 
     let first = service(database, clock: clock)
@@ -71,7 +71,7 @@ struct AccessControlPersistenceTests {
     // Without it a repeat offender restarts at the base lockout after every restart,
     // which is precisely what escalation exists to prevent — and an attacker gets to
     // choose when the server restarts far more often than anyone would like.
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [AccessControlSchema.self])
     let store = AccessControlStore(database: database)
     try await store.saveBlocked([
       BlockedClient(
@@ -89,7 +89,7 @@ struct AccessControlPersistenceTests {
   func allowlistIsPersisted() async throws {
     // The half that is worse than useless when it does not persist: it appears to work,
     // then silently stops the next time the server launches.
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [AccessControlSchema.self])
 
     let first = service(database)
     _ = await first.allow(cidr: "203.0.113.0/24", note: "office")
@@ -114,7 +114,7 @@ struct AccessControlPersistenceTests {
   func permanentBlocksStayPermanent() async throws {
     // `expires_at` is null for these, so loading has to read `is_permanent` rather than
     // inferring from the timestamp — otherwise a permanent block reads as an expired one.
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [AccessControlSchema.self])
 
     let first = service(database)
     await first.blockPermanently(address: "198.51.100.10", reason: "abuse")
@@ -134,7 +134,7 @@ struct AccessControlPersistenceTests {
     // The lockout escape hatch, and the stated reason the Security admin routes can stay
     // off by default. It has to work when whatever locked the operator out is still
     // broken, so it goes at the table and builds no server.
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: [AccessControlSchema.self])
     let first = service(database)
     for _ in 0..<2 {
       _ = await first.recordFailure(.address("198.51.100.10"), path: "/x", reason: "bad")

@@ -43,7 +43,7 @@ public enum FaceTimeHandlers {
     into registry: inout HandlerRegistry,
     context: some FaceTimeProviding & LoggerProviding & PrivateAPIProviding & SettingsProviding
   ) {
-    registry.register("facetime.newSession") { _ in
+    registry.register(.facetimeNewSession) { _ in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "creating a FaceTime link")
       let link = try await api.generateFaceTimeLink(invitedAddresses: [])
@@ -51,7 +51,7 @@ public enum FaceTimeHandlers {
       return .data(inheritedLinkPayload(link))
     }
 
-    registry.register("facetime.answer") { request in
+    registry.register(.facetimeAnswer) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "answering a FaceTime call")
       let callUUID = try pathCallUUID(request)
@@ -61,7 +61,7 @@ public enum FaceTimeHandlers {
       return .data(inheritedLinkPayload(link))
     }
 
-    registry.register("facetime.leave") { request in
+    registry.register(.facetimeLeave) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "leaving a FaceTime call")
       try await api.leaveFaceTimeCall(callUUID: try pathCallUUID(request))
@@ -78,7 +78,7 @@ public enum FaceTimeHandlers {
   ) {
 
     // Flow A — a bare link.
-    registry.register("facetime.generateLink") { request in
+    registry.register(.facetimeGenerateLink) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "creating a FaceTime link")
       // `{ "addresses": [...] }` pre-invites those people onto the link.
@@ -96,7 +96,7 @@ public enum FaceTimeHandlers {
     }
 
     // Hang up the Mac's side of a call, by UUID in the body.
-    registry.register("facetime.leaveCall") { request in
+    registry.register(.facetimeLeaveCall) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "leaving a FaceTime call")
       let values = try request.values()
@@ -110,7 +110,7 @@ public enum FaceTimeHandlers {
     }
 
     // Invalidate active links — user-driven cleanup.
-    registry.register("facetime.invalidateLinks") { request in
+    registry.register(.facetimeInvalidateLinks) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "invalidating FaceTime links")
       let body = (try? request.jsonBody()) ?? nil
@@ -123,15 +123,14 @@ public enum FaceTimeHandlers {
         ]))
     }
 
-    // Flow A or B, chosen by `facetime_outgoing_mode`.
-    // Place a call AND hand back a link (Flow B).
+    // Place a call AND hand back a link.
     //
-    // ALWAYS dials. This used to branch on a `facetime_outgoing_mode` setting whose
-    // other value quietly minted a bare link instead — so the same request either rang
-    // somebody or did not, depending on server configuration the client cannot see. A
-    // client asking to call someone should never silently get a link nobody was called
-    // for; if it wants a bare link it asks for one, at `POST facetime/link`.
-    registry.register("facetime.call") { request in
+    // ALWAYS dials — deliberately not switchable. Branching on a server-side mode whose
+    // other value minted a bare link instead would mean the same request either rang
+    // somebody or did not, depending on configuration the client cannot see. A client asking
+    // to call someone should never silently get a link nobody was called for; if it wants a
+    // bare link it asks for one, at `POST facetime/link`.
+    registry.register(.facetimeCall) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "starting a FaceTime call")
       let values = try request.values()
@@ -206,7 +205,7 @@ public enum FaceTimeHandlers {
     }
 
     // Admit a knocker. `:group_uuid` is the conversation; the address is in the body.
-    registry.register("facetime.admit") { request in
+    registry.register(.facetimeAdmit) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "admitting a FaceTime participant")
       let group = try pathParameter(request, "group_uuid")
@@ -217,7 +216,7 @@ public enum FaceTimeHandlers {
     }
 
     // Read who is in a conversation, and who is knocking.
-    registry.register("facetime.members") { request in
+    registry.register(.facetimeMembers) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let api = try await requirePrivateAPI(context, for: "reading FaceTime members")
       let members = try await api.faceTimeMembers(
@@ -232,7 +231,7 @@ public enum FaceTimeHandlers {
     // which the log stores in the same table.
     registerDebugDiagnostics(into: &registry, context: context)
 
-    registry.register("facetime.recents") { request in
+    registry.register(.facetimeRecents) { request in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       let limit = min(max(intQuery(request, "limit") ?? 50, 1), 500)
       let offset = max(intQuery(request, "offset") ?? 0, 0)
@@ -263,7 +262,7 @@ public enum FaceTimeHandlers {
     // What FaceTime.app is showing — a diagnostic for a dial that went nowhere.
     // Clear up after ourselves: stray links, and calls the Mac is stuck in. Backs the
     // settings button as well as this route. Only ever touches links the SERVER minted.
-    registry.register("facetime.cleanup") { _ in
+    registry.register(.facetimeCleanup) { _ in
       try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
       _ = try await requirePrivateAPI(context, for: "cleaning up FaceTime state")
       // The route means "clear them now", not "clear the old ones".
@@ -281,7 +280,7 @@ public enum FaceTimeHandlers {
     }
 
     // Flow C — answer an incoming call, hand back a link, admit joiners, then drop.
-    registry.register("facetime.handoff") { request in
+    registry.register(.facetimeHandoff) { request in
       try await requireFaceTimeSetting(Settings.faceTimeIncomingHandoff, context)
       let api = try await requirePrivateAPI(context, for: "handing off a FaceTime call")
       let callUUID = try pathCallUUID(request)
@@ -463,10 +462,8 @@ public enum FaceTimeHandlers {
   ///
   ///     new Success(ctx, { data: { link } })      // link is session.url
   ///
-  /// This returned `data.url` instead, so an existing client reading `data.link` got
-  /// `undefined` on the two routes it already depended on. The comment here previously
-  /// claimed the opposite ("the URL at the top level (Node's shape)"), which is how the
-  /// divergence survived.
+  /// Answering with `data.url` instead gives an existing client reading `data.link`
+  /// `undefined` on the two routes it already depends on.
   ///
   /// `link` is the compatibility contract; `url`/`group_uuid` ride along because extra keys
   /// are harmless to a client that ignores them, and the group UUID is what a client needs
@@ -682,7 +679,7 @@ public enum FaceTimeHandlers {
     context: some FaceTimeProviding & LoggerProviding & PrivateAPIProviding & SettingsProviding
   ) {
     #if DEBUG
-      registry.register("facetime.debug") { request in
+      registry.register(.facetimeDebug) { request in
         try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
         let api = try await requirePrivateAPI(context, for: "reading FaceTime debug state")
         let state = try await api.faceTimeDebugState(
@@ -691,7 +688,7 @@ public enum FaceTimeHandlers {
         return .data(.object(state.mapValues(JSONValue.string)))
       }
 
-      registry.register("facetime.windows") { _ in
+      registry.register(.facetimeWindows) { _ in
         try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
         let api = try await requirePrivateAPI(context, for: "inspecting FaceTime windows")
         return .data(
@@ -704,7 +701,7 @@ public enum FaceTimeHandlers {
 
       // Cancels rather than confirms: the alert's other buttons offer to call a DIFFERENT
       // address on the contact card. Production gets this automatically via FaceTimeCleanup.
-      registry.register("facetime.dismissAlert") { _ in
+      registry.register(.facetimeDismissAlert) { _ in
         try await requireFaceTimeSetting(Settings.enableFaceTimePrivateAPI, context)
         let api = try await requirePrivateAPI(context, for: "dismissing a FaceTime alert")
         let dismissed = try await api.dismissFaceTimeAlert()

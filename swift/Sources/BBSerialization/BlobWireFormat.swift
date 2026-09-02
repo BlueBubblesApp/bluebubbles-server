@@ -33,7 +33,7 @@ public enum AttributedBodyWireFormat: String, Sendable, CaseIterable {
   /// Adds `__kIMDataDetectedAttributeName`, `__kIMCalendarEventAttributeName`,
   /// `__kIMPhoneNumberAttributeName` and `__kIMAddressAttributeName` as base64, and real
   /// URLs for `__kIMLinkAttributeName`. Additive, so it belongs behind the per-device
-  /// capability negotiation in Phase 7 rather than being switched on globally.
+  /// capability negotiation rather than being switched on globally.
   case extended
 }
 

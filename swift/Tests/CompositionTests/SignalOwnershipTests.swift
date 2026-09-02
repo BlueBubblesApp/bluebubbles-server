@@ -3,13 +3,13 @@
 //
 //  `Application.runService()` defaults to `gracefulShutdownSignals: [.sigterm, .sigint]`, and
 //  a ServiceGroup claims those PROCESS-WIDE — SIG_IGN plus its own signal sources. Starting
-//  the listener therefore used to change what SIGTERM meant for the whole application.
+//  the listener would therefore change what SIGTERM means for the whole application.
 //
-//  What that produced in the app is worth stating plainly, because the symptom looks like
-//  nothing at all: a SIGTERM shut the HTTP server down and left everything else running. The
-//  process stayed alive with NO listening socket, the UI still said "running", and every
-//  client silently lost the server. `lsof -iTCP -sTCP:LISTEN` on the surviving process came
-//  back empty while the app sat there looking healthy.
+//  What that produces is worth stating plainly, because the symptom looks like nothing at
+//  all: a SIGTERM shuts the HTTP server down and leaves everything else running. The process
+//  stays alive with NO listening socket, the UI still says "running", and every client
+//  silently loses the server. `lsof -iTCP -sTCP:LISTEN` on the surviving process comes back
+//  empty while the app sits there looking healthy.
 //
 //  This asserts the disposition directly rather than the behaviour, because the behaviour is
 //  a signal delivered to a test process that is trying to run other tests. It is the kind of

@@ -444,15 +444,11 @@ public actor SocketTransport: PrivateAPITransport {
 
   /// Sends an action to exactly ONE helper.
   ///
-  /// This used to write to every connected client, inherited from the legacy TCP bridge —
-  /// where several different helpers could plausibly be attached at once, and a broadcast
-  /// with "success if any write lands" was the only way to reach whichever was real.
-  ///
-  /// With a single verified helper that is a bug, and a damaging one. The helper reconnects
-  /// whenever the server restarts while Messages keeps running, so a second live connection
-  /// from the SAME Messages process is the ordinary state — and every action was then
-  /// executed twice. Measured: three API calls produced six messages in chat.db, which
-  /// means a real person received everything twice.
+  /// NEVER a broadcast to every connected client. The helper reconnects whenever the server
+  /// restarts while Messages keeps running, so a second live connection from the SAME
+  /// Messages process is the ordinary state — writing to all of them executes every action
+  /// twice. Measured: three API calls produced six messages in chat.db, which means a real
+  /// person received everything twice.
   ///
   /// The newest connection wins, because a reconnect means the older one is on its way out.
   /// Dead channels are pruned as they are found rather than swept separately.

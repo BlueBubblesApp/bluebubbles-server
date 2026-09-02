@@ -111,18 +111,18 @@ public struct MessageInterface: MessagesBackedInterface {
       self.withAttachmentMetadata = withAttachmentMetadata
     }
 
-    /// The serializer config these flags describe.
-    ///
-    /// `.full` used to be passed here unconditionally, which meant every message carried a
-    /// decoded `attributedBody`, `messageSummaryInfo` and `payloadData` whether or not the
-    /// client asked. The reference gates all three behind `with` and defaults them to
-    /// `null`; measured against a live Electron server, that was the difference between
-    /// `"attributedBody": null` and a fully expanded run array on every row of every page.
     /// The attachment config these flags describe.
     public var attachmentConfig: AttachmentSerializerConfig {
       AttachmentSerializerConfig(loadMetadata: withAttachmentMetadata)
     }
 
+    /// The serializer config these flags describe.
+    ///
+    /// Each `with` flag is honoured rather than passing `.full` unconditionally. The
+    /// reference gates `attributedBody`, `messageSummaryInfo` and `payloadData` behind `with`
+    /// and defaults them to `null`; measured against a live Electron server, that is the
+    /// difference between `"attributedBody": null` and a fully expanded run array on every
+    /// row of every page.
     public var serializerConfig: MessageSerializerConfig {
       MessageSerializerConfig(
         parseAttributedBody: withAttributedBody,

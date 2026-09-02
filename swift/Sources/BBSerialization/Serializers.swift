@@ -194,11 +194,10 @@ public struct MessageSerializer: Sendable {
 
     // MARK: The FCM size ceiling
     //
-    // Last, because it has to measure the WHOLE response. It used to sit up in the chats
-    // block and weigh `chats` alone, which is not the thing with a limit on it: a message
-    // whose text runs to 3.9 KB has a tiny chats array, so the cap never fired, the
-    // payload went over FCM's 4 KB data limit, and Google rejected the send. The user
-    // saw one missing notification and nothing anywhere said why.
+    // Last, because it has to measure the WHOLE response. Weighing `chats` alone measures
+    // the wrong thing: a message whose text runs to 3.9 KB has a tiny chats array, so the
+    // cap never fires, the payload goes over FCM's 4 KB data limit, and Google rejects the
+    // send. The user sees one missing notification and nothing anywhere says why.
     //
     // Node measures `JSON.stringify(messageResponses)` — an ARRAY, because the singular
     // `serialize` delegates to `serializeList` with one element. Hence `+ 2`: two bytes

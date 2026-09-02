@@ -15,7 +15,7 @@
 //  exactly as a missing one does — an extra field is a client parsing something no Node server
 //  sends, which is how a "compatible" server drifts into needing its own client.
 //
-//  See `.claude/docs/decisions.md` and § 14.
+//  See `.claude/docs/decisions.md`.
 
 import BBSerialization
 import Foundation

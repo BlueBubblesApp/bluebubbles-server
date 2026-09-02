@@ -54,8 +54,8 @@ public struct ServerInterface: Sendable {
   ///
   /// The v1 row throws away most of an alert: `value` flattens a title and a body into one
   /// string, `type` folds five severities into three, and the diagnostics, the remedy
-  /// actions and the occurrence count have nowhere to go at all. This is the shape § 3
-  /// designed and the one the app uses in process.
+  /// actions and the occurrence count have nowhere to go at all. This is the full alert
+  /// shape, and the one the app uses in process.
   ///
   /// `id` is the SAME integer v1 reports, deliberately. The two versions describe the same
   /// alert, and a client reading v2 and marking read over either endpoint must not have to
@@ -71,8 +71,8 @@ public struct ServerInterface: Sendable {
   /// that cannot reach it cheaply is a test nobody writes.
   public static func alertJSON(_ alert: UserAlert) -> JSONValue {
     .object([
-      // An INTEGER. The reference's `alert.id` is an autoincrement primary key, and a
-      // client doing `parseInt(id)` on the UUID this used to send gets NaN.
+      // An INTEGER. The reference's `alert.id` is an autoincrement primary key, and a client
+      // doing `parseInt(id)` on a UUID gets NaN.
       "id": .int(alert.sequence),
       "type": .string(alert.legacyType),
       "value": .string(alert.legacyValue),
@@ -103,7 +103,7 @@ public struct ServerInterface: Sendable {
       // nowhere to say that and simply looks like a single event.
       "occurrenceCount": .int(alert.occurrenceCount),
       "lastOccurredAt": .string(WireDate.iso(alert.lastOccurredAt)),
-      // The remedy travels with the problem (§ 3). Stable wire names, not Swift
+      // The remedy travels with the problem. Stable wire names, not Swift
       // descriptions.
       "actions": .array(alert.actions.map { .string($0.wireName) }),
     ]
@@ -118,15 +118,15 @@ public struct ServerInterface: Sendable {
 
   /// Marks the named alerts read.
   ///
-  /// An empty list marks NOTHING, deliberately. It used to mean "all", which read as a
-  /// convenience and behaved as a trap: any caller whose ids failed to parse silently
-  /// cleared the user's entire notification list instead of erroring. Marking everything
-  /// read is `AlertCenter.markAllRead`, which the app calls directly and no route reaches.
+  /// An empty list marks NOTHING, deliberately. Treating it as "all" reads as a convenience
+  /// and behaves as a trap: any caller whose ids fail to parse would silently clear the
+  /// user's entire notification list instead of erroring. Marking everything read is
+  /// `AlertCenter.markAllRead`, which the app calls directly and no route reaches.
   public func markAlertsRead(ids: [String]) async {
     guard !ids.isEmpty else { return }
     // Sequence numbers are what clients hold, on both versions. UUIDs are still accepted
-    // because they are what this route used to emit, and a client that cached one from an
-    // older build should not silently stop being able to mark it read.
+    // because an older build emitted them, and a client that cached one should not silently
+    // stop being able to mark it read.
     await alerts.markRead(sequences: ids.compactMap(Int.init))
     let uuids = ids.compactMap(UUID.init(uuidString:))
     if !uuids.isEmpty { await alerts.markRead(uuids) }

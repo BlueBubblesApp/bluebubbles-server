@@ -32,8 +32,8 @@ struct CertificateImportView: View {
   }
 
   var body: some View {
-    // The explanation that used to be a header inside the card is the section's subtitle
-    // now, which is where every other group on this screen puts it.
+    // The explanation goes in the section's subtitle, which is where every other group on
+    // this screen puts it.
     SettingsSection(
       "TLS Certificate",
       subtitle: "Let this server terminate HTTPS itself, instead of a tunnel or reverse "

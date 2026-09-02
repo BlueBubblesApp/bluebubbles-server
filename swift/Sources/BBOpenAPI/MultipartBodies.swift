@@ -33,10 +33,10 @@ public enum MultipartBodies {
   }
 
   public static let byHandler: [HandlerID: [Field]] = [
-    "attachment.upload": [
+    .attachmentUpload: [
       Field("attachment", "binary", "The file to stage on the server.", required: true)
     ],
-    "message.sendAttachment": [
+    .messageSendAttachment: [
       Field("attachment", "binary", "The file to send.", required: true),
       Field("chatGuid", "string", "Conversation to send it to.", required: true),
       Field(
@@ -56,7 +56,7 @@ public enum MultipartBodies {
       Field("partIndex", "string", "Which part of the replied-to message. Private API only."),
       Field("isAudioMessage", "string", "Send as a voice memo. Converted to CAF if needed."),
     ],
-    "message.sendAttachmentChunk": [
+    .messageSendAttachmentChunk: [
       Field("chunk", "binary", "This slice of the file.", required: true),
       Field("attachmentGuid", "string", "Groups the slices of one upload.", required: true),
       Field("chatGuid", "string", "Conversation to send to.", required: true),
@@ -68,10 +68,10 @@ public enum MultipartBodies {
         "isComplete", "string",
         "Truthy on the final slice. Assembly and sending happen only then.", required: true),
     ],
-    "chat.setGroupIcon": [
+    .chatSetGroupIcon: [
       Field("icon", "binary", "Image to use as the group photo.", required: true)
     ],
-    "contact.importVCF": [
+    .contactImportVCF: [
       Field("vcf", "binary", "A vCard file. Every card in it is imported.", required: true)
     ],
   ]

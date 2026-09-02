@@ -21,7 +21,7 @@ public enum HydrationHandlers {
   public static func register(
     into registry: inout HandlerRegistry, context: some InterfaceProviding
   ) {
-    registry.register("message.hydrate") { request in
+    registry.register(.messageHydrate) { request in
       try await self.hydrate(request, context: context)
     }
   }

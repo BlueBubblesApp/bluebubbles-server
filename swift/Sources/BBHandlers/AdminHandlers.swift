@@ -2,9 +2,9 @@
 //  Controllers for server administration.
 //
 //  Alerts, statistics, webhooks, backups, and the restart routes. All `server:admin` scope
-//  except the statistics and alert reads, which match the current server's scoping — the
-//  brute-force target § 17 names is `statistics/totals`, and failure-only rate limiting is
-//  what covers it rather than a scope change that would break clients.
+//  except the statistics and alert reads, which keep the v1 scoping — the brute-force
+//  target is `statistics/totals`, and failure-only rate limiting is what covers it rather
+//  than a scope change that would break clients. See `docs/AUTH.md` § "2. Access control".
 
 import BBHTTPAPI
 import BBInterfaces
@@ -32,7 +32,7 @@ public enum AdminHandlers {
     context: some AlertProviding & LoggerProviding & ServerControlling
       & ServerInterfaceProviding & SettingsProviding
   ) {
-    registry.register("server.alerts") { request in
+    registry.register(.serverAlerts) { request in
       let server = context.server
       // Node ignores `limit` entirely and returns `AlertsInterface.find()`'s default of
       // 10. Honouring the parameter is additive and allowed; the DEFAULT has to match,
@@ -43,12 +43,12 @@ public enum AdminHandlers {
     // v2: everything an alert carries. A higher default limit than v1's ten, because this
     // is the shape something browsing a history would read rather than the one a client
     // polls for the newest few.
-    registry.register("server.alertsV2") { request in
+    registry.register(.serverAlertsV2) { request in
       let server = context.server
       return .data(.array(await server.alertsV2(limit: request.integer("limit") ?? 100)))
     }
 
-    registry.register("server.markAlertRead") { request in
+    registry.register(.serverMarkAlertRead) { request in
       let server = context.server
       let values = try request.values()
 
@@ -60,10 +60,10 @@ public enum AdminHandlers {
       let ids = alertIdentifiers(in: values.raw)
 
       // Empty is a 400, matching the reference (`if (isEmpty(ids)) throw new
-      // BadRequest`). It used to mean "all", which is a behaviour the reference does not
-      // have and which is what turned the parse failure above into data loss. The app's
-      // "Mark All Read" does not come through here — it calls `AlertCenter.markAllRead`
-      // in process — so nothing depended on it.
+      // BadRequest`). Treating empty as "all" is a behaviour the reference does not have,
+      // and it is what would turn the parse failure above into data loss. The app's "Mark
+      // All Read" does not come through here — it calls `AlertCenter.markAllRead` in
+      // process — so nothing depends on it.
       guard !ids.isEmpty else { throw BadRequest("No alert IDs provided!") }
 
       await server.markAlertsRead(ids: ids)
@@ -72,7 +72,7 @@ public enum AdminHandlers {
 
     // Same ids, same rules. Duplicated rather than shared so a v2 client never has to
     // drop back to a v1 path to finish a flow it started on v2.
-    registry.register("server.markAlertReadV2") { request in
+    registry.register(.serverMarkAlertReadV2) { request in
       let server = context.server
       let ids = alertIdentifiers(in: try request.jsonBody() ?? .object([:]))
       guard !ids.isEmpty else { throw BadRequest("No alert IDs provided!") }
@@ -102,7 +102,7 @@ public enum AdminHandlers {
     context: some AlertProviding & LoggerProviding & ServerControlling
       & ServerInterfaceProviding & SettingsProviding
   ) {
-    registry.register("server.statTotals") { _ in
+    registry.register(.serverStatTotals) { _ in
       let server = context.server
       return .data(try await server.totals())
     }
@@ -115,12 +115,12 @@ public enum AdminHandlers {
     context: some AlertProviding & LoggerProviding & ServerControlling
       & ServerInterfaceProviding & SettingsProviding
   ) {
-    registry.register("webhook.list") { _ in
+    registry.register(.webhookList) { _ in
       let server = context.server
       return .data(.array(try await server.webhooks()))
     }
 
-    registry.register("webhook.create") { request in
+    registry.register(.webhookCreate) { request in
       let server = context.server
       let values = try request.values()
       let url = try values.requireString("url")
@@ -128,7 +128,7 @@ public enum AdminHandlers {
       return .data(try await server.createWebhook(url: url, events: events))
     }
 
-    registry.register("webhook.update") { request in
+    registry.register(.webhookUpdate) { request in
       let server = context.server
       let raw = try request.requirePathParameter("id")
       guard let id = Int64(raw) else { throw BadRequest("`id` must be a number") }
@@ -140,7 +140,7 @@ public enum AdminHandlers {
       return .data(try await server.updateWebhook(id: id, url: url, events: events))
     }
 
-    registry.register("webhook.delete") { request in
+    registry.register(.webhookDelete) { request in
       let server = context.server
       let raw = try request.requirePathParameter("id")
       guard let id = Int64(raw) else { throw BadRequest("`id` must be a number") }
@@ -156,21 +156,21 @@ public enum AdminHandlers {
     context: some AlertProviding & LoggerProviding & ServerControlling
       & ServerInterfaceProviding & SettingsProviding
   ) {
-    for (kind, prefix) in [
-      (ServerInterface.BackupKind.theme, "backup.getTheme"),
-      (ServerInterface.BackupKind.settings, "backup.getSettings"),
+    for (kind, prefix): (ServerInterface.BackupKind, HandlerID) in [
+      (.theme, .backupGetTheme),
+      (.settings, .backupGetSettings),
     ] {
-      registry.register(HandlerID(prefix)) { _ in
+      registry.register(prefix) { _ in
         let server = context.server
         return .data(try await server.backups(kind: kind))
       }
     }
 
-    for (kind, id) in [
-      (ServerInterface.BackupKind.theme, "backup.createTheme"),
-      (ServerInterface.BackupKind.settings, "backup.createSettings"),
+    for (kind, id): (ServerInterface.BackupKind, HandlerID) in [
+      (.theme, .backupCreateTheme),
+      (.settings, .backupCreateSettings),
     ] {
-      registry.register(HandlerID(id)) { request in
+      registry.register(id) { request in
         let server = context.server
         let values = try request.values()
         let name = try values.requireString("name")
@@ -185,11 +185,11 @@ public enum AdminHandlers {
       }
     }
 
-    for (kind, id) in [
-      (ServerInterface.BackupKind.theme, "backup.deleteTheme"),
-      (ServerInterface.BackupKind.settings, "backup.deleteSettings"),
+    for (kind, id): (ServerInterface.BackupKind, HandlerID) in [
+      (.theme, .backupDeleteTheme),
+      (.settings, .backupDeleteSettings),
     ] {
-      registry.register(HandlerID(id)) { request in
+      registry.register(id) { request in
         let server = context.server
         let body = try? request.jsonBody()
         try await server.deleteBackup(
@@ -210,7 +210,7 @@ public enum AdminHandlers {
   ) {
     // Both restarts are GET, which is not what we would choose for a non-idempotent
     // action, but clients issue them that way and the route table is frozen.
-    registry.register("server.restartServices") { _ in
+    registry.register(.serverRestartServices) { _ in
       // Answered before restarting, not after. A restart tears down the HTTP listener
       // that owes this response, so replying afterwards is replying on a socket that
       // no longer exists — the client sees a dropped connection and reports a failure
@@ -221,7 +221,7 @@ public enum AdminHandlers {
 
     // The hard restart replaces the PROCESS rather than cycling the services. Same
     // answer-first ordering, and for the same reason.
-    registry.register("server.restartAll") { _ in
+    registry.register(.serverRestartAll) { _ in
       Task {
         // A beat, so this response is actually on the wire before the listener goes
         // away. Without it the client reliably sees a dropped connection and reports

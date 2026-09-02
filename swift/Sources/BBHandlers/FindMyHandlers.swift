@@ -46,7 +46,7 @@ public enum FindMyHandlers {
     into registry: inout HandlerRegistry,
     context: some FindMyProviding & PrivateAPIProviding & SettingsProviding
   ) {
-    registry.register("findmy.devices") { _ in
+    registry.register(.findmyDevices) { _ in
       // `null`, not an error, when the cache cannot be read as JSON.
       //
       // Apple ENCRYPTED this cache in Sequoia: `Devices.data` is now a binary plist
@@ -81,13 +81,13 @@ public enum FindMyHandlers {
     context: some FindMyProviding & PrivateAPIProviding & SettingsProviding
   ) {
 
-    registry.register("findmy.friends") { _ in
+    registry.register(.findmyFriends) { _ in
       // Served from the cache rather than from disk: there IS no friends file. See
       // `FindMyFriendsCache` for the mistake this replaced.
       .data(.array(await context.findMyFriends.all.map(legacyPayload)))
     }
 
-    registry.register("findmy.refreshFriends") { _ in
+    registry.register(.findmyRefreshFriends) { _ in
       let api = try await requirePrivateAPI(context, for: "refreshing FindMy friends")
 
       // Gated GLOBALLY, not per client.
@@ -124,7 +124,7 @@ public enum FindMyHandlers {
 
     // MARK: Additive
 
-    registry.register("findmy.refreshFriend") { request in
+    registry.register(.findmyRefreshFriend) { request in
       let api = try await requirePrivateAPI(context, for: "refreshing a FindMy location")
       let address = try address(in: request)
 
@@ -150,7 +150,7 @@ public enum FindMyHandlers {
       }
     }
 
-    registry.register("findmy.requestShare") { request in
+    registry.register(.findmyRequestShare) { request in
       let api = try await requirePrivateAPI(context, for: "requesting a location share")
       let address = try address(in: request)
       try await api.requestFindMyLocationShare(handle: address)
@@ -171,7 +171,7 @@ public enum FindMyHandlers {
     into registry: inout HandlerRegistry,
     context: some FindMyProviding & PrivateAPIProviding & SettingsProviding
   ) {
-    registry.register("findmy.status") { _ in
+    registry.register(.findmyStatus) { _ in
       let features = await context.settings.featureStates()
 
       // The helper is asked for FindMy's own state, but its absence is reported rather
@@ -231,7 +231,7 @@ public enum FindMyHandlers {
     context: some FindMyProviding & PrivateAPIProviding & SettingsProviding
   ) {
 
-    registry.register("findmy.startSharing") { request in
+    registry.register(.findmyStartSharing) { request in
       // Checked in the handler as well as at registration. The route only mounts when
       // the flag is on, so this is belt and braces — but a handler that assumes its
       // route's gate is the only gate is one refactor away from being reachable, and
@@ -263,7 +263,7 @@ public enum FindMyHandlers {
         ]))
     }
 
-    registry.register("findmy.stopSharing") { request in
+    registry.register(.findmyStopSharing) { request in
       try await requireFeature(Features.findMyLocationSharing, context)
       let api = try await requirePrivateAPI(context, for: "stopping a FindMy share")
 

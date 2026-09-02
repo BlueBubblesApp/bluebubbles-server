@@ -186,7 +186,9 @@ public actor AppContext {
   /// Set once the Private API service is running. Nil is a normal state, not a failure:
   /// the Private API is an enhancement and AppleScript covers the send path without it.
   private var privateAPI: (any PrivateAPI)?
-  private var contactsIngestor: ContactsIngestor?
+  /// `private(set)` rather than `private` so a test can assert it was published. It went
+  /// unpublished for the life of the project precisely because nothing could look.
+  private(set) var contactsIngestor: ContactsIngestor?
   /// Group chat creation without the Private API.
   ///
   /// Owned here rather than constructed per interface because it caches whether the user's
@@ -246,10 +248,31 @@ public actor AppContext {
     self.logger = logger
   }
 
-  func attach(registry: ServiceRegistry<AppContext>) {
+  /// Closes the construction cycle, once.
+  ///
+  /// The registry and the handlers cannot be constructor-injected and this is why: the
+  /// handlers close over this context — they need the message repository, the device
+  /// registry, the access-control service — so building them first would require the
+  /// context to exist first. The knot is untied here instead.
+  ///
+  /// ONE method rather than the two `attach` calls it replaces, because they were always
+  /// made together, immediately after one another, and nothing checked that either had
+  /// happened. Two independent late-binding points that must both fire is two chances to
+  /// fire only one. `isWired` below is what turns "somebody remembered" into something a
+  /// test can assert — see `AppContextWiringTests`.
+  func finishWiring(registry: ServiceRegistry<AppContext>, handlers: HandlerRegistry) {
     self.registry = registry
     self.lifecycle = ServerLifecycle(registry: registry, logger: logger)
+    self.httpHandlers = handlers
+    self.isWired = true
   }
+
+  /// Whether `finishWiring` has run.
+  ///
+  /// A context that skipped it looks healthy and fails obscurely later: no service can be
+  /// looked up, no route has a controller, and the failure surfaces as a 404 or a nil
+  /// service rather than as "this was never assembled".
+  public private(set) var isWired = false
 
   /// FaceTime link bookkeeping, hand-off tracking and cleanup.
   ///
@@ -291,22 +314,48 @@ public actor AppContext {
   /// healthy while every Private API route reports the helper as unavailable.
   public private(set) var privateAPIRuntime: PrivateAPIRuntime?
 
-  func attach(pushDelivery: PushService?) {
+  func publish(pushDelivery: PushService) {
     self.pushDelivery = pushDelivery
   }
 
-  func attach(privateAPIRuntime: PrivateAPIRuntime?) {
-    self.privateAPIRuntime = privateAPIRuntime
+  func withdrawPushDelivery() {
+    self.pushDelivery = nil
   }
 
-  /// Hands the interfaces their Private API reference.
+  /// Publishes the Private API — the connection AND the process control — together.
   ///
-  /// Invalidates the cache, because an interface built before the helper connected holds a
-  /// nil reference and would go on reporting the Private API as unavailable for the life of
-  /// the process — which is exactly the bug where a working helper looks broken.
-  func attach(privateAPI: (any PrivateAPI)?, ingestor: ContactsIngestor? = nil) {
-    self.privateAPI = privateAPI
-    if let ingestor { self.contactsIngestor = ingestor }
+  /// One call rather than two, and that is a fix rather than a tidy-up. They were set by two
+  /// `attach` calls and cleared by two more, and in `stop()` the two clears sat either side
+  /// of `runtime.stop()`: for the length of that await the runtime was already nil while the
+  /// client was still published, so `isHelperConnected` could answer "yes" for a helper that
+  /// was being torn down. Setting both under one actor-isolated call closes that window.
+  ///
+  /// Invalidates the interface cache, because an interface built before the helper connected
+  /// holds a nil reference and would go on reporting the Private API as unavailable for the
+  /// life of the process — exactly the bug where a working helper looks broken.
+  func publishPrivateAPI(client: any PrivateAPI, runtime: PrivateAPIRuntime?) {
+    self.privateAPI = client
+    self.privateAPIRuntime = runtime
+    self.cachedInterfaces = nil
+  }
+
+  /// Withdraws both halves at once. See `publishPrivateAPI`.
+  func withdrawPrivateAPI() {
+    self.privateAPI = nil
+    self.privateAPIRuntime = nil
+    self.cachedInterfaces = nil
+  }
+
+  /// The address-book reader, published by `ContactsService` once it exists.
+  ///
+  /// Its OWN call, deliberately — not an optional parameter on the Private API publication.
+  /// The two have nothing to do with one another, the Private API call sites have no
+  /// ingestor to pass, and a defaulted argument means leaving it out compiles:
+  /// `ContactInterface.refresh` then runs with a nil ingestor for the life of the process and
+  /// answers "contact access has not been granted to this server" on servers where it has.
+  /// A separate call is what makes forgetting it visible.
+  func publish(contactsIngestor ingestor: ContactsIngestor) {
+    self.contactsIngestor = ingestor
     self.cachedInterfaces = nil
   }
 
@@ -425,8 +474,15 @@ public actor AppContext {
     get async { await privateAPI?.isConnected ?? false }
   }
 
-  public func attach(updateInstaller: any UpdateInstalling) {
-    self.updateInstallerBacking = updateInstaller
+  /// Supplied by the hosting application, which owns the updater.
+  ///
+  /// **Nothing conforms to `UpdateInstalling` yet, so this is never called and
+  /// `updateInstaller` is always nil.** The seam is real and the endpoint is written against
+  /// it; what is missing is an implementation in the app. Until there is one,
+  /// `server.installUpdate` refuses — see `UpdateHandlers`, whose message says so without
+  /// claiming a reason it cannot know.
+  public func setUpdateInstaller(_ installer: any UpdateInstalling) {
+    self.updateInstallerBacking = installer
   }
 
   /// The Private API, if the helper is connected.
@@ -443,10 +499,6 @@ public actor AppContext {
       )
     }
     return interfaces
-  }
-
-  func attach(handlers: HandlerRegistry) {
-    self.httpHandlers = handlers
   }
 
   public func service<S: Service>(_ type: S.Type) async -> S? {
@@ -544,9 +596,8 @@ public actor AppContext {
 
   /// The registered push targets, with the delivery path's failure policy.
   ///
-  /// The three wrappers that used to sit here — prune, clear, read — moved to
-  /// `DeviceDirectory`. Holding a reference is a container's job; deciding what to do when a
-  /// delete fails is not.
+  /// Prune, clear and read live on `DeviceDirectory`, not here. Holding a reference is a
+  /// container's job; deciding what to do when a delete fails is not.
   public nonisolated var deviceDirectory: DeviceDirectory {
     DeviceDirectory(repository: devices, logger: logger)
   }

@@ -1,5 +1,5 @@
 //  SubprocessTests
-//  The properties every call site used to re-establish for itself.
+//  The properties every call site would otherwise re-establish for itself.
 //
 //  The large-output test is the one that earns its keep: a pipe holds 64 KB, and reading it
 //  after `waitUntilExit()` rather than during deadlocks the moment a child writes more than

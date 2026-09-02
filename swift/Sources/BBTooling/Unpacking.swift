@@ -134,13 +134,12 @@ public enum Unpacking {
 
   // MARK: - Running the unpackers
 
-  /// - Parameter timeout: five minutes. There used to be NONE, so an unpacker that decided
-  ///   to prompt hung the install with no way out — `unzip` does exactly that when an
-  ///   archive contains a name that already exists. Generous, because a large archive on a
-  ///   slow disk is legitimate; the point is only that it ends.
+  /// - Parameter timeout: five minutes, and NOT optional. An unpacker that decides to
+  ///   prompt hangs the install with no way out — `unzip` does exactly that when an archive
+  ///   contains a name that already exists. Generous, because a large archive on a slow disk
+  ///   is legitimate; the point is only that it ends.
   ///
-  /// Synchronous because `unpack` is. The draining and the detached stdin that used to be
-  /// spelled out here are `Subprocess`'s job now.
+  /// Synchronous because `unpack` is. Draining and the detached stdin are `Subprocess`'s job.
   private static func run(
     _ executable: String, _ arguments: [String], toolID: String,
     timeout: Duration = .seconds(300)

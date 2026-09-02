@@ -133,7 +133,7 @@ Rules:
 - Renaming a column means a **new** migration with `table.rename(column:to:)`.
 - Add the migration and the model change in the same commit.
 
-### Naming — enforced by `Tests/CompositionTests/NamingConventionTests.swift`
+### Naming — enforced by `Tests/CompatibilityTests/NamingConventionTests.swift`
 
 - Tables `snake_case` and **singular** (`alert`, not `alerts`) — a row is one of the thing.
 - Columns `snake_case`.

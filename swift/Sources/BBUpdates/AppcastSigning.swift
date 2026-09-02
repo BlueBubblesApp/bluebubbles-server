@@ -11,7 +11,7 @@
 //  valid-looking appcast that every shipped install silently refuses, and the symptom —
 //  "nobody is getting updates" — appears weeks later with nothing in any log.
 //
-//  See `CONTRIBUTING.md` and the residual risk on key loss in § Residual risks.
+//  See `CONTRIBUTING.md`. The residual risk is loss of the signing key.
 
 import BBCore
 import Crypto

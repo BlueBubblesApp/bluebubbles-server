@@ -1,5 +1,5 @@
 //  GuidesView
-//  The "how do I…" page § 16 lists in the sidebar.
+//  The "how do I…" page in the sidebar.
 //
 //  Deliberately NOT a browser pointed at the docs site. Every question here is about THIS
 //  machine's current state — is the Private API on, which delivery routes are live, what

@@ -301,12 +301,12 @@ public actor ChangeDetector {
     // across date_read/date_delivered/date_edited full-scans `message`.
     //
     // PAGED, and that matters more than it looks. `MessageQuery` caps `limit` at 1000,
-    // and this used to take a single ascending page — so on the 7-day reconcile pass an
-    // install with more than 1000 messages a week only ever examined the OLDEST 1000 in
-    // the window, forever. Read receipts, delivered flags and edits on anything newer
-    // than that were never detected, and the symptom was "read receipts stop working
-    // after half an hour" on exactly the busiest accounts. The fast pass hid it, because
-    // its 30-minute window rarely holds 1000 messages.
+    // a single ascending page would mean the 7-day reconcile pass on an install with more
+    // than 1000 messages a week only ever examines the OLDEST 1000 in the window, forever.
+    // Read receipts, delivered flags and edits on anything newer would never be detected,
+    // and the symptom is "read receipts stop working after half an hour" on exactly the
+    // busiest accounts. The fast pass hides it, because its 30-minute window rarely holds
+    // 1000 messages.
     let candidates = try await fetchWindow(after: queryFloor)
 
     var changes: [MessageChange] = []

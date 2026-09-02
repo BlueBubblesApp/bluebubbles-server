@@ -11,8 +11,23 @@ import SwiftUI
 struct DevicesView: View {
 
   @Bindable var model: AppModel
-  @State private var devices: [EnrolledDevice] = []
-  @State private var error: String?
+  @State private var screen: ScreenModel<[EnrolledDevice]>
+
+  init(model: AppModel) {
+    self.model = model
+    _screen = State(initialValue: ScreenModel { try await Self.read(model) })
+  }
+
+  /// Token auth being off is not an error worth showing — the list is simply empty, which
+  /// is what a default server should look like here. Distinguished from "the server is not
+  /// running", which returns nil and leaves the screen idle.
+  @MainActor
+  private static func read(_ model: AppModel) async throws -> [EnrolledDevice]? {
+    guard let auth = model.tokenAuth else { return nil }
+    return (try? await auth.devices()) ?? []
+  }
+
+  private var devices: [EnrolledDevice] { screen.state.value ?? [] }
 
   var body: some View {
     Group {
@@ -22,7 +37,9 @@ struct DevicesView: View {
           systemImage: "iphone",
           description: Text("Start the server to manage paired devices.")
         )
-      } else if devices.isEmpty {
+      } else if devices.isEmpty, screen.problem == nil {
+        // See ScheduledMessagesView: an empty state keyed off the count alone renders
+        // over a failed read.
         ContentUnavailableView(
           "No devices",
           systemImage: "iphone.slash",
@@ -32,7 +49,7 @@ struct DevicesView: View {
         list
       }
     }
-    .task { await reload() }
+    .task { await screen.reload() }
   }
 
   private var list: some View {
@@ -62,8 +79,8 @@ struct DevicesView: View {
             }
           }
         }
-        if let error {
-          Text(error).font(.caption).foregroundStyle(.red)
+        if let message = screen.problem {
+          ScreenErrorLine(message: message)
         }
       }
       .padding(20)
@@ -77,23 +94,9 @@ struct DevicesView: View {
     return "Last seen \(lastSeenAt.formatted(.relative(presentation: .named)))"
   }
 
-  private func reload() async {
-    guard let auth = model.tokenAuth else { return }
-    do { devices = try await auth.devices() } catch {
-      // Token auth being off is not an error worth showing — the list is simply
-      // empty, which is what a default server should look like here.
-      devices = []
-    }
-  }
-
   private func revoke(_ device: EnrolledDevice) async {
     guard let auth = model.tokenAuth else { return }
-    do {
-      try await auth.revoke(deviceID: device.id)
-      await reload()
-    } catch {
-      self.error = String(describing: error)
-    }
+    await screen.perform { try await auth.revoke(deviceID: device.id) }
   }
 }
 

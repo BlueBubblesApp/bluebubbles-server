@@ -1,25 +1,20 @@
 //  AttributedBody
 //  Decodes `message.attributedBody` — the field that holds the message text.
 //
-//  Why this is not a hand-rolled parser any more
-//  --------------------------------------------
-//  It used to be. The Node server carries `node-typedstream` because JavaScript has no way
-//  to read Apple's `typedstream` archives, and the first pass of this port transliterated
-//  that decision into Swift as a byte-level reader. On a Mac that reasoning does not hold:
-//  `NSUnarchiver` reads the format natively, because it is the class that wrote it.
+//  Why this is not a hand-rolled parser
+//  ------------------------------------
+//  `NSUnarchiver` reads Apple's `typedstream` archives natively, because it is the class that
+//  wrote them. A byte-level reader is the right answer only where that class is unavailable,
+//  which is what `node-typedstream` exists for — JavaScript cannot read the format at all.
 //
-//  The transliterated reader was also wrong. Measured against 4,000 real rows from a live
-//  chat.db, where `message.text` gives ground truth:
-//
-//      NSUnarchiver          4000/4000 decoded, 4000/4000 text exactly correct
-//      hand-rolled scanner   4000/4000 "decoded", 0/4000 correct
-//
-//  Not a ranking bug — a structural one. That scanner collected `tagNew` length-prefixed
-//  strings, which in a real archive are the class names and attribute KEYS. The message text
-//  is written through the type-encoded character-array path and never appeared in what it
-//  scanned at all (0% of samples), so no amount of filtering could have recovered it. Every
-//  message relying on the attributedBody fallback would have shown text lifted from somewhere
-//  else in the archive.
+//  A scanner that collects `tagNew` length-prefixed strings CANNOT work here, and the failure
+//  is structural rather than a matter of ranking: in a real archive those strings are the
+//  class names and attribute KEYS. The message text is written through the type-encoded
+//  character-array path and never appears among them, so no amount of filtering recovers it.
+//  Measured against 4,000 real rows from a live chat.db, with `message.text` as ground truth,
+//  `NSUnarchiver` decoded 4000/4000 with the text exactly correct; a `tagNew` scanner
+//  "decoded" 4000/4000 and got 0 right — every message relying on the attributedBody fallback
+//  would show text lifted from somewhere else in the archive.
 //
 //  The native path also recovers four attribute keys `node-typedstream` drops outright
 //  (`__kIMCalendarEventAttributeName`, `__kIMDataDetectedAttributeName`,

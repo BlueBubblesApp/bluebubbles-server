@@ -79,7 +79,7 @@ struct TLSTests {
     )
 
     var registry = HandlerRegistry()
-    registry.register("general.ping") { _ in .data(.string("pong")) }
+    registry.register(.generalPing) { _ in .data(.string("pong")) }
     PlaceholderHandlers.fill(into: &registry, groups: RouteTable.groups)
 
     let builder = HTTPAPIBuilder(

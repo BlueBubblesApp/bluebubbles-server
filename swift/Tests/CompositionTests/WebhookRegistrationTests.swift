@@ -28,7 +28,7 @@ import Testing
 struct WebhookRegistrationTests {
 
   private func makeInterface() async throws -> ServerInterface {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     return ServerInterface(
       database: database,
       alerts: AlertCenter(),

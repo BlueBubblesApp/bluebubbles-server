@@ -160,7 +160,7 @@ extension AsyncSequence where Element: Sendable, Self: Sendable {
 ///
 /// Every cache in the server uses this rather than an unbounded dictionary or an array
 /// trimmed only by age. The current EventCache is a linear-scanned array with no size
-/// bound, which is a large part of why the memory budget in § 10 exists.
+/// bound, which is a large part of why the memory budget exists.
 public struct BoundedCache<Key: Hashable, Value>: Sendable where Key: Sendable, Value: Sendable {
 
   private struct Entry {

@@ -18,8 +18,6 @@ import Foundation
 import Testing
 
 @testable import BBHandlers
-@testable import BBInterfaces
-@testable import BlueBubblesServerCore
 
 @Suite("Request values")
 struct RequestValuesTests {

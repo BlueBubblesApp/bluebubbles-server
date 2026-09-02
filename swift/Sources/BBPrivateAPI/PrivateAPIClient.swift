@@ -117,8 +117,8 @@ public actor PrivateAPIClient: PrivateAPI {
   ///
   /// MEASURED: an `IMMessageItem` retrieved by GUID reports `chatIdentifier = nil`, so
   /// there is nothing on the message to look a conversation up by. The chat-less form of
-  /// this call used to exist and could only ever fail; the server resolves the chat from
-  /// chat.db instead, which is authoritative and free.
+  /// this call is deliberately absent — it could only ever fail. The server resolves the
+  /// chat from chat.db instead, which is authoritative and free.
   public func editMessage(
     _ guid: MessageGUID,
     in chat: ChatGUID,

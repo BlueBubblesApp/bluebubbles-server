@@ -1,10 +1,10 @@
 //  LaunchOptions
 //  Command-line arguments for the app bundle.
 //
-//  The app has to honour the same arguments the CLI does. It previously built
-//  `ServerComposition.Options()` with nothing at all, so `--headless`, `--config` and `--set`
-//  were accepted on the command line and silently ignored — the server came up on its stored
-//  settings while the operator believed their override had applied.
+//  The app has to honour the same arguments the CLI does. Building
+//  `ServerComposition.Options()` with nothing means `--headless`, `--config` and `--set` are
+//  accepted on the command line and silently ignored — the server comes up on its stored
+//  settings while the operator believes their override applied.
 //
 //  That matters most for a login item, which is launched with arguments and has no other way
 //  to be configured.

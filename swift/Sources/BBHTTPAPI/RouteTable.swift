@@ -144,9 +144,15 @@ public struct RouteGroup: Sendable {
 
 /// Identifies a handler without importing the controllers here, which keeps the table a
 /// pure description that a test can read without standing up the server.
-public struct HandlerID: Hashable, Sendable, ExpressibleByStringLiteral {
+///
+/// Deliberately NOT `ExpressibleByStringLiteral`. Every identifier is declared once in
+/// `HandlerIDs.swift`, so the table and the controller that serves it reference the same
+/// constant and a typo is a compile error rather than a route with no handler. The
+/// initialiser stays public because the raw form is still needed to read one back — from a
+/// recorded fixture, or from the parity harness — but writing a new identifier means adding
+/// it there.
+public struct HandlerID: Hashable, Sendable {
   public let rawValue: String
-  public init(stringLiteral value: String) { self.rawValue = value }
   public init(_ value: String) { self.rawValue = value }
 }
 
@@ -225,7 +231,7 @@ public enum RouteTable {
   public static let landing = RouteGroup(
     "Index", mountsAtRoot: true,
     routes: [
-      .init(.get, "", "ui.index", requires: .unauthenticated)
+      .init(.get, "", .uiIndex, requires: .unauthenticated)
     ]
   )
 
@@ -234,7 +240,7 @@ public enum RouteTable {
   static let general = RouteGroup(
     "General",
     routes: [
-      .init(.get, "ping", "general.ping")
+      .init(.get, "ping", .generalPing)
     ])
 
   // MARK: macOS
@@ -242,8 +248,8 @@ public enum RouteTable {
   static let macOS = RouteGroup(
     "macOS", prefix: "mac", responseTimeout: .seconds(30),
     routes: [
-      .init(.post, "lock", "mac.lock", scope: .serverAdmin),
-      .init(.post, "imessage/restart", "mac.restartMessages", scope: .serverAdmin),
+      .init(.post, "lock", .macLock, scope: .serverAdmin),
+      .init(.post, "imessage/restart", .macRestartMessages, scope: .serverAdmin),
     ])
 
   // MARK: iCloud
@@ -254,14 +260,14 @@ public enum RouteTable {
   static let iCloud = RouteGroup(
     "iCloud", prefix: "icloud",
     routes: [
-      .init(.get, "account", "icloud.accountInfo", requires: .privateAPI),
+      .init(.get, "account", .icloudAccountInfo, requires: .privateAPI),
       .init(
-        .post, "account/alias", "icloud.changeAlias", scope: .serverAdmin, requires: .privateAPI),
-      .init(.get, "contact", "icloud.contactCard", requires: .privateAPI),
-      .init(.get, "findmy/devices", "findmy.devices"),
-      .init(.post, "findmy/devices/refresh", "findmy.refreshDevices"),
-      .init(.get, "findmy/friends", "findmy.friends", requires: .privateAPI),
-      .init(.post, "findmy/friends/refresh", "findmy.refreshFriends", requires: .privateAPI),
+        .post, "account/alias", .icloudChangeAlias, scope: .serverAdmin, requires: .privateAPI),
+      .init(.get, "contact", .icloudContactCard, requires: .privateAPI),
+      .init(.get, "findmy/devices", .findmyDevices),
+      .init(.post, "findmy/devices/refresh", .findmyRefreshDevices),
+      .init(.get, "findmy/friends", .findmyFriends, requires: .privateAPI),
+      .init(.post, "findmy/friends/refresh", .findmyRefreshFriends, requires: .privateAPI),
     ])
 
   // MARK: Server
@@ -269,27 +275,27 @@ public enum RouteTable {
   static let server = RouteGroup(
     "Server", prefix: "server",
     routes: [
-      .init(.get, "info", "server.info"),
-      .init(.get, "logs", "server.logs", scope: .serverAdmin),
+      .init(.get, "info", .serverInfo),
+      .init(.get, "logs", .serverLogs, scope: .serverAdmin),
 
       // Both restarts are GET. Non-idempotent verbs behind GET is not what we would
       // choose, but clients issue them as GET.
-      .init(.get, "restart/soft", "server.restartServices", scope: .serverAdmin),
-      .init(.get, "restart/hard", "server.restartAll", scope: .serverAdmin),
+      .init(.get, "restart/soft", .serverRestartServices, scope: .serverAdmin),
+      .init(.get, "restart/hard", .serverRestartAll, scope: .serverAdmin),
 
-      .init(.get, "update/check", "server.checkUpdate", scope: .serverAdmin),
+      .init(.get, "update/check", .serverCheckUpdate, scope: .serverAdmin),
       .init(
-        .post, "update/install", "server.installUpdate",
+        .post, "update/install", .serverInstallUpdate,
         scope: .serverAdmin, responseTimeout: .seconds(1800)),
 
-      .init(.get, "alert", "server.alerts"),
-      .init(.post, "alert/read", "server.markAlertRead"),
+      .init(.get, "alert", .serverAlerts),
+      .init(.post, "alert/read", .serverMarkAlertRead),
 
       // The report's brute-force target: unauthenticated guessing was cheap here because
       // it is a plain GET with a small response. Failure-only rate limiting covers it now.
-      .init(.get, "statistics/totals", "server.statTotals"),
-      .init(.get, "statistics/media", "server.statMedia"),
-      .init(.get, "statistics/media/chat", "server.statMediaByChat"),
+      .init(.get, "statistics/totals", .serverStatTotals),
+      .init(.get, "statistics/media", .serverStatMedia),
+      .init(.get, "statistics/media/chat", .serverStatMediaByChat),
     ])
 
   // MARK: FCM
@@ -297,9 +303,9 @@ public enum RouteTable {
   static let fcm = RouteGroup(
     "FCM", prefix: "fcm",
     routes: [
-      .init(.post, "device", "fcm.registerDevice", scope: .serverAdmin),
+      .init(.post, "device", .fcmRegisterDevice, scope: .serverAdmin),
       // Synthesizes `oauth_client[]` when Google omits it. Clients break without that key.
-      .init(.get, "client", "fcm.clientConfig", scope: .serverAdmin),
+      .init(.get, "client", .fcmClientConfig, scope: .serverAdmin),
     ])
 
   // MARK: Attachment
@@ -307,20 +313,20 @@ public enum RouteTable {
   static let attachment = RouteGroup(
     "Attachment", prefix: "attachment",
     routes: [
-      .init(.get, "count", "attachment.count"),
-      .init(.post, "upload", "attachment.upload", scope: .messagesWrite, requires: .privateAPI),
+      .init(.get, "count", .attachmentCount),
+      .init(.post, "upload", .attachmentUpload, scope: .messagesWrite, requires: .privateAPI),
 
       .init(
-        .get, ":guid/download", "attachment.download",
+        .get, ":guid/download", .attachmentDownload,
         scope: .attachmentsRead, responseTimeout: .seconds(1800)),
       .init(
-        .get, ":guid/download/force", "attachment.forceDownload",
+        .get, ":guid/download/force", .attachmentForceDownload,
         scope: .attachmentsRead, requires: .privateAPI, responseTimeout: .seconds(3600)),
-      .init(.get, ":guid/blurhash", "attachment.blurhash", scope: .attachmentsRead),
+      .init(.get, ":guid/blurhash", .attachmentBlurhash, scope: .attachmentsRead),
       .init(
-        .get, ":guid/live", "attachment.downloadLive",
+        .get, ":guid/live", .attachmentDownloadLive,
         scope: .attachmentsRead, responseTimeout: .seconds(1800)),
-      .init(.get, ":guid", "attachment.find", scope: .attachmentsRead),
+      .init(.get, ":guid", .attachmentFind, scope: .attachmentsRead),
     ])
 
   // MARK: Chat
@@ -336,51 +342,51 @@ public enum RouteTable {
       // on a server with neither refuses with an explanation naming the setting that fixes
       // it — see `ChatInterface.create`. Gating the whole route would take away the
       // one-to-one case that has always worked here.
-      .init(.post, "new", "chat.create", scope: .chatsWrite),
-      .init(.get, "count", "chat.count"),
-      .init(.post, "query", "chat.query"),
+      .init(.post, "new", .chatCreate, scope: .chatsWrite),
+      .init(.get, "count", .chatCount),
+      .init(.post, "query", .chatQuery),
 
-      .init(.get, ":guid/message", "chat.messages"),
-      .init(.get, ":guid/share/contact/status", "chat.shouldShareContact", requires: .privateAPI),
+      .init(.get, ":guid/message", .chatMessages),
+      .init(.get, ":guid/share/contact/status", .chatShouldShareContact, requires: .privateAPI),
       .init(
-        .post, ":guid/share/contact", "chat.shareContact",
+        .post, ":guid/share/contact", .chatShareContact,
         scope: .chatsWrite, requires: .privateAPI),
-      .init(.post, ":guid/read", "chat.markRead", scope: .chatsWrite, requires: .privateAPI),
-      .init(.post, ":guid/unread", "chat.markUnread", scope: .chatsWrite, requires: .privateAPI),
-      .init(.post, ":guid/leave", "chat.leave", scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, ":guid/read", .chatMarkRead, scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, ":guid/unread", .chatMarkUnread, scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, ":guid/leave", .chatLeave, scope: .chatsWrite, requires: .privateAPI),
 
       // Four routes, two handlers. POST/DELETE :guid/participant is the older form and
       // POST :guid/participant/{add,remove} the newer; both ship.
       .init(
-        .post, ":guid/participant", "chat.addParticipant",
+        .post, ":guid/participant", .chatAddParticipant,
         scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .delete, ":guid/participant", "chat.removeParticipant",
+        .delete, ":guid/participant", .chatRemoveParticipant,
         scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .post, ":guid/participant/add", "chat.addParticipant",
+        .post, ":guid/participant/add", .chatAddParticipant,
         scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .post, ":guid/participant/remove", "chat.removeParticipant",
+        .post, ":guid/participant/remove", .chatRemoveParticipant,
         scope: .chatsWrite, requires: .privateAPI),
 
-      .init(.post, ":guid/typing", "chat.startTyping", scope: .chatsWrite, requires: .privateAPI),
-      .init(.delete, ":guid/typing", "chat.stopTyping", scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, ":guid/typing", .chatStartTyping, scope: .chatsWrite, requires: .privateAPI),
+      .init(.delete, ":guid/typing", .chatStopTyping, scope: .chatsWrite, requires: .privateAPI),
 
-      .init(.post, ":guid/icon", "chat.setGroupIcon", scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, ":guid/icon", .chatSetGroupIcon, scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .delete, ":guid/icon", "chat.removeGroupIcon", scope: .chatsWrite, requires: .privateAPI),
+        .delete, ":guid/icon", .chatRemoveGroupIcon, scope: .chatsWrite, requires: .privateAPI),
       // GET icon needs no helper — it reads the attachment off disk.
-      .init(.get, ":guid/icon", "chat.groupIcon", scope: .attachmentsRead),
+      .init(.get, ":guid/icon", .chatGroupIcon, scope: .attachmentsRead),
 
       // Two path params. Must precede the bare `:guid` routes below.
       .init(
-        .delete, ":guid/:messageGuid", "chat.deleteMessage",
+        .delete, ":guid/:messageGuid", .chatDeleteMessage,
         scope: .chatsWrite, requires: .privateAPI),
 
-      .init(.put, ":guid", "chat.update", scope: .chatsWrite, requires: .privateAPI),
-      .init(.get, ":guid", "chat.find"),
-      .init(.delete, ":guid", "chat.delete", scope: .chatsWrite, requires: .privateAPI),
+      .init(.put, ":guid", .chatUpdate, scope: .chatsWrite, requires: .privateAPI),
+      .init(.get, ":guid", .chatFind),
+      .init(.delete, ":guid", .chatDelete, scope: .chatsWrite, requires: .privateAPI),
     ])
 
   // MARK: Message
@@ -390,33 +396,33 @@ public enum RouteTable {
     routes: [
       // No .privateAPI on the send routes: AppleScript is the fallback and it is a
       // supported configuration, not a degraded one.
-      .init(.post, "text", "message.sendText", scope: .messagesWrite),
-      .init(.post, "attachment", "message.sendAttachment", scope: .messagesWrite),
-      .init(.post, "attachment/chunk", "message.sendAttachmentChunk", scope: .messagesWrite),
-      .init(.post, "multipart", "message.sendMultipart", scope: .messagesWrite),
+      .init(.post, "text", .messageSendText, scope: .messagesWrite),
+      .init(.post, "attachment", .messageSendAttachment, scope: .messagesWrite),
+      .init(.post, "attachment/chunk", .messageSendAttachmentChunk, scope: .messagesWrite),
+      .init(.post, "multipart", .messageSendMultipart, scope: .messagesWrite),
 
-      .init(.post, "react", "message.react", scope: .messagesWrite, requires: .privateAPI),
+      .init(.post, "react", .messageReact, scope: .messagesWrite, requires: .privateAPI),
 
-      .init(.get, "count", "message.count"),
-      .init(.get, "count/updated", "message.countUpdated"),
-      .init(.get, "count/me", "message.sentCount"),
-      .init(.post, "query", "message.query"),
+      .init(.get, "count", .messageCount),
+      .init(.get, "count/updated", .messageCountUpdated),
+      .init(.get, "count/me", .messageSentCount),
+      .init(.post, "query", .messageQuery),
 
       // Scheduled messages live under /message even though they are their own subsystem.
-      .init(.get, "schedule", "schedule.list"),
-      .init(.post, "schedule", "schedule.create", scope: .messagesWrite),
-      .init(.get, "schedule/:id", "schedule.find"),
-      .init(.put, "schedule/:id", "schedule.update", scope: .messagesWrite),
-      .init(.delete, "schedule/:id", "schedule.delete", scope: .messagesWrite),
+      .init(.get, "schedule", .scheduleList),
+      .init(.post, "schedule", .scheduleCreate, scope: .messagesWrite),
+      .init(.get, "schedule/:id", .scheduleFind),
+      .init(.put, "schedule/:id", .scheduleUpdate, scope: .messagesWrite),
+      .init(.delete, "schedule/:id", .scheduleDelete, scope: .messagesWrite),
 
-      .init(.get, ":guid", "message.find"),
+      .init(.get, ":guid", .messageFind),
       // Edit and unsend check the helper inside the handler rather than via middleware,
       // because they also gate on macOS version and want a different message.
-      .init(.post, ":guid/edit", "message.edit", scope: .messagesWrite),
-      .init(.post, ":guid/unsend", "message.unsend", scope: .messagesWrite),
-      .init(.post, ":guid/notify", "message.notify", scope: .messagesWrite, requires: .privateAPI),
+      .init(.post, ":guid/edit", .messageEdit, scope: .messagesWrite),
+      .init(.post, ":guid/unsend", .messageUnsend, scope: .messagesWrite),
+      .init(.post, ":guid/notify", .messageNotify, scope: .messagesWrite, requires: .privateAPI),
       .init(
-        .get, ":guid/embedded-media", "message.embeddedMedia",
+        .get, ":guid/embedded-media", .messageEmbeddedMedia,
         scope: .attachmentsRead, requires: .privateAPI),
     ])
 
@@ -425,13 +431,13 @@ public enum RouteTable {
   static let handle = RouteGroup(
     "Handle", prefix: "handle",
     routes: [
-      .init(.get, "count", "handle.count"),
-      .init(.post, "query", "handle.query"),
-      .init(.get, "availability/imessage", "handle.iMessageAvailability", requires: .privateAPI),
+      .init(.get, "count", .handleCount),
+      .init(.post, "query", .handleQuery),
+      .init(.get, "availability/imessage", .handleIMessageAvailability, requires: .privateAPI),
       // FaceTime availability does not need the helper; iMessage availability does.
-      .init(.get, "availability/facetime", "handle.faceTimeAvailability"),
-      .init(.get, ":guid", "handle.find"),
-      .init(.get, ":guid/focus", "handle.focusStatus"),
+      .init(.get, "availability/facetime", .handleFaceTimeAvailability),
+      .init(.get, ":guid", .handleFind),
+      .init(.get, ":guid/focus", .handleFocusStatus),
     ])
 
   // MARK: FaceTime
@@ -441,10 +447,10 @@ public enum RouteTable {
   static let faceTime = RouteGroup(
     "FaceTime", prefix: "facetime", requires: .privateAPI,
     routes: [
-      .init(.post, "session", "facetime.newSession", scope: .chatsWrite),
-      .init(.post, "answer/:call_uuid", "facetime.answer", scope: .chatsWrite),
+      .init(.post, "session", .facetimeNewSession, scope: .chatsWrite),
+      .init(.post, "answer/:call_uuid", .facetimeAnswer, scope: .chatsWrite),
       // Returns 201 "No Data", not 200. Asserted by the parity harness.
-      .init(.post, "leave/:call_uuid", "facetime.leave", scope: .chatsWrite),
+      .init(.post, "leave/:call_uuid", .facetimeLeave, scope: .chatsWrite),
     ])
 
   // MARK: Contact
@@ -455,15 +461,15 @@ public enum RouteTable {
   static let contact = RouteGroup(
     "Contact", prefix: "contact",
     routes: [
-      .init(.get, "", "contact.list"),
-      .init(.post, "", "contact.create", scope: .serverAdmin),
-      .init(.put, "", "contact.update", scope: .serverAdmin),
-      .init(.put, ":id", "contact.update", scope: .serverAdmin),
-      .init(.get, "external/:externalId", "contact.findByExternalID"),
-      .init(.delete, ":id", "contact.delete", scope: .serverAdmin),
-      .init(.delete, "", "contact.delete", scope: .serverAdmin),
-      .init(.post, "query", "contact.query"),
-      .init(.post, "import/vcf", "contact.importVCF", scope: .serverAdmin),
+      .init(.get, "", .contactList),
+      .init(.post, "", .contactCreate, scope: .serverAdmin),
+      .init(.put, "", .contactUpdate, scope: .serverAdmin),
+      .init(.put, ":id", .contactUpdate, scope: .serverAdmin),
+      .init(.get, "external/:externalId", .contactFindByExternalID),
+      .init(.delete, ":id", .contactDelete, scope: .serverAdmin),
+      .init(.delete, "", .contactDelete, scope: .serverAdmin),
+      .init(.post, "query", .contactQuery),
+      .init(.post, "import/vcf", .contactImportVCF, scope: .serverAdmin),
     ])
 
   // MARK: Backup
@@ -471,12 +477,12 @@ public enum RouteTable {
   static let backup = RouteGroup(
     "Backup", prefix: "backup",
     routes: [
-      .init(.get, "theme", "backup.getTheme"),
-      .init(.post, "theme", "backup.createTheme", scope: .serverAdmin),
-      .init(.delete, "theme", "backup.deleteTheme", scope: .serverAdmin),
-      .init(.get, "settings", "backup.getSettings"),
-      .init(.post, "settings", "backup.createSettings", scope: .serverAdmin),
-      .init(.delete, "settings", "backup.deleteSettings", scope: .serverAdmin),
+      .init(.get, "theme", .backupGetTheme),
+      .init(.post, "theme", .backupCreateTheme, scope: .serverAdmin),
+      .init(.delete, "theme", .backupDeleteTheme, scope: .serverAdmin),
+      .init(.get, "settings", .backupGetSettings),
+      .init(.post, "settings", .backupCreateSettings, scope: .serverAdmin),
+      .init(.delete, "settings", .backupDeleteSettings, scope: .serverAdmin),
     ])
 
   // MARK: Webhooks
@@ -484,9 +490,9 @@ public enum RouteTable {
   static let webhook = RouteGroup(
     "Webhooks", prefix: "webhook",
     routes: [
-      .init(.get, "", "webhook.list", scope: .serverAdmin),
-      .init(.post, "", "webhook.create", scope: .serverAdmin),
-      .init(.delete, ":id", "webhook.delete", scope: .serverAdmin),
+      .init(.get, "", .webhookList, scope: .serverAdmin),
+      .init(.post, "", .webhookCreate, scope: .serverAdmin),
+      .init(.delete, ":id", .webhookDelete, scope: .serverAdmin),
     ])
 }
 
@@ -499,7 +505,7 @@ public enum RouteTable {
 /// deliberately, which is what stops "additive" from drifting into "changed".
 public enum AdditiveRoutes {
 
-  /// Access-control administration (§17), and **`#if DEBUG` — never in a shipped binary.**
+  /// Access-control administration, and **`#if DEBUG` — never in a shipped binary.**
   ///
   /// These edit the rules that decide who may talk to the server: unblock an address, add a
   /// CIDR to the permanent allowlist, clear the blocklist entirely. Reaching them requires
@@ -527,20 +533,21 @@ public enum AdditiveRoutes {
   static var securityRoutes: [RouteDefinition] {
     #if DEBUG
       return [
-        .init(.get, "blocklist", "security.listBlocked", scope: .serverAdmin),
-        .init(.delete, "blocklist", "security.clearBlocked", scope: .serverAdmin),
-        .init(.delete, "blocklist/:id", "security.unblock", scope: .serverAdmin),
-        .init(.get, "allowlist", "security.listAllowed", scope: .serverAdmin),
-        .init(.post, "allowlist", "security.allow", scope: .serverAdmin),
-        .init(.delete, "allowlist/:id", "security.disallow", scope: .serverAdmin),
-        .init(.get, "failures", "security.recentFailures", scope: .serverAdmin),
+        .init(.get, "blocklist", .securityListBlocked, scope: .serverAdmin),
+        .init(.delete, "blocklist", .securityClearBlocked, scope: .serverAdmin),
+        .init(.delete, "blocklist/:id", .securityUnblock, scope: .serverAdmin),
+        .init(.get, "allowlist", .securityListAllowed, scope: .serverAdmin),
+        .init(.post, "allowlist", .securityAllow, scope: .serverAdmin),
+        .init(.delete, "allowlist/:id", .securityDisallow, scope: .serverAdmin),
+        .init(.get, "failures", .securityRecentFailures, scope: .serverAdmin),
       ]
     #else
       return []
     #endif
   }
 
-  /// Alerts, with everything an alert actually carries (§3).
+  /// Alerts, with everything an alert actually carries — structured actions, severity and
+  /// occurrence count.
   ///
   /// The v1 row is six flat keys, and it stays that way — it is the reference's `alert`
   /// table and clients read it. This is where the title and body stay separate, the real
@@ -553,17 +560,17 @@ public enum AdditiveRoutes {
   public static let alerts = RouteGroup(
     "Alerts", prefix: "server/alert", apiVersion: RouteTable.latestVersion,
     routes: [
-      .init(.get, "", "server.alertsV2"),
-      .init(.post, "read", "server.markAlertReadV2"),
+      .init(.get, "", .serverAlertsV2),
+      .init(.post, "read", .serverMarkAlertReadV2),
     ]
   )
 
-  /// Streams a contact avatar with an ETag instead of base64-in-JSON (§9). The inline
+  /// Streams a contact avatar with an ETag instead of base64-in-JSON. The inline
   /// `avatar` field stays exactly as it is; this is a second way to get the same image.
   public static let contactAvatar = RouteGroup(
     "Contact Avatar", prefix: "contact", apiVersion: RouteTable.latestVersion,
     routes: [
-      .init(.get, ":id/avatar", "contact.avatar")
+      .init(.get, ":id/avatar", .contactAvatar)
     ])
 
   /// The shared contact card, with everything the helper actually reports.
@@ -579,10 +586,10 @@ public enum AdditiveRoutes {
   public static let contactCard = RouteGroup(
     "Contact Card", prefix: "icloud", apiVersion: RouteTable.latestVersion,
     routes: [
-      .init(.get, "contact", "icloud.contactCardV2", requires: .privateAPI)
+      .init(.get, "contact", .icloudContactCardV2, requires: .privateAPI)
     ])
 
-  /// Editing a registered webhook (§16). The Node server could only create and delete one
+  /// Editing a registered webhook. The v1 surface could only create and delete one
   /// over HTTP — changing an endpoint's URL or its event subscriptions was an Electron IPC
   /// call with no route behind it — so this is additive by definition and a default table
   /// carrying it would no longer match.
@@ -593,20 +600,20 @@ public enum AdditiveRoutes {
   public static let webhookEditing = RouteGroup(
     "Webhook Editing", prefix: "webhook", apiVersion: RouteTable.latestVersion,
     routes: [
-      .init(.put, ":id", "webhook.update", scope: .serverAdmin)
+      .init(.put, ":id", .webhookUpdate, scope: .serverAdmin)
     ]
   )
 
-  /// Batch hydration for `reference-v2` (§4). Registered only when a non-legacy codec is
-  /// enabled — a client on `legacy-v1` never needs it, and an endpoint nobody calls is
-  /// still an endpoint an attacker can.
+  /// Batch hydration for `reference-v2` (`docs/EVENTS.md` § "`reference-v2`"). Registered
+  /// only when a non-legacy codec is enabled — a client on `legacy-v1` never needs it, and
+  /// an endpoint nobody calls is still an endpoint an attacker can.
   public static let hydration = RouteGroup(
     "Hydration", prefix: "message", apiVersion: RouteTable.latestVersion,
     routes: [
-      .init(.post, "hydrate", "message.hydrate")
+      .init(.post, "hydrate", .messageHydrate)
     ])
 
-  /// Pinning a conversation (§15). The helper has always been able to do this and the Node
+  /// Pinning a conversation. The helper has always been able to do this and the v1 surface
   /// server never exposed it, so it is additive by definition — a default table that
   /// carried it would no longer match.
   public static let chatPinning = RouteGroup(
@@ -620,9 +627,9 @@ public enum AdditiveRoutes {
       // Reads the pinned list in DISPLAY ORDER, which is what makes it usable for syncing
       // pins between devices: pins render in this sequence, so a client that treats the
       // response as a set reshuffles the user's arrangement every time it syncs.
-      .init(.get, "pin", "chat.pinned", requires: .privateAPI),
-      .init(.post, ":guid/pin", "chat.pin", scope: .chatsWrite, requires: .privateAPI),
-      .init(.delete, ":guid/pin", "chat.unpin", scope: .chatsWrite, requires: .privateAPI),
+      .init(.get, "pin", .chatPinned, requires: .privateAPI),
+      .init(.post, ":guid/pin", .chatPin, scope: .chatsWrite, requires: .privateAPI),
+      .init(.delete, ":guid/pin", .chatUnpin, scope: .chatsWrite, requires: .privateAPI),
     ])
 
   /// Conversation controls the Node server never exposed: wallpaper, mute, filtering,
@@ -643,46 +650,46 @@ public enum AdditiveRoutes {
       // segment count so the router separates them either way — declaring the longer
       // one first keeps the group readable under the table's own rule rather than
       // relying on that.
-      .init(.get, ":guid/background/info", "chat.backgroundInfo", scope: .attachmentsRead),
+      .init(.get, ":guid/background/info", .chatBackgroundInfo, scope: .attachmentsRead),
       // A download, not a change to the conversation — so `attachments:read` like the
       // rest of the background group, and the helper because only imagent can fetch it.
       .init(
-        .post, ":guid/background/fetch", "chat.fetchBackground",
+        .post, ":guid/background/fetch", .chatFetchBackground,
         scope: .attachmentsRead, requires: .privateAPI),
-      .init(.get, ":guid/background", "chat.background", scope: .attachmentsRead),
+      .init(.get, ":guid/background", .chatBackground, scope: .attachmentsRead),
 
       // Mute. The read carries the default scope, matching `chat.pinned`; the writes
       // carry `chats:write` like every other chat write.
-      .init(.get, ":guid/mute", "chat.muteState", requires: .privateAPI),
-      .init(.post, ":guid/mute", "chat.mute", scope: .chatsWrite, requires: .privateAPI),
-      .init(.delete, ":guid/mute", "chat.unmute", scope: .chatsWrite, requires: .privateAPI),
+      .init(.get, ":guid/mute", .chatMuteState, requires: .privateAPI),
+      .init(.post, ":guid/mute", .chatMute, scope: .chatsWrite, requires: .privateAPI),
+      .init(.delete, ":guid/mute", .chatUnmute, scope: .chatsWrite, requires: .privateAPI),
 
       // Filtering. `known`, `spam` and `junk` are three doors into the same state, and
       // `filter` is the read plus the way back out — including recovery from Junk.
-      .init(.get, ":guid/filter", "chat.filterState", requires: .privateAPI),
+      .init(.get, ":guid/filter", .chatFilterState, requires: .privateAPI),
       .init(
-        .post, ":guid/filter", "chat.setFilter",
+        .post, ":guid/filter", .chatSetFilter,
         scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .post, ":guid/known", "chat.markKnown",
+        .post, ":guid/known", .chatMarkKnown,
         scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .post, ":guid/spam", "chat.markSpam",
+        .post, ":guid/spam", .chatMarkSpam,
         scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .post, ":guid/junk", "chat.reportJunk",
+        .post, ":guid/junk", .chatReportJunk,
         scope: .chatsWrite, requires: .privateAPI),
 
       // Empties a conversation, keeping the conversation. Note where this ISN'T: the
       // v1 chat group has `DELETE :guid/:messageGuid`, which would match this path and
       // try to delete a message whose GUID is the literal string "messages".
       .init(
-        .delete, ":guid/messages", "chat.clearHistory",
+        .delete, ":guid/messages", .chatClearHistory,
         scope: .chatsWrite, requires: .privateAPI),
     ]
   )
 
-  /// FindMy beyond what the previous server had (§15).
+  /// FindMy device and location routes beyond the v1 surface.
   ///
   /// Under the same `icloud/findmy` prefix as the four inherited routes, which keeps a
   /// client's FindMy calls in one place — but declared here, because adding a path to
@@ -698,14 +705,14 @@ public enum AdditiveRoutes {
       // No `requires: .privateAPI`: this is the call that TELLS a client whether the
       // Private API is usable for FindMy, so failing it when the helper is absent would
       // withhold exactly the answer being asked for.
-      .init(.get, "status", "findmy.status"),
-      .init(.post, "friend/refresh", "findmy.refreshFriend", requires: .privateAPI),
+      .init(.get, "status", .findmyStatus),
+      .init(.post, "friend/refresh", .findmyRefreshFriend, requires: .privateAPI),
       .init(
-        .post, "friend/request", "findmy.requestShare",
+        .post, "friend/request", .findmyRequestShare,
         scope: .messagesWrite, requires: .privateAPI),
     ])
 
-  /// Sharing this Mac's location out (§15). Gated on `Features.findMyLocationSharing` as
+  /// Sharing this Mac's location out. Gated on `Features.findMyLocationSharing` as
   /// well as `Features.findMy`, and both are off by default.
   ///
   /// A separate group rather than two more routes in `findMy` because the second flag has
@@ -716,15 +723,15 @@ public enum AdditiveRoutes {
     "Find My Sharing", prefix: "icloud/findmy", apiVersion: RouteTable.latestVersion,
     routes: [
       .init(
-        .post, "sharing/start", "findmy.startSharing",
+        .post, "sharing/start", .findmyStartSharing,
         scope: .messagesWrite, requires: .privateAPI),
       .init(
-        .post, "sharing/stop", "findmy.stopSharing",
+        .post, "sharing/stop", .findmyStopSharing,
         scope: .messagesWrite, requires: .privateAPI),
     ]
   )
 
-  /// Enhanced FaceTime (§15). Additive routes under the same `facetime` prefix as the three
+  /// Enhanced FaceTime. Additive routes under the same `facetime` prefix as the three
   /// inherited ones (`session`/`answer`/`leave`, which stay in the default table). Gated on
   /// `Features.faceTime`.
   ///
@@ -734,28 +741,28 @@ public enum AdditiveRoutes {
   public static let faceTime = RouteGroup(
     "FaceTime Enhanced", prefix: "facetime", apiVersion: RouteTable.latestVersion,
     routes: [
-      .init(.post, "link", "facetime.generateLink", scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, "link", .facetimeGenerateLink, scope: .chatsWrite, requires: .privateAPI),
       // Invalidate active links. No body → all created links; `{ "urls": [...] }` → those.
-      .init(.delete, "link", "facetime.invalidateLinks", scope: .chatsWrite, requires: .privateAPI),
+      .init(.delete, "link", .facetimeInvalidateLinks, scope: .chatsWrite, requires: .privateAPI),
       // An explicit escape hatch: end the Mac's participation in a call by UUID. The
       // inherited `leave/:call_uuid` exists too; this one takes the UUID in the body so a
       // client that has a call object can hang up without URL-encoding.
-      .init(.post, "leave", "facetime.leaveCall", scope: .chatsWrite, requires: .privateAPI),
-      .init(.post, "call", "facetime.call", scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, "leave", .facetimeLeaveCall, scope: .chatsWrite, requires: .privateAPI),
+      .init(.post, "call", .facetimeCall, scope: .chatsWrite, requires: .privateAPI),
       .init(
-        .post, ":group_uuid/admit", "facetime.admit",
+        .post, ":group_uuid/admit", .facetimeAdmit,
         scope: .chatsWrite, requires: .privateAPI),
-      .init(.get, ":group_uuid/members", "facetime.members", requires: .privateAPI),
+      .init(.get, ":group_uuid/members", .facetimeMembers, requires: .privateAPI),
       // Deliberately NOT `requires: .privateAPI`: the call log is a database read, so
       // recents work with no helper injected. See CallHistoryRepository.
-      .init(.get, "recents", "facetime.recents"),
+      .init(.get, "recents", .facetimeRecents),
       // Clear stray links and stuck calls. Admin-scoped: it deletes things.
-      .init(.post, "cleanup", "facetime.cleanup", scope: .serverAdmin, requires: .privateAPI),
+      .init(.post, "cleanup", .facetimeCleanup, scope: .serverAdmin, requires: .privateAPI),
       // FaceTime's counterpart to the inherited `mac/imessage/restart`. It lives HERE, not
       // beside that route, because the default table must match the Node server's exactly —
       // a parity test enforces that, and Node has no FaceTime restart. Restarts FaceTime.app
       // with its Private API helper re-injected.
-      .init(.post, "restart", "facetime.restart", scope: .serverAdmin),
+      .init(.post, "restart", .facetimeRestart, scope: .serverAdmin),
     ] + debugDiagnostics)
 
   // DEBUG-ONLY DIAGNOSTICS, and compiled out of a release build entirely.
@@ -774,10 +781,10 @@ public enum AdditiveRoutes {
   static var debugDiagnostics: [RouteDefinition] {
     #if DEBUG
       return [
-        .init(.get, ":group_uuid/debug", "facetime.debug", requires: .privateAPI),
-        .init(.get, "windows", "facetime.windows", requires: .privateAPI),
+        .init(.get, ":group_uuid/debug", .facetimeDebug, requires: .privateAPI),
+        .init(.get, "windows", .facetimeWindows, requires: .privateAPI),
         .init(
-          .post, "dismiss-alert", "facetime.dismissAlert",
+          .post, "dismiss-alert", .facetimeDismissAlert,
           scope: .chatsWrite, requires: .privateAPI),
       ]
     #else
@@ -792,20 +799,21 @@ public enum AdditiveRoutes {
     "FaceTime Incoming", prefix: "facetime", apiVersion: RouteTable.latestVersion,
     routes: [
       .init(
-        .post, "handoff/:call_uuid", "facetime.handoff",
+        .post, "handoff/:call_uuid", .facetimeHandoff,
         scope: .chatsWrite, requires: .privateAPI)
     ]
   )
 
-  /// Token auth (§5). NOT registered under `auth_mode = password`, which is the default —
-  /// these paths must 404, not 401, so the route table matches the Node server's exactly.
+  /// Token auth (`docs/AUTH.md` § "Tokens"). NOT registered under `auth_mode = password`,
+  /// which is the default — these paths must 404, not 401, so the route table matches the
+  /// reference table exactly.
   /// The distinction is asserted in the default-off tests.
   public static let auth = RouteGroup(
     "Auth", prefix: "auth", apiVersion: RouteTable.latestVersion,
     routes: [
-      .init(.post, "register", "auth.register", requires: .optionalAuthentication),
-      .init(.post, "token", "auth.token", requires: .unauthenticated),
-      .init(.post, "rotate", "auth.rotate"),
-      .init(.post, "revoke", "auth.revoke", scope: .serverAdmin),
+      .init(.post, "register", .authRegister, requires: .optionalAuthentication),
+      .init(.post, "token", .authToken, requires: .unauthenticated),
+      .init(.post, "rotate", .authRotate),
+      .init(.post, "revoke", .authRevoke, scope: .serverAdmin),
     ])
 }

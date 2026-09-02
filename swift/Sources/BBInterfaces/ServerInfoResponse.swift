@@ -11,7 +11,7 @@
 //  these and asserts its keys equal an independent transcription of Node's
 //  `ServerMetadataResponse`, which needs no server, no database and no network.
 //
-//  See `.claude/docs/decisions.md` and § 14.
+//  See `.claude/docs/decisions.md`.
 
 import BBSerialization
 import Foundation

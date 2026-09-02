@@ -33,6 +33,23 @@
 //  types already are), a loader that validates BEFORE anything is constructed, and a
 //  decision about what an untrusted manifest is allowed to declare.
 //
+//  FROZEN, deliberately, until that work is picked up.
+//
+//  Third-party plugins are still wanted; they are not being built now. Until they are, this
+//  surface is CLOSED TO NEW CAPABILITY: no new entitlement kinds, no new manifest fields for
+//  hypothetical plugin needs, no widening of the tool or migration descriptors. Roughly 1,700
+//  lines across this file, `ManifestValidation`, `ToolRequirement`, `ServiceMigration` and
+//  `SettingsScope` already serve eleven compiled-in services, and every line of it is tax the
+//  built-ins pay for a boundary no process boundary yet enforces.
+//
+//  What is still fair game while frozen: fixing a bug, and adding a field a BUILT-IN service
+//  genuinely needs today. The test is whether a shipping service is blocked without it — not
+//  whether a future plugin might want it.
+//
+//  It has already earned its keep once, and that is why it is frozen rather than deleted:
+//  `ProxyServices` models connection methods as manifest-described services rather than an
+//  enum, which is the only reason a third-party tunnel is expressible at all.
+//
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
 import Foundation

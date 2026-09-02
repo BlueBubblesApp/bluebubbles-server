@@ -61,7 +61,7 @@ struct FixtureCoverageTests {
       for: exchange("GET", "/api/v1/chat/count"), in: entries
     )
     let matched = try! #require(index.map { entries[$0] })
-    #expect(matched.route.handlerID.rawValue == "chat.count")
+    #expect(matched.route.handlerID == .chatCount)
   }
 
   @Test("Method is part of the match")
@@ -71,7 +71,7 @@ struct FixtureCoverageTests {
       for: exchange("DELETE", "/api/v1/chat/any;-;x/typing"), in: entries
     )
     let matched = try! #require(index.map { entries[$0] })
-    #expect(matched.route.handlerID.rawValue == "chat.stopTyping")
+    #expect(matched.route.handlerID == .chatStopTyping)
   }
 
   @Test("The landing page matches the root route")
@@ -79,7 +79,7 @@ struct FixtureCoverageTests {
     let entries = RouteCatalog.routes
     let index = FixtureCoverage.matchIndex(for: exchange("GET", "/"), in: entries)
     let matched = try! #require(index.map { entries[$0] })
-    #expect(matched.route.handlerID.rawValue == "ui.index")
+    #expect(matched.route.handlerID == .uiIndex)
   }
 
   @Test("An unknown path matches nothing rather than the nearest route")

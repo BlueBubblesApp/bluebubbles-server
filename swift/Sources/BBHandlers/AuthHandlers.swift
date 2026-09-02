@@ -20,16 +20,16 @@ public enum AuthHandlers {
   public static func register(
     into registry: inout HandlerRegistry, context: some TokenAuthProviding
   ) {
-    registry.register("auth.register") { request in
+    registry.register(.authRegister) { request in
       try await self.enroll(request, context: context)
     }
-    registry.register("auth.token") { request in
+    registry.register(.authToken) { request in
       try await self.token(request, context: context)
     }
-    registry.register("auth.rotate") { request in
+    registry.register(.authRotate) { request in
       try await self.rotate(request, context: context)
     }
-    registry.register("auth.revoke") { request in
+    registry.register(.authRevoke) { request in
       try await self.revoke(request, context: context)
     }
   }

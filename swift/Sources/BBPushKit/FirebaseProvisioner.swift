@@ -504,22 +504,7 @@ public actor FirebaseProvisioner {
     )
   }
 
-  /// Creates a key for the project's Firebase Admin service account.
-  ///
-  /// The account itself is created by `addFirebase`, but not instantly — hence the retry.
-  /// The current implementation has the same wait, for the same reason.
-  /// Finds the project's Firebase Admin service account by ASKING, not by guessing.
-  ///
-  /// The address is not derivable. Google appends a suffix to it —
-  /// `firebase-adminsdk-a1b2c@…` historically, `firebase-adminsdk-fbsvc@…` on projects
-  /// created more recently — so the plain `firebase-adminsdk@{project}` this used to
-  /// construct never exists for ANY project. Every guided setup 404'd twelve times over
-  /// sixty seconds and reported the account as "not ready yet", which is why it read as a
-  /// slow provisioning run rather than as a defect.
-  ///
-  /// The reference server has always listed the accounts and matched on `displayName`; the
-  /// port replaced that with a constructed address. Matching on the email prefix as well
-  /// costs nothing and survives Google renaming the display name.
+  /// Identifies the project's Firebase Admin service account.
   struct AdminAccount: Sendable {
     /// What the IAM URLs address the account by — its unique ID, or the email as a
     /// fallback. Both are accepted by the API.
@@ -527,6 +512,19 @@ public actor FirebaseProvisioner {
     let email: String?
   }
 
+  /// Finds the project's Firebase Admin service account by ASKING, not by guessing.
+  ///
+  /// The address is not derivable. Google appends a suffix to it —
+  /// `firebase-adminsdk-a1b2c@…` historically, `firebase-adminsdk-fbsvc@…` on projects
+  /// created more recently — so a constructed `firebase-adminsdk@{project}` never exists for
+  /// ANY project. Guessing it makes every guided setup 404 twelve times over sixty seconds
+  /// and report the account as "not ready yet", which reads as a slow provisioning run
+  /// rather than as a defect.
+  ///
+  /// The reference server lists the accounts and matches on `displayName`. Matching on the
+  /// email prefix as well costs nothing and survives Google renaming the display name.
+  ///
+  /// The account is created by `addFirebase`, but not instantly — hence the deadline.
   private func firebaseAdminAccount(
     in projectId: String,
     deadline timeout: Duration = .seconds(180)
@@ -738,10 +736,10 @@ public actor FirebaseProvisioner {
 
   /// The `google-services.json` Google generated, as bytes.
   ///
-  /// Returned whole. It was previously decoded straight into `FirebaseClientConfig` and
-  /// only the projection kept, which discarded the Android API key and app ID at the one
-  /// moment they existed — the guided path produced the same unusable client configuration
-  /// as the import path, from the other direction.
+  /// Returned whole, NOT decoded into `FirebaseClientConfig` first. Keeping only that
+  /// projection discards the Android API key and app ID at the one moment they exist, which
+  /// makes the guided path produce the same unusable client configuration as the import
+  /// path, from the other direction.
   private func fetchClientConfig(appName: String) async throws -> Data {
     let response = try await api.send(
       method: "GET",

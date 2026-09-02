@@ -39,7 +39,13 @@ public struct AppDatabase: Sendable {
       .appendingPathComponent("Library/Application Support/bluebubbles-server/app.db")
   }
 
-  public static func open(at url: URL = defaultURL) throws -> AppDatabase {
+  /// - Parameter contributors: The modules that own tables here, in a FIXED order. See
+  ///   `migrate(contributors:)` — this order is part of the schema and must not be
+  ///   rearranged once a release has shipped with it.
+  public static func open(
+    at url: URL = defaultURL,
+    contributors: [any SchemaContributor.Type] = []
+  ) throws -> AppDatabase {
     try FileManager.default.createDirectory(
       at: url.deletingLastPathComponent(), withIntermediateDirectories: true
     )
@@ -47,234 +53,99 @@ public struct AppDatabase: Sendable {
     configuration.foreignKeysEnabled = true
     let queue = try DatabaseQueue(path: url.path, configuration: configuration)
     let database = AppDatabase(queue: queue)
-    try database.migrate()
+    try database.migrate(contributors: contributors)
     return database
   }
 
   /// In-memory, for tests.
-  public static func inMemory() throws -> AppDatabase {
+  ///
+  /// Takes contributors for the same reason `open` does: a test that needs a module's
+  /// tables asks for that module's schema. A test target that names none gets the core
+  /// baseline alone, which is what every existing caller wanted and still gets.
+  public static func inMemory(
+    contributors: [any SchemaContributor.Type] = []
+  ) throws -> AppDatabase {
     let queue = try DatabaseQueue()
     let database = AppDatabase(queue: queue)
-    try database.migrate()
+    try database.migrate(contributors: contributors)
     return database
   }
 
   /// Migrations are append-only and never edited once released — editing one means two
   /// installs on the same version have different schemas.
-  public func migrate() throws {
+  ///
+  /// Two phases, and the split is deliberate:
+  ///
+  ///   1. **The core baseline below.** History, and immutable. It stays here rather than
+  ///      moving to the modules that own these tables because of ONE migration:
+  ///      `normaliseTimestampColumnNames` renames columns on `device` (BBInterfaces) and on
+  ///      `blocked_client`, `paired_client` and `auth_failure` (BBAuth) in a single step.
+  ///      A released migration cannot be split — the identifier is already recorded on
+  ///      every install — so those two modules' tables cannot leave until it is dealt with.
+  ///      `setting` and the contact tables are not touched by it, and have moved out.
+  ///
+  ///   2. **Contributed schema**, registered after it, in the order given.
+  ///
+  /// - Parameter contributors: Registered in the order supplied, after the baseline. That
+  ///   order is part of the schema on a FRESH install and must stay stable across releases.
+  ///   It is safe to reorder relative to an EXISTING install — GRDB applies by identifier
+  ///   and skips what is recorded — but a fresh install would build its tables in the new
+  ///   order, so treat the list as append-only too.
+  public func migrate(contributors: [any SchemaContributor.Type] = []) throws {
     var migrator = DatabaseMigrator()
 
-    migrator.registerMigration("createSettings") { db in
-      try db.create(table: "setting") { table in
-        table.column("key", .text).primaryKey()
-        table.column("value", .blob).notNull()
-        table.column("type_tag", .text).notNull()
-        table.column("is_secret", .boolean).notNull().defaults(to: false)
-        table.column("updated_at", .datetime).notNull()
+    // Namespaces checked before anything runs: a collision would have one contributor's
+    // migration recorded under another's identifier and silently never applied.
+    var seen: Set<String> = []
+    for contributor in contributors {
+      guard seen.insert(contributor.schemaNamespace).inserted else {
+        throw SchemaContributionError.duplicateNamespace(contributor.schemaNamespace)
       }
+      try contributor.validateSchemaNamespace()
     }
-
-    migrator.registerMigration("createAlerts") { db in
-      try db.create(table: "alert") { table in
-        table.autoIncrementedPrimaryKey("id")
-        table.column("uuid", .text).notNull().unique()
-        table.column("severity", .text).notNull()
-        table.column("title", .text).notNull()
-        table.column("body", .text).notNull()
-        table.column("source", .text).notNull()
-        table.column("diagnostics", .blob)
-        table.column("dedupe_key", .text).indexed()
-        table.column("occurrence_count", .integer).notNull().defaults(to: 1)
-        table.column("created_at", .datetime).notNull()
-        table.column("last_occurred_at", .datetime).notNull()
-        table.column("read_at", .datetime)
-        table.column("dismissed_at", .datetime)
-      }
+    for contributor in contributors {
+      contributor.registerSchema(in: &migrator)
     }
+    Self.registerFrozenTail(in: &migrator)
 
-    migrator.registerMigration("createDevices") { db in
-      try db.create(table: "device") { table in
-        table.autoIncrementedPrimaryKey("id")
-        table.column("name", .text).notNull()
-        table.column("identifier", .text).notNull().unique()
-        table.column("last_active", .datetime)
-        // Per-target codec negotiation (§ 4). Null means legacy-v1.
-        table.column("supported_codecs", .text)
-        table.column("public_key", .blob)
-      }
+    try migrator.migrate(queue)
+  }
+
+  /// Every migration this database would run, in order, without touching a database.
+  ///
+  /// Exists for the test that freezes the sequence. Reordering migrations across a release
+  /// is invisible in review and changes what a fresh install builds.
+  public static func migrationPlan(
+    contributors: [any SchemaContributor.Type] = []
+  ) throws -> [String] {
+    var migrator = DatabaseMigrator()
+    for contributor in contributors {
+      try contributor.validateSchemaNamespace()
+      contributor.registerSchema(in: &migrator)
     }
+    registerFrozenTail(in: &migrator)
+    return migrator.migrations
+  }
 
-    migrator.registerMigration("createWebhooks") { db in
-      try db.create(table: "webhook") { table in
-        table.autoIncrementedPrimaryKey("id")
-        table.column("url", .text).notNull().unique()
-        table.column("events", .text).notNull()
-        table.column("created_at", .datetime).notNull()
-      }
-    }
-
-    migrator.registerMigration("createContactIndex") { db in
-      // Contacts merged from macOS Contacts, Google and the local table into ONE
-      // indexed table, resolved once at index time rather than per request.
-      try db.create(table: "contact") { table in
-        table.column("id", .text).primaryKey()
-        table.column("source", .integer).notNull()
-        table.column("first_name", .text)
-        table.column("last_name", .text)
-        table.column("display_name", .text)
-        table.column("nickname", .text)
-        table.column("birthday", .text)
-        table.column("external_id", .text).indexed()
-        table.column("updated_at", .datetime).notNull()
-      }
-
-      try db.create(table: "contact_address") { table in
-        table.column("normalized", .text).notNull()
-        // The normalized address REVERSED. SQLite can range-scan a prefix but not a
-        // suffix, and the match we need is "ends with these N digits" — so we store
-        // it backwards and the suffix match becomes a prefix range on the index.
-        table.column("reversed", .text).notNull()
-        table.column("kind", .integer).notNull()
-        table.column("contact_id", .text)
-          .notNull()
-          .references("contact", onDelete: .cascade)
-        table.primaryKey(["normalized", "contact_id"])
-      }
-
-      // THE index that matters. It turns the "last N digits" phone match from four
-      // full scans over a map rebuilt per call into four indexed range probes — and
-      // that lookup runs once per handle during message serialization.
-      try db.create(
-        index: "idx_contact_address_reversed", on: "contact_address", columns: ["reversed"]
-      )
-    }
-
-    migrator.registerMigration("addContactAddressRawAndAccount") { db in
-      // The stored `normalized` address is lossy by design — it strips everything that
-      // is not alphanumeric so that "+1 (555) 010-1234" and "5550101234" collide on
-      // lookup. It was also the ONLY thing stored, so every read handed the stripped
-      // form back: `person.name@example.com` came out of GET /api/v1/contact as
-      // `personnameexamplecom`. `raw` keeps what was actually entered.
-      //
-      // Nullable with no backfill because there is nothing to backfill FROM. Existing
-      // rows read as they did before until the next re-index rewrites them.
-      try db.alter(table: "contact_address") { table in
-        table.add(column: "raw", .text)
-      }
-
-      // Which account in Contacts a record synced from — iCloud, Google, on this Mac.
-      // Distinct from `source`, which says only "address book" vs "our own API" and is
-      // frozen into the wire format as db/api.
-      try db.alter(table: "contact") { table in
-        table.add(column: "account_kind", .text)
-        table.add(column: "account_name", .text)
-      }
-    }
-
-    migrator.registerMigration("createScheduledMessages") { db in
-      try db.create(table: "scheduled_message") { table in
-        table.autoIncrementedPrimaryKey("id")
-        table.column("type", .text).notNull()
-        table.column("payload", .blob).notNull()
-        table.column("scheduled_for", .datetime).notNull().indexed()
-        table.column("schedule", .blob)
-        table.column("status", .text).notNull()
-        table.column("error", .text)
-        table.column("sent_at", .datetime)
-        table.column("created_at", .datetime).notNull()
-      }
-    }
-
-    // Client-supplied blobs the server only stores and hands back: theme definitions and
-    // settings bundles from the mobile app. Deliberately opaque — the server has no
-    // reason to parse a client's theme, and parsing it would make every client-side
-    // format change a server release.
-    migrator.registerMigration("createBackups") { db in
-      try db.create(table: "backup") { table in
-        table.autoIncrementedPrimaryKey("id")
-        // "theme" or "settings". Both live in one table because they differ only by
-        // kind, and two identical tables would drift.
-        table.column("kind", .text).notNull()
-        table.column("name", .text).notNull()
-        table.column("payload", .blob).notNull()
-        table.column("created_at", .datetime).notNull()
-        table.uniqueKey(["kind", "name"])
-      }
-    }
-
-    migrator.registerMigration("createAccessControl") { db in
-      // Blocklist persists so a restart is not an accidental unblock, and an admin
-      // can see what happened while they were away (§ 17).
-      try db.create(table: "blocked_client") { table in
-        table.autoIncrementedPrimaryKey("id")
-        table.column("address", .text).notNull().unique()
-        table.column("reason", .text).notNull()
-        table.column("failure_count", .integer).notNull().defaults(to: 0)
-        table.column("first_seen", .datetime).notNull()
-        table.column("last_seen", .datetime).notNull()
-        table.column("blocked_at", .datetime).notNull()
-        table.column("expires_at", .datetime)
-        table.column("is_permanent", .boolean).notNull().defaults(to: false)
-      }
-
-      try db.create(table: "allowed_client") { table in
-        table.autoIncrementedPrimaryKey("id")
-        table.column("cidr", .text).notNull().unique()
-        table.column("note", .text)
-        table.column("created_at", .datetime).notNull()
-      }
-
-      // Bounded ring, so an attack is visible before it trips a block.
-      try db.create(table: "auth_failure") { table in
-        table.autoIncrementedPrimaryKey("id")
-        table.column("address", .text).notNull().indexed()
-        table.column("at", .datetime).notNull().indexed()
-        table.column("path", .text)
-        table.column("reason", .text)
-      }
-    }
-
-    // Added separately rather than folded into `createAccessControl`: installs created
-    // before this shipped have already run that migration, and editing it would leave
-    // them without the column while the schema version claimed otherwise.
-    migrator.registerMigration("addBlockOffenceCount") { db in
-      // Escalation state. Without persisting it a repeat offender restarts at the base
-      // lockout after every server restart, which is the one thing escalation exists
-      // to prevent.
-      try db.alter(table: "blocked_client") { table in
-        table.add(column: "offence_count", .integer).notNull().defaults(to: 1)
-      }
-    }
-
-    // Appended, never edited into `createAlerts`: migrations are append-only, and an
-    // install that already ran the original has to get this column by migrating rather
-    // than by having history rewritten under it.
-    //
-    // Defaults to true because every alert raised before this existed was a fact rather
-    // than a live condition as far as anything can now tell, and true is the reading that
-    // keeps information rather than discarding it.
-    migrator.registerMigration("addAlertDurability") { db in
-      try db.alter(table: "alert") { table in
-        table.add(column: "is_durable", .boolean).notNull().defaults(to: true)
-      }
-    }
-
-    migrator.registerMigration("createPairedClients") { db in
-      // Token auth (§ 5). Created regardless so the schema is stable, but no rows
-      // exist and no endpoint is registered while auth_mode is `password`.
-      try db.create(table: "paired_client") { table in
-        table.column("client_id", .text).primaryKey()
-        table.column("secret_hash", .text).notNull()
-        table.column("device_name", .text).notNull()
-        table.column("platform", .text)
-        table.column("scopes", .text).notNull()
-        table.column("public_key", .blob)
-        table.column("created_at", .datetime).notNull()
-        table.column("last_seen", .datetime)
-        table.column("revoked_at", .datetime)
-      }
-    }
-
+  /// The one migration that could not move to a module, applied last.
+  ///
+  /// `normaliseTimestampColumnNames` renames columns on `device` (BBInterfaces) and on
+  /// `blocked_client`, `paired_client` and `auth_failure` (BBAuth) in a SINGLE step. It has
+  /// shipped, so its identifier is recorded on every install and it cannot be split into one
+  /// migration per module — there would be two new identifiers where one old one is on file,
+  /// and both would re-run.
+  ///
+  /// So it stays here, as the last thing registered, and each rename is guarded on the table
+  /// being present. On any real database that guard is always true: every install ran the
+  /// creates before this, so the behaviour is exactly what it has always been. What the guard
+  /// buys is a PARTIAL contributor set — `BBAuthTests` can stand up the access-control tables
+  /// alone and still get its renames, without also building the BBInterfaces schema to
+  /// satisfy one `ALTER` it does not care about.
+  ///
+  /// Registered by `migrate` unconditionally rather than being a contributor callers pass.
+  /// A caller who forgot it would get un-renamed columns and no error, which is a silent
+  /// data bug — so it is not theirs to forget.
+  private static func registerFrozenTail(in migrator: inout DatabaseMigrator) {
     // Every datetime column in the schema says WHEN something happened with an `_at`
     // suffix. Six did not, and five of those were plain drift — `first_seen`, `last_seen`,
     // `last_active`, and a column literally called `at`. The drift was not cosmetic: it
@@ -286,24 +157,29 @@ public struct AppDatabase: Sendable {
     // event happened; `_for` states a time something is aimed at, which has not happened
     // and may never. See docs/NAMING.md.
     migrator.registerMigration("normaliseTimestampColumnNames") { db in
-      try db.alter(table: "blocked_client") { table in
-        table.rename(column: "first_seen", to: "first_seen_at")
-        table.rename(column: "last_seen", to: "last_seen_at")
+      if try db.tableExists("blocked_client") {
+        try db.alter(table: "blocked_client") { table in
+          table.rename(column: "first_seen", to: "first_seen_at")
+          table.rename(column: "last_seen", to: "last_seen_at")
+        }
       }
-      try db.alter(table: "device") { table in
-        table.rename(column: "last_active", to: "last_active_at")
+      if try db.tableExists("device") {
+        try db.alter(table: "device") { table in
+          table.rename(column: "last_active", to: "last_active_at")
+        }
       }
-      try db.alter(table: "paired_client") { table in
-        table.rename(column: "last_seen", to: "last_seen_at")
+      if try db.tableExists("paired_client") {
+        try db.alter(table: "paired_client") { table in
+          table.rename(column: "last_seen", to: "last_seen_at")
+        }
       }
-      try db.alter(table: "auth_failure") { table in
-        table.rename(column: "at", to: "occurred_at")
+      if try db.tableExists("auth_failure") {
+        try db.alter(table: "auth_failure") { table in
+          table.rename(column: "at", to: "occurred_at")
+        }
       }
     }
-
-    try migrator.migrate(queue)
   }
-
   public func read<T: Sendable>(_ block: @Sendable (Database) throws -> T) async throws -> T {
     try await queue.read(block)
   }

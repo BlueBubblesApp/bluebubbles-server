@@ -13,7 +13,7 @@ public enum PushHandlers {
 
   public static func register(into registry: inout HandlerRegistry, context: some DeviceRegistering)
   {
-    registry.register("fcm.registerDevice") { request in
+    registry.register(.fcmRegisterDevice) { request in
       let values = try request.values()
       guard let token = values["identifier"]?.stringValue ?? values["token"]?.stringValue,
         !token.isEmpty
@@ -37,7 +37,7 @@ public enum PushHandlers {
     ///
     /// The one edit made on the way out is Google's missing `oauth_client`, restored the
     /// way the reference server restores it.
-    registry.register("fcm.clientConfig") { _ in
+    registry.register(.fcmClientConfig) { _ in
       let store = PushCredentialStore(secrets: context.secrets)
       guard let raw = try await store.rawClientConfig() else {
         throw ServiceUnavailable(

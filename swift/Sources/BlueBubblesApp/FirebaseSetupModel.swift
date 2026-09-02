@@ -551,7 +551,7 @@ final class FirebaseSetupModel {
   ///
   /// "Credentials imported" is not enough. A service account with no `google-services.json`
   /// sends notifications but leaves `GET /api/v1/fcm/client` returning nothing, so clients
-  /// cannot register in the first place — and that state used to be reported as complete
+  /// cannot register in the first place — so that state must not be reported as complete
   /// success on this screen.
   private func finishImport(
     push: PushInterface,

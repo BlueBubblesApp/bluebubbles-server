@@ -55,10 +55,10 @@ public actor EventBus {
   private let logger: Logger
   /// Spacing for events that declare a `minimumInterval`.
   ///
-  /// COALESCING, not dropping. This used to keep the first event in each window and
-  /// discard the rest, which is right for a counter and wrong for state: a FindMy batch
-  /// covering forty devices delivered one position and lost thirty-nine, and the survivors
-  /// were the oldest. Keyed per device, the newest position for each is delivered, spaced.
+  /// COALESCING, not dropping. Keeping the first event in each window and discarding the
+  /// rest is right for a counter and wrong for state: a FindMy batch covering forty devices
+  /// would deliver one position and lose thirty-nine, and the survivor would be the oldest.
+  /// Keyed per device, the newest position for each is delivered, spaced.
   private var limiter: CoalescingRateLimiter<String, ServerEvent>?
   /// A sink that hangs must not hold a delivery task forever.
   private let deliveryTimeout: Duration

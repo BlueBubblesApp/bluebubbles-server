@@ -12,8 +12,8 @@
 //  that moved degrades to a clear `unavailableOnThisOS`, naming the selector, on the one
 //  method that needed it. Everything else keeps working.
 //
-//  That difference is the whole point of § 15's observation ladder applied to calls rather
-//  than events: fail one feature loudly, never the process.
+//  That difference is the observation ladder (`docs/OBSERVATION_LADDER.md`) applied to calls
+//  rather than events: fail one feature loudly, never the process.
 //
 //  **`objc_msgSend` cannot be called from Swift.** Its signature depends on the method being
 //  called, and Swift has no variadic C calling convention. Everything below therefore goes
@@ -508,11 +508,11 @@ extension IMCoreRuntime {
   ///
   /// That guarantee is provided STRUCTURALLY rather than defensively: `IMCoreBridge` is
   /// `@MainActor` and `HelperDispatch.perform` is too, so the hop happens once per request
-  /// at the boundary and the compiler checks it. An earlier version forced the hop here
-  /// with `DispatchQueue.main.sync` on every call, which worked but blocked a helper
-  /// thread each time and could not run under `swift test` at all — a test host does not
-  /// drain the main queue, so the suite deadlocked. Pushing the isolation up to the type
-  /// removed both problems and the test-only escape hatch that had papered over the second.
+  /// at the boundary and the compiler checks it. Forcing the hop here with
+  /// `DispatchQueue.main.sync` on every call also works, but blocks a helper thread each
+  /// time and cannot run under `swift test` at all — a test host does not drain the main
+  /// queue, so the suite deadlocks. Keeping the isolation on the type avoids both, and the
+  /// test-only escape hatch the second would otherwise need.
   ///
   /// Nothing here dispatches. These functions run wherever their caller is, which in
   /// production is the main actor and in tests is the test thread — safe there, because

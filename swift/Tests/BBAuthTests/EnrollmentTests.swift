@@ -277,8 +277,8 @@ struct DeviceLifecycleTests {
     }
   }
 
-  /// §4 composes with §5: the key submitted at enrollment is the one sealed-v2 encrypts to,
-  /// so one handshake covers identity, codecs and encryption.
+  /// Enrollment and sealed-v2 compose: the key submitted at enrollment is the one sealed-v2
+  /// encrypts to, so one handshake covers identity, codecs and encryption.
   @Test("Enrollment carries codec capability and a public key")
   func enrollmentCarriesCodecCapability() async throws {
     let registry = DeviceRegistry()

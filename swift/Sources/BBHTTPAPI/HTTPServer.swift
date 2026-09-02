@@ -531,7 +531,8 @@ public struct HTTPAPIBuilder: Sendable {
 ///
 /// This is on the deferred list rather than the fixed list: restricting it requires knowing
 /// which origins real clients use, and getting that wrong locks people out. Recorded in
-/// § Residual risk.
+/// `.claude/docs/decisions.md` § "2. Security work that shipped, and what it deliberately
+/// did not close".
 struct CORSMiddleware<Context: RequestContext>: RouterMiddleware {
 
   let allowedOrigin: String
@@ -560,9 +561,9 @@ struct CORSMiddleware<Context: RequestContext>: RouterMiddleware {
 
 /// Streams a file in fixed-size chunks.
 ///
-/// Placeholder for NIO's `FileRegion` path, which Phase 9 wires up properly once the
-/// attachment routes exist. The contract it has to keep either way is that peak memory is
-/// the chunk size and not the file size.
+/// A `FileHandle` read loop rather than NIO's `FileRegion`/`sendfile` path, so these bytes
+/// do pass through the heap. The contract it keeps either way is that peak memory is the
+/// chunk size and not the file size.
 struct FileBodySequence: AsyncSequence, Sendable {
   typealias Element = ByteBuffer
 

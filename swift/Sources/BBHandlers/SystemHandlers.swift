@@ -1,9 +1,8 @@
 //  SystemHandlers
 //  Controllers for the machine itself and the account.
 //
-//  FindMy used to live here, back when it was two routes that read a cache file. It is now a
-//  surface of its own — status, two refreshes, a share request, sharing control — and lives
-//  in `FindMyHandlers`.
+//  FindMy is NOT here. It is a surface of its own — status, two refreshes, a share request,
+//  sharing control — in `FindMyHandlers`.
 
 import BBDiagnostics
 import BBHTTPAPI
@@ -32,12 +31,12 @@ public enum SystemHandlers {
     into registry: inout HandlerRegistry,
     context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding
   ) {
-    registry.register("mac.lock") { _ in
+    registry.register(.macLock) { _ in
       try await ScreenLock.lock()
       return .data(nil)
     }
 
-    registry.register("mac.restartMessages") { _ in
+    registry.register(.macRestartMessages) { _ in
       scheduleRestart(
         applicationName: "Messages",
         bundleIdentifier: HelperHost.messages,
@@ -49,7 +48,7 @@ public enum SystemHandlers {
 
     // FaceTime's counterpart. Same rule about injection — restarting FaceTime.app without
     // its helper leaves the FaceTime routes reporting no helper.
-    registry.register("facetime.restart") { _ in
+    registry.register(.facetimeRestart) { _ in
       scheduleRestart(
         applicationName: "FaceTime",
         bundleIdentifier: HelperHost.faceTime,
@@ -61,10 +60,9 @@ public enum SystemHandlers {
 
   /// Restarts a managed app, PRESERVING the Private API helper.
   ///
-  /// A plain quit-and-relaunch is what this used to do, and it silently disabled the
-  /// Private API: the app comes back looking perfectly healthy while dyld never inserted
-  /// the helper, so every Private API route starts reporting the helper as unavailable and
-  /// nothing says why. When the server manages injection, the restart goes THROUGH the
+  /// A plain quit-and-relaunch silently disables the Private API: the app comes back
+  /// looking perfectly healthy while dyld never inserted the helper, so every Private API
+  /// route starts reporting the helper as unavailable and nothing says why. When the server manages injection, the restart goes THROUGH the
   /// injector, which relaunches with `DYLD_INSERT_LIBRARIES` and waits for the helper to
   /// register before reporting success.
   ///
@@ -190,7 +188,7 @@ public enum SystemHandlers {
     into registry: inout HandlerRegistry,
     context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding
   ) {
-    registry.register("icloud.accountInfo") { _ in
+    registry.register(.icloudAccountInfo) { _ in
       let api = try await requirePrivateAPI(context, for: "reading account information")
       let info = try await api.accountInfo()
       return .data(
@@ -214,7 +212,7 @@ public enum SystemHandlers {
     // helper reports them — a v1 response with extra keys is a parity failure exactly like
     // one with missing keys. They stay on the contract because the socket layer and future
     // v2 surface can use them.
-    registry.register("icloud.contactCard") { request in
+    registry.register(.icloudContactCard) { request in
       let api = try await requirePrivateAPI(context, for: "reading a contact card")
       // Absent means the local user's own card. The reference takes it from the query
       // string and passes undefined straight through, so an empty value is the default
@@ -231,14 +229,14 @@ public enum SystemHandlers {
     // `hasSharedNickname` is the key v1 cannot express. A person who shared a card with no
     // name and no photo, and a person who shared nothing at all, both reduce to an empty
     // `data` object in v1; here they differ.
-    registry.register("icloud.contactCardV2") { request in
+    registry.register(.icloudContactCardV2) { request in
       let api = try await requirePrivateAPI(context, for: "reading a contact card")
       let address = request.queryParameters["address"].flatMap { $0.isEmpty ? nil : $0 }
       let card = try await api.nicknameInfo(for: address)
       return .data(.object(contactCardPayload(card, includingExtendedKeys: true)))
     }
 
-    registry.register("icloud.changeAlias") { request in
+    registry.register(.icloudChangeAlias) { request in
       let api = try await requirePrivateAPI(context, for: "changing the active alias")
       let values = try request.values()
       let alias = try values.requireString("alias")
@@ -263,7 +261,7 @@ public enum SystemHandlers {
     context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding,
     logSink: FileSink?
   ) {
-    registry.register("server.logs") { request in
+    registry.register(.serverLogs) { request in
       guard let logSink else {
         throw ServiceUnavailable("this server is not writing to a log file")
       }

@@ -17,7 +17,7 @@ public enum UploadHandlers {
   public static func register(
     into registry: inout HandlerRegistry, context: some InterfaceProviding
   ) {
-    registry.register("attachment.upload") { request in
+    registry.register(.attachmentUpload) { request in
       guard let body = request.body, !body.isEmpty else {
         throw BadRequest("the request body is empty")
       }
@@ -46,7 +46,7 @@ public enum UploadHandlers {
     /// the file is assembled once the last one lands. Appended to a file rather than
     /// accumulated in memory: the whole reason this route exists is files too large to
     /// buffer, so buffering them here would defeat it.
-    registry.register("message.sendAttachmentChunk") { request in
+    registry.register(.messageSendAttachmentChunk) { request in
       let values = try request.values()
       guard
         let transferID = values["attachmentGuid"]?.stringValue

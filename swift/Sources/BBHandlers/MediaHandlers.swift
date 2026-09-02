@@ -32,7 +32,7 @@ public enum MediaHandlers {
     // Same as `attachment.download`, except it insists on pulling a purged attachment
     // back from iCloud rather than reporting it missing. Separate route because that can
     // take minutes — the table gives it a one-hour timeout for exactly that reason.
-    registry.register("attachment.forceDownload") { request in
+    registry.register(.attachmentForceDownload) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       guard let api = await context.privateAPIClient() else {
@@ -55,7 +55,7 @@ public enum MediaHandlers {
     /// Apple stores it beside the still with the same basename and a `.mov` extension.
     /// Derived from the still's path rather than looked up, because chat.db has no row
     /// for it — it is not an attachment, it is a sidecar file.
-    registry.register("attachment.downloadLive") { request in
+    registry.register(.attachmentDownloadLive) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let still = try await interfaces.attachment.resolvePath(guid: guid)
@@ -85,7 +85,7 @@ public enum MediaHandlers {
   ) {
     /// Reads the group photo off disk — no helper needed, which is why the route table
     /// scopes it to `attachments:read` rather than requiring the Private API.
-    registry.register("chat.groupIcon") { request in
+    registry.register(.chatGroupIcon) { request in
       let guid = try request.requirePathParameter("guid")
       let chat = try await context.requireInterfaces().chat.row(guid: guid)
       guard let path = GroupIcon.path(forGroupID: chat.groupID) else {
@@ -98,7 +98,7 @@ public enum MediaHandlers {
       )
     }
 
-    registry.register("chat.removeGroupIcon") { request in
+    registry.register(.chatRemoveGroupIcon) { request in
       let guid = try request.requirePathParameter("guid")
       guard let api = await context.privateAPIClient() else {
         throw IMessageError(
@@ -124,7 +124,7 @@ public enum MediaHandlers {
   ) {
     /// The image itself. Same shape as `chat.groupIcon`: bytes, or a 404 that says which
     /// of the two nothing-to-serve cases this is.
-    registry.register("chat.background") { request in
+    registry.register(.chatBackground) { request in
       let chat = try await Self.chatRow(request, context: context)
       switch TranscriptBackground.asset(for: chat.properties) {
       case .success(let asset):
@@ -163,7 +163,7 @@ public enum MediaHandlers {
     /// rendering a transcript over this image needs it to keep text legible — and
     /// `available: false` with an identifier is how "set but not downloaded" is
     /// expressed as data rather than as a 404 string.
-    registry.register("chat.backgroundInfo") { request in
+    registry.register(.chatBackgroundInfo) { request in
       let chat = try await Self.chatRow(request, context: context)
       switch TranscriptBackground.asset(for: chat.properties) {
       case .success(let asset):
@@ -195,7 +195,7 @@ public enum MediaHandlers {
     /// Separate from the implicit request the bytes route makes, because a client syncing
     /// several conversations wants to start every download and collect them later rather
     /// than hold a GET open for each.
-    registry.register("chat.fetchBackground") { request in
+    registry.register(.chatFetchBackground) { request in
       let chat = try await Self.chatRow(request, context: context)
       let interfaces = try await context.requireInterfaces()
       try await interfaces.chat.refetchBackground(guid: chat.guid)
@@ -284,7 +284,7 @@ public enum MediaHandlers {
     into registry: inout HandlerRegistry,
     context: some InterfaceProviding & PrivateAPIProviding
   ) {
-    registry.register("server.statMedia") { request in
+    registry.register(.serverStatMedia) { request in
       let interfaces = try await context.requireInterfaces()
       let wanted = Self.requestedCategories(request.queryParameters["only"])
       return .data(Self.totals(try await interfaces.attachment.mediaCounts(), only: wanted))
@@ -292,11 +292,10 @@ public enum MediaHandlers {
 
     // NO `chatGuid` parameter, and the response is an ARRAY.
     //
-    // This used to require one and answer with a single object, so a client calling the
-    // route the way the reference defines it — with no parameters — got a 400. Measured
-    // against a live Electron server, which returns one entry per chat that has any
-    // media at all.
-    registry.register("server.statMediaByChat") { request in
+    // Requiring one and answering with a single object would 400 a client calling the route
+    // the way the reference defines it, with no parameters. Measured against a live Electron
+    // server, which returns one entry per chat that has any media at all.
+    registry.register(.serverStatMediaByChat) { request in
       let interfaces = try await context.requireInterfaces()
       let wanted = Self.requestedCategories(request.queryParameters["only"])
       let rows = try await interfaces.attachment.mediaCountsByChat()
@@ -357,14 +356,14 @@ public enum MediaHandlers {
     into registry: inout HandlerRegistry,
     context: some InterfaceProviding & PrivateAPIProviding
   ) {
-    registry.register("chat.shouldShareContact") { request in
+    registry.register(.chatShouldShareContact) { request in
       let api = try await requirePrivateAPI(context, for: "contact sharing")
       let guid = try request.requirePathParameter("guid")
       let should = try await api.shouldOfferNicknameSharing(chat: ChatGUID(guid))
       return .data(.object(["shouldShare": .bool(should)]))
     }
 
-    registry.register("chat.shareContact") { request in
+    registry.register(.chatShareContact) { request in
       let api = try await requirePrivateAPI(context, for: "contact sharing")
       let guid = try request.requirePathParameter("guid")
       try await api.shareNickname(chat: ChatGUID(guid))
@@ -382,7 +381,7 @@ public enum MediaHandlers {
     /// cache is written by FindMy itself, on its own schedule. Rather than pretend, this
     /// re-reads what is on disk and reports how old it is, so a client can tell a stale
     /// answer from a fresh one instead of trusting a refresh that did nothing.
-    registry.register("findmy.refreshDevices") { _ in
+    registry.register(.findmyRefreshDevices) { _ in
       let data = try FindMy.read(.devices)
       let modified =
         try? FileManager.default.attributesOfItem(

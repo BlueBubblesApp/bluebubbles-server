@@ -122,7 +122,7 @@ struct PushWiringTests {
 
   @Test("A server_address change reaches the announcer")
   func addressChangeIsAnnounced() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let store = try await SettingsStore(
       database: database, secrets: InMemorySecretStore()
     )
@@ -143,7 +143,7 @@ struct PushWiringTests {
 
   @Test("An unrelated change announces nothing")
   func unrelatedChangeIsNotAnnounced() async throws {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let store = try await SettingsStore(
       database: database, secrets: InMemorySecretStore()
     )
@@ -246,10 +246,9 @@ struct PushWiringTests {
     let status = await interface.status()
     #expect(status.isConfigured)
 
-    // The whole document survived. This is the regression that matters most: the client
-    // configuration used to be re-encoded from a three-field projection, so the API key
-    // every Android client needs was dropped at import and the response still looked
-    // well-formed.
+    // The whole document survives. This is the regression that matters most: re-encoding
+    // the client configuration from a three-field projection drops the API key every Android
+    // client needs, at import, while the response still looks well-formed.
     let stored = try await PushCredentialStore(secrets: secrets).rawClientConfig()
     let text = String(decoding: try #require(stored), as: UTF8.self)
     #expect(text.contains("AIzaSyTESTKEY"))
@@ -376,7 +375,7 @@ struct PushWiringTests {
     secrets: any SecretStore,
     reloads: Reloads
   ) async throws -> PushInterface {
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     return PushInterface(
       credentials: PushCredentialStore(secrets: secrets),
       settings: try await SettingsStore(database: database, secrets: secrets),
@@ -427,8 +426,8 @@ struct PushWiringTests {
   private static let probeGroup = RouteGroup(
     "PushProbe", prefix: "test",
     routes: [
-      .init(.get, "guarded", "test.guarded"),
-      .init(.get, "open", "test.open", requires: .unauthenticated),
+      .init(.get, "guarded", HandlerID("test.guarded")),
+      .init(.get, "open", HandlerID("test.open"), requires: .unauthenticated),
     ])
 
   /// Runs a real listener, because the thing under test is where the dispatch path calls
@@ -443,8 +442,8 @@ struct PushWiringTests {
     // the odds. Asking the kernel removes them. See `EphemeralPort`.
     let listener = HTTPListener()
     var registry = HandlerRegistry()
-    registry.register("test.guarded") { _ in .data(.string("ok")) }
-    registry.register("test.open") { _ in .data(.string("ok")) }
+    registry.register(HandlerID("test.guarded")) { _ in .data(.string("ok")) }
+    registry.register(HandlerID("test.open")) { _ in .data(.string("ok")) }
     PlaceholderHandlers.fill(into: &registry, groups: RouteTable.groups)
 
     let builder = HTTPAPIBuilder(
@@ -518,11 +517,11 @@ struct PushWiringTests {
 
 //  MARK: - Legacy configuration import
 //
-//  `LegacyConfigMigration` was written and unit-tested in Phase 1 and called from NOWHERE, so
-//  an upgrading Electron user's port, password, proxy provider, ngrok key and tunnel settings
-//  were all silently discarded: the Swift server came up on defaults, on a different port,
-//  with no password, and nothing explained why. Its unit tests all passed the whole time,
-//  which is exactly why these are wiring tests.
+//  `LegacyConfigMigration` has to be CALLED, not merely correct. Unwired, an upgrading
+//  Electron user's port, password, proxy provider, ngrok key and tunnel settings are all
+//  silently discarded: the server comes up on defaults, on a different port, with no
+//  password, and nothing explains why. Its unit tests pass either way, which is exactly why
+//  these are wiring tests.
 
 @Suite("Legacy configuration import")
 struct LegacyConfigWiringTests {
@@ -550,7 +549,7 @@ struct LegacyConfigWiringTests {
     // re-import on EVERY launch — quietly reverting whatever the user had changed in the
     // Swift app back to whatever the old server happened to hold.
     let secrets = InMemorySecretStore()
-    let database = try AppDatabase.inMemory()
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
     let store = try await SettingsStore(database: database, secrets: secrets)
     let url = try makeLegacyDatabase(["socket_port": "45001"])
     defer { try? FileManager.default.removeItem(at: url) }
@@ -653,10 +652,9 @@ struct ClientConfigResponseTests {
 
 /// The rules check reports the rules it actually verified.
 ///
-/// The report used to be a fixed sentence claiming "the restart channel is scoped", printed
-/// whichever way the switch was set — including immediately after the channel had been closed,
-/// where it stated the opposite of the truth. A report that cannot be wrong about this has to
-/// carry the setting the check ran under.
+/// A fixed sentence claiming "the restart channel is scoped", printed whichever way the
+/// switch is set, states the opposite of the truth immediately after the channel is closed. A
+/// report that cannot be wrong about this has to carry the setting the check ran under.
 @Suite("Security rules check reporting", .serialized)
 struct RulesCheckReportingTests {
 

@@ -8,13 +8,13 @@
 //
 //  CAVEAT — this is the LEGACY keychain. These calls omit `kSecUseDataProtectionKeychain`,
 //  so on macOS they address the file-based login keychain, not the data-protection keychain.
-//  Two consequences, both of which an earlier version of this comment got wrong:
+//  Two consequences, both easy to get wrong:
 //
 //    1. Access is gated by the item's ACL, NOT by a hard code-signing check. The ACL trusts
 //       the binary that created the item, by code requirement; another process is PROMPTED
 //       rather than refused, and a user who clicks Allow has granted it access for good. So
-//       this raises the bar against a same-user attacker, but it is not the categorical
-//       "denied rather than merely inconvenienced" that was claimed here.
+//       this raises the bar against a same-user attacker, but it is not a categorical
+//       "denied rather than merely inconvenienced".
 //    2. `kSecAttrAccessible` below is IGNORED. The legacy keychain has no accessibility
 //       classes, so `ThisDeviceOnly` buys nothing and login.keychain-db is carried in a Time
 //       Machine backup like any other file.

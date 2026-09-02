@@ -44,7 +44,7 @@ import Foundation
 /// What a connection method supplies. Everything else is `ProxyService`.
 ///
 /// A protocol with two static requirements rather than a class to subclass: a method that
-/// forgets one does not compile, where a missing override used to trap at start-up.
+/// forgets one does not compile, where a missing override on a base class traps at start-up.
 protocol ProxyMethod: Sendable {
   static var manifest: ServiceManifest { get }
 
@@ -203,14 +203,13 @@ final class ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableSe
 
   func start() async throws {
     guard let provider = await Method.makeProvider(proxyHost) else {
-      // NOT a silent return. Selecting Cloudflare — which is the DEFAULT — used to start
-      // this service, find no binary, return, and publish no address, with no log line
-      // and no alert: a connection method selected in the UI and a server nobody can
-      // reach.
+      // NOT a silent return. Cloudflare is the DEFAULT, so starting this service, finding
+      // no binary and returning without a log line or an alert leaves a connection method
+      // selected in the UI and a server nobody can reach.
       //
-      // Now the remedy travels with the problem. The program is a managed tool, so the
-      // alert can offer to install it rather than describing a state and leaving the
-      // user to find the button.
+      // The remedy travels with the problem: the program is a managed tool, so the alert
+      // offers to install it rather than describing a state and leaving the user to find
+      // the button.
       let name = Self.manifest.name
       context.logger.error(
         "The selected connection method has no usable binary",

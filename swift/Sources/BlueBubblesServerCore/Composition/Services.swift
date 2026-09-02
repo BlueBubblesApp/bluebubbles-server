@@ -37,10 +37,9 @@ import Logging
 /// The registry's keys, taken from the manifests.
 ///
 /// Derived rather than declared, so a service's manifest identifier and the key the registry
-/// files it under cannot drift. They used to be independent short strings — `"http"` — which
-/// meant a dependency written as `ServiceID.http` silently failed to match a service whose
-/// manifest called it something else, and the topological sort then ordered on a graph with
-/// missing edges.
+/// files it under cannot drift. Independent short strings — `"http"` — let a dependency
+/// written as `ServiceID.http` silently fail to match a service whose manifest calls it
+/// something else, and the topological sort then orders on a graph with missing edges.
 extension ServiceID {
   public static let permissions = ServiceID(BuiltInManifests.ID.permissions.rawValue)
   public static let contactsIngest = ServiceID(BuiltInManifests.ID.contacts.rawValue)
@@ -128,10 +127,18 @@ final class ContactsService: ContextualService, PermissionDependentService {
     // Names simply fill in as the ingest progresses.
     let contacts = context.contacts
     let logger = context.logger
+
+    // Published, not just used. The startup reindex built one of these locally and threw it
+    // away, so `ContactInterface` held nil and every `contact/refresh` — the API route and
+    // the app's "Refresh from Address Book" button — refused with "contact access has not
+    // been granted", whatever the actual permission was. One instance, shared.
+    let ingestor = ContactsIngestor(index: contacts)
+    await context.publish(contactsIngestor: ingestor)
+
     await ingest.set(
       Task {
         do {
-          let result = try await ContactsIngestor(index: contacts).reindexAll()
+          let result = try await ingestor.reindexAll()
           logger.info(
             "Indexed the address book",
             metadata: [
@@ -505,9 +512,9 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
   let context: AppContext
   /// Built in `start()` rather than `init`, because its configuration comes from settings
   /// and the initializer is synchronous. A runtime constructed here with `isEnabled: false`
-  /// — which is what this used to do — never opens a socket and never injects, so the
-  /// helper has nothing to connect to and every Private API endpoint reports the helper as
-  /// unavailable on a machine where it would work.
+  /// never opens a socket and never injects, so the helper has nothing to connect to and
+  /// every Private API endpoint reports the helper as unavailable on a machine where it
+  /// would work.
   private let runtime = RuntimeBox()
   /// Forwards helper events onto the event bus. Held so it stops with the service.
   private let pump = TaskBox()
@@ -564,8 +571,7 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
     // Attached BEFORE start: injection quits and relaunches Messages and can take tens
     // of seconds, and the interfaces should hold the client for that whole time rather
     // than reporting "no Private API" until it finishes.
-    await context.attach(privateAPI: runtime.client)
-    await context.attach(privateAPIRuntime: runtime)
+    await context.publishPrivateAPI(client: runtime.client, runtime: runtime)
 
     try await runtime.start()
 
@@ -602,10 +608,12 @@ final class PrivateAPIGatedService: ContextualService, GatedService, Configurabl
 
   func stop() async {
     await pump.cancel()
-    await context.attach(privateAPIRuntime: nil)
+    // Withdrawn BEFORE the runtime is torn down, and both halves together. Clearing them
+    // separately either side of `stop()` left the client published against a runtime that
+    // was already gone.
+    await context.withdrawPrivateAPI()
     await self.runtime.current?.stop()
     await self.runtime.set(nil)
-    await context.attach(privateAPI: nil)
   }
 
   /// Maps a helper event onto the client-facing vocabulary.
@@ -849,7 +857,7 @@ final class PushDeliveryService: ContextualService, GatedService, ConfigurableSe
     )
     await push.start()
     // Handed to the context rather than looked up from it: see `AppContext.pushDelivery`.
-    await context.attach(pushDelivery: push)
+    await context.publish(pushDelivery: push)
 
     // Registering the sink is what makes push actually deliver. Without it the service
     // starts, reports itself configured, and is never asked to send anything: the bus
@@ -869,7 +877,7 @@ final class PushDeliveryService: ContextualService, GatedService, ConfigurableSe
   func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
 
   func stop() async {
-    await context.attach(pushDelivery: nil)
+    await context.withdrawPushDelivery()
     await context.events.unregister(.push)
     await push.stop()
   }

@@ -59,7 +59,7 @@ final class ScheduledMessageService: ContextualService {
   let context: AppContext
   private let pump = TaskBox()
 
-  /// The only path this service takes to the table. It used to run its own UPDATEs.
+  /// The only path this service takes to the table — it runs no SQL of its own.
   private var store: ScheduledMessageRepository {
     ScheduledMessageRepository(database: context.appDatabase)
   }

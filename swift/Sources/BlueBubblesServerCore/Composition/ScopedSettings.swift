@@ -14,8 +14,8 @@
 //      theatre. What they are NOT trusted with is credentials: `checkRead` refuses a secret
 //      before it considers whether the caller is built-in.
 //    - **This is a declaration that can be checked, not a sandbox.** It becomes a real
-//      boundary only for the out-of-process plugins § 12 specifies, where the host answers
-//      each request over RPC and can simply decline.
+//      boundary only for out-of-process plugins, where the host answers each request over
+//      RPC and can simply decline.
 //
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 

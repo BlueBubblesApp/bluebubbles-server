@@ -10,28 +10,28 @@ public enum ScheduleHandlers {
 
   public static func register(into registry: inout HandlerRegistry, context: some ScheduleProviding)
   {
-    registry.register("schedule.list") { request in
+    registry.register(.scheduleList) { request in
       let status = request.queryParameters["status"]
         .flatMap(ScheduleInterface.Status.init(rawValue:))
       return .data(.array(try await context.schedule.list(status: status)))
     }
 
-    registry.register("schedule.find") { request in
+    registry.register(.scheduleFind) { request in
       return .data(try await context.schedule.find(id: try request.identifier()))
     }
 
-    registry.register("schedule.create") { request in
+    registry.register(.scheduleCreate) { request in
       return .data(try await context.schedule.create(try request.jsonBody() ?? .object([:])))
     }
 
-    registry.register("schedule.update") { request in
+    registry.register(.scheduleUpdate) { request in
       return .data(
         try await context.schedule.update(
           id: try request.identifier(), body: try request.jsonBody() ?? .object([:])
         ))
     }
 
-    registry.register("schedule.delete") { request in
+    registry.register(.scheduleDelete) { request in
       try await context.schedule.delete(id: try request.identifier())
       return .data(nil)
     }

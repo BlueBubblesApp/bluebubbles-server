@@ -18,8 +18,8 @@ enum Destination: String, CaseIterable, Identifiable, Hashable {
   /// naming the vendor.
   case firebase = "Firebase"
   case logs = "Logs"
-  /// § 16 lists this in the sidebar and it had never been built. Not a docs link — it reads
-  /// live state, because every question it answers is about THIS machine.
+  /// Not a docs link — it reads live state, because every question it answers is about THIS
+  /// machine.
   case guides = "Guides"
   case settings = "Settings"
 

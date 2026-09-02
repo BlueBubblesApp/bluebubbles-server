@@ -288,10 +288,10 @@ struct FaceTimeRoundTripTests {
   /// The other half of the routing rule, and a REGRESSION TEST.
   ///
   /// Only the FaceTime routes name a process; every inherited action — sending, reactions,
-  /// availability — goes out untargeted. Those belong to Messages, but the fallback used to
-  /// be "whichever helper connected most recently", so with both injected a plain
-  /// `check-facetime-availability` was answered by the FaceTime dispatch as `unknown
-  /// action`. Here FaceTime registers LAST, so a most-recent fallback would misroute.
+  /// availability — goes out untargeted. Those belong to Messages, so a fallback of
+  /// "whichever helper connected most recently" misroutes: with both injected, a plain
+  /// `check-facetime-availability` is answered by the FaceTime dispatch as `unknown action`.
+  /// Here FaceTime registers LAST, which is what makes such a fallback observable.
   @Test("An untargeted request reaches Messages even when FaceTime connected last")
   func untargetedRequestsPreferMessages() async throws {
     let group = MultiThreadedEventLoopGroup(numberOfThreads: 2)

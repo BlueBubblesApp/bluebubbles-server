@@ -1,14 +1,14 @@
 //  ProxyManifestDispatchTests
 //  Every connection method declares its own manifest, and declares the entitlement it needs.
 //
-//  **The bug this suite was written for is now unrepresentable, and that is worth recording
-//  rather than deleting.** `ProxyServiceBase.manifest` used to be
-//  `fatalError("… is abstract …")`, and reaching it took the whole app down at startup. It was
+//  **The bug this suite guards against is unrepresentable by construction, and that is worth
+//  recording rather than deleting.** An abstract `manifest` on a base class —
+//  `fatalError("… is abstract …")` — takes the whole app down at startup, and it IS
 //  reachable: `scoped` is a `ContextualService` protocol-extension member, so its
-//  `Self.manifest` bound STATICALLY to the type declaring the conformance — the base — rather
-//  than dynamically to the subclass. Anything reading a core setting through the scope trapped.
-//  "Local Network" hit it first, because it needs `socket_port` before it can publish anything,
-//  which made the simplest connection method the one that crashed on launch.
+//  `Self.manifest` binds STATICALLY to the type declaring the conformance — the base — rather
+//  than dynamically to the subclass. Anything reading a core setting through the scope traps.
+//  "Local Network" hits it first, because it needs `socket_port` before it can publish
+//  anything, which makes the simplest connection method the one that crashes on launch.
 //
 //  `ProxyService<Method>` has no abstract member to reach and no override to forget: a method
 //  that does not supply a manifest does not compile, and `ProxyHost` carries the manifest as a

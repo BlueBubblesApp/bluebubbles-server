@@ -1,13 +1,10 @@
 //  PushInterface
 //  Firebase setup, and the seam that finally connects it to something.
 //
-//  `BBPushKit` has shipped `OAuthCallbackServer` and `FirebaseProvisioner` since Phase 6.
-//  Both are complete and tested. Neither was referenced by ANY other file in the package —
-//  `FirebaseProvisioner` not even by a test — so a user had no way to reach the guided setup
-//  at all: the only path to a working push configuration was to build a Firebase project by
-//  hand in Google's console and drop two JSON files somewhere the server never looked. This
-//  is the missing call site, and § "A component can be complete, unit-tested, and connected
-//  to nothing" in the audit is about exactly this class of gap.
+//  This is the call site that makes `BBPushKit`'s `OAuthCallbackServer` and
+//  `FirebaseProvisioner` reachable. Without it there is no path to the guided setup at all,
+//  and the only way to a working push configuration is to build a Firebase project by hand
+//  in Google's console and drop two JSON files somewhere the server never looks.
 //
 //  It is also where the credential paths meet. Users arrive at push in one of three ways and
 //  all three end in the same Keychain entries:
@@ -35,8 +32,8 @@ public struct PushStatus: Sendable, Equatable {
   public let hasServiceAccount: Bool
   /// The `google-services.json`. `GET /api/v1/fcm/client` serves it, and a client that
   /// cannot fetch it cannot register for notifications in the first place — so a server
-  /// with a key and no client configuration is HALF set up, and used to report itself as
-  /// fully set up while every client bootstrap failed.
+  /// with a key and no client configuration is HALF set up, and must not report itself as
+  /// fully set up while every client bootstrap fails.
   public let hasClientConfig: Bool
   public let projectId: String?
   public let databaseKind: String?
@@ -233,13 +230,12 @@ public struct PushInterface: Sendable {
     // The CREDENTIAL STORE decides what exists; the service only describes what it is
     // doing with it. That order is load-bearing.
     //
-    // It used to be the other way round — a running service's capabilities answered
-    // first — and a service reports the capabilities its last `start` found, which is
-    // stale the moment credentials change. Disconnecting therefore cleared both entries
-    // and then reported the service account as still present, because the old push
-    // service had not finished restarting: the screen showed "half set up, the
-    // google-services.json is missing" and a second Disconnect appeared to be needed to
-    // finish the job. Nothing had failed to delete.
+    // Answering from a running service's capabilities first would invert that: a service
+    // reports the capabilities its last `start` found, which is stale the moment credentials
+    // change. Disconnecting would clear both entries and then report the service account as
+    // still present, because the push service had not finished restarting — the screen would
+    // show "half set up, the google-services.json is missing" and a second Disconnect would
+    // appear to be needed, with nothing actually having failed to delete.
     let clientConfig = try? await credentials.clientConfig()
     let hasClientConfig = clientConfig != nil
 
@@ -414,9 +410,8 @@ public struct PushInterface: Sendable {
       }
     }
 
-    // Once, after both — not per file. Importing a pair used to restart push between the
-    // two, so the service came up on the service account alone and had to be restarted
-    // again a moment later.
+    // Once, after both — not per file. Restarting between the two would bring the service
+    // up on the service account alone and require a second restart a moment later.
     if inspection.hasSomethingToImport {
       await reloadPush()
     }

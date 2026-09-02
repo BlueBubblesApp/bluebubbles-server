@@ -12,7 +12,7 @@ public enum ContactHandlers {
   public static func register(
     into registry: inout HandlerRegistry, context: some ContactIndexProviding & InterfaceProviding
   ) {
-    registry.register("contact.create") { request in
+    registry.register(.contactCreate) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       return .data(try await interfaces.contact.create(values.raw))
@@ -20,7 +20,7 @@ public enum ContactHandlers {
 
     // One handler for two routes: `PUT /contact` takes the id in the body, `PUT
     // /contact/:id` in the path. Both ship, and clients use both.
-    registry.register("contact.update") { request in
+    registry.register(.contactUpdate) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
       guard let id = request.pathParameters["id"] ?? values["id"]?.stringValue else {
@@ -29,7 +29,7 @@ public enum ContactHandlers {
       return .data(try await interfaces.contact.update(id: id, body: values.raw))
     }
 
-    registry.register("contact.delete") { request in
+    registry.register(.contactDelete) { request in
       let interfaces = try await context.requireInterfaces()
       let body = try? request.jsonBody()
       guard let id = request.pathParameters["id"] ?? body?["id"]?.stringValue else {
@@ -39,7 +39,7 @@ public enum ContactHandlers {
       return .data(nil)
     }
 
-    registry.register("contact.findByExternalID") { request in
+    registry.register(.contactFindByExternalID) { request in
       let externalID = try request.requirePathParameter("externalId")
       guard let record = try await context.contacts.contact(externalID: externalID) else {
         throw NotFound("no contact with external id \(externalID)")
@@ -47,7 +47,7 @@ public enum ContactHandlers {
       return .data(ContactInterface.serialize(record))
     }
 
-    registry.register("contact.importVCF") { request in
+    registry.register(.contactImportVCF) { request in
       guard let body = request.body, !body.isEmpty else {
         throw BadRequest("the request body is empty")
       }

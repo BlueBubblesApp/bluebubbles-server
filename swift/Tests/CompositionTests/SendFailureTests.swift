@@ -2,9 +2,10 @@
 //  What a client receives when Messages refuses to send.
 //
 //  A failed send is HTTP 500 with `error.type = "iMessage Error"` — the response clients
-//  depend on most. Neither backend produces it: AppleScript throws `MessageSendError` and the
-//  helper throws `PrivateAPIError`, and both used to reach the renderer's fallback as a
-//  generic `Server Error`, indistinguishable from the server itself having broken.
+//  depend on most. Neither backend produces it directly: AppleScript throws
+//  `MessageSendError` and the helper throws `PrivateAPIError`, and untranslated both reach
+//  the renderer's fallback as a generic `Server Error`, indistinguishable from the server
+//  itself having broken.
 //
 //  What these assert is the DOMAIN case — `InterfaceError.messagesFailed` — not the status.
 //  The interfaces layer no longer speaks HTTP, and the mapping is asserted once in

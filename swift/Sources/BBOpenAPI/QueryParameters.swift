@@ -77,43 +77,43 @@ public enum QueryParameters {
 
   public static let byHandler: [HandlerID: [Parameter]] = [
     // Reads
-    "chat.messages": [
+    .chatMessages: [
       with("`handle`, `chat`/`chats`, `attachment`/`attachments`, `attributedBody`"),
       sort, after, before, offset, limit,
     ],
-    "chat.find": [with("`participants`, `lastmessage`")],
-    "chat.count": [
+    .chatFind: [with("`participants`, `lastmessage`")],
+    .chatCount: [
       Parameter(
         "includeArchived", "boolean",
         "Count archived conversations too. Truthy accepts `1`, `true`, `yes`, or a bare "
           + "`?includeArchived` with no value.", defaultValue: "false")
     ],
-    "chat.pinned": [with("`participants`, `lastmessage`")],
-    "chat.update": [with("`participants`, `lastmessage`")],
-    "message.find": [with("`chat`/`chats`, `attachment`/`attachments`, `handle`")],
-    "message.count": [
+    .chatPinned: [with("`participants`, `lastmessage`")],
+    .chatUpdate: [with("`participants`, `lastmessage`")],
+    .messageFind: [with("`chat`/`chats`, `attachment`/`attachments`, `handle`")],
+    .messageCount: [
       after, before,
       Parameter("chatGuid", "string", "Count only within this conversation."),
     ],
-    "message.countUpdated": [after, before],
-    "message.sentCount": [after, before],
-    "handle.find": [with("`chat`/`chats`")],
-    "contact.list": [
+    .messageCountUpdated: [after, before],
+    .messageSentCount: [after, before],
+    .handleFind: [with("`chat`/`chats`")],
+    .contactList: [
       limit, offset,
       Parameter(
         "extraProperties", "string",
         "Comma-separated extra fields to include. `avatar` is the one the Flutter client "
           + "asks for, and it is expensive — base64 image data per contact."),
     ],
-    "handle.iMessageAvailability": [
+    .handleIMessageAvailability: [
       Parameter("address", "string", "The phone number or email to check. REQUIRED.")
     ],
-    "handle.faceTimeAvailability": [
+    .handleFaceTimeAvailability: [
       Parameter("address", "string", "The phone number or email to check. REQUIRED.")
     ],
 
     // Attachments
-    "attachment.download": [
+    .attachmentDownload: [
       Parameter(
         "original", "boolean",
         "Serve the file as stored rather than converting it. HEIC and CAF are converted by "
@@ -122,11 +122,11 @@ public enum QueryParameters {
       Parameter("width", "integer", "Resize width in pixels, preserving aspect."),
       Parameter("height", "integer", "Resize height in pixels, preserving aspect."),
     ],
-    "attachment.blurhash": [
+    .attachmentBlurhash: [
       Parameter("componentX", "integer", "Horizontal BlurHash components.", defaultValue: "3"),
       Parameter("componentY", "integer", "Vertical BlurHash components.", defaultValue: "3"),
     ],
-    "chat.fetchBackground": [
+    .chatFetchBackground: [
       Parameter(
         "wait", "number",
         "Seconds to wait for the download before returning. Absent returns as soon as the "
@@ -134,24 +134,24 @@ public enum QueryParameters {
     ],
 
     // Server
-    "server.logs": [
+    .serverLogs: [
       Parameter("count", "integer", "Lines to return from the tail.", defaultValue: "100")
     ],
-    "server.alerts": [limit],
-    "server.alertsV2": [limit],
-    "server.statMedia": [
+    .serverAlerts: [limit],
+    .serverAlertsV2: [limit],
+    .serverStatMedia: [
       Parameter(
         "only", "string",
         "Comma-separated categories to count. Omit for all.",
         allowed: ["image", "video", "audio", "location", "link", "other"])
     ],
-    "server.statMediaByChat": [
+    .serverStatMediaByChat: [
       Parameter(
         "only", "string",
         "Comma-separated categories to count. Omit for all.",
         allowed: ["image", "video", "audio", "location", "link", "other"])
     ],
-    "server.installUpdate": [
+    .serverInstallUpdate: [
       Parameter(
         "wait", "boolean",
         "Block until the download finishes rather than returning as soon as it starts.",
@@ -159,35 +159,35 @@ public enum QueryParameters {
     ],
 
     // Scheduled messages
-    "schedule.list": [
+    .scheduleList: [
       Parameter(
         "status", "string", "Return only messages in this state.",
         allowed: ["pending", "sent", "error"])
     ],
 
     // Backups — name may arrive in the body OR the query, and both ship.
-    "backup.deleteTheme": [
+    .backupDeleteTheme: [
       Parameter("name", "string", "Theme to delete. May also be sent in the body.")
     ],
-    "backup.deleteSettings": [
+    .backupDeleteSettings: [
       Parameter("name", "string", "Settings backup to delete. May also be sent in the body.")
     ],
-    "backup.getTheme": [Parameter("name", "string", "Fetch one theme instead of all.")],
-    "backup.getSettings": [
+    .backupGetTheme: [Parameter("name", "string", "Fetch one theme instead of all.")],
+    .backupGetSettings: [
       Parameter("name", "string", "Fetch one settings backup instead of all.")
     ],
 
     // Participants. Four route entries share these two handlers, and the address may arrive
     // in the body or the query on either spelling.
-    "chat.addParticipant": [
+    .chatAddParticipant: [
       Parameter("address", "string", "Participant to add. May also be sent in the body.")
     ],
-    "chat.removeParticipant": [
+    .chatRemoveParticipant: [
       Parameter("address", "string", "Participant to remove. May also be sent in the body.")
     ],
 
     // FaceTime
-    "facetime.recents": [
+    .facetimeRecents: [
       Parameter(
         "service", "string",
         "Which call log to read. Anything other than `all` returns FaceTime calls only.",
@@ -195,7 +195,7 @@ public enum QueryParameters {
     ],
 
     // Webhooks
-    "webhook.list": [
+    .webhookList: [
       Parameter("url", "string", "Return only the webhook with this URL."),
       Parameter("id", "integer", "Return only the webhook with this id."),
     ],

@@ -112,6 +112,9 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Logging", package: "swift-log")
             ],
+            // Agent guidance, not a build input. Declared so SwiftPM stops warning
+            // about an unhandled file on every build.
+            exclude: ["CLAUDE.md"],
             swiftSettings: swiftSettings
         ),
 
@@ -375,6 +378,9 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "GRDB", package: "GRDB.swift")
             ],
+            // Agent guidance, not a build input. Declared so SwiftPM stops warning
+            // about an unhandled file on every build.
+            exclude: ["CLAUDE.md"],
             swiftSettings: swiftSettings
         ),
 
@@ -393,6 +399,9 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "GRDB", package: "GRDB.swift")
             ],
+            // Agent guidance, not a build input. Declared so SwiftPM stops warning
+            // about an unhandled file on every build.
+            exclude: ["CLAUDE.md"],
             swiftSettings: swiftSettings
         ),
 
@@ -420,6 +429,9 @@ let package = Package(
                 .product(name: "HummingbirdWebSocket", package: "hummingbird-websocket"),
                 .product(name: "GRDB", package: "GRDB.swift")
             ],
+            // Agent guidance, not a build input. Declared so SwiftPM stops warning
+            // about an unhandled file on every build.
+            exclude: ["CLAUDE.md"],
             swiftSettings: swiftSettings
         ),
 
@@ -546,7 +558,7 @@ let package = Package(
         // and the attributedBody decoder that stands between a Ventura message and having no
         // text at all.
         .testTarget(
-            name: "SerializationTests",
+            name: "BBSerializationTests",
             dependencies: [
                 "BBSerialization", "BBIMessage", "BBCore",
                 .product(name: "GRDB", package: "GRDB.swift")
@@ -565,14 +577,14 @@ let package = Package(
                 // The three targets the composition root is now split across. Reaching all of
                 // them from one suite is expected: what this suite tests IS the wiring.
                 "BlueBubblesServerCore", "BBInterfaces", "BBHandlers", "BBHTTPAPI", "BBSocketIO", "BBAuth", "BBEvents",
-                "BBSettings", "BBServiceKit", "BBPushKit", "BBPersistence",
+                "BBSettings", "BBServiceKit", "BBTooling", "BBPushKit", "BBPersistence",
                 "BBDiagnostics", "BBSerialization", "BBCore",
                 // For the one-method `AppleScriptRunning` seam. `SendFailureTests` drives a
                 // real send down the AppleScript branch with a runner that fails, which is
                 // the only way to prove the backend's error becomes an `IMessageError`
                 // without standing up the 64-method Private API protocol.
                 "BBAppleScript",
-                "BBContacts", "BBIMessage", "BBPrivateAPI", "BBPrivateAPIContract", "BBSystem",
+                "BBContacts", "BBIMessage", "BBPrivateAPIContract", "BBSystem",
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "Logging", package: "swift-log")
@@ -715,7 +727,7 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
         .testTarget(
-            name: "IMessageTests",
+            name: "BBIMessageTests",
             dependencies: [
                 "BBIMessage", "BBPersistence", "BBCore", "BBSerialization",
                 .product(name: "GRDB", package: "GRDB.swift")
@@ -807,13 +819,42 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
 
+        // `ProtocolTests` used to hold both of the following. It was one target covering two
+        // modules, which is how "where does this test go" stopped having an answer — see
+        // CompositionTests above.
         .testTarget(
-            name: "ProtocolTests",
+            name: "BBHTTPAPITests",
+            dependencies: ["BBHTTPAPI"],
+            swiftSettings: swiftSettings
+        ),
+
+        .testTarget(
+            name: "BBSocketIOTests",
             dependencies: [
-                "BBSocketIO", "BBSerialization", "BBHTTPAPI", "BBAuth", "BBEvents",
-                "BBSettings", "BBCore"
+                "BBSocketIO", "BBSerialization", "BBAuth", "BBEvents", "BBSettings", "BBCore"
             ],
+            // Recorded Engine.IO/Socket.IO frames and typedstream payloads, diffed against
+            // what this implementation produces.
             resources: [.copy("ProtocolFixtures")],
+            swiftSettings: swiftSettings
+        ),
+
+        .testTarget(
+            name: "BBHandlersTests",
+            dependencies: ["BBHandlers", "BBHTTPAPI", "BBSerialization"],
+            swiftSettings: swiftSettings
+        ),
+
+        // The app layer had NO test target of its own; its tests lived in CompositionTests
+        // alongside the wiring assertions, which is why the largest module in the package
+        // read as untested.
+        .testTarget(
+            name: "BlueBubblesAppTests",
+            dependencies: [
+                "BlueBubblesApp", "BlueBubblesServerCore", "BBHandlers", "BBInterfaces",
+                "BBAuth", "BBCore", "BBDiagnostics", "BBEvents", "BBSerialization",
+                "BBServiceKit", "BBSettings", "BBSystem"
+            ],
             swiftSettings: swiftSettings
         )
     ]

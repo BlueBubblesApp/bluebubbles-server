@@ -91,11 +91,10 @@ public enum LaunchAtLogin {
     case loginItem = "login-item"
     /// A per-user LaunchAgent.
     ///
-    /// NOT a way to run without a login session, which an earlier version of this
-    /// comment claimed. `SMAppService.agent` loads into the user's Aqua session at
-    /// login and unloads at logout, exactly like `.loginItem` — it differs only in
-    /// being launchd-supervised, so it restarts if it crashes. Nothing here runs
-    /// before a user logs in.
+    /// NOT a way to run without a login session. `SMAppService.agent` loads into the
+    /// user's Aqua session at login and unloads at logout, exactly like `.loginItem` — it
+    /// differs only in being launchd-supervised, so it restarts if it crashes. Nothing
+    /// here runs before a user logs in.
     ///
     /// That distinction is load-bearing for secrets: `SMAppService.daemon` WOULD run
     /// pre-login as root, where the user's login keychain is not unlocked and not
@@ -310,7 +309,7 @@ public enum ScreenLock {
     return unsafeBitCast(symbol, to: (@convention(c) () -> Int32).self)
   }()
 
-  /// The fallback, and what this used to do unconditionally.
+  /// The fallback.
   private static func sleepDisplay() async throws {
     let result = try await Subprocess.run(
       "/usr/bin/pmset", ["displaysleepnow"], output: .discarded, timeout: .seconds(10)

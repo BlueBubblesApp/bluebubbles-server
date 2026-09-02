@@ -836,7 +836,7 @@ messages.
 
 **Socket frames are compared byte-for-byte against reference vectors.** A malformed frame
 does not fail loudly: the client ignores it and messages just stop arriving, which surfaces
-weeks later as "the server broke". `Tests/ProtocolTests` pins the encoder against
+weeks later as "the server broke". `Tests/BBSocketIOTests` pins the encoder against
 socket.io-parser and engine.io-parser output. Regenerate with:
 
 ```sh

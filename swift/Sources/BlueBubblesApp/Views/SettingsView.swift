@@ -42,8 +42,8 @@ struct SettingsView: View {
             value: tab,
             title: tab.title,
             symbol: tab.symbol,
-            // The count the sidebar used to carry. Moving Permissions into
-            // settings must not lose the one signal telling someone to look.
+            // Permissions live in settings rather than the sidebar, and this badge is the
+            // one signal telling someone to look.
             badge: tab == .permissions ? model.unsatisfiedRequiredCount : 0
           )
         }
@@ -550,9 +550,9 @@ struct SettingRow: View {
         justSaved = false
       } catch {
         // The validator's own sentence, not a generic failure. "Too short — use at least 8
-        // characters" is actionable; "could not save" is not, and neither is the raw enum
-        // this used to fall back to for anything that was not a `SettingsError` — which
-        // included every password rejection, since the policy throws its own type.
+        // characters" is actionable; "could not save" is not, and neither is a raw enum
+        // description. Falling back to one for anything that is not a `SettingsError` would
+        // cover every password rejection, since the policy throws its own type.
         self.error = userFacingMessage(error)
         await load()
       }

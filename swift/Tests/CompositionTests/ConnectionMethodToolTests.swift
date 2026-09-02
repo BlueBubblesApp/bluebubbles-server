@@ -1,10 +1,10 @@
 //  ConnectionMethodToolTests
 //  A connection method that needs a binary says so, and says which one.
 //
-//  Choosing ngrok used to look complete: the picker showed ngrok, no field was blank, and
-//  the tunnel then failed to start with the reason only in the log. A binary that has not
+//  Without this, choosing ngrok looks complete: the picker shows ngrok, no field is blank,
+//  and the tunnel then fails to start with the reason only in the log. A binary that has not
 //  been downloaded is a required thing that is missing, exactly like an empty auth token —
-//  the row just had no way to know about it.
+//  the row needs a way to know about it.
 //
 //  What is asserted is the DECLARATION the row reads, not the SwiftUI. The row derives
 //  everything from `manifest.tools`, so a third-party connection method gets the warning and

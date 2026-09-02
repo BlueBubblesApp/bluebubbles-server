@@ -58,7 +58,7 @@ public struct SettingsScope: Sendable {
   /// Not a loophole so much as an honest statement of where the boundary is: built-ins are
   /// compiled into this binary and can read the database file directly, so pretending to
   /// contain them would be theatre. The boundary is real for out-of-process plugins, which
-  /// is where § 12 puts third parties.
+  /// is where third parties run.
   private let isBuiltIn: Bool
 
   public init(

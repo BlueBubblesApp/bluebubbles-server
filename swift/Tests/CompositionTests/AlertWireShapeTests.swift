@@ -1,7 +1,7 @@
 //  AlertWireShapeTests
 //  Pins `GET /api/v1/server/alert` to the Node `alert` row.
 //
-//  This route is the one place where § 3's split between logs and notifications reaches a
+//  This route is the one place where the split between logs and notifications reaches a
 //  client, and it drifted: the projection grew `detail` and `occurrences`, lost `updated`,
 //  and put only the title in `value` — while `UserAlert.legacyValue`, which computes the
 //  right string, sat unreferenced beside it. Nothing caught it, because the parity corpus is
@@ -174,7 +174,7 @@ struct AlertWireShapeTests {
     #expect(AlertAction.installTool(id: "cloudflared").wireName == "install-tool")
   }
 
-  /// The redaction guarantee § 3 asks for, on the v2 projection — the only alert response
+  /// The redaction guarantee, on the v2 projection — the only alert response
   /// that carries diagnostics at all, and one any authenticated client can read, including
   /// one on a tunnel.
   ///
@@ -224,8 +224,8 @@ struct AlertReadRequestTests {
 
   /// And the shape that produced the data loss: nothing parseable at all.
   ///
-  /// This used to yield `[]`, `[]` meant "all", and marking one alert read marked every
-  /// alert read. The handler now answers 400 for it, matching the reference's
+  /// Yielding `[]` here, where `[]` means "all", makes marking one alert read mark every
+  /// alert read. The handler answers 400 instead, matching the reference's
   /// `if (isEmpty(ids)) throw new BadRequest`.
   @Test("A request with no usable ids yields none, never all")
   func unparseableIdsYieldNothing() {

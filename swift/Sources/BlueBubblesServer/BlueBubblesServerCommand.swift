@@ -78,11 +78,11 @@ struct BlueBubblesServerCommand: AsyncParsableCommand {
 
   /// Opens just enough to clear the blocklist.
   ///
-  /// Goes straight at the table. Building an `AccessControlService` here — which is what
-  /// this used to do — clears the blocklist of a brand new in-memory instance and reports
-  /// success, so the one recovery path someone reaches for during a lockout was a placebo.
+  /// Goes straight at the table. Building an `AccessControlService` here would clear the
+  /// blocklist of a brand new in-memory instance and report success, making the one recovery
+  /// path someone reaches for during a lockout a placebo.
   static func clearBlocklistAndExit() async throws {
-    let database = try AppDatabase.open()
+    let database = try AppDatabase.open(contributors: AppSchema.contributors)
     let cleared = try await AccessControlStore.clearBlocklist(database: database)
     print("Access-control blocklist cleared (\(cleared) \(cleared == 1 ? "entry" : "entries")).")
   }
