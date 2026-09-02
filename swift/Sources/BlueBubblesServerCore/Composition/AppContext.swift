@@ -109,6 +109,8 @@ public actor AppContext {
   /// `AttachmentConversion` — HEIC and CAF are what iMessage stores and what most clients
   /// cannot display.
   public nonisolated let attachmentConversion = AttachmentConversion()
+  /// Where uploaded bytes land before a send. A value over a directory; see `UploadStore`.
+  public nonisolated let uploads = UploadStore()
   /// Machine facts for `server/info`, cached. See `SystemInfoProvider` — two of those
   /// fields are a network round trip and a database query, on a route every client polls.
   public nonisolated let systemInfo: SystemInfoProvider
@@ -303,6 +305,20 @@ public actor AppContext {
       logger: logger
     )
     faceTimeBacking = coordinator
+    return coordinator
+  }
+
+  /// Restarting Messages or FaceTime with the helper re-injected. Built on first use, like
+  /// `faceTime()`, and for the same reason: most servers never do this.
+  private var applicationRestartBacking: ApplicationRestartCoordinator?
+
+  public func applicationRestart() -> ApplicationRestartCoordinator {
+    if let applicationRestartBacking { return applicationRestartBacking }
+    let coordinator = ApplicationRestartCoordinator(
+      privateAPIRuntime: { [weak self] in await self?.privateAPIRuntime },
+      logger: logger
+    )
+    applicationRestartBacking = coordinator
     return coordinator
   }
 

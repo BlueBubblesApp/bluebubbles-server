@@ -435,6 +435,19 @@ public struct ChatInterface: MessagesBackedInterface {
     return chat
   }
 
+  /// The group photo on disk, for a chat that has one.
+  ///
+  /// Reads Messages' own photo directory — no helper needed, which is why the route is scoped
+  /// to `attachments:read` rather than requiring the Private API. Two distinct refusals: the
+  /// chat does not exist, or it exists and has never had a photo set.
+  public func groupIconPath(guid: String) async throws -> String {
+    let chat = try await row(guid: guid)
+    guard let path = GroupIconStore.path(forGroupID: chat.groupID) else {
+      throw InterfaceError.notFound("that chat has no group photo")
+    }
+    return path
+  }
+
   // MARK: - Private-API-only operations
 
   public func delete(guid: String) async throws {

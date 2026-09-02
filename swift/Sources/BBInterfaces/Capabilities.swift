@@ -164,6 +164,11 @@ public protocol AttachmentConverting: Sendable {
   var attachmentConversion: AttachmentConversion { get }
 }
 
+/// Where uploaded bytes land before they are sent.
+public protocol UploadStoring: Sendable {
+  var uploads: UploadStore { get }
+}
+
 public protocol AccessControlProviding: Sendable {
   var accessControl: AccessControlService { get }
 }
@@ -193,6 +198,14 @@ public protocol ServerControlling: Sendable {
   func requestRestart() async
   /// Replaces the process with `execv`, so the supervisor keeps watching the same PID.
   func requestFullRestart() async
+}
+
+/// Restarting the applications this server injects into, with the helper preserved.
+///
+/// A function rather than a property because the coordinator is built on first use — most
+/// servers never restart Messages — and it is isolated to the container.
+public protocol ApplicationRestarting: Sendable {
+  func applicationRestart() async -> ApplicationRestartCoordinator
 }
 
 /// What `server/info` reports about this machine and this build.

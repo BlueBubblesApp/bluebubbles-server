@@ -116,7 +116,7 @@ protocol ConfigurableService: Service { static var watchedSettings; func apply(_
 protocol GatedService:        Service { func canRun(_ settings:) -> Bool }
 ```
 
-Built-in service ids (`Sources/BlueBubblesServerCore/Composition/Services.swift:43`):
+Built-in service ids (`Sources/BlueBubblesServerCore/Composition/Services/ContextualService.swift`):
 `permissions`, `contactsIngest`, `changeDetection`, `http`, `socket`, `privateAPI`, `push`,
 `webhooks`, `sleepPrevention`, `scheduledMessages`, `launchAtLogin`.
 
@@ -132,7 +132,8 @@ lock, you are probably in the wrong type.
 ### Adding a service
 
 1. Declare a manifest in `Composition/BuiltInManifests.swift`, including any `tools:` it needs.
-2. Conform in `Composition/Services.swift`, declaring `dependencies`.
+2. Conform in its own file under `Composition/Services/` (connection methods under
+   `Services/Proxy/`), declaring `dependencies` through the manifest.
 3. Gate it with `GatedService.canRun` if it should be absent when unconfigured — **absent, not
    disabled**. An unconfigured optional subsystem is never constructed and its routes are never
    registered.

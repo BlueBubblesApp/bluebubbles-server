@@ -417,7 +417,7 @@ let package = Package(
                 "BBTooling",
                 "BBServiceKit", "BBSettings", "BBDiagnostics", "BBHTTPAPI", "BBSocketIO",
                 "BBEvents", "BBPushKit", "BBProxy", "BBIMessage", "BBContacts",
-                "BBPrivateAPI", "BBPrivateAPIContract", "BBSystem", "BBAppleScript",
+                "BBPrivateAPI", "BBPrivateAPIContract", "BBSystem",
                 "BBShortcuts",
                 "BBAuth", "BBSerialization", "BBPersistence", "BBCore",
                 .product(name: "Logging", package: "swift-log"),

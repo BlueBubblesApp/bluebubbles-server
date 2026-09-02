@@ -10,6 +10,14 @@ reviewed. Put logic in `BBInterfaces`, controllers in `BBHandlers`, and wiring h
 
 Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architecture.md).
 
+## Layout
+
+- `Composition/Services/` — one file per service. `ContextualService.swift` holds the shared
+  protocol, the `ServiceID` constants, `TaskBox`/`RuntimeBox` and `ServiceStartupError`.
+- `Composition/Services/Proxy/` — `ProxyService<Method>` plus one file per connection method.
+- Everything else in `Composition/` is wiring: the context, the composition, the lifecycle,
+  the settings bridge and propagation.
+
 ## AppContext
 
 - `interfaces()` returns `nil` when there is no message access; `requireInterfaces()` throws.
@@ -19,14 +27,18 @@ Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architec
   `AppModel`, and `AppContext` is private to keep that true.
 - **It holds references; it does not act.** Whole-server verbs — restart, process replacement —
   live in `ServerLifecycle`. A container that can `execv` is not a container. Device and webhook
-  administration live on `DeviceDirectory` and `WebhookDirectory` for the same reason: holding a
-  repository is a container's job, deciding what to do when a delete fails is not.
+  administration live on `DeviceDirectory` and `WebhookDirectory`, FaceTime hand-offs on
+  `FaceTimeCoordinator`, app restarts on `ApplicationRestartCoordinator`, for the same reason:
+  holding a repository is a container's job, deciding what to do when a delete fails is not.
+- **Long-running work belongs to an owner.** A `Task` spawned from a handler that nothing
+  holds cannot be cancelled when the service behind it stops. Coordinators own their tasks and
+  expose `stop()`; `PrivateAPIGatedService.stop` calls them.
 - **It does not look up concrete services.** The push service hands over its `PushService` on
   start; the container does not reach for `PushDeliveryService`. That direction was a module
   cycle waiting to surface.
 
 `AppContextCapabilities.swift` is the whole of what connects the container to the capability
-protocols in `BBHandlers`. It is deliberately nothing but a list of conformances.
+protocols in `BBInterfaces`. It is deliberately nothing but a list of conformances.
 
 ## Composition
 

@@ -6,12 +6,8 @@
 //    B. Dial the person, hand back a link.                  → `call`
 //    C. Answer an incoming call, hand back a link, drop.    → `handoff`, and `answer` (inherited)
 //
-//  WHY THE DROP IS A POLL, NOT A TIMER. Flows B and C must not leave the call until a real
-//  participant has joined, or a 1:1 call collapses on the caller. The Node server reads the
-//  macOS *notification database* and parses serialized join notifications to know this — the
-//  "almost never works" hack. Here the helper exposes typed membership (`faceTimeMembers`), so
-//  the drop is gated on an actual member appearing, polled, with a hard timeout. When the
-//  helper's membership *event* proves reliable on-device, this poll can be replaced by it.
+//  The hand-off — admit joiners, leave once a client has really joined — is
+//  `FaceTimeHandOff`, owned by `FaceTimeCoordinator`. The handlers start it and answer.
 
 import BBHTTPAPI
 import BBInterfaces
@@ -175,15 +171,12 @@ public enum FaceTimeHandlers {
       }
 
       if let group = link?.groupUUID ?? call.groupUUID {
-        Task.detached {
-          // Marked so cleanup never hangs up on a hand-off that is still running.
-          await context.faceTime().beginHandOff(callUUID: call.callUUID)
-          await admitThenDrop(
-            api: api, callUUID: call.callUUID, conversationUUID: group,
-            dialledAddresses: addresses, logger: context.logger
-          )
-          await context.faceTime().endHandOff(callUUID: call.callUUID)
-        }
+        // Owned by the coordinator, which marks the call so cleanup never hangs up on a
+        // hand-off that is still running, and cancels it if the Private API goes away.
+        await context.faceTime().beginHandOff(
+          api: api, callUUID: call.callUUID, conversationUUID: group,
+          dialledAddresses: addresses
+        )
       }
 
       guard let link else {
@@ -292,166 +285,12 @@ public enum FaceTimeHandlers {
       // happens in the background so the client can join immediately — and the Mac only
       // drops once someone actually has, never on a timer alone.
       if let group = link.groupUUID {
-        Task.detached {
-          await context.faceTime().beginHandOff(callUUID: callUUID)
-          await admitThenDrop(
-            api: api, callUUID: callUUID, conversationUUID: group,
-            logger: context.logger
-          )
-          await context.faceTime().endHandOff(callUUID: callUUID)
-        }
+        await context.faceTime().beginHandOff(
+          api: api, callUUID: callUUID, conversationUUID: group
+        )
       }
       return .data(inheritedLinkPayload(link))
     }
-  }
-
-  // MARK: - Flow C orchestration
-
-  /// Admits anyone knocking, waits for a real participant to join, then drops the Mac.
-  ///
-  /// Bounded at two minutes — the same ceiling the Node server uses — because a link nobody
-  /// joins must not pin the Mac in a call forever. Reads typed membership rather than the
-  /// notification database. Best-effort: every failure degrades to "the Mac stays in the
-  /// call until the timeout drops it," never to a crash.
-  /// Admits anyone knocking, waits until the Mac is genuinely SURPLUS, then drops it.
-  ///
-  /// THE COUNT IS THE WHOLE POINT, and getting it wrong hangs up on a real person.
-  ///
-  /// A FaceTime call does not survive dropping below two participants. On a 1:1 call the
-  /// participants are the Mac and the callee — so "leave once a real participant has
-  /// joined" (the previous condition) was satisfied the instant the callee ANSWERED, and
-  /// leaving then collapses the call on them. Measured on a live call: the callee answered
-  /// and the Mac was still the only thing holding the conversation open.
-  ///
-  /// The Mac may only leave once the client has ALSO joined — three participants: the Mac,
-  /// the callee, and the client. Dropping to two then leaves a working call between the two
-  /// people who actually want to talk.
-  ///
-  /// `remoteMembers` counts everyone in the conversation OTHER than the local (Mac)
-  /// participant, so the threshold is two remotes: callee + client.
-  /// The Mac may never leave a call with fewer than this many joined remotes behind it —
-  /// FaceTime does not keep a call alive below two participants.
-  private static let remotesRequiredBeforeLeaving = 2
-
-  /// How long the Mac waits for the hand-off to complete before giving up and staying.
-  ///
-  /// Two humans have to act inside this window — the callee answers, and only then does the
-  /// requesting client open the link and join. Two minutes (the Node server's ceiling) is
-  /// not generous for that, and expiring early does not end the call: it just leaves the Mac
-  /// parked in it. Five minutes covers a realistic answer-then-join without holding a
-  /// forgotten link open for anything like as long as the call itself would run.
-  private static let handOffTimeout: Duration = .seconds(300)
-
-  /// Loose handle comparison. `remoteMembers` may report a number in a different format
-  /// from the one dialled (`+12025550143` vs `2025550143`), and an email in any casing, so
-  /// an exact string match would fail to recognise a person we called.
-  private static func sameHandle(_ a: String, _ b: String) -> Bool {
-    if a.caseInsensitiveCompare(b) == .orderedSame { return true }
-    let digits = { (s: String) in s.filter(\.isNumber) }
-    let (da, db) = (digits(a), digits(b))
-    // Compare by the last 10 digits, which is what survives country-code differences.
-    guard da.count >= 7, db.count >= 7 else { return false }
-    return da.suffix(10) == db.suffix(10)
-  }
-
-  private static func admitThenDrop(
-    api: any PrivateAPI,
-    callUUID: String,
-    conversationUUID: String,
-    dialledAddresses: [String] = [],
-    logger: Logger
-  ) async {
-    let deadline = ContinuousClock.now.advanced(by: handOffTimeout)
-    var admitted = Set<String>()
-
-    while ContinuousClock.now < deadline {
-      // STOP IF THE CALL IS GONE. Someone cancelling from a client, or the callee
-      // declining, ends the call — and there is nothing left to hand off. Polling on
-      // regardless kept re-asserting mute and re-admitting members against a call that
-      // no longer existed, for the full timeout, every time a call was cancelled.
-      //
-      // A failed status check is NOT treated as "gone": that would abandon the hand-off
-      // on one dropped request and leave the Mac in a live call forever.
-      if let status = try? await api.faceTimeCallStatus(callUUID: callUUID),
-        status == .disconnected
-      {
-        logger.info(
-          "FaceTime call ended before hand-off; the watcher is stopping",
-          metadata: [
-            "call": .string(callUUID)
-          ])
-        return
-      }
-
-      let members = (try? await api.faceTimeMembers(conversationUUID: conversationUUID)) ?? []
-
-      // Re-assert mute every poll. It does not stick while the call is still ringing,
-      // so applying it once at dial left the Mac's camera and microphone live for the
-      // callee. Cheap, idempotent, and it catches the moment the call connects.
-      _ = try? await api.silenceFaceTimeCall(callUUID: callUUID)
-
-      // ADMIT anyone knocking. A link-joiner sits at "Waiting to be let in…" until the
-      // host approves; nothing else in this system will do it, and the joiner is
-      // invisible in `pendingMembers` (see FaceTimeMember.isPending). Retried every
-      // poll rather than once, because an admit can land before the daemon has fully
-      // registered the knock.
-      for waiting in members where !waiting.isActive {
-        try? await api.admitFaceTimeParticipant(
-          conversationUUID: conversationUUID, handle: waiting.handle.value
-        )
-        admitted.insert(waiting.handle.value)
-      }
-
-      // ACTUALLY CONNECTED remotes only — `isActive`, not "on the roster". A browser
-      // appears on the roster the moment it opens the link, while the person is still
-      // staring at "Waiting to be let in…"; counting those let the Mac leave before
-      // anyone had really joined, and the call died. See FaceTimeMember.isActive.
-      let joined = members.filter(\.isActive)
-      // The client is the participant we did NOT dial. Identifying it that way rather
-      // than by a raw count is what makes GROUP calls correct: dialling three people
-      // and waiting for "two remotes" would fire as soon as the second CALLEE answered,
-      // dropping the Mac before the client ever arrived — and the person who tapped the
-      // button would never be in their own call.
-      //
-      // It also handles someone not answering: dial A and B, only A picks up, client
-      // joins → the client is still recognisably an outsider, so the hand-off completes
-      // instead of waiting forever for B.
-      // A guest who came in by link has no FaceTime address — their handle is a
-      // throwaway `temp:<uuid>` — so `isLightweight` identifies the client directly.
-      // Everyone we dialled has a real address we already know, which makes the
-      // remaining test a simple "not one of ours".
-      let clientJoined =
-        joined.contains { member in
-          member.isLightweight
-            || !dialledAddresses.contains { sameHandle($0, member.handle.value) }
-        } && (dialledAddresses.isEmpty ? joined.count >= remotesRequiredBeforeLeaving : true)
-
-      // Both conditions. The outsider check says the hand-off happened; the count says
-      // the call survives the Mac leaving.
-      if clientJoined, joined.count >= remotesRequiredBeforeLeaving {
-        // A short grace so the newest join is fully established before teardown.
-        try? await Task.sleep(for: .seconds(3))
-        try? await api.leaveFaceTimeCall(callUUID: callUUID)
-        logger.info(
-          "FaceTime hand-off complete; the Mac left the call",
-          metadata: [
-            "call": .string(callUUID),
-            "remotes": .stringConvertible(joined.count),
-          ])
-        return
-      }
-
-      try? await Task.sleep(for: .seconds(1))
-    }
-
-    // TIMED OUT — and the Mac deliberately STAYS. Leaving here would hang up on whoever
-    // did answer, which is the opposite of a safe default: the failure mode of staying is
-    // an idle participant a human can hang up on, while the failure mode of leaving is
-    // ending a live call between real people. The call is reported, not severed.
-    logger.warning(
-      "FaceTime hand-off timed out before the client joined; the Mac stays in the call rather than hanging up on the other party",
-      metadata: ["call": .string(callUUID)]
-    )
   }
 
   // MARK: - Payloads

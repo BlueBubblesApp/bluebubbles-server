@@ -10,7 +10,9 @@ Parse the request, call one interface method, serialize, return. Anything resemb
 belongs one level down, in `BBInterfaces`.
 
 The test: *could the SwiftUI settings window call this without going through HTTP?* If not, it
-is in the wrong place.
+is in the wrong place. That includes filesystem work (`UploadStore`, `GroupIconStore`), process
+control (`ApplicationRestartCoordinator`) and anything that outlives the request
+(`FaceTimeCoordinator.beginHandOff`). A handler never spawns a `Task` that nothing owns.
 
 ```swift
 registry.register("server.info") { _ in try await serverInfo(context: context) }

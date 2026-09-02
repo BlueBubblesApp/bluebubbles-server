@@ -87,10 +87,7 @@ public enum MediaHandlers {
     /// scopes it to `attachments:read` rather than requiring the Private API.
     registry.register(.chatGroupIcon) { request in
       let guid = try request.requirePathParameter("guid")
-      let chat = try await context.requireInterfaces().chat.row(guid: guid)
-      guard let path = GroupIcon.path(forGroupID: chat.groupID) else {
-        throw NotFound("that chat has no group photo")
-      }
+      let path = try await context.requireInterfaces().chat.groupIconPath(guid: guid)
       return .file(
         path: path,
         filename: (path as NSString).lastPathComponent,
@@ -412,24 +409,5 @@ public enum MediaHandlers {
       )
     }
     return api
-  }
-}
-
-/// Where Messages keeps group photos.
-enum GroupIcon {
-  /// The group photo for a chat, if one is set.
-  ///
-  /// Messages stores these under its own support directory keyed by the chat's group id —
-  /// not in the attachments tree, and with no row in chat.db. A chat with no `group_id`
-  /// has never had a photo set.
-  static func path(forGroupID groupID: String?) -> String? {
-    guard let groupID, !groupID.isEmpty else { return nil }
-    let directory = URL(fileURLWithPath: NSHomeDirectory())
-      .appendingPathComponent("Library/Messages/Attachments/GroupPhotoImage")
-    for candidate in ["\(groupID)", "\(groupID).jpeg", "\(groupID).png", "\(groupID).heic"] {
-      let path = directory.appendingPathComponent(candidate).path
-      if FileManager.default.fileExists(atPath: path) { return path }
-    }
-    return nil
   }
 }

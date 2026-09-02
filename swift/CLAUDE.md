@@ -92,7 +92,7 @@ improvising the order:**
 | Logic behind a route | `Sources/BBInterfaces/` — **not** the handler. Interfaces return typed values; one `serialize` step projects them. Anything reaching Messages goes inside `throughMessages { … }` |
 | A capability a handler, service or view may reach | `Sources/BBInterfaces/Capabilities.swift`, then conform `AppContext` in `AppContextCapabilities.swift`. Never take the whole `AppContext` |
 | A page in the app | `Sources/BlueBubblesApp/Views/` — reach state through `AppModel`, never `AppContext` |
-| A service | Conform to `Service` in `Sources/BlueBubblesServerCore/Composition/Services.swift` and declare a manifest in `BuiltInManifests.swift`; start order is derived from `dependencies` |
+| A service | One file per service under `Sources/BlueBubblesServerCore/Composition/Services/`, conforming to `ContextualService`; declare its manifest in `BuiltInManifests.swift` and register it in `ServerComposition`. Start order is derived from `dependencies` |
 | A table in `app.db` | A `SchemaContributor` in the module that owns it, then append it to `AppSchema.contributors`. **Not** `AppDatabase` — see [`Sources/BBPersistence/CLAUDE.md`](Sources/BBPersistence/CLAUDE.md) |
 | An event | `Sources/BBEvents/ServerEvent.swift` plus its per-sink projection |
 | A user-visible alert | Raise it explicitly through `BBDiagnostics`. Logging must never produce one |

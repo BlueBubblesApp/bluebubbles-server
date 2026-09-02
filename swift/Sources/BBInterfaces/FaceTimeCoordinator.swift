@@ -1,15 +1,13 @@
 //  FaceTimeCoordinator
 //  Everything the server has to remember about FaceTime while it runs.
 //
-//  This lived on `AppContext` — the link ledger, the set of hand-offs in flight, and the
-//  cleanup that reads both. None of it is wiring, which is what that type is for: it is a
-//  subsystem with its own state and its own rule (never hang up on a call a watcher is
-//  still waiting on), and it was on the container because that is where the handlers could
-//  already reach.
+//  The link ledger, the hand-offs in flight, and the cleanup that reads both. A subsystem with
+//  its own state and its own rule — never hang up on a call a watcher is still waiting on — so
+//  it is its own type rather than more members on the application context.
 //
-//  Fifteen routes and one settings screen use this. They now depend on a coordinator rather
-//  than on the whole application context, which is what makes the FaceTime surface
-//  testable without opening two databases.
+//  It OWNS the hand-off tasks. They used to be spawned detached from the HTTP handler, which
+//  meant nothing could cancel them: stopping the Private API service left watchers polling a
+//  helper that had gone. Holding them here is what lets `stop()` end them.
 
 import BBDiagnostics
 import BBPrivateAPI
@@ -37,11 +35,11 @@ public actor FaceTimeCoordinator {
   /// created.
   public nonisolated let links = FaceTimeLinkLedger()
 
-  /// Calls with a hand-off watcher running right now.
+  /// Hand-off watchers running right now, by call UUID.
   ///
   /// Cleanup must never hang up on one of these: the watcher is mid-flight, waiting for a
   /// client to join, and leaving underneath it would drop a live conversation.
-  private var handOffsInFlight: Set<String> = []
+  private var handOffs: [String: Task<Void, Never>] = [:]
 
   private let settings: SettingsStore
   private let logger: Logger
@@ -60,10 +58,46 @@ public actor FaceTimeCoordinator {
     self.logger = logger
   }
 
-  public var protectedCalls: Set<String> { handOffsInFlight }
+  /// Calls with a hand-off watcher running.
+  public var protectedCalls: Set<String> { Set(handOffs.keys) }
 
-  public func beginHandOff(callUUID: String) { handOffsInFlight.insert(callUUID) }
-  public func endHandOff(callUUID: String) { handOffsInFlight.remove(callUUID) }
+  // MARK: - Hand-offs
+
+  /// Starts watching a call the Mac is in, admitting joiners and leaving once a client has
+  /// really joined. Returns at once; the watcher runs under this coordinator.
+  ///
+  /// - Parameter dialledAddresses: who the Mac called (Flow B), so the client can be told
+  ///   apart from the callees. Empty for an answered incoming call (Flow C).
+  public func beginHandOff(
+    api: any PrivateAPI,
+    callUUID: String,
+    conversationUUID: String,
+    dialledAddresses: [String] = []
+  ) {
+    handOffs[callUUID]?.cancel()
+    let logger = logger
+    handOffs[callUUID] = Task { [weak self] in
+      await FaceTimeHandOff.run(
+        api: api, callUUID: callUUID, conversationUUID: conversationUUID,
+        dialledAddresses: dialledAddresses, logger: logger
+      )
+      await self?.endHandOff(callUUID: callUUID)
+    }
+  }
+
+  /// Forgets a watcher, cancelling it if it is still running.
+  public func endHandOff(callUUID: String) {
+    handOffs.removeValue(forKey: callUUID)?.cancel()
+  }
+
+  /// Cancels every watcher. Called when the Private API goes away: there is no helper left
+  /// to poll, and a watcher that keeps trying is a task that never ends.
+  public func stop() {
+    for task in handOffs.values { task.cancel() }
+    handOffs.removeAll()
+  }
+
+  // MARK: - Cleanup
 
   /// Clears stray links and any call the Mac is stuck in.
   ///
@@ -88,7 +122,7 @@ public actor FaceTimeCoordinator {
         ? .all
         : .expired(hours <= 0 ? .infinity : Double(hours) * 3600),
       leaveUntrackedCalls: true,
-      protectedCalls: handOffsInFlight,
+      protectedCalls: protectedCalls,
       logger: logger
     )
     return CleanupResult(

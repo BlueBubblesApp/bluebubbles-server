@@ -28,6 +28,8 @@ extension AppContext: PrivateAPIRuntimeProviding {}
 extension AppContext: FaceTimeProviding {}
 extension AppContext: FindMyProviding {}
 extension AppContext: AttachmentConverting {}
+extension AppContext: UploadStoring {}
+extension AppContext: ApplicationRestarting {}
 extension AppContext: ToolProviding {}
 extension AppContext: PermissionsProviding {}
 extension AppContext: PushSetupProviding {}

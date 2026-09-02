@@ -17,7 +17,7 @@ public enum SystemHandlers {
 
   public static func register(
     into registry: inout HandlerRegistry,
-    context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding,
+    context: some ApplicationRestarting & PrivateAPIProviding,
     logSink: FileSink?
   ) {
     registerMac(into: &registry, context: context)
@@ -29,19 +29,18 @@ public enum SystemHandlers {
 
   private static func registerMac(
     into registry: inout HandlerRegistry,
-    context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding
+    context: some ApplicationRestarting & PrivateAPIProviding
   ) {
     registry.register(.macLock) { _ in
       try await ScreenLock.lock()
       return .data(nil)
     }
 
+    // Answered first, THEN restarted — see `ApplicationRestartCoordinator.scheduleRestart`.
+    // The restart goes through the injector so the Private API helper comes back with the
+    // app; a plain relaunch would silently drop it.
     registry.register(.macRestartMessages) { _ in
-      scheduleRestart(
-        applicationName: "Messages",
-        bundleIdentifier: HelperHost.messages,
-        context: context
-      )
+      await context.applicationRestart().scheduleRestart(.messages)
       // The inherited route answers with no data — asserted by the parity harness.
       return .data(nil)
     }
@@ -49,96 +48,8 @@ public enum SystemHandlers {
     // FaceTime's counterpart. Same rule about injection — restarting FaceTime.app without
     // its helper leaves the FaceTime routes reporting no helper.
     registry.register(.facetimeRestart) { _ in
-      scheduleRestart(
-        applicationName: "FaceTime",
-        bundleIdentifier: HelperHost.faceTime,
-        context: context
-      )
+      await context.applicationRestart().scheduleRestart(.faceTime)
       return .data(.object(["restarting": .bool(true)]))
-    }
-  }
-
-  /// Restarts a managed app, PRESERVING the Private API helper.
-  ///
-  /// A plain quit-and-relaunch silently disables the Private API: the app comes back
-  /// looking perfectly healthy while dyld never inserted the helper, so every Private API
-  /// route starts reporting the helper as unavailable and nothing says why. When the server manages injection, the restart goes THROUGH the
-  /// injector, which relaunches with `DYLD_INSERT_LIBRARIES` and waits for the helper to
-  /// register before reporting success.
-  ///
-  /// Falls back to a plain restart when injection is not managed here — the Private API is
-  /// off, or the helper was installed by other means — because in that case relaunching
-  /// normally is exactly right.
-  /// Answers the request, THEN restarts — the same shape as `server.restartServices`.
-  ///
-  /// Restarting through the injector is slow and unbounded from a client's point of view:
-  /// it quits the app (waiting up to ten seconds for it to exit), relaunches it, waits for
-  /// the helper to register, and RETRIES several times before giving up. Awaiting that
-  /// inside the handler left the request hanging for minutes, which reads as a broken
-  /// server rather than a slow restart.
-  ///
-  /// The outcome therefore reaches the user through the log and the alert centre — the
-  /// injector already raises an alert when injection fails — rather than through the
-  /// response, which is gone by then.
-  private static func scheduleRestart(
-    applicationName: String,
-    bundleIdentifier: String,
-    context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding
-  ) {
-    Task.detached {
-      // A beat, so the HTTP response is flushed before the app starts churning.
-      try? await Task.sleep(for: .milliseconds(500))
-      let logger = context.logger
-      logger.info(
-        "Restarting an application with its Private API helper",
-        metadata: [
-          "app": .string(applicationName)
-        ])
-      do {
-        try await restart(
-          applicationName: applicationName,
-          bundleIdentifier: bundleIdentifier,
-          context: context
-        )
-        logger.info(
-          "Application restarted",
-          metadata: [
-            "app": .string(applicationName)
-          ])
-      } catch {
-        logger.error(
-          "Application restart failed",
-          metadata: [
-            "app": .string(applicationName),
-            "error": .string(String(describing: error)),
-          ])
-      }
-    }
-  }
-
-  private static func restart(
-    applicationName: String,
-    bundleIdentifier: String,
-    context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding
-  ) async throws {
-    if let runtime = await context.privateAPIRuntime {
-      do {
-        if try await runtime.reinject(bundleIdentifier: bundleIdentifier) { return }
-        // Not a managed app — fall through to the plain restart below.
-      } catch {
-        throw IMessageError(
-          "\(applicationName) was restarted, but the Private API helper did not "
-            + "come back: \(error.localizedDescription)"
-        )
-      }
-    }
-
-    // Quit politely first. `terminate()` sends a Quit Apple Event, which lets Messages
-    // finish writing chat.db — force-killing it mid-write is how a database ends up
-    // corrupt.
-    _ = await ApplicationControl.quit(bundleIdentifier: bundleIdentifier)
-    guard ApplicationControl.launch(bundleIdentifier: bundleIdentifier) else {
-      throw IMessageError("\(applicationName) could not be restarted")
     }
   }
 
@@ -186,7 +97,7 @@ public enum SystemHandlers {
 
   private static func registerAccount(
     into registry: inout HandlerRegistry,
-    context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding
+    context: some ApplicationRestarting & PrivateAPIProviding
   ) {
     registry.register(.icloudAccountInfo) { _ in
       let api = try await requirePrivateAPI(context, for: "reading account information")
@@ -258,7 +169,7 @@ public enum SystemHandlers {
 
   private static func registerLogs(
     into registry: inout HandlerRegistry,
-    context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding,
+    context: some ApplicationRestarting & PrivateAPIProviding,
     logSink: FileSink?
   ) {
     registry.register(.serverLogs) { request in
@@ -273,7 +184,7 @@ public enum SystemHandlers {
   }
 
   private static func requirePrivateAPI(
-    _ context: some LoggerProviding & PrivateAPIProviding & PrivateAPIRuntimeProviding,
+    _ context: some ApplicationRestarting & PrivateAPIProviding,
     for feature: String
   ) async throws -> any PrivateAPI {
     guard let api = await context.privateAPIClient() else {

@@ -17,7 +17,8 @@ import Foundation
 public enum WriteHandlers {
 
   public static func register(
-    into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
+    into registry: inout HandlerRegistry,
+    context: some AlertProviding & InterfaceProviding & UploadStoring
   ) {
     registerSending(into: &registry, context: context)
     registerMultipart(into: &registry, context: context)
@@ -232,7 +233,8 @@ public enum WriteHandlers {
   }
 
   private static func registerChatActions(
-    into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
+    into registry: inout HandlerRegistry,
+    context: some AlertProviding & InterfaceProviding & UploadStoring
   ) {
     registry.register(.chatCreate) { request in
       let interfaces = try await context.requireInterfaces()
@@ -482,7 +484,7 @@ public enum WriteHandlers {
         else {
           throw BadRequest("no `icon` part in the form")
         }
-        path = try UploadStore.write(file.data, named: file.filename ?? "icon")
+        path = try context.uploads.write(file.data, named: file.filename ?? "icon")
       } else {
         let values = try request.values()
         guard let given = values["filePath"]?.stringValue ?? values["path"]?.stringValue
