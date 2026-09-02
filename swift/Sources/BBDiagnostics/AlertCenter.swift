@@ -1,10 +1,9 @@
 //  AlertCenter
 //  The only path to a user-visible notification.
 //
-//  There is deliberately no route from `logger.error(...)` to here. In the current server,
-//  Server().log(msg, "error") writes a log AND creates an alert row AND bumps the dock badge
-//  (index.ts:269-297), so every internal error becomes a notification carrying a bare string.
-//  Raising is now an explicit act.
+//  There is deliberately no route from `logger.error(...)` to here. A logger that also
+//  created alert rows and bumped the dock badge turned every internal error into a
+//  notification carrying a bare string. Raising is an explicit act.
 //
 //  See `.claude/docs/architecture.md`.
 
@@ -14,8 +13,7 @@ import Logging
 
 public actor AlertCenter: AlertRaising {
 
-  /// Rows are capped; an unbounded alert table is one of the ways the current server grows
-  /// without limit.
+  /// Rows are capped; an unbounded alert table grows without limit on a busy server.
   public static let defaultCapacity = 500
   public static let defaultRetention: Duration = .seconds(60 * 60 * 24 * 30)
 
@@ -205,7 +203,7 @@ public actor AlertCenter: AlertRaising {
   }
 
   /// The dock badge counts warnings and above only — an info alert should not decorate the
-  /// icon, which the current implementation does not distinguish.
+  /// icon.
   public func badgeCount() -> Int {
     alerts.filter { $0.readAt == nil && $0.severity >= .warning }.count
   }

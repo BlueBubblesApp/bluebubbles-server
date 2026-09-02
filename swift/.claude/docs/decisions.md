@@ -182,3 +182,12 @@ closed by default. Opening it is a security decision to make deliberately, not a
 
 `CustomEventSink` is today's extension point, and it is the shape to extend from:
 [`../../docs/EVENTS.md`](../../docs/EVENTS.md).
+
+## Two JSON value types, two chat identifier types — on purpose
+
+`BBSerialization.JSONValue` is the client wire contract; `BBPrivateAPI.WireJSON` is the helper
+protocol's dynamic half. They stay separate so the Private API transport is not tied to the
+read path; `WireJSON` already writes whole numbers as integers, which is the one place the two
+could disagree on the wire. Likewise `BBCore.ChatGUID` (comparison of `chat.db` values) and
+`BBPrivateAPIContract.ChatIdentifier` (the opaque handle the helper takes) are different
+things with different rules, and were renamed apart rather than merged.

@@ -10,8 +10,8 @@
 //
 //  Two jobs, and they are deliberately separate:
 //
-//    1. Route the change to the registry. That is the whole of what `handleConfigUpdate`
-//       (`index.ts:995-1153`) did, minus the 160-line if-chain.
+//    1. Route the change to the registry, which restarts exactly the services that watch
+//       an affected key.
 //    2. Apply the changes that belong to no service. `AccessControlService` is shared by the
 //       HTTP middleware and the socket rather than owned by either, so it is not in the
 //       registry and would otherwise never see a policy change.
@@ -68,8 +68,7 @@ public actor SettingsPropagation {
   ///
   /// DERIVED from the declarations: a setting says `application: .composition` on itself,
   /// and this is every setting that does. A new composition-time setting reaches the restart
-  /// notice by being declared, and a list here that could disagree with the declaration is
-  /// exactly what this used to be.
+  /// notice by being declared; a list here could disagree with the declaration.
   static let structuralKeys: Set<String> = Set(
     Settings.all.filter { $0.application == .composition }.map(\.key)
   )

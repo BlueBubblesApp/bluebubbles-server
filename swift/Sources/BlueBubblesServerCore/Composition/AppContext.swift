@@ -1,10 +1,7 @@
 //  AppContext
-//  The dependency container, and what replaces the `Server()` global.
-//
-//  The current implementation reaches through a `Server()` singleton **530 times across 70
-//  files**. Every one of those is an undeclared dependency: nothing states what a component
-//  needs, so nothing can be constructed without constructing everything, and nothing can be
-//  tested without a running server.
+//  The dependency container. There is no global: everything reaches what it needs through
+//  a parameter or a capability protocol, so a component states what it depends on and can be
+//  constructed — and tested — without the rest.
 //
 //  This is the one place that knows how the parts fit together. Everything below it takes
 //  what it needs as a parameter.

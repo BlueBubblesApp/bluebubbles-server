@@ -11,8 +11,8 @@
 //  member appearing, polled, with a hard timeout. When the helper's membership EVENT proves
 //  reliable on-device, the poll can be replaced by it.
 //
-//  This lived inside the HTTP handler, spawned as a detached task nothing owned. It is a
-//  decision about live calls, so it belongs here — and `FaceTimeCoordinator` owns the task.
+//  A decision about live calls, so it lives here rather than in a handler — and
+//  `FaceTimeCoordinator` owns the task, so stopping the Private API stops the watcher.
 
 import BBPrivateAPIContract
 import Foundation

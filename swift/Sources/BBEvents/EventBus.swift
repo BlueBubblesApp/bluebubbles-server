@@ -3,8 +3,7 @@
 //
 //  There is no primary delivery route. A socket-only install, a webhook-only install, and a
 //  full FCM install are all first-class, and none of them logs a warning about the sinks it
-//  does not have. That is a deliberate departure from the current postChecks, which nags
-//  about a missing Firebase config as though it were a defect.
+//  does not have. A missing Firebase config is a configuration, not a defect.
 //
 //  The property that matters most operationally: one sink failing must not affect another.
 //  A webhook endpoint that hangs cannot delay socket delivery, and an FCM outage cannot stop

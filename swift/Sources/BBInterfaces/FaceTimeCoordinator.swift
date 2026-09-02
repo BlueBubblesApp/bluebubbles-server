@@ -5,9 +5,9 @@
 //  its own state and its own rule — never hang up on a call a watcher is still waiting on — so
 //  it is its own type rather than more members on the application context.
 //
-//  It OWNS the hand-off tasks. They used to be spawned detached from the HTTP handler, which
-//  meant nothing could cancel them: stopping the Private API service left watchers polling a
-//  helper that had gone. Holding them here is what lets `stop()` end them.
+//  It OWNS the hand-off tasks. A detached task nothing holds cannot be cancelled, and a
+//  watcher that outlives the Private API service polls a helper that has gone. Holding them
+//  here is what lets `stop()` end them.
 
 import BBDiagnostics
 import BBPrivateAPI

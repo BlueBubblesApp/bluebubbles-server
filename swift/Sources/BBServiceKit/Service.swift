@@ -1,6 +1,6 @@
 //  Service
-//  The lifecycle contract that replaces the three hand-ordered try/catch lists in
-//  packages/server/src/server/index.ts:459-615.
+//  The lifecycle contract every service implements: declared dependencies, one start, one
+//  stop, and a restart policy the registry applies.
 //
 //  See `.claude/docs/architecture.md` — Service registry.
 
@@ -39,8 +39,8 @@ public enum ReloadAction: Sendable, Equatable {
   case restart
 }
 
-/// Restart policy applied by the registry when a service throws. Replaces the current
-/// recovery strategy, which is to relaunch the entire application.
+/// Restart policy applied by the registry when a service throws. Per service, so one failing
+/// tunnel is retried on its own rather than taking the application down with it.
 public enum RestartPolicy: Sendable, Equatable {
   case never
   case backoff(base: Duration, max: Duration, attempts: Int)
@@ -84,8 +84,7 @@ extension Service {
   public static var id: ServiceID { ServiceID(manifest.id.rawValue) }
 
   /// Services that must be running first. The registry topologically sorts these, so start
-  /// order is derived rather than hand-maintained — and stop order is exactly its reverse,
-  /// which the current implementation gets wrong.
+  /// order is derived rather than hand-maintained — and stop order is exactly its reverse.
   public static var dependencies: [ServiceID] {
     manifest.dependencies.map { ServiceID($0.rawValue) }
   }
@@ -106,9 +105,8 @@ public protocol ConfigurableService: Service {
 
 /// Opt-in: a service that is not always applicable.
 ///
-/// Replaces `Proxy.canStart()` and the inline `if privateApiEnabled` gating in
-/// `startServices()`. A gated service that declines reports `.inactive`, which is a normal
-/// state rather than a failure.
+/// A gated service that declines reports `.inactive`, which is a normal state rather than a
+/// failure — no Private API, no tunnel configured.
 public protocol GatedService: Service {
   func canRun() async -> Bool
 }

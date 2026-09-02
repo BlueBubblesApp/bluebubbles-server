@@ -1,9 +1,8 @@
 //  SystemInfo
 //  The facts `GET /api/v1/server/info` reports, without shelling out for any of them.
 //
-//  Each of these is a subprocess in the current server — `PlistBuddy` for the iCloud account,
-//  `os.networkInterfaces()` for the addresses, `sntp` for the clock offset. Three of the four
-//  have a framework equivalent, and the fourth genuinely does not; see `timeSync`.
+//  Three of the four have a framework equivalent (the iCloud account is a plist read, the
+//  addresses come from `getifaddrs`); the clock offset genuinely does not — see `timeSync`.
 //
 //  See `.claude/docs/performance.md`.
 
@@ -34,9 +33,9 @@ public enum SystemInfo {
   /// The signed-in iCloud account, or nil.
   ///
   /// `PlistBuddy -c "print :Accounts:0:AccountID"` becomes reading the plist, which is what
-  /// PlistBuddy does anyway. Index 0 is preserved rather than searched: the current server
-  /// takes the first account and clients have been shown that value for years, so picking a
-  /// "better" one would change what an existing install reports about itself.
+  /// PlistBuddy does anyway. Index 0 is preserved rather than searched: clients have been
+  /// shown the first account for years, so picking a "better" one would change what an
+  /// existing install reports about itself.
   public static func icloudAccount() -> String? {
     let path = (NSHomeDirectory() as NSString)
       .appendingPathComponent("Library/Preferences/MobileMeAccounts.plist")

@@ -1,14 +1,9 @@
 //  ServiceRegistry
-//  Replaces initServices / startServices / stopServices (index.ts:459-615) — three
-//  hand-ordered lists of copy-pasted try/catch blocks, in inconsistent orders, with
-//  inconsistent lifecycle shapes.
-//
-//  And handleConfigUpdate (index.ts:995-1153) — a 160-line if-chain with a manual
-//  `proxiesRestarted` latch and every service's reaction centralised in the server object.
+//  Starts, stops, restarts and supervises every service from what the services declare.
 //
 //  Start order is DERIVED from declared dependencies, and stop order is exactly its reverse.
 //  Settings changes are routed only to services that watch an affected key, and restarting a
-//  service restarts its dependents, which is what the manual latch was approximating.
+//  service restarts its dependents. There is no hand-maintained list anywhere in this file.
 //
 //  See `.claude/docs/architecture.md`.
 
@@ -307,8 +302,8 @@ public actor ServiceRegistry<Host: Sendable> {
 
   /// Runs a service under its restart policy.
   ///
-  /// Replaces the current recovery strategy, which for proxies is ten retries and then
-  /// `Server().relaunch()` — restarting the entire application because one tunnel failed.
+  /// Retries with backoff and gives up per the policy; a failing service never takes the
+  /// application down with it.
   /// - Parameters:
   ///   - startingAt: Which attempt number this begins on. `start(_:)` performs attempt 1
   ///     inline so that startup ordering is real, and hands the remainder here.

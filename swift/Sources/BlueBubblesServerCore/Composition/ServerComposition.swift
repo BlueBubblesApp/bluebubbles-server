@@ -2,10 +2,8 @@
 //  Building the server, once, in one place.
 //
 //  Everything above this file takes what it needs as a parameter. This is the only code that
-//  knows the whole graph, and it is deliberately readable top to bottom — the current
-//  implementation spreads the same job across `index.ts` init/start/stop plus 530 reaches
-//  through a `Server()` global, and the result is that nobody can say what starts before what
-//  without tracing it by hand.
+//  knows the whole graph, and it is deliberately readable top to bottom: what starts before
+//  what is answered by reading this file, not by tracing.
 //
 //  Three properties this is responsible for:
 //
@@ -72,7 +70,7 @@ public struct ServerComposition {
     // Bootstrapped before anything else logs, and to the SAME path the Electron server
     // uses — an operator debugging a migrated install should find one log file where
     // they expect it, not two. Held so `GET /server/logs` can tail it: without the sink,
-    // that route has nothing to read and the current server's log viewer goes blank.
+    // that route has nothing to read and a client's log viewer goes blank.
     let logSink = LoggingSystemBootstrap.bootstrap(level: options.logLevel)
     let logger = Logger(label: "bluebubbles")
 

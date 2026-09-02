@@ -1,11 +1,8 @@
 //  MessageInterface
 //  Message operations, independent of how they were asked for.
 //
-//  This is the layer the plan calls for: controllers stay thin and delegate here, and the
-//  same methods serve the HTTP routes, the legacy socket commands, and the SwiftUI app. That
-//  is what makes the current implementation's **68 IPC channels** unnecessary — they exist
-//  because the UI cannot reach the business logic any other way, so every operation needs a
-//  hand-written channel on both sides.
+//  Controllers stay thin and delegate here, and the same methods serve the HTTP routes, the
+//  legacy socket commands, and the SwiftUI app.
 //
 //  It is also where the send-backend decision lives. `MessageInterface` picks between the
 //  Private API and AppleScript per operation and reports capability, rather than failing late
@@ -55,8 +52,8 @@ public struct MessageInterface: MessagesBackedInterface {
     public var after: Date?
     public var before: Date?
     /// Which related objects to load. Each costs a query per row, so none are loaded
-    /// unless asked for — the current server loads participants unconditionally, which is
-    /// where its chat listing spends most of its time.
+    /// unless asked for — participants especially, which is where a chat listing spends
+    /// most of its time when loaded unconditionally.
     public var withChats: Bool
     public var withAttachments: Bool
     public var withHandle: Bool
@@ -243,9 +240,9 @@ public struct MessageInterface: MessagesBackedInterface {
   /// Loads relations and serializes.
   ///
   /// Relations are fetched per message rather than in one pass. That is the honest simple
-  /// version; the current server does the same and it is not the bottleneck at these page
-  /// sizes. If it becomes one, the fix is a batched fetch here — which is possible
-  /// precisely because it is one function rather than fifteen call sites.
+  /// version and it is not the bottleneck at these page sizes. If it becomes one, the fix
+  /// is a batched fetch here — possible precisely because it is one function rather than
+  /// fifteen call sites.
   /// Loads whatever relations the query asked for. Exactly what the old private
   /// `serialize` did, minus the final serializer call.
   private func project(

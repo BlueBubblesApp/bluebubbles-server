@@ -2,8 +2,7 @@
 //  The entry point. Parses arguments, builds the server, and hands control to the registry.
 //
 //  Deliberately thin: everything it knows is in ServerComposition, and everything the
-//  composition knows is declared by the services themselves. Contrast with
-//  `index.ts:459-615`, where init/start/stop are three hand-ordered lists.
+//  composition knows is declared by the services themselves.
 //
 //  See `.claude/docs/architecture.md`.
 

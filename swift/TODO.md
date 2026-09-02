@@ -158,6 +158,27 @@ untestable from a plain debug build, which is the configuration a contributor ha
 
 # 2. Verification the plan claims and CI does not do, and code nothing tests
 
+## v1 send routes answer `{guid, backend}`; the Node fixture answers the Message
+
+`POST /api/v1/message/text` (and the attachment, reaction and multipart sends) return
+`MessageInterface.serialize(SendOutcome)` — a GUID and the backend that sent it — with
+`message: "Message sent!"`. The recorded Node fixture
+(`Fixtures/http/post_api_v1_message_text-5baa61-200.json`) carries the serialised Message
+row. Clients that read the returned message (text, date, handle) get less than they used to.
+The compatibility suite does not diff send routes, which is why this survived the corpus.
+Done looks like: after a Private API send, poll `chat.db` for the row by GUID (bounded, as the
+AppleScript path already does) and serialise it; keep `backend` as an additive field; add the
+send routes to the parity diff with the GUID and dates masked.
+
+## Two tests are timing-sensitive under a loaded machine
+
+`HelperRoundTripTests` ("unknown action is reported differently") once hit its 5 s socket
+timeout during a full parallel run and passed in isolation and on two reruns.
+`SignalOwnershipTests` ("Stopping is driven by cancellation") once found its port in use.
+Neither reproduced. Done looks like: the round trip uses a longer timeout under `swift test`,
+and the signal test binds port 0 and reads the bound port back rather than choosing one.
+
+
 ## The parity corpus is recorded, committed, and never replayed
 
 The worst one in this section, because the claim it invalidates is the project's central one.
@@ -786,6 +807,22 @@ The standalone Notifications page (now the toolbar bell); the Permissions and Se
 ---
 
 # 6. Housekeeping
+
+## Statics the lock pass left alone, and `@unchecked Sendable` not re-audited
+
+Three `nonisolated(unsafe)` statics remain (`HelperMain`/`FaceTimeHelperMain.client` and
+`started`, `EventObservation.emit`/`handler`/`rung`, `FaceTimeBridge.emit`/
+`lastLinkSnapshotCount`). Each is written once at load before any listener exists and says
+so; none is a latch. 24 `@unchecked Sendable` conformances remain; the ones touched in the
+lock pass now carry a precise comment, the rest were not re-read. Done looks like: each
+`@unchecked` names the invariant that makes it safe, or becomes an `OSAllocatedUnfairLock`.
+
+## `AppModel` still owns tool-status observation
+
+`toolStatuses`, `toolsTask`, `toolObservers` and `beginObservingTools` stayed on the root
+model in the split; a `ToolsModel` following the `PermissionsModel` pattern is the obvious
+next cut, and `ToolActions` is its only consumer.
+
 
 - [ ] **A test asserting every setting with a `presentation:` has a READER.** The existing
       `RenderableSettingsTests` catches the adjacent mistake — a presented setting missing from

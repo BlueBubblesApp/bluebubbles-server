@@ -2,9 +2,7 @@
 //  The root observable model. Owns the running server; the views read from it.
 //
 //  There is NO IPC here, and that is the point. View models call the same interfaces layer the
-//  HTTP controllers call, in the same process. The Electron app needed 68 `ipcMain.handle`
-//  channels — one per operation, hand-written on both sides — purely because the UI ran in a
-//  different process from the business logic. See `.claude/docs/architecture.md`.
+//  HTTP controllers call, in the same process. See `.claude/docs/architecture.md`.
 
 import BBAuth
 import BBContacts

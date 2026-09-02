@@ -1,6 +1,5 @@
 //  Setting
-//  Typed setting descriptors, replacing the stringly-typed config store and its regex
-//  coercion in packages/server/src/server/databases/server/index.ts:287-302.
+//  Typed setting descriptors: a key, a value type, a default, and how a change is applied.
 //
 //  See `.claude/docs/database.md` — Typed, secure, reactive settings.
 
@@ -197,8 +196,7 @@ public enum SettingsError: BBError {
   }
 
   /// Only the Keychain failure is worth interrupting someone over — the other two are
-  /// developer-facing and get logged. This is the distinction the current server does not
-  /// make, where every `log.error` becomes a notification.
+  /// developer-facing and get logged.
   public var isUserFacing: Bool {
     if case .keychainUnavailable = self { return true }
     return false
