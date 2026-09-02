@@ -87,9 +87,10 @@ improvising the order:**
 
 | To add | Go to |
 |---|---|
-| A setting | `Sources/BBSettings/SettingsRegistry.swift` — declare a `Setting<T>` with `presentation:`, then add it to **both** `Settings.allKeys` and `Settings.renderable`. Do not write a view |
+| A setting | `Sources/BBSettings/SettingsRegistry.swift` — declare a `Setting<T>` with `presentation:` and add it to `Settings.renderable` (or `Settings.hidden` if it has no UI). `allKeys` is derived. Mark it `application: .composition` if only a restart applies it. Never write a key as a string literal elsewhere: use `Settings.x.key` |
 | An API route | `Sources/BBHTTPAPI/RouteTable.swift` (or `AdditiveRoutes` if Node does not have it), then a handler in `Sources/BBHandlers/` |
-| Logic behind a route | `Sources/BBInterfaces/` — **not** the handler. Anything reaching Messages goes inside `throughMessages { … }` |
+| Logic behind a route | `Sources/BBInterfaces/` — **not** the handler. Interfaces return typed values; one `serialize` step projects them. Anything reaching Messages goes inside `throughMessages { … }` |
+| A capability a handler, service or view may reach | `Sources/BBInterfaces/Capabilities.swift`, then conform `AppContext` in `AppContextCapabilities.swift`. Never take the whole `AppContext` |
 | A page in the app | `Sources/BlueBubblesApp/Views/` — reach state through `AppModel`, never `AppContext` |
 | A service | Conform to `Service` in `Sources/BlueBubblesServerCore/Composition/Services.swift` and declare a manifest in `BuiltInManifests.swift`; start order is derived from `dependencies` |
 | A table in `app.db` | A `SchemaContributor` in the module that owns it, then append it to `AppSchema.contributors`. **Not** `AppDatabase` — see [`Sources/BBPersistence/CLAUDE.md`](Sources/BBPersistence/CLAUDE.md) |

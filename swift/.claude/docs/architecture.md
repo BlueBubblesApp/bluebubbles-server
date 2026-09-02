@@ -46,7 +46,7 @@ and knows nothing about the whole.
 | `BBTooling` | Downloading, verifying and version-managing external binaries |
 | `BBUpdates` | Appcast, semantic versions, update checking |
 | `BBInterfaces` | The domain layer: what an operation MEANS, plus the repositories it reads. **Does not depend on BBHTTPAPI** |
-| `BBHandlers` | The HTTP controllers and the capability protocols that say what one may reach |
+| `BBHandlers` | The HTTP controllers. Parse, call one interface, serialize, return |
 | `BBOpenAPI` | Generates `docs/api/openapi.json` from the route table |
 | `BBParity` | Replays recorded response fixtures and diffs them against live output |
 
@@ -63,7 +63,7 @@ BlueBubblesServerCore   builds the graph, owns AppContext, registers services
         |
         v
 BBHandlers              thin: parse request -> call an interface -> serialize -> return
-        |               plus the capability protocols
+        |
         v
 BBInterfaces            the business logic and its repositories; shared by HTTP,
                         socket and the SwiftUI app. NO transport dependency.
@@ -78,8 +78,11 @@ Note what that does and does not buy. The Swift compiler will still resolve a tr
 reachable module, so an undeclared `import` compiles locally — **the graph check is the
 enforcement, and it runs in CI**. Run it after touching any `import`.
 
-The capability protocols live in `BBHandlers` because they describe what a HANDLER may reach;
-the `extension AppContext: …Providing {}` conformances live in the composition root, in
+The capability protocols (`InterfaceProviding`, `SettingsProviding`, `PushSetupProviding`, …)
+live in `BBInterfaces/Capabilities.swift`. Three consumers compose them — the handlers, the
+composition root and the SwiftUI app — so they sit below all three; putting them in `BBHandlers`
+made the app link the HTTP controller target to name a protocol. The
+`extension AppContext: …Providing {}` conformances live in the composition root, in
 `AppContextCapabilities.swift`, which is the whole of what joins the two.
 
 **Handlers are thin and interfaces are where logic lives.** The test: *could the SwiftUI
@@ -89,10 +92,12 @@ This is what keeps the SwiftUI app off the HTTP API and out of a parallel IPC ch
 Logic written into a handler is logic the app cannot call, and the only way to reach it then is
 to add a hand-written channel on both sides — one per operation, forever.
 
-**Read methods return rows, not JSON.** `interfaces.message.query(...)` returns
-`[MessageProjection]`; the handler calls `interfaces.message.serialize(_:query:)`.
-Serialization belongs in the handler, never in the interface — an interface that returns
-pre-serialized JSON cannot be used by the app without parsing its own output back by string key.
+**Interfaces return typed values, never wire JSON.** `interfaces.message.query(...)` returns
+`[MessageProjection]`, `send…` returns `SendOutcome`, `countByService` returns `ChatCounts`,
+`webhooks()` returns `[Webhook]`. Each has exactly one projection onto the wire — a `serialize`
+on the interface, a static `serialize(_:)`, or a `json` property on the record — and the handler
+calls it. An interface that returned pre-serialized JSON grew a second `…List()`/`records()`
+method the moment the app needed the value, which is the drift this rule ends.
 
 Absent-vs-null is not the handler's problem: whether a field appears is decided by
 `SchemaProfile` inside the serializer, so moving the serialize call cannot change the bytes.

@@ -24,7 +24,8 @@ route as missing. `HandlerRegistry.missing(for:)` is the authoritative answer.
 
 ## Take capabilities, not the container
 
-A handler group declares what it needs by composing protocols:
+A handler group declares what it needs by composing the protocols in
+`../BBInterfaces/Capabilities.swift`:
 
 ```swift
 static func register(
@@ -37,7 +38,10 @@ That composition IS the dependency list, and it is what lets a test stand the gr
 a two-field struct instead of a running server. Taking `AppContext` instead would say
 "everything" and mean nothing — which is what it did before these existed.
 
-The `extension AppContext: …Providing {}` conformances live in the composition root, not here.
+The protocols live in `BBInterfaces` because the composition root and the SwiftUI app compose
+them too; the `extension AppContext: …Providing {}` conformances live in the composition root.
+`PrivateAPIProviding.requirePrivateAPI(for:)` is the one "no helper connected" refusal — do not
+write a private copy.
 
 **A capability vends an interface, never a repository.** `MessageDataProviding` used to hand out
 a raw `MessageRepository`, and nine handlers took it — reading rows and serializing them inline

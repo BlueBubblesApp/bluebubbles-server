@@ -179,7 +179,8 @@ password.
 **Settings.** Every key round-trips to its declared type, with explicit cases for a numeric setting
 whose value is `0` or `1`, a password of `"1"`, and a delay stored as `"0.0"`. Secrets land in the
 Keychain and plaintext rows are gone. `RenderableSettingsTests` fails when a setting declares a
-presentation and is missing from `Settings.renderable`.
+presentation and is missing from `Settings.renderable`; `SettingApplicationTests` pins which
+settings need a restart to apply and that every legacy row stays hidden.
 
 **Service lifecycle.** Start/stop ordering under a synthetic dependency graph, restart-with-
 dependents on a `socket_port` change, gated services declining to start, and supervised

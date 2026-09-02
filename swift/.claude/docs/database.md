@@ -186,9 +186,15 @@ try await settings.write { $0[.proxyService] = .zrok; $0[.zrokToken] = tok }
 ```
 
 Adding a setting means declaring it in `Sources/BBSettings/SettingsRegistry.swift` and adding it
-to **both** `Settings.allKeys` and `Settings.renderable`.
-`Tests/BBSettingsTests/RenderableSettingsTests.swift` fails if you forget either — it has
-already caught two.
+to `Settings.renderable` (has a UI) or `Settings.hidden` (bookkeeping). `Settings.allKeys` is
+derived from those two lists; there is no string list to keep in step. Settings the composition
+root reads once — which route groups mount, how chat.db is opened — declare
+`application: .composition`, and `SettingsPropagation` derives its "restart to apply" set from
+that. Rows kept only so the Electron `config.db` can migrate live under `Settings.Legacy`.
+Refer to a key as `Settings.x.key`, never as a string literal: `WatchedSettingsTests` proves
+every watched key exists, but only a typed reference makes a rename a compile error.
+`RenderableSettingsTests` and `SettingApplicationTests` fail if a declaration is missing from
+the lists.
 
 `Sources/BBSettings/LegacyConfigMigration.swift` imports settings from an older `config.db` if
 one is present: coerce each value by its declared type, move secrets to the Keychain, delete the

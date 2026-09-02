@@ -50,11 +50,18 @@ Four interfaces conform: `Message`, `Chat`, `Handle`, `Attachment`. Adding a fif
 conforming it, not copying the helpers — they were duplicated three times before this existed,
 once under a different name (`require(for:)`), which is how one went unnoticed.
 
-## Interfaces return rows; handlers serialize
+## Interfaces return typed values; one `serialize` step projects them
 
-`query(...)` hands back `[MessageProjection]`; the handler calls `serialize(_:query:)`. An
-interface returning pre-serialized JSON cannot be used by the app without parsing its own
-output back by string key.
+`query(...)` hands back `[MessageProjection]`, `sendText` a `SendOutcome`, `webhooks()` a
+`[Webhook]`; the handler calls `serialize(_:)` (or the record's `json`). Never return
+`JSONValue` from an interface method: the app consumes this layer in-process, and every JSON
+return grew a parallel `records()`/`…List()` twin the moment a view needed the value.
+
+## Capabilities live here
+
+`Capabilities.swift` holds the `…Providing` protocols the handlers, the composition root and
+the app compose. Add a capability here, vend an interface (never a repository), and conform
+`AppContext` in the composition root.
 
 Absent-vs-null is not your problem here — `SchemaProfile` inside the serializer decides whether
 a field appears, so moving a serialize call cannot change the bytes.
