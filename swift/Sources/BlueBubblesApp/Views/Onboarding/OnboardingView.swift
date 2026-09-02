@@ -274,7 +274,10 @@ struct OnboardingView: View {
     }
     do {
       try await store.set(Settings.password, to: password)
-      try await store.set(Settings.socketPort, to: port)
+      // Only written when it was asked; a port the person never saw keeps its value.
+      if OnboardingRules.asksForPort(onboarding.selections.goals) {
+        try await store.set(Settings.socketPort, to: port)
+      }
       connectionError = nil
       return true
     } catch {

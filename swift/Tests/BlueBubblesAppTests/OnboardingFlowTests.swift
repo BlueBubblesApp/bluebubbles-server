@@ -80,6 +80,14 @@ struct OnboardingPlanTests {
     #expect(!ids([.other]).contains(.api))
   }
 
+  @Test("The port is asked only when something will connect; the password always is")
+  func portOnlyWhenReachable() {
+    #expect(!OnboardingRules.asksForPort([.webhooks]))
+    #expect(OnboardingRules.asksForPort([.api]))
+    #expect(OnboardingRules.asksForPort([.webhooks, .desktop]))
+    #expect(ids([.webhooks]).contains(.password))
+  }
+
   @Test("Nothing chosen yet still yields a walkable plan")
   func emptyGoals() {
     let plan = ids([])

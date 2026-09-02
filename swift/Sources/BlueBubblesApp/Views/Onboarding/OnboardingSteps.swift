@@ -34,7 +34,8 @@ struct OnboardingStepView: View {
     case .password:
       ConnectionStep(
         model: model, password: $password, port: $port,
-        rejection: passwordRejection, saveError: connectionError)
+        rejection: passwordRejection, saveError: connectionError,
+        showsPort: OnboardingRules.asksForPort(model.onboarding.selections.goals))
     case .connection: ConnectionMethodStep(model: model, onChanged: onConnectionChanged)
     case .firebase: FirebaseStep(model: model)
     case .webhooks: WebhooksView(model: model)

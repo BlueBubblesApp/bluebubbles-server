@@ -200,6 +200,16 @@ enum OnboardingRules {
     !goals.isEmpty && goals != [.webhooks]
   }
 
+  /// Whether the port is worth asking about.
+  ///
+  /// The password is always required — the server refuses every request without one, and
+  /// a webhook consumer may add a client later — but the port only matters to something
+  /// that connects to the HTTP API or the socket. A webhook-only setup is outbound, so the
+  /// question would be noise.
+  static func asksForPort(_ goals: Set<UsageGoal>) -> Bool {
+    needsConnectionMethod(goals)
+  }
+
   /// Whether a connection method's address can change between restarts.
   ///
   /// Read from the manifest, not from a list of tunnel names: a method that runs a program
@@ -288,9 +298,12 @@ enum OnboardingCatalog {
     ),
     OnboardingStep(
       .password, title: "Server password", symbol: "key",
-      purpose: { _ in
-        "Every client authenticates with this. It is the only thing between the internet "
-          + "and your messages."
+      purpose: { selections in
+        OnboardingRules.asksForPort(selections.goals)
+          ? "Every client authenticates with this. It is the only thing between the "
+            + "internet and your messages."
+          : "Required even when nothing connects yet: the server refuses every request "
+            + "without one, and it protects the API the moment something does."
       },
       gate: OnboardingRules.passwordGate
     ),

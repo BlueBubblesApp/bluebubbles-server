@@ -21,6 +21,8 @@ struct ConnectionStep: View {
   /// still unacceptable but should not be shouted at someone who has not started.
   let rejection: String?
   let saveError: String?
+  /// Whether the port row is shown. Off for a setup nothing connects to.
+  var showsPort = true
 
   var body: some View {
     GlassCard {
@@ -38,15 +40,17 @@ struct ConnectionStep: View {
               .help("Create a strong random password")
           }
         }
-        SettingsDivider()
-        SettingsRow(
-          title: "Port",
-          help: "Clients connect here. Leave it unless something else on this Mac uses it."
-        ) {
-          // A port is an identifier, not a quantity: no thousands separator.
-          TextField("", value: $port, format: .number.grouping(.never))
-            .textFieldStyle(.roundedBorder)
-            .frame(maxWidth: 100)
+        if showsPort {
+          SettingsDivider()
+          SettingsRow(
+            title: "Port",
+            help: "Clients connect here. Leave it unless something else on this Mac uses it."
+          ) {
+            // A port is an identifier, not a quantity: no thousands separator.
+            TextField("", value: $port, format: .number.grouping(.never))
+              .textFieldStyle(.roundedBorder)
+              .frame(maxWidth: 100)
+          }
         }
 
         // Required, and said so before the Continue button is discovered to be dead. An
