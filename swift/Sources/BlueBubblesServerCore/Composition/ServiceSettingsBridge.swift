@@ -34,10 +34,10 @@ struct SettingsStorageAdapter: MigratableStorage {
     await store.string(forKey: key)
   }
 
-  func setValue(_ value: String?, forKey key: String, isSecret: Bool) async {
+  func setValue(_ value: String?, forKey key: String, isSecret: Bool) async throws {
     // A nil clears the key. `setDynamic` with an empty string is the store's way of saying
     // "no value", which reads back as nil through `string(forKey:)`.
-    try? await store.set(value ?? "", forKey: key, isSecret: isSecret)
+    try await store.set(value ?? "", forKey: key, isSecret: isSecret)
   }
 }
 
@@ -144,7 +144,21 @@ public enum ServiceSettingsBridge {
     let storage = SettingsStorageAdapter(store: store)
 
     for manifest in manifests {
-      let result = await ServiceMigrator.migrate(manifest, in: storage)
+      let result: ServiceMigrationResult
+      do {
+        result = try await ServiceMigrator.migrate(manifest, in: storage)
+      } catch {
+        // The service still starts: its settings are whatever shape they were, which is
+        // the shape the previous version ran with. But a migration that did not land is
+        // a migration that will be attempted again next launch, and someone should know.
+        logger.error(
+          "A service's settings could not be migrated",
+          metadata: [
+            "service": .string(manifest.id.rawValue),
+            "error": .string(String(describing: error)),
+          ])
+        continue
+      }
 
       // Logged only when something actually moved. A first run and an unchanged version
       // are the common cases and saying so every launch would bury the one line that
@@ -160,7 +174,16 @@ public enum ServiceSettingsBridge {
           ])
       }
 
-      await seedDefaults(manifest, store: store)
+      do {
+        try await seedDefaults(manifest, store: store)
+      } catch {
+        logger.error(
+          "A service's default settings could not be written",
+          metadata: [
+            "service": .string(manifest.id.rawValue),
+            "error": .string(String(describing: error)),
+          ])
+      }
     }
   }
 
@@ -174,7 +197,7 @@ public enum ServiceSettingsBridge {
   /// An off-by-default toggle is not seeded either, because an unset flag already reads as
   /// `false` — writing it would only turn "never chosen" into "chosen", and a later change
   /// to that default would then be ignored on every existing install.
-  static func seedDefaults(_ manifest: ServiceManifest, store: SettingsStore) async {
+  static func seedDefaults(_ manifest: ServiceManifest, store: SettingsStore) async throws {
     for field in manifest.fields {
       let value: String
       switch field.kind {
@@ -191,7 +214,7 @@ public enum ServiceSettingsBridge {
       // Only when never set. Someone who has explicitly turned an on-by-default toggle
       // off has chosen that, and a seed must not undo it on the next launch.
       guard await store.string(forKey: key) == nil else { continue }
-      try? await store.set(value, forKey: key, isSecret: field.isSecret)
+      try await store.set(value, forKey: key, isSecret: field.isSecret)
     }
   }
 
@@ -212,7 +235,7 @@ public enum ServiceSettingsBridge {
   public static func resetToDefaults(
     _ manifest: ServiceManifest,
     store: SettingsStore
-  ) async -> Int {
+  ) async throws -> Int {
     var cleared = 0
     for field in manifest.fields {
       let key = manifest.storageKey(for: field.key)
@@ -220,12 +243,12 @@ public enum ServiceSettingsBridge {
       // Removed, not blanked. A row holding "" is still a row, and `seedDefaults`
       // below would then decline to fill it because something is already there — so a
       // reset would clear the value and fail to restore the default in one go.
-      try? await store.remove(forKey: key)
+      try await store.remove(forKey: key)
       cleared += 1
     }
 
     // Put back the values the manifest says a fresh install should have.
-    await seedDefaults(manifest, store: store)
+    try await seedDefaults(manifest, store: store)
     return cleared
   }
 

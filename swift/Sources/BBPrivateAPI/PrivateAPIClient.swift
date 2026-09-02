@@ -137,7 +137,9 @@ public actor PrivateAPIClient: PrivateAPI {
       ]))
   }
 
-  public func unsendMessage(_ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int) async throws {
+  public func unsendMessage(_ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int)
+    async throws
+  {
     try await transport.request(
       action: "unsend-message",
       data: .object([
@@ -853,7 +855,9 @@ public actor PrivateAPIClient: PrivateAPI {
     )
   }
 
-  private func participantAction(_ action: String, address: String, chat: ChatIdentifier) async throws {
+  private func participantAction(_ action: String, address: String, chat: ChatIdentifier)
+    async throws
+  {
     try await transport.request(
       action: action,
       data: .object([

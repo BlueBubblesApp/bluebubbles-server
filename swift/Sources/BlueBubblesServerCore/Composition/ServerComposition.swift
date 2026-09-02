@@ -442,7 +442,7 @@ public struct ServerComposition {
       let result = try await migration.run(into: settings, secrets: secrets)
       // Set even when nothing was imported: an empty legacy database is still a
       // database we have now read, and re-reading it every launch buys nothing.
-      try? await settings.set(Settings.legacyConfigImported, to: true)
+      await settings.trySet(Settings.legacyConfigImported, to: true)
       guard !result.imported.isEmpty || !result.secretsMoved.isEmpty else { return }
 
       logger.info(

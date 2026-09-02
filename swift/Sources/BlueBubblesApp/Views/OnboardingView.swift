@@ -266,7 +266,11 @@ struct OnboardingView: View {
 
   private func saveCheckForUpdates(_ enabled: Bool) async {
     guard let store = model.settingsStore else { return }
-    try? await store.set(Settings.checkForUpdates, to: enabled)
+    do {
+      try await store.set(Settings.checkForUpdates, to: enabled)
+    } catch {
+      await model.report(error, while: "save the update-check preference")
+    }
     // Applied now rather than at the next launch: the periodic task re-reads the setting
     // on each tick, but starting it here means someone who says yes gets their first
     // check today.
@@ -278,7 +282,12 @@ struct OnboardingView: View {
     // `loginItem` rather than `launchAgent`: it is the one macOS manages itself, shows in
     // System Settings › Login Items where a user can undo it, and needs no privileged
     // install. The agent stays available in settings for anyone who wants it.
-    try? await store.set(Settings.autoStartMethod, to: enabled ? .loginItem : AutoStartMethod.none)
+    do {
+      try await store.set(
+        Settings.autoStartMethod, to: enabled ? .loginItem : AutoStartMethod.none)
+    } catch {
+      await model.report(error, while: "save the start-at-login preference")
+    }
   }
 
   /// The two gates. Everything else advances freely.

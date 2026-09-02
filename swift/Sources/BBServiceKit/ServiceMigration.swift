@@ -57,7 +57,7 @@ public struct FieldMigration: Sendable, Codable, Equatable {
 /// result, which is most of what makes migrations reviewable at all.
 public protocol MigratableStorage: Sendable {
   func value(forKey key: String) async -> String?
-  func setValue(_ value: String?, forKey key: String, isSecret: Bool) async
+  func setValue(_ value: String?, forKey key: String, isSecret: Bool) async throws
 }
 
 public struct ServiceMigrationResult: Sendable, Equatable {
@@ -86,7 +86,7 @@ public enum ServiceMigrator {
   public static func migrate(
     _ manifest: ServiceManifest,
     in storage: any MigratableStorage
-  ) async -> ServiceMigrationResult {
+  ) async throws -> ServiceMigrationResult {
     let versionKey = versionKey(for: manifest)
     let stored = await storage.value(forKey: versionKey)
 
@@ -95,7 +95,7 @@ public enum ServiceMigrator {
     // fields the user is about to configure, and a `rename` would look for keys that were
     // never written.
     guard let stored else {
-      await storage.setValue(manifest.version, forKey: versionKey, isSecret: false)
+      try await storage.setValue(manifest.version, forKey: versionKey, isSecret: false)
       return ServiceMigrationResult(
         from: nil, to: manifest.version, applied: [], wasFirstRun: true
       )
@@ -117,12 +117,12 @@ public enum ServiceMigrator {
     var applied: [String] = []
     for migration in pending {
       for operation in migration.operations {
-        await apply(operation, manifest: manifest, storage: storage)
+        try await apply(operation, manifest: manifest, storage: storage)
       }
       applied.append(migration.toVersion)
     }
 
-    await storage.setValue(manifest.version, forKey: versionKey, isSecret: false)
+    try await storage.setValue(manifest.version, forKey: versionKey, isSecret: false)
     return ServiceMigrationResult(
       from: stored, to: manifest.version, applied: applied, wasFirstRun: false
     )
@@ -132,7 +132,7 @@ public enum ServiceMigrator {
     _ operation: FieldMigration.Operation,
     manifest: ServiceManifest,
     storage: any MigratableStorage
-  ) async {
+  ) async throws {
     // Every key is assembled from the manifest's namespace, so a migration cannot reach
     // outside its own service even by naming a fully-qualified key — the same rule that
     // governs field declarations.
@@ -148,20 +148,20 @@ public enum ServiceMigrator {
     switch operation {
     case .rename(let from, let to):
       guard let value = await storage.value(forKey: key(from)) else { return }
-      await storage.setValue(value, forKey: key(to), isSecret: isSecret(to))
-      await storage.setValue(nil, forKey: key(from), isSecret: isSecret(from))
+      try await storage.setValue(value, forKey: key(to), isSecret: isSecret(to))
+      try await storage.setValue(nil, forKey: key(from), isSecret: isSecret(from))
 
     case .copy(let from, let to):
       guard let value = await storage.value(forKey: key(from)) else { return }
-      await storage.setValue(value, forKey: key(to), isSecret: isSecret(to))
+      try await storage.setValue(value, forKey: key(to), isSecret: isSecret(to))
 
     case .remove(let field):
-      await storage.setValue(nil, forKey: key(field), isSecret: isSecret(field))
+      try await storage.setValue(nil, forKey: key(field), isSecret: isSecret(field))
 
     case .setDefault(let field, let value):
       // Only when absent. See the note on the case itself.
       guard await storage.value(forKey: key(field)) == nil else { return }
-      await storage.setValue(value, forKey: key(field), isSecret: isSecret(field))
+      try await storage.setValue(value, forKey: key(field), isSecret: isSecret(field))
     }
   }
 

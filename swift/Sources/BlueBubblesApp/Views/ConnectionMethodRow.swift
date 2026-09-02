@@ -122,7 +122,7 @@ struct ConnectionMethodRow: View {
     .sheet(isPresented: $isConfiguring) {
       if let manifest, let store = model.settingsStore {
         ConfigureSheet(
-          manifest: manifest, store: store,
+          manifest: manifest, store: store, model: model,
           onDone: {
             isConfiguring = false
             Task { await refresh() }
@@ -181,6 +181,7 @@ struct ConnectionMethodRow: View {
 private struct ConfigureSheet: View {
   let manifest: ServiceManifest
   let store: SettingsStore
+  let model: AppModel
   let onDone: () -> Void
 
   var body: some View {
@@ -199,7 +200,7 @@ private struct ConfigureSheet: View {
       // The form emits sections rather than a scrolling page, so the sheet supplies the
       // scrolling — the same content, laid out for a smaller frame.
       ScrollView {
-        ServiceFormView(manifest: manifest, store: store)
+        ServiceFormView(manifest: manifest, store: store, model: model)
           .padding(20)
       }
     }

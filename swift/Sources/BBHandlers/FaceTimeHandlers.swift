@@ -165,7 +165,18 @@ public enum FaceTimeHandlers {
       // between left the Mac sitting in the call indefinitely — observed on a live
       // call, where the callee answered and the Mac never left. So the watcher is armed
       // off the CALL, and the link is reported separately.
-      let link = try? await api.generateFaceTimeLinkForCall(callUUID: call.callUUID)
+      let link: FaceTimeLink?
+      do {
+        link = try await api.generateFaceTimeLinkForCall(callUUID: call.callUUID)
+      } catch {
+        link = nil
+        context.logger.warning(
+          "The FaceTime call was placed but no link could be minted for it",
+          metadata: [
+            "call": .string(call.callUUID),
+            "error": .string(String(describing: error)),
+          ])
+      }
       if let link {
         await context.faceTime().links.record(url: link.url, groupUUID: link.groupUUID)
       }

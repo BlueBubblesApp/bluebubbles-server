@@ -556,7 +556,11 @@ final class AppModel {
 
   func select(_ manifest: ServiceManifest) async {
     guard let store = settingsStore, manifest.category.isExclusive else { return }
-    try? await store.set(Settings.connectionMethod, to: manifest.id.rawValue)
+    do {
+      try await store.set(Settings.connectionMethod, to: manifest.id.rawValue)
+    } catch {
+      await report(error, while: "change the connection method")
+    }
     await refreshIntegrationState()
   }
 
@@ -569,12 +573,39 @@ final class AppModel {
     } else {
       disabled.insert(manifest.id.rawValue)
     }
-    try? await store.set(
-      disabled.sorted().joined(separator: ","),
-      forKey: Settings.disabledServicesKey,
-      isSecret: false
-    )
+    do {
+      try await store.set(
+        disabled.sorted().joined(separator: ","),
+        forKey: Settings.disabledServicesKey,
+        isSecret: false
+      )
+    } catch {
+      await report(
+        error,
+        while: "turn \(manifest.name) \(disabled.contains(manifest.id.rawValue) ? "off" : "on")")
+    }
     await refreshIntegrationState()
+  }
+
+  /// Surfaces a failure the person caused and would otherwise never see — a settings
+  /// write the store refused. A control that silently does nothing is the worst outcome:
+  /// the toggle flips back on the next redraw and nothing says why.
+  ///
+  /// Through the alert centre when the server is up, so it is persisted and badged like
+  /// any other; before that, straight into the drawer.
+  func report(_ error: any Error, while action: String) async {
+    let alert = UserAlert(
+      severity: .warning,
+      title: "Could not \(action)",
+      body: String(describing: error),
+      source: "app",
+      dedupeKey: nil
+    )
+    if let center = server?.context.alerts {
+      await center.raise(alert)
+    } else {
+      alerts.insert(alert, at: 0)
+    }
   }
 
   /// Re-reads what is enabled.

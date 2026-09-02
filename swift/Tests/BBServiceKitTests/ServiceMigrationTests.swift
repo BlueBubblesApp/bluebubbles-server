@@ -61,7 +61,7 @@ struct ServiceMigrationTests {
   // MARK: - First run
 
   @Test("A first install runs nothing and stamps the current version")
-  func firstRunIsStamped() async {
+  func firstRunIsStamped() async throws {
     // Running migrations on a fresh install would be actively wrong, not merely wasteful:
     // `setDefault` would write values for fields the user is about to fill in, and a
     // `rename` would hunt for keys that were never written.
@@ -76,7 +76,7 @@ struct ServiceMigrationTests {
       ]
     )
 
-    let result = await ServiceMigrator.migrate(manifest, in: storage)
+    let result = try await ServiceMigrator.migrate(manifest, in: storage)
 
     #expect(result.wasFirstRun)
     #expect(result.applied.isEmpty)
@@ -87,7 +87,7 @@ struct ServiceMigrationTests {
   // MARK: - Upgrades
 
   @Test("A rename moves the value and clears the old key")
-  func renameMovesTheValue() async {
+  func renameMovesTheValue() async throws {
     // The case that motivates the whole file. Leaving the old key behind would also mean a
     // later downgrade silently resurrecting a stale value.
     let storage = Storage([
@@ -105,7 +105,7 @@ struct ServiceMigrationTests {
       ]
     )
 
-    let result = await ServiceMigrator.migrate(manifest, in: storage)
+    let result = try await ServiceMigrator.migrate(manifest, in: storage)
 
     #expect(result.applied == ["2.0.0"])
     #expect(await storage.value(forKey: key("auth_token")) == "abc123")
@@ -113,7 +113,7 @@ struct ServiceMigrationTests {
   }
 
   @Test("A renamed secret stays a secret")
-  func renamedSecretsKeepTheirStorage() async {
+  func renamedSecretsKeepTheirStorage() async throws {
     // Taken from the destination FIELD, not from the operation. A credential that moved
     // into the database instead of the Keychain would be a storage downgrade nobody asked
     // for and nothing would report.
@@ -136,12 +136,12 @@ struct ServiceMigrationTests {
       ]
     )
 
-    await ServiceMigrator.migrate(manifest, in: storage)
+    try await ServiceMigrator.migrate(manifest, in: storage)
     #expect(await storage.secretKeys.contains(key("auth_token")))
   }
 
   @Test("Steps run in order, and only the ones not yet applied")
-  func onlyPendingStepsRun() async {
+  func onlyPendingStepsRun() async throws {
     // An install two versions behind has to walk through both; one already at 2.0.0 must
     // not re-run 2.0.0, or a rename would move a value that is already where it belongs.
     let storage = Storage([
@@ -158,7 +158,7 @@ struct ServiceMigrationTests {
       ]
     )
 
-    let result = await ServiceMigrator.migrate(manifest, in: storage)
+    let result = try await ServiceMigrator.migrate(manifest, in: storage)
 
     #expect(result.applied == ["2.0.0", "3.0.0"])
     #expect(
@@ -167,7 +167,7 @@ struct ServiceMigrationTests {
   }
 
   @Test("Migrating twice does nothing the second time")
-  func migrationsAreIdempotent() async {
+  func migrationsAreIdempotent() async throws {
     let storage = Storage([
       "app.example.thing.__version": "1.0.0",
       "app.example.thing.token": "abc",
@@ -182,8 +182,8 @@ struct ServiceMigrationTests {
       ]
     )
 
-    await ServiceMigrator.migrate(manifest, in: storage)
-    let second = await ServiceMigrator.migrate(manifest, in: storage)
+    try await ServiceMigrator.migrate(manifest, in: storage)
+    let second = try await ServiceMigrator.migrate(manifest, in: storage)
 
     #expect(second.applied.isEmpty)
     #expect(await storage.value(forKey: key("auth_token")) == "abc")
@@ -192,7 +192,7 @@ struct ServiceMigrationTests {
   // MARK: - The careful cases
 
   @Test("setDefault fills a gap but never overrides a choice")
-  func defaultsDoNotOverride() async {
+  func defaultsDoNotOverride() async throws {
     // A user who set the value wins over a migration's idea of a sensible one. The
     // opposite would silently revert a deliberate decision on update, which is the worst
     // thing an automatic migration can do.
@@ -217,14 +217,14 @@ struct ServiceMigrationTests {
       ]
     )
 
-    await ServiceMigrator.migrate(manifest, in: storage)
+    try await ServiceMigrator.migrate(manifest, in: storage)
 
     #expect(await storage.value(forKey: key("region")) == "eu", "an existing choice must win")
     #expect(await storage.value(forKey: key("mode")) == "proxy", "an absent value gets the default")
   }
 
   @Test("A downgrade changes nothing")
-  func downgradeIsLeftAlone() async {
+  func downgradeIsLeftAlone() async throws {
     // Stored data newer than the code reading it. Migrations only run forwards, so the
     // honest move is to touch nothing — a "reverse migration" would be inventing a shape
     // the older version never wrote.
@@ -241,7 +241,7 @@ struct ServiceMigrationTests {
       ]
     )
 
-    let result = await ServiceMigrator.migrate(manifest, in: storage)
+    let result = try await ServiceMigrator.migrate(manifest, in: storage)
 
     #expect(result.applied.isEmpty)
     #expect(await storage.value(forKey: key("value")) == "keep me")
@@ -249,7 +249,7 @@ struct ServiceMigrationTests {
   }
 
   @Test("A migration cannot reach outside its own service")
-  func migrationsAreNamespaced() async {
+  func migrationsAreNamespaced() async throws {
     // Keys are assembled from the manifest's namespace, so naming a fully-qualified key
     // does not escape it — the same rule that governs field declarations.
     let storage = Storage([
@@ -265,7 +265,7 @@ struct ServiceMigrationTests {
       ]
     )
 
-    await ServiceMigrator.migrate(manifest, in: storage)
+    try await ServiceMigrator.migrate(manifest, in: storage)
     #expect(await storage.value(forKey: "password") == "do not touch")
   }
 
@@ -314,5 +314,40 @@ struct ServiceMigrationTests {
     )
     #expect(
       problems.contains { if case .duplicateMigration = $0 { return true } else { return false } })
+  }
+}
+
+// MARK: - Storage that refuses
+
+@Suite("Service migration: storage failures")
+struct ServiceMigrationFailureTests {
+
+  private struct Refused: Error {}
+
+  /// A store whose every write fails, the way a full disk or a refused Keychain does.
+  private struct RefusingStorage: MigratableStorage {
+    func value(forKey key: String) async -> String? { "1.0.0" }
+    func setValue(_ value: String?, forKey key: String, isSecret: Bool) async throws {
+      throw Refused()
+    }
+  }
+
+  @Test("A write the storage refuses is the caller's error, not a silent no-op")
+  func writeFailurePropagates() async {
+    let manifest = ServiceManifest(
+      id: ServiceIdentifier("app.example.refusing"),
+      name: "Thing",
+      summary: "A thing.",
+      category: .integration,
+      version: "2.0.0",
+      settings: [],
+      migrations: [
+        FieldMigration(toVersion: "2.0.0", operations: [.setDefault(field: "mode", value: "on")])
+      ],
+      isBuiltIn: false
+    )
+    await #expect(throws: Refused.self) {
+      try await ServiceMigrator.migrate(manifest, in: RefusingStorage())
+    }
   }
 }

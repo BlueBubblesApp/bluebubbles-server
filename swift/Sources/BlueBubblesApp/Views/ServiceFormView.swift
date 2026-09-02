@@ -35,6 +35,7 @@ struct ServiceFormView: View {
 
   let manifest: ServiceManifest
   let store: SettingsStore
+  let model: AppModel
 
   /// Every field's current value, keyed by the field's RELATIVE name.
   ///
@@ -454,11 +455,15 @@ struct ServiceFormView: View {
   }
 
   private func save(_ field: FieldDescriptor, _ value: String) async {
-    try? await store.set(
-      value,
-      forKey: manifest.storageKey(for: field.key),
-      isSecret: field.isSecret
-    )
+    do {
+      try await store.set(
+        value,
+        forKey: manifest.storageKey(for: field.key),
+        isSecret: field.isSecret
+      )
+    } catch {
+      await model.report(error, while: "save \(field.label)")
+    }
   }
 
   private func choosePath(for field: FieldDescriptor) {

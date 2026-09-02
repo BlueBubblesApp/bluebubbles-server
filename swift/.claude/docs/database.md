@@ -200,3 +200,13 @@ the lists.
 one is present: coerce each value by its declared type, move secrets to the Keychain, delete the
 plaintext rows, stamp a marker. **It leaves the old file untouched** — do not add a cleanup step
 that deletes it.
+
+### A settings write is never `try?`
+
+`SettingsStore.set` throws for a reason a person needs to hear: the Keychain refused, the
+disk is full, a value failed validation. Propagate it, or — where nothing can catch it, a
+closure handed to a service or a SwiftUI action — use `trySet`, which logs at error level
+with the key and returns whether the value stuck. In the app, a caught failure goes to
+`AppModel.report(_:while:)`, which raises an alert. Grep for `try? await .*\.set(` before
+committing; the answer should be nothing.
+

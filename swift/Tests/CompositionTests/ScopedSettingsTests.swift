@@ -169,7 +169,7 @@ struct RequiredFieldTests {
   func hiddenFieldsAreNotMissing() async throws {
     let store = try await makeStore()
     let manifest = BuiltInManifests.cloudflare
-    await ServiceSettingsBridge.seedDefaults(manifest, store: store)
+    try await ServiceSettingsBridge.seedDefaults(manifest, store: store)
 
     // A quick tunnel, which is the seeded default and asks for nothing.
     let quick = await ServiceSettingsBridge.missingRequiredFields(manifest, store: store)
@@ -182,7 +182,7 @@ struct RequiredFieldTests {
   func revealedFieldsAreReported() async throws {
     let store = try await makeStore()
     let manifest = BuiltInManifests.cloudflare
-    await ServiceSettingsBridge.seedDefaults(manifest, store: store)
+    try await ServiceSettingsBridge.seedDefaults(manifest, store: store)
     try await store.set("token", forKey: manifest.storageKey(for: "mode"))
 
     let missing = await ServiceSettingsBridge.missingRequiredFields(manifest, store: store)
@@ -197,7 +197,7 @@ struct RequiredFieldTests {
   func hostnameSpansBothNamedModes() async throws {
     let store = try await makeStore()
     let manifest = BuiltInManifests.cloudflare
-    await ServiceSettingsBridge.seedDefaults(manifest, store: store)
+    try await ServiceSettingsBridge.seedDefaults(manifest, store: store)
     try await store.set("config", forKey: manifest.storageKey(for: "mode"))
 
     let keys = Set(
@@ -244,7 +244,7 @@ struct ResetToDefaultsTests {
     try await store.set("token-abc", forKey: zrok.storageKey(for: "account_token"), isSecret: true)
     try await store.set("true", forKey: zrok.storageKey(for: "reserve_tunnel"), isSecret: false)
 
-    let cleared = await ServiceSettingsBridge.resetToDefaults(zrok, store: store)
+    let cleared = try await ServiceSettingsBridge.resetToDefaults(zrok, store: store)
 
     #expect(cleared == 2)
     #expect(await store.string(forKey: zrok.storageKey(for: "account_token")) == nil)
@@ -268,7 +268,7 @@ struct ResetToDefaultsTests {
       isSecret: true
     )
 
-    await ServiceSettingsBridge.resetToDefaults(BuiltInManifests.zrok, store: store)
+    try await ServiceSettingsBridge.resetToDefaults(BuiltInManifests.zrok, store: store)
 
     #expect(
       await store.string(forKey: BuiltInManifests.ngrok.storageKey(for: "auth_token"))
@@ -288,7 +288,7 @@ struct ResetToDefaultsTests {
     try await store.set("1.0.0", forKey: versionKey, isSecret: false)
     try await store.set("x", forKey: zrok.storageKey(for: "account_token"), isSecret: true)
 
-    await ServiceSettingsBridge.resetToDefaults(zrok, store: store)
+    try await ServiceSettingsBridge.resetToDefaults(zrok, store: store)
 
     #expect(await store.string(forKey: versionKey) == "1.0.0")
   }
@@ -301,7 +301,7 @@ struct ResetToDefaultsTests {
     let ngrok = BuiltInManifests.ngrok
 
     try await store.set("eu", forKey: ngrok.storageKey(for: "region"), isSecret: false)
-    await ServiceSettingsBridge.resetToDefaults(ngrok, store: store)
+    try await ServiceSettingsBridge.resetToDefaults(ngrok, store: store)
 
     let expected = ngrok.fields.first { $0.key == "region" }
       .flatMap { field -> String? in
@@ -316,7 +316,8 @@ struct ResetToDefaultsTests {
     // So the button can say "nothing to reset" rather than claiming success — it gives no
     // other feedback, and a confirmation dialog followed by silence reads as a failure.
     let store = try await makeStore()
-    #expect(await ServiceSettingsBridge.resetToDefaults(BuiltInManifests.zrok, store: store) == 0)
+    #expect(
+      try await ServiceSettingsBridge.resetToDefaults(BuiltInManifests.zrok, store: store) == 0)
   }
 }
 
@@ -585,7 +586,7 @@ struct ManifestDefaultSeedingTests {
       FieldDescriptor(key: "collect", label: "Collect", kind: .toggle(default: true))
     ])
 
-    await ServiceSettingsBridge.seedDefaults(m, store: store)
+    try await ServiceSettingsBridge.seedDefaults(m, store: store)
 
     #expect(await store.string(forKey: m.storageKey(for: "collect")) == "true")
   }
@@ -600,7 +601,7 @@ struct ManifestDefaultSeedingTests {
       FieldDescriptor(key: "verbose", label: "Verbose", kind: .toggle())
     ])
 
-    await ServiceSettingsBridge.seedDefaults(m, store: store)
+    try await ServiceSettingsBridge.seedDefaults(m, store: store)
 
     #expect(await store.string(forKey: m.storageKey(for: "verbose")) == nil)
   }
@@ -616,7 +617,7 @@ struct ManifestDefaultSeedingTests {
     let key = m.storageKey(for: "collect")
     try await store.set("false", forKey: key, isSecret: false)
 
-    await ServiceSettingsBridge.seedDefaults(m, store: store)
+    try await ServiceSettingsBridge.seedDefaults(m, store: store)
 
     #expect(await store.string(forKey: key) == "false")
   }
@@ -629,7 +630,7 @@ struct ManifestDefaultSeedingTests {
     let store = try await makeStore()
     let ngrok = BuiltInManifests.ngrok
 
-    await ServiceSettingsBridge.seedDefaults(ngrok, store: store)
+    try await ServiceSettingsBridge.seedDefaults(ngrok, store: store)
 
     #expect(await store.string(forKey: ngrok.storageKey(for: "disable_inspection")) == "true")
     // And the debugging toggles stay off, so this is a considered default rather than

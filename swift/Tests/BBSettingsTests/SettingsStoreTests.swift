@@ -219,3 +219,23 @@ struct SettingsRegistryTests {
     #expect(Settings.eventPayloadCodec.defaultValue == .legacyV1)
   }
 }
+
+// MARK: - Writes that cannot propagate
+
+@Suite("Settings store: trySet")
+struct SettingsStoreTrySetTests {
+
+  @Test("trySet writes the value and reports that it stuck")
+  func trySetWrites() async throws {
+    let database = try AppDatabase.inMemory(contributors: [SettingsSchema.self])
+    let store = try await SettingsStore(
+      database: database, secrets: InMemorySecretStore(),
+      configFileValues: [:], commandLineValues: [:])
+
+    #expect(await store.trySet(Settings.checkForUpdates, to: false))
+    #expect(await store.get(Settings.checkForUpdates) == false)
+
+    #expect(await store.trySet("abc", forKey: "plugin.example.token", isSecret: false))
+    #expect(await store.string(forKey: "plugin.example.token") == "abc")
+  }
+}

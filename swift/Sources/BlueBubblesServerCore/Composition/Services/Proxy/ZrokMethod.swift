@@ -145,7 +145,7 @@ enum ZrokMethod: ProxyMethod {
       // settings write is broadcast and this service restarts on its own keys — an
       // unconditional write here would restart the tunnel on every launch, forever.
       if storedToken != share.token {
-        try? await host.scoped.setOwn(share.token, field: "reserved_token")
+        await remember(reservedToken: share.token, host: host)
       }
       return share.token
     }
@@ -161,7 +161,7 @@ enum ZrokMethod: ProxyMethod {
       let token = try await environment.reserve(
         endpoint: endpoint, name: desiredName, backendMode: backendMode
       )
-      try? await host.scoped.setOwn(token, field: "reserved_token")
+      await remember(reservedToken: token, host: host)
       host.context.logger.info("Reserved a zrok share")
       return token
     } catch let error as ZrokError {
@@ -193,7 +193,22 @@ enum ZrokMethod: ProxyMethod {
     }
     // Forgotten either way: this server is no longer using it, and a token left behind is
     // one that would be adopted again the next time reserving is switched on.
-    try? await host.scoped.setOwn("", field: "reserved_token")
+    await remember(reservedToken: "", host: host)
+  }
+
+  /// Persists the reserved share token, or says why it could not.
+  ///
+  /// A token that fails to persist is a share this server will not recognise as its own
+  /// next launch — it will reserve another, and the account collects orphans. Logged at
+  /// error so the leak has a cause on record.
+  private static func remember(reservedToken token: String, host: ProxyHost) async {
+    do {
+      try await host.scoped.setOwn(token, field: "reserved_token")
+    } catch {
+      host.context.logger.error(
+        "Could not save the reserved zrok share token",
+        metadata: ["error": .string(String(describing: error))])
+    }
   }
 
 }

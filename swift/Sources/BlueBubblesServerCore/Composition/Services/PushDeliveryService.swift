@@ -34,7 +34,7 @@ final class PushDeliveryService: ContextualService, GatedService, ConfigurableSe
       onRestart: { await app.requestRestart() },
       pruneTokens: { tokens in await app.deviceDirectory.prune(tokens: tokens) },
       persistLastRestart: { timestamp in
-        try? await app.settings.set(Settings.lastFcmRestart, to: Int(timestamp))
+        await app.settings.trySet(Settings.lastFcmRestart, to: Int(timestamp))
       },
       serverURL: { await app.settings.get(Settings.serverAddress) }
     )

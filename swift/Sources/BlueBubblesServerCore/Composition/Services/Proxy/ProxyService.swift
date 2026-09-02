@@ -161,7 +161,23 @@ final class ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableSe
       onAddressChanged: { address in
         // The one place the published address is written. Everything that needs it —
         // Firebase, the UI, server/info — reads it from settings.
-        try? await app.settings.set(Settings.serverAddress, to: address)
+        guard await app.settings.trySet(Settings.serverAddress, to: address) else {
+          // The tunnel is up and nobody will be told where. Clients keep the old
+          // address; Firebase keeps the old address. That is an outage with no symptom
+          // on this side, so it is raised, not logged.
+          await app.alerts.raise(
+            UserAlert(
+              severity: .error,
+              title: "Could not save the server address",
+              body:
+                "\(name) is running at \(address), but the address could not be written to "
+                + "settings, so clients and Firebase will not learn it.",
+              source: identifier,
+              dedupeKey: "\(identifier).address-not-saved"
+            )
+          )
+          return
+        }
       },
       onFailure: { reason in
         // A tunnel that has stopped coming back is not a log line. Every client is now

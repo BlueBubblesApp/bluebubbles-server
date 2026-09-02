@@ -462,7 +462,9 @@ public struct ChatInterface: MessagesBackedInterface {
 
   public func setPinned(guid: String, pinned: Bool) async throws {
     let api = try requirePrivateAPI(for: "pinning a chat")
-    try await throughMessages { try await api.setPinned(chat: ChatIdentifier(guid), pinned: pinned) }
+    try await throughMessages {
+      try await api.setPinned(chat: ChatIdentifier(guid), pinned: pinned)
+    }
   }
 
   /// The pinned conversations, in display order, each serialized as a full chat.
@@ -652,7 +654,9 @@ public struct ChatInterface: MessagesBackedInterface {
 
   public func removeParticipant(_ address: String, from guid: String) async throws {
     let api = try requirePrivateAPI(for: "removing a participant")
-    try await throughMessages { try await api.removeParticipant(address, from: ChatIdentifier(guid)) }
+    try await throughMessages {
+      try await api.removeParticipant(address, from: ChatIdentifier(guid))
+    }
   }
 
   public func setTyping(guid: String, typing: Bool) async throws {

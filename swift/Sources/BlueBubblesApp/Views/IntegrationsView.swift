@@ -294,7 +294,7 @@ struct IntegrationDetailView: View {
       //
       // Not wrapped in a scroll view of its own: it emits sections into THIS page, so a
       // long manifest scrolls with the rest of the page rather than inside a pane.
-      ServiceFormView(manifest: manifest, store: store)
+      ServiceFormView(manifest: manifest, store: store, model: model)
         .id(formGeneration)
     }
     .confirmationDialog(
@@ -314,7 +314,14 @@ struct IntegrationDetailView: View {
   }
 
   private func reset() async {
-    let cleared = await ServiceSettingsBridge.resetToDefaults(manifest, store: store)
+    let cleared: Int
+    do {
+      cleared = try await ServiceSettingsBridge.resetToDefaults(manifest, store: store)
+    } catch {
+      await model.report(error, while: "reset \(manifest.name)")
+      resetMessage = "The settings could not be cleared. See Alerts for the reason."
+      return
+    }
     // Says what happened rather than claiming success either way: "nothing to reset" is a
     // real outcome and the button gives no other feedback.
     resetMessage =

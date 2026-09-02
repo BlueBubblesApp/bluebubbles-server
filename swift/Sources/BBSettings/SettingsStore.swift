@@ -322,6 +322,43 @@ public actor SettingsStore {
     }
   }
 
+  /// A write whose caller cannot propagate the failure — a closure handed to a service, a
+  /// SwiftUI action — but must not lose it either. Logged at error level with the key, and
+  /// the result says whether the value stuck so the caller can tell the user.
+  ///
+  /// This is the ONLY sanctioned home for a swallowed settings error. A `try?` on `set`
+  /// hides a Keychain refusal or a full disk behind a control that appears to have worked.
+  @discardableResult
+  public func trySet<Value: SettingValue>(_ setting: Setting<Value>, to value: Value) async
+    -> Bool
+  {
+    do {
+      try await set(setting, to: value)
+      return true
+    } catch {
+      logWriteFailure(key: setting.key, error: error)
+      return false
+    }
+  }
+
+  /// The string-keyed twin of `trySet(_:to:)`, for service-owned keys.
+  @discardableResult
+  public func trySet(_ value: String, forKey key: String, isSecret: Bool = false) async -> Bool {
+    do {
+      try await set(value, forKey: key, isSecret: isSecret)
+      return true
+    } catch {
+      logWriteFailure(key: key, error: error)
+      return false
+    }
+  }
+
+  private func logWriteFailure(key: String, error: any Error) {
+    logger.error(
+      "A setting could not be saved",
+      metadata: ["key": .string(key), "error": .string(String(describing: error))])
+  }
+
   /// Applies a batch and emits exactly one change.
   ///
   /// This is what stops a UI Save touching five keys from producing five restart cascades.
