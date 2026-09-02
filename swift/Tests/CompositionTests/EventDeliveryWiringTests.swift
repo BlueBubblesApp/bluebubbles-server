@@ -47,6 +47,7 @@ struct EventDeliveryWiringTests {
   private actor CountingSink: EventSink {
     nonisolated let id: SinkID
     nonisolated let projection: PayloadProjection
+    nonisolated let routing = SinkRouting.webhook
     private(set) var received: [EventName] = []
 
     init(id: SinkID, projection: PayloadProjection = .notification) {
@@ -124,6 +125,7 @@ struct EventDeliveryWiringTests {
     struct ThrowingSink: EventSink {
       let id = SinkID.webhook
       let projection = PayloadProjection.notification
+      let routing = SinkRouting.webhook
       func accepts(_ event: ServerEvent) async -> Bool { true }
       func deliver(_ event: ServerEvent) async throws {
         struct Boom: Error {}

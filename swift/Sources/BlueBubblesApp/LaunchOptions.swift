@@ -18,6 +18,14 @@ import Foundation
 
 struct LaunchOptions {
 
+  /// The options this process was launched with.
+  ///
+  /// A `static let`, so `argv` is read once. It was parsed in two places — the `App` for the
+  /// activation policy and `AppModel.start` for the composition — which is two answers to a
+  /// question with one answer, and they would have diverged the moment either grew a rule the
+  /// other did not.
+  static let current = LaunchOptions.parse()
+
   var isHeadless = false
   var configPath: String?
   var overrides: [String: String] = [:]

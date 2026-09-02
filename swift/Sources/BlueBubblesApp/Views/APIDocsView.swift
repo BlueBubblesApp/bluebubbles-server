@@ -18,6 +18,7 @@
 //  reasoning about Scalar's network defaults lives. The short version is that several of
 //  them reach scalar.com and the page turns all of them off twice.
 
+import BBCore
 import BBInterfaces
 import BBOpenAPI
 import BBSettings
@@ -89,7 +90,7 @@ struct APIDocsView: View {
       let document = try OpenAPIDocument.generate(options: .init(serverURL: serverURL))
       state = .ready(specJSON: document.serialized())
     } catch {
-      state = .failed(String(describing: error))
+      state = .failed(DiagnosticText.sentence(for: error))
     }
   }
 }

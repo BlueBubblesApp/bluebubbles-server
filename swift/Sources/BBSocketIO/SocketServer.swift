@@ -257,6 +257,7 @@ public actor SocketServer {
 public struct SocketSink: EventSink {
 
   public let id = SinkID.socket
+  public let routing = SinkRouting.socket
   /// The socket gets the FULL payload. FCM and webhooks get the trimmed one. Mixing these
   /// up is the single most likely way to break clients while every test still passes.
   public let projection = PayloadProjection.full

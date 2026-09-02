@@ -6,6 +6,7 @@
 
 import BBAuth
 import BBContacts
+import BBCore
 import BBDiagnostics
 import BBInterfaces
 import BBPrivateAPI
@@ -203,7 +204,7 @@ final class AppModel {
       try SingleInstanceLock.acquire()
 
       let built = try await ServerComposition.build(
-        options: LaunchOptions.parse().compositionOptions
+        options: LaunchOptions.current.compositionOptions
       )
       // Published before the delay, not after: during a 30-second startup delay the
       // settings screen should still open, so someone who set the delay too high can
@@ -238,7 +239,7 @@ final class AppModel {
       // Kept in the UI rather than only logged. A server that failed to start is the
       // one moment the user most needs to be told why, and the log viewer is itself
       // part of the window that just failed to become useful.
-      phase = .failed(String(describing: error))
+      phase = .failed(DiagnosticText.sentence(for: error))
     }
   }
 
@@ -283,7 +284,7 @@ final class AppModel {
           UserAlert(
             severity: .warning,
             title: "Could not lock the Mac",
-            body: String(describing: error),
+            body: DiagnosticText.sentence(for: error),
             source: "app",
             dedupeKey: "lock-screen-failed"
           )
@@ -364,7 +365,7 @@ final class AppModel {
     let alert = UserAlert(
       severity: .warning,
       title: "Could not \(action)",
-      body: String(describing: error),
+      body: DiagnosticText.sentence(for: error),
       source: "app",
       dedupeKey: nil
     )

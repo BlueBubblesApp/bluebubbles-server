@@ -23,6 +23,7 @@ import Logging
 public struct PushSink: EventSink {
 
   public let id = SinkID.push
+  public let routing = SinkRouting.push
   /// The TRIMMED payload. The socket takes `.full`; FCM has a 4 KB limit and a full
   /// message body with its attachments will not fit. Mixing these up is the single most
   /// likely way to break clients while every test still passes.

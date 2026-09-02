@@ -306,7 +306,7 @@ public struct HTTPAPIBuilder: Sendable {
     var timedOut = false
     if route.method != .get {
       do {
-        let buffer = try await Self.withTimeout(Self.requestTimeout(for: route)) {
+        let buffer = try await withTimeout(Self.requestTimeout(for: route)) {
           try await request.body.collect(upTo: configuration.maximumBodySize)
         }
         collected = Data(buffer.readableBytesView)
@@ -365,7 +365,7 @@ public struct HTTPAPIBuilder: Sendable {
       // in place, and a concurrently-running task may not capture a mutable binding. The
       // value is Sendable and no longer changes past this point.
       let authenticated = context
-      let result = try await Self.withTimeout(Self.responseTimeout(for: route, in: group)) {
+      let result = try await withTimeout(Self.responseTimeout(for: route, in: group)) {
         try await handler(authenticated)
       }
       failed = false
@@ -413,7 +413,6 @@ public struct HTTPAPIBuilder: Sendable {
 
   /// Thrown internally when a stage outruns its limit. Not an `HTTPError`: the 504 body is
   /// built by hand because its `message` embeds the elapsed time.
-  private struct TimedOut: Error {}
 
   /// Precedence, matching `OpenAPIDocument` exactly — the published document and the
   /// enforced behaviour have to come from one rule or they will disagree.
@@ -423,28 +422,6 @@ public struct HTTPAPIBuilder: Sendable {
 
   static func responseTimeout(for route: RouteDefinition, in group: RouteGroup) -> Duration {
     route.responseTimeout ?? group.responseTimeout ?? RouteTable.defaultResponseTimeout
-  }
-
-  /// Runs `work`, or throws `TimedOut` if it has not finished within `limit`.
-  ///
-  /// The loser is cancelled, so a handler that honours cancellation stops; one that does not
-  /// runs to completion in the background with nobody reading its result. That is the
-  /// standard trade and it is strictly better than the previous behaviour, which was to wait
-  /// for it indefinitely while holding the connection open.
-  private static func withTimeout<T: Sendable>(
-    _ limit: Duration,
-    _ work: @escaping @Sendable () async throws -> T
-  ) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-      group.addTask { try await work() }
-      group.addTask {
-        try await Task.sleep(for: limit)
-        throw TimedOut()
-      }
-      guard let first = try await group.next() else { throw TimedOut() }
-      group.cancelAll()
-      return first
-    }
   }
 
   static func response(

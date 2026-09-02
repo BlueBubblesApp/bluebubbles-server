@@ -1,6 +1,7 @@
 //  UpdatesModel
 //  The update check the menu item and the automatic timer share.
 
+import BBCore
 import BBSettings
 import BBUpdates
 import Foundation
@@ -77,7 +78,7 @@ final class UpdatesModel {
         ? .available(result.item?.shortVersion ?? "?")
         : .upToDate
     } catch {
-      state = .failed(String(describing: error))
+      state = .failed(DiagnosticText.sentence(for: error))
     }
   }
 }

@@ -61,6 +61,7 @@ struct ServerAddressAnnouncerTests {
   private actor RecordingSink: EventSink {
     let id: SinkID = .socket
     let projection: PayloadProjection = .full
+    let routing = SinkRouting.socket
     var payloads: [JSONValue?] = []
     func accepts(_ event: ServerEvent) async -> Bool { true }
     func deliver(_ event: ServerEvent) async throws {

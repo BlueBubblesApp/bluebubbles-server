@@ -17,7 +17,7 @@ import Testing
 @testable import BBAuth
 
 /// The narrow secret store BBAuth declares, backed by a dictionary.
-private final class RecordingSecrets: SecretStoring, @unchecked Sendable {
+private final class RecordingSecrets: SecretStore, @unchecked Sendable {
   private let lock = NSLock()
   private var storage: [String: String] = [:]
   private var _reads: [String] = []

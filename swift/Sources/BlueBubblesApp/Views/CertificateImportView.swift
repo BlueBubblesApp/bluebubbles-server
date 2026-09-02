@@ -12,6 +12,7 @@
 //  classified by INSPECTING the contents rather than by the order they arrived in or by
 //  their extension, both of which are wrong often enough to matter.
 
+import BBCore
 import BBSystem
 import SwiftUI
 import UniformTypeIdentifiers
@@ -207,7 +208,7 @@ struct CertificateImportView: View {
       self.privateKeyPEM = nil
       status = .installed(expires: nil)
     } catch {
-      status = .failed(String(describing: error))
+      status = .failed(DiagnosticText.sentence(for: error))
     }
   }
 

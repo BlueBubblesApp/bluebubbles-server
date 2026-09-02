@@ -14,7 +14,7 @@ import Testing
 
 @testable import BBAuth
 
-private final class MemorySecrets: SecretStoring, @unchecked Sendable {
+private final class MemorySecrets: SecretStore, @unchecked Sendable {
   private let lock = NSLock()
   private var storage: [String: String] = [:]
   func get(_ key: String) throws -> String? { lock.withLock { storage[key] } }

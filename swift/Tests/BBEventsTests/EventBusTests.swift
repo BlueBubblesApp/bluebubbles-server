@@ -20,14 +20,31 @@ import Testing
 actor RecordingSink: EventSink {
   nonisolated let id: SinkID
   nonisolated let projection: PayloadProjection
+  nonisolated let routing: SinkRouting
 
   private(set) var received: [EventName] = []
   private(set) var payloads: [JSONValue] = []
   var delay: Duration?
 
-  init(id: SinkID, projection: PayloadProjection = .notification) {
+  /// The routing class defaults to the one the real sink of that name declares, so a double
+  /// standing in for push is subject to push's suppressions. Pass it explicitly to test a
+  /// sink whose class does not match its name.
+  init(
+    id: SinkID,
+    projection: PayloadProjection = .notification,
+    routing: SinkRouting? = nil
+  ) {
     self.id = id
     self.projection = projection
+    self.routing = routing ?? Self.conventionalRouting(for: id)
+  }
+
+  private static func conventionalRouting(for id: SinkID) -> SinkRouting {
+    switch id {
+    case .socket: .socket
+    case .push: .push
+    default: .webhook
+    }
   }
 
   func accepts(_ event: ServerEvent) async -> Bool { true }
@@ -243,6 +260,7 @@ struct SinkIndependenceTests {
   func throwingSinkIsIsolated() async {
     struct FailingSink: EventSink {
       let id = SinkID("failing")
+      let routing = SinkRouting.webhook
       let projection = PayloadProjection.notification
       func accepts(_ event: ServerEvent) async -> Bool { true }
       func deliver(_ event: ServerEvent) async throws {

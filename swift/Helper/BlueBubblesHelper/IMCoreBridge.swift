@@ -69,12 +69,21 @@ public final class IMCoreBridge: PrivateAPI {
   /// moved in a macOS release is `unavailableOnThisOS` and will never work here, while a
   /// rejection from Messages is `rejectedByMessages` and might work next time. Collapsing
   /// them into one error would make an OS upgrade look like a transient failure.
-  private func translating<T>(_ body: () throws -> T) throws -> T {
+  /// Wraps a call into IMCore, turning its two lookup failures into contract errors.
+  ///
+  /// `method` defaults to `#function`, which is evaluated AT THE CALL SITE — so the error
+  /// names `sendMessage(_:)` rather than `translating(_:)`. Written inside the body it named
+  /// the wrapper every time, which made every "unavailable on this macOS" report identical
+  /// and useless for working out which selector had gone.
+  private func translating<T>(
+    _ method: String = #function,
+    _ body: () throws -> T
+  ) throws -> T {
     do {
       return try body()
     } catch let lookup as IMCoreLookupError {
       throw PrivateAPIError.unavailableOnThisOS(
-        method: #function, requires: lookup.description
+        method: method, requires: lookup.description
       )
     } catch let shim as PrivateAPIErrorShim {
       throw PrivateAPIError.rejectedByMessages(reason: shim.description)

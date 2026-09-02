@@ -230,7 +230,7 @@ public struct ServerComposition {
     let authMode = await settings.get(Settings.authMode)
     let tokenAuth = TokenAuthService(
       configuration: TokenAuthConfiguration(mode: authMode),
-      secrets: authMode == .password ? nil : KeychainAuthSecrets(store: secrets)
+      secrets: authMode == .password ? nil : secrets
     )
 
     let events = EventBus()
@@ -320,7 +320,7 @@ public struct ServerComposition {
           UserAlert(
             severity: .error,
             title: "\(id.rawValue) stopped working",
-            body: String(describing: error),
+            body: DiagnosticText.sentence(for: error),
             source: "Services",
             dedupeKey: "service.\(id.rawValue)",
             // A live condition: on the next start the service either comes up or fails
@@ -728,12 +728,3 @@ public enum ConfigFile {
 
 /// Bridges BBSettings' secret store to the narrow protocol BBAuth declares.
 ///
-/// The two exist separately so BBAuth does not depend on the settings layer purely to name a
-/// protocol; this is the seam where they meet.
-public struct KeychainAuthSecrets: SecretStoring {
-  let store: any SecretStore
-  public init(store: any SecretStore) { self.store = store }
-  public func get(_ key: String) throws -> String? { try store.get(key) }
-  public func set(_ key: String, value: String) throws { try store.set(key, value: value) }
-  public func delete(_ key: String) throws { try store.delete(key) }
-}

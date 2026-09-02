@@ -3,6 +3,7 @@
 //
 //  Replaces the Electron main process, the tray, and the renderer. See `.claude/docs/architecture.md`.
 
+import BBCore
 import BBInterfaces
 import BlueBubblesServerCore
 import Logging
@@ -31,7 +32,7 @@ struct BlueBubblesApp: App {
   /// That is why both products exist, and why the CLI ships INSIDE the bundle rather than
   /// being dropped once there was an app: it is covered by the same signature and the same
   /// notarization ticket.
-  private static let launchOptions = LaunchOptions.parse()
+  private static let launchOptions = LaunchOptions.current
 
   var body: some Scene {
     Window("BlueBubbles", id: "main") {
@@ -200,25 +201,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// service registry and is not main-actor isolated, which is what makes it safe to run
   /// detached and wait for here. Bounded, because the process is about to exit either way
   /// and a wedged service must not hold a logout hostage.
+  /// Stops the server before quitting, without blocking the main thread to do it.
+  ///
+  /// This used to run `stop()` on a detached task and park the main thread on a
+  /// `DispatchSemaphore` until it finished. That worked only because nothing in the stop path
+  /// hops to the main actor — the day one did, the semaphore would have waited on work that
+  /// could not run because the thread holding it was the one that had to run it. AppKit has a
+  /// protocol for exactly this: say "later", do the work, then answer.
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     guard let server = model?.server else { return .terminateNow }
 
-    let semaphore = DispatchSemaphore(value: 0)
-    Task.detached {
-      await server.stop()
-      semaphore.signal()
+    Task {
+      do {
+        try await withTimeout(Self.shutdownDeadline) { await server.stop() }
+      } catch {
+        Logger(label: "bluebubbles.app").warning(
+          "The server did not stop within \(Self.shutdownDeadline.seconds)s; quitting anyway"
+        )
+      }
+      NSApplication.shared.reply(toApplicationShouldTerminate: true)
     }
-    if semaphore.wait(timeout: .now() + Self.shutdownDeadline) == .timedOut {
-      Logger(label: "bluebubbles.app").warning(
-        "The server did not stop within \(Int(Self.shutdownDeadline))s; quitting anyway"
-      )
-    }
-    return .terminateNow
+    return .terminateLater
   }
 
   /// Long enough for an orderly shutdown, short enough not to read as a hang. macOS raises
   /// its own "prevented logout" complaint well after this.
-  private static let shutdownDeadline: TimeInterval = 8
+  private static let shutdownDeadline: Duration = .seconds(8)
 
   /// Closing the window must NOT quit: the server keeps running in the menu bar, which is
   /// the whole point of a background service. Quitting on last-window-close is the default

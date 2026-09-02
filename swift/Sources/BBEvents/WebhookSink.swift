@@ -54,6 +54,7 @@ public struct WebhookTarget: Sendable, Identifiable {
 public actor WebhookSink: CustomEventSink {
 
   public nonisolated let id = SinkID.webhook
+  public let routing = SinkRouting.webhook
   public nonisolated let projection = PayloadProjection.notification
 
   private let targets: @Sendable () async -> [WebhookTarget]
@@ -74,7 +75,7 @@ public actor WebhookSink: CustomEventSink {
     targets: @escaping @Sendable () async -> [WebhookTarget],
     negotiator: CodecNegotiator = .legacyOnly(),
     transport: any HTTPPosting = URLSessionPoster(),
-    logger: Logger = Logger(label: "bluebubbles.webhook"),
+    logger: Logger = Logger(label: "bluebubbles.webhooks"),
     alerts: (any AlertRaising)? = nil,
     deliveries: WebhookDeliveryTracker = WebhookDeliveryTracker()
   ) {
@@ -216,6 +217,7 @@ public struct NtfyTarget: Sendable {
 public struct NtfySink: CustomEventSink {
 
   public let id = SinkID.ntfy
+  public let routing = SinkRouting.webhook
   public let projection = PayloadProjection.notification
 
   private let target: NtfyTarget

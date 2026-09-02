@@ -26,17 +26,15 @@ final class AlertsModel {
       // next alert arrives.
       let existing = await center.all(limit: 200)
       let unread = await center.badgeCount()
-      await MainActor.run {
-        self?.items = existing
-        self?.unreadCount = unread
-      }
+      // No `MainActor.run` hop: `AlertsModel` is `@MainActor`, so this task already runs
+      // there and the hop only made it look as though it did not.
+      self?.items = existing
+      self?.unreadCount = unread
 
       for await alert in await center.stream() {
-        await MainActor.run {
-          self?.items.insert(alert, at: 0)
-          self?.unreadCount += 1
-          Task { await self?.onUnreadCountChanged?() }
-        }
+        self?.items.insert(alert, at: 0)
+        self?.unreadCount += 1
+        await self?.onUnreadCountChanged?()
       }
     }
   }

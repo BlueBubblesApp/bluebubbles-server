@@ -309,6 +309,20 @@ public actor ServiceRegistry<Host: Sendable> {
   ///     inline so that startup ordering is real, and hands the remainder here.
   ///   - lastError: The failure that brought us here, so an immediately-exhausted policy
   ///     still alerts with a cause rather than with nothing.
+  /// Logs a permanent failure and raises it. The two callers below differ only in how they
+  /// discovered the policy was out of attempts.
+  private func giveUp(id: ServiceID, error: any Error, policy: RestartPolicy) async {
+    logger.error(
+      policy.forbidsRestart
+        ? "Service failed and its policy forbids restarting"
+        : "Service failed permanently",
+      metadata: [
+        "service": .string(id.rawValue),
+        "error": .string(String(describing: error)),
+      ])
+    await onAlert(id, error)
+  }
+
   private func supervise(
     id: ServiceID,
     instance: any Service,
@@ -318,39 +332,16 @@ public actor ServiceRegistry<Host: Sendable> {
   ) async {
     var attempt = startingAt
 
-    // A policy already exhausted by the inline attempt never enters the loop, so the
-    // alert has to be raised here.
-    if case .backoff(_, _, let maxAttempts) = policy, attempt > maxAttempts,
-      let lastError
-    {
-      logger.error(
-        "Service failed permanently",
-        metadata: [
-          "service": .string(id.rawValue),
-          "error": .string(String(describing: lastError)),
-        ])
-      await onAlert(id, lastError)
-      return
-    }
-    if case .never = policy, let lastError {
-      logger.error(
-        "Service failed and its policy forbids restarting",
-        metadata: [
-          "service": .string(id.rawValue),
-          "error": .string(String(describing: lastError)),
-        ])
-      await onAlert(id, lastError)
+    // A policy already exhausted by the inline attempt never enters the loop, so the alert
+    // has to be raised here rather than by the loop's own give-up path.
+    if let lastError, !policy.permits(attempt: attempt) {
+      await giveUp(id: id, error: lastError, policy: policy)
       return
     }
 
     // The first supervised attempt waits out the backoff for its own attempt number,
     // rather than retrying instantly on top of the inline failure.
-    if startingAt > 1, case .backoff(_, _, let maxAttempts) = policy {
-      let delay = RetryPolicy(
-        maxAttempts: maxAttempts,
-        initialDelay: policy.baseDelay,
-        maxDelay: policy.maxDelay
-      ).delay(forAttempt: attempt)
+    if startingAt > 1, let delay = policy.delay(forAttempt: attempt) {
       try? await Task.sleep(for: delay)
       if Task.isCancelled { return }
     }
@@ -362,23 +353,12 @@ public actor ServiceRegistry<Host: Sendable> {
       } catch is CancellationError {
         return
       } catch {
-        guard case .backoff(_, _, let maxAttempts) = policy, attempt < maxAttempts else {
-          logger.error(
-            "Service failed permanently",
-            metadata: [
-              "service": .string(id.rawValue),
-              "error": .string(String(describing: error)),
-            ])
-          // Policy exhausted: raise, do not relaunch the app.
-          await onAlert(id, error)
+        // Policy exhausted: raise, do not relaunch the app.
+        guard policy.permits(attempt: attempt + 1) else {
+          await giveUp(id: id, error: error, policy: policy)
           return
         }
-
-        let delay = RetryPolicy(
-          maxAttempts: maxAttempts,
-          initialDelay: policy.baseDelay,
-          maxDelay: policy.maxDelay
-        ).delay(forAttempt: attempt + 1)
+        let delay = policy.delay(forAttempt: attempt + 1) ?? .zero
 
         logger.warning(
           "Service failed; retrying",
@@ -556,6 +536,25 @@ public enum ServiceRegistryError: BBError, Equatable {
 }
 
 extension RestartPolicy {
+  var forbidsRestart: Bool {
+    if case .never = self { return true }
+    return false
+  }
+
+  /// Whether the policy allows an attempt with this number.
+  func permits(attempt: Int) -> Bool {
+    guard case .backoff(_, _, let maxAttempts) = self else { return false }
+    return attempt <= maxAttempts
+  }
+
+  /// The backoff before `attempt`, or nil when the policy has no backoff to apply.
+  func delay(forAttempt attempt: Int) -> Duration? {
+    guard case .backoff(_, _, let maxAttempts) = self else { return nil }
+    return RetryPolicy(
+      maxAttempts: maxAttempts, initialDelay: baseDelay, maxDelay: maxDelay
+    ).delay(forAttempt: attempt)
+  }
+
   var baseDelay: Duration {
     if case .backoff(let base, _, _) = self { return base }
     return .seconds(1)

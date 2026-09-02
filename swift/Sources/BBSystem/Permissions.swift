@@ -381,6 +381,7 @@ public actor PermissionsService {
 
   private var states: [PermissionID: PermissionState] = [:]
   private var monitorTask: Task<Void, Never>?
+  private var observers: [UUID: AsyncStream<[PermissionID: PermissionStatus]>.Continuation] = [:]
 
   public init(
     probe: any PermissionProbing = SystemPermissionProbe(),
@@ -499,7 +500,33 @@ public actor PermissionsService {
     for permission in permissions {
       result[permission.id] = await check(permission.id)
     }
+    broadcast(result)
     return result
+  }
+
+  /// The results of every check this service runs, for observers that want the answer
+  /// without asking the question themselves.
+  ///
+  /// The app used to run its OWN two-second loop calling `checkAll` while the monitor below
+  /// ran the same loop, so every probe happened twice — and each automation probe spawns a
+  /// thread to ask TCC, which is the expensive one. Now the monitor probes and everyone else
+  /// listens.
+  public func stream() -> AsyncStream<[PermissionID: PermissionStatus]> {
+    let id = UUID()
+    return AsyncStream { continuation in
+      observers[id] = continuation
+      continuation.onTermination = { [weak self] _ in
+        Task { await self?.removeObserver(id) }
+      }
+    }
+  }
+
+  private func removeObserver(_ id: UUID) {
+    observers[id] = nil
+  }
+
+  private func broadcast(_ states: [PermissionID: PermissionStatus]) {
+    for continuation in observers.values { continuation.yield(states) }
   }
 
   public func status(of id: PermissionID) -> PermissionStatus {

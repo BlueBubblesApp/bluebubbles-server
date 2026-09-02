@@ -30,7 +30,24 @@ public struct SinkID: Hashable, Sendable, RawRepresentable, CustomStringConverti
   public static let ntfy = SinkID("ntfy")
 }
 
+/// Which routing rules a sink is subject to.
+///
+/// Declared by the sink rather than inferred from its `SinkID`. The bus used to switch on the
+/// identifier with `default: allowsWebhooks`, so a sink whose id was not one of the four
+/// known constants silently inherited webhook rules — including, for instance, whether
+/// typing indicators reach it. `SinkID` is a string wrapper, so the compiler could not make
+/// that switch exhaustive; this enum can.
+public enum SinkRouting: Sendable, Equatable {
+  case socket
+  case push
+  case webhook
+}
+
 public protocol EventSink: Sendable {
+  /// Which of the three routing rules this sink follows. Deliberately without a default:
+  /// inheriting one silently is the thing this replaces.
+  var routing: SinkRouting { get }
+
   var id: SinkID { get }
   /// Which payload this sink wants. The socket takes `.full`; everything else takes the
   /// trimmed `.notification` variant.
@@ -55,6 +72,7 @@ public actor EventBus {
   private var sinks: [SinkID: any EventSink] = [:]
   /// One per registered sink. The continuation feeds it; the task drains it in order.
   private struct Lane {
+    let routing: SinkRouting
     let continuation: AsyncStream<ServerEvent>.Continuation
     let task: Task<Void, Never>
   }
@@ -98,7 +116,7 @@ public actor EventBus {
         await self?.completed()
       }
     }
-    lanes[sink.id] = Lane(continuation: continuation, task: task)
+    lanes[sink.id] = Lane(routing: sink.routing, continuation: continuation, task: task)
   }
 
   /// Stops routing to a sink. Anything already queued for it is still delivered: the lane
@@ -168,7 +186,7 @@ public actor EventBus {
 
   /// Queues on every eligible lane. The rate limit is applied before this, never inside.
   private func fanOut(_ event: ServerEvent, routing: EventRouting) {
-    for (id, lane) in lanes where routing.allows(id) {
+    for (_, lane) in lanes where routing.allows(lane.routing) {
       inFlight += 1
       lane.continuation.yield(event)
     }
@@ -216,38 +234,16 @@ public actor EventBus {
 }
 
 extension EventRouting {
-  fileprivate func allows(_ sink: SinkID) -> Bool {
-    switch sink {
+  /// Exhaustive over the routing classes, where the previous switch over `SinkID` needed a
+  /// `default` — `SinkID` wraps a string, so "every other sink behaves like a webhook" was
+  /// a rule nothing had to opt into. A sink now says which class it is in.
+  fileprivate func allows(_ routing: SinkRouting) -> Bool {
+    switch routing {
     case .socket: allowsSocket
     case .push: allowsPush
-    case .webhook, .ntfy: allowsWebhooks
-    // A custom sink is treated as a webhook-class target: it is an outbound HTTP
-    // delivery the user configured, so it follows the same suppressions.
-    default: allowsWebhooks
+    case .webhook: allowsWebhooks
     }
   }
 }
 
 // MARK: - Timeout
-
-struct TimeoutError: Error {}
-
-/// Runs `operation`, cancelling it after `duration`.
-///
-/// Note this cancels rather than abandons: a sink that respects cancellation stops doing
-/// work, and one that does not at least stops holding the group open.
-func withTimeout<T: Sendable>(
-  _ duration: Duration,
-  operation: @escaping @Sendable () async throws -> T
-) async throws -> T {
-  try await withThrowingTaskGroup(of: T.self) { group in
-    group.addTask { try await operation() }
-    group.addTask {
-      try await Task.sleep(for: duration)
-      throw TimeoutError()
-    }
-    guard let result = try await group.next() else { throw TimeoutError() }
-    group.cancelAll()
-    return result
-  }
-}

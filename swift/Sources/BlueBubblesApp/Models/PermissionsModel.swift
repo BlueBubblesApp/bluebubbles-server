@@ -53,15 +53,15 @@ final class PermissionsModel {
     self.service = service
     self.messageAccess = hasMessageAccess
     list = service.permissions
+    // Observe, do not poll. `PermissionsMonitorService` already runs the probe loop, and a
+    // second one here meant every check ran twice — including the automation probe, which
+    // spawns a thread to ask TCC and is the one worth not doubling.
     pollTask?.cancel()
     pollTask = Task { [weak self] in
-      while !Task.isCancelled {
-        let states = await service.checkAll()
-        await MainActor.run {
-          self?.statuses = states
-          self?.checkedAt = Date()
-        }
-        try? await Task.sleep(for: .seconds(2))
+      for await states in await service.stream() {
+        if Task.isCancelled { return }
+        self?.statuses = states
+        self?.checkedAt = Date()
       }
     }
   }

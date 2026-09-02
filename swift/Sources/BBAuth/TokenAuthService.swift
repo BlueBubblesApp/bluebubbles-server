@@ -54,7 +54,7 @@ public actor TokenAuthService {
 
   public init(
     configuration: TokenAuthConfiguration = .dormant,
-    secrets: (any SecretStoring)? = nil,
+    secrets: (any SecretStore)? = nil,
     deviceStore: (any DeviceStoring)? = nil,
     logger: Logger = Logger(label: "bluebubbles.auth.token")
   ) {

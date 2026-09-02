@@ -507,6 +507,7 @@ struct PushWiringTests {
   private actor RecordingSink: EventSink {
     nonisolated let id = SinkID.webhook
     nonisolated let projection = PayloadProjection.full
+    nonisolated let routing = SinkRouting.webhook
     private(set) var received: [ServerEvent] = []
     func accepts(_ event: ServerEvent) async -> Bool { true }
     func deliver(_ event: ServerEvent) async throws { received.append(event) }

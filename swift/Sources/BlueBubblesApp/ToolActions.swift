@@ -11,6 +11,7 @@
 //  one update that must never happen unattended.
 
 import AppKit
+import BBCore
 import BBDiagnostics
 import BBInterfaces
 import BBServiceKit
@@ -116,7 +117,7 @@ extension AppModel {
         UserAlert(
           severity: .warning,
           title: "That program cannot be used",
-          body: String(describing: error),
+          body: DiagnosticText.sentence(for: error),
           source: "Programs"
         )
       )

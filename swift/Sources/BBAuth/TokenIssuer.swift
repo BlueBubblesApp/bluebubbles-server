@@ -19,6 +19,7 @@
 //  generated. See `docs/AUTH.md`.
 
 import BBCore
+import BBSettings
 import Crypto
 import Foundation
 
@@ -192,9 +193,9 @@ public actor KeychainSigningKeyProvider: SigningKeyProviding {
 
   public static let keychainAccount = "auth.token_signing_key"
 
-  private let secrets: any SecretStoring
+  private let secrets: any SecretStore
 
-  public init(secrets: any SecretStoring) {
+  public init(secrets: any SecretStore) {
     self.secrets = secrets
   }
 
@@ -228,13 +229,6 @@ public actor KeychainSigningKeyProvider: SigningKeyProviding {
 
 /// The narrow slice of a secret store this module needs.
 ///
-/// Declared here rather than importing BBSettings' `SecretStore` so that BBAuth does not take
-/// a dependency on the settings layer purely to name a protocol.
-public protocol SecretStoring: Sendable {
-  func get(_ key: String) throws -> String?
-  func set(_ key: String, value: String) throws
-  func delete(_ key: String) throws
-}
 
 extension TokenError {
   public var code: String {
