@@ -1,11 +1,16 @@
 //  CompatibilityContractTests
-//  Replays fixtures recorded from the running Node server against the Swift server and
-//  diffs them STRICTLY IN BOTH DIRECTIONS — an added key fails exactly like a missing one.
+//  What the corpus IS, and what the diff engine does with two objects. Not the replay.
 //
-//  That bidirectional strictness is the point. It is what mechanically enforces the
-//  compatibility contract, rather than relying on everyone remembering it: every opt-in
-//  field (?fields=extended on alerts, replay=1 on the socket, negotiated payload codecs) is
-//  proven absent from the default response instead of merely intended to be.
+//  This header used to open with "Replays fixtures recorded from the running Node server
+//  against the Swift server", and no test in the file did: one counts the files, one checks
+//  they cover more than 200s, one scans them for personal data, and `StrictDiffTests` drives
+//  `ResponseDiff` against hand-built dictionaries. None of them decoded a fixture, let alone
+//  issued one. So "the compatibility contract is mechanically enforced" meant "it was
+//  enforced once, by hand, on one Mac, in August" — and while it meant that, the envelope's
+//  `message` and `error.message` sat swapped on every error response the server sent.
+//
+//  The replay is `FixtureReplayTests`, in this directory. These two suites are the halves it
+//  needs — a corpus worth replaying, and a diff that fails in both directions.
 //
 //  Fixtures are produced by Tools/conformance-recorder. See `.claude/docs/decisions.md` and
 //  `.claude/docs/workflow.md` § "The parity harness is the important one".
@@ -120,6 +125,36 @@ struct StrictDiffTests {
     let actual: [String: Any] = ["status": 200, "message": "Success", "title": "Extra"]
     let differences = diff(expected: recorded, actual: actual)
     #expect(differences.contains { $0.contains("title") })
+  }
+
+  /// The requirement, stated as a test: every field the reference sends must be present.
+  /// This is the half that matters — a field of ours that the reference lacks is tolerable,
+  /// a field of the reference's that we lack is the bug this whole harness exists to catch.
+  @Test("A declared addition is allowed; a missing reference field never is")
+  func additionsAreDeclarable() {
+    let recorded: [String: Any] = ["status": 200, "guid": "A"]
+
+    // Undeclared: reported, because one-way the diff stops detecting a replaced field.
+    // (A name nothing else declares — `backend` is in the shipping list.)
+    let added: [String: Any] = ["status": 200, "guid": "A", "somethingOfOurs": 1]
+    #expect(!diff(expected: recorded, actual: added).isEmpty)
+
+    // Declared: allowed. `acceptedDifferences` did not cover added keys at all before —
+    // the entry silenced a value check for a key the unexpected-key pass had already
+    // failed on, so declaring one changed nothing.
+    #expect(
+      ResponseDiff.compare(
+        expected: recorded, actual: added,
+        accepting: ["somethingOfOurs": "additive, on purpose"]
+      ).isEmpty
+    )
+
+    // And no declaration lets a reference field go missing.
+    let dropped: [String: Any] = ["status": 200]
+    let missing = ResponseDiff.compare(
+      expected: recorded, actual: dropped, accepting: ["guid": "declared anyway"]
+    )
+    #expect(missing.contains { $0.kind == .missingKey && $0.path == "guid" })
   }
 
   @Test("A missing key fails the diff")

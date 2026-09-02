@@ -17,12 +17,14 @@ public enum PushHandlers {
       guard let token = values["identifier"]?.stringValue ?? values["token"]?.stringValue,
         !token.isEmpty
       else {
-        throw BadRequest("`identifier` is required")
+        throw BadRequest("The identifier field is required.")
       }
       let name = values["name"]?.stringValue ?? "Unknown Device"
 
       try await context.devices.register(name: name, identifier: token)
-      return .data(.object(["name": .string(name), "identifier": .string(token)]))
+      // The message and nothing else, as the reference sends. Echoing the registration
+      // back was ours to add and ours to remove.
+      return .data(nil)
     }
 
     /// The Firebase client configuration — the `google-services.json` itself.
@@ -38,10 +40,12 @@ public enum PushHandlers {
     /// way the reference server restores it.
     registry.register(.fcmClientConfig) { _ in
       let store = PushCredentialStore(secrets: context.secrets)
+      // 404, not 503. A 503 is the better description — the server is fine, a thing it
+      // needs was never uploaded — but the reference answers `NotFound` here, and a
+      // client branching on the status sees a retryable outage where the reference tells
+      // it to go and configure Firebase.
       guard let raw = try await store.rawClientConfig() else {
-        throw ServiceUnavailable(
-          "no Firebase configuration has been uploaded to this server"
-        )
+        throw NotFound(ReferenceMessages.googleServicesNotFound)
       }
       return .data(patchOAuthClient(in: try JSONValue.parse(raw)))
     }

@@ -265,7 +265,7 @@ public final class IMCoreBridge: PrivateAPI {
 
   /// PORTED. ObjC: the association initializer plus `[chat sendMessage:]`
   /// (BlueBubblesHelper.m:1053).
-  public func react(_ request: ReactionRequest) async throws {
+  public func react(_ request: ReactionRequest) async throws -> SentMessage {
     try translating {
       let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
 
@@ -282,6 +282,16 @@ public final class IMCoreBridge: PrivateAPI {
         summaryInfo: nil
       )
       try chat.send(message)
+
+      // Read AFTER the send, exactly as `sendMessage` does: a tapback goes out through
+      // `chat.send` like any other message, so the GUID does not exist until Messages has
+      // accepted it and `lastSentMessage` is where it appears.
+      guard let guid = try chat.lastSentMessageGUID() else {
+        throw PrivateAPIErrorShim.rejected(
+          "Messages accepted the reaction but reported no message GUID"
+        )
+      }
+      return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
     }
   }
 
@@ -366,10 +376,14 @@ public final class IMCoreBridge: PrivateAPI {
   /// It addresses a CHAT ITEM, not the message item: an earlier pass called
   /// `setShouldNotifyOnSend:` on the message, which is a different property about
   /// outgoing sends and does nothing for this.
-  public func notifyAnyways(_ guid: MessageGUID) async throws {
+  public func notifyAnyways(_ guid: MessageGUID, in chatGUID: ChatIdentifier) async throws {
     let item = try await IMChatHistory.messageItem(guid: guid.rawValue)
     return try translating {
-      let chat = try Self.chat(owning: item, fallbackGUID: String?.none)
+      // The chat GUID from the request is what resolves this, not the item — see the
+      // contract. `chat(owning:)` is still asked first so a message that DOES name its
+      // chat keeps working, and the request's GUID is the fallback that makes it work
+      // at all.
+      let chat = try Self.chat(owning: item, fallbackGUID: chatGUID.rawValue)
       let container = (try? IMCoreRuntime.send(item, "_imMessageItem")) ?? item
       guard let items = try? IMCoreRuntime.send(container, "_newChatItems") else {
         throw PrivateAPIErrorShim.rejected("that message exposes no chat items")

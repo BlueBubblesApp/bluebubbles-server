@@ -24,6 +24,10 @@ public struct MessageSerializer: Sendable {
     public var otherHandle: HandleRow?
     public var chats: [ChatRow]
     public var attachments: [AttachmentRow]
+    /// What was read off disk for each attachment, by GUID. Loaded by the interface layer
+    /// like every other relation, so the serializer stays free of file I/O — see
+    /// `AttachmentMetadataReader`, and `Query.withAttachmentMetadata`, which gates the cost.
+    public var attachmentMetadata: [String: AttachmentMetadata] = [:]
     public var participantsByChatGUID: [String: [HandleRow]]
 
     public init(
@@ -81,7 +85,9 @@ public struct MessageSerializer: Sendable {
       .array(
         context.attachments.map {
           AttachmentSerializer.serialize(
-            $0, config: attachmentConfig, isForNotification: isForNotification)
+            $0, config: attachmentConfig,
+            metadata: context.attachmentMetadata[$0.guid],
+            isForNotification: isForNotification)
         }))
 
     object.setOrNull("subject", message.subject.map(JSONValue.string))
@@ -315,7 +321,7 @@ public enum AttachmentSerializer {
     config: AttachmentSerializerConfig = .default,
     messageGUIDs: [String] = [],
     data: Data? = nil,
-    dimensions: (height: Int, width: Int)? = nil,
+    metadata: AttachmentMetadata? = nil,
     isForNotification: Bool = false
   ) -> JSONValue {
     var object = JSONObjectBuilder()
@@ -341,10 +347,25 @@ public enum AttachmentSerializer {
     }
 
     if config.loadMetadata {
-      // Default to 0 rather than null, matching the current serializer.
-      object.set("height", .int(dimensions?.height ?? 0))
-      object.set("width", .int(dimensions?.width ?? 0))
-      object.set("metadata", .object([:]))
+      // Zero rather than null when unknown, which is the reference's `?? 0`.
+      object.set("height", .int(metadata?.height ?? 0))
+      object.set("width", .int(metadata?.width ?? 0))
+      // Three states, and they are not interchangeable:
+      //
+      //   - an object, for a medium that was read;
+      //   - `null`, for one whose file is not on disk — the reference initialises its
+      //     `metadata` to null and only replaces it once the file is found;
+      //   - ABSENT, for an attachment that is not an image, audio or video — the
+      //     reference's `getAttachmentMetadata` returns `undefined` for those and
+      //     `JSON.stringify` drops the key.
+      //
+      // The third is easy to lose and a strict client notices: `metadata: null` on a PDF
+      // says "we looked and found nothing", where absent says "this kind has none".
+      if let metadata {
+        object.set("metadata", metadata.json())
+      } else if AttachmentMetadataReader.kind(of: attachment) != nil {
+        object.set("metadata", .null)
+      }
     }
 
     if config.loadData, let data {

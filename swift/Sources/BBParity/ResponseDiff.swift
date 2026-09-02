@@ -51,6 +51,7 @@ public let volatileFields: Set<String> = [
 /// Each entry has to say what the difference IS, so that reading this list is enough to judge
 /// whether the decision still holds.
 public let acceptedDifferences: [String: String] = [
+
   // The reference publishes link-local IPv6 (`fe80::…`) because Node's `internal` flag does
   // not catch it. A bare link-local address cannot be dialled without a zone index, and this
   // field feeds the "how do I reach my server" setup screen, so publishing them is noise a
@@ -65,6 +66,9 @@ public struct Difference: Sendable, Equatable, CustomStringConvertible {
     case valueDiffers = "value"
     case typeDiffers = "type"
     case arrayLength = "length"
+    /// One side had no elements, so what is inside them was never checked. A gap in
+    /// coverage, reported rather than scored as agreement.
+    case notCompared = "unverified"
   }
 
   public let kind: Kind
@@ -74,6 +78,35 @@ public struct Difference: Sendable, Equatable, CustomStringConvertible {
   public var description: String {
     detail.isEmpty ? "\(kind.rawValue) at \(path)" : "\(kind.rawValue) at \(path): \(detail)"
   }
+}
+
+/// How hard the diff compares.
+///
+/// `.strict` is the original and the one that means the most: two servers, one Mac, one
+/// database, so every value should agree and any that does not is a finding.
+///
+/// `.shape` exists because the recorded corpus cannot be replayed that way. The fixtures were
+/// captured against a real Mac holding real conversations; a replay runs against a synthetic
+/// `chat.db` with seven messages in it. Every count, GUID, address and body text differs by
+/// construction, and comparing them would produce a wall of noise with the real findings
+/// buried in it.
+///
+/// So `.shape` drops scalar VALUES and keeps everything that is actually the contract: which
+/// keys exist, what type each one is, and the handful of strings that are themselves the
+/// contract — the envelope's `status` and `message`, and `error.type`. That is the whole of
+/// what a client parses before it looks at anyone's data, and it is where every divergence
+/// found so far has lived.
+public enum DiffMode: Sendable {
+  case strict
+  case shape
+
+  /// Keys whose literal value is part of the contract even in `.shape`.
+  ///
+  /// `message` is here because about forty routes carry their own string and this server
+  /// answered "Success" for all of them until the strings were transcribed; `error.type` is
+  /// here because the status/error-type pairing is one of the stated compatibility
+  /// invariants. Both are literals a client branches on, not data.
+  static let contractualScalars: Set<String> = ["status", "message", "type"]
 }
 
 public enum ResponseDiff {
@@ -86,6 +119,7 @@ public enum ResponseDiff {
     expected: [String: Any],
     actual: [String: Any],
     path: String = "",
+    mode: DiffMode = .strict,
     ignoring ignored: Set<String> = volatileFields,
     accepting accepted: [String: String] = acceptedDifferences
   ) -> [Difference] {
@@ -93,10 +127,20 @@ public enum ResponseDiff {
     let expectedKeys = Set(expected.keys)
     let actualKeys = Set(actual.keys)
 
+    // MISSING is the one that matters. The requirement this harness exists to enforce is
+    // that every field the reference sends is present here; an extra field of ours is
+    // tolerable, and clients ignore what they do not know.
     for key in expectedKeys.subtracting(actualKeys).sorted() {
       differences.append(.init(kind: .missingKey, path: "\(path)\(key)", detail: ""))
     }
-    for key in actualKeys.subtracting(expectedKeys).sorted() {
+    // UNEXPECTED is still reported, because one-way the diff stops being a drift check: a
+    // field that REPLACED another, or an internal value that leaked into a response, both
+    // look like an addition plus a removal and only the removal half would be caught.
+    //
+    // An addition we CHOSE is declared in `acceptedDifferences` and skipped here. It was
+    // not skipped here before, so declaring an added key did nothing at all — the entry
+    // silenced the value check for a key the loop above had already failed on.
+    for key in actualKeys.subtracting(expectedKeys).sorted() where accepted[key] == nil {
       differences.append(.init(kind: .unexpectedKey, path: "\(path)\(key)", detail: ""))
     }
 
@@ -128,56 +172,94 @@ public enum ResponseDiff {
         differences.append(
           contentsOf: compare(
             expected: left, actual: right, path: "\(childPath).",
-            ignoring: ignored, accepting: accepted
+            mode: mode, ignoring: ignored, accepting: accepted
           ))
 
       case (let left as [Any], let right as [Any]):
-        if left.count != right.count {
+        // The length is reported and then the elements are compared ANYWAY.
+        //
+        // It used to be `else`, and that one keyword cost six findings on one route:
+        // `contact` reported "length at data: 552 vs 587" and stopped, so an added key,
+        // two dropped keys, a missing nested `id` and a null `displayName` all sat behind
+        // a number that read like an environment difference. Two servers holding
+        // identical data is the rare case, not the common one — a length mismatch must
+        // never suppress what is inside the array.
+        if left.count != right.count, mode == .strict {
           differences.append(
             .init(
               kind: .arrayLength, path: childPath,
               detail: "\(left.count) vs \(right.count)"
             ))
-        } else {
-          for (index, pair) in zip(left, right).enumerated() {
-            if let leftObject = pair.0 as? [String: Any],
-              let rightObject = pair.1 as? [String: Any]
-            {
-              differences.append(
-                contentsOf: compare(
-                  expected: leftObject, actual: rightObject,
-                  path: "\(childPath)[\(index)].",
-                  ignoring: ignored, accepting: accepted
-                ))
-            } else if !equalScalars(pair.0, pair.1) {
-              differences.append(
-                .init(
-                  kind: .valueDiffers, path: "\(childPath)[\(index)]",
-                  detail: "\(pair.0) vs \(pair.1)"
-                ))
-            }
+        }
+        // One side empty means the element shape is UNVERIFIED, not equal. Reported as
+        // its own kind so a replay can count what it could not see instead of scoring it
+        // as a pass — the failure this whole harness exists to prevent is a check that
+        // silently stops checking.
+        if left.isEmpty != right.isEmpty {
+          differences.append(
+            .init(
+              kind: .notCompared, path: childPath,
+              detail: left.isEmpty
+                ? "reference is empty; \(right.count) here" : "\(left.count) expected; empty here"
+            ))
+        }
+        for (index, pair) in zip(left, right).enumerated() {
+          if let leftObject = pair.0 as? [String: Any],
+            let rightObject = pair.1 as? [String: Any]
+          {
+            differences.append(
+              contentsOf: compare(
+                expected: leftObject, actual: rightObject,
+                path: "\(childPath)[\(index)].",
+                mode: mode, ignoring: ignored, accepting: accepted
+              ))
+          } else if let difference = scalarDifference(
+            pair.0, pair.1, at: "\(childPath)[\(index)]", mode: mode
+          ) {
+            differences.append(difference)
           }
         }
 
       default:
-        // Type before value. "number vs string" is a more useful report than
-        // "1 vs \"1\"", and the two are genuinely different breaks.
-        if !sameShape(lhs, rhs) {
-          differences.append(
-            .init(
-              kind: .typeDiffers, path: childPath,
-              detail: "\(typeName(lhs)) vs \(typeName(rhs))"
-            ))
-        } else if !equalScalars(lhs, rhs) {
-          differences.append(
-            .init(
-              kind: .valueDiffers, path: childPath, detail: "\(lhs) vs \(rhs)"
-            ))
+        if let difference = scalarDifference(lhs, rhs, at: childPath, mode: mode, key: key) {
+          differences.append(difference)
         }
       }
     }
 
     return differences
+  }
+
+  /// One scalar against another, under the active mode.
+  ///
+  /// Type before value: "number vs string" is a more useful report than `1 vs "1"`, and the
+  /// two are genuinely different breaks.
+  ///
+  /// In `.shape` the value check is dropped for everything but the contract literals, and the
+  /// TYPE check is dropped when either side is null. That second exemption is not laxity —
+  /// almost every entity field in this API is nullable (`subject`, `groupTitle`,
+  /// `associatedMessageType`), so whether one is null is a fact about whose message was read,
+  /// not about the response's shape. Asserting it against a different database would fail on
+  /// every route while proving nothing.
+  static func scalarDifference(
+    _ lhs: Any, _ rhs: Any, at path: String, mode: DiffMode, key: String? = nil
+  ) -> Difference? {
+    let nullEither = lhs is NSNull || rhs is NSNull
+
+    if !sameShape(lhs, rhs) {
+      if mode == .shape, nullEither { return nil }
+      return .init(
+        kind: .typeDiffers, path: path, detail: "\(typeName(lhs)) vs \(typeName(rhs))"
+      )
+    }
+
+    if mode == .shape {
+      // The literals a client branches on, and nothing else.
+      guard let key, DiffMode.contractualScalars.contains(key) else { return nil }
+    }
+
+    guard !equalScalars(lhs, rhs) else { return nil }
+    return .init(kind: .valueDiffers, path: path, detail: "\(lhs) vs \(rhs)")
   }
 
   /// Whether two values are the same JSON kind.

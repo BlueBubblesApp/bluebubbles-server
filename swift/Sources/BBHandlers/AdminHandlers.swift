@@ -223,7 +223,10 @@ public enum AdminHandlers {
       // no longer exists — the client sees a dropped connection and reports a failure
       // for a restart that worked.
       Task { await context.requestRestart() }
-      return .data(.object(["restarting": .bool(true)]))
+      // No `data`. The reference sends the message and nothing else, and `{"restarting":
+      // true}` was an addition of ours — which the two-way diff counts as a break in the
+      // same way a dropped field is.
+      return .data(nil)
     }
 
     // The hard restart replaces the PROCESS rather than cycling the services. Same
@@ -236,7 +239,7 @@ public enum AdminHandlers {
         try? await Task.sleep(for: .milliseconds(500))
         await context.requestFullRestart()
       }
-      return .data(.object(["restarting": .bool(true)]))
+      return .data(nil)
     }
   }
 }

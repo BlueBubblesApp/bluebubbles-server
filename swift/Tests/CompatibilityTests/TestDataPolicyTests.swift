@@ -117,8 +117,20 @@ struct TestDataPolicyTests {
   }
 
   static func isReservedEmail(_ raw: String) -> Bool {
-    let lowered = raw.lowercased()
+    var lowered = raw.lowercased()
     if exemptAddresses.contains(lowered) { return true }
+
+    // A recorded fixture is NAMED after the request it captured, so a filename like
+    // `get_api_v1_contact_person@example.com_avatar-5baa61-200.json` looks to the pattern
+    // like an address at the domain `example.com_avatar-5baa61-200.json`. Trimming the
+    // fixture suffix judges the address itself, which is what this check is for — and it
+    // judges it strictly, since what is left still has to be a reserved domain.
+    if lowered.hasSuffix(".json"), let hyphen = lowered.lastIndex(of: "-"),
+      let previous = lowered[..<hyphen].lastIndex(of: "-")
+    {
+      lowered = String(lowered[..<previous])
+    }
+
     guard let domain = lowered.split(separator: "@").last.map(String.init) else { return false }
     if reservedDomains.contains(domain) { return true }
     if let tld = domain.split(separator: ".").last.map(String.init),

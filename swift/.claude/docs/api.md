@@ -24,11 +24,92 @@ Failures add an `error` object and keep the outer shape. `error.type` comes from
 vocabulary: `Server Error`, `Database Error`, `iMessage Error`, `Socket Error`,
 `Validation Error`, `Authentication Error`, `Gateway Timeout`.
 
+### On an error, `message` is a SENTENCE and `error.message` is the detail
+
+```json
+{
+  "status": 404,
+  "message": "The requested resource was not found",
+  "error": { "type": "Database Error", "message": "Chat does not exist!" }
+}
+```
+
+Not the other way round, and this server had it the other way round on **every error response
+on every route** until the recorded corpus was replayed against it: `message` carried the short
+`"Not Found"` / `"Bad Request"` / `"Server Error"`, which the reference uses as the DEFAULT for
+`error.message`. The sentences per status live on the error types in
+`Sources/BBHTTPAPI/HTTPErrors.swift`; the details the reference sends per route are transcribed
+in `Sources/BBSerialization/ReferenceMessages.swift`.
+
+Three consequences worth knowing before writing a handler:
+
+- An exception that reaches the renderer **without** being an `HTTPError` gets
+  `"An unhandled error has occurred!"`, not `ServerError`'s own sentence. That difference is how
+  a client tells "this route decided to fail" from "this server fell over" — see
+  `ServerError.unhandled`.
+- A required field that is absent answers `"The <field> field is required."` — validatorjs's
+  own wording, which is what the reference generates from a `required` rule.
+- The Private API gate puts its long sentence in `message` and which half failed in
+  `error.message`, and sends **no `data`**.
+
 Two pairings look like bugs and are **not**:
 
 - **A 404 reports `Database Error`, not `Not Found`.**
 - **A failed send returns HTTP 500 with the serialized message in `data`.** Clients read that
-  payload; it is the most depended-on error response in the API.
+  payload; it is the most depended-on error response in the API. See below — a send answers
+  with the message either way, and the status is decided by the row's `error` column.
+
+### Eight routes answer with the MESSAGE, not with an identifier
+
+`POST /message/text`, `/attachment`, `/attachment/chunk`, `/multipart`, `/react`,
+`/:guid/edit`, `/:guid/unsend` and `/:guid/notify` all return the serialised row, under `.full`
+(blob columns parsed, participants not loaded), plus `tempGuid` on the two routes that echo it.
+Not `{guid, chatGuid}` and not `data: null` — a client reads back the text, date, handle and
+chats of what it just did. `SendShapeTests` diffs all eight against their recorded fixtures.
+
+Messages writes asynchronously, so `MessageInterface` waits, and **what it waits for differs by
+kind**:
+
+| | Waits for | Ceiling |
+|---|---|---|
+| text / attachment / multipart / chunk / react | the row to APPEAR, by GUID | 60 s |
+| edit / unsend | `dateEdited` to move past what it was | 30 s |
+| notify | `didNotifyRecipient` to become true | 30 s |
+
+An AppleScript send has no GUID, so it matches on chat plus text inside a ten-second window —
+comparing `universalText()`, **not** the `text` column, which Messages leaves NULL on a send and
+never fills in. Backoff throughout is the reference's: 250 ms × 1.5.
+
+The wait is for the row **and its `chat_message_join`**. Messages writes the row first and joins
+it to the chat a moment later, so stopping at "the row exists" answers `chats: []` — which is
+where a client places the message it just sent. Both of these were found by sending real
+messages; neither is reproducible against a fixture database, where `text` is populated and the
+joins are already written.
+
+A mutation waits for the column to CHANGE rather than for the row to exist, and that distinction
+is load-bearing: the row is already there, so a wait for existence returns instantly with the
+pre-edit text — which a client then displays as the result. An unsend watches `dateEdited`, not
+`dateRetracted`, because Messages records an unsend as an edit that empties the part.
+
+**A timeout answers 200 with the identifiers rather than failing** — the operation already
+happened, and a 500 would invite the client to repeat it.
+
+Only `text` and `multipart` turn a non-zero `error` on the row into a 500 carrying that message.
+`attachment`, `chunk`, `react` and the rest answer 200 and let the client read `error` itself.
+It reads like something that should be uniform; it is transcribed, not tidied.
+
+`react` answers with the tapback's OWN message. A tapback is an ordinary message carrying an
+association, so Messages assigns it a GUID — which is why `PrivateAPI.react` returns a
+`SentMessage` rather than nothing.
+
+The four message-action routes refuse an unknown GUID with **400 "Selected message does not
+exist!"**, and a message in no chat with 400 "Associated chat not found!". Both are 400s in the
+reference, not 404s.
+
+There is no `backend` key. It named which send path ran, from this server's first commit, and
+nothing ever read it — no client was told it existed, and the case it would cover does not
+arise: a request for a subject, effect or reply that only AppleScript can serve is refused
+rather than quietly downgraded. `SendOutcome.backend` still records it for the log.
 
 ### Anything Messages refuses is an `iMessage Error`
 
@@ -50,8 +131,10 @@ Two things pass through it untranslated, and both matter:
   stays a 400; wrapping it would blame the server for the caller's mistake and invite a client
   to retry something that can never succeed.
 - **`requirePrivateAPI`'s refusal** (`.helperUnavailable`), whose projection carries the fixed
-  helper-unavailable message and a `data.feature` naming what was wanted. Clients match on that
-  string.
+  helper-unavailable sentence in the envelope's `message` and no `data` at all. It used to send
+  `data.feature`; that was an added key, and the feature name lives in the log instead.
+  `.capabilityUnavailable` still carries `data.feature`, because the reference has no Shortcut
+  path and so never produces that response.
 
 `AttachmentInterface` is the one deliberate exception to the second point: with no helper it
 answers a purged attachment with a **404 explaining it was offloaded to iCloud**, because the

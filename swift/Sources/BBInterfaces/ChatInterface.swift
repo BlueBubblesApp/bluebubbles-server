@@ -143,6 +143,16 @@ public struct ChatInterface: MessagesBackedInterface {
     public let participants: [HandleRow]
     /// The chat's most recent message, when it was asked for.
     public let lastMessage: MessageInterface.MessageProjection?
+    /// Whether the caller ASKED for the last message, which is a different question from
+    /// whether there was one.
+    ///
+    /// Both keys the reference emits for `with=lastMessage` depend on the request rather
+    /// than on the row: `lastMessage` is set to `null` for a chat that has no messages, and
+    /// `messages` is set to `[]` because the reference passes `includeMessages:
+    /// withLastMessage` to its chat serializer. Deriving either from `lastMessage != nil`
+    /// dropped the key from exactly the chats a client is most likely to mishandle — the
+    /// empty ones.
+    public let wantsLastMessage: Bool
   }
 
   public func query(_ query: Query) async throws -> [ChatProjection] {
@@ -170,12 +180,18 @@ public struct ChatInterface: MessagesBackedInterface {
         // the reference serializes these with `DEFAULT_CHAT_CONFIG`, whose
         // `includeParticipants` is true regardless of the query. Only a chat nested
         // inside a message omits the key.
-        includeParticipants: true
+        includeParticipants: true,
+        // `[]`, always, and only when the last message was asked for. The reference
+        // passes `config: { includeMessages: withLastMessage }` and then serialises a
+        // chat it deliberately loaded WITHOUT messages, so the key is present and empty.
+        // It reads like an oversight there and is one clients have parsed for years.
+        includeMessages: projection.wantsLastMessage
       )
-      if let last = projection.lastMessage {
+      if projection.wantsLastMessage {
         object = object.merging([
-          "lastMessage": serializer.serialize(
-            last.row, context: last.relations, config: .full)
+          "lastMessage": projection.lastMessage.map {
+            serializer.serialize($0.row, context: $0.relations, config: .full)
+          } ?? .null
         ])
       }
       return object
@@ -263,7 +279,9 @@ public struct ChatInterface: MessagesBackedInterface {
       }
 
       results.append(
-        ChatProjection(row: row, participants: participants, lastMessage: lastMessage))
+        ChatProjection(
+          row: row, participants: participants, lastMessage: lastMessage,
+          wantsLastMessage: query.withLastMessage))
     }
     return results
   }
@@ -430,7 +448,7 @@ public struct ChatInterface: MessagesBackedInterface {
   /// group-icon and background routes want the row itself and nothing loaded alongside it.
   public func row(guid: String) async throws -> ChatRow {
     guard let chat = try await repository.chat(guid: guid) else {
-      throw InterfaceError.notFound("no chat with GUID \(guid)")
+      throw InterfaceError.notFound(ReferenceMessages.chatNotFound)
     }
     return chat
   }
@@ -443,7 +461,7 @@ public struct ChatInterface: MessagesBackedInterface {
   public func groupIconPath(guid: String) async throws -> String {
     let chat = try await row(guid: guid)
     guard let path = GroupIconStore.path(forGroupID: chat.groupID) else {
-      throw InterfaceError.notFound("that chat has no group photo")
+      throw InterfaceError.notFound(ReferenceMessages.chatIconNotFound)
     }
     return path
   }

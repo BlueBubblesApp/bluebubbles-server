@@ -62,7 +62,7 @@ public enum MediaHandlers {
           FileManager.default.fileExists(atPath: $0)
         })
       else {
-        throw NotFound("attachment \(guid) has no Live Photo video alongside it")
+        throw NotFound(ReferenceMessages.livePhotoNotFound)
       }
       return .file(
         path: motion,

@@ -35,29 +35,33 @@ struct InterfaceProjectionTests {
     #expect(json["breakdown"]?["iMessage"]?.intValue == 480)
   }
 
-  @Test("A Private API send reports the message GUID; an AppleScript send the chat")
-  func sendOutcomeKeys() {
-    let privateAPI = MessageInterface.serialize(
-      MessageInterface.SendOutcome(backend: .privateAPI, messageGUID: "MSG-1"),
-      includingBackend: true
+  /// A send whose row never appeared answers with what it has, and never fails.
+  ///
+  /// This used to be the ONLY shape a send produced — identifiers, plus a `backend` key the
+  /// reference does not send. It is now the fallback for a hydration that timed out, and it
+  /// stays 200 on purpose: the send reached Messages, and reporting a failure would invite
+  /// the client to send the message twice. `SendHydrationTests` covers the shape that
+  /// matters, which is the message itself.
+  @Test("A send whose row never arrived falls back to the identifiers")
+  func sendOutcomeFallback() throws {
+    let interface = MessageInterface(
+      repository: try InterfaceFixtures.repository(), serializer: InterfaceFixtures.serializer
     )
-    #expect(privateAPI.objectKeys == ["guid", "backend"])
-    #expect(privateAPI["backend"]?.stringValue == "private-api")
 
-    let appleScript = MessageInterface.serialize(
-      MessageInterface.SendOutcome(backend: .appleScript, chatGUID: "iMessage;-;chat1"),
-      includingBackend: true
-    )
-    #expect(appleScript.objectKeys == ["chatGuid", "backend"])
-  }
-
-  @Test("The attachment and multipart routes never name the backend")
-  func sendOutcomeWithoutBackend() {
-    let json = MessageInterface.serialize(
+    let privateAPI = interface.serialize(
       MessageInterface.SendOutcome(backend: .privateAPI, messageGUID: "MSG-1"),
-      includingBackend: false
+      tempGUID: "TEMP-1"
     )
-    #expect(json.objectKeys == ["guid"])
+    #expect(privateAPI.objectKeys == ["guid", "tempGuid"])
+    // No `backend`, on any send route. It named which path ran, nothing ever read it, and
+    // the comment justifying it claimed clients did — which they cannot have, since the
+    // reference has never sent it. `SendOutcome.backend` still records it off the wire.
+    #expect(privateAPI["backend"] == nil)
+
+    let appleScript = interface.serialize(
+      MessageInterface.SendOutcome(backend: .appleScript, chatGUID: "iMessage;-;chat1")
+    )
+    #expect(appleScript.objectKeys == ["chatGuid"])
   }
 
   @Test("A contacts re-index reports what it did, in milliseconds")

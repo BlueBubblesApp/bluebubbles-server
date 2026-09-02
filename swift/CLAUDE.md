@@ -11,7 +11,7 @@ follow the one that matches the task before you start editing.
 
 ## Read this first
 
-Seven rules override anything you would otherwise infer from the code.
+Eight rules override anything you would otherwise infer from the code.
 
 1. **Client compatibility outranks everything, including security fixes.** Shipped clients are
    not under our control and cannot be updated in step with the server. The route table, the
@@ -19,6 +19,23 @@ Seven rules override anything you would otherwise infer from the code.
    contract, enforced mechanically by the parity harness. A fix that would require a client to
    change ships behind a setting, or is deferred.
    → [`.claude/docs/decisions.md`](.claude/docs/decisions.md)
+
+   **The requirement, stated plainly: every field the reference's v1 response carries must
+   be present in ours.** That is the contract. A MISSING field is the break — a client reads
+   it and it is not there. An extra field of ours is tolerable; clients ignore what they do
+   not know.
+
+   The parity diff nevertheless reports additions too, and that is a drift check rather than
+   a second rule: one-way, it stops detecting a field that REPLACED another, or an internal
+   value that leaked into a response, because both look like an addition plus a removal and
+   only the removal half would be caught. So an addition you meant goes in
+   `acceptedDifferences` (`Sources/BBParity/ResponseDiff.swift`) with a line saying what it
+   is, and one you did not mean fails — which is the point. Two things to know before adding
+   one anyway: it becomes a contract as soon as a client reads it, so taking it back later IS
+   a break; and the **FCM payload is capped at 4000 bytes**, where an extra field can push a
+   notification over and it is dropped. The bar is real — `backend` on `POST /message/text`
+   was declared for a day and then deleted, because nothing read it and the comment saying
+   clients did was never true.
 
 2. **`chat.db` is Apple's, and it is opened read-only by construction.** Never add a write path.
    Never `SELECT *` against it. → [`.claude/docs/database.md`](.claude/docs/database.md)
@@ -43,7 +60,16 @@ Seven rules override anything you would otherwise infer from the code.
 6. **Never put real phone numbers, emails or message content in tests or fixtures.**
    `Tests/CompatibilityTests/TestDataPolicyTests.swift` fails the build if you do.
 
-7. **Odd-looking code is usually load-bearing.** Duplicate routes, a route order that looks
+7. **Say what the reference does only when you have looked.** Every statement about v1
+   behaviour has to be traceable to `packages/server/src/…` or to a recorded fixture, in the
+   comment that makes it. Confident prose with nothing behind it is the single most expensive
+   failure mode this project has: `CompatibilityContractTests` opened with "Replays fixtures
+   recorded from the running Node server" and replayed nothing for months; `RequestValues`
+   called its own invented wording "what clients have been shown"; a serializer comment reasoned
+   that a send needs no attachments and the reference sends them. Each read as settled fact and
+   each was wrong. **Cite it or find out.**
+
+8. **Odd-looking code is usually load-bearing.** Duplicate routes, a route order that looks
    arbitrary, timeouts that differ by orders of magnitude, a `Double` where an `Int` would
    do — these are transcriptions of client-observable behaviour. The file header almost always
    says why. Read it before "cleaning up".
@@ -123,6 +149,20 @@ improvising the order:**
   declaration rots the moment the declaration changes — the audit found a delegate doc that
   said "NOT `.terminateLater`" above a `return .terminateLater`. When you change code under a
   comment, the comment is part of the change.
+- **What Messages writes, and WHEN, can only be learned from Messages.** A fixture database has
+  its rows already complete; a live one does not, and the gap is where the bugs are. Measured,
+  each after passing a full green suite: an AppleScript send lands with `text` **NULL** and the
+  words only in `attributedBody` (so match `universalText()`, never the column); the
+  `chat_message_join` row arrives **after** the message row (so a wait for "the row exists"
+  answers `chats: []`); `date_edited` moves on an unsend while `date_retracted` stays null.
+  Anything that depends on the timing or completeness of what Messages writes is unverified
+  until it has been run against a real send. → [`docs/TESTING.md`](docs/TESTING.md)
+- **A literal in a serializer is invisible to the parity diff.** The diff compares keys and
+  types, so `object.set("metadata", .object([:]))` and `height: 0` passed every check for as
+  long as they existed — the shape was right and the values were placeholders. When you write a
+  constant into a response, either it IS the contract (and says so, with a citation) or it is a
+  stub that needs a test asserting the real value. A parameter no call site passes —
+  `AttachmentSerializer`'s `dimensions` — is the same bug wearing a signature.
 - **The plugin manifest surface is frozen.** Third-party plugins are wanted but are not being
   built now, so `BBServiceKit` is closed to new capability: no new entitlement kinds, no new
   manifest fields for hypothetical plugin needs, no widening of the tool or migration

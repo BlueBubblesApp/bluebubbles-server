@@ -17,8 +17,60 @@ was broken.
 
 ## The parity harness — the backbone
 
-`ParityRunner` replays recorded fixtures against the server and structurally diffs responses, with
-an allowlist for genuinely variable fields (timestamps, GUIDs, `computer_id`). Runs in CI.
+`Tests/CompatibilityTests/FixtureReplayTests` mounts the **shipping** router in-process —
+`ServerComposition.buildHandlers`, over the synthetic `chat.db` from `Tools/chatdb-fixtures` —
+replays every recorded v1 fixture against it, and structurally diffs the answers. Runs in CI.
+
+**Two things it must be read with:**
+
+- **It compares SHAPE, not values.** The fixtures were recorded against a real Mac holding real
+  conversations; the replay runs against three synthetic chats. No count, GUID, address or body
+  text can agree. So `DiffMode.shape` keeps keys, types, and the literal strings that ARE the
+  contract — `status`, `message`, `error.type` — and drops the rest. Value-level parity needs two
+  servers over one database, which is `bb-parity` below.
+- **The baseline is a ratchet, not a suppression list.** `Fixtures/replay-baseline.json` lists
+  the fixtures that cannot match here and why: HARNESS (no helper, no network, no log sink),
+  DATA (the recorded row is not in the synthetic database), OPEN (a real divergence, with an
+  entry in `TODO.md`). A fixture that starts matching must be **removed** from it or the suite
+  fails, and one that stops matching and is not listed fails too.
+
+**Nothing that acts on the machine is ever replayed.** `FixtureReplay.destructiveRoutes` refuses
+`mac/lock`, `mac/imessage/restart`, both restarts, the update install, and every non-GET route
+under `message/`, `chat/`, `facetime/`, `handle/` and `icloud/` — bar the four query routes, which
+read. This is not tidiness: the first run of the harness locked the developer's Mac and restarted
+Messages, on a machine being used over a remote session. `ReplayDenyListTests` asserts it.
+
+### What a fixture database cannot tell you
+
+**A fixture database has its rows already complete. A live one does not, and the difference is
+where the bugs are.** Every one of these passed a full green suite and was found by sending a
+real message:
+
+| Assumption | What Messages actually does |
+|---|---|
+| A sent message's `text` column holds its text | **NULL** on an AppleScript send, and never filled in — the words are in `attributedBody`. Match `universalText()`. |
+| A message row arrives with its chat | The `chat_message_join` row lands **after**. A wait for "the row exists" answers `chats: []`. |
+| An unsend moves `dateRetracted` | It moves **`dateEdited`**; `dateRetracted` stays null. Watching the obvious column times out every time. |
+| A helper call that compiles, works | `notifyAnyways` took only a message GUID and could never resolve the chat. Every call failed; nothing tested it. |
+
+So: **anything that depends on the timing or completeness of what Messages writes is unverified
+until it has run against a real send.** `FailingPrivateAPI` proves the translation of a refusal
+and nothing about IMCore's behaviour.
+
+Running one, on a Mac with the Private API set up:
+
+```bash
+swift build --arch arm64e --product BlueBubblesHelper     # Messages runs arm64e; a plain arm64 dylib maps nowhere
+.build/arm64-apple-macosx/debug/bluebubbles-server --headless     --set socket_port=1234 --set password=… --set enable_private_api=true     --set private_api_helper_path="$PWD/.build/arm64e-apple-macosx/debug/libBlueBubblesHelper.dylib"
+```
+
+`server/info` reports `helper_connected`. **Send only to an address you have been told you may
+send to** — these reach real people — and never commit one.
+
+**A fixture is only a contract if the REFERENCE recorded it.** Fifteen v1 routes have no fixture
+except one this server produced, which cannot fail and proves nothing;
+`CorpusProvenanceTests` pins that set so it cannot grow. The source is inferred from the CORS
+header, because the recorder does not stamp it.
 
 **The diff is strict in both directions: an added key fails exactly like a missing one.** That is
 what mechanically enforces the compatibility contract — every opt-in field (`?fields=extended` on

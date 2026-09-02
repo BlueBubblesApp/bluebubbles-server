@@ -112,7 +112,7 @@ enum HelperDispatch {
       guard let reaction = ReactionType(rawValue: try string("reactionType")) else {
         throw PrivateAPIError.rejectedByMessages(reason: "unknown reaction type")
       }
-      try await bridge.react(
+      let reacted = try await bridge.react(
         ReactionRequest(
           chat: try chat(),
           target: try message("selectedMessageGuid"),
@@ -120,7 +120,7 @@ enum HelperDispatch {
           partIndex: integer("partIndex")
         )
       )
-      return nil
+      return ["identifier": reacted.guid.rawValue]
 
     case .editMessage:
       try await bridge.editMessage(
@@ -143,7 +143,7 @@ enum HelperDispatch {
       return nil
 
     case .notifyAnyways:
-      try await bridge.notifyAnyways(try message())
+      try await bridge.notifyAnyways(try message(), in: try chat())
       return nil
 
     case .searchMessages:

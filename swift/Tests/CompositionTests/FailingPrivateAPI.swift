@@ -21,6 +21,17 @@ struct FailingPrivateAPI: PrivateAPI {
   /// error the translation actually has to cope with.
   let error: any Error
 
+  /// The three mutating operations, allowed to SUCCEED and to have a side effect.
+  ///
+  /// `edit`, `unsend` and `notify` wait for a column on an existing row to move, so testing
+  /// that wait needs a helper that both returns and changes something. Three closures on this
+  /// double rather than a second, succeeding conformance to a sixty-eight-member protocol:
+  /// the alternative is another file of `throw error` lines that has to be kept in step with
+  /// this one.
+  var onEdit: (@Sendable () async throws -> Void)?
+  var onUnsend: (@Sendable () async throws -> Void)?
+  var onNotify: (@Sendable () async throws -> Void)?
+
   init(error: any Error = PrivateAPIError.rejectedByMessages(reason: "Messages said no")) {
     self.error = error
   }
@@ -34,16 +45,23 @@ struct FailingPrivateAPI: PrivateAPI {
   func sendMessage(_ request: SendMessageRequest) async throws -> SentMessage { throw error }
   func sendMultipart(_ request: SendMultipartRequest) async throws -> SentMessage { throw error }
   func sendAttachment(_ request: SendAttachmentRequest) async throws -> SentMessage { throw error }
-  func react(_ request: ReactionRequest) async throws { throw error }
+  func react(_ request: ReactionRequest) async throws -> SentMessage { throw error }
   func editMessage(
     _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String,
     backwardCompatibilityText: String
-  ) async throws { throw error }
+  ) async throws {
+    guard let onEdit else { throw error }
+    try await onEdit()
+  }
   func unsendMessage(_ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int) async throws {
-    throw error
+    guard let onUnsend else { throw error }
+    try await onUnsend()
   }
   func deleteMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws { throw error }
-  func notifyAnyways(_ guid: MessageGUID) async throws { throw error }
+  func notifyAnyways(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
+    guard let onNotify else { throw error }
+    try await onNotify()
+  }
   func searchMessages(_ request: MessageSearchRequest) async throws -> [MessageGUID] { throw error }
   func balloonBundleMediaPath(for guid: MessageGUID) async throws -> String { throw error }
   func createChat(addresses: [String], service: String, message: String?) async throws

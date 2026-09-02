@@ -65,7 +65,7 @@ public enum ReadHandlers {
         withHandle: true
       )
       guard let message = try await interfaces.message.find(guid: guid, query: query) else {
-        throw NotFound("no message with GUID \(guid)")
+        throw NotFound(ReferenceMessages.messageNotFound)
       }
       return .data(interfaces.message.serialize(message, query: query))
     }
@@ -96,7 +96,7 @@ public enum ReadHandlers {
       // "how many messages have ever been delivered or read", which is every message
       // and is not what any client wants.
       guard let after = request.date("after") else {
-        throw BadRequest("`after` is required")
+        throw BadRequest("The after field is required.")
       }
       let total = try await interfaces.message.updatedCount(
         after: after, before: request.date("before")
@@ -144,7 +144,7 @@ public enum ReadHandlers {
         withLastMessage: request.wants("lastmessage")
       )
       guard let chat = try await interfaces.chat.find(guid: guid, query: query) else {
-        throw NotFound("no chat with GUID \(guid)")
+        throw NotFound(ReferenceMessages.chatNotFound)
       }
       return .data(interfaces.chat.serialize(chat))
     }
@@ -233,7 +233,7 @@ public enum ReadHandlers {
           address: address, withChats: request.wants("chat")
         )
       else {
-        throw NotFound("no handle with address \(address)")
+        throw NotFound(ReferenceMessages.handleNotFound)
       }
       return .data(interfaces.handle.serialize(handle))
     }
@@ -279,9 +279,9 @@ public enum ReadHandlers {
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       guard let attachment = try await interfaces.attachment.find(guid: guid) else {
-        throw NotFound("no attachment with GUID \(guid)")
+        throw NotFound(ReferenceMessages.attachmentNotFound)
       }
-      return .data(interfaces.attachment.serialize(attachment))
+      return .data(await interfaces.attachment.serialize(attachment))
     }
 
     // Streamed from disk rather than buffered — a 500 MB video must not enter the heap.

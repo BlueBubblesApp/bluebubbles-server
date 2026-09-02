@@ -110,7 +110,7 @@ public struct WebhookRepository: Sendable {
     let encoded = events.map(Webhook.encode(events:))
     return try await database.write { db in
       guard var record = try Webhook.filter(Column("id") == id).fetchOne(db) else {
-        throw InterfaceError.notFound("no webhook with id \(id)")
+        throw InterfaceError.notFound(ReferenceMessages.webhookNotFound)
       }
       if let url {
         // The URL column is unique, so moving one endpoint onto another's address would
@@ -133,6 +133,6 @@ public struct WebhookRepository: Sendable {
     let deleted = try await database.write { db in
       try Webhook.filter(Column("id") == id).deleteAll(db)
     }
-    guard deleted > 0 else { throw InterfaceError.notFound("no webhook with id \(id)") }
+    guard deleted > 0 else { throw InterfaceError.notFound(ReferenceMessages.webhookNotFound) }
   }
 }

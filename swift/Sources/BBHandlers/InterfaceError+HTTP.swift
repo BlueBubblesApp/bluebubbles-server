@@ -44,29 +44,57 @@ extension InterfaceError: HTTPError {
     }
   }
 
+  /// The envelope's sentence — NOT the short `ResponseMessage` value.
+  ///
+  /// This was the second copy of the swap `HTTPErrors.swift` had, and the worse of the two:
+  /// nearly every failure a handler produces arrives as an `InterfaceError`, so this switch
+  /// decided the `message` on most of the error responses the server sends. Deferred to the
+  /// error types themselves rather than transcribed again here, because a third copy of six
+  /// sentences would drift from the other two silently.
   public var responseMessage: String {
     switch self {
-    case .invalidRequest: ResponseMessage.badRequest.rawValue
-    case .notFound: ResponseMessage.notFound.rawValue
-    case .unavailable: ResponseMessage.serverError.rawValue
-    case .messagesFailed, .helperUnavailable, .capabilityUnavailable:
-      ResponseMessage.unknownIMessageError.rawValue
+    case .invalidRequest: BadRequest().responseMessage
+    case .notFound: NotFound().responseMessage
+    case .unavailable: ServiceUnavailable("").responseMessage
+    // The gate's sentence goes in `message`, not in `error.message`. The reference's
+    // `PrivateApiMiddleware` throws `new IMessageError({ message: "Please make sure you
+    // have completed the setup…", error: ex.message })` — so the long sentence a client
+    // shows a person is the ENVELOPE's, and the detail is which half failed. This server
+    // had them the other way round.
+    case .helperUnavailable:
+      "Please make sure you have completed the setup for the Private API, "
+        + "and your helper is connected!"
+    // NOT the gate's sentence. This case exists for a capability the reference has no
+    // notion of — group creation through a user-installed Shortcut — so there is nothing to
+    // match, and its own explanation is the whole reason it is a separate case.
+    case .messagesFailed, .capabilityUnavailable: IMessageError().responseMessage
     }
   }
 
+  /// The DETAIL — which half of the gate failed, matching `checkPrivateApiStatus`.
+  ///
+  /// The reference distinguishes "not enabled" from "not connected" here, and a client
+  /// diagnosing a setup problem needs to know which: one is a setting, the other is an
+  /// injection that did not take.
   public var errorMessage: String {
     switch self {
-    // The canonical text, verbatim. Clients display it and some match on it, so the feature
-    // name goes in `data` below rather than into this string.
-    case .helperUnavailable: IMessageError.helperUnavailable().errorMessage
+    case .helperUnavailable: "iMessage Private API Helper is not connected!"
     default: body
     }
   }
 
+  /// Only `capabilityUnavailable` carries one.
+  ///
+  /// `helperUnavailable` used to as well, and it was an added key: the reference's Private
+  /// API gate sends the envelope and nothing else, and the two-way diff treats a key we add
+  /// exactly like one we drop. The feature name survives in the log, which was always the
+  /// more useful of the two places.
+  ///
+  /// `capabilityUnavailable` keeps it because there is nothing to diverge from — the
+  /// reference has no Shortcut path, so it never produces this response at all.
   public var data: JSONValue? {
     switch self {
-    case .helperUnavailable(let feature), .capabilityUnavailable(_, let feature):
-      .object(["feature": .string(feature)])
+    case .capabilityUnavailable(_, let feature): .object(["feature": .string(feature)])
     default: nil
     }
   }

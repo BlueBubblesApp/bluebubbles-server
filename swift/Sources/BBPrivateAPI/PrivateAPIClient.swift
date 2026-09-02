@@ -105,8 +105,8 @@ public actor PrivateAPIClient: PrivateAPI {
     return try sentMessage(from: result, chat: request.chat)
   }
 
-  public func react(_ request: ReactionRequest) async throws {
-    try await transport.request(
+  public func react(_ request: ReactionRequest) async throws -> SentMessage {
+    let result = try await transport.request(
       action: .sendReaction,
       data: .object([
         "chatGuid": .string(request.chat.rawValue),
@@ -114,6 +114,7 @@ public actor PrivateAPIClient: PrivateAPI {
         "reactionType": .string(request.reaction.rawValue),
         "partIndex": .number(Double(request.partIndex)),
       ]))
+    return try sentMessage(from: result, chat: request.chat)
   }
 
   /// Editing needs the chat, and the helper cannot derive it.
@@ -161,11 +162,12 @@ public actor PrivateAPIClient: PrivateAPI {
       ]))
   }
 
-  public func notifyAnyways(_ guid: MessageGUID) async throws {
+  public func notifyAnyways(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
     try await transport.request(
       action: .notifyAnyways,
       data: .object([
-        "messageGuid": .string(guid.rawValue)
+        "chatGuid": .string(chat.rawValue),
+        "messageGuid": .string(guid.rawValue),
       ]))
   }
 

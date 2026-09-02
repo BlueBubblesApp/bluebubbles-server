@@ -262,7 +262,12 @@ public enum ErrorRenderer {
     }
 
     logger.error("Unhandled error", metadata: diagnostics(for: error))
-    let fallback = ServerError(message(for: error))
+    // NOT `ServerError`'s own sentence. An exception that reaches here was never given a
+    // status by anybody, and the reference says so in the envelope: its error middleware
+    // answers "An unhandled error has occurred!" while a deliberately thrown `ServerError`
+    // says "The server has encountered an error". A client can tell "this route decided to
+    // fail" from "this server fell over" only because those two differ.
+    let fallback = ServerError.unhandled(message(for: error))
     return (fallback.status, fallback.envelope())
   }
 

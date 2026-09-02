@@ -108,6 +108,107 @@ public struct ContactInterface: Sendable {
     try await index.remove(ids: [id])
   }
 
+  // MARK: - Batch writes
+  //
+  // `POST /contact`, `PUT /contact` and `DELETE /contact` are BATCH routes, and this server
+  // treated all three as single-record ones — returning an object where the reference returns
+  // an array, and failing the whole request where the reference reports the bad entries in
+  // `metadata.errors` and commits the rest.
+  //
+  // Both halves matter to a client. The shape is what a parser breaks on; the partial-success
+  // behaviour is what an address-book sync depends on, because one malformed entry in a
+  // hundred otherwise costs the other ninety-nine.
+
+  /// What a batch did, and what it could not do.
+  public struct BatchOutcome<Value: Sendable>: Sendable {
+    public let succeeded: [Value]
+    public let failures: [Failure]
+
+    public init(succeeded: [Value], failures: [Failure]) {
+      self.succeeded = succeeded
+      self.failures = failures
+    }
+
+    /// The entry as it was sent, alongside why it did not take. The entry is echoed back
+    /// because the reference echoes it: a client sending a hundred contacts has no other way
+    /// to tell which one the message is about.
+    public struct Failure: Sendable {
+      public let entry: JSONValue
+      public let message: String
+    }
+
+    /// Projects the successes, keeping the failures as they are. The handler serialises;
+    /// the interface does not know what a wire shape is.
+    public func map<Other: Sendable>(_ transform: (Value) -> Other) -> BatchOutcome<Other> {
+      BatchOutcome<Other>(
+        succeeded: succeeded.map(transform),
+        failures: failures.map { .init(entry: $0.entry, message: $0.message) }
+      )
+    }
+  }
+
+  /// One entry, or an array of them, as one array. The reference wraps a bare object the
+  /// same way, so both request shapes reach the same code.
+  static func entries(in body: JSONValue) -> [JSONValue] {
+    body.arrayValue ?? [body]
+  }
+
+  public func create(batch body: JSONValue) async throws -> BatchOutcome<ContactRecord> {
+    var created: [ContactRecord] = []
+    var failures: [BatchOutcome<ContactRecord>.Failure] = []
+    for entry in Self.entries(in: body) {
+      do {
+        created.append(try await create(entry))
+      } catch {
+        failures.append(.init(entry: entry, message: DiagnosticText.sentence(for: error)))
+      }
+    }
+    return BatchOutcome(succeeded: created, failures: failures)
+  }
+
+  /// - Parameter id: the path's `:id`, when the route carried one. `PUT /contact/:id` puts a
+  ///   single body under that id; `PUT /contact` reads an id per entry.
+  public func update(batch body: JSONValue, id: String?) async throws -> BatchOutcome<
+    ContactRecord
+  > {
+    var updated: [ContactRecord] = []
+    var failures: [BatchOutcome<ContactRecord>.Failure] = []
+    for entry in Self.entries(in: body) {
+      guard let entryID = id ?? entry["id"]?.stringValue ?? entry["id"]?.intValue.map(String.init)
+      else {
+        failures.append(.init(entry: entry, message: "`id` is required"))
+        continue
+      }
+      do {
+        updated.append(try await update(id: entryID, body: entry))
+      } catch {
+        failures.append(.init(entry: entry, message: DiagnosticText.sentence(for: error)))
+      }
+    }
+    return BatchOutcome(succeeded: updated, failures: failures)
+  }
+
+  public func delete(batch body: JSONValue) async throws -> BatchOutcome<String> {
+    var deleted: [String] = []
+    var failures: [BatchOutcome<String>.Failure] = []
+    for entry in Self.entries(in: body) {
+      let entryID =
+        entry.stringValue ?? entry.intValue.map(String.init)
+        ?? entry["id"]?.stringValue ?? entry["id"]?.intValue.map(String.init)
+      guard let entryID else {
+        failures.append(.init(entry: entry, message: "`id` is required"))
+        continue
+      }
+      do {
+        try await delete(id: entryID)
+        deleted.append(entryID)
+      } catch {
+        failures.append(.init(entry: entry, message: DiagnosticText.sentence(for: error)))
+      }
+    }
+    return BatchOutcome(succeeded: deleted, failures: failures)
+  }
+
   /// Re-reads the address book.
   ///
   /// Only `.macOS` contacts are replaced; `.local` ones are the client's own and are not

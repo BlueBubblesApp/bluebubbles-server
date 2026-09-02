@@ -58,18 +58,33 @@ struct InterfaceErrorHTTPTests {
     #expect(envelope.error?.message == "`chatGuid` is required")
   }
 
-  /// The fixed string, and why it is fixed: clients display it and some match on it, so the
-  /// feature name has to travel in `data` instead of being appended to the message.
-  @Test("A missing helper sends the canonical message with the feature in data")
-  func helperUnavailableKeepsTheCanonicalText() {
+  /// The gate's two fields, the way the reference fills them.
+  ///
+  /// `PrivateApiMiddleware` throws `new IMessageError({ message: "Please make sure you have
+  /// completed the setup…", error: ex.message })`. So the long sentence is the ENVELOPE's
+  /// `message` and the detail is which half of `checkPrivateApiStatus` failed — this server
+  /// had the two the wrong way round, and sent a `data.feature` the reference does not send.
+  /// Found by replaying the recorded corpus; see `FixtureReplayTests`.
+  @Test("A missing helper fills the envelope the way the reference's gate does")
+  func helperUnavailableMatchesTheGate() {
     let error = InterfaceError.helperUnavailable(feature: "reactions")
-    #expect(error.errorMessage == IMessageError.helperUnavailable().errorMessage)
-    #expect(error.data?["feature"]?.stringValue == "reactions")
+    #expect(
+      error.responseMessage
+        == "Please make sure you have completed the setup for the Private API, "
+        + "and your helper is connected!"
+    )
+    #expect(error.errorMessage == "iMessage Private API Helper is not connected!")
+    // No data. An added key fails the parity diff exactly like a dropped one, and the
+    // feature name is in the log, where it is more use anyway.
+    #expect(error.data == nil)
     // The domain `body` is the readable one and is deliberately NOT what goes on the wire.
     #expect(error.body != error.errorMessage)
   }
 
   /// The case that exists because `helperUnavailable` cannot carry a bespoke sentence.
+  ///
+  /// Unlike `helperUnavailable`, this one keeps its `data.feature`: the reference has no
+  /// Shortcut path, so it never produces this response and there is nothing to diverge from.
   @Test("A missing capability sends its own message and still names the feature")
   func capabilityUnavailableCarriesBoth() {
     let error = InterfaceError.capabilityUnavailable(

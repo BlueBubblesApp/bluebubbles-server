@@ -55,9 +55,18 @@ public struct AttachmentInterface: MessagesBackedInterface {
     try await repository.attachment(guid: guid)
   }
 
+  /// Attachment dimensions and durations, cached across requests. See
+  /// `AttachmentMetadataReader`.
+  let metadataReader = AttachmentMetadataReader()
+
   /// Wire form, for the HTTP layer.
-  public func serialize(_ row: AttachmentRow) -> JSONValue {
-    AttachmentSerializer.serialize(row)
+  ///
+  /// Reads the file, because `GET /attachment/:guid` serialises under the reference's
+  /// DEFAULT attachment config — whose `loadMetadata` is true — and its recorded response
+  /// carries `height`, `width` and `metadata`. Unlike the message routes there is no `with`
+  /// to gate it: one attachment, one probe.
+  public func serialize(_ row: AttachmentRow) async -> JSONValue {
+    AttachmentSerializer.serialize(row, metadata: await metadataReader.metadata(for: row))
   }
 
   /// Resolves an attachment's bytes on disk.
@@ -71,10 +80,10 @@ public struct AttachmentInterface: MessagesBackedInterface {
   /// "not downloaded yet" and "gone" call for different things from a client.
   public func resolvePath(guid: String) async throws -> String {
     guard let row = try await repository.attachment(guid: guid) else {
-      throw InterfaceError.notFound("no attachment with GUID \(guid)")
+      throw InterfaceError.notFound(ReferenceMessages.attachmentNotFound)
     }
     guard let stored = row.filename else {
-      throw InterfaceError.notFound("attachment \(guid) has no file path")
+      throw InterfaceError.notFound(ReferenceMessages.attachmentNotOnDisk)
     }
     let path = (stored as NSString).expandingTildeInPath
 

@@ -74,14 +74,20 @@ public enum UploadHandlers {
         chunk, to: transferID, named: name, expectingChunk: index
       )
 
+      // The reference's own keys and its own message, both of which this route had
+      // invented: it answered `{guid, received, of, complete}` under "Attachment sent!" —
+      // which also told a client the attachment had been sent when nothing had been sent
+      // yet. The index in the message counts to `total - 1`, as the reference does.
       guard index == total - 1 else {
         return .data(
           .object([
-            "guid": .string(transferID),
-            "received": .int(index + 1),
-            "of": .int(total),
-            "complete": .bool(false),
-          ]))
+            "attachmentGuid": .string(transferID),
+            "chunkIndex": .int(index),
+            "totalChunks": .int(total),
+            "remainingChunks": .int(total - index - 1),
+          ]),
+          message: "Chunk \(index)/\(total - 1) uploaded successfully."
+        )
       }
 
       let interfaces = try await context.requireInterfaces()
@@ -92,9 +98,9 @@ public enum UploadHandlers {
         filePath: path,
         isAudioMessage: values["isAudioMessage"]?.boolValue ?? false
       )
-      return .data(
-        MessageInterface.serialize(sent, includingBackend: false)
-          .merging(["complete": .bool(true)]))
+      // The message, and only the message. `complete: true` was ours, and an added key on
+      // a frozen route fails the parity diff exactly like a dropped one.
+      return .data(interfaces.message.serialize(sent))
     }
   }
 }

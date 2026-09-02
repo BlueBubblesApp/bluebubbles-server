@@ -59,7 +59,11 @@ public enum WriteHandlers {
           forcedBackend: forced
         )
       )
-      return .data(MessageInterface.serialize(sent, includingBackend: true))
+      return try Self.sendResult(
+        sent, interfaces: interfaces,
+        tempGUID: values["tempGuid"]?.stringValue,
+        checkingSendError: true
+      )
     }
 
     registry.register(.messageSendAttachment) { request in
@@ -74,8 +78,46 @@ public enum WriteHandlers {
         filePath: path,
         isAudioMessage: values["isAudioMessage"]?.boolValue ?? false
       )
-      return .data(MessageInterface.serialize(sent, includingBackend: false))
+      // No `tempGuid`, and no error check. The reference injects the temp GUID only on
+      // text and multipart — the attachment route reads it from the body for its send cache
+      // and does not echo it — and it answers 200 even for a row whose `error` is set.
+      return try Self.sendResult(sent, interfaces: interfaces)
     }
+  }
+
+  /// The response every send route gives: the message it wrote.
+  ///
+  /// **A send answers with the MESSAGE.** All of them used to answer
+  /// `{guid, chatGuid, backend}` — identifiers — where the reference answers the serialised
+  /// row, so a client reading back the text, date, handle or chats of what it had just sent
+  /// got none of them and had to ask again. The hydration is in `MessageInterface`.
+  ///
+  /// - Parameter checkingSendError: whether a non-zero `error` on the row becomes a 500.
+  ///   **Only `text` and `multipart` do this.** It reads like something that should be
+  ///   uniform and is not: `attachment` and `attachment/chunk` return 200 with the failed
+  ///   message in `data` and let the client read `error` itself. Both are transcribed rather
+  ///   than tidied — a client that has been shown a 200 for a failed attachment since the
+  ///   Electron server would start seeing 500s.
+  private static func sendResult(
+    _ outcome: MessageInterface.SendOutcome,
+    interfaces: ServerInterfaces,
+    tempGUID: String? = nil,
+    checkingSendError: Bool = false
+  ) throws -> RouteResult {
+    let data = interfaces.message.serialize(outcome, tempGUID: tempGUID)
+
+    // The shape clients depend on most: Messages can accept a send and then fail it, the
+    // row records that in `error`, and the reference reports it as a 500 carrying the same
+    // message. That is how a client shows a red mark against what it just sent; a 200 would
+    // tell it the send worked.
+    if checkingSendError, MessageInterface.sendFailed(outcome) {
+      throw IMessageError(
+        "Message failed to send!",
+        message: "Message sent with an error. See attached message",
+        data: data
+      )
+    }
+    return .data(data)
   }
 
   private static func registerMultipart(
@@ -111,7 +153,11 @@ public enum WriteHandlers {
         replyToGUID: values["selectedMessageGuid"]?.stringValue,
         partIndex: values["partIndex"]?.intValue
       )
-      return .data(MessageInterface.serialize(sent, includingBackend: false))
+      return try Self.sendResult(
+        sent, interfaces: interfaces,
+        tempGUID: values["tempGuid"]?.stringValue,
+        checkingSendError: true
+      )
     }
   }
 
@@ -129,13 +175,15 @@ public enum WriteHandlers {
       else {
         throw BadRequest("`chatGuid`, `selectedMessageGuid` and `reaction` are required")
       }
-      try await interfaces.message.react(
+      let sent = try await interfaces.message.react(
         chatGUID: chatGUID,
         targetGUID: target,
         reaction: reaction,
         partIndex: values["partIndex"]?.intValue ?? 0
       )
-      return .data(nil)
+      // The tapback's OWN message, not the one it reacts to. No error check: the
+      // reference's reaction route answers 200 whatever the row's `error` says.
+      return try Self.sendResult(sent, interfaces: interfaces)
     }
 
     registry.register(.messageEdit) { request in
@@ -143,7 +191,7 @@ public enum WriteHandlers {
       let guid = try request.requirePathParameter("guid")
       let values = try request.values()
       let text = try values.requireString("editedMessage")
-      try await interfaces.message.edit(
+      let edited = try await interfaces.message.edit(
         guid: guid,
         partIndex: values["partIndex"]?.intValue ?? 0,
         newText: text,
@@ -153,23 +201,25 @@ public enum WriteHandlers {
         backwardCompatibilityText: values["backwardsCompatMessage"]?.stringValue
           ?? "Edited to \u{201C}\(text)\u{201D}"
       )
-      return .data(nil)
+      return try Self.sendResult(edited, interfaces: interfaces)
     }
 
     registry.register(.messageUnsend) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")
       let values = try request.values()
-      try await interfaces.message.unsend(
+      let unsent = try await interfaces.message.unsend(
         guid: guid, partIndex: values["partIndex"]?.intValue ?? 0
       )
-      return .data(nil)
+      return try Self.sendResult(unsent, interfaces: interfaces)
     }
 
     registry.register(.messageNotify) { request in
       let interfaces = try await context.requireInterfaces()
-      try await interfaces.message.notify(guid: try request.requirePathParameter("guid"))
-      return .data(nil)
+      let notified = try await interfaces.message.notify(
+        guid: try request.requirePathParameter("guid")
+      )
+      return try Self.sendResult(notified, interfaces: interfaces)
     }
 
     registry.register(.messageEmbeddedMedia) { request in
@@ -524,7 +574,7 @@ public enum WriteHandlers {
       let address = values["address"]?.stringValue
         ?? request.queryParameters["address"]
     else {
-      throw BadRequest("`address` is required")
+      throw BadRequest("The address field is required.")
     }
     if adding {
       try await interfaces.chat.addParticipant(address, to: guid)

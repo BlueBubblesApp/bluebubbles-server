@@ -429,13 +429,25 @@ public protocol PrivateAPI: Sendable {
   func sendMessage(_ request: SendMessageRequest) async throws -> SentMessage
   func sendMultipart(_ request: SendMultipartRequest) async throws -> SentMessage
   func sendAttachment(_ request: SendAttachmentRequest) async throws -> SentMessage
-  func react(_ request: ReactionRequest) async throws
+  /// Returns the reaction's OWN message, not the message it reacts to.
+  ///
+  /// A tapback is an ordinary message with an association, so Messages assigns it a GUID —
+  /// and the v1 route answers with the serialised row behind that GUID, which is why the
+  /// identifier has to come back across the wire. This returned nothing until then.
+  func react(_ request: ReactionRequest) async throws -> SentMessage
   func editMessage(
     _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String,
     backwardCompatibilityText: String) async throws
   func unsendMessage(_ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int) async throws
   func deleteMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
-  func notifyAnyways(_ guid: MessageGUID) async throws
+  /// Rings a silenced message through. Needs the CHAT, like every other write.
+  ///
+  /// It took only the message GUID and could never work: `chat(owning:)` recovers the
+  /// conversation from the item, and an `IMMessageItem` fetched by GUID reports
+  /// `chatIdentifier = nil` — the same fact `requireConversation` is written around two
+  /// functions below. Every call answered "could not find the conversation this message
+  /// belongs to". The reference has always sent `{chatGuid, messageGuid}`.
+  func notifyAnyways(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
   func searchMessages(_ request: MessageSearchRequest) async throws -> [MessageGUID]
   /// Path to the rendered preview for a Digital Touch or handwritten message.
   func balloonBundleMediaPath(for guid: MessageGUID) async throws -> String

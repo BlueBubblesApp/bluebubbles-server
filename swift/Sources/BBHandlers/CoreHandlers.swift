@@ -132,7 +132,7 @@ public enum PlaceholderHandlers {
 struct NotImplemented: HTTPError {
   let status = 501
   let errorType = ErrorType.serverError
-  let responseMessage = ResponseMessage.serverError.rawValue
+  let responseMessage = ServerError().responseMessage
   let errorMessage: String
 
   init(handler: String) {

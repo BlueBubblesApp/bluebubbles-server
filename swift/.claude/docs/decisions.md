@@ -18,7 +18,8 @@ no user action.
 |---|---|
 | Server-internal: storage, crypto at rest, structure, performance | **Yes** — invisible to clients |
 | Bounding abuse without changing the contract: rate limits, caps | **Yes**, if legitimate traffic is untouched |
-| New endpoints, new optional request params, new opt-in response fields | **Yes** — nothing existing changes |
+| New endpoints, new optional request params, new response fields **behind an opt-in** | **Yes** — nothing existing changes |
+| A field added unconditionally to an existing response, however useful | **No** — see below |
 | Altering an existing response body, event payload, or channel | **No** — opt-in only |
 | Removing or restricting something a client uses today | **No** — deferred |
 | An alternate mechanism for something clients already do (auth, payload format) | **No** — ships dormant and default-off, however good it is |
@@ -34,6 +35,58 @@ They are built to be switchable by a setting, not switched.
 This is enforced mechanically, not by intent: the parity harness replays recorded response
 fixtures and diffs them **strictly in both directions**. An added key fails exactly like a missing
 one.
+
+**"Opt-in" means the client asked.** A field that appears because a `?fields=` or a `with` names
+it is additive; a field that appears on every response is a change to the response, and the two
+are easy to conflate when the field is a good idea.
+
+### The requirement, and what the diff adds on top of it
+
+**Every field the reference's v1 response carries must be present in ours.** That is the whole
+contract. A missing field is the break: a client reads it and it is not there. An extra field
+of ours is tolerable — clients ignore unknown keys.
+
+The diff is nevertheless two-way, and that is a **drift check** rather than a second rule. One
+-way it would pass a field that REPLACED another, and an internal value that leaked into a
+response, because both look like an addition plus a removal and only the removal half would be
+caught. So:
+
+- A **missing** reference field fails, always, and no declaration can silence it.
+- An **added** field fails unless it is declared in `acceptedDifferences`
+  (`Sources/BBParity/ResponseDiff.swift`), whose entries have to say what the difference IS.
+
+The list is meant to be short. `local_ipv6s` is the only entry — link-local addresses the
+reference publishes and we drop, because a bare `fe80::…` cannot be dialled without a zone index
+and the field feeds a "how do I reach my server" screen.
+
+`backend` on `POST /api/v1/message/text` is the cautionary one. It named which send path ran, it
+was declared here for a day, and it was deleted: nothing read it, no client had been told it
+existed, and the comment justifying it said clients "read this to confirm it took" — which they
+cannot have, since the reference has never sent it. An addition needs a consumer, not a rationale.
+
+Two things to weigh before adding one anyway: an unconditional field becomes a contract the
+moment a client reads it, so taking it back later is the break the addition was supposed not to
+be; and the **FCM payload is capped at 4000 bytes** (`MessageSerializerConfig.enforceMaxSize`),
+which is the one place an addition genuinely breaks something — a notification over the cap is
+dropped.
+
+Four additions were removed rather than declared, because nothing wanted them: `backend` on the
+send routes, `data.feature` on the Private API gate, `complete` on the chunk route, and
+`{restarting: true}` on the two restarts.
+
+### What the diff cannot see
+
+It compares keys and types. Three classes of divergence pass it, and all three have been found
+by hand or by a live run rather than by CI:
+
+- **A placeholder with the right shape.** `metadata` was written as a literal `{}` and
+  `height`/`width` as `0` for as long as they existed. The key set matched the fixture exactly.
+- **A wrong value in a right-shaped field.** `os_version` sent `"Version 26.5.2 (Build 25F84)"`
+  where the reference sends `"26.5.2"` — both strings, so the diff was satisfied.
+- **Anything on a route the corpus does not cover**, which includes every sending route: they
+  are deny-listed in the replay, because the harness drives a real server. Those are compared by
+  serialising a row and diffing against the recorded fixture (`SendShapeTests`), and verified
+  for real by sending.
 
 ### What this means for you
 

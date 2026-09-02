@@ -18,19 +18,21 @@ housekeeping. Within a section, worst first.
 
 # 1. Wrong for users now
 
-## v1 send routes answer `{guid, backend}`; the Node fixture answers the Message
+## `tempGuid` is echoed but never used to deduplicate
 
-`POST /api/v1/message/text` (and the attachment, reaction and multipart sends) return
-`MessageInterface.serialize(SendOutcome)` — a GUID, the chat and the backend that sent it —
-with `message: "Message sent!"`. The recorded Node fixture
-(`Fixtures/http/post_api_v1_message_text-5baa61-200.json`) carries the serialised Message
-row. Clients that read the returned message (text, date, handle) get less than they used to,
-and this is the one v1 divergence the parity corpus cannot see because send routes are not
-diffed. First in this section because it is a compatibility break on the most-used route.
+The reference registers `tempGuid` in a send cache before sending and removes it after, so a
+client that retries a send it never got an answer to can be told the first one is still in
+flight. This server echoes `tempGuid` back on the response and keeps no cache, so a retry
+sends the message twice.
 
-- [ ] After a Private API send, poll `chat.db` for the row by GUID (bounded, as the
-      AppleScript path already does) and serialise it; keep `backend` as an additive field;
-      add the send routes to the parity diff with the GUID and dates masked.
+Worth noting because the hydration work made the window bigger, not smaller: every
+message-bearing route now holds its response until the row appears — up to 60 seconds for a
+send, 30 for an edit — so a client with a short timeout is MORE likely to retry than it was
+when the answer came back immediately.
+
+- [ ] Decide whether to build the cache. It is not visible in any recorded response — the
+      reference's cache changes what a concurrent duplicate does, not what a single send
+      returns — so this is a behaviour question rather than a parity one.
 
 ## The notification payload drops chat participants
 
@@ -134,50 +136,131 @@ untestable from a plain debug build, which is the configuration a contributor ha
 
 # 2. Verification the plan claims and CI does not do, and code nothing tests
 
-## The parity corpus is recorded, committed, and never replayed
+## The parity corpus is replayed; five things it still cannot see
 
-The worst one in this section, because the claim it invalidates is the project's central one.
-`CompatibilityContractTests` opens with "Replays fixtures recorded from the running Node server
-against the Swift server" and does not: `FixtureCorpusTests` checks the directory exists, has
-enough files and carries no personal data, and `StrictDiffTests` unit-tests `ResponseDiff`
-against hand-built dictionaries. **No test in the suite feeds a recorded request into this
-server.** The corpus (180 files under `Fixtures/http` today) was diffed once, by hand, through
-`bb-parity`, and has been inert in CI ever since — so "the compatibility contract is
-mechanically enforced" is, today, "it was enforced on one afternoon on one Mac".
+`FixtureReplayTests` now mounts the shipping router in-process over the synthetic `chat.db` and
+replays every recorded v1 fixture on each build, with `Fixtures/replay-baseline.json` as a
+two-way ratchet. That closed the worst of this entry — the claim "the compatibility contract is
+mechanically enforced" is now true rather than aspirational, and the first run found the
+envelope swap described below. What it still does not do:
 
-- [ ] **Replay them.** Mount the router in-process the way `PathParameterTests` does, issue each
-      fixture's method/path/body against it, and diff both ways. This is the highest return in
-      the file: the fixtures are recorded, the diff engine is shared, and the only missing piece
-      is the driver.
 - [ ] **Nothing compares response HEADERS.** `Sources/BBParity` contains no occurrence of
-      `header` — the recorder captures them, the diff ignores them. So the "Misc" contract rows
-      are asserted by nothing: wide-open CORS, `?pretty`, the 504 timeout body, and
-      `Content-Disposition` on file streams. **It has already diverged:** the recorded Node
-      responses carry `access-control-allow-methods` on ordinary 200s, and `CORSMiddleware`
-      sends that header only on `OPTIONS` while adding an `allow-headers` Node does not send.
-- [ ] **Record the write paths that touch only the server's own database.** The corpus is
-      read-only on purpose: a corpus that sent anything would send it twice, to a real person.
-      But `POST`/`DELETE` `/backup/theme` and `/backup/settings`, `POST /webhook` and
-      `DELETE /webhook/:id`, `POST /server/alert/read`, `POST /fcm/device`, the four
-      `/message/schedule` routes and the six `/contact` writes send nothing to anyone and can
-      be recorded today against a throwaway server. `bb-openapi coverage --check` reports the
-      gap and ratchets it.
-- [ ] **Record the sends, carefully.** Sends, reactions, edits and group management are
-      unpinned — exactly where the helper work lives. Needs a dedicated throwaway conversation
-      and a driver that is explicit about what it will send.
+      `header` outside the provenance sniff — the recorder captures them, the diff ignores them.
+      So the "Misc" contract rows are asserted by nothing: wide-open CORS, `?pretty`, the 504
+      timeout body, and `Content-Disposition` on file streams. **It has already diverged:** the
+      recorded Node responses carry `access-control-allow-methods` on ordinary 200s, and
+      `CORSMiddleware` sends that header only on `OPTIONS` while adding an `allow-headers` Node
+      does not send. This is also what `RecordedFixture.recordedFrom` leans on to tell a
+      Node recording from one of ours, so fixing the CORS divergence and recording the
+      provenance explicitly have to happen together — see the entry below.
+- [ ] **Record the write paths that touch only the server's own database.** `POST`/`DELETE`
+      `/backup/theme` and `/backup/settings`, `POST /webhook` and `DELETE /webhook/:id`,
+      `POST /server/alert/read`, `POST /fcm/device`, the four `/message/schedule` routes and the
+      six `/contact` writes send nothing to anyone and can be recorded today against a throwaway
+      server. `bb-openapi coverage --check` reports the gap and ratchets it.
+- [ ] **Record the sends, carefully.** Sends, reactions, edits and group management are unpinned
+      — exactly where the helper work lives. Needs a dedicated throwaway conversation and a
+      driver that is explicit about what it will send. Note that the replay DENY-LISTS all of
+      these (see below), so recording them buys `bb-parity` coverage, not CI coverage.
 - [ ] **Capture the socket transcript.** The HTTP half is recorded; the handshake and frame
-      sequence are not, and `Fixtures/` has no `socket/` directory yet. § Verification asks for
-      frame-level equality against captured Node output across both transports and both EIO
-      versions; `BBSocketIOTests` covers the codec in isolation, which is a different claim.
-      The recorder has the capture path — it needs a client driven through it.
-- [ ] **Make `ResponseDiff` compare elements even when array lengths differ.** `contact`
-      reported one line, "length at data: 552 vs 587", and stopped — so an added key, two
-      dropped keys, a missing nested `id` and a null `displayName` all sat behind a number that
-      looked like an environment difference. The two servers will almost never hold identical
-      data, so a length mismatch is the COMMON case, and today it suppresses everything inside
-      it. Diffing the first element's shape regardless of length would have caught all six.
+      sequence are not, and `Fixtures/` has no `socket/` directory yet.
 - [ ] **Re-record after any Node-side change.** The fixture is a snapshot of a server that is
       still being maintained. Worth a note in the release process.
+- [ ] **Record an attachment with EXIF.** Every attachment in the corpus is a test PNG, and all
+      three carry `metadata: {size, height, width}` — which is exactly what
+      `AttachmentMetadataReader` now produces, so this reads as parity. It may not be: the
+      reference maps forty-odd `kMDItem…` keys out of `mdls`, so a camera photo Spotlight has
+      indexed could also carry `aperture`, `focalLength`, `deviceMake`, `orientation`. One
+      recorded photo settles whether that is a gap. If it is, ImageIO's
+      `kCGImagePropertyExifDictionary` is the same data without the subprocess — and worth
+      weighing against the fact that the EXIF tail is the part most likely to carry something
+      personal out of someone's picture.
+
+## The replay harness locked the developer's Mac, and only a deny-list stops it
+
+Its first run issued `POST /api/v1/mac/lock` against a real in-process server, on a machine
+being used over a remote session, and went on to restart Messages and kick off a service
+restart in the same pass. `FixtureReplay.destructiveRoutes` and `sendingPrefixes` now refuse
+them, and `ReplayDenyListTests` asserts it — but the protection lives in the DRIVER, and
+anything else that ever replays this corpus has to remember it exists.
+
+- [ ] Move the refusal somewhere a future harness cannot miss: a flag on `RouteDefinition`
+      (`isDestructive`) that the route table declares once, that `FixtureReplay` reads instead
+      of keeping its own list, and that `bb-parity`'s corpus can read too. Done = deleting
+      `destructiveRoutes` from `FixtureReplay` changes nothing about what runs.
+
+## The recorder does not stamp which server it recorded
+
+Nothing in a fixture file says whether Node or this server answered, so `RecordedFixture`
+infers it from a CORS header — which works only because the two happen to differ, and stops
+working the moment `CORSMiddleware` is fixed to match. That inference is what
+`CorpusProvenanceTests` rests on, and what found that **fifteen v1 routes have no reference
+recording at all**: the group-management writes, `chat/:guid/leave`, the participant routes, the
+group icon, the FaceTime session routes, the alias change, `POST /webhook`,
+`DELETE /webhook/:id`. Diffing those compares this server against a photograph of itself.
+
+- [ ] Have `Tools/conformance-recorder` write `"recordedFrom": "node" | "swift"` into each file,
+      backfill the existing corpus from the header sniff, and switch `RecordedFixture` to read
+      the field. Then re-record the fifteen against a Node server.
+
+## The corpus scrubber destroyed an epoch timestamp it mistook for a phone number
+
+`get_api_v1_message_count_updated-ad9b67-200.json` records the path
+`/api/v1/message/count/updated?after=+15555550100`. `after` is epoch **milliseconds**; the
+scrubber's phone-number rule matched the digits and replaced them, so the fixture now asks a
+question no server can answer — the reference's recorded 200 against a replayed 400. It is in
+the replay baseline as an OPEN corpus bug.
+
+- [ ] Narrow the scrubber so it does not rewrite numeric query values whose parameter is a known
+      date field, re-record that fixture, and add a scrubber self-test for it
+      (`Tools/conformance-recorder/selftest.mjs` is the place).
+
+## There is no request-validation layer, so this server accepts what the reference rejects
+
+The reference runs validatorjs rules per route (`validators/*.ts`): `limit: "numeric|min:1|max:1000"`,
+`after: "required|numeric|min:0"`, `sort: "string|in:ASC,DESC"` and so on, and a violation is a
+400 whose `error.message` is the generated sentence. This server has none of it — the
+`RequestValues` accessors are lenient by design, so a field of the wrong type reads as absent
+and the route's default applies. `POST /api/v1/message/query` with `{"limit": "not-a-number"}`
+is a 400 in the reference and a 200 here, and that is the only case the corpus happens to
+capture; the gap is every route with a rule set.
+
+Note that the leniency is right for the case it was written for and wrong for this one:
+validatorjs's `numeric` accepts `"5"`, so a client sending numbers as strings passes there too.
+What it rejects is genuine garbage, which we silently ignore.
+
+- [ ] Transcribe the rule sets into a table beside `RouteTable`, and a small evaluator for the
+      dozen rules actually used (`required`, `string`, `numeric`, `boolean`, `array`, `present`,
+      `in:`, `min:`, `max:`). Match validatorjs's message format and its FIRST-error-only
+      behaviour — `ValidationFailure` already documents the second half. Done = the
+      `post_api_v1_message_query-5baa61-400` baseline entry is deleted.
+
+## A contact created through the API gets a UUID where the reference gives a number
+
+`POST /api/v1/contact` answers `data[0].id: 554` in the reference — a row id in its own contacts
+table — and `data[0].id: "<uuid>"` here. `PUT /contact/:id` and `DELETE /contact/:id` take that
+id back, and the reference `parseInt`s it. Address-book contacts are a UUID string on both sides
+(`identifier ?? id` in `mapContacts`), so the reference genuinely emits both types; only the
+locally created ones differ.
+
+Held back from the parity pass because it is a primary-key change, not a serializer one:
+`ContactRecord.id` is a `String` used as the key throughout `ContactIndex`, and moving locally
+created contacts onto an autoincrementing integer needs a migration plus every `:id` route.
+
+- [ ] Decide it deliberately. Done = the `post_api_v1_contact-5baa61-200` baseline entry is
+      deleted, or the entry is rewritten to say the divergence is accepted and why.
+
+## Two statuses the reference's `ValidStatuses` does not contain
+
+`PayloadTooLarge` sends 413 and `ServiceUnavailable` sends 503; the reference's union is
+`200 | 201 | 400 | 401 | 403 | 404 | 500 | 504`. Both are better descriptions than what Node
+sends — a body past the limit is the client's constraint to respect, and "a thing this server
+needs is not available" is not "this server is broken" — and both are, strictly, statuses no
+shipped client has ever been given. `GET /fcm/client` was moved back to the reference's 404
+because the corpus caught it; the other call sites were not audited.
+
+- [ ] Enumerate what still answers 413 or 503 on a v1 route and decide each. Neither is visible
+      to the replay today: no fixture provokes them.
 
 ## The helper's 40-command vocabulary is tested seven commands deep
 

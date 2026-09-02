@@ -1,7 +1,20 @@
 //  HTTPErrors
-//  The status <-> error-type pairings, which are part of the client contract.
+//  The error envelope, which is part of the client contract in all three of its fields.
 //
-//  Two of these are load-bearing and easy to "fix" into a break:
+//  **`message` is a sentence; `error.message` is the detail.** Not the other way round, and
+//  that is what this file used to have. Every error here set `message` to the short
+//  `ResponseMessage` value — "Not Found", "Bad Request" — where the reference sends
+//  "The requested resource was not found" and puts the short value in `error.message` as the
+//  DEFAULT detail. So every error response on every v1 route carried the wrong text in the
+//  one field a client is most likely to show a person. Found by replaying the recorded
+//  corpus (`FixtureReplayTests`), which is the first thing that ever read it back.
+//
+//  The reference is `packages/server/src/server/api/http/api/v1/responses/errors.ts`. Its
+//  constructors take `{ message, error }` — a sentence and a detail — and the initialisers
+//  below take the same two in the same order of importance, with `message:` spelled the same
+//  way so the two can be read side by side.
+//
+//  Two more are load-bearing and easy to "fix" into a break:
 //    - NotFound reports "Database Error", not "Not Found". Odd, but shipped.
 //    - IMessageError returns HTTP 500, and it is the response clients depend on most: a send
 //      failure comes back as 500 with the serialized Message in `data`.
@@ -35,34 +48,62 @@ extension HTTPError {
 public struct Unauthorized: HTTPError {
   public let status = 401
   public let errorType = ErrorType.authenticationError
-  public let responseMessage = ResponseMessage.unauthorized.rawValue
+  public let responseMessage: String
   public let errorMessage: String
-  public init(_ message: String = "Unauthorized") { self.errorMessage = message }
+
+  public init(
+    _ detail: String = ResponseMessage.unauthorized.rawValue,
+    message: String = "You are not authorized to access this resource"
+  ) {
+    self.errorMessage = detail
+    self.responseMessage = message
+  }
 }
 
 public struct Forbidden: HTTPError {
   public let status = 403
   public let errorType = ErrorType.authenticationError
-  public let responseMessage = ResponseMessage.forbidden.rawValue
+  public let responseMessage: String
   public let errorMessage: String
-  public init(_ message: String = "Forbidden") { self.errorMessage = message }
+
+  public init(
+    _ detail: String = ResponseMessage.forbidden.rawValue,
+    message: String = "You are forbidden from accessing this resource"
+  ) {
+    self.errorMessage = detail
+    self.responseMessage = message
+  }
 }
 
 public struct BadRequest: HTTPError {
   public let status = 400
   public let errorType = ErrorType.validationError
-  public let responseMessage = ResponseMessage.badRequest.rawValue
+  public let responseMessage: String
   public let errorMessage: String
-  public init(_ message: String = "Bad Request") { self.errorMessage = message }
+
+  public init(
+    _ detail: String = ResponseMessage.badRequest.rawValue,
+    message: String = "You've made a bad request! Please check your request params & body"
+  ) {
+    self.errorMessage = detail
+    self.responseMessage = message
+  }
 }
 
 /// 404 pairs with "Database Error". Not a typo on our part — it is what ships.
 public struct NotFound: HTTPError {
   public let status = 404
   public let errorType = ErrorType.databaseError
-  public let responseMessage = ResponseMessage.notFound.rawValue
+  public let responseMessage: String
   public let errorMessage: String
-  public init(_ message: String = "Not Found") { self.errorMessage = message }
+
+  public init(
+    _ detail: String = ResponseMessage.notFound.rawValue,
+    message: String = "The requested resource was not found"
+  ) {
+    self.errorMessage = detail
+    self.responseMessage = message
+  }
 }
 
 /// 413, for a request body past `maximumBodySize`.
@@ -72,7 +113,7 @@ public struct NotFound: HTTPError {
 public struct PayloadTooLarge: HTTPError {
   public let status = 413
   public let errorType = ErrorType.validationError
-  public let responseMessage = ResponseMessage.badRequest.rawValue
+  public let responseMessage = "You've made a bad request! Please check your request params & body"
   public let errorMessage: String
 
   public init(limit: Int) {
@@ -83,9 +124,26 @@ public struct PayloadTooLarge: HTTPError {
 public struct ServerError: HTTPError {
   public let status = 500
   public let errorType = ErrorType.serverError
-  public let responseMessage = ResponseMessage.serverError.rawValue
+  public let responseMessage: String
   public let errorMessage: String
-  public init(_ message: String = "Server Error") { self.errorMessage = message }
+
+  public init(
+    _ detail: String = ResponseMessage.serverError.rawValue,
+    message: String = "The server has encountered an error"
+  ) {
+    self.errorMessage = detail
+    self.responseMessage = message
+  }
+
+  /// The envelope for something nobody typed a status for.
+  ///
+  /// Its own constructor because the reference has one: an exception that reaches the error
+  /// middleware without being an `HTTPError` does NOT get `ServerError`'s sentence, it gets
+  /// "An unhandled error has occurred!" — which is how a client tells "this route decided to
+  /// fail" from "this server fell over". Losing that distinction is losing a diagnostic.
+  public static func unhandled(_ detail: String) -> ServerError {
+    ServerError(detail, message: "An unhandled error has occurred!")
+  }
 }
 
 /// HTTP 500 with the serialized Message in `data`.
@@ -95,12 +153,17 @@ public struct ServerError: HTTPError {
 public struct IMessageError: HTTPError {
   public let status = 500
   public let errorType = ErrorType.iMessageError
-  public let responseMessage = ResponseMessage.unknownIMessageError.rawValue
+  public let responseMessage: String
   public let errorMessage: String
   public let data: JSONValue?
 
-  public init(_ message: String = "Unknown iMessage Error", data: JSONValue? = nil) {
-    self.errorMessage = message
+  public init(
+    _ detail: String = ResponseMessage.unknownIMessageError.rawValue,
+    message: String = "iMessage has encountered an error",
+    data: JSONValue? = nil
+  ) {
+    self.errorMessage = detail
+    self.responseMessage = message
     self.data = data
   }
 
@@ -124,19 +187,27 @@ public struct IMessageError: HTTPError {
 public struct ServiceUnavailable: HTTPError {
   public let status = 503
   public let errorType = ErrorType.serverError
-  public let responseMessage = ResponseMessage.serverError.rawValue
+  public let responseMessage: String
   public let errorMessage: String
-  public init(_ message: String) { self.errorMessage = message }
+
+  public init(_ detail: String, message: String = "The server has encountered an error") {
+    self.errorMessage = detail
+    self.responseMessage = message
+  }
 }
 
 public struct GatewayTimeout: HTTPError {
   public let status = 504
   public let errorType = ErrorType.gatewayTimeout
-  public let responseMessage = ResponseMessage.gatewayTimeout.rawValue
+  public let responseMessage: String
   public let errorMessage: String
 
-  public init(_ message: String = "The data in your request took too long to get to the server!") {
-    self.errorMessage = message
+  public init(
+    _ detail: String = "The data in your request took too long to get to the server!",
+    message: String = "The server took too long to response!"
+  ) {
+    self.errorMessage = detail
+    self.responseMessage = message
   }
 
   /// The timeout body is built by hand rather than by the standard error path, and its
@@ -158,7 +229,7 @@ public struct GatewayTimeout: HTTPError {
 public struct ValidationFailure: HTTPError {
   public let status = 400
   public let errorType = ErrorType.validationError
-  public let responseMessage = ResponseMessage.badRequest.rawValue
+  public let responseMessage = "You've made a bad request! Please check your request params & body"
   public let errorMessage: String
 
   public init(errors: [String]) {

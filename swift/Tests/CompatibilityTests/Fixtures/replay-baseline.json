@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "Fixtures the in-process replay cannot match, and why. Read by FixtureReplayTests.",
+    "",
+    "This is a RATCHET, not a suppression list. A fixture that starts matching must be",
+    "removed from here or the suite fails, and a fixture that stops matching and is not",
+    "listed fails too. The reason on each entry is the load-bearing part: without it the",
+    "next person cannot tell 'the test Mac has no helper' from 'this endpoint is broken'.",
+    "",
+    "Three kinds live here. HARNESS entries are facts about where the replay runs and will",
+    "never clear in-process; DATA entries clear the day the synthetic chat.db grows the row",
+    "the fixture was recorded against; OPEN entries are real divergences with an entry in",
+    "TODO.md, and those are the ones to shrink."
+  ],
+  "entries": {
+    "get_api_v1_ping-401.json": "HARNESS: the recorded 401 was a wrong password. The replay supplies the server-under-test's real one, so it authenticates and answers 200.",
+    "get_api_v1_ping-5baa61-401.json": "HARNESS: as above.",
+    "get_api_v1_server_logs-9d34d7-200.json": "HARNESS: no FileSink is attached in-process, so the log route has nothing to read and answers 503.",
+    "get_api_v1_server_update_check-5baa61-200.json": "HARNESS: the appcast is fetched over the network, which CI does not have.",
+
+    "get_api_v1_icloud_account-5baa61-200.json": "HARNESS: needs the Private API helper. The stage reports connected so the route is exercised; the call itself has nothing to reach.",
+    "get_api_v1_icloud_contact-5baa61-200.json": "HARNESS: needs the Private API helper.",
+    "get_api_v1_handle_availability_imessage-51eeda-200.json": "HARNESS: needs the Private API helper.",
+    "get_api_v1_handle_availability_facetime-51eeda-200.json": "HARNESS: needs the Private API helper.",
+    "get_api_v1_handle_person@example.com_focus-5baa61-500.json": "HARNESS: needs the Private API helper. Both servers answer 500; the reference's is 'Selector not found!' from a helper that answered, ours is 'not connected'.",
+    "get_api_v1_chat_any;-;person@example.com_share_contact_status-5baa61-200.json": "HARNESS: needs the Private API helper.",
+    "get_api_v1_message_:id_embedded-media-5baa61-500.json": "HARNESS: needs the Private API helper.",
+    "get_api_v1_attachment_:id_download_force-5baa61-500.json": "HARNESS: needs the Private API helper.",
+
+    "get_api_v1_chat_any;+;bcb9a1843dfc4b65bb47ce50afec8d32-5baa61-200.json": "DATA: that chat is not in the synthetic chat.db, so the lookup 404s where the reference found a row.",
+    "get_api_v1_chat_any;+;bcb9a1843dfc4b65bb47ce50afec8d32_icon-5baa61-404.json": "DATA: both 404, but the reference had the chat and no icon ('Unable to find icon…') while we do not have the chat ('Chat does not exist!'). Same code path, different row.",
+    "get_api_v1_message_:id-5baa61-200.json": "DATA: that message GUID is not in the synthetic chat.db.",
+    "get_api_v1_message_:id-0002fc-200.json": "DATA: as above.",
+    "get_api_v1_attachment_at_0_0A23AC44-5B9E-46F8-B494-B4630F309644-5baa61-200.json": "DATA: that attachment is not in the synthetic chat.db.",
+    "get_api_v1_attachment_at_0_0A23AC44-5B9E-46F8-B494-B4630F309644_blurhash-5baa61-200.json": "DATA: as above.",
+    "get_api_v1_attachment_at_0_0A23AC44-5B9E-46F8-B494-B4630F309644_live-5baa61-404.json": "DATA: both 404, but the reference had the attachment and no Live Photo beside it; we do not have the attachment.",
+    "get_api_v1_message_schedule_:id-5baa61-200.json": "DATA: schedule 4 does not exist in a fresh app.db.",
+    "delete_api_v1_backup_theme-5baa61-200.json": "DATA: nothing to delete in a fresh app.db. Also an ordering artefact — fixtures replay in filename order, so DELETE runs before the POST that would have created one.",
+    "delete_api_v1_backup_settings-5baa61-200.json": "DATA: as above.",
+    "delete_api_v1_contact_:id-5baa61-200.json": "DATA: contact 555 does not exist in a fresh app.db.",
+    "delete_api_v1_contact-5baa61-200.json": "DATA: contact 554 does not exist, so the batch deletes nothing and says so.",
+    "put_api_v1_contact-5baa61-200.json": "DATA: contact 553 does not exist, so the batch updates nothing and reports the entry in metadata.errors — which is the reference's own behaviour for a failed entry.",
+    "put_api_v1_contact_:id-5baa61-200.json": "DATA: as above.",
+    "post_api_v1_message_query-5baa61-200.json": "DATA: dateEdited is null in the recording and set in the synthetic fixture, which is a difference in whose messages were read.",
+    "post_api_v1_chat_query-5baa61-200.json": "DATA: the recorded chats have read/delivered receipts the synthetic ones do not, and vice versa for dateEdited.",
+
+    "get_api_v1_message_count_updated-ad9b67-200.json": "OPEN — CORPUS BUG: the recorded path is `?after=+15555550100`. `after` is epoch milliseconds; the scrubber's phone-number rule matched the digits and replaced them, so the fixture asks a question no server can answer. Re-record, and narrow the scrubber. See TODO.md.",
+    "post_api_v1_message_query-5baa61-400.json": "OPEN: `{\"limit\": \"not-a-number\"}` is a 400 in the reference and a 200 here. This server has no request-validation layer at all — the reference runs validatorjs rules per route. See TODO.md.",
+    "post_api_v1_contact-5baa61-200.json": "OPEN: a contact created through the API gets a numeric id in the reference (a row id in its own database) and a UUID string here. See TODO.md."
+  }
+}

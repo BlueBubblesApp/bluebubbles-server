@@ -63,14 +63,24 @@ struct RequestValuesTests {
 
   // MARK: - Required fields
 
-  @Test("A required field that is absent gives the standard sentence")
+  /// validatorjs's sentence, which is what the reference sends for a `required` rule.
+  ///
+  /// This asserted "`chatGuid` is required" — a wording this server invented. The recorded
+  /// corpus shows the reference answering "The after field is required." for the one
+  /// required-field refusal it captured, and every `required` rule in `validators/*.ts`
+  /// generates that same format.
+  @Test("A required field that is absent gives the reference's sentence")
   func requiredMissingUsesStandardMessage() throws {
     do {
       _ = try values([:]).requireString("chatGuid")
       Issue.record("should have thrown")
     } catch let error as BadRequest {
-      #expect(error.errorMessage == "`chatGuid` is required")
+      #expect(error.errorMessage == "The chatGuid field is required.")
       #expect(error.status == 400)
+      // And the ENVELOPE carries the reference's sentence, not the short "Bad Request".
+      #expect(
+        error.responseMessage
+          == "You've made a bad request! Please check your request params & body")
     }
   }
 

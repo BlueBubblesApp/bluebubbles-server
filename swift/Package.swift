@@ -618,6 +618,10 @@ let package = Package(
                 // without standing up the 64-method Private API protocol.
                 "BBAppleScript",
                 "BBContacts", "BBIMessage", "BBPrivateAPIContract", "BBSystem",
+                // For `SendShapeTests`, which diffs the send response against the recorded
+                // reference fixture. The send routes are deny-listed in the parity replay,
+                // so this is the only place that comparison can happen.
+                "BBParity",
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "Logging", package: "swift-log")
@@ -830,7 +834,17 @@ let package = Package(
         // See `.claude/docs/decisions.md`.
         .testTarget(
             name: "CompatibilityTests",
-            dependencies: ["BBParity", "BBHTTPAPI"],
+            dependencies: [
+                "BBParity", "BBHTTPAPI",
+                // The replay mounts the REAL router over the real handler registry, which
+                // means it needs the composition root. A hand-rolled router would prove
+                // that a hand-rolled router matches the fixtures.
+                "BlueBubblesServerCore", "BBHandlers", "BBInterfaces", "BBAuth", "BBEvents",
+                "BBSettings", "BBSerialization", "BBPersistence", "BBIMessage", "BBContacts",
+                "BBSocketIO", "BBTooling", "BBSystem", "BBServiceKit", "BBDiagnostics",
+                .product(name: "Hummingbird", package: "hummingbird"),
+                .product(name: "Logging", package: "swift-log")
+            ],
             resources: [.copy("Fixtures")],
             swiftSettings: swiftSettings
         ),

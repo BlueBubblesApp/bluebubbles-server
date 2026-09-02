@@ -134,18 +134,21 @@ enum Rows {
     rowID: Int64 = 11,
     guid: String = "at_0_ABCD",
     mimeType: String? = "image/png",
-    totalBytes: Int64 = 2048
+    totalBytes: Int64 = 2048,
+    filename: String? = "~/Library/Messages/Attachments/a.png",
+    uti: String? = "public.png",
+    transferState: Int = 5
   ) -> AttachmentRow {
     AttachmentRow(
       row: Row([
         "ROWID": rowID,
         "guid": guid,
-        "filename": "~/Library/Messages/Attachments/a.png",
-        "uti": "public.png",
+        "filename": filename,
+        "uti": uti,
         "mime_type": mimeType,
         "transfer_name": "a.png",
         "total_bytes": totalBytes,
-        "transfer_state": 5,
+        "transfer_state": transferState,
         "is_outgoing": 0,
         "is_sticker": 0,
         "hide_attachment": 0,

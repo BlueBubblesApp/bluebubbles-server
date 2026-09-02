@@ -174,7 +174,14 @@ struct RequestValues {
     return value
   }
 
-  /// The sentence 18 of the 24 hand-written guards already used, now used by all of them.
-  /// Keeping the exact wording is not a preference — it is what clients have been shown.
-  private static func missing(_ key: String) -> String { "`\(key)` is required" }
+  /// validatorjs's own sentence for a `required` rule, which is what the reference sends.
+  ///
+  /// This read "`\(key)` is required" and was described here as "what clients have been
+  /// shown" — it was not. It was what 18 of this server's 24 hand-written guards happened to
+  /// say, and the recorded corpus disagrees in the one place it can be seen:
+  /// `GET /message/count/updated` without `after` answers "The after field is required."
+  /// Most of the reference's required-field refusals come from a `required` rule in
+  /// `validators/*.ts` and are generated in exactly this format; the handful that are
+  /// hand-written pass `message:` instead.
+  private static func missing(_ key: String) -> String { "The \(key) field is required." }
 }
