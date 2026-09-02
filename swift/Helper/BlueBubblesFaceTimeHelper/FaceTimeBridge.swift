@@ -953,7 +953,7 @@ enum FaceTimeBridge {
     timeout: Duration = .seconds(20),
     onResult: (@Sendable (AnyObject?) -> Void)? = nil
   ) async {
-    let sentinel = CompletionSentinel()
+    let sentinel = ResumeOnce<Void>()
     let block: @convention(block) (AnyObject?) -> Void = { value in
       onResult?(value)
       sentinel.finish()
@@ -966,12 +966,7 @@ enum FaceTimeBridge {
       sentinel.finish()
     }
 
-    let watchdog = Task.detached {
-      try? await Task.sleep(for: timeout)
-      sentinel.finish()
-    }
-    await sentinel.wait()
-    watchdog.cancel()
+    await sentinel.wait(timeout: timeout)
   }
 
   /// A two-argument completion — `(result, error)`, the FaceTime link shape. Kept separate
@@ -985,7 +980,7 @@ enum FaceTimeBridge {
     timeout: Duration = .seconds(20),
     onResult: @escaping @Sendable (AnyObject?, AnyObject?) -> Void
   ) async {
-    let sentinel = CompletionSentinel()
+    let sentinel = ResumeOnce<Void>()
     let block: @convention(block) (AnyObject?, AnyObject?) -> Void = { result, error in
       onResult(result, error)
       sentinel.finish()
@@ -1006,12 +1001,7 @@ enum FaceTimeBridge {
       sentinel.finish()
     }
 
-    let watchdog = Task.detached {
-      try? await Task.sleep(for: timeout)
-      sentinel.finish()
-    }
-    await sentinel.wait()
-    watchdog.cancel()
+    await sentinel.wait(timeout: timeout)
   }
 
   /// A completion whose FIRST argument is a `BOOL` — `(success, error)`. `invalidateLink:`
@@ -1025,7 +1015,7 @@ enum FaceTimeBridge {
     timeout: Duration = .seconds(20),
     onResult: @escaping @Sendable (Bool, AnyObject?) -> Void
   ) async {
-    let sentinel = CompletionSentinel()
+    let sentinel = ResumeOnce<Void>()
     let block: @convention(block) (Bool, AnyObject?) -> Void = { success, error in
       onResult(success, error)
       sentinel.finish()
@@ -1044,12 +1034,7 @@ enum FaceTimeBridge {
       sentinel.finish()
     }
 
-    let watchdog = Task.detached {
-      try? await Task.sleep(for: timeout)
-      sentinel.finish()
-    }
-    await sentinel.wait()
-    watchdog.cancel()
+    await sentinel.wait(timeout: timeout)
   }
 }
 
@@ -1060,39 +1045,6 @@ private final class ResultBox: @unchecked Sendable {
   var value: AnyObject?
   var error: AnyObject?
   var success = false
-}
-
-/// One-shot resume, safe from any thread — completions arrive on the daemon's queue.
-private final class CompletionSentinel: @unchecked Sendable {
-  private let lock = NSLock()
-  private var continuation: CheckedContinuation<Void, Never>?
-  private var finished = false
-
-  func wait() async {
-    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-      lock.lock()
-      if finished {
-        lock.unlock()
-        continuation.resume()
-        return
-      }
-      self.continuation = continuation
-      lock.unlock()
-    }
-  }
-
-  func finish() {
-    lock.lock()
-    guard !finished else {
-      lock.unlock()
-      return
-    }
-    finished = true
-    let pending = continuation
-    continuation = nil
-    lock.unlock()
-    pending?.resume()
-  }
 }
 
 /// The object set as the conversation client's delegate.

@@ -585,7 +585,7 @@ enum FindMyBridge {
     timeout: Duration = .seconds(20),
     _ body: (@escaping @Sendable () -> Void) throws -> Void
   ) async {
-    let sentinel = CompletionSentinel()
+    let sentinel = ResumeOnce<Void>()
 
     do {
       try body { sentinel.finish() }
@@ -596,56 +596,6 @@ enum FindMyBridge {
       sentinel.finish()
     }
 
-    let watchdog = Task.detached {
-      try? await Task.sleep(for: timeout)
-      sentinel.finish()
-    }
-    await sentinel.wait()
-    watchdog.cancel()
-  }
-}
-
-/// One-shot resume, safe to call from any thread.
-///
-/// IMCore's completions arrive on whatever queue the locate session happens to use, and more
-/// than one of them can be in flight; `CheckedContinuation` traps on a second resume. A class
-/// with a lock is the smallest thing that makes "first caller wins" true.
-private final class CompletionSentinel: @unchecked Sendable {
-  private let lock = NSLock()
-  private var continuation: CheckedContinuation<Void, Never>?
-  private var finished = false
-
-  /// Suspends until `finish` is called, or returns immediately if it already has been.
-  func wait() async {
-    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-      attach(continuation)
-    }
-  }
-
-  private func attach(_ continuation: CheckedContinuation<Void, Never>) {
-    lock.lock()
-    // Already finished: the call failed synchronously before the continuation was
-    // installed. Resume immediately rather than storing a continuation nothing will
-    // resume, which would hang until the timeout.
-    if finished {
-      lock.unlock()
-      continuation.resume()
-      return
-    }
-    self.continuation = continuation
-    lock.unlock()
-  }
-
-  func finish() {
-    lock.lock()
-    guard !finished else {
-      lock.unlock()
-      return
-    }
-    finished = true
-    let pending = continuation
-    continuation = nil
-    lock.unlock()
-    pending?.resume()
+    await sentinel.wait(timeout: timeout)
   }
 }

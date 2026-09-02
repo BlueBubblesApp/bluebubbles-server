@@ -29,6 +29,7 @@
 //  which is a different problem and stays its own type.
 
 import Foundation
+import os
 
 public enum Subprocess {
 
@@ -332,21 +333,19 @@ public enum Subprocess {
   /// the process is started, so a short command can be finished before the caller reaches
   /// `wait()`. A bare `withCheckedContinuation` cannot express this — the continuation does
   /// not exist yet at the moment it would need to be resumed.
-  private final class ExitWaiter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var hasExited = false
-    private var continuation: CheckedContinuation<Void, Never>?
+  private final class ExitWaiter: Sendable {
+    private enum Phase {
+      case waiting(CheckedContinuation<Void, Never>?)
+      case exited
+    }
+    private let phase = OSAllocatedUnfairLock<Phase>(initialState: .waiting(nil))
 
     func signal() {
-      lock.lock()
-      if hasExited {
-        lock.unlock()
-        return
+      let waiting: CheckedContinuation<Void, Never>? = phase.withLock { state in
+        guard case .waiting(let continuation) = state else { return nil }
+        state = .exited
+        return continuation
       }
-      hasExited = true
-      let waiting = continuation
-      continuation = nil
-      lock.unlock()
       // Resumed OUTSIDE the lock: the continuation runs caller code, and holding a lock
       // across it invites a deadlock against anything that calls back in here.
       waiting?.resume()
@@ -354,32 +353,21 @@ public enum Subprocess {
 
     func wait() async {
       await withCheckedContinuation { continuation in
-        lock.lock()
-        if hasExited {
-          lock.unlock()
-          continuation.resume()
-          return
+        let alreadyExited: Bool = phase.withLock { state in
+          if case .exited = state { return true }
+          state = .waiting(continuation)
+          return false
         }
-        self.continuation = continuation
-        lock.unlock()
+        if alreadyExited { continuation.resume() }
       }
     }
   }
 
   /// A one-way flag, set from a task and read after it.
-  private final class Flag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = false
-    func set() {
-      lock.lock()
-      value = true
-      lock.unlock()
-    }
-    var isSet: Bool {
-      lock.lock()
-      defer { lock.unlock() }
-      return value
-    }
+  private final class Flag: Sendable {
+    private let value = OSAllocatedUnfairLock(initialState: false)
+    func set() { value.withLock { $0 = true } }
+    var isSet: Bool { value.withLock { $0 } }
   }
 }
 

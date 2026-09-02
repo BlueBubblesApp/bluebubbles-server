@@ -7,6 +7,7 @@
 
 import Foundation
 import Logging
+import struct os.OSAllocatedUnfairLock
 
 public enum LogDestination: Sendable {
   /// The path the Electron server writes to. Unchanged deliberately.
@@ -146,7 +147,7 @@ public final class FileSink: @unchecked Sendable {
 
 public enum LoggingSystemBootstrap {
 
-  /// The sink installed by the first bootstrap.
+  /// The sink installed by the first bootstrap, and the level in force.
   ///
   /// `LoggingSystem.bootstrap` traps on a SECOND call — "logging system can only be
   /// initialized once per process" — and that is a process-wide fact the caller cannot see.
@@ -154,10 +155,12 @@ public enum LoggingSystemBootstrap {
   /// composition happens once and the process exits. In the APP it is not: Stop and then
   /// Start builds a second server in the same process, and the app died on the precondition.
   /// Measured by pressing the buttons.
-  ///
-  /// `nonisolated(unsafe)` is honest here: written once behind the flag below, read after.
-  private nonisolated(unsafe) static var installed: FileSink?
-  private static let lock = NSLock()
+  private struct State: Sendable {
+    var installed: FileSink?
+    var level: Logger.Level = .info
+  }
+
+  private static let state = OSAllocatedUnfairLock(initialState: State())
 
   /// Installs the file handler alongside the default stream handler.
   ///
@@ -166,29 +169,27 @@ public enum LoggingSystemBootstrap {
   /// from the new settings is applied to the existing handlers rather than by re-bootstrapping.
   @discardableResult
   public static func bootstrap(level: Logger.Level = .info, fileURL: URL? = nil) -> FileSink {
-    lock.lock()
-    defer { lock.unlock() }
+    state.withLock { state in
+      state.level = level
+      if let installed = state.installed {
+        // A second composition in the same process — the app's Stop/Start. The handlers
+        // are already installed and cannot be replaced, so only the level moves.
+        return installed
+      }
 
-    if let installed {
-      // A second composition in the same process — the app's Stop/Start. The handlers
-      // are already installed and cannot be replaced, so only the level moves.
-      currentLevel = level
-      return installed
+      let sink = FileSink(url: fileURL ?? LogDestination.fileURL)
+      LoggingSystem.bootstrap { label in
+        var fileHandler = RotatingFileLogHandler(label: label, sink: sink)
+        var streamHandler = StreamLogHandler.standardOutput(label: label)
+        // The children never filter. The gate is the wrapper's dynamic level, and a child
+        // with its own threshold would silently re-filter below it.
+        fileHandler.logLevel = .trace
+        streamHandler.logLevel = .trace
+        return DynamicLevelLogHandler(handlers: [fileHandler, streamHandler])
+      }
+      state.installed = sink
+      return sink
     }
-
-    let sink = FileSink(url: fileURL ?? LogDestination.fileURL)
-    currentLevel = level
-    LoggingSystem.bootstrap { label in
-      var fileHandler = RotatingFileLogHandler(label: label, sink: sink)
-      var streamHandler = StreamLogHandler.standardOutput(label: label)
-      // The children never filter. The gate is the wrapper's dynamic level, and a child
-      // with its own threshold would silently re-filter below it.
-      fileHandler.logLevel = .trace
-      streamHandler.logLevel = .trace
-      return DynamicLevelLogHandler(handlers: [fileHandler, streamHandler])
-    }
-    installed = sink
-    return sink
   }
 
   /// Changes the level every logger uses, immediately.
@@ -199,13 +200,11 @@ public enum LoggingSystemBootstrap {
   /// It is also the setting people reach for at precisely the moment they are trying to
   /// diagnose something else.
   public static func setLevel(_ level: Logger.Level) {
-    lock.lock()
-    defer { lock.unlock() }
-    currentLevel = level
+    state.withLock { $0.level = level }
   }
 
   /// The level in force. Read on every log call through `DynamicLevelLogHandler`.
-  fileprivate nonisolated(unsafe) static var currentLevel: Logger.Level = .info
+  fileprivate static var currentLevel: Logger.Level { state.withLock { $0.level } }
 }
 
 /// A multiplexer whose level is read from `LoggingSystemBootstrap` on every call.

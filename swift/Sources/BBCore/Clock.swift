@@ -13,6 +13,7 @@
 //  is the case that separates them, and this server runs on Macs that sleep.
 
 import Foundation
+import os
 
 public protocol BBClock: Sendable {
   var now: Date { get }
@@ -24,33 +25,24 @@ public struct SystemClock: BBClock {
 }
 
 /// A clock a test drives by hand. Nothing sleeps.
-public final class ManualClock: BBClock, @unchecked Sendable {
-  private let lock = NSLock()
-  private var current: Date
+public final class ManualClock: BBClock, Sendable {
+  private let current: OSAllocatedUnfairLock<Date>
 
   public init(_ start: Date = Date(timeIntervalSince1970: 1_700_000_000)) {
-    self.current = start
+    current = OSAllocatedUnfairLock(initialState: start)
   }
 
-  public var now: Date {
-    lock.lock()
-    defer { lock.unlock() }
-    return current
-  }
+  public var now: Date { current.withLock { $0 } }
 
   public func advance(by interval: TimeInterval) {
-    lock.lock()
-    defer { lock.unlock() }
-    current = current.addingTimeInterval(interval)
+    current.withLock { $0 = $0.addingTimeInterval(interval) }
   }
 
   public func advance(by duration: Duration) {
-    advance(by: TimeInterval(duration.components.seconds))
+    advance(by: duration.seconds)
   }
 
   public func set(_ date: Date) {
-    lock.lock()
-    defer { lock.unlock() }
-    current = date
+    current.withLock { $0 = date }
   }
 }

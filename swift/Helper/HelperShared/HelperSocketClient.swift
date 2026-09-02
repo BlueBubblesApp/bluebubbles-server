@@ -18,6 +18,7 @@
 import BBPrivateAPIContract
 import Darwin
 import Foundation
+import os
 
 /// Connects to the server, answers requests, and pushes events.
 public final class HelperSocketClient: @unchecked Sendable {
@@ -42,7 +43,17 @@ public final class HelperSocketClient: @unchecked Sendable {
   /// The Messages helper passes `EventObservation.rung`; the FaceTime helper reports its own.
   private let eventRung: String
 
-  private var descriptor: Int32 = -1
+  /// The socket and whether the loop should keep serving it.
+  ///
+  /// One lock over both, because they change together: `stop()` clears `running` and closes
+  /// the descriptor, and the read loop checks one then uses the other. `write` holds the same
+  /// lock for the length of a frame so two replies finishing at once cannot interleave on the
+  /// wire.
+  private struct Connection {
+    var descriptor: Int32 = -1
+    var running = false
+  }
+  private let connection = OSAllocatedUnfairLock(initialState: Connection())
   /// A dedicated thread, not a queue.
   ///
   /// `serve()` sits in a blocking `read()` for the client's lifetime. On a DispatchQueue
@@ -50,10 +61,11 @@ public final class HelperSocketClient: @unchecked Sendable {
   /// thread and fine, but is a real hazard anywhere several clients exist at once: the pool
   /// runs out, and work that has nothing to do with this queue simply stops being
   /// scheduled. A thread we own has no such shared budget to exhaust.
-  private var thread: Thread?
-  private let writeLock = NSLock()
-  private var running = false
-  /// Grows until a complete frame is available.
+  // `Thread` is not `Sendable`, so the lock is the unchecked flavour; the thread is only
+  // ever started once and otherwise held for identity.
+  private let thread = OSAllocatedUnfairLock<Thread?>(uncheckedState: nil)
+  /// Grows until a complete frame is available. Touched only on the socket thread, which is
+  /// the one place `@unchecked Sendable` still rests on a convention rather than a lock.
   private var inbound = Data()
 
   /// Reconnect backoff. The server restarting is normal, not an error — the helper simply
@@ -80,22 +92,38 @@ public final class HelperSocketClient: @unchecked Sendable {
   // MARK: - Lifecycle
 
   public func start() {
-    guard thread == nil else { return }
-    let thread = Thread { [weak self] in self?.runLoop() }
-    thread.name = "com.bluebubbles.helper.socket"
-    // Below the default: this thread spends its life blocked on a socket read, and
-    // nothing about it is latency-sensitive until a frame actually arrives.
-    thread.qualityOfService = .utility
-    self.thread = thread
-    thread.start()
+    let started: Thread? = thread.withLockUnchecked { slot in
+      guard slot == nil else { return nil }
+      let thread = Thread { [weak self] in self?.runLoop() }
+      thread.name = "com.bluebubbles.helper.socket"
+      // Below the default: this thread spends its life blocked on a socket read, and
+      // nothing about it is latency-sensitive until a frame actually arrives.
+      thread.qualityOfService = .utility
+      slot = thread
+      return thread
+    }
+    started?.start()
   }
 
   public func stop() {
-    running = false
     // Closing the descriptor is what unblocks the read; the loop then sees `running` is
     // false and the thread exits on its own.
-    closeConnection()
-    thread = nil
+    connection.withLock { state in
+      state.running = false
+      Self.closeSocket(in: &state)
+    }
+    thread.withLockUnchecked { $0 = nil }
+  }
+
+  private var isRunning: Bool { connection.withLock { $0.running } }
+  private var currentDescriptor: Int32 { connection.withLock { $0.descriptor } }
+
+  /// Closes the socket held in `state`, if any. Called with the lock held.
+  private static func closeSocket(in state: inout Connection) {
+    if state.descriptor >= 0 {
+      Darwin.close(state.descriptor)
+      state.descriptor = -1
+    }
   }
 
   /// Connect, serve, and reconnect forever.
@@ -103,14 +131,14 @@ public final class HelperSocketClient: @unchecked Sendable {
   /// Runs on a dedicated queue, never on Messages.app's main thread: blocking that would
   /// freeze the user's UI, which is a far worse failure than the helper being late.
   private func runLoop() {
-    running = true
-    while running {
+    connection.withLock { $0.running = true }
+    while isRunning {
       if connect() {
         reconnectDelay = 1
         announce()
         serve()
       }
-      guard running else { return }
+      guard isRunning else { return }
       Thread.sleep(forTimeInterval: reconnectDelay)
       reconnectDelay = min(reconnectDelay * 2, maximumReconnectDelay)
     }
@@ -190,19 +218,14 @@ public final class HelperSocketClient: @unchecked Sendable {
       return false
     }
 
-    descriptor = fd
+    connection.withLock { $0.descriptor = fd }
     inbound.removeAll(keepingCapacity: true)
     log("Connected to the BlueBubbles server over the Unix socket")
     return true
   }
 
   private func closeConnection() {
-    writeLock.lock()
-    defer { writeLock.unlock() }
-    if descriptor >= 0 {
-      close(descriptor)
-      descriptor = -1
-    }
+    connection.withLock { Self.closeSocket(in: &$0) }
   }
 
   /// Registration. The server treats this as proof the injection actually took — nothing
@@ -227,7 +250,9 @@ public final class HelperSocketClient: @unchecked Sendable {
 
   private func serve() {
     var buffer = [UInt8](repeating: 0, count: 16 * 1024)
-    while running, descriptor >= 0 {
+    while isRunning {
+      let descriptor = currentDescriptor
+      guard descriptor >= 0 else { return }
       let count = read(descriptor, &buffer, buffer.count)
       guard count > 0 else {
         // 0 is a clean close; negative is an error. Either way the connection is
@@ -326,24 +351,26 @@ public final class HelperSocketClient: @unchecked Sendable {
     ])
     frame.append(body)
 
-    writeLock.lock()
-    defer { writeLock.unlock() }
-    guard descriptor >= 0 else { return }
+    let bytes = frame
+    connection.withLock { state in
+      let descriptor = state.descriptor
+      guard descriptor >= 0 else { return }
 
-    frame.withUnsafeBytes { raw in
-      var offset = 0
-      // A single write() can be partial on a stream socket; looping is not optional.
-      while offset < raw.count {
-        let written = Darwin.write(
-          descriptor, raw.baseAddress!.advanced(by: offset), raw.count - offset
-        )
-        guard written > 0 else {
-          // EPIPE or any other write failure: the connection is finished. The read
-          // loop will see the same thing and reconnect; there is nothing useful to
-          // do with a partially-written frame except abandon it.
-          return
+      bytes.withUnsafeBytes { raw in
+        var offset = 0
+        // A single write() can be partial on a stream socket; looping is not optional.
+        while offset < raw.count {
+          let written = Darwin.write(
+            descriptor, raw.baseAddress!.advanced(by: offset), raw.count - offset
+          )
+          guard written > 0 else {
+            // EPIPE or any other write failure: the connection is finished. The read
+            // loop will see the same thing and reconnect; there is nothing useful to
+            // do with a partially-written frame except abandon it.
+            return
+          }
+          offset += written
         }
-        offset += written
       }
     }
   }

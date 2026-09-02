@@ -1058,33 +1058,18 @@ enum IMChatHistory {
   private static func load(guid: String, selector: String) async throws -> AnyObject {
     let controller = try IMCoreRuntime.sharedInstance(ofClass: "IMChatHistoryController")
 
-    let loaded: AnyObject? = await withCheckedContinuation {
-      (continuation: CheckedContinuation<Box, Never>) in
-      let resumed = NSLock()
-      nonisolated(unsafe) var done = false
-      let block: @convention(block) (AnyObject?) -> Void = { item in
-        // IMCore has been observed calling a completion block more than once for a
-        // single query. A second `resume` traps, so the latch is not optional.
-        resumed.lock()
-        let alreadyDone = done
-        done = true
-        resumed.unlock()
-        guard !alreadyDone else { return }
-        continuation.resume(returning: Box(item))
-      }
-      do {
-        try IMCoreRuntime.invoke(
-          controller, selector, [guid, unsafeBitCast(block, to: AnyObject.self)]
-        )
-      } catch {
-        resumed.lock()
-        let alreadyDone = done
-        done = true
-        resumed.unlock()
-        guard !alreadyDone else { return }
-        continuation.resume(returning: Box(nil))
-      }
-    }.value
+    // IMCore has been observed calling a completion block more than once for a single
+    // query, and a failed invoke means no completion at all. `ResumeOnce` handles both.
+    let once = ResumeOnce<Box>()
+    let block: @convention(block) (AnyObject?) -> Void = { once.finish(Box($0)) }
+    do {
+      try IMCoreRuntime.invoke(
+        controller, selector, [guid, unsafeBitCast(block, to: AnyObject.self)]
+      )
+    } catch {
+      once.finish(Box(nil))
+    }
+    let loaded = await once.wait().value
 
     guard let loaded else {
       throw PrivateAPIErrorShim.rejected("Messages has no message with GUID \(guid)")
@@ -1170,53 +1155,42 @@ enum IMCoreQueries {
       ? address
       : (isEmail ? "mailto:\(address)" : "tel:\(address)")
 
-    let response: AnyObject? = await withCheckedContinuation {
-      (continuation: CheckedContinuation<Box, Never>) in
-      let lock = NSLock()
-      nonisolated(unsafe) var done = false
-      let finish: @Sendable (AnyObject?) -> Void = { value in
-        lock.lock()
-        let already = done
-        done = true
-        lock.unlock()
-        guard !already else { return }
-        continuation.resume(returning: Box(value))
-      }
-      let block: @convention(block) (AnyObject?) -> Void = { finish($0) }
+    let once = ResumeOnce<Box>()
+    let block: @convention(block) (AnyObject?) -> Void = { once.finish(Box($0)) }
 
-      // The selector has moved. `forceRefreshIDStatusForDestinations:…` is what the
-      // reference calls and is gone on macOS 26; `currentIDStatusForDestinations:…`
-      // is what replaced it and still consults IDS when it has no fresh answer.
-      // Newest-known first, and a macOS with neither reports unavailable rather than
-      // silently answering "not reachable" for everyone.
-      let candidates = [
-        "currentIDStatusForDestinations:service:listenerID:queue:completionBlock:",
-        "forceRefreshIDStatusForDestinations:service:listenerID:queue:completionBlock:",
-      ]
-      var dispatched = false
-      for selector in candidates
-      where IMCoreRuntime.responds(controller, to: NSSelectorFromString(selector)) {
-        do {
-          try IMCoreRuntime.invoke(
-            controller, selector,
-            [
-              [destination], service,
-              "BlueBubblesHelper-IDSListener",
-              DispatchQueue.global(),
-              unsafeBitCast(block, to: AnyObject.self),
-            ]
-          )
-          dispatched = true
-        } catch {
-          finish(nil)
-          dispatched = true
-        }
-        break
+    // The selector has moved. `forceRefreshIDStatusForDestinations:…` is what the
+    // reference calls and is gone on macOS 26; `currentIDStatusForDestinations:…`
+    // is what replaced it and still consults IDS when it has no fresh answer.
+    // Newest-known first, and a macOS with neither reports unavailable rather than
+    // silently answering "not reachable" for everyone.
+    let candidates = [
+      "currentIDStatusForDestinations:service:listenerID:queue:completionBlock:",
+      "forceRefreshIDStatusForDestinations:service:listenerID:queue:completionBlock:",
+    ]
+    var dispatched = false
+    for selector in candidates
+    where IMCoreRuntime.responds(controller, to: NSSelectorFromString(selector)) {
+      do {
+        try IMCoreRuntime.invoke(
+          controller, selector,
+          [
+            [destination], service,
+            "BlueBubblesHelper-IDSListener",
+            DispatchQueue.global(),
+            unsafeBitCast(block, to: AnyObject.self),
+          ]
+        )
+        dispatched = true
+      } catch {
+        once.finish(Box(nil))
+        dispatched = true
       }
-      if !dispatched {
-        finish(nil)
-      }
-    }.value
+      break
+    }
+    if !dispatched {
+      once.finish(Box(nil))
+    }
+    let response = await once.wait().value
 
     // 1 is available. Anything else — including 0, which means IDS still does not know —
     // is not.
@@ -1258,31 +1232,21 @@ enum IMCoreQueries {
     .first { IMCoreRuntime.responds(manager, to: NSSelectorFromString($0)) }
 
     if let refreshSelector {
-      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        let lock = NSLock()
-        nonisolated(unsafe) var done = false
-        let finish: @Sendable () -> Void = {
-          lock.lock()
-          let already = done
-          done = true
-          lock.unlock()
-          guard !already else { return }
-          continuation.resume()
-        }
-        // Zero parameters, deliberately, and safe whichever spelling answered: a block
-        // that declares none is called correctly no matter how many arguments IMCore
-        // passes, because it never reads the argument registers. The reverse — declaring
-        // parameters the caller does not supply — is what reads register garbage.
-        let block: @convention(block) () -> Void = { finish() }
-        do {
-          try IMCoreRuntime.invoke(
-            manager, refreshSelector,
-            [handle, unsafeBitCast(block, to: AnyObject.self)]
-          )
-        } catch {
-          finish()
-        }
+      let once = ResumeOnce<Void>()
+      // Zero parameters, deliberately, and safe whichever spelling answered: a block
+      // that declares none is called correctly no matter how many arguments IMCore
+      // passes, because it never reads the argument registers. The reverse — declaring
+      // parameters the caller does not supply — is what reads register garbage.
+      let block: @convention(block) () -> Void = { once.finish() }
+      do {
+        try IMCoreRuntime.invoke(
+          manager, refreshSelector,
+          [handle, unsafeBitCast(block, to: AnyObject.self)]
+        )
+      } catch {
+        once.finish()
       }
+      await once.wait()
       // The reference's one-second settle, and only meaningful after a refresh: the
       // completion fires before the manager's own value is updated, so reading
       // immediately returns the previous status.

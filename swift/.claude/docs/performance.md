@@ -137,6 +137,15 @@ which `cloudflared` can produce.
 
 ---
 
+## Locks
+
+`OSAllocatedUnfairLock<State>` for anything shared across threads that an actor cannot own
+(`Subprocess.ExitWaiter`, `ManualClock`, `LoggingSystemBootstrap`, the helper's socket client).
+It is `Sendable` on its own, so the type that holds it needs neither `@unchecked` nor
+`nonisolated(unsafe)`. A completion block that has to be awaited is a `ResumeOnce`
+(`Helper/HelperShared`). `NSLock` and `nonisolated(unsafe) var` are the smell; the six sites
+that had them were converted in one pass and the remaining three statics are write-once at load.
+
 ## The wiring lesson
 
 > A phase is not done when its module is tested. It is done when something in the composition root

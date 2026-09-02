@@ -130,10 +130,11 @@ public struct SecretHash: Sendable, Equatable, Codable {
   /// Hashes a secret with a fresh random salt.
   public static func make(_ secret: String) throws -> SecretHash {
     var salt = Data(count: 16)
+    var generator = SystemRandomNumberGenerator()
     salt.withUnsafeMutableBytes { buffer in
       guard let base = buffer.bindMemory(to: UInt8.self).baseAddress else { return }
       for offset in 0..<buffer.count {
-        base[offset] = UInt8.random(in: 0...255, using: &SystemRandomNumberGenerator.shared)
+        base[offset] = UInt8.random(in: 0...255, using: &generator)
       }
     }
     return SecretHash(salt: salt, hash: try derive(secret, salt: salt))
@@ -156,11 +157,6 @@ public struct SecretHash: Sendable, Equatable, Codable {
     )
     return key.withUnsafeBytes { Data($0) }
   }
-}
-
-extension SystemRandomNumberGenerator {
-  /// A shared instance, so a loop does not construct one per byte.
-  nonisolated(unsafe) static var shared = SystemRandomNumberGenerator()
 }
 
 // MARK: - Constant time
@@ -205,8 +201,9 @@ public enum ClientSecret {
   /// is what makes the hashing choice sound.
   public static func generate() -> String {
     var bytes = [UInt8](repeating: 0, count: 32)
+    var generator = SystemRandomNumberGenerator()
     for index in bytes.indices {
-      bytes[index] = UInt8.random(in: 0...255, using: &SystemRandomNumberGenerator.shared)
+      bytes[index] = UInt8.random(in: 0...255, using: &generator)
     }
     return Data(bytes).base64EncodedString()
       .replacingOccurrences(of: "+", with: "-")

@@ -24,6 +24,7 @@ import BBInterfaces
 import BBPrivateAPIContract
 import Darwin
 import Foundation
+import os
 
 public enum SingleInstanceLock {
 
@@ -31,7 +32,7 @@ public enum SingleInstanceLock {
   ///
   /// Never closed on purpose: closing releases the lock, so this deliberately leaks. The
   /// kernel reclaims it at exit, which is exactly the release semantics wanted.
-  private nonisolated(unsafe) static var descriptor: Int32 = -1
+  private static let descriptor = OSAllocatedUnfairLock<Int32>(initialState: -1)
 
   public static var defaultPath: String {
     SocketLocation.supportDirectory + "/bluebubbles-server.lock"
@@ -66,7 +67,7 @@ public enum SingleInstanceLock {
     // flock is tied to the open file description rather than the process — so a second
     // open+flock from the same process is refused just like a stranger's would be, and
     // restarting would fail with an error naming our own pid.
-    if descriptor >= 0 { return descriptor }
+    if let held = descriptor.withLock({ $0 >= 0 ? $0 : nil }) { return held }
 
     try FileManager.default.createDirectory(
       atPath: (path as NSString).deletingLastPathComponent,
@@ -110,16 +111,18 @@ public enum SingleInstanceLock {
     let pid = "\(getpid())"
     _ = pid.withCString { write(fd, $0, strlen($0)) }
 
-    descriptor = fd
+    descriptor.withLock { $0 = fd }
     return fd
   }
 
   /// Releases the lock. Exposed for tests, which need to take and drop it repeatedly in one
   /// process; the server itself never calls this and relies on process exit.
   public static func release() {
-    guard descriptor >= 0 else { return }
-    flock(descriptor, LOCK_UN)
-    close(descriptor)
-    descriptor = -1
+    descriptor.withLock { fd in
+      guard fd >= 0 else { return }
+      flock(fd, LOCK_UN)
+      close(fd)
+      fd = -1
+    }
   }
 }

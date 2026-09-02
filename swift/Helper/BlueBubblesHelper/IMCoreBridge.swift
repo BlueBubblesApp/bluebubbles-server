@@ -423,26 +423,16 @@ public final class IMCoreBridge: PrivateAPI {
     // by whether the data source can generate, rather than by class name, so a plugin
     // this port has not seen still works if it follows the same shape.
     if IMCoreRuntime.responds(source, to: NSSelectorFromString("generateMedia:")) {
-      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        let lock = NSLock()
-        nonisolated(unsafe) var done = false
-        let finish: @Sendable () -> Void = {
-          lock.lock()
-          let already = done
-          done = true
-          lock.unlock()
-          guard !already else { return }
-          continuation.resume()
-        }
-        let block: @convention(block) () -> Void = { finish() }
-        do {
-          try IMCoreRuntime.invoke(
-            source, "generateMedia:", [unsafeBitCast(block, to: AnyObject.self)]
-          )
-        } catch {
-          finish()
-        }
+      let once = ResumeOnce<Void>()
+      let block: @convention(block) () -> Void = { once.finish() }
+      do {
+        try IMCoreRuntime.invoke(
+          source, "generateMedia:", [unsafeBitCast(block, to: AnyObject.self)]
+        )
+      } catch {
+        once.finish()
       }
+      await once.wait()
     }
 
     return try translating {
@@ -849,40 +839,21 @@ public final class IMCoreBridge: PrivateAPI {
     let conversation = try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue)
     }
-    // The completion bridged with the same latch `IMChatHistory.load` uses: IMCore has
-    // been observed firing a completion twice, and a second `resume` traps.
-    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-      let lock = NSLock()
-      nonisolated(unsafe) var finished = false
-      @Sendable func finish() {
-        lock.lock()
-        let already = finished
-        finished = true
-        lock.unlock()
-        guard !already else { return }
-        continuation.resume()
-      }
-
-      let completion: @convention(block) (AnyObject?) -> Void = { _ in finish() }
-      do {
-        try IMCoreRuntime.invoke(
-          conversation.object,
-          "markAsKnownAndSaveInContacts:completion:",
-          [saveInContacts, unsafeBitCast(completion, to: AnyObject.self)]
-        )
-      } catch {
-        BlueBubblesHelper.Logging.error("markAsKnown: \(error)")
-        finish()
-        return
-      }
-
-      // IMCore's callback is not a promise. After ten seconds the state is read
-      // anyway — the write has normally landed, and reporting the CURRENT state is
-      // more useful than failing a call that probably worked.
-      Task { @MainActor in
-        try? await Task.sleep(for: .seconds(10))
-        finish()
-      }
+    // IMCore has been observed firing a completion twice, and a second `resume` traps —
+    // `ResumeOnce` is the latch. Its callback is not a promise either: after ten seconds the
+    // state is read anyway — the write has normally landed, and reporting the CURRENT state
+    // is more useful than failing a call that probably worked.
+    let once = ResumeOnce<Void>()
+    let completion: @convention(block) (AnyObject?) -> Void = { _ in once.finish() }
+    do {
+      try IMCoreRuntime.invoke(
+        conversation.object,
+        "markAsKnownAndSaveInContacts:completion:",
+        [saveInContacts, unsafeBitCast(completion, to: AnyObject.self)]
+      )
+      await once.wait(timeout: .seconds(10))
+    } catch {
+      BlueBubblesHelper.Logging.error("markAsKnown: \(error)")
     }
 
     return try translating { try conversation.filterState() }

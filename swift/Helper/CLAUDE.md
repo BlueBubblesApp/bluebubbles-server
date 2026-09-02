@@ -71,6 +71,17 @@ found by its own tests and both look fine at the call site:
 
 See `Tests/HelperTests/IMCoreRuntimeTests.swift` and `IMCoreSelectorTests.swift`.
 
+## Bridging a completion block
+
+Use `HelperShared/ResumeOnce` — never a `withCheckedContinuation` with a hand-rolled lock and
+flag. IMCore fires some completions twice (a second `resume` traps), some never, and some
+before the wait starts; `ResumeOnce` handles all three and bounds the wait with
+`wait(timeout:)`. Seven private copies of that latch were replaced by it.
+
+Shared mutable state is an `OSAllocatedUnfairLock<State>` (`IMCoreRuntime.classCache`,
+`HelperSocketClient.connection`), never `NSLock` plus a `var`. The only `nonisolated(unsafe)`
+statics left are written once at load, before any listener is installed, and each says so.
+
 ## Order of work
 
 **Contract first, implementation second.** Add to `BBPrivateAPIContract`, then implement in

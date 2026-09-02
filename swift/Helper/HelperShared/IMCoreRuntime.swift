@@ -25,6 +25,7 @@
 import Foundation
 import HelperObjC
 import ObjectiveC
+import os
 
 /// Why an IMCore call could not be made.
 ///
@@ -69,12 +70,12 @@ public enum IMCoreRuntime {
   /// runtime's class table each time. The cache is keyed by name and never invalidated:
   /// classes do not appear or disappear within a process's lifetime.
   public static func lookUpClass(_ name: String) -> AnyClass? {
-    cacheLock.lock()
-    defer { cacheLock.unlock() }
-    if let cached = classCache[name] { return cached }
-    let resolved: AnyClass? = NSClassFromString(name)
-    classCache[name] = resolved
-    return resolved
+    classCache.withLock { cache in
+      if let cached = cache[name] { return cached }
+      let resolved: AnyClass? = NSClassFromString(name)
+      cache[name] = resolved
+      return resolved
+    }
   }
 
   public static func requireClass(_ name: String) throws -> AnyClass {
@@ -84,8 +85,7 @@ public enum IMCoreRuntime {
     return resolved
   }
 
-  private nonisolated(unsafe) static var classCache: [String: AnyClass?] = [:]
-  private static let cacheLock = NSLock()
+  private static let classCache = OSAllocatedUnfairLock<[String: AnyClass?]>(initialState: [:])
 
   // MARK: - Sending
 
