@@ -8,7 +8,7 @@ import SwiftUI
 struct HomeView: View {
 
   @Bindable var model: AppModel
-  @State private var stats: ServerInterface.Totals?
+  @State private var stats: AdminInterface.Totals?
   @State private var backend: String = "—"
 
   private let columns = [GridItem(.adaptive(minimum: 200), spacing: 12)]
@@ -64,7 +64,7 @@ struct HomeView: View {
 
   /// A key path rather than a string key: a renamed count is a build error instead of an
   /// em dash on the home screen.
-  private func number(_ count: KeyPath<ServerInterface.Totals, Int>) -> String {
+  private func number(_ count: KeyPath<AdminInterface.Totals, Int>) -> String {
     guard let stats else { return "—" }
     return stats[keyPath: count].formatted(.number)
   }

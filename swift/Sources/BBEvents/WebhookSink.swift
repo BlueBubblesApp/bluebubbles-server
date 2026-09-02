@@ -158,7 +158,7 @@ public actor WebhookSink: CustomEventSink {
                 "consecutive_failures": .int(count),
               ]
             ),
-            actions: [.openSettings(section: "webhooks")],
+            actions: [.openSettings(.webhooks)],
             dedupeKey: "webhook.failure.\(target.id)"
           )
         )

@@ -46,7 +46,7 @@ struct AlertWireShapeTests {
   /// The whole contract in one assertion.
   @Test("The default projection is exactly the Node alert row")
   func defaultKeysMatchNode() {
-    let json = ServerInterface.alertJSON(alert())
+    let json = AdminInterface.alertJSON(alert())
 
     #expect(json.objectKeys == ["id", "type", "value", "isRead", "created", "updated"])
   }
@@ -55,7 +55,7 @@ struct AlertWireShapeTests {
   /// dropping the body would show "Cloudflare tunnel disconnected" and nothing about why.
   @Test("value carries the title AND the body")
   func valueIsTitleAndBody() {
-    let json = ServerInterface.alertJSON(alert())
+    let json = AdminInterface.alertJSON(alert())
 
     #expect(
       json["value"]?.stringValue
@@ -68,7 +68,7 @@ struct AlertWireShapeTests {
   @Test("type uses Node's vocabulary, not Severity's raw values")
   func typeUsesNodeVocabulary() {
     func type(_ severity: Severity) -> String? {
-      ServerInterface.alertJSON(alert(severity: severity))["type"]?.stringValue
+      AdminInterface.alertJSON(alert(severity: severity))["type"]?.stringValue
     }
 
     #expect(type(.info) == "info")
@@ -84,7 +84,7 @@ struct AlertWireShapeTests {
   /// rule covers the serializers; this route returns an entity.
   @Test("created and updated are ISO 8601 in UTC")
   func datesAreISO8601() throws {
-    let created = try #require(ServerInterface.alertJSON(alert())["created"]?.stringValue)
+    let created = try #require(AdminInterface.alertJSON(alert())["created"]?.stringValue)
 
     #expect(created.hasSuffix("Z"))
 
@@ -98,7 +98,7 @@ struct AlertWireShapeTests {
   @Test("updated equals created until something touches the alert")
   func updatedTracksCreatedInitially() {
     let subject = alert()
-    let json = ServerInterface.alertJSON(subject)
+    let json = AdminInterface.alertJSON(subject)
 
     #expect(json["created"]?.stringValue == json["updated"]?.stringValue)
     #expect(subject.lastUpdatedAt == subject.createdAt)
@@ -111,7 +111,7 @@ struct AlertWireShapeTests {
   /// actions and the occurrence count need somewhere else to live.
   @Test("The v2 projection carries the whole alert")
   func v2CarriesEverything() {
-    let json = ServerInterface.alertJSONV2(alert())
+    let json = AdminInterface.alertJSONV2(alert())
 
     #expect(json["title"]?.stringValue == "Cloudflare tunnel disconnected")
     #expect(json["body"]?.stringValue == "The tunnel dropped and is retrying.")
@@ -137,8 +137,8 @@ struct AlertWireShapeTests {
     let stored = await center.all(limit: 1)[0]
 
     #expect(stored.sequence == 1)
-    #expect(ServerInterface.alertJSON(stored)["id"] == .int(1))
-    #expect(ServerInterface.alertJSONV2(stored)["id"] == .int(1))
+    #expect(AdminInterface.alertJSON(stored)["id"] == .int(1))
+    #expect(AdminInterface.alertJSONV2(stored)["id"] == .int(1))
   }
 
   /// Numbers are never reused, even after the cap trims a row.
@@ -164,7 +164,7 @@ struct AlertWireShapeTests {
   /// change the moment a case gained a payload.
   @Test("Alert actions have stable wire names")
   func actionWireNamesAreStable() {
-    #expect(AlertAction.openSettings(section: "security").wireName == "open-settings")
+    #expect(AlertAction.openSettings(.security).wireName == "open-settings")
     #expect(AlertAction.openLogs.wireName == "open-logs")
     #expect(AlertAction.retry(service: "proxy").wireName == "retry")
     #expect(AlertAction.openURL(URL(string: "https://example.com")!).wireName == "open-url")
@@ -192,7 +192,7 @@ struct AlertWireShapeTests {
     )
 
     let diagnostics = try #require(
-      ServerInterface.alertJSONV2(subject)["diagnostics"]?.stringValue
+      AdminInterface.alertJSONV2(subject)["diagnostics"]?.stringValue
     )
 
     #expect(diagnostics.contains("ngrok_key: ••••"))

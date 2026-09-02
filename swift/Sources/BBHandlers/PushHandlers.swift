@@ -7,7 +7,6 @@ import BBPersistence
 import BBPushKit
 import BBSerialization
 import Foundation
-import GRDB
 
 public enum PushHandlers {
 

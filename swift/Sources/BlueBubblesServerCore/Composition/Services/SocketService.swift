@@ -1,12 +1,18 @@
 //  SocketService
 //  Registers the socket sink so connected clients hear events, and keeps sessions alive.
 
+import BBBuiltIns
 import BBServiceKit
 import BBSettings
 import BBSocketIO
 
 actor SocketService: ContextualService, ConfigurableService {
-  static let watchedSettings: Set<String> = [Settings.password.key]
+  /// Nothing from the manifest — the socket reads no settings — plus the password, for the
+  /// same reason `HTTPService` watches it: a revoked password must disconnect whoever
+  /// authenticated with it.
+  static var watchedSettings: Set<String> {
+    manifestWatchedSettings.union([Settings.password.key])
+  }
 
   static let manifest = BuiltInManifests.socket
 

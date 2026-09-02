@@ -1,6 +1,7 @@
 //  HTTPService
 //  The REST API and the socket transport, on one listener.
 
+import BBBuiltIns
 import BBDiagnostics
 import BBHTTPAPI
 import BBServiceKit
@@ -11,11 +12,12 @@ import Hummingbird
 
 actor HTTPService: ContextualService, ConfigurableService {
   static let manifest = BuiltInManifests.http
-  /// A port change or a certificate change means rebinding, which is a restart.
-  static let watchedSettings: Set<String> = [
-    Settings.socketPort.key, Settings.useCustomCertificate.key, Settings.password.key,
-    Settings.bindAddress.key,
-  ]
+  /// The manifest's reads — port, bind address, TLS — plus the password, which this service
+  /// does not read (authentication is delegated) but must restart on, to kick clients that
+  /// authenticated with the old one.
+  static var watchedSettings: Set<String> {
+    manifestWatchedSettings.union([Settings.password.key])
+  }
   static let restartPolicy = RestartPolicy.backoff(
     base: .seconds(1), max: .seconds(30), attempts: 10
   )
@@ -117,7 +119,7 @@ actor HTTPService: ContextualService, ConfigurableService {
           + (available.isEmpty ? "none" : available.joined(separator: ", "))
           + ". Change Listen On, or set it back to all interfaces.",
         source: "HTTP",
-        actions: [.openSettings(section: "settings")],
+        actions: [.openSettings(.settings)],
         dedupeKey: "http.bind-address-missing",
         // The interface list is read fresh on every bind, so this answer is only
         // ever true of the start that raised it.

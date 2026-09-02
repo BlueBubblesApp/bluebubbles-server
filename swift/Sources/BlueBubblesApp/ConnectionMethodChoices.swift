@@ -8,6 +8,7 @@
 //
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
+import BBBuiltIns
 import BBInterfaces
 import BBServiceKit
 import BlueBubblesServerCore

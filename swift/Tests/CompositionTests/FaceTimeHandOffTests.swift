@@ -9,7 +9,7 @@ import BBPrivateAPIContract
 import Foundation
 import Testing
 
-@testable import BBInterfaces
+@testable import BBFaceTime
 
 @Suite("FaceTime hand-off")
 struct FaceTimeHandOffTests {

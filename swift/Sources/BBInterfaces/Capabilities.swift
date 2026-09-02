@@ -18,23 +18,26 @@
 //  Only one of those is an HTTP concern, and putting the protocols in the controller module
 //  made the app link the HTTP layer purely to name `PushSetupProviding`.
 //
+//  The converse holds too. A capability that ONLY a handler composes — access control, token
+//  auth, the update installer — lives in `BBHandlers/HandlerCapabilities.swift`, so this
+//  module does not import the auth and update layers to name three protocols nothing here
+//  uses.
+//
 //  Isolation note: the container is an actor, so a requirement it satisfies with an isolated
 //  member has to be `async` — a synchronous requirement can only be witnessed by a
 //  `nonisolated` one. That is why the split below looks arbitrary and is not: the `async`
 //  members are the genuinely isolated state, and the rest are `nonisolated let` bindings to
 //  types that do their own synchronisation.
 
-import BBAuth
 import BBContacts
 import BBCore
 import BBDiagnostics
 import BBEvents
+import BBFaceTime
 import BBPrivateAPI
 import BBPrivateAPIContract
 import BBSettings
 import BBSystem
-import BBTooling
-import BBUpdates
 import Foundation
 import Logging
 
@@ -67,8 +70,8 @@ public protocol ContactIndexProviding: Sendable {
 }
 
 /// Server administration — alerts, totals, webhooks, backups.
-public protocol ServerInterfaceProviding: Sendable {
-  var server: ServerInterface { get }
+public protocol AdminInterfaceProviding: Sendable {
+  var admin: AdminInterface { get }
 }
 
 public protocol ScheduleProviding: Sendable {
@@ -128,11 +131,6 @@ public protocol FindMyProviding: Sendable {
   var findMy: FindMyRuntime { get }
 }
 
-/// The external programs services depend on.
-public protocol ToolProviding: Sendable {
-  var tools: ToolManager { get }
-}
-
 /// macOS permission state.
 public protocol PermissionsProviding: Sendable {
   var permissions: PermissionsService { get }
@@ -150,7 +148,7 @@ public protocol PushSetupProviding: Sendable {
 /// Webhook administration beyond create/update/delete: what each endpoint's last delivery
 /// did, and sending a test to one.
 ///
-/// Separate from `ServerInterfaceProviding`, which owns the registrations themselves. This is
+/// Separate from `AdminInterfaceProviding`, which owns the registrations themselves. This is
 /// the OBSERVED behaviour of those registrations, and only the webhooks screen wants it.
 public protocol WebhookAdministering: Sendable {
   var webhooks: WebhookDirectory { get }
@@ -163,27 +161,6 @@ public protocol AttachmentConverting: Sendable {
 /// Where uploaded bytes land before they are sent.
 public protocol UploadStoring: Sendable {
   var uploads: UploadStore { get }
-}
-
-public protocol AccessControlProviding: Sendable {
-  var accessControl: AccessControlService { get }
-}
-
-public protocol TokenAuthProviding: Sendable {
-  var tokenAuth: TokenAuthService { get }
-}
-
-/// How the hosting application performs an update.
-///
-/// Implemented by the SwiftUI app, which owns the updater. The seam exists so the endpoint
-/// and the menu item are written once against a capability rather than against a specific
-/// host.
-public protocol UpdateInstalling: Sendable {
-  func beginUpdate(to item: AppcastItem) async
-}
-
-public protocol UpdateInstallerProviding: Sendable {
-  var updateInstaller: (any UpdateInstalling)? { get async }
 }
 
 // MARK: - Server control and status

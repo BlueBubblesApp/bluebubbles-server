@@ -18,8 +18,8 @@ struct InterfaceProjectionTests {
 
   @Test("Statistics totals project to the four counts")
   func totals() {
-    let json = ServerInterface.serialize(
-      ServerInterface.Totals(handles: 1, messages: 2, chats: 3, attachments: 4)
+    let json = AdminInterface.serialize(
+      AdminInterface.Totals(handles: 1, messages: 2, chats: 3, attachments: 4)
     )
     #expect(json.objectKeys == ["handles", "messages", "chats", "attachments"])
     #expect(json["messages"]?.intValue == 2)

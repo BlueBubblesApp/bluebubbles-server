@@ -10,6 +10,7 @@ import BBSerialization
 import Foundation
 import Testing
 
+@testable import BBBuiltIns
 @testable import BBHandlers
 @testable import BBInterfaces
 @testable import BlueBubblesServerCore
@@ -145,7 +146,7 @@ struct ScheduledMessageTests {
   @Test("The service is registered and depends on the send path")
   func serviceIsWired() {
     // The step that was missing. A dispatcher nothing registers is a table nobody reads.
-    #expect(ScheduledMessageService.dependencies.contains(.privateAPI))
-    #expect(ScheduledMessageService.id == .scheduledMessages)
+    #expect(ScheduledMessageService.dependencies.contains(BuiltInManifests.ID.privateAPI))
+    #expect(ScheduledMessageService.id == BuiltInManifests.ID.scheduledMessages)
   }
 }

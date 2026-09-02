@@ -1,6 +1,7 @@
 //  IntegrationsModel
 //  Which services are on: the selected connection method, and the additive switches.
 
+import BBBuiltIns
 import BBServiceKit
 import BBSettings
 import Foundation
@@ -42,7 +43,9 @@ final class IntegrationsModel {
     if manifest.category.isExclusive {
       return selectedConnectionMethod == manifest.id.rawValue
     }
-    return !disabledServices.contains(manifest.id.rawValue)
+    // The server's own answer, so the switch on screen and the service that is running
+    // agree — including for the services `alwaysOn` refuses to switch off.
+    return ServiceEnablement.isEnabled(manifest.id, disabled: disabledServices)
   }
 
   /// Picks a service within an exclusive category.
@@ -68,7 +71,7 @@ final class IntegrationsModel {
     }
     do {
       try await store.set(
-        disabled.sorted().joined(separator: ","),
+        ServiceEnablement.serialized(disabled),
         forKey: Settings.disabledServicesKey,
         isSecret: false
       )
@@ -82,10 +85,10 @@ final class IntegrationsModel {
   func refresh() async {
     guard let store else { return }
     selectedConnectionMethod = await store.get(Settings.connectionMethod)
-    disabledServices = Set(
-      (await store.string(forKey: Settings.disabledServicesKey) ?? "")
-        .split(separator: ",")
-        .map(String.init)
+    // Parsed by the server's own rule. A second parser here is how the app and the server
+    // came to disagree about a hand-edited value with a space in it.
+    disabledServices = ServiceEnablement.disabledIdentifiers(
+      in: await store.string(forKey: Settings.disabledServicesKey) ?? ""
     )
   }
 }

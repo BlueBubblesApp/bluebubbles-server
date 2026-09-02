@@ -10,6 +10,7 @@
 //  The switch in `OnboardingStepView` is exhaustive over `OnboardingStep.ID`. A step added
 //  to the catalogue without a view here does not compile.
 
+import BBBuiltIns
 import BBServiceKit
 import BBSettings
 import BBSystem

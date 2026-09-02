@@ -1,6 +1,7 @@
 //  PermissionsMonitorService
 //  Starts first, because everything else's permission gate reads from it.
 
+import BBBuiltIns
 import BBServiceKit
 
 /// Starts first, because everything else's permission gate reads from it.

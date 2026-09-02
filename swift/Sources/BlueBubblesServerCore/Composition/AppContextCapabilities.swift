@@ -8,6 +8,7 @@
 //  gained a requirement the container does not meet, which is exactly the failure worth
 //  seeing.
 
+import BBHandlers
 import BBInterfaces
 
 // MARK: - Conformance
@@ -20,7 +21,7 @@ extension AppContext: SettingsProviding {}
 extension AppContext: AlertProviding {}
 extension AppContext: LoggerProviding {}
 extension AppContext: ContactIndexProviding {}
-extension AppContext: ServerInterfaceProviding {}
+extension AppContext: AdminInterfaceProviding {}
 extension AppContext: ScheduleProviding {}
 extension AppContext: DeviceRegistering {}
 extension AppContext: PrivateAPIProviding {}
@@ -30,7 +31,6 @@ extension AppContext: FindMyProviding {}
 extension AppContext: AttachmentConverting {}
 extension AppContext: UploadStoring {}
 extension AppContext: ApplicationRestarting {}
-extension AppContext: ToolProviding {}
 extension AppContext: PermissionsProviding {}
 extension AppContext: PushSetupProviding {}
 extension AppContext: WebhookAdministering {}

@@ -25,6 +25,7 @@ import BBSettings
 import Foundation
 import Testing
 
+@testable import BBBuiltIns
 @testable import BBHandlers
 @testable import BBInterfaces
 @testable import BlueBubblesServerCore
@@ -37,18 +38,72 @@ struct WatchedSettingsTests {
   /// A list rather than reflection because Swift has no way to enumerate conformers, and a
   /// service missing from here is a service nobody checks — so adding one is a deliberate
   /// act, the same way registering it with the registry is.
-  static let configurable: [(name: String, watched: Set<String>)] = [
-    ("HTTPService", HTTPService.watchedSettings),
-    ("SocketService", SocketService.watchedSettings),
-    ("PrivateAPIGatedService", PrivateAPIGatedService.watchedSettings),
-    ("PushDeliveryService", PushDeliveryService.watchedSettings),
-    ("WebhookDeliveryService", WebhookDeliveryService.watchedSettings),
-    ("ProxyService<LANMethod>", ProxyService<LANMethod>.watchedSettings),
-    ("ProxyService<NgrokMethod>", ProxyService<NgrokMethod>.watchedSettings),
-    ("ProxyService<ZrokMethod>", ProxyService<ZrokMethod>.watchedSettings),
-    ("SleepPreventionService", SleepPreventionService.watchedSettings),
-    ("ChangeDetectionService", ChangeDetectionService.watchedSettings),
+  static let configurable: [(name: String, manifest: ServiceManifest, watched: Set<String>)] = [
+    ("HTTPService", HTTPService.manifest, HTTPService.watchedSettings),
+    ("SocketService", SocketService.manifest, SocketService.watchedSettings),
+    (
+      "PrivateAPIGatedService", PrivateAPIGatedService.manifest,
+      PrivateAPIGatedService.watchedSettings
+    ),
+    ("PushDeliveryService", PushDeliveryService.manifest, PushDeliveryService.watchedSettings),
+    (
+      "WebhookDeliveryService", WebhookDeliveryService.manifest,
+      WebhookDeliveryService.watchedSettings
+    ),
+    ("ProxyService<LANMethod>", LANMethod.manifest, ProxyService<LANMethod>.watchedSettings),
+    (
+      "ProxyService<DynamicDNSMethod>", DynamicDNSMethod.manifest,
+      ProxyService<DynamicDNSMethod>.watchedSettings
+    ),
+    ("ProxyService<NgrokMethod>", NgrokMethod.manifest, ProxyService<NgrokMethod>.watchedSettings),
+    (
+      "ProxyService<CloudflareMethod>", CloudflareMethod.manifest,
+      ProxyService<CloudflareMethod>.watchedSettings
+    ),
+    ("ProxyService<ZrokMethod>", ZrokMethod.manifest, ProxyService<ZrokMethod>.watchedSettings),
+    (
+      "SleepPreventionService", SleepPreventionService.manifest,
+      SleepPreventionService.watchedSettings
+    ),
+    ("LaunchAtLoginService", LaunchAtLoginService.manifest, LaunchAtLoginService.watchedSettings),
+    ("ToolUpdateService", ToolUpdateService.manifest, ToolUpdateService.watchedSettings),
+    (
+      "ChangeDetectionService", ChangeDetectionService.manifest,
+      ChangeDetectionService.watchedSettings
+    ),
   ]
+
+  /// THE rule. A service's watch list defaults to what its manifest declares it reads and
+  /// owns, and a service may only ADD to that. So the declared set is always a subset of the
+  /// watched set — a hand-written list that dropped a declared read would fail here.
+  @Test("Every configurable service watches at least what its manifest declares")
+  func watchedCoversDeclared() {
+    for service in Self.configurable {
+      let declared = service.manifest.watchedSettingKeys
+      let missing = declared.subtracting(service.watched).sorted()
+      #expect(
+        declared.isSubset(of: service.watched),
+        "\(service.name) declares \(missing) and does not watch them"
+      )
+    }
+  }
+
+  /// The one exemption in the rule, checked: a key the manifest says the service WRITES is
+  /// not watched, or the service would restart on its own writes. Every connection method
+  /// writes `server_address`; none may watch it.
+  @Test("A service never watches a key its manifest says it writes")
+  func writtenKeysAreNotWatched() {
+    for service in Self.configurable {
+      for entitlement in service.manifest.entitlements {
+        guard case .writeSettings(let written) = entitlement else { continue }
+        let overlap = written.intersection(service.watched).sorted()
+        #expect(
+          written.isDisjoint(with: service.watched),
+          "\(service.name) watches \(overlap), which it writes"
+        )
+      }
+    }
+  }
 
   @Test("Every watched key is a real setting")
   func watchedKeysExist() {
@@ -153,7 +208,5 @@ struct WatchedSettingsTests {
     "auto_lock_mac", "open_findmy_on_startup",
     // Bookkeeping, never user-set.
     "last_fcm_restart", "legacy_config_imported",
-    // Private API detail read when the helper is launched.
-    "enable_ft_private_api",
   ]
 }

@@ -672,9 +672,12 @@ public enum Settings {
     ] + Legacy.all
 
   /// Keys whose values must never appear in a log, an alert, or an exported diagnostic.
-  public static let secretKeys: Set<String> = [
-    "password", "ntfy_token",
-  ]
+  ///
+  /// DERIVED from `isSecret` rather than listed a second time. As a literal set it could
+  /// miss a setting declared secret later, and the miss was silent in the worst direction:
+  /// the value went to the Keychain, but `SettingsScope` let a service read it and nothing
+  /// redacted it, because both consult this set rather than the declaration.
+  public static let secretKeys: Set<String> = Set(all.filter(\.isSecret).map(\.key))
 }
 
 /// The default update feed.

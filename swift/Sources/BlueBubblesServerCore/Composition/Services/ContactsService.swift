@@ -1,6 +1,7 @@
 //  ContactsService
 //  Indexes the address book, and publishes the ingestor the contact interface refreshes with.
 
+import BBBuiltIns
 import BBContacts
 import BBServiceKit
 

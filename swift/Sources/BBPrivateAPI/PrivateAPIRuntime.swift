@@ -1,4 +1,4 @@
-//  PrivateAPIService
+//  PrivateAPIRuntime
 //  The Private API as a registry service.
 //
 //  Gated rather than conditional: when the Private API is off, this service simply declines

@@ -1,4 +1,4 @@
-//  ServerInterface
+//  AdminInterface
 //  Server administration: alerts, statistics, webhooks, backups, scheduled messages.
 //
 //  The part of the surface that is about the server rather than about Messages. It is also
@@ -15,7 +15,7 @@ import Foundation
 import GRDB
 import Logging
 
-public struct ServerInterface: Sendable {
+public struct AdminInterface: Sendable {
 
   private let database: AppDatabase
   private let alerts: AlertCenter
@@ -53,9 +53,6 @@ public struct ServerInterface: Sendable {
   /// Six keys, an integer `id`, `type` in the reference's three-value vocabulary, `value` as
   /// `"title: body"`, and ISO dates. There is no `?fields=extended` here any more: extra
   /// fields are new surface, and new surface lives in v2 (`.claude/docs/api.md`).
-  ///
-  /// Static and public so a test can pin the exact key set without standing up a database, a
-  /// settings store and a message repository. The key set IS the contract here.
   ///
   /// Static and public so a test can pin the exact key set without standing up a database, a
   /// settings store and a message repository. The key set IS the contract here, and a test

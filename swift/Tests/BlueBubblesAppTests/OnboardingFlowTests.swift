@@ -5,6 +5,7 @@
 //  walkthrough testable at all: which steps a phone gets, why a desktop on a fixed address
 //  skips Firebase, and what stops Continue on each gate.
 
+import BBBuiltIns
 import BlueBubblesServerCore
 import Foundation
 import Testing

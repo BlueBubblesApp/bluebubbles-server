@@ -17,9 +17,11 @@
 //      boundary only for out-of-process plugins, where the host answers each request over
 //      RPC and can simply decline.
 //
+//  Here rather than in BBServiceKit because that module deliberately cannot see BBSettings;
+//  this is where a manifest and the settings store meet.
+//
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
-import BBInterfaces
 import BBServiceKit
 import BBSettings
 import Foundation

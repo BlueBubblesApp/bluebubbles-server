@@ -13,7 +13,10 @@
 //
 //  See `.claude/docs/architecture.md`.
 
+import BBBuiltIns
+import BBEvents
 import BBInterfaces
+import BBPushKit
 import BBServiceKit
 import Foundation
 import Logging
@@ -26,11 +29,37 @@ import Logging
 public actor ServerLifecycle {
 
   private let registry: ServiceRegistry<AppContext>
+  private let announcer: ServerAddressAnnouncer
+  /// Resolved per announcement rather than captured: push is published by its service once
+  /// it starts, and withdrawn when it stops.
+  private let pushDelivery: @Sendable () async -> PushService?
   private let logger: Logger
 
-  init(registry: ServiceRegistry<AppContext>, logger: Logger) {
+  init(
+    registry: ServiceRegistry<AppContext>,
+    events: EventBus,
+    pushDelivery: @escaping @Sendable () async -> PushService?,
+    logger: Logger
+  ) {
     self.registry = registry
+    self.announcer = ServerAddressAnnouncer(events: events, logger: logger)
+    self.pushDelivery = pushDelivery
     self.logger = logger
+  }
+
+  /// Announces a new address for this server, to connected clients over the socket and to
+  /// the ones that are not connected through Firebase. See `ServerAddressAnnouncer`.
+  ///
+  /// Neither delivery happened before this existed: `new-server` was a defined event name
+  /// with no emitter, and `ServerURLPublisher` was built, tested, and called from nowhere.
+  public func announce(serverAddress: String) async {
+    let push = await pushDelivery()
+    await announcer.announce(serverAddress) { address in
+      // Forced, because this is only reached when the address CHANGED and the publisher's
+      // own "unchanged" memory is about what this process wrote, not about what the
+      // document says.
+      await push?.publish(serverURL: address, force: true)
+    }
   }
 
   /// Stops every service in reverse dependency order and starts them again.
@@ -78,6 +107,6 @@ public actor ServerLifecycle {
   /// taking the socket or the tunnel down because someone imported a Firebase key would
   /// disconnect every client mid-setup.
   public func restartPush() async {
-    await registry.restart(.push)
+    await registry.restart(BuiltInManifests.ID.push)
   }
 }

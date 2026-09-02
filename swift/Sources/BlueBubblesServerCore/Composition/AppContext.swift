@@ -6,14 +6,31 @@
 //  This is the one place that knows how the parts fit together. Everything below it takes
 //  what it needs as a parameter.
 //
+//  A member has one of three shapes, and the shape tells a reader what an access costs:
+//
+//    - `nonisolated let` — a collaborator built once, already its own isolation domain. Free
+//      to read from anywhere; no actor hop.
+//    - `nonisolated var` — a VALUE over those collaborators, rebuilt per read. Also free,
+//      and deliberately not cached: `devices`, `webhooks`, `admin` and `schedule` are cheap
+//      structs and a cache would be one more thing to invalidate.
+//    - isolated `var` or `func` — state that changes while the server runs, or something
+//      built on first use. These are the only members that cost a hop, and the hop is what
+//      protects them.
+//
+//  It holds references and answers questions. Verbs that act on the whole server — restart,
+//  process replacement, announcing a new address — live on `ServerLifecycle`.
+//
 //  See `.claude/docs/architecture.md`.
 
 import BBAuth
+import BBBuiltIns
 import BBContacts
 import BBCore
 import BBDiagnostics
 import BBEvents
+import BBFaceTime
 import BBHTTPAPI
+import BBHandlers
 import BBIMessage
 import BBInterfaces
 import BBPersistence
@@ -139,9 +156,6 @@ public actor AppContext {
   /// Services, once the registry has built them. Populated by the registry rather than
   /// here, which is what keeps this from being a second construction path.
   private var registry: ServiceRegistry<AppContext>?
-  /// The `new-server` announcer. Built on first use; it needs `events` and `logger`.
-  private var addressAnnouncer: ServerAddressAnnouncer?
-
   /// The interfaces layer.
   ///
   /// Built lazily and cached rather than constructed per request: each one is a value type
@@ -152,7 +166,7 @@ public actor AppContext {
   /// This is the layer `.claude/docs/api.md` calls for — shared verbatim by the HTTP
   /// routes, the legacy socket commands, and the SwiftUI app. Sharing it is what makes the
   /// current implementation's 68 IPC channels unnecessary.
-  private var cachedInterfaces: Interfaces?
+  private var cachedInterfaces: ServerInterfaces?
 
   /// Everything a service publishes into the container while it runs, as ONE value.
   ///
@@ -202,13 +216,10 @@ public actor AppContext {
   /// shortcut is currently installed, and that reading should be shared — the settings page
   /// and a `chat.create` arriving at the same moment must not disagree about it, and each
   /// fresh instance would spawn its own `shortcuts list` subprocess.
-  private let groupChatShortcutsBacking = GroupChatShortcutManager()
+  public nonisolated let groupChatShortcuts = GroupChatShortcutManager()
   /// Set by the hosting application when one exists. Nil headless, which is a supported
   /// configuration rather than a failure — see UpdateHandlers.
   private var updateInstallerBacking: (any UpdateInstalling)?
-
-  /// Kept as a nested name so existing call sites read the same.
-  public typealias Interfaces = ServerInterfaces
 
   init(
     appDatabase: AppDatabase,
@@ -269,7 +280,12 @@ public actor AppContext {
   /// test can assert — see `AppContextWiringTests`.
   func finishWiring(registry: ServiceRegistry<AppContext>, handlers: HandlerRegistry) {
     self.registry = registry
-    self.lifecycle = ServerLifecycle(registry: registry, logger: logger)
+    self.lifecycle = ServerLifecycle(
+      registry: registry,
+      events: events,
+      pushDelivery: { [weak self] in await self?.pushDelivery() },
+      logger: logger
+    )
     self.httpHandlers = handlers
     self.isWired = true
   }
@@ -294,12 +310,6 @@ public actor AppContext {
     guard let messages else { return nil }
     return try? await messages.ownAddress()
   }
-
-  /// The group chat Shortcut, for the settings page that installs and tests it.
-  ///
-  /// The same instance `ChatInterface` uses, so a status the user just refreshed on the
-  /// settings page is the status the next `chat.create` acts on.
-  public func groupChatShortcuts() -> GroupChatShortcutManager { groupChatShortcutsBacking }
 
   public func faceTime() -> FaceTimeCoordinator {
     if let faceTimeBacking { return faceTimeBacking }
@@ -334,6 +344,10 @@ public actor AppContext {
   /// Messages without injection silently drops the Private API: the app comes back looking
   /// healthy while every Private API route reports the helper as unavailable.
   public var privateAPIRuntime: PrivateAPIRuntime? { published.privateAPIRuntime }
+
+  /// The push service, once the push service has started it. For `ServerLifecycle`, which
+  /// republishes the address through it.
+  func pushDelivery() -> PushService? { published.pushDelivery }
 
   func publish(pushDelivery: PushService) {
     published.pushDelivery = pushDelivery
@@ -382,7 +396,7 @@ public actor AppContext {
   /// Nil rather than a half-built set: every interface here reads the message database,
   /// and handing back one that cannot would move the failure from a clear "no access" to a
   /// confusing empty result on every route.
-  public func interfaces() -> Interfaces? {
+  public func interfaces() -> ServerInterfaces? {
     if let cachedInterfaces { return cachedInterfaces }
     guard let messages, let serializer else { return nil }
 
@@ -392,7 +406,7 @@ public actor AppContext {
       ),
       chat: ChatInterface(
         repository: messages, serializer: serializer, privateAPI: published.privateAPI,
-        shortcuts: groupChatShortcutsBacking
+        shortcuts: groupChatShortcuts
       ),
       handle: HandleInterface(repository: messages, privateAPI: published.privateAPI),
       attachment: AttachmentInterface(repository: messages, privateAPI: published.privateAPI),
@@ -411,8 +425,8 @@ public actor AppContext {
   /// thing that needs it, so the rest works without it.
   ///
   /// A value type over the same storage, so building one per call costs nothing.
-  public nonisolated var server: ServerInterface {
-    ServerInterface(
+  public nonisolated var admin: AdminInterface {
+    AdminInterface(
       database: appDatabase, alerts: alerts, settings: settings, messages: messages
     )
   }
@@ -447,20 +461,12 @@ public actor AppContext {
         // so there is no instance to reload, and asking one to reload itself would be
         // a no-op on exactly the install that just finished setting push up. Restarting
         // through the registry re-runs the gate, which now sees credentials.
-        await self?.restartPushService()
+        guard let lifecycle = await self?.lifecycle else { return }
+        await lifecycle.restartPush()
       },
       clearDevices: { [weak self] in await self?.deviceDirectory.removeAll() },
       logger: logger
     )
-  }
-
-  /// Rebuilds the push service from the credentials as they are now.
-  ///
-  /// Deliberately `restart` rather than `restartWithDependents`: nothing depends on push,
-  /// and taking the socket or the tunnel down because someone imported a Firebase key would
-  /// disconnect every client mid-setup.
-  func restartPushService() async {
-    await lifecycle?.restartPush()
   }
 
   /// What `server/info` reports as `proxy_service`.
@@ -510,7 +516,7 @@ public actor AppContext {
   public func privateAPIClient() -> (any PrivateAPI)? { published.privateAPI }
 
   /// The interfaces, or a 503 explaining why not.
-  public func requireInterfaces() throws -> Interfaces {
+  public func requireInterfaces() throws -> ServerInterfaces {
     guard let interfaces = interfaces() else {
       throw ServiceUnavailable(
         "the iMessage database is not readable; grant this server Full Disk Access"
@@ -522,30 +528,6 @@ public actor AppContext {
   public func service<S: Service>(_ type: S.Type) async -> S? {
     await registry?.service(type.id) as? S
   }
-
-  // MARK: - Address changes
-
-  /// Announces a new address for this server. See `ServerAddressAnnouncer`.
-  ///
-  /// Neither delivery happened before this existed: `new-server` was a defined event name
-  /// with no emitter, and `ServerURLPublisher` was built, tested, and called from nowhere.
-  public func announce(serverAddress: String) async {
-    let announcer = addressAnnouncer ?? ServerAddressAnnouncer(events: events, logger: logger)
-    addressAnnouncer = announcer
-    await announcer.announce(serverAddress) { [pushDelivery = published.pushDelivery] address in
-      // Forced, because this is only reached when the address CHANGED and the publisher's
-      // own "unchanged" memory is about what this process wrote, not about what the
-      // document says.
-      await pushDelivery?.publish(serverURL: address, force: true)
-    }
-  }
-
-  /// The secret store, reachable synchronously.
-  ///
-  /// Needed because services are constructed by the registry inside a non-async
-  /// initializer, and `secrets` is actor-isolated. `nonisolated` is safe here: the store is
-  /// immutable and its own implementation is thread-safe.
-  public nonisolated var secretsForPush: any SecretStore { secrets }
 
   /// The whole-server verbs — restart, and process replacement.
   ///
@@ -602,5 +584,5 @@ public actor AppContext {
   /// It is optional because Full Disk Access may not be granted yet — and the server has to
   /// start anyway, so the user can reach the permissions page and fix it. A server that
   /// refuses to boot without the permission cannot tell anyone why.
-  public var hasMessageAccess: Bool { messages != nil }
+  public nonisolated var hasMessageAccess: Bool { messages != nil }
 }

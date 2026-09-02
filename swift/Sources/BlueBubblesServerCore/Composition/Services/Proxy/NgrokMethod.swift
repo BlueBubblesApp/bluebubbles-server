@@ -1,6 +1,7 @@
 //  NgrokMethod
 //  The ngrok tunnel, driven through the managed `ngrok` binary.
 
+import BBBuiltIns
 import BBDiagnostics
 import BBProxy
 import BBServiceKit
@@ -23,7 +24,7 @@ enum NgrokMethod: ProxyMethod {
           body: "ngrok will not open a tunnel without one. Paste the authtoken "
             + "from your ngrok dashboard on the ngrok page.",
           source: "Connection",
-          actions: [.openSettings(section: "settings")],
+          actions: [.openSettings(.settings)],
           dedupeKey: "proxy.ngrok.token-missing"
         )
       )

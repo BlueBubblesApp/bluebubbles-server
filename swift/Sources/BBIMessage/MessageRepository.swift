@@ -564,11 +564,6 @@ public struct MessageRepository: Sendable {
     try await chats(guid: guid, limit: 1).first
   }
 
-  /// Chat totals per `style`, which is what GET /chat/count reports.
-  ///
-  /// 43 is a group and 45 a one-to-one, but this deliberately does not translate them —
-  /// the wire format is keyed by the raw number, and inventing names here would mean
-  /// inventing them identically in every client.
   /// The Apple ID this Mac sends iMessages from, or nil.
   ///
   /// Read from the newest iMessage chat's `account_login` rather than from any account API,
@@ -636,14 +631,10 @@ public struct MessageRepository: Sendable {
     }
   }
 
-  /// Attachment totals grouped by broad media kind.
-  ///
-  /// Grouped by the mime type's top-level type rather than by its full value: a client
-  /// wants "412 images", not a histogram over `image/jpeg`, `image/heic` and
-  /// `image/png`. Rows with no mime type at all are counted as `other` rather than
-  /// dropped — a purged attachment often has none, and silently omitting them makes the
+  /// Attachment counts by media bucket — "412 images", not a histogram over `image/jpeg`,
+  /// `image/heic` and `image/png`. Rows with no mime type at all count as `other` rather
+  /// than being dropped: a purged attachment often has none, and omitting them makes the
   /// totals disagree with `attachmentCount`.
-  /// Attachment counts by media bucket.
   ///
   /// Grouped on the FULL mime type rather than the part before the slash, because one of
   /// the buckets the wire contract names is not a top-level type: the reference counts

@@ -1,4 +1,4 @@
-//  ProxyService
+//  ProxyCoordinator
 //  The tunnels, behind one protocol.
 //
 //  Five options, and today they share almost nothing: ngrok goes through an npm binding,

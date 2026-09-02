@@ -90,15 +90,15 @@ improvising the order:**
 | A setting | `Sources/BBSettings/SettingsRegistry.swift` — declare a `Setting<T>` with `presentation:` and add it to `Settings.renderable` (or `Settings.hidden` if it has no UI). `allKeys` is derived. Mark it `application: .composition` if only a restart applies it. Never write a key as a string literal elsewhere: use `Settings.x.key` |
 | An API route | `Sources/BBHTTPAPI/RouteTable.swift` (or `AdditiveRoutes` if Node does not have it), then a handler in `Sources/BBHandlers/` |
 | Logic behind a route | `Sources/BBInterfaces/` — **not** the handler. Interfaces return typed values; one `serialize` step projects them. Anything reaching Messages goes inside `throughMessages { … }` |
-| A capability a handler, service or view may reach | `Sources/BBInterfaces/Capabilities.swift`, then conform `AppContext` in `AppContextCapabilities.swift`. Never take the whole `AppContext` |
+| A capability a handler, service or view may reach | `Sources/BBInterfaces/Capabilities.swift` if the app or the root composes it too, `Sources/BBHandlers/HandlerCapabilities.swift` if only a handler does; then conform `AppContext` in `AppContextCapabilities.swift`. Never take the whole `AppContext` |
 | A setup (onboarding) step | `Sources/BlueBubblesApp/Onboarding/OnboardingFlow.swift` — a case in `OnboardingStep.ID`, an entry in `OnboardingCatalog.steps` with its `isIncluded` rule and `gate`, and a view case in `Views/Onboarding/OnboardingSteps.swift` (the switch is exhaustive). Build the view from the settings screens that already exist; never a second copy of a control |
 | A page in the app | `Sources/BlueBubblesApp/Views/` — reach state through `AppModel`, never `AppContext`. State with its own lifetime goes on a child model in `Sources/BlueBubblesApp/Models/` (`PermissionsModel`, `AlertsModel`, `UpdatesModel`, `IntegrationsModel`) that attaches in `start` and detaches in `stop`; `AppModel` is the root that owns phase, navigation and lifetime |
-| A service | One file per service under `Sources/BlueBubblesServerCore/Composition/Services/`, conforming to `ContextualService`; declare its manifest in `BuiltInManifests.swift` and register it in `ServerComposition`. Start order is derived from `dependencies` |
+| A service | One file per service under `Sources/BlueBubblesServerCore/Composition/Services/`, conforming to `ContextualService`; declare its manifest in `Sources/BBBuiltIns/BuiltInManifests.swift` and register it in `ServerComposition`. Start order is derived from `dependencies`. Its registry key is its manifest identifier — there is no separate `ServiceID` |
 | A table in `app.db` | A `SchemaContributor` in the module that owns it, then append it to `AppSchema.contributors`. **Not** `AppDatabase` — see [`Sources/BBPersistence/CLAUDE.md`](Sources/BBPersistence/CLAUDE.md) |
 | An event | `Sources/BBEvents/ServerEvent.swift` plus its per-sink projection |
 | A user-visible alert | Raise it explicitly through `BBDiagnostics`. Logging must never produce one |
 | A Private API call | `Helper/BBPrivateAPIContract` first — a case on `MessagesHelperAction` or `FaceTimeHelperAction`, then the contract method — then `Helper/BlueBubblesHelper`. Each dispatch is exhaustive over its enum, so the helper side will not compile until you handle it. Go through `IMCoreRuntime`, never IMCore directly |
-| An external binary a service runs | A `ManagedToolDescriptor` on its manifest (`BuiltInTools.swift`). Do not write a downloader |
+| An external binary a service runs | A `ManagedToolDescriptor` on its manifest (`Sources/BBBuiltIns/BuiltInTools.swift`). Do not write a downloader |
 
 ---
 
@@ -117,6 +117,12 @@ improvising the order:**
 - **Never log a secret.** Anything from a setting marked `isSecret` is wrapped as
   `DiagnosticValue.secret` and renders as `••••`. Keep it that way.
 - **Migrations are append-only.** Never edit a released one. Rename via a new migration.
+- **A header states the decision and the failure it prevents. It does not narrate history.**
+  What the code *used to* do, what a previous pass replaced and why it was measured belong in
+  git and [`.claude/docs/decisions.md`](.claude/docs/decisions.md). Narrative above a
+  declaration rots the moment the declaration changes — the audit found a delegate doc that
+  said "NOT `.terminateLater`" above a `return .terminateLater`. When you change code under a
+  comment, the comment is part of the change.
 - **The plugin manifest surface is frozen.** Third-party plugins are wanted but are not being
   built now, so `BBServiceKit` is closed to new capability: no new entitlement kinds, no new
   manifest fields for hypothetical plugin needs, no widening of the tool or migration

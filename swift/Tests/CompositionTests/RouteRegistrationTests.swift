@@ -17,6 +17,7 @@ import BBSettings
 import Foundation
 import Testing
 
+@testable import BBBuiltIns
 @testable import BBHandlers
 @testable import BBInterfaces
 @testable import BlueBubblesServerCore
@@ -549,14 +550,14 @@ struct ServiceGraphTests {
     // websocket upgrade is decided at the channel, before the router sees a request, so
     // the transport has to exist by the time the port is bound. The edge pointed the
     // other way while the socket had no transport at all, and nothing noticed.
-    #expect(HTTPService.dependencies.contains(ServiceID.socket))
+    #expect(HTTPService.dependencies.contains(BuiltInManifests.ID.socket))
     #expect(SocketService.dependencies.isEmpty)
     // A tunnel pointing at a port nothing is serving publishes an address that fails for
     // every client that tries it.
-    #expect(ProxyService<ZrokMethod>.dependencies.contains(ServiceID.http))
+    #expect(ProxyService<ZrokMethod>.dependencies.contains(BuiltInManifests.ID.http))
     // Everything that gates on a permission needs the monitor running first.
-    #expect(ChangeDetectionService.dependencies.contains(ServiceID.permissions))
-    #expect(HTTPService.dependencies.contains(ServiceID.permissions))
+    #expect(ChangeDetectionService.dependencies.contains(BuiltInManifests.ID.permissions))
+    #expect(HTTPService.dependencies.contains(BuiltInManifests.ID.permissions))
   }
 
   /// The one permission that genuinely gates a service. Without Full Disk Access there is

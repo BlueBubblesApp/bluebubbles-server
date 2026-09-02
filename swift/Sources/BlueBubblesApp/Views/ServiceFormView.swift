@@ -21,6 +21,14 @@
 //  instead of one unbroken column — and it costs a manifest author nothing they were not
 //  already writing.
 //
+//  TEXT IS EDITED AS A DRAFT AND COMMITTED ON RETURN OR FOCUS LOSS, exactly as `SettingRow`
+//  does, and here the reason is sharper than there. Every proxy service watches its own
+//  fields and answers a change with `.restart`, so a form that wrote the store per keystroke
+//  restarted the selected tunnel once per character typed into its token field — and each of
+//  those partial tokens was handed to the vendor's binary. A click is a finished decision, so
+//  toggles, pickers, dates and the path chooser commit at once; a keystroke is one letter of
+//  one, so text waits for Return, for focus to move, or for the page to close.
+//
 //  This emits sections, NOT a page: it is placed inside a host that already scrolls, and a
 //  scroll view nested in a scroll view traps the wheel over whichever one the pointer is on.
 //
@@ -37,11 +45,18 @@ struct ServiceFormView: View {
   let store: SettingsStore
   let model: AppModel
 
-  /// Every field's current value, keyed by the field's RELATIVE name.
+  /// Every field's current value as the form shows it, keyed by the field's RELATIVE name.
   ///
   /// Relative rather than fully qualified because `visibleWhen` names a sibling field, and
   /// resolving a condition would otherwise mean re-deriving the namespace on every keystroke.
+  ///
+  /// This is the DRAFT. For a text field it can run ahead of the store while the person is
+  /// typing; `committed` is what the store holds.
   @State private var values: [String: String] = [:]
+  /// What the store last accepted, so a commit that changes nothing is skipped — tabbing
+  /// through a page must not rewrite every field, and a no-op write of a token would still
+  /// restart the tunnel.
+  @State private var committed: [String: String] = [:]
   @State private var revealed: Set<String> = []
   /// Which collapsed sections the user has opened, by title.
   ///
@@ -49,6 +64,8 @@ struct ServiceFormView: View {
   /// moment ago is not configuration, and writing it into the service's namespace would put
   /// a key nothing reads next to the ones that decide how the tunnel runs.
   @State private var expanded: Set<String> = []
+  /// The text field being edited, by field key. Focus leaving one is its commit.
+  @FocusState private var editing: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: SettingsMetrics.sectionSpacing) {
@@ -78,6 +95,14 @@ struct ServiceFormView: View {
       }
     }
     .task { await load() }
+    // Focus moving off a text field commits it. Clicking away is how macOS says "done
+    // with this one", and it is the case a Save button would exist to catch.
+    .onChange(of: editing) { previous, _ in
+      if let previous { commit(previous) }
+    }
+    // Navigating away commits too. Without it, switching pages mid-edit drops the change
+    // on the floor — the one outcome worse than saving too eagerly.
+    .onDisappear { commitAll() }
   }
 
   // MARK: - Grouping
@@ -213,13 +238,16 @@ struct ServiceFormView: View {
     // label-and-control shape the core settings screen uses.
     case .paragraph:
       SettingsWideRow(title: field.label, help: field.help) {
-        TextEditor(text: binding(field))
+        // No Return to commit here — Return is a newline in a text editor — so focus loss
+        // and leaving the page are the commit points.
+        TextEditor(text: draft(field))
           .frame(minHeight: 96)
           .font(.body)
           .scrollContentBackground(.hidden)
           .padding(6)
           .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
-        requiredNote(field)
+          .focused($editing, equals: field.key)
+        ForEach(Array(footnotes(for: field).enumerated()), id: \.offset) { _, note in note }
       }
 
     case .multiSelect(let options):
@@ -230,7 +258,7 @@ struct ServiceFormView: View {
               .toggleStyle(.checkbox)
           }
         }
-        requiredNote(field)
+        ForEach(Array(footnotes(for: field).enumerated()), id: \.offset) { _, note in note }
       }
 
     default:
@@ -252,7 +280,9 @@ struct ServiceFormView: View {
   ///
   /// The disabled reason takes precedence over "Required.": a field that cannot be edited
   /// cannot be filled in either, so demanding a value would be telling the user to do
-  /// something the form has just stopped them doing.
+  /// something the form has just stopped them doing. An unsaved draft is named too, and
+  /// neutrally: it appears on the first keystroke of a perfectly ordinary edit, and
+  /// colouring it as a problem would make typing look like a fault.
   private func footnotes(for field: FieldDescriptor) -> [SettingsFootnote] {
     if isDisabled(field) {
       return [
@@ -263,32 +293,29 @@ struct ServiceFormView: View {
         )
       ]
     }
+    var notes: [SettingsFootnote] = []
+    if hasUnsavedEdit(field) {
+      notes.append(
+        SettingsFootnote(
+          text: "Not saved yet — press Return, or click another field.",
+          symbol: "pencil.circle",
+          tone: .neutral
+        ))
+    }
     if field.isRequired, (values[field.key] ?? "").isEmpty {
-      return [
+      notes.append(
         SettingsFootnote(
           text: "Required.", symbol: "exclamationmark.circle", tone: .warning
-        )
-      ]
+        ))
     }
-    return []
-  }
-
-  @ViewBuilder
-  private func requiredNote(_ field: FieldDescriptor) -> some View {
-    if isDisabled(field) {
-      SettingsFootnote(
-        text: field.disabledReason ?? "Set elsewhere.", symbol: "lock", tone: .neutral
-      )
-    } else if field.isRequired, (values[field.key] ?? "").isEmpty {
-      SettingsFootnote(text: "Required.", symbol: "exclamationmark.circle", tone: .warning)
-    }
+    return notes
   }
 
   @ViewBuilder
   private func control(for field: FieldDescriptor) -> some View {
     switch field.kind {
     case .toggle:
-      Toggle("", isOn: binding(field, default: "false").isTrue)
+      Toggle("", isOn: immediate(field, default: "false").isTrue)
         .toggleStyle(.switch)
         .labelsHidden()
 
@@ -299,10 +326,12 @@ struct ServiceFormView: View {
       secureOrPlain(field, placeholder: "https://…")
 
     case .number(let range):
-      TextField("", text: binding(field))
+      TextField("", text: draft(field))
         .textFieldStyle(.roundedBorder)
         .controlSize(.large)
         .frame(width: 140)
+        .focused($editing, equals: field.key)
+        .onSubmit { commit(field.key) }
         .onChange(of: values[field.key] ?? "") { _, new in
           // Digits only, clamped as typed. Letting a non-number through would
           // store a value the service reads back as zero.
@@ -315,10 +344,12 @@ struct ServiceFormView: View {
         }
 
     case .decimal:
-      TextField("", text: binding(field))
+      TextField("", text: draft(field))
         .textFieldStyle(.roundedBorder)
         .controlSize(.large)
         .frame(width: 140)
+        .focused($editing, equals: field.key)
+        .onSubmit { commit(field.key) }
 
     case .date:
       DatePicker("", selection: dateBinding(field), displayedComponents: [.date])
@@ -326,7 +357,7 @@ struct ServiceFormView: View {
         .controlSize(.large)
 
     case .select(let options):
-      Picker("", selection: binding(field)) {
+      Picker("", selection: immediate(field)) {
         ForEach(options, id: \.value) { option in
           Text(option.label).tag(option.value)
         }
@@ -354,13 +385,15 @@ struct ServiceFormView: View {
     HStack(spacing: 6) {
       SwiftUI.Group {
         if field.isSecret, !revealed.contains(field.key) {
-          SecureField(placeholder ?? "", text: binding(field))
+          SecureField(placeholder ?? "", text: draft(field))
         } else {
-          TextField(placeholder ?? "", text: binding(field))
+          TextField(placeholder ?? "", text: draft(field))
         }
       }
       .textFieldStyle(.roundedBorder)
       .controlSize(.large)
+      .focused($editing, equals: field.key)
+      .onSubmit { commit(field.key) }
 
       if field.isSecret {
         // Revealable, because a user pasting a token needs to be able to check it —
@@ -383,13 +416,24 @@ struct ServiceFormView: View {
 
   // MARK: - Values
 
-  /// A binding that writes through to the store as it changes.
-  private func binding(_ field: FieldDescriptor, default fallback: String = "") -> Binding<String> {
+  /// A binding onto the draft alone. Nothing reaches the store until `commit`.
+  private func draft(_ field: FieldDescriptor) -> Binding<String> {
+    Binding(
+      get: { values[field.key] ?? "" },
+      set: { values[field.key] = $0 }
+    )
+  }
+
+  /// A binding that commits as it changes, for controls where a change IS a decision:
+  /// a switch, a picker, a checkbox, a date, a file chooser.
+  private func immediate(_ field: FieldDescriptor, default fallback: String = "")
+    -> Binding<String>
+  {
     Binding(
       get: { values[field.key] ?? fallback },
       set: { newValue in
         values[field.key] = newValue
-        Task { await save(field, newValue) }
+        commit(field.key)
       }
     )
   }
@@ -404,9 +448,8 @@ struct ServiceFormView: View {
         return date
       },
       set: { newValue in
-        let text = ISO8601DateFormatter().string(from: newValue)
-        values[field.key] = text
-        Task { await save(field, text) }
+        values[field.key] = ISO8601DateFormatter().string(from: newValue)
+        commit(field.key)
       }
     )
   }
@@ -418,9 +461,8 @@ struct ServiceFormView: View {
       set: { isOn in
         var current = selected(field)
         if isOn { current.insert(option) } else { current.remove(option) }
-        let text = current.sorted().joined(separator: ",")
-        values[field.key] = text
-        Task { await save(field, text) }
+        values[field.key] = current.sorted().joined(separator: ",")
+        commit(field.key)
       }
     )
   }
@@ -444,6 +486,18 @@ struct ServiceFormView: View {
     return condition.isSatisfied(by: values[condition.field] ?? "")
   }
 
+  /// Whether a text field holds something the store has not been given.
+  ///
+  /// Only the text-shaped kinds can: everything else commits the moment it changes.
+  private func hasUnsavedEdit(_ field: FieldDescriptor) -> Bool {
+    switch field.kind {
+    case .text, .url, .number, .decimal, .paragraph:
+      return (values[field.key] ?? "") != (committed[field.key] ?? "")
+    default:
+      return false
+    }
+  }
+
   private func load() async {
     var loaded: [String: String] = [:]
     for field in manifest.fields {
@@ -452,6 +506,25 @@ struct ServiceFormView: View {
       }
     }
     values = loaded
+    committed = loaded
+  }
+
+  // MARK: - Committing
+
+  /// Writes one field's draft to the store, if it actually differs from what is stored.
+  ///
+  /// The equality check is what makes commit-on-blur quiet — and, for this form, what keeps a
+  /// tunnel up: every proxy restarts on a change to its own fields, so a write that changed
+  /// nothing would still cost a reconnect and a new address.
+  private func commit(_ key: String) {
+    guard let field = manifest.fields.first(where: { $0.key == key }) else { return }
+    let value = values[key] ?? ""
+    guard value != (committed[key] ?? "") else { return }
+    Task { await save(field, value) }
+  }
+
+  private func commitAll() {
+    for field in manifest.fields { commit(field.key) }
   }
 
   private func save(_ field: FieldDescriptor, _ value: String) async {
@@ -461,6 +534,7 @@ struct ServiceFormView: View {
         forKey: manifest.storageKey(for: field.key),
         isSecret: field.isSecret
       )
+      committed[field.key] = value
     } catch {
       await model.report(error, while: "save \(field.label)")
     }
@@ -473,7 +547,7 @@ struct ServiceFormView: View {
     panel.allowsMultipleSelection = false
     guard panel.runModal() == .OK, let url = panel.url else { return }
     values[field.key] = url.path
-    Task { await save(field, url.path) }
+    commit(field.key)
   }
 
   /// Renders the Markdown subset a manifest may use, falling back to the literal text.

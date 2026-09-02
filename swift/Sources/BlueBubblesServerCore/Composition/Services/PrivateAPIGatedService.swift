@@ -1,8 +1,10 @@
 //  PrivateAPIGatedService
 //  The Private API as a registry service: inject, connect, forward helper events onto the bus.
 
+import BBBuiltIns
 import BBDiagnostics
 import BBEvents
+import BBFaceTime
 import BBPrivateAPI
 import BBPrivateAPIContract
 import BBSerialization
@@ -12,12 +14,6 @@ import Foundation
 
 actor PrivateAPIGatedService: ContextualService, GatedService, ConfigurableService {
   static let manifest = BuiltInManifests.privateAPI
-  static let watchedSettings: Set<String> = [
-    Settings.enablePrivateAPI.key, Settings.privateAPIHelperPath.key,
-    // Changing which FaceTime dylib is injected has to re-inject it, same as the
-    // Messages one — and so does turning FaceTime injection on or off.
-    Settings.privateAPIFaceTimeHelperPath.key, Settings.enableFaceTimePrivateAPI.key,
-  ]
   static let restartPolicy = RestartPolicy.backoff(
     base: .seconds(5), max: .seconds(60), attempts: 5
   )
@@ -145,15 +141,6 @@ actor PrivateAPIGatedService: ContextualService, GatedService, ConfigurableServi
     self.runtime = nil
   }
 
-  /// Maps a helper event onto the client-facing vocabulary.
-  ///
-  /// The second element is the rate-limit key. It matters for FindMy: locations arrive as
-  /// a batch covering every device, and keying on the DEVICE is what makes the limiter
-  /// deliver each device's newest position rather than one device's and nobody else's.
-  /// The automatic sweep: expired server-created links, plus any call the Mac is stuck in.
-  ///
-  /// Deliberately quiet. This runs on every registration, and the common case is that there
-  /// is nothing to do; only actual work is logged.
   /// The automatic sweep: expired server-created links, plus any call the Mac is stuck in.
   ///
   /// Deliberately quiet. This runs on every registration and the common case is that there
@@ -169,6 +156,11 @@ actor PrivateAPIGatedService: ContextualService, GatedService, ConfigurableServi
       ])
   }
 
+  /// Maps a helper event onto the client-facing vocabulary.
+  ///
+  /// The second element is the rate-limit key. It matters for FindMy: locations arrive as
+  /// a batch covering every device, and keying on the DEVICE is what makes the limiter
+  /// deliver each device's newest position rather than one device's and nobody else's.
   static func serverEvent(
     for event: PrivateAPIEvent
   ) -> (event: ServerEvent, rateLimitKey: String?)? {

@@ -869,3 +869,127 @@ next cut, and `ToolActions` is its only consumer.
       -extract`.
 - [ ] **Test group 481** ("Renamed By Swift Helper", `any;+;bcb9a1843dfc4b65bb47ce50afec8d32`)
       is left in the user's Messages with the user departed from it. Delete when convenient.
+
+# 7. Architecture audit — 2 September 2026
+
+A whole-tree read of `Sources/` and `Helper/` for maintainability, standardisation and
+extensibility, done from the code rather than the comments. The verdict was that the shape is
+sound — strict concurrency everywhere, actors as the isolation model, layering checked by
+`Tools/package-graph/check.py`, typed errors, swift-testing with real doubles — and that the
+problems are second-order. Ten findings came out of it. Three are done; the rest are recorded
+here so they can be picked up cold, in the order the audit recommended.
+
+## ~~Manifest forms saved per keystroke and restarted the tunnel each time~~ — DONE
+
+`ServiceFormView` wrote the store on every change of a text binding. Every `ProxyService`
+watches its own fields and answers `.restart`, so typing a Cloudflare or zrok token restarted
+the selected tunnel once per character, and each partial token reached the vendor's binary.
+Text now drafts and commits on Return, focus loss or leaving the page, with a "Not saved yet"
+footnote while a draft is pending, the same policy `SettingRow` already had. Toggles, pickers,
+dates and the path chooser still commit at once, because a click is a finished decision.
+
+## ~~Two identifier types for one concept~~ — DONE
+
+`ServiceID` and `ServiceIdentifier` named the same thing and were converted through
+`rawValue` at forty sites, with `ContextualService.swift` re-declaring every built-in id as a
+second set of constants. `ServiceID` is gone: `Service.id` returns `manifest.id`, the registry
+keys on `ServiceIdentifier`, and a dependency is written as `BuiltInManifests.ID.http`.
+
+## ~~The composition root implemented as well as wired~~ — DONE, as `BBBuiltIns`
+
+The manifests, the tool descriptors, `ServiceEnablement`, `ScopedSettings` and
+`ServiceSettingsBridge` lived in `BlueBubblesServerCore/Composition`, so the app linked the
+whole wiring to render a manifest and parse the disabled list. They are `Sources/BBBuiltIns`
+now — a data module depending on `BBServiceKit`, `BBSettings`, `BBDiagnostics` and `BBSystem`
+— and the root reads it like the app does. Still in the root and still worth moving later:
+`TLSProvisioning`, `ServerAddressAnnouncer` and the per-vendor option building in
+`Services/Proxy/*Method.swift`, which is behaviour rather than wiring.
+
+## ~~`AppContext` is a service locator with mixed access rules~~ — DONE
+
+`secretsForPush` (an alias of `secrets`), the `Interfaces` typealias and the
+`groupChatShortcuts()` accessor over a `let` are gone. Announcing a new address and restarting
+push moved to `ServerLifecycle`, which now owns the announcer; the container no longer holds a
+lazily built one. `hasMessageAccess` and `groupChatShortcuts` are `nonisolated`, so reading
+them costs nothing. The header now states the three member shapes — `nonisolated let`,
+`nonisolated var` value, isolated state — and `Sources/BlueBubblesServerCore/CLAUDE.md` says
+not to add a fourth. What stays on the container, deliberately: `requestRestart` and
+`requestFullRestart` as two-line delegations, because `ServerControlling` is a capability the
+handlers compose and the container is what conforms; and the lazily built `faceTime()`,
+`applicationRestart()` and `callHistory()`, which close over the container's own published
+state and are honestly isolated.
+
+## ~~Rules enforced in one place and hand-maintained in another~~ — DONE
+
+Four drift classes, each now derived from the declaration it used to mirror:
+
+- `Settings.secretKeys` is `Set(all.filter(\.isSecret).map(\.key))`.
+- `IntegrationsModel` parses and writes `disabled_services` through `ServiceEnablement`.
+- `ConfigurableService.watchedSettings` DEFAULTS to `manifest.watchedSettingKeys` — own
+  fields plus declared reads, minus declared writes so a connection method never restarts
+  on its own `server_address` publish. A service may only ADD to it (`HTTPService` and
+  `SocketService` add `password`; `WebhookDeliveryService` adds `ntfy_token`, a secret no
+  entitlement may name; `PushDeliveryService` adds `remote_restart_enabled`, which has no
+  presentation and so no name the permissions sentence could use). Every other core read
+  is now declared on its manifest, which also fixed the permissions list — the Private API
+  reads its four helper settings, HTTP reads the TLS switch, and every proxy declares that
+  it writes `server_address`. Two tests in
+  `WatchedSettingsTests` pin the rule: declared ⊆ watched, and written ∩ watched = ∅.
+  `PushDeliveryService.apply` now answers `.none` for `server_address`, which it consumes
+  live.
+- `AlertAction.openSettings` takes an `AlertDestination` enum and the app routes it with an
+  exhaustive switch.
+
+## ~~`BBInterfaces` has become the everything-domain module~~ — DONE, in the narrowed form
+
+Section 6's retraction stands: the repositories stay. What moved: the FaceTime trio is
+`Sources/BBFaceTime`, `FindMyRuntime` is in `BBSystem` beside the other FindMy types, and the
+three capabilities only handlers compose — access control, token auth, the update installer —
+are `BBHandlers/HandlerCapabilities.swift`. `ToolProviding` had no composer and is deleted.
+`BBInterfaces` no longer depends on `BBAuth`, `BBTooling` or `BBUpdates`.
+
+## ~~The registry has no per-service state machine~~ — DONE, as lanes
+
+Every start, stop, restart and supervised retry for one service now passes through that
+service's lane in `ServiceRegistry` — a chain of tasks, one per service, each waiting for the
+last — so a stop or a second restart arriving while a start is in flight waits for it and then
+runs against a service that is genuinely up or genuinely failed. A restart is one lane
+operation, so two restarts are stop, start, stop, start and never interleave. `stop` cancels
+the supervisor at once, so no further retry is scheduled, and an attempt already in the lane
+completes before the stop runs. `health()` reports `.starting` while a start is in flight,
+which the enum had a case for from the first commit and nothing reported. Three gate-driven
+tests in `ServiceRegistryTests` pin it: a stop during a start, two concurrent restarts, and a
+stop during a supervised retry. Lanes are per service and never shared, so this adds no
+cross-service waiting.
+
+## Fire-and-forget persistence can reorder
+
+`AccessControlService.persist` snapshots state and writes it in a detached task with no
+ordering, so two rapid blocks produce two tasks and the older snapshot can land last.
+
+- [ ] Give the writes a serial lane, the way `EventBus` gives each sink one, or fold them into
+      one task that drains a queue. Done looks like a test with a slow `AccessControlPersistence`
+      double that proves the last write wins.
+
+## ~~Comment rot, and the volume that guarantees more~~ — DONE, as a rule
+
+Fixed the four found: the delegate doc that contradicted its code, the duplicated FaceTime
+sweep paragraph (and the `serverEvent` doc it had displaced), the duplicated `alertJSON`
+paragraph, and two orphaned paragraphs in `MessageRepository`. The rule is in `CLAUDE.md`
+under the non-negotiables: a header states the decision and the failure it prevents, history
+goes in git and the decisions doc, and a comment above changed code is part of the change.
+The thirty-odd files that still carry narrative are trimmed as they are opened for other
+reasons, not in a sweep.
+
+## ~~Smaller consistency items~~ — DONE, one retracted
+
+- `PrivateAPIRuntime.swift` and `ProxyCoordinator.swift` are named after what they define.
+- `ServerInterface` is `AdminInterface`, reached as `admin`; the `Interfaces` alias is gone.
+- `PushHandlers` no longer imports GRDB and `BBHandlers` no longer declares it.
+- `SettingValue.parse(loose:)` is a protocol requirement; the store no longer switches on
+  `type == Bool.self`. Enum-backed settings get it from a constrained extension, and `Date`
+  now parses ISO 8601 from the command line where before it parsed nothing.
+- **`BBError` boilerplate — RETRACTED.** The repeated lines are the `code` switches, and
+  `code` is a searchable, per-case contract that has to be written out. `domain` is one line
+  per type, and a reflective default would change every logged domain string. Nothing to
+  remove.

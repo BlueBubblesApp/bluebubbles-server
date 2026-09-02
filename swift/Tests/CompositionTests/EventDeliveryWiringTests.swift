@@ -162,7 +162,7 @@ struct EventDeliveryWiringTests {
   func deliveryServicesAreRegistered() {
     // The composition root is where a sink gets its chance to register, and a service
     // missing from that list is a delivery route that silently does not exist.
-    let ids: Set<ServiceID> = [
+    let ids: Set<ServiceIdentifier> = [
       SocketService.id, PushDeliveryService.id, WebhookDeliveryService.id,
     ]
     #expect(ids.count == 3, "two delivery services collided on one id")

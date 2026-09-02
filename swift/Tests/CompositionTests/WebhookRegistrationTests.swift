@@ -27,9 +27,9 @@ import Testing
 @Suite("Webhook registration")
 struct WebhookRegistrationTests {
 
-  private func makeInterface() async throws -> ServerInterface {
+  private func makeInterface() async throws -> AdminInterface {
     let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
-    return ServerInterface(
+    return AdminInterface(
       database: database,
       alerts: AlertCenter(),
       settings: try await SettingsStore(

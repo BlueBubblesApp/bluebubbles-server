@@ -14,13 +14,48 @@ import Foundation
 /// it exists to dodge boolean parsing.
 public protocol SettingValue: Codable, Sendable, Equatable {
   static var typeTag: String { get }
+
+  /// The value a string from the command line or the config file means, or nil when it
+  /// means nothing of this type.
+  ///
+  /// Those two layers carry no type tag, so each value type says for itself what it accepts
+  /// — `"1"`, `"true"` and `"yes"` are all a Bool — rather than the store switching on
+  /// `type == Bool.self` and knowing every conformer by name.
+  static func parse(loose raw: String) -> Self?
 }
 
-extension Bool: SettingValue { public static var typeTag: String { "bool" } }
-extension Int: SettingValue { public static var typeTag: String { "int" } }
-extension Double: SettingValue { public static var typeTag: String { "double" } }
-extension String: SettingValue { public static var typeTag: String { "string" } }
-extension Date: SettingValue { public static var typeTag: String { "date" } }
+extension Bool: SettingValue {
+  public static var typeTag: String { "bool" }
+  public static func parse(loose raw: String) -> Bool? {
+    switch raw.lowercased() {
+    case "1", "true", "yes": true
+    case "0", "false", "no": false
+    default: nil
+    }
+  }
+}
+extension Int: SettingValue {
+  public static var typeTag: String { "int" }
+  public static func parse(loose raw: String) -> Int? { Int(raw) }
+}
+extension Double: SettingValue {
+  public static var typeTag: String { "double" }
+  public static func parse(loose raw: String) -> Double? { Double(raw) }
+}
+extension String: SettingValue {
+  public static var typeTag: String { "string" }
+  public static func parse(loose raw: String) -> String? { raw }
+}
+extension Date: SettingValue {
+  public static var typeTag: String { "date" }
+  /// ISO 8601, the one spelling that survives a config file being copied between Macs.
+  public static func parse(loose raw: String) -> Date? { ISO8601DateFormatter().date(from: raw) }
+}
+
+/// Enum-backed settings — `auth_mode`, the codec picker — parse from their raw value.
+extension SettingValue where Self: RawRepresentable, RawValue == String {
+  public static func parse(loose raw: String) -> Self? { Self(rawValue: raw) }
+}
 
 /// How a setting should be presented, declared alongside the setting itself.
 ///

@@ -30,6 +30,7 @@
 //
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
+import BBBuiltIns
 import BBDiagnostics
 import BBProxy
 import BBServiceKit
@@ -116,7 +117,7 @@ struct ProxyHost: Sendable {
         title: title,
         body: body,
         source: "Connection",
-        actions: [.openSettings(section: "settings")],
+        actions: [.openSettings(.settings)],
         dedupeKey: "proxy.\(manifest.id.rawValue).\(key)"
       )
     )
@@ -130,16 +131,13 @@ actor ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableService,
 
   static var manifest: ServiceManifest { Method.manifest }
 
-  /// Watches the selection plus its own namespace, so a change to either restarts it.
+  /// The manifest's own fields and declared reads, plus the selection.
   ///
-  /// Derived rather than hand-listed: a service's own fields are exactly the keys under its
-  /// namespace, which is the whole point of owning one. The zrok bug — watching
-  /// `zrok_token`, which nothing read, and not `zrok_reserved_token`, which built the
-  /// provider — is unrepresentable now, because the list is computed from the manifest that
-  /// declares the fields.
+  /// `connection_method` is added here rather than declared by each method because it is
+  /// THIS generic that reads it, in `canRun` — a method's manifest describes the method. It
+  /// is what lets switching connection method stop the one that was running.
   static var watchedSettings: Set<String> {
-    Set(Method.manifest.fields.map { Method.manifest.storageKey(for: $0.key) })
-      .union([Settings.connectionMethod.key, Settings.socketPort.key])
+    manifestWatchedSettings.union([Settings.connectionMethod.key])
   }
 
   /// Replaces the current recovery path, which retries ten times and then relaunches the
@@ -189,7 +187,7 @@ actor ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableService,
             title: "\(name) has stopped",
             body: reason,
             source: "Connection",
-            actions: [.openSettings(section: "settings")],
+            actions: [.openSettings(.settings)],
             dedupeKey: "proxy.gave-up.\(identifier)",
             // Whether the tunnel is down is re-established the moment it tries again.
             isDurable: false
@@ -239,7 +237,7 @@ actor ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableService,
           "This server cannot start \(name) because its program is not installed, "
           + "so no address is being published. Choose a different connection method, "
           + "or install the program and restart."
-        actions = [.openSettings(section: "settings")]
+        actions = [.openSettings(.settings)]
       }
       await context.alerts.raise(
         UserAlert(

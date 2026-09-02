@@ -594,7 +594,7 @@ public enum AdditiveRoutes {
   /// call with no route behind it — so this is additive by definition and a default table
   /// carrying it would no longer match.
   ///
-  /// The app does not need it: it holds `ServerInterface` in process and calls
+  /// The app does not need it: it holds `AdminInterface` in process and calls
   /// `updateWebhook` directly. It is here so a client can do what the settings window can,
   /// which is the standing rule for anything the UI can reach.
   public static let webhookEditing = RouteGroup(

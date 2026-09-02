@@ -25,8 +25,8 @@ public protocol SettingsChangeRouting: Sendable {
 public actor ServiceRegistry<Host: Sendable> {
 
   public struct Registration {
-    let id: ServiceID
-    let dependencies: [ServiceID]
+    let id: ServiceIdentifier
+    let dependencies: [ServiceIdentifier]
     let manifest: ServiceManifest
     let restartPolicy: RestartPolicy
     let make: @Sendable (Host) -> any Service
@@ -34,15 +34,28 @@ public actor ServiceRegistry<Host: Sendable> {
     let requiredPermissions: [PermissionID]
   }
 
-  private var registrations: [ServiceID: Registration] = [:]
-  private var instances: [ServiceID: any Service] = [:]
-  private var supervisors: [ServiceID: Task<Void, Never>] = [:]
-  private var startOrder: [ServiceID] = []
+  private var registrations: [ServiceIdentifier: Registration] = [:]
+  private var instances: [ServiceIdentifier: any Service] = [:]
+  private var supervisors: [ServiceIdentifier: Task<Void, Never>] = [:]
+  /// One lane per service, through which every start, stop and supervised retry passes.
+  ///
+  /// `start` awaits the service's own `start()` with the actor free. Before the lanes, a
+  /// `stop` or `restart` landing in that window found the instance already registered and
+  /// stopped it underneath a start still running, and the supervisor's retries ran outside
+  /// any ordering at all — so a service could be started twice, or stopped and then finish
+  /// starting with nothing holding it. A lane is the last operation issued for one service;
+  /// the next waits for it. Lanes are per service, never shared, so a slow start of one
+  /// service holds nothing but its own stop.
+  private var lanes: [ServiceIdentifier: Task<Void, Never>] = [:]
+  /// Services whose `start()` is in flight, for `health()`. `ServiceHealth.starting` existed
+  /// from the first commit and nothing reported it.
+  private var startsInFlight: Set<ServiceIdentifier> = []
+  private var startOrder: [ServiceIdentifier] = []
   /// Why a registered service has no instance. `ServiceHealth.inactive` exists to say
   /// "deliberately not running, and here is why" — without recording it, a service that
   /// declined its gate and one that has a missing permission both reported the same
   /// "not started", which is exactly the obscurity the health model was added to remove.
-  private var inactiveReasons: [ServiceID: String] = [:]
+  private var inactiveReasons: [ServiceIdentifier: String] = [:]
   /// Services not running because someone switched them off, plus the ones that depend on
   /// those.
   ///
@@ -50,7 +63,7 @@ public actor ServiceRegistry<Host: Sendable> {
   /// asking `enablementCheck`: a proxy whose HTTP API is switched off is not itself
   /// switched off, and asking it would say it may run. Holding the set is also what makes
   /// the answer transitive — a dependent of a dependent is blocked by the same lookup.
-  private var blocked: Set<ServiceID> = []
+  private var blocked: Set<ServiceIdentifier> = []
   /// True while `startAll` is in flight.
   ///
   /// `start()` awaits each service's own `start()`, and the actor is free during that
@@ -65,7 +78,7 @@ public actor ServiceRegistry<Host: Sendable> {
 
   private let logger = Logger(label: "bluebubbles.services")
   private let host: Host
-  private let onAlert: @Sendable (ServiceID, any Error) async -> Void
+  private let onAlert: @Sendable (ServiceIdentifier, any Error) async -> Void
   /// Consulted before starting a PermissionDependentService, so a missing permission
   /// produces a precise inactive state rather than an obscure failure at first use.
   private let permissionCheck: @Sendable (PermissionID) async -> Bool
@@ -76,7 +89,7 @@ public actor ServiceRegistry<Host: Sendable> {
   /// answer to "did someone turn this off in the UI", and no service should have to
   /// implement it: a switch that every manageable service must remember to honour is a
   /// switch that some of them will not.
-  private let enablementCheck: @Sendable (ServiceID) async -> Bool
+  private let enablementCheck: @Sendable (ServiceIdentifier) async -> Bool
   /// Settings keys that can change what `enablementCheck` answers.
   ///
   /// Held so a change to one can re-evaluate every service, which is the half that cannot
@@ -87,9 +100,9 @@ public actor ServiceRegistry<Host: Sendable> {
   public init(
     host: Host,
     permissionCheck: @escaping @Sendable (PermissionID) async -> Bool = { _ in true },
-    enablementCheck: @escaping @Sendable (ServiceID) async -> Bool = { _ in true },
+    enablementCheck: @escaping @Sendable (ServiceIdentifier) async -> Bool = { _ in true },
     enablementSettings: Set<String> = [],
-    onAlert: @escaping @Sendable (ServiceID, any Error) async -> Void = { _, _ in }
+    onAlert: @escaping @Sendable (ServiceIdentifier, any Error) async -> Void = { _, _ in }
   ) {
     self.host = host
     self.permissionCheck = permissionCheck
@@ -116,7 +129,7 @@ public actor ServiceRegistry<Host: Sendable> {
     )
   }
 
-  public func service(_ id: ServiceID) -> (any Service)? { instances[id] }
+  public func service(_ id: ServiceIdentifier) -> (any Service)? { instances[id] }
 
   /// Every registered service's manifest, for validation and for the UI.
   public var manifests: [ServiceManifest] {
@@ -129,12 +142,12 @@ public actor ServiceRegistry<Host: Sendable> {
   ///
   /// Throws on a cycle rather than deadlocking at startup, and names the services
   /// involved — a cycle is a programming error and should fail loudly at launch.
-  func resolveStartOrder() throws -> [ServiceID] {
-    var resolved: [ServiceID] = []
-    var visiting: Set<ServiceID> = []
-    var visited: Set<ServiceID> = []
+  func resolveStartOrder() throws -> [ServiceIdentifier] {
+    var resolved: [ServiceIdentifier] = []
+    var visiting: Set<ServiceIdentifier> = []
+    var visited: Set<ServiceIdentifier> = []
 
-    func visit(_ id: ServiceID, path: [ServiceID]) throws {
+    func visit(_ id: ServiceIdentifier, path: [ServiceIdentifier]) throws {
       if visited.contains(id) { return }
       if visiting.contains(id) {
         throw ServiceRegistryError.dependencyCycle(path + [id])
@@ -160,8 +173,8 @@ public actor ServiceRegistry<Host: Sendable> {
   }
 
   /// Everything that depends on `id`, transitively. Used when a restart cascades.
-  func dependents(of id: ServiceID) -> Set<ServiceID> {
-    var result: Set<ServiceID> = []
+  func dependents(of id: ServiceIdentifier) -> Set<ServiceIdentifier> {
+    var result: Set<ServiceIdentifier> = []
     var queue = [id]
     while let current = queue.popLast() {
       for (candidate, registration) in registrations
@@ -203,7 +216,42 @@ public actor ServiceRegistry<Host: Sendable> {
     }
   }
 
-  public func start(_ id: ServiceID) async {
+  /// Starts a service, after whatever its lane was already doing.
+  ///
+  /// Idempotent for a running service, and a start queued behind a stop runs after it — so
+  /// `stop` then `start` from two callers is a restart, never a stop that lands mid-start.
+  public func start(_ id: ServiceIdentifier) async {
+    await serialized(id) { await self.performStart(id) }
+  }
+
+  /// Runs `operation` once this service's lane is free, and holds the lane until it returns.
+  ///
+  /// Every lifecycle operation for one service is chained onto the last, which is what makes
+  /// "the actor is free while a service starts" safe: a second operation cannot observe the
+  /// half-started state because it cannot run yet. The chain is a task that awaits the
+  /// previous task, so nothing here blocks the actor, and a caller that is cancelled stops
+  /// waiting without cancelling the operation — a half-run stop is worse than a late one.
+  private func serialized<T: Sendable>(
+    _ id: ServiceIdentifier,
+    _ operation: @escaping @Sendable () async -> T
+  ) async -> T {
+    let previous = lanes[id]
+    let task = Task<T, Never> {
+      await previous?.value
+      return await operation()
+    }
+    let marker = Task<Void, Never> { _ = await task.value }
+    lanes[id] = marker
+    let result = await task.value
+    if lanes[id] == marker { lanes[id] = nil }
+    return result
+  }
+
+  private func markStart(_ id: ServiceIdentifier, inFlight: Bool) {
+    if inFlight { startsInFlight.insert(id) } else { startsInFlight.remove(id) }
+  }
+
+  private func performStart(_ id: ServiceIdentifier) async {
     guard let registration = registrations[id] else { return }
     guard instances[id] == nil else { return }
 
@@ -282,6 +330,8 @@ public actor ServiceRegistry<Host: Sendable> {
     // the exact failure the sort exists to prevent. It surfaced as an ordering test that
     // failed roughly one run in six, which is precisely how this would show up in
     // production: rarely, on a loaded machine, as an unreproducible startup bug.
+    startsInFlight.insert(id)
+    defer { startsInFlight.remove(id) }
     do {
       try await instance.start()
       // Returned cleanly, so the service is up. `Service.start()` brings a service up
@@ -311,7 +361,7 @@ public actor ServiceRegistry<Host: Sendable> {
   ///     still alerts with a cause rather than with nothing.
   /// Logs a permanent failure and raises it. The two callers below differ only in how they
   /// discovered the policy was out of attempts.
-  private func giveUp(id: ServiceID, error: any Error, policy: RestartPolicy) async {
+  private func giveUp(id: ServiceIdentifier, error: any Error, policy: RestartPolicy) async {
     logger.error(
       policy.forbidsRestart
         ? "Service failed and its policy forbids restarting"
@@ -324,7 +374,7 @@ public actor ServiceRegistry<Host: Sendable> {
   }
 
   private func supervise(
-    id: ServiceID,
+    id: ServiceIdentifier,
     instance: any Service,
     policy: RestartPolicy,
     startingAt: Int = 1,
@@ -347,12 +397,26 @@ public actor ServiceRegistry<Host: Sendable> {
     }
 
     while !Task.isCancelled {
-      do {
-        try await instance.start()
+      // Through the service's lane, like the first attempt. A retry that ran outside it
+      // could overlap a `stop`, which is the interleaving the lanes exist to rule out.
+      let attemptOutcome: Result<Void, any Error> = await serialized(id) { [weak self] in
+        await self?.markStart(id, inFlight: true)
+        let outcome: Result<Void, any Error>
+        do {
+          try await instance.start()
+          outcome = .success(())
+        } catch {
+          outcome = .failure(error)
+        }
+        await self?.markStart(id, inFlight: false)
+        return outcome
+      }
+      switch attemptOutcome {
+      case .success:
         return
-      } catch is CancellationError {
+      case .failure(is CancellationError):
         return
-      } catch {
+      case .failure(let error):
         // Policy exhausted: raise, do not relaunch the app.
         guard policy.permits(attempt: attempt + 1) else {
           await giveUp(id: id, error: error, policy: policy)
@@ -381,7 +445,17 @@ public actor ServiceRegistry<Host: Sendable> {
     }
   }
 
-  public func stop(_ id: ServiceID) async {
+  /// Stops a service, after whatever its lane was already doing.
+  ///
+  /// The supervisor is cancelled at once rather than when the lane gets round to it, so a
+  /// retry loop schedules no further attempt; an attempt already in the lane finishes, and
+  /// the stop runs after it against a service that is genuinely up or genuinely failed.
+  public func stop(_ id: ServiceIdentifier) async {
+    supervisors[id]?.cancel()
+    await serialized(id) { await self.performStop(id) }
+  }
+
+  private func performStop(_ id: ServiceIdentifier) async {
     supervisors[id]?.cancel()
     supervisors[id] = nil
     if let instance = instances[id] {
@@ -390,13 +464,19 @@ public actor ServiceRegistry<Host: Sendable> {
     instances[id] = nil
   }
 
-  public func restart(_ id: ServiceID) async {
-    await stop(id)
-    await start(id)
+  /// One lane operation, not two: a second restart queued behind this one runs its stop
+  /// after this one's start, so two restarts are a stop, a start, a stop and a start, in
+  /// that order and never interleaved.
+  public func restart(_ id: ServiceIdentifier) async {
+    supervisors[id]?.cancel()
+    await serialized(id) {
+      await self.performStop(id)
+      await self.performStart(id)
+    }
   }
 
   /// Restarts a service and everything that depends on it, in order.
-  public func restartWithDependents(_ id: ServiceID) async {
+  public func restartWithDependents(_ id: ServiceIdentifier) async {
     let affected = dependents(of: id).union([id])
     let ordered = startOrder.filter { affected.contains($0) }
     for target in ordered.reversed() { await stop(target) }
@@ -425,7 +505,7 @@ public actor ServiceRegistry<Host: Sendable> {
       await applyEnablement()
     }
 
-    var toRestart: Set<ServiceID> = []
+    var toRestart: Set<ServiceIdentifier> = []
 
     for id in startOrder {
       guard let registration = registrations[id],
@@ -454,7 +534,7 @@ public actor ServiceRegistry<Host: Sendable> {
 
     // Expand to dependents once, so a socket_port change restarts the HTTP service and
     // the proxies that depend on it without anyone hand-coding that relationship.
-    var expanded: Set<ServiceID> = []
+    var expanded: Set<ServiceIdentifier> = []
     for id in toRestart { expanded.formUnion(dependents(of: id).union([id])) }
 
     let ordered = startOrder.filter { expanded.contains($0) }
@@ -478,11 +558,11 @@ public actor ServiceRegistry<Host: Sendable> {
   /// known to have been switched off — it re-checks permissions and gates itself, so the
   /// worst case is that a service inactive for some other reason stays inactive.
   private func applyEnablement() async {
-    var switchedOff: Set<ServiceID> = []
+    var switchedOff: Set<ServiceIdentifier> = []
     for id in startOrder where await !enablementCheck(id) { switchedOff.insert(id) }
 
     // Everything switched off, plus everything that depends on it.
-    var toStop: Set<ServiceID> = []
+    var toStop: Set<ServiceIdentifier> = []
     for id in switchedOff { toStop.formUnion(dependents(of: id).union([id])) }
 
     for id in startOrder.reversed() where toStop.contains(id) && instances[id] != nil {
@@ -510,8 +590,8 @@ public actor ServiceRegistry<Host: Sendable> {
 
   // MARK: - Health
 
-  public func health() async -> [ServiceID: ServiceHealth] {
-    var result: [ServiceID: ServiceHealth] = [:]
+  public func health() async -> [ServiceIdentifier: ServiceHealth] {
+    var result: [ServiceIdentifier: ServiceHealth] = [:]
     // Every REGISTERED service, not only those in `startOrder` — which is empty until
     // `startAll()` runs. Reporting on the start order alone means a server that failed
     // before startup reports no services at all rather than nine stopped ones.
@@ -520,7 +600,9 @@ public actor ServiceRegistry<Host: Sendable> {
       ? registrations.keys.sorted { $0.rawValue < $1.rawValue }
       : startOrder
     for id in all {
-      if let instance = instances[id] {
+      if startsInFlight.contains(id) {
+        result[id] = .starting
+      } else if let instance = instances[id] {
         result[id] = await instance.health
       } else if registrations[id] != nil {
         result[id] = .inactive(reason: inactiveReasons[id] ?? "not started")
@@ -531,8 +613,8 @@ public actor ServiceRegistry<Host: Sendable> {
 }
 
 public enum ServiceRegistryError: BBError, Equatable {
-  case dependencyCycle([ServiceID])
-  case unknownDependency(ServiceID)
+  case dependencyCycle([ServiceIdentifier])
+  case unknownDependency(ServiceIdentifier)
 }
 
 extension RestartPolicy {

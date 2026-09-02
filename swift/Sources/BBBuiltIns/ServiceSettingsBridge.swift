@@ -13,10 +13,13 @@
 //  migrating after a service has read its settings means it configured itself from the old
 //  shape and will not look again.
 //
+//  Lives in BBBuiltIns rather than the composition root: the app calls `resetToDefaults` and
+//  `missingRequiredFields` for the integrations screens, and it should not have to link the
+//  wiring to reach two functions over a manifest and a store.
+//
 //  See `.claude/docs/architecture.md`.
 
 import BBDiagnostics
-import BBInterfaces
 import BBServiceKit
 import BBSettings
 import Foundation
@@ -59,7 +62,7 @@ public enum ServiceSettingsBridge {
   ///
   /// - Returns: The manifests that may be started.
   @discardableResult
-  static func validate(
+  public static func validate(
     manifests: [ServiceManifest],
     enabled: Set<ServiceIdentifier>,
     logger: Logger,
@@ -93,7 +96,7 @@ public enum ServiceSettingsBridge {
             title: "Two connection methods are enabled",
             body: String(describing: problem),
             source: "Integrations",
-            actions: [.openSettings(section: "settings")],
+            actions: [.openSettings(.settings)],
             dedupeKey: "manifest.exclusive-conflict"
           )
         )
@@ -136,7 +139,7 @@ public enum ServiceSettingsBridge {
   }
 
   /// Migrates and seeds every manifest's settings.
-  static func prepare(
+  public static func prepare(
     manifests: [ServiceManifest],
     store: SettingsStore,
     logger: Logger
@@ -197,7 +200,7 @@ public enum ServiceSettingsBridge {
   /// An off-by-default toggle is not seeded either, because an unset flag already reads as
   /// `false` — writing it would only turn "never chosen" into "chosen", and a later change
   /// to that default would then be ignored on every existing install.
-  static func seedDefaults(_ manifest: ServiceManifest, store: SettingsStore) async throws {
+  public static func seedDefaults(_ manifest: ServiceManifest, store: SettingsStore) async throws {
     for field in manifest.fields {
       let value: String
       switch field.kind {

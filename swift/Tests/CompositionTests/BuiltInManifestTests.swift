@@ -15,6 +15,7 @@ import Foundation
 import Logging
 import Testing
 
+@testable import BBBuiltIns
 @testable import BBHandlers
 @testable import BBInterfaces
 @testable import BlueBubblesServerCore

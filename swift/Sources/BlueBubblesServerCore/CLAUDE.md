@@ -13,13 +13,16 @@ Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architec
 ## Layout
 
 - `Composition/Services/` — one file per service. `ContextualService.swift` holds the shared
-  protocol, the `ServiceID` constants and `ServiceStartupError`. A service is an `actor` —
+  protocol and `ServiceStartupError`. A service is an `actor` —
   `Service` requires it — so its own mutable state is a `private var`, not a box. The two
   boxes that used to hold a `Task` and the Private API runtime were deleted with their last
   caller.
 - `Composition/Services/Proxy/` — `ProxyService<Method>` plus one file per connection method.
-- Everything else in `Composition/` is wiring: the context, the composition, the lifecycle,
-  the settings bridge and propagation.
+- Everything else in `Composition/` is wiring: the context, the composition, the lifecycle
+  and settings propagation.
+- **What a service declares is not here.** The manifests, the tool descriptors, enablement,
+  `ScopedSettings` and `ServiceSettingsBridge` live in [`../BBBuiltIns`](../BBBuiltIns), a
+  data module the app and the tests can link without the wiring. This root READS them.
 
 ## AppContext
 
@@ -35,8 +38,12 @@ Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architec
   written by hand at each publishing site, which was correct only for as long as everyone
   remembered it, and a stale interface is silent — an interface built before the helper
   connected reports the Private API as unavailable for the life of the process.
-- **It holds references; it does not act.** Whole-server verbs — restart, process replacement —
-  live in `ServerLifecycle`. A container that can `execv` is not a container. Device and webhook
+- **Three member shapes, and the shape says the cost.** `nonisolated let` is a collaborator
+  built once; `nonisolated var` is a cheap value rebuilt per read (`admin`, `schedule`,
+  `devices`, `webhooks`); an isolated `var` or `func` is mutable state or something built on
+  first use, and is the only kind that costs a hop. Do not add a fourth shape.
+- **It holds references; it does not act.** Whole-server verbs — restart, process replacement,
+  announcing a new address — live in `ServerLifecycle`. A container that can `execv` is not a container. Device and webhook
   administration live on `DeviceDirectory` and `WebhookDirectory`, FaceTime hand-offs on
   `FaceTimeCoordinator`, app restarts on `ApplicationRestartCoordinator`, client activity on
   `ClientActivityTracker`, `new-server` on `ServerAddressAnnouncer`, FindMy's gates and cache on
@@ -63,8 +70,9 @@ protocols in `BBInterfaces`. It is deliberately nothing but a list of conformanc
 3. Start order is derived from declared `dependencies`; stop order is its exact reverse. Never
    add a hand-maintained ordering list.
 
-Service ids are derived from manifest identifiers in `BuiltInManifests.swift`, so they cannot
-drift from what the registry files them under.
+A service's registry key IS its manifest identifier — `Service.id` returns `manifest.id` and
+the registry keys on `ServiceIdentifier`. There is no second identifier type and no second
+list of constants: name a service as `BuiltInManifests.ID.http`.
 
 ## Connection methods are generic, not subclassed
 

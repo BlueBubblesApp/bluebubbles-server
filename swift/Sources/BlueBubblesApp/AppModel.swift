@@ -8,6 +8,7 @@ import BBAuth
 import BBContacts
 import BBCore
 import BBDiagnostics
+import BBFaceTime
 import BBInterfaces
 import BBPrivateAPI
 import BBServiceKit
@@ -141,7 +142,7 @@ final class AppModel {
   var permissionsService: PermissionsService? { context?.permissions }
   var accessControl: AccessControlService? { context?.accessControl }
   var tokenAuth: TokenAuthService? { context?.tokenAuth }
-  var serverAdmin: ServerInterface? { context?.server }
+  var serverAdmin: AdminInterface? { context?.admin }
   var scheduling: ScheduleInterface? { context?.schedule }
   var contactIndex: ContactIndex? { context?.contacts }
 
@@ -158,9 +159,7 @@ final class AppModel {
   func interfaces() async -> ServerInterfaces? { await context?.interfaces() }
   func faceTime() async -> FaceTimeCoordinator? { await context?.faceTime() }
   func ownMessagingAddress() async -> String? { await context?.ownMessagingAddress() }
-  func groupChatShortcuts() async -> GroupChatShortcutManager? {
-    await context?.groupChatShortcuts()
-  }
+  var groupChatShortcuts: GroupChatShortcutManager? { context?.groupChatShortcuts }
   var privateAPIAccess: (any PrivateAPIRuntimeProviding)? { context }
   var isHelperConnected: Bool {
     get async { await context?.isHelperConnected ?? false }
@@ -230,7 +229,7 @@ final class AppModel {
       // touched one, whatever the settings actually said.
       await integrations.refresh()
       let context = built.context
-      permissions.attach(context.permissions) { await context.hasMessageAccess }
+      permissions.attach(context.permissions) { context.hasMessageAccess }
       alerts.attach(context.alerts)
       beginObservingAppearance(context.settings)
       await applyStartupBehaviour()
@@ -335,7 +334,7 @@ final class AppModel {
   /// their tunnel — and does not want to wait out the next attempt.
   func restartService(named service: String) async {
     guard let registry = server?.registry else { return }
-    await registry.restart(ServiceID(service))
+    await registry.restart(ServiceIdentifier(service))
   }
 
   /// Lifts a rate-limit block, for an alert's `.unblock` action.

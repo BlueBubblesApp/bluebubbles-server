@@ -19,6 +19,7 @@
 //  See `.claude/docs/architecture.md`.
 
 import BBAuth
+import BBBuiltIns
 import BBContacts
 import BBCore
 import BBDiagnostics
@@ -382,7 +383,8 @@ public struct ServerComposition {
         // something clients hear about — a `new-server` frame now, and a Firebase
         // document for the ones that are not connected.
         onServerAddressChanged: { [weak context] address in
-          await context?.announce(serverAddress: address)
+          guard let lifecycle = await context?.lifecycle else { return }
+          await lifecycle.announce(serverAddress: address)
         },
         // Saved, not yet in effect, and one click from being in effect. Deduplicated
         // on a fixed key so toggling one of these repeatedly leaves one standing

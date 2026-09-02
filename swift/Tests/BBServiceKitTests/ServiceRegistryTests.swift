@@ -24,6 +24,27 @@ actor LifecycleRecorder {
 /// one. One recorder per test removes the shared state entirely.
 struct TestContext: Sendable {
   let recorder: LifecycleRecorder
+  /// Held open by a slow fake's `start()` until a test releases it. A gate rather than a
+  /// sleep, so the ordering tests below assert on causality and not on a machine being fast.
+  var startGate = Gate()
+}
+
+/// Suspends callers until opened, then never again.
+actor Gate {
+  private var isOpen = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  func wait() async {
+    if isOpen { return }
+    await withCheckedContinuation { waiters.append($0) }
+  }
+
+  func open() {
+    isOpen = true
+    let pending = waiters
+    waiters = []
+    for waiter in pending { waiter.resume() }
+  }
 }
 
 /// Shared lifecycle recording for the fakes below.
@@ -375,3 +396,163 @@ struct SupervisionTests {
 }
 
 enum TestFailure: Error { case always }
+
+// MARK: - Lifecycle serialisation
+
+/// A start that does not return until the test lets it, recording where each transition
+/// begins and ends so an overlap is visible in the event list.
+actor SlowService: RecordingService {
+  static var manifest: ServiceManifest { .minimal(id: "slow") }
+  let recorder: LifecycleRecorder
+  let gate: Gate
+  init(host: TestContext) {
+    recorder = host.recorder
+    gate = host.startGate
+  }
+  func start() async throws {
+    await recorder.record("start-begin")
+    await gate.wait()
+    await recorder.record("start-end")
+  }
+  func stop() async {
+    await recorder.record("stop-begin")
+    await recorder.record("stop-end")
+  }
+}
+
+/// Fails once, then starts slowly on the retry — so a stop can arrive while the SUPERVISOR
+/// has a start in flight, which is the path the first attempt's ordering never covered.
+actor FlakyService: Service {
+  struct Failure: Error {}
+  typealias Host = TestContext
+  static var manifest: ServiceManifest { .minimal(id: "flaky") }
+  static var restartPolicy: RestartPolicy {
+    .backoff(base: .milliseconds(10), max: .milliseconds(10), attempts: 5)
+  }
+  let recorder: LifecycleRecorder
+  let gate: Gate
+  private var attempts = 0
+  init(host: TestContext) {
+    recorder = host.recorder
+    gate = host.startGate
+  }
+  func start() async throws {
+    attempts += 1
+    await recorder.record("attempt-\(attempts)")
+    if attempts == 1 { throw Failure() }
+    await gate.wait()
+    await recorder.record("start-end")
+  }
+  func stop() async { await recorder.record("stop") }
+  var health: ServiceHealth { get async { .running } }
+}
+
+@Suite("Lifecycle serialisation", .serialized)
+struct LifecycleSerialisationTests {
+
+  /// Polls the recorder until `event` appears, bounded so a regression fails rather than hangs.
+  private func waitFor(_ event: String, in recorder: LifecycleRecorder) async throws {
+    for _ in 0..<200 {
+      if await recorder.snapshot().contains(event) { return }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    Issue.record("timed out waiting for \(event)")
+  }
+
+  /// No `-begin` may be followed by another `-begin` before its own `-end`.
+  private func neverOverlaps(_ events: [String]) -> Bool {
+    var open: String?
+    for event in events where event.hasSuffix("-begin") || event.hasSuffix("-end") {
+      let name = String(event.prefix { $0 != "-" })
+      if event.hasSuffix("-begin") {
+        guard open == nil else { return false }
+        open = name
+      } else {
+        guard open == name else { return false }
+        open = nil
+      }
+    }
+    return open == nil
+  }
+
+  @Test("A stop that arrives during a start waits for the start")
+  func stopWaitsForStart() async throws {
+    let recorder = LifecycleRecorder()
+    let context = TestContext(recorder: recorder)
+    let registry = ServiceRegistry(host: context)
+    await registry.register(SlowService.self)
+    let id = SlowService.id
+
+    let starter = Task { await registry.start(id) }
+    try await waitFor("start-begin", in: recorder)
+    #expect(await registry.health()[id] == .starting)
+
+    let stopper = Task { await registry.stop(id) }
+    // Enough turns of the scheduler for a stop that was going to interleave to have done so.
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(!(await recorder.snapshot().contains("stop-begin")), "stop ran underneath the start")
+
+    await context.startGate.open()
+    await starter.value
+    await stopper.value
+
+    #expect(await recorder.snapshot() == ["start-begin", "start-end", "stop-begin", "stop-end"])
+    #expect(await registry.service(id) == nil)
+    #expect(await registry.health()[id] == .inactive(reason: "not started"))
+  }
+
+  @Test("Two restarts of one service never interleave")
+  func restartsAreSerialised() async throws {
+    let recorder = LifecycleRecorder()
+    let context = TestContext(recorder: recorder)
+    let registry = ServiceRegistry(host: context)
+    await registry.register(SlowService.self)
+    let id = SlowService.id
+    await context.startGate.open()
+    try await registry.startAll()
+
+    async let first: Void = registry.restart(id)
+    async let second: Void = registry.restart(id)
+    _ = await (first, second)
+
+    let events = await recorder.snapshot()
+    #expect(neverOverlaps(events), "lifecycle transitions overlapped: \(events)")
+    #expect(events.filter { $0 == "start-begin" }.count == 3)
+    #expect(events.filter { $0 == "stop-begin" }.count == 2)
+    // Each restart is a stop THEN a start, and the second restart's stop follows the
+    // first restart's start.
+    #expect(
+      events == [
+        "start-begin", "start-end",
+        "stop-begin", "stop-end", "start-begin", "start-end",
+        "stop-begin", "stop-end", "start-begin", "start-end",
+      ])
+    #expect(await registry.service(id) != nil)
+  }
+
+  @Test("A stop during a supervised retry waits for the attempt and schedules no more")
+  func stopWaitsForSupervisedRetry() async throws {
+    let recorder = LifecycleRecorder()
+    let context = TestContext(recorder: recorder)
+    let registry = ServiceRegistry(host: context)
+    await registry.register(FlakyService.self)
+    let id = FlakyService.id
+
+    // Attempt 1 fails inline; the supervisor schedules attempt 2 after 10ms.
+    await registry.start(id)
+    try await waitFor("attempt-2", in: recorder)
+    #expect(await registry.health()[id] == .starting)
+
+    let stopper = Task { await registry.stop(id) }
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(!(await recorder.snapshot().contains("stop")), "stop ran underneath the retry")
+
+    await context.startGate.open()
+    await stopper.value
+    // Room for a third attempt to have been scheduled, if the cancellation had not landed.
+    try await Task.sleep(for: .milliseconds(60))
+
+    #expect(await recorder.snapshot() == ["attempt-1", "attempt-2", "start-end", "stop"])
+    #expect(await registry.service(id) == nil)
+  }
+}

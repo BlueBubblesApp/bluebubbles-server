@@ -13,7 +13,6 @@
 //
 //  See `docs/EVENTS.md`.
 
-import BBInterfaces
 import BBServiceKit
 import BBSettings
 import Foundation
@@ -32,19 +31,25 @@ public enum ServiceEnablement {
     )
   }
 
+  /// The stored form of a disabled set — the inverse of `disabledIdentifiers(in:)`, kept
+  /// beside it so the app writes exactly what the server parses.
+  public static func serialized(_ disabled: Set<String>) -> String {
+    disabled.sorted().joined(separator: ",")
+  }
+
   /// Whether a service may run, given what the user has switched off.
   ///
   /// A core service is always enabled no matter what the list says — see
   /// `BuiltInManifests.alwaysOn`. Refusing here rather than trusting the writer means a
   /// hand-edited setting cannot take the server off the network.
-  public static func isEnabled(_ id: ServiceID, disabled: Set<String>) -> Bool {
-    guard !BuiltInManifests.alwaysOn.contains(ServiceIdentifier(id.rawValue)) else {
+  public static func isEnabled(_ id: ServiceIdentifier, disabled: Set<String>) -> Bool {
+    guard !BuiltInManifests.alwaysOn.contains(id) else {
       return true
     }
     return !disabled.contains(id.rawValue)
   }
 
-  static func isEnabled(_ id: ServiceID, settings: SettingsStore) async -> Bool {
+  public static func isEnabled(_ id: ServiceIdentifier, settings: SettingsStore) async -> Bool {
     let raw = await settings.string(forKey: Settings.disabledServicesKey) ?? ""
     return isEnabled(id, disabled: disabledIdentifiers(in: raw))
   }

@@ -58,7 +58,7 @@ import Foundation
 
 /// A stable, reverse-DNS identifier: `app.bluebubbles.proxy.zrok`.
 ///
-/// Distinct from the display name and from `ServiceID` on purpose. This is what the settings
+/// Distinct from the display name on purpose, and also the registry's key. This is what the settings
 /// namespace and every granted entitlement key on, so it must never change — renaming it
 /// orphans the plugin's stored configuration and silently re-prompts for permissions the user
 /// already granted.
@@ -571,5 +571,29 @@ public struct ServiceManifest: Sendable {
   /// The fully-qualified storage key for one of this service's own fields.
   public func storageKey(for field: String) -> String {
     "\(id.settingsNamespace)\(field)"
+  }
+
+  /// The settings this service must be told about when they change: its own fields, and
+  /// every core key it declared it READS.
+  ///
+  /// Derived from the declarations rather than listed beside them, so a service cannot read
+  /// a setting it never watches or watch one it never reads — both of which shipped before
+  /// this existed (a proxy watched `zrok_token`, which nothing read, and not
+  /// `zrok_reserved_token`, which built the provider).
+  ///
+  /// Keys the service declared it WRITES are deliberately not here. A service that watched
+  /// what it writes would restart on its own writes — every connection method publishes
+  /// `server_address`, and a restart on each publish is a loop.
+  public var watchedSettingKeys: Set<String> {
+    var keys = Set(fields.map { storageKey(for: $0.key) })
+    var written: Set<String> = []
+    for entitlement in entitlements {
+      switch entitlement {
+      case .readSettings(let read): keys.formUnion(read)
+      case .writeSettings(let write): written.formUnion(write)
+      default: break
+      }
+    }
+    return keys.subtracting(written)
   }
 }

@@ -1,6 +1,7 @@
 //  ChangeDetectionService
 //  Watches chat.db and turns writes into events.
 
+import BBBuiltIns
 import BBEvents
 import BBIMessage
 import BBSerialization
@@ -12,10 +13,6 @@ actor ChangeDetectionService: ContextualService, PermissionDependentService,
   ConfigurableService
 {
   static let manifest = BuiltInManifests.changeDetection
-  /// The poll interval is read once, at start, to build the detector — so without this the
-  /// setting was inert: a user lowering it to get faster message delivery saw no change
-  /// until the next launch, and nothing said why.
-  static let watchedSettings: Set<String> = [Settings.dbPollInterval.key]
   /// The one permission that genuinely gates a service: without Full Disk Access there is
   /// no database to watch, and the registry reports that precisely instead of letting this
   /// fail obscurely at first read.
@@ -117,6 +114,6 @@ actor ChangeDetectionService: ContextualService, PermissionDependentService,
   }
 
   var health: ServiceHealth {
-    get async { await context.hasMessageAccess ? .running : .degraded(reason: "no chat.db access") }
+    get async { context.hasMessageAccess ? .running : .degraded(reason: "no chat.db access") }
   }
 }

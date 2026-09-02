@@ -1,6 +1,7 @@
 //  WebhookDeliveryService
 //  Registers the webhook and ntfy sinks so subscribed endpoints actually receive events.
 
+import BBBuiltIns
 import BBEvents
 import BBServiceKit
 import BBSettings
@@ -21,10 +22,11 @@ actor WebhookDeliveryService: ContextualService, ConfigurableService {
 
   init(host: AppContext) { self.context = host }
 
-  static let watchedSettings: Set<String> = [
-    Settings.ntfyTopic.key, Settings.ntfyServer.key, Settings.ntfyToken.key,
-    Settings.ntfyEvents.key,
-  ]
+  /// The manifest's ntfy reads, plus the token: a secret, which no entitlement may name and
+  /// which therefore cannot reach the default.
+  static var watchedSettings: Set<String> {
+    manifestWatchedSettings.union([Settings.ntfyToken.key])
+  }
 
   func start() async throws {
     // Targets are read per event rather than captured: a webhook added through the API

@@ -7,15 +7,6 @@
 import BBCore
 import BBSettings
 
-/// Stable identifier for a service. Used for dependency edges, health reporting, and as the
-/// `source` on any alert the service raises.
-public struct ServiceID: Hashable, Sendable, RawRepresentable, CustomStringConvertible {
-  public let rawValue: String
-  public init(rawValue: String) { self.rawValue = rawValue }
-  public init(_ rawValue: String) { self.rawValue = rawValue }
-  public var description: String { rawValue }
-}
-
 /// What a service reports about itself. Surfaced in the UI and on `GET /api/v1/server/info`.
 public enum ServiceHealth: Sendable, Equatable {
   case stopped
@@ -92,14 +83,13 @@ public protocol Service: Actor {
 }
 
 extension Service {
-  /// The registry's key, taken from the manifest so the two can never drift.
-  public static var id: ServiceID { ServiceID(manifest.id.rawValue) }
+  /// The registry's key. The manifest identifier IS the key — there is no second type to
+  /// convert through, so the two cannot drift.
+  public static var id: ServiceIdentifier { manifest.id }
 
   /// Services that must be running first. The registry topologically sorts these, so start
   /// order is derived rather than hand-maintained — and stop order is exactly its reverse.
-  public static var dependencies: [ServiceID] {
-    manifest.dependencies.map { ServiceID($0.rawValue) }
-  }
+  public static var dependencies: [ServiceIdentifier] { manifest.dependencies }
 
   public static var restartPolicy: RestartPolicy {
     .backoff(base: .seconds(1), max: .seconds(60), attempts: 5)
@@ -110,9 +100,23 @@ extension Service {
 ///
 /// The registry routes a change only to services whose `watchedSettings` intersect it, which
 /// is what removes the manual `proxiesRestarted` latch from the old `handleConfigUpdate`.
+///
+/// `watchedSettings` defaults to what the manifest declares — see
+/// `ServiceManifest.watchedSettingKeys` — and that default is the rule. A service that must
+/// hear about a key it cannot declare (a secret, which no entitlement may name; or a password
+/// change it does not read but must kick clients for) ADDS to the default with
+/// `manifestWatchedSettings.union(...)`. It never replaces it: a hand-written list is how a
+/// service comes to read a setting it does not watch.
 public protocol ConfigurableService: Service {
   static var watchedSettings: Set<String> { get }
   func apply(_ change: SettingsChange) async throws -> ReloadAction
+}
+
+extension ConfigurableService {
+  /// What the manifest says this service reads and owns.
+  public static var manifestWatchedSettings: Set<String> { manifest.watchedSettingKeys }
+
+  public static var watchedSettings: Set<String> { manifestWatchedSettings }
 }
 
 /// Opt-in: a service that is not always applicable.

@@ -1,5 +1,5 @@
 //  ContextualService
-//  What every built-in service shares: the host it is built from and its registry key.
+//  What every built-in service shares: the host it is built from and its scoped settings.
 //
 //  There were two more things here — `TaskBox` and `RuntimeBox`, single-purpose actors that
 //  held a `Task` and the Private API runtime so a service could keep mutable state without
@@ -13,30 +13,15 @@
 //
 //  See `.claude/docs/architecture.md`.
 
+import BBBuiltIns
 import BBCore
 import BBPrivateAPI
 import BBServiceKit
 import Foundation
 
-/// The registry's keys, taken from the manifests.
-///
-/// Derived rather than declared, so a service's manifest identifier and the key the registry
-/// files it under cannot drift. Independent short strings — `"http"` — let a dependency
-/// written as `ServiceID.http` silently fail to match a service whose manifest calls it
-/// something else, and the topological sort then orders on a graph with missing edges.
-extension ServiceID {
-  public static let permissions = ServiceID(BuiltInManifests.ID.permissions.rawValue)
-  public static let contactsIngest = ServiceID(BuiltInManifests.ID.contacts.rawValue)
-  public static let changeDetection = ServiceID(BuiltInManifests.ID.changeDetection.rawValue)
-  public static let http = ServiceID(BuiltInManifests.ID.http.rawValue)
-  public static let socket = ServiceID(BuiltInManifests.ID.socket.rawValue)
-  public static let privateAPI = ServiceID(BuiltInManifests.ID.privateAPI.rawValue)
-  public static let push = ServiceID(BuiltInManifests.ID.push.rawValue)
-  public static let webhooks = ServiceID(BuiltInManifests.ID.webhooks.rawValue)
-  public static let sleepPrevention = ServiceID(BuiltInManifests.ID.sleepPrevention.rawValue)
-  public static let scheduledMessages = ServiceID(BuiltInManifests.ID.scheduledMessages.rawValue)
-  public static let launchAtLogin = ServiceID(BuiltInManifests.ID.launchAtLogin.rawValue)
-}
+// There is deliberately no second list of service identifiers here. `BuiltInManifests.ID` is
+// the one declaration, and the registry keys on `ServiceIdentifier` directly, so a dependency
+// written as `BuiltInManifests.ID.http` is the same value the manifest declares.
 
 /// Shared plumbing: every service here is built from the same context.
 public protocol ContextualService: Service where Host == AppContext {

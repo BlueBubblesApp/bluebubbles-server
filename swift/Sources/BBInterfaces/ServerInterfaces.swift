@@ -17,7 +17,7 @@ import Foundation
 /// here reads chat.db, so handing back a half-built set would move the failure from a clear
 /// "no access" to a confusing empty result on every route.
 ///
-/// `ServerInterface` and `ScheduleInterface` are deliberately NOT in here — see
+/// `AdminInterface` and `ScheduleInterface` are deliberately NOT in here — see
 /// `AppContext.server`.
 public struct ServerInterfaces: Sendable {
   public let message: MessageInterface

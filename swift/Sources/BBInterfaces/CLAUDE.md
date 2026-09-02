@@ -66,11 +66,23 @@ a field appears, so moving a serialize call cannot change the bytes.
 `lookupCandidates`). `BBPrivateAPIContract.ChatIdentifier` is the opaque handle the helper is
 given. Convert at the call site with `ChatIdentifier(guid)`; never compare one with `==`.
 
-## Capabilities live here
+## Capabilities live here — unless only a handler composes them
 
 `Capabilities.swift` holds the `…Providing` protocols the handlers, the composition root and
 the app compose. Add a capability here, vend an interface (never a repository), and conform
 `AppContext` in the composition root.
+
+A capability that ONLY a handler group composes — access control, token auth, the update
+installer — lives in `../BBHandlers/HandlerCapabilities.swift` instead, so this module does
+not import the auth and update layers to name a protocol nothing here uses. The test for
+where a new one goes: does the app or the root compose it? If not, it is a handler capability.
+
+## What is not here
+
+- **FaceTime** (`FaceTimeCoordinator`, `FaceTimeHandOff`, `FaceTimeCleanup`) is
+  [`../BBFaceTime`](../BBFaceTime): a coordinator with its own state that needs the Private
+  API runtime, not an interface over chat.db. `FaceTimeProviding` names it from here.
+- **`FindMyRuntime`** is in `BBSystem`, beside `FindMyFriendsCache` and the FindMy types.
 
 ## Tests that will catch you
 

@@ -480,7 +480,7 @@ public actor AccessControlService {
           domain: "AccessControl",
           context: ["failure_count": .int(failureCount)]
         ),
-        actions: [.openSettings(section: "security")],
+        actions: [.openSettings(.security)],
         dedupeKey: "access_control.throttled"
       )
     )
@@ -533,7 +533,7 @@ public actor AccessControlService {
             "offence_count": .int(offences),
           ]
         ),
-        actions: [.unblock(address: address), .openSettings(section: "security")],
+        actions: [.unblock(address: address), .openSettings(.security)],
         dedupeKey: "access_control.blocked.\(address)"
       )
     )

@@ -1,6 +1,7 @@
 //  DynamicDNSMethod
 //  "Custom URL": publishes an address the user maintains.
 
+import BBBuiltIns
 import BBProxy
 import BBServiceKit
 

@@ -1,6 +1,7 @@
 //  PushDeliveryService
 //  Firebase Cloud Messaging as a registry service. Optional: declines when unconfigured.
 
+import BBBuiltIns
 import BBDiagnostics
 import BBEvents
 import BBPushKit
@@ -24,7 +25,7 @@ actor PushDeliveryService: ContextualService, GatedService, ConfigurableService 
     // The SHARED Keychain store, not a fresh in-memory one. With its own store this
     // would find no credentials, decline to run, and report "push is not configured" on
     // a machine where it demonstrably is.
-    let credentials = PushCredentialStore(secrets: app.secretsForPush)
+    let credentials = PushCredentialStore(secrets: app.secrets)
     self.credentials = credentials
     self.push = PushService(
       credentials: credentials,
@@ -51,7 +52,12 @@ actor PushDeliveryService: ContextualService, GatedService, ConfigurableService 
   /// sent. Measured by the wiring test that now pins this.
   func canRun() async -> Bool { await credentials.isConfigurable() }
 
-  static let watchedSettings: Set<String> = [Settings.remoteRestartEnabled.key]
+  /// The manifest's read — `server_address` — plus the remote-restart switch, which has no
+  /// presentation (its control is on the Firebase page) and so cannot be declared without
+  /// putting a column name on the permissions list.
+  static var watchedSettings: Set<String> {
+    manifestWatchedSettings.union([Settings.remoteRestartEnabled.key])
+  }
 
   func start() async throws {
     // Read here rather than at construction: the registry builds services synchronously
@@ -80,8 +86,12 @@ actor PushDeliveryService: ContextualService, GatedService, ConfigurableService 
   }
 
   /// Turning remote restart off has to stop the poll, which means rebuilding the watcher —
-  /// there is nothing to reconfigure in place.
-  func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
+  /// there is nothing to reconfigure in place. The other declared read, `server_address`, is
+  /// consumed live: the URL publisher reads it on every publish and the announcer pushes a
+  /// changed one through `PushService.publish`, so a restart would only cost a token mint.
+  func apply(_ change: SettingsChange) async throws -> ReloadAction {
+    change.contains(Settings.remoteRestartEnabled.key) ? .restart : .none
+  }
 
   func stop() async {
     await context.withdrawPushDelivery()

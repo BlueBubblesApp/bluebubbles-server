@@ -2,7 +2,7 @@
 //  The only path to the `webhook` table.
 //
 //  This table had two owners reading it two different ways: a `PersistableRecord` in
-//  `ServerInterface` for the CRUD the API exposes, and a raw `Row.fetchAll` in `AppContext`
+//  `AdminInterface` for the CRUD the API exposes, and a raw `Row.fetchAll` in `AppContext`
 //  for the delivery path. Two decoders for one table is one place for them to disagree, and
 //  the `events` column — a JSON array stored as text — is exactly the sort of column they
 //  disagree about: the raw reader parsed it into names and the record left it as a string.

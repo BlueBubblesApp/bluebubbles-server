@@ -8,6 +8,7 @@
 //
 //  See `Onboarding/OnboardingFlow.swift` for the rules and `.claude/docs/architecture.md`.
 
+import BBBuiltIns
 import BBServiceKit
 import BBSettings
 import BBSystem

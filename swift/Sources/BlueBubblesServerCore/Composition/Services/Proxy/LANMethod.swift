@@ -1,6 +1,7 @@
 //  LANMethod
 //  Local network: no tunnel, this Mac's own address.
 
+import BBBuiltIns
 import BBProxy
 import BBServiceKit
 import BBSystem

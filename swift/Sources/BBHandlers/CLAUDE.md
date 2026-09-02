@@ -42,6 +42,9 @@ a two-field struct instead of a running server. Taking `AppContext` instead woul
 
 The protocols live in `BBInterfaces` because the composition root and the SwiftUI app compose
 them too; the `extension AppContext: …Providing {}` conformances live in the composition root.
+The exception is `HandlerCapabilities.swift` in this module: `AccessControlProviding`,
+`TokenAuthProviding` and `UpdateInstallerProviding` are composed by handlers alone, so they
+live with their composers rather than making the domain layer import auth and updates.
 `PrivateAPIProviding.requirePrivateAPI(for:)` is the one "no helper connected" refusal — do not
 write a private copy.
 

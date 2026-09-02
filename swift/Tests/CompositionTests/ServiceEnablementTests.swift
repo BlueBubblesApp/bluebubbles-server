@@ -11,6 +11,7 @@ import BBServiceKit
 import BBSettings
 import Testing
 
+@testable import BBBuiltIns
 @testable import BBHandlers
 @testable import BBInterfaces
 @testable import BlueBubblesServerCore
@@ -28,11 +29,11 @@ struct ServiceEnablementTests {
 
     #expect(
       !ServiceEnablement.isEnabled(
-        ServiceID(BuiltInManifests.ID.webhooks.rawValue), disabled: disabled
+        BuiltInManifests.ID.webhooks, disabled: disabled
       ))
     #expect(
       ServiceEnablement.isEnabled(
-        ServiceID(BuiltInManifests.ID.scheduledMessages.rawValue), disabled: disabled
+        BuiltInManifests.ID.scheduledMessages, disabled: disabled
       ))
   }
 
@@ -59,7 +60,7 @@ struct ServiceEnablementTests {
     )
     for id in BuiltInManifests.alwaysOn {
       #expect(
-        ServiceEnablement.isEnabled(ServiceID(id.rawValue), disabled: disabled),
+        ServiceEnablement.isEnabled(id, disabled: disabled),
         "\(id.rawValue) must stay enabled"
       )
     }
@@ -81,12 +82,12 @@ struct ServiceEnablementTests {
     let disabled = ServiceEnablement.disabledIdentifiers(in: BuiltInManifests.ID.http.rawValue)
     #expect(
       !ServiceEnablement.isEnabled(
-        ServiceID(BuiltInManifests.ID.http.rawValue), disabled: disabled
+        BuiltInManifests.ID.http, disabled: disabled
       ))
     // And the socket beside it is not collateral: they are separate switches.
     #expect(
       ServiceEnablement.isEnabled(
-        ServiceID(BuiltInManifests.ID.socket.rawValue), disabled: disabled
+        BuiltInManifests.ID.socket, disabled: disabled
       ))
   }
 
@@ -103,7 +104,7 @@ struct ServiceEnablementTests {
     let store = try await SettingsStore(
       database: database, secrets: InMemorySecretStore()
     )
-    let webhooks = ServiceID(BuiltInManifests.ID.webhooks.rawValue)
+    let webhooks = BuiltInManifests.ID.webhooks
 
     // Untouched: every service runs. This is the state of a fresh install, and it is
     // also what an empty stored value must mean.

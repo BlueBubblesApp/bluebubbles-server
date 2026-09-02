@@ -10,6 +10,7 @@ import BBServiceKit
 import BBSystem
 import Testing
 
+@testable import BBBuiltIns
 @testable import BBHandlers
 @testable import BBInterfaces
 @testable import BlueBubblesServerCore

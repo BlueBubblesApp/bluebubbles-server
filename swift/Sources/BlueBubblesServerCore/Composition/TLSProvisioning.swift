@@ -67,7 +67,7 @@ public enum TLSProvisioning {
               + "certificate on the Security page, or turn off custom "
               + "certificates to serve over plain HTTP.",
             source: "Certificates",
-            actions: [.openSettings(section: "security")],
+            actions: [.openSettings(.security)],
             dedupeKey: "tls.unreadable"
           )
         )
@@ -157,7 +157,7 @@ public enum TLSProvisioning {
             + "until you accept it once. To use your own certificate instead, "
             + "import it on the Security page.",
           source: "Certificates",
-          actions: [.openSettings(section: "security")],
+          actions: [.openSettings(.security)],
           dedupeKey: "tls.self-signed"
         )
       )

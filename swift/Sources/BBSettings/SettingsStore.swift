@@ -483,25 +483,10 @@ public actor SettingsStore {
     for continuation in continuations.values { continuation.yield(change) }
   }
 
-  /// Loose decoding for the string-shaped layers (YAML, CLI), which have no type tags.
+  /// Loose decoding for the string-shaped layers (YAML, CLI), which have no type tags. The
+  /// value type decides what it accepts; see `SettingValue.parse(loose:)`.
   private func decodeLoose<Value: SettingValue>(_ raw: String, as type: Value.Type) -> Value? {
-    if let value = raw as? Value { return value }
-    if type == Bool.self {
-      switch raw.lowercased() {
-      case "1", "true", "yes": return true as? Value
-      case "0", "false", "no": return false as? Value
-      default: return nil
-      }
-    }
-    if type == Int.self { return Int(raw) as? Value }
-    if type == Double.self { return Double(raw) as? Value }
-    // Enum-backed settings decode from their raw string.
-    if let data = "\"\(raw)\"".data(using: .utf8),
-      let value = try? JSONDecoder().decode(Value.self, from: data)
-    {
-      return value
-    }
-    return nil
+    Value.parse(loose: raw)
   }
 }
 

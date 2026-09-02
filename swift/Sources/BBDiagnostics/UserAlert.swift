@@ -71,9 +71,39 @@ public struct Diagnostics: Sendable {
   }
 }
 
+/// Where an alert's "open …" remedy lands.
+///
+/// An enum rather than the free string it replaced. The string was written by whoever raised
+/// the alert, in a different module, and matched by the app in a switch with a `default` —
+/// so a new spelling compiled, rendered a button, and landed on the wrong page. Every case
+/// here is a page the app has, and the app's routing switch is exhaustive.
+public enum AlertDestination: String, Sendable, Equatable, CaseIterable {
+  /// The settings window, on its first tab.
+  case settings
+  case security
+  case features
+  case permissions
+  /// The API & Webhooks page.
+  case webhooks
+  /// Firebase setup.
+  case push
+
+  /// What the remedy button says it opens.
+  public var label: String {
+    switch self {
+    case .settings: "Settings"
+    case .security: "Security"
+    case .features: "Features"
+    case .permissions: "Permissions"
+    case .webhooks: "Webhooks"
+    case .push: "Firebase"
+    }
+  }
+}
+
 /// Something the alert offers to do about itself, so the remedy travels with the problem.
 public enum AlertAction: Sendable, Equatable {
-  case openSettings(section: String)
+  case openSettings(AlertDestination)
   case openLogs
   case retry(service: String)
   case openURL(URL)

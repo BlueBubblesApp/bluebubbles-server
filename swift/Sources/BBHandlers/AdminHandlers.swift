@@ -16,7 +16,7 @@ public enum AdminHandlers {
   public static func register(
     into registry: inout HandlerRegistry,
     context: some AlertProviding & LoggerProviding & ServerControlling
-      & ServerInterfaceProviding & SettingsProviding
+      & AdminInterfaceProviding & SettingsProviding
   ) {
     registerAlerts(into: &registry, context: context)
     registerStatistics(into: &registry, context: context)
@@ -30,16 +30,16 @@ public enum AdminHandlers {
   private static func registerAlerts(
     into registry: inout HandlerRegistry,
     context: some AlertProviding & LoggerProviding & ServerControlling
-      & ServerInterfaceProviding & SettingsProviding
+      & AdminInterfaceProviding & SettingsProviding
   ) {
     registry.register(.serverAlerts) { request in
-      let server = context.server
+      let server = context.admin
       // Node ignores `limit` entirely and returns `AlertsInterface.find()`'s default of
       // 10. Honouring the parameter is additive and allowed; the DEFAULT has to match,
       // or a client that pages by counting rows sees a different world.
       return .data(
         .array(
-          await server.alerts(limit: request.integer("limit") ?? 10).map(ServerInterface.alertJSON))
+          await server.alerts(limit: request.integer("limit") ?? 10).map(AdminInterface.alertJSON))
       )
     }
 
@@ -47,16 +47,16 @@ public enum AdminHandlers {
     // is the shape something browsing a history would read rather than the one a client
     // polls for the newest few.
     registry.register(.serverAlertsV2) { request in
-      let server = context.server
+      let server = context.admin
       return .data(
         .array(
           await server.alerts(limit: request.integer("limit") ?? 100).map(
-            ServerInterface.alertJSONV2)
+            AdminInterface.alertJSONV2)
         ))
     }
 
     registry.register(.serverMarkAlertRead) { request in
-      let server = context.server
+      let server = context.admin
       let values = try request.values()
 
       // Ids may arrive as NUMBERS or as strings, and reading only strings was actively
@@ -80,7 +80,7 @@ public enum AdminHandlers {
     // Same ids, same rules. Duplicated rather than shared so a v2 client never has to
     // drop back to a v1 path to finish a flow it started on v2.
     registry.register(.serverMarkAlertReadV2) { request in
-      let server = context.server
+      let server = context.admin
       let ids = alertIdentifiers(in: try request.jsonBody() ?? .object([:]))
       guard !ids.isEmpty else { throw BadRequest("No alert IDs provided!") }
       await server.markAlertsRead(ids: ids)
@@ -107,11 +107,11 @@ public enum AdminHandlers {
   private static func registerStatistics(
     into registry: inout HandlerRegistry,
     context: some AlertProviding & LoggerProviding & ServerControlling
-      & ServerInterfaceProviding & SettingsProviding
+      & AdminInterfaceProviding & SettingsProviding
   ) {
     registry.register(.serverStatTotals) { _ in
-      let server = context.server
-      return .data(ServerInterface.serialize(try await server.counts()))
+      let server = context.admin
+      return .data(AdminInterface.serialize(try await server.counts()))
     }
   }
 
@@ -120,15 +120,15 @@ public enum AdminHandlers {
   private static func registerWebhooks(
     into registry: inout HandlerRegistry,
     context: some AlertProviding & LoggerProviding & ServerControlling
-      & ServerInterfaceProviding & SettingsProviding
+      & AdminInterfaceProviding & SettingsProviding
   ) {
     registry.register(.webhookList) { _ in
-      let server = context.server
+      let server = context.admin
       return .data(.array(try await server.webhooks().map(\.json)))
     }
 
     registry.register(.webhookCreate) { request in
-      let server = context.server
+      let server = context.admin
       let values = try request.values()
       let url = try values.requireString("url")
       let events = values["events"]?.arrayValue?.compactMap(\.stringValue) ?? ["*"]
@@ -136,7 +136,7 @@ public enum AdminHandlers {
     }
 
     registry.register(.webhookUpdate) { request in
-      let server = context.server
+      let server = context.admin
       let raw = try request.requirePathParameter("id")
       guard let id = Int64(raw) else { throw BadRequest("`id` must be a number") }
       let values = try request.values()
@@ -148,7 +148,7 @@ public enum AdminHandlers {
     }
 
     registry.register(.webhookDelete) { request in
-      let server = context.server
+      let server = context.admin
       let raw = try request.requirePathParameter("id")
       guard let id = Int64(raw) else { throw BadRequest("`id` must be a number") }
       try await server.deleteWebhook(id: id)
@@ -161,24 +161,24 @@ public enum AdminHandlers {
   private static func registerBackups(
     into registry: inout HandlerRegistry,
     context: some AlertProviding & LoggerProviding & ServerControlling
-      & ServerInterfaceProviding & SettingsProviding
+      & AdminInterfaceProviding & SettingsProviding
   ) {
-    for (kind, prefix): (ServerInterface.BackupKind, HandlerID) in [
+    for (kind, prefix): (AdminInterface.BackupKind, HandlerID) in [
       (.theme, .backupGetTheme),
       (.settings, .backupGetSettings),
     ] {
       registry.register(prefix) { _ in
-        let server = context.server
+        let server = context.admin
         return .data(server.serialize(try await server.backups(kind: kind)))
       }
     }
 
-    for (kind, id): (ServerInterface.BackupKind, HandlerID) in [
+    for (kind, id): (AdminInterface.BackupKind, HandlerID) in [
       (.theme, .backupCreateTheme),
       (.settings, .backupCreateSettings),
     ] {
       registry.register(id) { request in
-        let server = context.server
+        let server = context.admin
         let values = try request.values()
         let name = try values.requireString("name")
         // The whole body is STORED, not just a `data` field: clients send the
@@ -192,12 +192,12 @@ public enum AdminHandlers {
       }
     }
 
-    for (kind, id): (ServerInterface.BackupKind, HandlerID) in [
+    for (kind, id): (AdminInterface.BackupKind, HandlerID) in [
       (.theme, .backupDeleteTheme),
       (.settings, .backupDeleteSettings),
     ] {
       registry.register(id) { request in
-        let server = context.server
+        let server = context.admin
         let body = try? request.jsonBody()
         try await server.deleteBackup(
           kind: kind,
@@ -213,7 +213,7 @@ public enum AdminHandlers {
   private static func registerLifecycle(
     into registry: inout HandlerRegistry,
     context: some AlertProviding & LoggerProviding & ServerControlling
-      & ServerInterfaceProviding & SettingsProviding
+      & AdminInterfaceProviding & SettingsProviding
   ) {
     // Both restarts are GET, which is not what we would choose for a non-idempotent
     // action, but clients issue them that way and the route table is frozen.

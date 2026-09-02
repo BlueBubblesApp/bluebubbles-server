@@ -30,6 +30,8 @@ and knows nothing about the whole.
 | `BBDiagnostics` | Structured logging **and, separately**, the alert centre |
 | `BBSettings` | Typed `Setting<T>` descriptors, Keychain secrets, layered providers, feature flags |
 | `BBServiceKit` | `Service` protocol, registry, dependency graph, supervision, manifests |
+| `BBBuiltIns` | The built-in services as data — manifests, tool descriptors, enablement — plus `ScopedSettings` and `ServiceSettingsBridge`, where a manifest meets the settings store |
+| `BBFaceTime` | FaceTime link minting, hand-off tracking and cleanup — a coordinator with its own state, above `BBPrivateAPI` |
 | `BBPersistence` | `AppDatabase` (ours, read-write) and `ReadOnlyDatabase` (`chat.db`) |
 | `BBIMessage` | `chat.db` repositories, `SchemaProfile`, typedstream decoding, `ChangeDetector` |
 | `BBContacts` | Streaming contact ingest, persistent address index |
@@ -81,7 +83,10 @@ enforcement, and it runs in CI**. Run it after touching any `import`.
 The capability protocols (`InterfaceProviding`, `SettingsProviding`, `PushSetupProviding`, …)
 live in `BBInterfaces/Capabilities.swift`. Three consumers compose them — the handlers, the
 composition root and the SwiftUI app — so they sit below all three; putting them in `BBHandlers`
-made the app link the HTTP controller target to name a protocol. The
+made the app link the HTTP controller target to name a protocol. The three that only handlers
+compose (`AccessControlProviding`, `TokenAuthProviding`, `UpdateInstallerProviding`) live in
+`BBHandlers/HandlerCapabilities.swift` for the mirror-image reason: keeping them in the domain
+layer made it import auth and updates to name protocols nothing in it used. The
 `extension AppContext: …Providing {}` conformances live in the composition root, in
 `AppContextCapabilities.swift`, which is the whole of what joins the two.
 
@@ -116,15 +121,24 @@ protocol ConfigurableService: Service { static var watchedSettings; func apply(_
 protocol GatedService:        Service { func canRun(_ settings:) -> Bool }
 ```
 
-Built-in service ids (`Sources/BlueBubblesServerCore/Composition/Services/ContextualService.swift`):
-`permissions`, `contactsIngest`, `changeDetection`, `http`, `socket`, `privateAPI`, `push`,
-`webhooks`, `sleepPrevention`, `scheduledMessages`, `launchAtLogin`.
+Built-in service ids (`Sources/BBBuiltIns/BuiltInManifests.swift`, `BuiltInManifests.ID`):
+`http`, `socket`, `permissions`, `changeDetection`, `contacts`, `privateAPI`,
+`scheduledMessages`, `sleepPrevention`, `launchAtLogin`, `toolUpdates`, `push`, `webhooks`,
+and the five `proxy*` connection methods.
 
-Service ids are **derived** from the manifest identifier in `BuiltInManifests.swift` rather than
-declared twice, so a dependency cannot silently name a service that does not exist.
+A service's registry key IS its manifest identifier: `Service.id` returns `manifest.id`, the
+registry keys on `ServiceIdentifier`, and there is no second identifier type. A dependency is
+written as `BuiltInManifests.ID.http`, the same value the manifest declares, so it cannot
+silently name a service that does not exist.
 
 A settings change is routed only to services whose `watchedSettings` intersect it; the returned
 `ReloadAction`s are coalesced, and restarting a service restarts its dependents automatically.
+
+Every start, stop, restart and supervised retry for one service passes through that service's
+**lane** in the registry — a chain of tasks, one per service, each waiting for the last. The
+actor is free while a service's own `start()` runs, and the lane is what stops a `stop` or a
+second `restart` from landing in that window: it waits, then runs against a service that is
+genuinely up or genuinely failed. `health()` reports `.starting` while a start is in flight.
 
 Each service is an `actor` — `Service` refines `Actor`, so this is checked rather than asked
 for — or `@MainActor` where it touches AppKit. Its own state is an ordinary `private var`. If
@@ -133,7 +147,7 @@ probably in the wrong type.
 
 ### Adding a service
 
-1. Declare a manifest in `Composition/BuiltInManifests.swift`, including any `tools:` it needs.
+1. Declare a manifest in `Sources/BBBuiltIns/BuiltInManifests.swift`, including any `tools:` it needs.
 2. Conform in its own file under `Composition/Services/` (connection methods under
    `Services/Proxy/`), declaring `dependencies` through the manifest.
 3. Gate it with `GatedService.canRun` if it should be absent when unconfigured — **absent, not

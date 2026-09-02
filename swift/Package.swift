@@ -355,6 +355,35 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
 
+        // The built-in services as DATA, and the rules for applying any manifest to the
+        // settings store: the manifests, the tool descriptors, enablement, scoped settings
+        // and the settings bridge. Out of the composition root so the app and the tests can
+        // name a manifest without linking the wiring, and so a service's declaration is
+        // something the root reads rather than something it owns.
+        .target(
+            name: "BBBuiltIns",
+            dependencies: [
+                "BBServiceKit", "BBSettings", "BBDiagnostics",
+                // The LAN connection method lists this Mac's interfaces in its own form.
+                "BBSystem",
+                .product(name: "Logging", package: "swift-log")
+            ],
+            swiftSettings: swiftSettings
+        ),
+
+        // FaceTime as a subsystem: link minting, hand-off tracking and cleanup. Its own
+        // target because it needs the Private API runtime (`BBPrivateAPI`), which sits above
+        // `BBSystem`, and because it is a coordinator with its own state rather than a
+        // domain interface over chat.db — `BBInterfaces` names it and does not own it.
+        .target(
+            name: "BBFaceTime",
+            dependencies: [
+                "BBDiagnostics", "BBPrivateAPI", "BBPrivateAPIContract", "BBSettings", "BBSystem",
+                .product(name: "Logging", package: "swift-log")
+            ],
+            swiftSettings: swiftSettings
+        ),
+
         // MARK: - Composition root
 
         // The wiring, as a LIBRARY.
@@ -374,10 +403,10 @@ let package = Package(
                 "BBIMessage", "BBContacts", "BBSerialization", "BBPersistence",
                 "BBPrivateAPI", "BBPrivateAPIContract", "BBAppleScript", "BBShortcuts",
                 "BBSystem", "BBSettings", "BBPushKit", "BBEvents", "BBDiagnostics",
-                // `Capabilities.swift` names the access-control service, the tool manager
-                // and the appcast item, so the modules that define them are reachable from
-                // here. None of the three depends on this target.
-                "BBAuth", "BBTooling", "BBUpdates",
+                // `Capabilities.swift` names the FaceTime coordinator. The auth, tooling and
+                // update modules it used to name for three handler-only protocols are not
+                // here any more: those protocols live in `BBHandlers/HandlerCapabilities`.
+                "BBFaceTime",
                 "BBCore",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "GRDB", package: "GRDB.swift")
@@ -395,13 +424,12 @@ let package = Package(
         .target(
             name: "BBHandlers",
             dependencies: [
-                "BBInterfaces",
+                "BBInterfaces", "BBFaceTime",
                 "BBHTTPAPI", "BBSerialization", "BBAuth", "BBSettings", "BBIMessage",
                 "BBContacts", "BBPrivateAPI", "BBPrivateAPIContract", "BBSystem",
                 "BBDiagnostics", "BBEvents", "BBPushKit", "BBUpdates",
                 "BBPersistence",
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "GRDB", package: "GRDB.swift")
+                .product(name: "Logging", package: "swift-log")
             ],
             // Agent guidance, not a build input. Declared so SwiftPM stops warning
             // about an unhandled file on every build.
@@ -413,7 +441,7 @@ let package = Package(
         .target(
             name: "BlueBubblesServerCore",
             dependencies: [
-                "BBInterfaces", "BBHandlers",
+                "BBInterfaces", "BBHandlers", "BBBuiltIns", "BBFaceTime",
                 "BBTooling",
                 "BBServiceKit", "BBSettings", "BBDiagnostics", "BBHTTPAPI", "BBSocketIO",
                 "BBEvents", "BBPushKit", "BBProxy", "BBIMessage", "BBContacts",
@@ -580,7 +608,8 @@ let package = Package(
                 "BlueBubblesApp",
                 // The three targets the composition root is now split across. Reaching all of
                 // them from one suite is expected: what this suite tests IS the wiring.
-                "BlueBubblesServerCore", "BBInterfaces", "BBHandlers", "BBHTTPAPI", "BBSocketIO", "BBAuth", "BBEvents",
+                "BlueBubblesServerCore", "BBBuiltIns", "BBFaceTime", "BBInterfaces", "BBHandlers",
+                "BBHTTPAPI", "BBSocketIO", "BBAuth", "BBEvents",
                 "BBSettings", "BBServiceKit", "BBTooling", "BBPushKit", "BBPersistence",
                 "BBDiagnostics", "BBSerialization", "BBCore",
                 // For the one-method `AppleScriptRunning` seam. `SendFailureTests` drives a
@@ -621,7 +650,8 @@ let package = Package(
         .executableTarget(
             name: "BlueBubblesApp",
             dependencies: [
-                "BlueBubblesServerCore", "BBInterfaces", "BBSettings", "BBSystem", "BBAuth",
+                "BlueBubblesServerCore", "BBBuiltIns", "BBFaceTime", "BBInterfaces", "BBSettings",
+                "BBSystem", "BBAuth",
                 "BBServiceKit", "BBDiagnostics", "BBUpdates", "BBSerialization",
                 // The Private API status card and the FaceTime maintenance screen name
                 // `PrivateAPIRuntime.StartOutcome` and the contract's reply types directly.
@@ -855,7 +885,7 @@ let package = Package(
         .testTarget(
             name: "BlueBubblesAppTests",
             dependencies: [
-                "BlueBubblesApp", "BlueBubblesServerCore", "BBHandlers", "BBInterfaces",
+                "BlueBubblesApp", "BlueBubblesServerCore", "BBBuiltIns", "BBHandlers", "BBInterfaces",
                 "BBAuth", "BBCore", "BBDiagnostics", "BBEvents", "BBSerialization",
                 "BBServiceKit", "BBSettings", "BBSystem"
             ],

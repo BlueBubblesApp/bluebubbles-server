@@ -152,7 +152,7 @@ struct GroupChatShortcutSection: View {
   /// Forced rather than cached: the user may have deleted it in the Shortcuts app since the
   /// last look, and this view is exactly where they would come to find out.
   private func refresh() async {
-    guard let shortcuts = await model.groupChatShortcuts() else { return }
+    guard let shortcuts = model.groupChatShortcuts else { return }
     let status = await shortcuts.status(forceRefresh: true)
     isInstalled = status.isInstalled
     hasChecked = true
@@ -160,7 +160,7 @@ struct GroupChatShortcutSection: View {
   }
 
   private func install() async {
-    guard let shortcuts = await model.groupChatShortcuts() else { return }
+    guard let shortcuts = model.groupChatShortcuts else { return }
     isWorking = true
     defer { isWorking = false }
     summary = nil
@@ -184,7 +184,7 @@ struct GroupChatShortcutSection: View {
 
   /// Sends one real message, which is what creates the permission grant.
   private func sendTest() async {
-    guard let shortcuts = await model.groupChatShortcuts() else { return }
+    guard let shortcuts = model.groupChatShortcuts else { return }
     isWorking = true
     defer { isWorking = false }
     summary = nil
@@ -224,7 +224,7 @@ struct GroupChatShortcutSection: View {
   }
 
   private func remove() async {
-    guard let shortcuts = await model.groupChatShortcuts() else { return }
+    guard let shortcuts = model.groupChatShortcuts else { return }
     isWorking = true
     defer { isWorking = false }
     do {

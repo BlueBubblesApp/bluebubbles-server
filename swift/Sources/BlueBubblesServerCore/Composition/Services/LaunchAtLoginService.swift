@@ -19,6 +19,7 @@
 //
 //  See `.claude/docs/architecture.md`.
 
+import BBBuiltIns
 import BBDiagnostics
 import BBInterfaces
 import BBServiceKit
@@ -29,7 +30,6 @@ import Foundation
 actor LaunchAtLoginService: ContextualService, ConfigurableService {
 
   static let manifest = BuiltInManifests.launchAtLogin
-  static let watchedSettings: Set<String> = [Settings.autoStartMethod.key]
   /// Registration either works or is refused by the system for a reason retrying will not
   /// change — a missing bundle, or a user who declined.
   static let restartPolicy = RestartPolicy.never
@@ -132,7 +132,7 @@ actor LaunchAtLoginService: ContextualService, ConfigurableService {
           body: "macOS refused the request: \(error). The server is running "
             + "normally, but it will not start on its own after a restart.",
           source: "Launch at Login",
-          actions: [.openSettings(section: "features")],
+          actions: [.openSettings(.features)],
           dedupeKey: "launch-at-login.failed"
         )
       )

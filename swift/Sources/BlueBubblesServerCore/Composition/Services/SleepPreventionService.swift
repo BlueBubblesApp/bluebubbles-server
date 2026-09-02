@@ -1,13 +1,13 @@
 //  SleepPreventionService
 //  Holds a power assertion while `auto_caffeinate` is on.
 
+import BBBuiltIns
 import BBServiceKit
 import BBSettings
 import BBSystem
 
 actor SleepPreventionService: ContextualService, ConfigurableService, GatedService {
   static let manifest = BuiltInManifests.sleepPrevention
-  static let watchedSettings: Set<String> = [Settings.autoCaffeinate.key]
 
   let context: AppContext
   private let prevention = SleepPrevention()

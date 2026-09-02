@@ -1,6 +1,7 @@
 //  CloudflareMethod
 //  Cloudflare quick and named tunnels, driven through the managed `cloudflared` binary.
 
+import BBBuiltIns
 import BBPrivateAPIContract
 import BBProxy
 import BBServiceKit

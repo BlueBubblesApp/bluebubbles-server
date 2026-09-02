@@ -43,7 +43,6 @@
 //
 //  See `.claude/docs/imessage.md`.
 
-import BBInterfaces
 import BBServiceKit
 import Foundation
 

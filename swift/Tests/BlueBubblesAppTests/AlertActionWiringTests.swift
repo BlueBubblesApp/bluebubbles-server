@@ -61,20 +61,20 @@ struct AlertActionWiringTests {
     // client to lift, and the alert is the only place that context exists.
     #expect(blockAlert.actions.contains(.unblock(address: address)))
     // And the page too, for a user who wants to see the whole list.
-    #expect(blockAlert.actions.contains(.openSettings(section: "security")))
+    #expect(blockAlert.actions.contains(.openSettings(.security)))
   }
 
-  @Test("Every action an alert can carry maps to a page or a command")
-  func everyActionIsHandled() {
-    // A cheap guard on the thing that actually broke. `NotificationsView.perform` is
-    // exhaustive, so this asserts the section strings producers actually use resolve to a
-    // real page — an unrecognised one silently lands on Settings, which is a button that
-    // appears to work and does not.
-    for section in ["security", "webhooks", "permissions", "notifications", "logs"] {
-      #expect(
-        AlertActionRouting.route(forSection: section) != nil,
-        "no page for alert section '\(section)'"
-      )
+  @Test("Every alert destination lands on the page it names")
+  func everyDestinationIsRouted() {
+    // The switch is exhaustive, so a destination with no route does not compile; what is
+    // left to check is that the two tabbed ones land on the RIGHT tab. "Open Permissions"
+    // landing on Settings/General is a button that appears to work and does not.
+    #expect(AlertActionRouting.route(for: .permissions).settingsTab == .permissions)
+    #expect(AlertActionRouting.route(for: .security).settingsTab == .security)
+    #expect(AlertActionRouting.route(for: .webhooks).destination == .webhooks)
+    #expect(AlertActionRouting.route(for: .push).destination == .firebase)
+    for destination in AlertDestination.allCases {
+      #expect(!destination.label.isEmpty)
     }
   }
 
@@ -88,11 +88,11 @@ struct AlertActionWiringTests {
     // Security matters most of the two: a block alert's "see the whole list" is the one
     // remedy a user follows while actively locked out.
     #expect(
-      AlertActionRouting.route(forSection: "permissions")
+      AlertActionRouting.route(for: .permissions)
         == AlertActionRouting.Route(destination: .settings, settingsTab: .permissions)
     )
     #expect(
-      AlertActionRouting.route(forSection: "security")
+      AlertActionRouting.route(for: .security)
         == AlertActionRouting.Route(destination: .settings, settingsTab: .security)
     )
   }

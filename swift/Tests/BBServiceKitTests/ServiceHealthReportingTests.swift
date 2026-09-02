@@ -46,7 +46,7 @@ struct ServiceHealthReportingTests {
     try await registry.startAll()
 
     let health = await registry.health()
-    #expect(health[ServiceID("gated")] == .inactive(reason: "disabled by configuration"))
+    #expect(health[ServiceIdentifier("gated")] == .inactive(reason: "disabled by configuration"))
   }
 
   @Test("A missing permission is named in the health report")
@@ -58,7 +58,7 @@ struct ServiceHealthReportingTests {
 
     let health = await registry.health()
     #expect(
-      health[ServiceID("permissioned")]
+      health[ServiceIdentifier("permissioned")]
         == .inactive(reason: "requires the full-disk-access permission")
     )
   }
@@ -68,7 +68,7 @@ struct ServiceHealthReportingTests {
     let registry = registry()
     await registry.register(DatabaseService.self)
     try await registry.startAll()
-    #expect(await registry.health()[ServiceID("database")] == .running)
+    #expect(await registry.health()[ServiceIdentifier("database")] == .running)
   }
 
   @Test("Registered but never started services still appear")
@@ -82,6 +82,6 @@ struct ServiceHealthReportingTests {
 
     let health = await registry.health()
     #expect(health.count == 2)
-    #expect(health[ServiceID("database")] == .inactive(reason: "not started"))
+    #expect(health[ServiceIdentifier("database")] == .inactive(reason: "not started"))
   }
 }

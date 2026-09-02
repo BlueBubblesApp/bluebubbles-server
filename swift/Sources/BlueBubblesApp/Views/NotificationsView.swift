@@ -180,7 +180,7 @@ struct NotificationsView: View {
   /// rather than "Security", so the button is readable without re-reading the alert.
   private static func label(for action: AlertAction) -> String {
     switch action {
-    case .openSettings(let section): "Open \(section.capitalized)"
+    case .openSettings(let destination): "Open \(destination.label)"
     case .openLogs: "View Logs"
     case .restartServer: "Restart Server"
     case .retry(let service): "Retry \(service)"
@@ -203,10 +203,8 @@ struct NotificationsView: View {
     await model.alerts.setRead(alert.id, true)
 
     switch action {
-    case .openSettings(let section):
-      let route =
-        AlertActionRouting.route(forSection: section)
-        ?? AlertActionRouting.Route(destination: .settings)
+    case .openSettings(let destination):
+      let route = AlertActionRouting.route(for: destination)
       model.selection = route.destination
       if let tab = route.settingsTab { model.settingsTab = tab }
       onNavigate?()

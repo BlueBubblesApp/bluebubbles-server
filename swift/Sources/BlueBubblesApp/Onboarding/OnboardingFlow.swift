@@ -18,6 +18,7 @@
 //
 //  See `.claude/docs/architecture.md` — The app.
 
+import BBBuiltIns
 import BBServiceKit
 import BBSettings
 import BlueBubblesServerCore

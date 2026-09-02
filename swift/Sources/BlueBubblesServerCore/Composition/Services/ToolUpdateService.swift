@@ -13,6 +13,7 @@
 //
 //  See `.claude/docs/imessage.md`.
 
+import BBBuiltIns
 import BBDiagnostics
 import BBInterfaces
 import BBServiceKit
@@ -23,7 +24,6 @@ import Foundation
 actor ToolUpdateService: ContextualService, GatedService, ConfigurableService {
 
   static let manifest = BuiltInManifests.toolUpdates
-  static let watchedSettings: Set<String> = [Settings.checkForUpdates.key]
   /// A failed check is a network failure, and the timer will come round again. Restarting
   /// the service would just make the same request sooner.
   static let restartPolicy = RestartPolicy.never

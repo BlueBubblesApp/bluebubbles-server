@@ -14,6 +14,7 @@
 //  edited all of it — the failure mode of a hand-maintained pin is a version bumped with the
 //  digests left behind, which produces a mismatch on the first install and nothing before it.
 
+import BBBuiltIns
 import BBServiceKit
 import BlueBubblesServerCore
 import Foundation

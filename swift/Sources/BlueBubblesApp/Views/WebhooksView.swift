@@ -11,6 +11,7 @@
 //  about a webhook: WHICH events it wants. An inline field cannot ask, which subscribes every
 //  endpoint to everything. See `WebhookEditor`.
 
+import BBBuiltIns
 import BBEvents
 import BBInterfaces
 import BBOpenAPI

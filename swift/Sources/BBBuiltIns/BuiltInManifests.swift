@@ -16,7 +16,6 @@
 //
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
-import BBInterfaces
 import BBServiceKit
 import BBSystem
 
@@ -96,6 +95,10 @@ public enum BuiltInManifests {
       // decides the scheme the share proxies to. NOT the password: a tunnel has no
       // business with it, and there is no entitlement that would hand it over anyway.
       .readSettings(keys: ["socket_port", "use_custom_certificate"]),
+      // Every connection method publishes the address clients use. Declared as a WRITE,
+      // which is the entitlement the model calls a hijack when a plugin asks for it — and
+      // exactly why a person should see it on the list.
+      .writeSettings(keys: ["server_address"]),
     ],
     settings: [
       .header("Account"),
@@ -215,6 +218,7 @@ public enum BuiltInManifests {
       // loopback. Declared so it appears on the permissions list — a service reading a
       // setting it never announced is what the entitlement model exists to prevent.
       .readSettings(keys: ["socket_port", "use_custom_certificate"]),
+      .writeSettings(keys: ["server_address"]),
     ],
     settings: [
       .header("Account"),
@@ -357,6 +361,7 @@ public enum BuiltInManifests {
       // permissions list, because a service reading a setting it never announced is the
       // thing the entitlement model exists to prevent.
       .readSettings(keys: ["socket_port", "use_custom_certificate"]),
+      .writeSettings(keys: ["server_address"]),
     ],
     settings: [
       // A header rather than a bare leading note, which would otherwise render as a card
@@ -513,7 +518,9 @@ public enum BuiltInManifests {
       dependencies: [ID.http],
       // No process, no network egress. Worth noticing that this one asks for almost nothing,
       // which is exactly the comparison a permission list is meant to make possible.
-      entitlements: [.readSettings(keys: ["socket_port"])],
+      entitlements: [
+        .readSettings(keys: ["socket_port"]), .writeSettings(keys: ["server_address"]),
+      ],
       settings: [
         .paragraph(
           "Clients connect straight to this Mac. Choose which of its addresses to "
@@ -579,7 +586,9 @@ public enum BuiltInManifests {
       """,
     category: .reverseProxy,
     dependencies: [ID.http],
-    entitlements: [.readSettings(keys: ["socket_port", "server_address"])],
+    entitlements: [
+      .readSettings(keys: ["socket_port"]), .writeSettings(keys: ["server_address"]),
+    ],
     settings: [
       .field(
         FieldDescriptor(
@@ -606,6 +615,9 @@ public enum BuiltInManifests {
     entitlements: [
       .receiveEvents(names: []),
       .network(hosts: ["*"]),
+      // The ntfy sink's configuration. `ntfy_token` is absent because it is a secret and no
+      // entitlement may name one; `WebhookDeliveryService` adds it to its watch list.
+      .readSettings(keys: ["ntfy_topic", "ntfy_server", "ntfy_events"]),
     ]
   )
 
@@ -624,6 +636,10 @@ public enum BuiltInManifests {
         "fcm.googleapis.com", "firestore.googleapis.com",
         "oauth2.googleapis.com", "firebaserules.googleapis.com",
       ]),
+      // `remote_restart_enabled` and `last_fcm_restart` are read too, and deliberately
+      // not declared: neither has a presentation, so the permissions sentence could only
+      // name them by their column names. `PushDeliveryService` watches the first itself;
+      // the second is its own bookkeeping write.
       .readSettings(keys: ["server_address"]),
     ]
   )
@@ -636,7 +652,11 @@ public enum BuiltInManifests {
     summary: "Serves the REST API clients connect to.",
     category: .networking,
     dependencies: [ID.permissions, ID.socket],
-    entitlements: [.authenticateRequests, .readSettings(keys: ["socket_port", "bind_address"])]
+    entitlements: [
+      .authenticateRequests,
+      // `use_custom_certificate` decides whether the listener terminates TLS.
+      .readSettings(keys: ["socket_port", "bind_address", "use_custom_certificate"]),
+    ]
   )
 
   public static let socket = ServiceManifest(
@@ -685,7 +705,14 @@ public enum BuiltInManifests {
       """,
     category: .messaging,
     dependencies: [ID.permissions],
-    entitlements: [.sendMessages, .readMessages, .spawnProcess]
+    entitlements: [
+      .sendMessages, .readMessages, .spawnProcess,
+      // Which helpers to inject and from where. A change to any of them re-injects.
+      .readSettings(keys: [
+        "enable_private_api", "private_api_helper_path",
+        "enable_ft_private_api", "private_api_facetime_helper_path",
+      ]),
+    ]
   )
 
   public static let scheduledMessages = ServiceManifest(

@@ -22,7 +22,7 @@ struct ServiceEnablementGateTests {
     private var off: Set<String> = []
     func disable(_ id: String) { off.insert(id) }
     func enable(_ id: String) { off.remove(id) }
-    func isEnabled(_ id: ServiceID) -> Bool { !off.contains(id.rawValue) }
+    func isEnabled(_ id: ServiceIdentifier) -> Bool { !off.contains(id.rawValue) }
   }
 
   private func registry(
@@ -54,7 +54,7 @@ struct ServiceEnablementGateTests {
     // And it says WHY, rather than reporting the same "not started" as a service that
     // simply has not been reached yet.
     let health = await registry.health()
-    #expect(health[ServiceID("http")] == .inactive(reason: "switched off"))
+    #expect(health[ServiceIdentifier("http")] == .inactive(reason: "switched off"))
   }
 
   @Test("Switching one off stops it")
@@ -97,7 +97,7 @@ struct ServiceEnablementGateTests {
 
     #expect((await recorder.snapshot()).contains("start:http"))
     let health = await registry.health()
-    #expect(health[ServiceID("http")] == .running)
+    #expect(health[ServiceIdentifier("http")] == .running)
   }
 
   @Test("Switching off a dependency stops what depends on it")
@@ -129,9 +129,9 @@ struct ServiceEnablementGateTests {
 
     // And each says why it is not running: the proxy is not switched off, it is stranded.
     let health = await registry.health()
-    #expect(health[ServiceID("http")] == .inactive(reason: "switched off"))
+    #expect(health[ServiceIdentifier("http")] == .inactive(reason: "switched off"))
     #expect(
-      health[ServiceID("proxy")]
+      health[ServiceIdentifier("proxy")]
         == .inactive(reason: "a service it depends on is switched off"))
 
     // Switching it back on brings both back, in dependency order.
@@ -167,7 +167,7 @@ struct ServiceEnablementGateTests {
     #expect(!events.contains("start:proxy"))
 
     let health = await registry.health()
-    #expect(health[ServiceID("proxy")] == .inactive(reason: "http is switched off"))
+    #expect(health[ServiceIdentifier("proxy")] == .inactive(reason: "http is switched off"))
   }
 
   @Test("An unrelated settings change does not re-evaluate anything")
