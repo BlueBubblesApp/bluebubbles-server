@@ -81,6 +81,15 @@ final class OnboardingModel {
     isPresented = true
   }
 
+  /// Forgets the answers and the completion mark, then opens the walkthrough as a first
+  /// run would. Settings already written — the password, the connection method — are not
+  /// touched; the walkthrough re-reads them where it can and asks again where it cannot.
+  func reset() {
+    selections = OnboardingSelections()
+    isComplete = false
+    present()
+  }
+
   private func persist() {
     guard let data = try? JSONEncoder().encode(selections) else { return }
     defaults.set(data, forKey: OnboardingSelections.defaultsKey)

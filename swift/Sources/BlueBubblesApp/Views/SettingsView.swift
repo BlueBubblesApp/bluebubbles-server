@@ -91,6 +91,7 @@ struct SettingsView: View {
         // Under Features, because that is where the capability it turns on is described.
         if model.settingsTab == .general {
           GroupChatShortcutSection(model: model)
+          SetupSection(model: model)
         }
       }
     }

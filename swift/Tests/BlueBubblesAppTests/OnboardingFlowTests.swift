@@ -203,3 +203,28 @@ struct OnboardingModelTests {
     #expect(!again.isPresented)
   }
 }
+
+@Suite("Onboarding reset")
+@MainActor
+struct OnboardingResetTests {
+
+  @Test("Reset forgets the answers and the completion mark, and opens the walkthrough")
+  func reset() {
+    let name = "onboarding-reset-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: name)!
+    defaults.removePersistentDomain(forName: name)
+    let model = OnboardingModel(defaults: defaults)
+    model.selections.goals = [.android]
+    model.advance()
+    model.complete()
+
+    model.reset()
+    #expect(model.selections == OnboardingSelections())
+    #expect(!model.isComplete)
+    #expect(model.isPresented)
+    #expect(model.isAtStart)
+    // Persisted, so the next launch is a first launch too.
+    #expect(!OnboardingModel(defaults: defaults).isComplete)
+    #expect(OnboardingModel(defaults: defaults).selections.goals.isEmpty)
+  }
+}
