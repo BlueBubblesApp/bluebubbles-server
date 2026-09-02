@@ -45,8 +45,6 @@ struct RootView: View {
 
   @Bindable var model: AppModel
 
-  @State private var showingOnboarding = false
-
   var body: some View {
     NavigationSplitView {
       // Plain tagged rows with an OPTIONAL selection binding.
@@ -122,14 +120,19 @@ struct RootView: View {
           }
         }
     }
-    .sheet(isPresented: $showingOnboarding) {
-      OnboardingView(model: model, isPresented: $showingOnboarding)
+    .sheet(
+      isPresented: Binding(
+        get: { model.onboarding.isPresented },
+        set: { model.onboarding.isPresented = $0 }
+      )
+    ) {
+      OnboardingView(model: model)
     }
     .task {
       // Shown once the server is up rather than immediately: the walkthrough's
       // permission step reads live status, and with no server there is nothing to read.
-      if !model.hasCompletedOnboarding {
-        showingOnboarding = true
+      if !model.onboarding.isComplete {
+        model.onboarding.present()
       }
     }
   }

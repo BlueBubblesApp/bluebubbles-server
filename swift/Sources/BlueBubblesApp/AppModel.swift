@@ -73,6 +73,7 @@ final class AppModel {
   let alerts = AlertsModel()
   let updates = UpdatesModel()
   let integrations = IntegrationsModel()
+  let onboarding = OnboardingModel()
 
   init() {
     alerts.onUnreadCountChanged = { [weak self] in await self?.applyAppearance() }
@@ -115,12 +116,6 @@ final class AppModel {
   /// column shows another page. Held here, the run continues and the screen re-attaches to
   /// it with its progress intact.
   let firebaseSetup = FirebaseSetupModel()
-
-  /// Set once onboarding has been completed or explicitly skipped.
-  var hasCompletedOnboarding: Bool {
-    get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
-    set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
-  }
 
   /// The whole container. PRIVATE, and the accessors below are why.
   ///

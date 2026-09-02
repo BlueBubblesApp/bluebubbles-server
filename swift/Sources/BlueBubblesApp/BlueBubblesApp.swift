@@ -82,6 +82,10 @@ struct BlueBubblesApp: App {
           Task { await model.updates.check() }
         }
         .disabled(!model.phase.isRunning)
+        // The walkthrough, on demand: someone adding a phone months after setting up for
+        // a desktop client gets the same guided path, with their earlier answers kept.
+        Button("Setup Assistant…") { model.onboarding.present() }
+          .disabled(!model.phase.isRunning)
       }
       CommandGroup(after: .help) {
         APIDocsMenuItem()

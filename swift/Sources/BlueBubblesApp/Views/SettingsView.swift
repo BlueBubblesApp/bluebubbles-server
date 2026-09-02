@@ -565,7 +565,7 @@ struct SettingRow: View {
 /// Placed above the sections rather than as help text on the first toggle, because it is not
 /// advice about a setting — it is the reason none of them will do anything. The Permissions
 /// page reports the live SIP state; this says what to do about it.
-private struct PrivateAPIPrerequisiteNote: View {
+struct PrivateAPIPrerequisiteNote: View {
 
   var body: some View {
     GlassCard {
@@ -601,7 +601,7 @@ private struct PrivateAPIPrerequisiteNote: View {
 /// can fail, or simply never finish, while every toggle on the page still reads "on". The
 /// server now bounds that wait and carries on without it — which is the right behaviour and
 /// completely invisible unless something says so here.
-private struct PrivateAPIStatusCard: View {
+struct PrivateAPIStatusCard: View {
 
   let model: AppModel
 

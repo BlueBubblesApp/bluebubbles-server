@@ -159,6 +159,15 @@ administration on `DeviceDirectory` and `WebhookDirectory`. Note the accessors:
 The SwiftUI app reaches state through narrow accessors on `AppModel` — never `AppContext`
 directly, which is private for exactly that reason.
 
+**Setup is a plan, not a script.** `OnboardingFlow.swift` declares every step as data — when it
+is included (a function of the goals chosen on the first screen and the connection method), whether
+it may be skipped, and what gates Continue — and `OnboardingPlan.steps(for:)` filters the catalogue.
+The wizard shell walks the plan; each step's view embeds the existing settings surface
+(`PermissionRow`, `SettingRow`, `ServiceFormView`, `ManagedToolSection`, `FirebaseView`,
+`WebhooksView`) rather than re-drawing it. The rules live off the view so `OnboardingFlowTests` can
+assert the branches: a phone gets Firebase for notifications, a desktop client behind a tunnel gets
+it for address updates only, one on a fixed address never sees it.
+
 ---
 
 ## Events
