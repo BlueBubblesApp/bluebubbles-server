@@ -54,7 +54,7 @@ final class HTTPService: ContextualService, ConfigurableService {
         return false
       }),
       onClientActivity: { [weak self] in
-        await self?.context.noteClientActivity()
+        self?.context.clientActivity.note()
       },
       logger: context.logger
     )

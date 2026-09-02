@@ -157,7 +157,7 @@ final class ProxyService<Method: ProxyMethod>: ContextualService, ConfigurableSe
     let name = Self.manifest.name
     let identifier = Self.manifest.id.rawValue
     self.coordinator = ProxyCoordinator(
-      lastConnectionAt: { await app.lastClientActivityAt() },
+      lastConnectionAt: { app.clientActivity.last },
       onAddressChanged: { address in
         // The one place the published address is written. Everything that needs it —
         // Firebase, the UI, server/info — reads it from settings.

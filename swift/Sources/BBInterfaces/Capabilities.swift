@@ -125,11 +125,7 @@ public protocol FaceTimeProviding: Sendable {
 }
 
 public protocol FindMyProviding: Sendable {
-  var findMyFriends: FindMyFriendsCache { get }
-  /// Global gates, shared by every client on purpose: several are connected by design and
-  /// Apple counts this server as one.
-  var findMyRefreshGate: IntervalGate { get }
-  var findMyHandleRefreshGate: IntervalGate { get }
+  var findMy: FindMyRuntime { get }
 }
 
 /// The external programs services depend on.

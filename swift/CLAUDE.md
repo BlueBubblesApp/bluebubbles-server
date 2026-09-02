@@ -91,7 +91,7 @@ improvising the order:**
 | An API route | `Sources/BBHTTPAPI/RouteTable.swift` (or `AdditiveRoutes` if Node does not have it), then a handler in `Sources/BBHandlers/` |
 | Logic behind a route | `Sources/BBInterfaces/` — **not** the handler. Interfaces return typed values; one `serialize` step projects them. Anything reaching Messages goes inside `throughMessages { … }` |
 | A capability a handler, service or view may reach | `Sources/BBInterfaces/Capabilities.swift`, then conform `AppContext` in `AppContextCapabilities.swift`. Never take the whole `AppContext` |
-| A page in the app | `Sources/BlueBubblesApp/Views/` — reach state through `AppModel`, never `AppContext` |
+| A page in the app | `Sources/BlueBubblesApp/Views/` — reach state through `AppModel`, never `AppContext`. State with its own lifetime goes on a child model in `Sources/BlueBubblesApp/Models/` (`PermissionsModel`, `AlertsModel`, `UpdatesModel`, `IntegrationsModel`) that attaches in `start` and detaches in `stop`; `AppModel` is the root that owns phase, navigation and lifetime |
 | A service | One file per service under `Sources/BlueBubblesServerCore/Composition/Services/`, conforming to `ContextualService`; declare its manifest in `BuiltInManifests.swift` and register it in `ServerComposition`. Start order is derived from `dependencies` |
 | A table in `app.db` | A `SchemaContributor` in the module that owns it, then append it to `AppSchema.contributors`. **Not** `AppDatabase` — see [`Sources/BBPersistence/CLAUDE.md`](Sources/BBPersistence/CLAUDE.md) |
 | An event | `Sources/BBEvents/ServerEvent.swift` plus its per-sink projection |

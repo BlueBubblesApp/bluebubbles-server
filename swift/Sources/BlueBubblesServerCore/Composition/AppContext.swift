@@ -86,25 +86,10 @@ public actor AppContext {
   // Cross-cutting
   public nonisolated let permissions: PermissionsService
   public nonisolated let accessControl: AccessControlService
-  /// Global gate on the FindMy friends refresh, which is the only route that reaches
-  /// Apple. Shared by every client on purpose — see `IntervalGate`.
-  ///
-  /// Fifteen seconds is well inside what a person pressing refresh perceives as immediate,
-  /// and well outside anything that looks like polling from Apple's side.
-  public nonisolated let findMyRefreshGate = IntervalGate(interval: .seconds(15))
-  /// Refreshing ONE person, gated separately and more loosely.
-  ///
-  /// A per-handle refresh is a single locate request rather than one per friend, so holding
-  /// it to the same fifteen seconds as the bulk refresh would make the cheap call as
-  /// expensive to use as the costly one. Still global rather than per client, for the same
-  /// reason the bulk gate is: several clients are connected by design, and Apple counts
-  /// this server as one.
-  public nonisolated let findMyHandleRefreshGate = IntervalGate(interval: .seconds(3))
-  /// Where people are, as the server currently understands it.
-  ///
-  /// Friends have no cache file — unlike devices, they exist only in memory, fed by the
-  /// helper. See `FindMyFriendsCache`.
-  public nonisolated let findMyFriends = FindMyFriendsCache()
+  /// FindMy's in-memory state and its gates on reaching Apple.
+  public nonisolated let findMy = FindMyRuntime()
+  /// When a client last did anything. See `ClientActivityTracker`.
+  public nonisolated let clientActivity = ClientActivityTracker()
   /// Serves attachments in formats clients can open, caching each conversion. See
   /// `AttachmentConversion` — HEIC and CAF are what iMessage stores and what most clients
   /// cannot display.
@@ -157,13 +142,8 @@ public actor AppContext {
   /// Services, once the registry has built them. Populated by the registry rather than
   /// here, which is what keeps this from being a second construction path.
   private var registry: ServiceRegistry<AppContext>?
-  /// When a client last did anything. Read by the proxy's refresh timer so a tunnel is
-  /// never recycled mid-download.
-  private var lastClientActivity: Date?
-  /// When push was last told about it. See `noteClientActivity`.
-  private var lastActivityForwardedAt: Date?
-  /// The address most recently announced. See `announce(serverAddress:)`.
-  private var lastAnnouncedAddress: String?
+  /// The `new-server` announcer. Built on first use; it needs `events` and `logger`.
+  private var addressAnnouncer: ServerAddressAnnouncer?
 
   /// The interfaces layer.
   ///
@@ -331,10 +311,12 @@ public actor AppContext {
 
   func publish(pushDelivery: PushService) {
     self.pushDelivery = pushDelivery
+    clientActivity.setForwarder { await pushDelivery.noteClientActivity() }
   }
 
   func withdrawPushDelivery() {
     self.pushDelivery = nil
+    clientActivity.setForwarder(nil)
   }
 
   /// Publishes the Private API — the connection AND the process control — together.
@@ -520,67 +502,21 @@ public actor AppContext {
     await registry?.service(type.id) as? S
   }
 
-  // MARK: - Client activity
+  // MARK: - Address changes
 
-  public func noteClientActivity(at moment: Date = Date()) {
-    lastClientActivity = moment
-
-    // Forwarded to push, which polls the Firebase restart document faster while somebody
-    // is around — but at most once a minute, not once a request. The watcher only asks
-    // whether there was activity inside a ten-minute window, so a busy client would
-    // otherwise spawn a task per request to re-answer a question whose answer cannot
-    // change for another nine and a half minutes.
-    guard moment.timeIntervalSince(lastActivityForwardedAt ?? .distantPast) > 60 else {
-      return
-    }
-    lastActivityForwardedAt = moment
-    // Fire-and-forget: nothing in the request path should wait on it.
-    Task { [weak self] in
-      await self?.pushDelivery?.noteClientActivity()
-    }
-  }
-
-  public func lastClientActivityAt() -> Date? { lastClientActivity }
-
-  /// Announces a new address for this server.
+  /// Announces a new address for this server. See `ServerAddressAnnouncer`.
   ///
-  /// Two deliveries, and they are not interchangeable. The socket event reaches clients
-  /// that are connected RIGHT NOW; the Firebase document is what a client reads when it
-  /// comes back later and needs to know where this machine went. A tunnel that reconnects
-  /// with a new URL while every client is asleep is exactly the case where only the second
-  /// one helps, and it is the common case for ngrok.
-  ///
-  /// Neither happened before this existed: `new-server` was a defined event name with no
-  /// emitter, and `ServerURLPublisher` was built, tested, and called from nowhere — so a
-  /// tunnel whose address changed left every client dialing the old one until someone
-  /// noticed and typed the new address in by hand.
+  /// Neither delivery happened before this existed: `new-server` was a defined event name
+  /// with no emitter, and `ServerURLPublisher` was built, tested, and called from nowhere.
   public func announce(serverAddress: String) async {
-    let address = serverAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !address.isEmpty else { return }
-
-    // Only on an actual change, matching `index.ts:1056` — which compares the previous
-    // and next values before announcing anything. `onAddressChanged` fires on every
-    // tunnel connect, including a reconnect to a reserved name or a custom domain that
-    // comes back on the SAME address, and a settings write broadcasts whether or not the
-    // value moved. Without this, a routine tunnel refresh tells every client the server
-    // moved somewhere it did not.
-    guard address != lastAnnouncedAddress else { return }
-    lastAnnouncedAddress = address
-
-    logger.info("Announcing a new server address")
-    await events.emit(
-      ServerEvent(
-        name: .newServer,
-        // A bare string, matching `emitMessage(NEW_SERVER, server_address, "high")`.
-        // Wrapping it in an object would be tidier and would break every client that
-        // reads the payload as the address itself.
-        fullPayload: .string(address),
-        priority: .high
-      )
-    )
-    // Forced, because this is only reached when the address CHANGED and the publisher's own
-    // "unchanged" memory is about what this process wrote, not about what the document says.
-    await pushDelivery?.publish(serverURL: address, force: true)
+    let announcer = addressAnnouncer ?? ServerAddressAnnouncer(events: events, logger: logger)
+    addressAnnouncer = announcer
+    await announcer.announce(serverAddress) { [pushDelivery] address in
+      // Forced, because this is only reached when the address CHANGED and the publisher's
+      // own "unchanged" memory is about what this process wrote, not about what the
+      // document says.
+      await pushDelivery?.publish(serverURL: address, force: true)
+    }
   }
 
   /// The secret store, reachable synchronously.

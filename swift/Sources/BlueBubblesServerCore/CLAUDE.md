@@ -28,8 +28,11 @@ Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architec
 - **It holds references; it does not act.** Whole-server verbs — restart, process replacement —
   live in `ServerLifecycle`. A container that can `execv` is not a container. Device and webhook
   administration live on `DeviceDirectory` and `WebhookDirectory`, FaceTime hand-offs on
-  `FaceTimeCoordinator`, app restarts on `ApplicationRestartCoordinator`, for the same reason:
-  holding a repository is a container's job, deciding what to do when a delete fails is not.
+  `FaceTimeCoordinator`, app restarts on `ApplicationRestartCoordinator`, client activity on
+  `ClientActivityTracker`, `new-server` on `ServerAddressAnnouncer`, FindMy's gates and cache on
+  `FindMyRuntime`, for the same reason: holding a repository is a container's job, deciding
+  what to do when a delete fails is not. **A `private var` on `AppContext` is a smell** — state
+  with rules belongs on a collaborator that can be tested without the container.
 - **Long-running work belongs to an owner.** A `Task` spawned from a handler that nothing
   holds cannot be cancelled when the service behind it stops. Coordinators own their tasks and
   expose `stop()`; `PrivateAPIGatedService.stop` calls them.

@@ -84,7 +84,7 @@ public enum FindMyHandlers {
     registry.register(.findmyFriends) { _ in
       // Served from the cache rather than from disk: there IS no friends file. See
       // `FindMyFriendsCache` for the mistake this replaced.
-      .data(.array(await context.findMyFriends.all.map(legacyPayload)))
+      .data(.array(await context.findMy.friends.all.map(legacyPayload)))
     }
 
     registry.register(.findmyRefreshFriends) { _ in
@@ -102,18 +102,18 @@ public enum FindMyHandlers {
       // Refused politely: the cached positions come back with `refreshed: false` and
       // how long until the next refresh is allowed. An error would make clients retry,
       // which is the opposite of what a rate limit wants.
-      switch await context.findMyRefreshGate.attempt() {
+      switch await context.findMy.refreshGate.attempt() {
       case .allowed:
         let friends = try await api.refreshFindMyFriends()
-        await context.findMyFriends.merge(friends)
+        await context.findMy.friends.merge(friends)
         return .data(
-          .array(await context.findMyFriends.all.map(legacyPayload)),
+          .array(await context.findMy.friends.all.map(legacyPayload)),
           metadata: .object(["refreshed": .bool(true)])
         )
 
       case .tooSoon(let retryAfter):
         return .data(
-          .array(await context.findMyFriends.all.map(legacyPayload)),
+          .array(await context.findMy.friends.all.map(legacyPayload)),
           metadata: .object([
             "refreshed": .bool(false),
             "retry_after_seconds": .int(Int(retryAfter.seconds.rounded(.up))),
@@ -128,17 +128,17 @@ public enum FindMyHandlers {
       let api = try await context.requirePrivateAPI(for: "refreshing a FindMy location")
       let address = try address(in: request)
 
-      switch await context.findMyHandleRefreshGate.attempt() {
+      switch await context.findMy.handleRefreshGate.attempt() {
       case .allowed:
         let friend = try await api.refreshFindMyLocation(handle: address)
-        await context.findMyFriends.merge(friend)
+        await context.findMy.friends.merge(friend)
         return .data(payload(friend), metadata: .object(["refreshed": .bool(true)]))
 
       case .tooSoon(let retryAfter):
         // The cached entry, not an error — same reasoning as the bulk refresh. A
         // client that just asked gets the position it already had rather than a
         // failure it will retry into the limiter.
-        guard let cached = await context.findMyFriends.friend(handle: address) else {
+        guard let cached = await context.findMy.friends.friend(handle: address) else {
           throw NotFound("No FindMy location is known for \(address) yet")
         }
         return .data(
