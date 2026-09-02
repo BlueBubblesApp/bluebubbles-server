@@ -176,7 +176,7 @@ Full loop, including the generated-artifact checks CI runs → [`.claude/docs/wo
 | Document | Size | What it is good for |
 |---|---|---|
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | ~56 KB | Human setup, permissions, SIP, signing, releases |
-| [`TODO.md`](TODO.md) | ~52 KB | Outstanding work |
+| [`TODO.md`](TODO.md) | ~48 KB | Outstanding work, ordered by priority; finished work is deleted, not struck through |
 | [`docs/api/README.md`](docs/api/README.md) | ~25 KB | The REST API explained in prose |
 | [`docs/PRIVATE_API_SURFACE.md`](docs/PRIVATE_API_SURFACE.md) | ~47 KB | Every IMCore call and its selectors |
 | [`docs/SEQUOIA_COMPATIBILITY.md`](docs/SEQUOIA_COMPATIBILITY.md) | ~37 KB | Per-macOS-version differences |
