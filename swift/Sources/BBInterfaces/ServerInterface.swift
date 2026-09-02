@@ -39,32 +39,23 @@ public struct ServerInterface: Sendable {
 
   // MARK: - Alerts
 
+  /// The most recent alerts, newest first.
+  ///
+  /// Values, not wire rows. The two HTTP projections below differ — v1 is the Node `alert`
+  /// row and nothing else, v2 is everything the alert carries — and which one a caller wants
+  /// is the route's decision, not this layer's.
+  public func alerts(limit: Int = 10) async -> [UserAlert] {
+    await alerts.all(limit: limit)
+  }
+
   /// `GET /api/v1/server/alert` — the Node `alert` row, and nothing else.
   ///
   /// Six keys, an integer `id`, `type` in the reference's three-value vocabulary, `value` as
   /// `"title: body"`, and ISO dates. There is no `?fields=extended` here any more: extra
-  /// fields are new surface, and new surface lives in v2 (`.claude/docs/api.md`). Keeping a
-  /// query parameter that reshapes a v1 response would be exactly the "additive is not
-  /// invisible" problem the version split exists to end.
-  public func alerts(limit: Int = 10) async -> [JSONValue] {
-    await alerts.all(limit: limit).map(Self.alertJSON)
-  }
-
-  /// `GET /api/v2/server/alert` — everything the alert actually carries.
+  /// fields are new surface, and new surface lives in v2 (`.claude/docs/api.md`).
   ///
-  /// The v1 row throws away most of an alert: `value` flattens a title and a body into one
-  /// string, `type` folds five severities into three, and the diagnostics, the remedy
-  /// actions and the occurrence count have nowhere to go at all. This is the full alert
-  /// shape, and the one the app uses in process.
-  ///
-  /// `id` is the SAME integer v1 reports, deliberately. The two versions describe the same
-  /// alert, and a client reading v2 and marking read over either endpoint must not have to
-  /// translate between identity schemes.
-  public func alertsV2(limit: Int = 100) async -> [JSONValue] {
-    await alerts.all(limit: limit).map(Self.alertJSONV2)
-  }
-
-  /// The v1 projection, as a pure function of one alert.
+  /// Static and public so a test can pin the exact key set without standing up a database, a
+  /// settings store and a message repository. The key set IS the contract here.
   ///
   /// Static and public so a test can pin the exact key set without standing up a database, a
   /// settings store and a message repository. The key set IS the contract here, and a test
@@ -84,7 +75,15 @@ public struct ServerInterface: Sendable {
     ])
   }
 
-  /// The v2 projection.
+  /// `GET /api/v2/server/alert` — everything the alert actually carries.
+  ///
+  /// The v1 row throws away most of an alert: `value` flattens a title and a body into one
+  /// string, `type` folds five severities into three, and the diagnostics, the remedy
+  /// actions and the occurrence count have nowhere to go at all.
+  ///
+  /// `id` is the SAME integer v1 reports, deliberately. The two versions describe the same
+  /// alert, and a client reading v2 and marking read over either endpoint must not have to
+  /// translate between identity schemes.
   public static func alertJSONV2(_ alert: UserAlert) -> JSONValue {
     var object: [String: JSONValue] = [
       "id": .int(alert.sequence),
@@ -142,20 +141,17 @@ public struct ServerInterface: Sendable {
     public let attachments: Int
   }
 
-  /// The wire shape, for the HTTP routes.
-  public func totals() async throws -> JSONValue {
-    let counts = try await counts()
-    return .object([
-      "handles": .int(counts.handles),
-      "messages": .int(counts.messages),
-      "chats": .int(counts.chats),
-      "attachments": .int(counts.attachments),
+  /// `GET /api/v1/server/statistics/totals`.
+  public static func serialize(_ totals: Totals) -> JSONValue {
+    .object([
+      "handles": .int(totals.handles),
+      "messages": .int(totals.messages),
+      "chats": .int(totals.chats),
+      "attachments": .int(totals.attachments),
     ])
   }
 
-  /// The same counts as VALUES, for callers in this process. The home screen read these
-  /// back out of the dictionary by string key, which meant a renamed key would have shown
-  /// an em dash rather than failing to build.
+  /// What the database holds, as four counts.
   public func counts() async throws -> Totals {
     guard let messages else {
       throw InterfaceError.unavailable("the iMessage database is not readable")
@@ -178,36 +174,24 @@ public struct ServerInterface: Sendable {
 
   // MARK: - Webhooks
   //
-  // Storage, the record type and the `events` encoding all live in `WebhookRepository`.
-  // What stays here is the part that is this layer's job: validating what a client sent,
-  // and projecting a row into the wire shape.
+  // Storage, the record type, the `events` encoding and the wire projection (`Webhook.json`)
+  // all live in `WebhookRepository`. What stays here is the part that is this layer's job:
+  // validating what a client sent.
 
   private var webhookStore: WebhookRepository { WebhookRepository(database: database) }
 
-  /// The wire shape, for the HTTP routes.
-  public func webhooks() async throws -> [JSONValue] {
-    try await webhookStore.all().map(\.json)
-  }
-
-  /// The same endpoints as VALUES, for callers in this process.
-  ///
-  /// The app runs in the same process as the server and has the record type available, so
-  /// handing it JSON meant every view re-derived the fields by subscript —
-  /// `hook["id"]?.intValue ?? 0` — which is the untyped boundary an in-process UI does not
-  /// have to pay for. The JSON projection above stays because the wire contract is exactly
-  /// what it describes.
-  public func webhookList() async throws -> [Webhook] {
+  public func webhooks() async throws -> [Webhook] {
     try await webhookStore.all()
   }
 
-  public func createWebhook(url: String, events: [String]) async throws -> JSONValue {
+  public func createWebhook(url: String, events: [String]) async throws -> Webhook {
     try Self.validate(url: url)
-    return try await webhookStore.upsert(url: url, events: events).json
+    return try await webhookStore.upsert(url: url, events: events)
   }
 
-  public func updateWebhook(id: Int64, url: String?, events: [String]?) async throws -> JSONValue {
+  public func updateWebhook(id: Int64, url: String?, events: [String]?) async throws -> Webhook {
     if let url { try Self.validate(url: url) }
-    return try await webhookStore.update(id: id, url: url, events: events).json
+    return try await webhookStore.update(id: id, url: url, events: events)
   }
 
   public func deleteWebhook(id: Int64) async throws {
@@ -232,13 +216,18 @@ public struct ServerInterface: Sendable {
     case settings
   }
 
-  public func backups(kind: BackupKind) async throws -> JSONValue {
-    let rows = try await backupStore.all(kind: kind.rawValue)
-    // An array of the stored documents. A backup whose bytes are no longer valid JSON is
-    // skipped rather than failing the whole listing — one corrupt theme should not make
-    // a client unable to load any of them.
-    return .array(
-      rows.compactMap { row in
+  public func backups(kind: BackupKind) async throws -> [Backup] {
+    try await backupStore.all(kind: kind.rawValue)
+  }
+
+  /// The wire shape: an array of the stored documents.
+  ///
+  /// A backup whose bytes are no longer valid JSON is skipped rather than failing the whole
+  /// listing — one corrupt theme should not make a client unable to load any of them. An
+  /// instance method rather than a static because the skip is worth a log line.
+  public func serialize(_ backups: [Backup]) -> JSONValue {
+    .array(
+      backups.compactMap { row in
         guard let value = try? JSONValue.parse(row.payload) else {
           logger.warning(
             "Skipping unreadable backup",

@@ -30,25 +30,19 @@ public struct ScheduleInterface: Sendable {
   /// have to learn a second name for the same three words.
   public typealias Status = ScheduledMessageStatus
 
-  /// The wire shape, for the HTTP routes.
-  public func list(status: Status? = nil) async throws -> [JSONValue] {
-    try await store.all(status: status).map(\.json)
-  }
-
-  /// The same messages as VALUES, for callers in this process. See
-  /// `ServerInterface.webhookList()` for why both exist.
-  public func records(status: Status? = nil) async throws -> [ScheduledMessage] {
+  /// Every scheduled message, soonest first. The wire projection is `ScheduledMessage.json`.
+  public func list(status: Status? = nil) async throws -> [ScheduledMessage] {
     try await store.all(status: status)
   }
 
-  public func find(id: Int64) async throws -> JSONValue {
+  public func find(id: Int64) async throws -> ScheduledMessage {
     guard let record = try await store.find(id: id) else {
       throw InterfaceError.notFound("no scheduled message with id \(id)")
     }
-    return record.json
+    return record
   }
 
-  public func create(_ body: JSONValue) async throws -> JSONValue {
+  public func create(_ body: JSONValue) async throws -> ScheduledMessage {
     guard let payload = body["payload"], case .object = payload else {
       throw InterfaceError.invalidRequest("`payload` is required and must be an object")
     }
@@ -73,10 +67,10 @@ public struct ScheduleInterface: Sendable {
       sentAt: nil,
       createdAt: Date()
     )
-    return try await store.insert(record).json
+    return try await store.insert(record)
   }
 
-  public func update(id: Int64, body: JSONValue) async throws -> JSONValue {
+  public func update(id: Int64, body: JSONValue) async throws -> ScheduledMessage {
     guard var record = try await store.find(id: id) else {
       throw InterfaceError.notFound("no scheduled message with id \(id)")
     }
@@ -102,7 +96,7 @@ public struct ScheduleInterface: Sendable {
 
     let updated = record
     try await store.update(updated)
-    return updated.json
+    return updated
   }
 
   public func delete(id: Int64) async throws {

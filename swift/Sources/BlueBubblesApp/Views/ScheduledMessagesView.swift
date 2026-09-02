@@ -33,7 +33,7 @@ struct ScheduledMessagesView: View {
     guard let scheduling = model.scheduling else { return nil }
     // Was `(try? …) ?? []`, which rendered a queue that could not be read as the
     // "Nothing scheduled" empty state — complete with a button inviting you to add to it.
-    return try await scheduling.records()
+    return try await scheduling.list()
   }
 
   private var messages: [ScheduledMessage] { screen.state.value ?? [] }

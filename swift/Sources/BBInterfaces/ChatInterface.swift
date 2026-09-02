@@ -190,25 +190,35 @@ public struct ChatInterface: MessagesBackedInterface {
     try await repository.chatCount(includeArchived: includeArchived)
   }
 
-  /// Chats grouped by style, which is what the `/chat/count` route reports.
-  ///
-  /// Style 43 is a group, 45 a one-to-one. Reported by the raw style number rather than a
-  /// friendly name because that is what the current server emits and clients key on it.
-  /// `GET /api/v1/chat/count` — `{total, breakdown: {<service>: n}}`.
-  ///
-  /// The breakdown key was missing entirely and the counts were keyed by chat STYLE, so a
-  /// client reading `data.breakdown.iMessage` got nothing at all. Measured against a live
-  /// Electron server.
+  /// Chat totals per service — `iMessage`, `SMS`, `RCS` — and the sum.
+  public struct ChatCounts: Sendable, Equatable {
+    public let total: Int
+    public let breakdown: [String: Int]
+
+    public init(breakdown: [String: Int]) {
+      self.breakdown = breakdown
+      self.total = breakdown.values.reduce(0, +)
+    }
+  }
+
+  /// Chats grouped by service, which is what `GET /api/v1/chat/count` reports.
   ///
   /// Chats with no participants are excluded, matching the reference, whose `getChats`
   /// inner-joins participants. Not a quirk being reproduced for parity's sake: there is
   /// nobody to send to in such a chat, so it is not something a client can act on. The
   /// listing and both counts share one definition of it so they cannot disagree.
-  public func countByService(includeArchived: Bool = true) async throws -> JSONValue {
-    let counts = try await repository.chatCountsByService(includeArchived: includeArchived)
-    return .object([
-      "total": .int(counts.values.reduce(0, +)),
-      "breakdown": .object(counts.mapValues(JSONValue.int)),
+  public func countByService(includeArchived: Bool = true) async throws -> ChatCounts {
+    ChatCounts(
+      breakdown: try await repository.chatCountsByService(includeArchived: includeArchived)
+    )
+  }
+
+  /// `{total, breakdown: {<service>: n}}` — keyed by service NAME, not by chat style. A
+  /// client reads `data.breakdown.iMessage`.
+  public static func serialize(_ counts: ChatCounts) -> JSONValue {
+    .object([
+      "total": .int(counts.total),
+      "breakdown": .object(counts.breakdown.mapValues(JSONValue.int)),
     ])
   }
 
@@ -658,14 +668,5 @@ public struct ChatInterface: MessagesBackedInterface {
     try await throughMessages {
       try await api.deleteMessage(MessageGUID(messageGUID), in: ChatGUID(chatGUID))
     }
-  }
-}
-
-extension JSONValue {
-  /// Adds keys to an object value. Returns the receiver unchanged for a non-object, since
-  /// there is nothing sensible to merge into an array or a scalar.
-  public func merging(_ other: [String: JSONValue]) -> JSONValue {
-    guard case .object(let values) = self else { return self }
-    return .object(values.merging(other) { _, new in new })
   }
 }

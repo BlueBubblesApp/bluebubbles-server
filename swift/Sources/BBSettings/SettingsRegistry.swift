@@ -213,6 +213,7 @@ public enum Settings {
   /// up on the caller. Off by default, and useless without `enable_ft_private_api`.
   public static let faceTimeIncomingHandoff = Setting<Bool>(
     "facetime_incoming_handoff", default: false,
+    application: .composition,
     presentation: .init(
       label: "Incoming call hand-off",
       help: "Lets a client answer an incoming FaceTime call through the API and join "
@@ -220,7 +221,6 @@ public enum Settings {
       section: "FaceTime", control: .toggle
     )
   )
-  public static let privateAPIMode = Setting<String>("private_api_mode", default: "process-dylib")
 
   // There is deliberately NO setting for the helper transport, and adding one would be a
   // mistake worth naming here.
@@ -316,6 +316,7 @@ public enum Settings {
   /// decision to take on evidence from real servers, not from this benchmark alone.
   public static let chatDatabaseReaders = Setting<Int>(
     "chat_db_readers", default: 1,
+    application: .composition,
     presentation: .init(
       label: "Concurrent Database Readers",
       help: "How many message-database reads run at once. 1 is the safe default; raising it "
@@ -366,9 +367,6 @@ public enum Settings {
   public static let openFindMyOnStartup = Setting<Bool>(
     "open_findmy_on_startup", default: true,
     presentation: .init(label: "Open FindMy on Startup", section: "Features", control: .toggle))
-  public static let startViaTerminal = Setting<Bool>("start_via_terminal", default: false)
-  public static let headless = Setting<Bool>("headless", default: false)
-  public static let disableGPU = Setting<Bool>("disable_gpu", default: false)
   /// An HTML file served at `GET /` in place of the built-in page.
   ///
   /// Had no reader for the whole of the port — the route it configures did not exist — so
@@ -383,7 +381,6 @@ public enum Settings {
       section: "Features",
       control: .path
     ))
-  public static let facetimeCalling = Setting<Bool>("facetime_calling", default: false)
 
   // MARK: - Updates and setup
 
@@ -398,8 +395,6 @@ public enum Settings {
       section: "Updates",
       control: .toggle
     ))
-  public static let autoInstallUpdates = Setting<Bool>("auto_install_updates", default: false)
-  public static let tutorialIsDone = Setting<Bool>("tutorial_is_done", default: false)
   /// Which network interface the HTTP API and socket listen on.
   ///
   /// `0.0.0.0` — every interface — is the default and matches the current server, which
@@ -462,24 +457,46 @@ public enum Settings {
   /// break the button), so with this off nothing polls it and a forged command reaches
   /// nothing. With it on, the DoS is bounded rather than open — one restart an hour,
   /// freshness-checked, and alerted.
-  public static let remoteRestartEnabled = Setting<Bool>(
-    "remote_restart_enabled", default: true,
-    presentation: .init(
-      label: "Allow Remote Restart",
-      help: "Lets the app's restart button work through Firebase. "
-        + "Turn it off if you never use it.",
-      section: "Notifications", control: .toggle
-    )
-  )
+  ///
+  /// No `presentation`: the control lives on the Firebase page, next to the project it
+  /// governs, and is bound through `PushInterface.setRemoteRestartEnabled`. It carried a
+  /// presentation for a "Notifications" section that never listed it, which made it look
+  /// renderable while nothing rendered it.
+  public static let remoteRestartEnabled = Setting<Bool>("remote_restart_enabled", default: true)
 
-  /// Retired. Force-disabled at startup today and its UI field is commented out; the
-  /// sealed-v2 codec supersedes it. Declared only so migration can read and drop it.
-  public static let encryptComs = Setting<Bool>("encrypt_coms", default: false)
+  /// Settings the Electron server had and this one does not read.
+  ///
+  /// Declared so `LegacyConfigMigration` can bring the row across and so the key stays
+  /// reserved — a future setting must not reuse a name whose stored value means something
+  /// else on an upgraded install. Nothing outside the migration reads any of these, and
+  /// `LegacySettingsTests` asserts exactly that.
+  public enum Legacy {
+    public static let startViaTerminal = Setting<Bool>("start_via_terminal", default: false)
+    /// The CLI's `--headless` flag is the real switch; this row is the Electron one.
+    public static let headless = Setting<Bool>("headless", default: false)
+    public static let disableGPU = Setting<Bool>("disable_gpu", default: false)
+    public static let facetimeCalling = Setting<Bool>("facetime_calling", default: false)
+    public static let autoInstallUpdates = Setting<Bool>("auto_install_updates", default: false)
+    public static let tutorialIsDone = Setting<Bool>("tutorial_is_done", default: false)
+    /// Force-disabled at startup by the Electron server; the sealed-v2 codec supersedes it.
+    public static let encryptComs = Setting<Bool>("encrypt_coms", default: false)
+    /// The Electron server's choice of injection mechanism. There is one here.
+    public static let privateAPIMode = Setting<String>(
+      "private_api_mode", default: "process-dylib")
+
+    /// Every legacy row, for the coverage checks.
+    public static let all: [AnySetting] = [
+      startViaTerminal.erased, headless.erased, disableGPU.erased, facetimeCalling.erased,
+      autoInstallUpdates.erased, tutorialIsDone.erased, encryptComs.erased,
+      privateAPIMode.erased,
+    ]
+  }
 
   // MARK: - New in the Swift server (all default-off)
 
   public static let authMode = Setting<AuthMode>(
     "auth_mode", default: .password,
+    application: .composition,
     presentation: .init(
       label: "Authentication",
       help:
@@ -501,6 +518,7 @@ public enum Settings {
   /// server at all.
   public static let additiveEndpoints = Setting<Bool>(
     "additive_endpoints", default: false,
+    application: .composition,
     presentation: .init(
       label: "Administration endpoints",
       help: "Adds /server/security/* for blocklist and allowlist administration, and "
@@ -525,6 +543,7 @@ public enum Settings {
 
   public static let eventPayloadCodec = Setting<PayloadCodecID>(
     "event_payload_codec", default: .legacyV1,
+    application: .composition,
     presentation: .init(
       label: "Event Payload Format",
       help: "The server's preference ceiling. Each client negotiates down from it.",
@@ -636,29 +655,28 @@ public enum Settings {
       section: "Security", control: .textField
     ))
 
-  /// Every setting, for migration and for generating the settings UI.
-  /// Keys must be unique; `SettingsRegistryTests` asserts that.
-  public static let allKeys: [String] =
-    [
-      "socket_port", "server_address", "password", "connection_method", "use_custom_certificate",
+  /// Every setting, for migration and for the coverage checks.
+  ///
+  /// DERIVED from the declarations rather than listed a second time as strings: `renderable`
+  /// is every setting with a presentation, `hidden` is the bookkeeping the UI never shows,
+  /// and a key that is in neither list does not exist. Uniqueness is asserted by
+  /// `SettingsStoreTests`.
+  public static var allKeys: [String] { all.map(\.key) }
 
-      "enable_private_api", "enable_ft_private_api", "private_api_mode",
-      "start_delay", "db_poll_interval", "chat_db_readers", "auto_caffeinate", "auto_start_method",
-      "start_minimized", "hide_dock_icon", "dock_badge", "auto_lock_mac",
-      "open_findmy_on_startup", "start_via_terminal", "headless", "disable_gpu",
-      "landing_page_path", "facetime_calling",
-      "facetime_incoming_handoff", "facetime_link_ttl_hours",
-      "check_for_updates", "auto_install_updates",
-      "tutorial_is_done", "last_fcm_restart", "encrypt_coms",
-      "remote_restart_enabled", "legacy_config_imported",
-      "bind_address",
-      "auth_mode", "event_payload_codec", "log_level", "trusted_proxies",
-      "ntfy_topic", "ntfy_server", "ntfy_token", "ntfy_events",
-      "additive_endpoints", "update_feed_url", "private_api_helper_path",
-      "private_api_facetime_helper_path",
-      "rate_limit_enabled", "rate_limit_failures", "rate_limit_block_seconds",
-      "trust_local_network",
-    ] + Features.allKeys
+  /// Every declared setting, renderable or not.
+  public static let all: [AnySetting] = renderable + hidden
+
+  /// Settings with no presentation: read by the server, never shown.
+  ///
+  /// Several exist only so `LegacyConfigMigration` can read the Electron server's row and
+  /// so the key stays reserved; they are read by nothing else. See `Legacy` below.
+  static let hidden: [AnySetting] =
+    [
+      remoteRestartEnabled.erased,
+      rateLimitBlockSeconds.erased,
+      lastFcmRestart.erased,
+      legacyConfigImported.erased,
+    ] + Legacy.all
 
   /// Keys whose values must never appear in a log, an alert, or an exported diagnostic.
   public static let secretKeys: Set<String> = [

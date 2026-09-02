@@ -70,4 +70,3 @@ public enum UpdateHandlers {
     }
   }
 }
-

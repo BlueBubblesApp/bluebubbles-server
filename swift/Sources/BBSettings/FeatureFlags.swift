@@ -66,6 +66,9 @@ public struct FeatureFlag: Sendable, Hashable, Identifiable {
   public var setting: Setting<Bool> {
     Setting<Bool>(
       key, default: false,
+      // A flag decides which route GROUPS are mounted, which is settled when the
+      // composition is assembled.
+      application: .composition,
       presentation: .init(
         label: summary,
         help: rationale,

@@ -176,7 +176,7 @@ public struct LegacyConfigMigration: Sendable {
     case "server_address": try batch.set(Settings.serverAddress, to: raw)
     case "landing_page_path": try batch.set(Settings.landingPagePath, to: raw)
     case "private_api_mode":
-      try batch.set(Settings.privateAPIMode, to: raw.isEmpty ? "process-dylib" : raw)
+      try batch.set(Settings.Legacy.privateAPIMode, to: raw.isEmpty ? "process-dylib" : raw)
     case "log_level": try batch.set(Settings.logLevel, to: raw.isEmpty ? "info" : raw)
 
     // Settings that now belong to a connection-method service rather than to the core.
@@ -230,13 +230,13 @@ public struct LegacyConfigMigration: Sendable {
     case "dock_badge": try batch.set(Settings.dockBadge, to: bool())
     case "auto_lock_mac": try batch.set(Settings.autoLockMac, to: bool())
     case "open_findmy_on_startup": try batch.set(Settings.openFindMyOnStartup, to: bool())
-    case "start_via_terminal": try batch.set(Settings.startViaTerminal, to: bool())
-    case "headless": try batch.set(Settings.headless, to: bool())
-    case "disable_gpu": try batch.set(Settings.disableGPU, to: bool())
-    case "facetime_calling": try batch.set(Settings.facetimeCalling, to: bool())
+    case "start_via_terminal": try batch.set(Settings.Legacy.startViaTerminal, to: bool())
+    case "headless": try batch.set(Settings.Legacy.headless, to: bool())
+    case "disable_gpu": try batch.set(Settings.Legacy.disableGPU, to: bool())
+    case "facetime_calling": try batch.set(Settings.Legacy.facetimeCalling, to: bool())
     case "check_for_updates": try batch.set(Settings.checkForUpdates, to: bool())
-    case "auto_install_updates": try batch.set(Settings.autoInstallUpdates, to: bool())
-    case "tutorial_is_done": try batch.set(Settings.tutorialIsDone, to: bool())
+    case "auto_install_updates": try batch.set(Settings.Legacy.autoInstallUpdates, to: bool())
+    case "tutorial_is_done": try batch.set(Settings.Legacy.tutorialIsDone, to: bool())
     case "rate_limit_enabled": try batch.set(Settings.rateLimitEnabled, to: bool())
     case "trust_local_network": try batch.set(Settings.trustLocalNetwork, to: bool())
 

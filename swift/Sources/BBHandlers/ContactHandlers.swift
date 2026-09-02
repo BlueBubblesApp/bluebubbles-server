@@ -15,7 +15,7 @@ public enum ContactHandlers {
     registry.register(.contactCreate) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
-      return .data(try await interfaces.contact.create(values.raw))
+      return .data(ContactInterface.serialize(try await interfaces.contact.create(values.raw)))
     }
 
     // One handler for two routes: `PUT /contact` takes the id in the body, `PUT
@@ -26,7 +26,8 @@ public enum ContactHandlers {
       guard let id = request.pathParameters["id"] ?? values["id"]?.stringValue else {
         throw BadRequest("`id` is required, in the path or the body")
       }
-      return .data(try await interfaces.contact.update(id: id, body: values.raw))
+      return .data(
+        ContactInterface.serialize(try await interfaces.contact.update(id: id, body: values.raw)))
     }
 
     registry.register(.contactDelete) { request in

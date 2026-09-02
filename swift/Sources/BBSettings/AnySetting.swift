@@ -60,6 +60,8 @@ public struct AnySetting: Sendable, Identifiable {
   /// shape is theirs to decide; applying a human-password rule to one would reject a valid
   /// credential with an error about predictability that makes no sense for it.
   public let hasValidator: Bool
+  /// When a change takes effect. See `SettingApplication`.
+  public let application: SettingApplication
   public var id: String { key }
 
   /// Reads the current value through the store, preserving the layered resolution — a
@@ -90,6 +92,7 @@ public struct AnySetting: Sendable, Identifiable {
       )
     self.isSecret = setting.isSecret
     self.hasValidator = setting.validate != nil
+    self.application = setting.application
 
     self.read = { store in box(await store.get(setting)) }
     self.write = { store, value in

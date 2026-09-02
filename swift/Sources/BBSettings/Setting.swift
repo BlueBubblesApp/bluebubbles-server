@@ -88,6 +88,19 @@ public struct SettingPresentation: Sendable {
   }
 }
 
+/// When a change to a setting takes effect.
+///
+/// Declared on the setting rather than listed by the propagation layer, so the list of
+/// "restart to apply" keys is derived from the declarations and cannot drift from them.
+public enum SettingApplication: Sendable, Equatable {
+  /// Read live, or by a service that restarts itself when the value changes.
+  case live
+  /// Read once while the server is assembled — it decides which routes mount, which codec
+  /// the socket negotiates, how chat.db is opened. A change needs a full restart, and the
+  /// propagation layer says so rather than pretending to apply it.
+  case composition
+}
+
 /// A single setting, declared once.
 ///
 /// `key` is the STORAGE name and must not change. Renaming one orphans the row a user's
@@ -109,17 +122,20 @@ public struct Setting<Value: SettingValue>: Sendable {
 
   public let validate: (@Sendable (Value) throws -> Void)?
   public let presentation: SettingPresentation?
+  public let application: SettingApplication
 
   public init(
     _ key: String,
     default defaultValue: Value,
     isSecret: Bool = false,
+    application: SettingApplication = .live,
     validate: (@Sendable (Value) throws -> Void)? = nil,
     presentation: SettingPresentation? = nil
   ) {
     self.key = key
     self.defaultValue = defaultValue
     self.isSecret = isSecret
+    self.application = application
     self.validate = validate
     self.presentation = presentation
   }

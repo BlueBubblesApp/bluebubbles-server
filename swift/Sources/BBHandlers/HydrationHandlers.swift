@@ -54,7 +54,7 @@ public enum HydrationHandlers {
     // message deleted between the notification and the hydration is normal, and failing
     // the whole request would lose the eleven that were fine.
     return .data(
-      .array(results),
+      .array(interfaces.message.serialize(results, config: .full)),
       metadata: .object([
         "requested": .int(hydration.uniqueGUIDs.count),
         "returned": .int(results.count),

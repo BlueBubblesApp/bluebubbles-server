@@ -213,6 +213,14 @@ public struct MessageInterface: MessagesBackedInterface {
     }
   }
 
+  /// Wire form under an explicit serializer configuration, for routes whose shape is fixed
+  /// by the route rather than by a query — hydration sends `.full` regardless.
+  public func serialize(
+    _ projections: [MessageProjection], config: MessageSerializerConfig
+  ) -> [JSONValue] {
+    projections.map { serializer.serialize($0.row, context: $0.relations, config: config) }
+  }
+
   public func serialize(_ projection: MessageProjection, query: Query) -> JSONValue {
     serialize([projection], query: query)[0]
   }
@@ -261,7 +269,7 @@ public struct MessageInterface: MessagesBackedInterface {
     return results
   }
 
-  /// The messages behind a set of GUIDs, ready to send.
+  /// The messages behind a set of GUIDs, with no relations loaded.
   ///
   /// For the hydration route: a client holding notification payloads asks for the full
   /// messages behind them. Deduplicated, because a message in several chats produces several
@@ -270,19 +278,12 @@ public struct MessageInterface: MessagesBackedInterface {
   /// A GUID that no longer resolves is OMITTED rather than erroring the batch. A message
   /// deleted between the notification and the hydration is normal, and failing the whole
   /// request would lose the eleven that were fine.
-  ///
-  /// Returns serialized values rather than rows, which is the exception to this layer's usual
-  /// rule and is deliberate: the config is fixed by the route rather than chosen by the caller,
-  /// so handing back projections would oblige every caller to re-derive the same `.full`. See
-  /// `ServerInterface.backups` for the same shape and the same reason.
-  public func hydrate(guids: [String]) async throws -> [JSONValue] {
+  public func hydrate(guids: [String]) async throws -> [MessageProjection] {
     var seen = Set<String>()
-    var results: [JSONValue] = []
+    var results: [MessageProjection] = []
     for guid in guids where seen.insert(guid).inserted {
       guard let row = try await repository.message(guid: guid) else { continue }
-      results.append(
-        serializer.serialize(row, context: MessageSerializer.Context(), config: .full)
-      )
+      results.append(MessageProjection(row: row, relations: MessageSerializer.Context()))
     }
     return results
   }
@@ -311,6 +312,40 @@ public struct MessageInterface: MessagesBackedInterface {
   public func availableBackend() async -> SendBackend {
     if let privateAPI, await privateAPI.isConnected { return .privateAPI }
     return .appleScript
+  }
+
+  /// What a send produced.
+  ///
+  /// The two backends confirm a send differently, and neither confirms it the way the
+  /// other does: the Private API reports the GUID Messages assigned, while AppleScript reports
+  /// the chat it resolved the send to and no GUID at all. Both facts are kept so a caller can
+  /// correlate whichever it has with the row the change detector later announces.
+  public struct SendOutcome: Sendable, Equatable {
+    public let backend: SendBackend
+    /// The GUID Messages assigned, when the backend reports one.
+    public let messageGUID: String?
+    /// The chat the message was sent to, as the backend resolved it.
+    public let chatGUID: String?
+
+    public init(backend: SendBackend, messageGUID: String? = nil, chatGUID: String? = nil) {
+      self.backend = backend
+      self.messageGUID = messageGUID
+      self.chatGUID = chatGUID
+    }
+  }
+
+  /// The wire shape of a send.
+  ///
+  /// `guid` for a Private API send, `chatGuid` for an AppleScript one — whichever the backend
+  /// reported — and `backend` only where the route has always said so. The text route names
+  /// its backend because clients pass `method` to force one and read this to confirm it took;
+  /// the attachment and multipart routes never did, and an added key fails the parity diff.
+  public static func serialize(_ outcome: SendOutcome, includingBackend: Bool) -> JSONValue {
+    var object = JSONObjectBuilder()
+    object.set("guid", outcome.messageGUID.map(JSONValue.string))
+    object.set("chatGuid", outcome.chatGUID.map(JSONValue.string))
+    if includingBackend { object.set("backend", .string(outcome.backend.rawValue)) }
+    return object.build()
   }
 
   public struct SendTextRequest: Sendable {
@@ -352,7 +387,7 @@ public struct MessageInterface: MessagesBackedInterface {
   /// replies; AppleScript supports none of those. When a request asks for a feature the
   /// chosen backend cannot deliver, that is reported rather than silently dropped — a reply
   /// that arrives as an ordinary message looks like the server ignored the user.
-  public func sendText(_ request: SendTextRequest) async throws -> JSONValue {
+  public func sendText(_ request: SendTextRequest) async throws -> SendOutcome {
     let backend: SendBackend
     if let forced = request.forcedBackend {
       backend = forced
@@ -378,10 +413,7 @@ public struct MessageInterface: MessagesBackedInterface {
           )
         )
       }
-      return .object([
-        "guid": .string(sent.guid.rawValue),
-        "backend": .string(backend.rawValue),
-      ])
+      return SendOutcome(backend: backend, messageGUID: sent.guid.rawValue)
 
     case .appleScript:
       // Stated rather than dropped. A client that asked for a reply and got a plain
@@ -395,10 +427,7 @@ public struct MessageInterface: MessagesBackedInterface {
       let resolved = try await throughMessages {
         try await appleScript.send(chatGUID: request.chatGUID, text: request.text)
       }
-      return .object([
-        "chatGuid": .string(resolved),
-        "backend": .string(backend.rawValue),
-      ])
+      return SendOutcome(backend: backend, chatGUID: resolved)
     }
   }
 
@@ -406,7 +435,7 @@ public struct MessageInterface: MessagesBackedInterface {
     chatGUID: String,
     filePath: String,
     isAudioMessage: Bool = false
-  ) async throws -> JSONValue {
+  ) async throws -> SendOutcome {
     let backend = await availableBackend()
     guard FileManager.default.fileExists(atPath: filePath) else {
       throw InterfaceError.invalidRequest("no file at \(filePath)")
@@ -427,13 +456,13 @@ public struct MessageInterface: MessagesBackedInterface {
           )
         )
       }
-      return .object(["guid": .string(sent.guid.rawValue)])
+      return SendOutcome(backend: backend, messageGUID: sent.guid.rawValue)
 
     case .appleScript:
       let resolved = try await throughMessages {
         try await appleScript.send(chatGUID: chatGUID, attachmentPath: filePath)
       }
-      return .object(["chatGuid": .string(resolved)])
+      return SendOutcome(backend: backend, chatGUID: resolved)
     }
   }
 
@@ -451,7 +480,7 @@ public struct MessageInterface: MessagesBackedInterface {
     effectID: String? = nil,
     replyToGUID: String? = nil,
     partIndex: Int? = nil
-  ) async throws -> JSONValue {
+  ) async throws -> SendOutcome {
     let api = try requirePrivateAPI(for: "multipart messages")
     guard !parts.isEmpty else {
       throw InterfaceError.invalidRequest("at least one part is required")
@@ -475,7 +504,7 @@ public struct MessageInterface: MessagesBackedInterface {
         )
       )
     }
-    return .object(["guid": .string(sent.guid.rawValue)])
+    return SendOutcome(backend: .privateAPI, messageGUID: sent.guid.rawValue)
   }
 
   // MARK: - Private-API-only operations

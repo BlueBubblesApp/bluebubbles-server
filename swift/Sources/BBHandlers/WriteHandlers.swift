@@ -58,7 +58,7 @@ public enum WriteHandlers {
           forcedBackend: forced
         )
       )
-      return .data(sent)
+      return .data(MessageInterface.serialize(sent, includingBackend: true))
     }
 
     registry.register(.messageSendAttachment) { request in
@@ -68,12 +68,12 @@ public enum WriteHandlers {
       // A path, not bytes. Multipart upload lands the file first; this sends what is
       // already on disk, which is what keeps a 500 MB video out of the heap.
       let path = try values.requireString("filePath", or: "path")
-      return .data(
-        try await interfaces.message.sendAttachment(
-          chatGUID: chatGUID,
-          filePath: path,
-          isAudioMessage: values["isAudioMessage"]?.boolValue ?? false
-        ))
+      let sent = try await interfaces.message.sendAttachment(
+        chatGUID: chatGUID,
+        filePath: path,
+        isAudioMessage: values["isAudioMessage"]?.boolValue ?? false
+      )
+      return .data(MessageInterface.serialize(sent, includingBackend: false))
     }
   }
 
@@ -102,15 +102,15 @@ public enum WriteHandlers {
         )
       }
 
-      return .data(
-        try await interfaces.message.sendMultipart(
-          chatGUID: chatGUID,
-          parts: parts,
-          subject: values["subject"]?.stringValue,
-          effectID: values["effectId"]?.stringValue,
-          replyToGUID: values["selectedMessageGuid"]?.stringValue,
-          partIndex: values["partIndex"]?.intValue
-        ))
+      let sent = try await interfaces.message.sendMultipart(
+        chatGUID: chatGUID,
+        parts: parts,
+        subject: values["subject"]?.stringValue,
+        effectID: values["effectId"]?.stringValue,
+        replyToGUID: values["selectedMessageGuid"]?.stringValue,
+        partIndex: values["partIndex"]?.intValue
+      )
+      return .data(MessageInterface.serialize(sent, includingBackend: false))
     }
   }
 

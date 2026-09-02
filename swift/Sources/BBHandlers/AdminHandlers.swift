@@ -37,7 +37,10 @@ public enum AdminHandlers {
       // Node ignores `limit` entirely and returns `AlertsInterface.find()`'s default of
       // 10. Honouring the parameter is additive and allowed; the DEFAULT has to match,
       // or a client that pages by counting rows sees a different world.
-      return .data(.array(await server.alerts(limit: request.integer("limit") ?? 10)))
+      return .data(
+        .array(
+          await server.alerts(limit: request.integer("limit") ?? 10).map(ServerInterface.alertJSON))
+      )
     }
 
     // v2: everything an alert carries. A higher default limit than v1's ten, because this
@@ -45,7 +48,11 @@ public enum AdminHandlers {
     // polls for the newest few.
     registry.register(.serverAlertsV2) { request in
       let server = context.server
-      return .data(.array(await server.alertsV2(limit: request.integer("limit") ?? 100)))
+      return .data(
+        .array(
+          await server.alerts(limit: request.integer("limit") ?? 100).map(
+            ServerInterface.alertJSONV2)
+        ))
     }
 
     registry.register(.serverMarkAlertRead) { request in
@@ -104,7 +111,7 @@ public enum AdminHandlers {
   ) {
     registry.register(.serverStatTotals) { _ in
       let server = context.server
-      return .data(try await server.totals())
+      return .data(ServerInterface.serialize(try await server.counts()))
     }
   }
 
@@ -117,7 +124,7 @@ public enum AdminHandlers {
   ) {
     registry.register(.webhookList) { _ in
       let server = context.server
-      return .data(.array(try await server.webhooks()))
+      return .data(.array(try await server.webhooks().map(\.json)))
     }
 
     registry.register(.webhookCreate) { request in
@@ -125,7 +132,7 @@ public enum AdminHandlers {
       let values = try request.values()
       let url = try values.requireString("url")
       let events = values["events"]?.arrayValue?.compactMap(\.stringValue) ?? ["*"]
-      return .data(try await server.createWebhook(url: url, events: events))
+      return .data(try await server.createWebhook(url: url, events: events).json)
     }
 
     registry.register(.webhookUpdate) { request in
@@ -137,7 +144,7 @@ public enum AdminHandlers {
       // carrying only `events` must not blank out the URL.
       let url = values["url"]?.stringValue
       let events = values["events"]?.arrayValue?.compactMap(\.stringValue)
-      return .data(try await server.updateWebhook(id: id, url: url, events: events))
+      return .data(try await server.updateWebhook(id: id, url: url, events: events).json)
     }
 
     registry.register(.webhookDelete) { request in
@@ -162,7 +169,7 @@ public enum AdminHandlers {
     ] {
       registry.register(prefix) { _ in
         let server = context.server
-        return .data(try await server.backups(kind: kind))
+        return .data(server.serialize(try await server.backups(kind: kind)))
       }
     }
 

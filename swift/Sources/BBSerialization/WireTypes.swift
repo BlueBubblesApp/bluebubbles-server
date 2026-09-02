@@ -243,6 +243,13 @@ extension JSONValue {
   }
 
   public var isNull: Bool { self == .null }
+
+  /// Adds keys to an object value. Returns the receiver unchanged for a non-object, since
+  /// there is nothing sensible to merge into an array or a scalar.
+  public func merging(_ other: [String: JSONValue]) -> JSONValue {
+    guard case .object(let values) = self else { return self }
+    return .object(values.merging(other) { _, new in new })
+  }
 }
 
 /// Builds an object while keeping absent keys absent.

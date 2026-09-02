@@ -27,7 +27,7 @@ struct ContactsView: View {
     // Was `(try? …) ?? []`, so a contact index that could not be read looked exactly
     // like an address book with nobody in it — and the empty state told the person to
     // grant Contacts access they may already have granted.
-    return try await interfaces.contact.records(limit: 5000)
+    return try await interfaces.contact.list(limit: 5000)
   }
 
   private var contacts: [ContactRecord] { screen.state.value ?? [] }
@@ -108,9 +108,7 @@ struct ContactsView: View {
       failureMessage: "Could not read the address book — check Contacts permission."
     ) {
       let result = try await interfaces.contact.refresh()
-      status =
-        "Indexed \(result["indexed"]?.intValue ?? 0), "
-        + "skipped \(result["skipped"]?.intValue ?? 0)."
+      status = "Indexed \(result.indexed), skipped \(result.skipped)."
     }
   }
 }

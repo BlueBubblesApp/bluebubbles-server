@@ -155,7 +155,9 @@ public enum ReadHandlers {
       // read an absent parameter as false and silently exclude archived chats.
       let includeArchived =
         request.has("includeArchived") ? request.truthy("includeArchived") : true
-      return .data(try await interfaces.chat.countByService(includeArchived: includeArchived))
+      return .data(
+        ChatInterface.serialize(
+          try await interfaces.chat.countByService(includeArchived: includeArchived)))
     }
 
     registry.register(.chatMessages) { request in
@@ -342,7 +344,7 @@ public enum ReadHandlers {
         limit: request.integer("limit") ?? 1000,
         offset: request.integer("offset") ?? 0
       )
-      return .data(.array(contacts))
+      return .data(.array(contacts.map { ContactInterface.serialize($0) }))
     }
 
     /// Two shapes on one route: with `addresses`, it resolves them; without, it lists.
@@ -358,7 +360,7 @@ public enum ReadHandlers {
           offset: values["offset"]?.intValue ?? 0
         )
         : try await interfaces.contact.find(addresses: addresses)
-      return .data(.array(contacts))
+      return .data(.array(contacts.map { ContactInterface.serialize($0) }))
     }
 
     registry.register(.contactAvatar) { request in

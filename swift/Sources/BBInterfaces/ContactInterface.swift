@@ -29,15 +29,7 @@ public struct ContactInterface: Sendable {
 
   // MARK: - Reading
 
-  /// The wire shape, for the HTTP routes.
-  public func list(limit: Int = 1000, offset: Int = 0) async throws -> [JSONValue] {
-    try await index.page(limit: limit, offset: offset).map { Self.serialize($0) }
-  }
-
-  /// The same contacts as VALUES, for callers in this process. See
-  /// `ServerInterface.webhookList()` for why both exist — `ContactRecord` is already
-  /// `Identifiable`, which is the thing the contacts table needed and had to fake.
-  public func records(limit: Int = 1000, offset: Int = 0) async throws -> [ContactRecord] {
+  public func list(limit: Int = 1000, offset: Int = 0) async throws -> [ContactRecord] {
     try await index.page(limit: limit, offset: offset)
   }
 
@@ -53,22 +45,22 @@ public struct ContactInterface: Sendable {
   ///
   /// Addresses with no match are OMITTED rather than returned as null entries — the
   /// current server does the same, and a client reads absence as "no contact".
-  public func find(addresses: [String]) async throws -> [JSONValue] {
+  public func find(addresses: [String]) async throws -> [ContactRecord] {
     let matches = try await index.findContacts(addresses: addresses)
     // Deduplicated by contact id: two addresses belonging to one person would otherwise
     // return that person twice.
     var seen = Set<String>()
-    var results: [JSONValue] = []
+    var results: [ContactRecord] = []
     for address in addresses {
       guard let record = matches[address], !seen.contains(record.id) else { continue }
       seen.insert(record.id)
-      results.append(Self.serialize(record))
+      results.append(record)
     }
     return results
   }
 
-  public func contact(id: String) async throws -> JSONValue? {
-    try await index.contact(id: id).map { Self.serialize($0) }
+  public func contact(id: String) async throws -> ContactRecord? {
+    try await index.contact(id: id)
   }
 
   /// Display names for addresses, for UI that shows who a conversation is with.
@@ -94,19 +86,19 @@ public struct ContactInterface: Sendable {
   /// Identity keys off `externalID` when the client provides one. That is the fix for the
   /// current server's unique constraint on (firstName, lastName, displayName), which makes
   /// two different people with the same name collide into one row.
-  public func create(_ body: JSONValue) async throws -> JSONValue {
+  public func create(_ body: JSONValue) async throws -> ContactRecord {
     let record = try Self.parse(body, existingID: nil)
     try await index.upsert([record])
-    return Self.serialize(record)
+    return record
   }
 
-  public func update(id: String, body: JSONValue) async throws -> JSONValue {
+  public func update(id: String, body: JSONValue) async throws -> ContactRecord {
     guard try await index.contact(id: id) != nil else {
       throw InterfaceError.notFound("no contact with id \(id)")
     }
     let record = try Self.parse(body, existingID: id)
     try await index.upsert([record])
-    return Self.serialize(record)
+    return record
   }
 
   public func delete(id: String) async throws {
@@ -120,12 +112,16 @@ public struct ContactInterface: Sendable {
   ///
   /// Only `.macOS` contacts are replaced; `.local` ones are the client's own and are not
   /// the address book's to remove.
-  public func refresh() async throws -> JSONValue {
+  public func refresh() async throws -> ContactsIngestResult {
     guard let ingestor else {
       throw InterfaceError.unavailable("contact access has not been granted to this server")
     }
-    let result = try await ingestor.reindexAll()
-    return .object([
+    return try await ingestor.reindexAll()
+  }
+
+  /// The wire shape of a re-index.
+  public static func serialize(_ result: ContactsIngestResult) -> JSONValue {
+    .object([
       "indexed": .int(result.indexed),
       "skipped": .int(result.skipped),
       "durationMs": .int(Int(result.duration.components.seconds * 1000)),

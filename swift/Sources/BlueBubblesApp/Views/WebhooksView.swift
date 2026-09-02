@@ -61,7 +61,7 @@ struct WebhooksView: View {
     return Registrations(
       // No longer `(try? …) ?? []`. A list the server refused to produce and a server
       // with no endpoints registered were arriving here as the same empty array.
-      webhooks: try await serverAdmin.webhookList(),
+      webhooks: try await serverAdmin.webhooks(),
       deliveries: await model.webhookAdmin?.webhooks.deliveries.all() ?? [:],
       address: configured.isEmpty ? "http://localhost:\(port)" : configured
     )

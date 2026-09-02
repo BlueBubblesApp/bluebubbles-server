@@ -94,7 +94,9 @@ public enum UploadHandlers {
         filePath: path,
         isAudioMessage: values["isAudioMessage"]?.boolValue ?? false
       )
-      return .data(sent.merging(["complete": .bool(true)]))
+      return .data(
+        MessageInterface.serialize(sent, includingBackend: false)
+          .merging(["complete": .bool(true)]))
     }
   }
 }

@@ -39,9 +39,7 @@ struct WebhookRegistrationTests {
     )
   }
 
-  private func events(_ hook: JSONValue) -> [String] {
-    hook["events"]?.arrayValue?.compactMap(\.stringValue) ?? []
-  }
+  private func events(_ hook: Webhook) -> [String] { hook.subscribedEvents }
 
   @Test("A chosen event set survives registration")
   func storesChosenEvents() async throws {
@@ -70,11 +68,11 @@ struct WebhookRegistrationTests {
   func updatesEvents() async throws {
     let server = try await makeInterface()
     let created = try await server.createWebhook(url: "https://example.com/hook", events: ["*"])
-    let id = Int64(try #require(created["id"]?.intValue))
+    let id = try #require(created.id)
 
     let updated = try await server.updateWebhook(id: id, url: nil, events: ["new-message"])
     #expect(events(updated) == ["new-message"])
-    #expect(updated["url"]?.stringValue == "https://example.com/hook")
+    #expect(updated.url == "https://example.com/hook")
 
     let listed = try await server.webhooks()
     #expect(listed.count == 1)
@@ -85,7 +83,7 @@ struct WebhookRegistrationTests {
   func updatesURLInPlace() async throws {
     let server = try await makeInterface()
     let created = try await server.createWebhook(url: "https://old.example.com/hook", events: ["*"])
-    let id = Int64(try #require(created["id"]?.intValue))
+    let id = try #require(created.id)
 
     _ = try await server.updateWebhook(id: id, url: "https://new.example.com/hook", events: nil)
 
@@ -93,7 +91,7 @@ struct WebhookRegistrationTests {
     // rows, and the old address keeps receiving every event.
     let listed = try await server.webhooks()
     #expect(listed.count == 1)
-    #expect(listed[0]["url"]?.stringValue == "https://new.example.com/hook")
+    #expect(listed[0].url == "https://new.example.com/hook")
     #expect(events(listed[0]) == ["*"])
   }
 
@@ -103,7 +101,7 @@ struct WebhookRegistrationTests {
     let created = try await server.createWebhook(
       url: "https://example.com/hook", events: ["new-message"]
     )
-    let id = Int64(try #require(created["id"]?.intValue))
+    let id = try #require(created.id)
 
     // Events absent, not empty — a caller changing only the URL must not blank the
     // subscription, and empty means the wildcard, so the two cannot be conflated.
@@ -111,7 +109,7 @@ struct WebhookRegistrationTests {
       id: id, url: "https://example.com/other", events: nil
     )
     #expect(events(updated) == ["new-message"])
-    #expect(updated["url"]?.stringValue == "https://example.com/other")
+    #expect(updated.url == "https://example.com/other")
   }
 
   @Test("Moving one endpoint onto another's address is refused")
@@ -119,7 +117,7 @@ struct WebhookRegistrationTests {
     let server = try await makeInterface()
     _ = try await server.createWebhook(url: "https://a.example.com/hook", events: ["*"])
     let second = try await server.createWebhook(url: "https://b.example.com/hook", events: ["*"])
-    let id = Int64(try #require(second["id"]?.intValue))
+    let id = try #require(second.id)
 
     await #expect(throws: InterfaceError.self) {
       _ = try await server.updateWebhook(id: id, url: "https://a.example.com/hook", events: nil)
@@ -128,7 +126,7 @@ struct WebhookRegistrationTests {
     // And nothing moved.
     let listed = try await server.webhooks()
     #expect(listed.count == 2)
-    #expect(listed[1]["url"]?.stringValue == "https://b.example.com/hook")
+    #expect(listed[1].url == "https://b.example.com/hook")
   }
 
   @Test("Editing a webhook that is not there is a not-found, not a silent no-op")
@@ -143,7 +141,7 @@ struct WebhookRegistrationTests {
   func validatesURL() async throws {
     let server = try await makeInterface()
     let created = try await server.createWebhook(url: "https://example.com/hook", events: ["*"])
-    let id = Int64(try #require(created["id"]?.intValue))
+    let id = try #require(created.id)
 
     await #expect(throws: InterfaceError.self) {
       _ = try await server.updateWebhook(id: id, url: "ftp://example.com/hook", events: nil)

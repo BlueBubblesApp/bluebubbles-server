@@ -69,7 +69,7 @@ struct SendFailureTests {
     )
   }
 
-  private func send(_ interface: MessageInterface) async throws -> JSONValue {
+  private func send(_ interface: MessageInterface) async throws -> MessageInterface.SendOutcome {
     try await interface.sendText(
       MessageInterface.SendTextRequest(
         chatGUID: "iMessage;-;person@example.com",

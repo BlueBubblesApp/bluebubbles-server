@@ -184,7 +184,7 @@ final class ChangeDetectionService: ContextualService, PermissionDependentServic
   /// The poll interval is read once, at start, to build the detector — so without this the
   /// setting was inert: a user lowering it to get faster message delivery saw no change
   /// until the next launch, and nothing said why.
-  static let watchedSettings: Set<String> = ["db_poll_interval"]
+  static let watchedSettings: Set<String> = [Settings.dbPollInterval.key]
   /// The one permission that genuinely gates a service: without Full Disk Access there is
   /// no database to watch, and the registry reports that precisely instead of letting this
   /// fail obscurely at first read.
@@ -319,7 +319,8 @@ final class HTTPService: ContextualService, ConfigurableService {
   static let manifest = BuiltInManifests.http
   /// A port change or a certificate change means rebinding, which is a restart.
   static let watchedSettings: Set<String> = [
-    "socket_port", "use_custom_certificate", "password", "bind_address",
+    Settings.socketPort.key, Settings.useCustomCertificate.key, Settings.password.key,
+    Settings.bindAddress.key,
   ]
   static let restartPolicy = RestartPolicy.backoff(
     base: .seconds(1), max: .seconds(30), attempts: 10
@@ -454,7 +455,7 @@ final class HTTPService: ContextualService, ConfigurableService {
 // MARK: - Socket
 
 final class SocketService: ContextualService, ConfigurableService {
-  static let watchedSettings: Set<String> = ["password"]
+  static let watchedSettings: Set<String> = [Settings.password.key]
 
   static let manifest = BuiltInManifests.socket
 
@@ -499,10 +500,10 @@ final class SocketService: ContextualService, ConfigurableService {
 final class PrivateAPIGatedService: ContextualService, GatedService, ConfigurableService {
   static let manifest = BuiltInManifests.privateAPI
   static let watchedSettings: Set<String> = [
-    "enable_private_api", "private_api_mode", "private_api_helper_path",
+    Settings.enablePrivateAPI.key, Settings.privateAPIHelperPath.key,
     // Changing which FaceTime dylib is injected has to re-inject it, same as the
     // Messages one — and so does turning FaceTime injection on or off.
-    "private_api_facetime_helper_path", "enable_ft_private_api",
+    Settings.privateAPIFaceTimeHelperPath.key, Settings.enableFaceTimePrivateAPI.key,
   ]
   static let restartPolicy = RestartPolicy.backoff(
     base: .seconds(5), max: .seconds(60), attempts: 5
@@ -843,7 +844,7 @@ final class PushDeliveryService: ContextualService, GatedService, ConfigurableSe
   /// sent. Measured by the wiring test that now pins this.
   func canRun() async -> Bool { await credentials.isConfigurable() }
 
-  static let watchedSettings: Set<String> = ["remote_restart_enabled"]
+  static let watchedSettings: Set<String> = [Settings.remoteRestartEnabled.key]
 
   func start() async throws {
     // Read here rather than at construction: the registry builds services synchronously
@@ -903,7 +904,8 @@ final class WebhookDeliveryService: ContextualService, ConfigurableService {
   init(host: AppContext) { self.context = host }
 
   static let watchedSettings: Set<String> = [
-    "ntfy_topic", "ntfy_server", "ntfy_token", "ntfy_events",
+    Settings.ntfyTopic.key, Settings.ntfyServer.key, Settings.ntfyToken.key,
+    Settings.ntfyEvents.key,
   ]
 
   func start() async throws {
@@ -989,7 +991,7 @@ final class WebhookDeliveryService: ContextualService, ConfigurableService {
 
 final class SleepPreventionService: ContextualService, ConfigurableService, GatedService {
   static let manifest = BuiltInManifests.sleepPrevention
-  static let watchedSettings: Set<String> = ["auto_caffeinate"]
+  static let watchedSettings: Set<String> = [Settings.autoCaffeinate.key]
 
   let context: AppContext
   private let prevention = SleepPrevention()

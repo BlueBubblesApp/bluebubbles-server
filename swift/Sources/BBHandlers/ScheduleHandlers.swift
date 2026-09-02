@@ -13,22 +13,22 @@ public enum ScheduleHandlers {
     registry.register(.scheduleList) { request in
       let status = request.queryParameters["status"]
         .flatMap(ScheduleInterface.Status.init(rawValue:))
-      return .data(.array(try await context.schedule.list(status: status)))
+      return .data(.array(try await context.schedule.list(status: status).map(\.json)))
     }
 
     registry.register(.scheduleFind) { request in
-      return .data(try await context.schedule.find(id: try request.identifier()))
+      return .data(try await context.schedule.find(id: try request.identifier()).json)
     }
 
     registry.register(.scheduleCreate) { request in
-      return .data(try await context.schedule.create(try request.jsonBody() ?? .object([:])))
+      return .data(try await context.schedule.create(try request.jsonBody() ?? .object([:])).json)
     }
 
     registry.register(.scheduleUpdate) { request in
       return .data(
         try await context.schedule.update(
           id: try request.identifier(), body: try request.jsonBody() ?? .object([:])
-        ))
+        ).json)
     }
 
     registry.register(.scheduleDelete) { request in

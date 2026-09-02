@@ -44,10 +44,16 @@ public enum ContactsIngestError: BBError, Equatable, CustomStringConvertible {
   }
 }
 
-public struct ContactsIngestResult: Sendable {
+public struct ContactsIngestResult: Sendable, Equatable {
   public let indexed: Int
   public let skipped: Int
   public let duration: Duration
+
+  public init(indexed: Int, skipped: Int, duration: Duration) {
+    self.indexed = indexed
+    self.skipped = skipped
+    self.duration = duration
+  }
 }
 
 public actor ContactsIngestor {

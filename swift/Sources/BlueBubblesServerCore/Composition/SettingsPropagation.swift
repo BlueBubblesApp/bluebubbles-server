@@ -50,41 +50,28 @@ public actor SettingsPropagation {
   /// the object they configure. `AccessControlService` is shared by the HTTP middleware and
   /// the socket handshake, so it belongs to neither and is not in the registry.
   static let unownedKeys: Set<String> = [
-    "rate_limit_enabled", "rate_limit_failures", "rate_limit_block_seconds",
-    "trust_local_network", "trusted_proxies",
+    Settings.rateLimitEnabled.key, Settings.rateLimitFailureThreshold.key,
+    Settings.rateLimitBlockSeconds.key, Settings.trustLocalNetwork.key,
+    Settings.trustedProxies.key,
     // Owned by the logging system, which is process-wide and older than any service.
-    "log_level",
+    Settings.logLevel.key,
   ]
 
   /// Settings read once while the server is being ASSEMBLED, before any service exists.
   ///
   /// These configure objects that services are HANDED rather than objects services own — the
-  /// route table, the socket's codec negotiator, the token auth service. Adding them to a
-  /// service's `watchedSettings` would restart that service and hand it the same object it
-  /// had before, which looks like wiring and is not; only rebuilding the composition
-  /// actually applies them.
+  /// route table, the socket's codec negotiator, the token auth service, the chat.db handle.
+  /// Adding them to a service's `watchedSettings` would restart that service and hand it the
+  /// same object it had before, which looks like wiring and is not; only rebuilding the
+  /// composition actually applies them. So the change raises a notice with a one-click
+  /// restart instead.
   ///
-  /// So rather than pretend, the change raises a notice with a one-click restart. That is
-  /// strictly better than the previous behaviour — saving the value and carrying on as
-  /// though nothing had happened, which from outside is indistinguishable from a setting
-  /// that was never wired up at all.
-  /// Feature flags belong here too: they decide which route GROUPS are mounted, and that
-  /// happens once while the router is built. Toggling one has to raise the restart notice
-  /// for the same reason `additive_endpoints` does — writing the value and carrying on
-  /// would leave a switch that reads as on and does nothing.
+  /// DERIVED from the declarations: a setting says `application: .composition` on itself,
+  /// and this is every setting that does. A new composition-time setting reaches the restart
+  /// notice by being declared, and a list here that could disagree with the declaration is
+  /// exactly what this used to be.
   static let structuralKeys: Set<String> = Set(
-    // `facetime_incoming_handoff` decides whether a ROUTE GROUP mounts, which is settled
-    // when the composition is assembled — so it raises the restart notice rather than
-    // being watched by a service that could not apply it anyway.
-    // `chat_db_readers` decides what KIND of connection chat.db is opened with, and that
-    // happens once in `ServerComposition.build`. No service can apply it — the repository
-    // and every interface hold the handle that already exists — so it raises the restart
-    // notice like the rest of this list.
-    [
-      "auth_mode", "additive_endpoints", "event_payload_codec", "facetime_incoming_handoff",
-      "chat_db_readers",
-    ]
-      + Features.allKeys
+    Settings.all.filter { $0.application == .composition }.map(\.key)
   )
 
   public init(
@@ -158,7 +145,7 @@ public actor SettingsPropagation {
     // a socket-only install — no Firebase at all — still has to tell its connected
     // clients where the server moved to. Hanging it off the push service would mean the
     // event stopped being emitted on exactly the installs that have no other route.
-    if change.changedKeys.contains("server_address") {
+    if change.changedKeys.contains(Settings.serverAddress.key) {
       await onServerAddressChanged(await settings.get(Settings.serverAddress))
     }
 

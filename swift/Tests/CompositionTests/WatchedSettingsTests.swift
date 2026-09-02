@@ -108,7 +108,7 @@ struct WatchedSettingsTests {
 
     // Applied by `SettingsPropagation` rather than by a service, because the object they
     // configure is shared and belongs to none of them.
-    let unowned = SettingsPropagation.unownedKeys.union(["server_address"])
+    let unowned = SettingsPropagation.unownedKeys.union([Settings.serverAddress.key])
 
     let unaccounted = Set(Settings.allKeys)
       .subtracting(watched)
@@ -119,6 +119,9 @@ struct WatchedSettingsTests {
       // restart notice instead. Subtracted from the source rather than transcribed,
       // so a new structural key does not need a second edit here.
       .subtracting(SettingsPropagation.structuralKeys)
+      // Rows the Electron server had and this one never reads. Declared to migrate and
+      // to stay reserved; see `Settings.Legacy`.
+      .subtracting(Settings.Legacy.all.map(\.key))
       .subtracting(Self.readPerUseOrUIOnly)
 
     #expect(
@@ -139,18 +142,15 @@ struct WatchedSettingsTests {
   static let readPerUseOrUIOnly: Set<String> = [
     // Read per request or per operation — a change is picked up on the next one.
     "log_level", "event_payload_codec", "auth_mode", "additive_endpoints",
-    "update_feed_url", "check_for_updates", "auto_install_updates",
-    "encrypt_coms", "facetime_calling", "landing_page_path",
+    "update_feed_url", "check_for_updates", "landing_page_path",
     // Read at each cleanup sweep rather than held by a service, so a change applies to
     // the next sweep with no restart.
     "facetime_link_ttl_hours",
     // Applied at launch only, and honestly so: they describe how the process itself was
     // started and cannot change without restarting it.
-    "start_delay", "start_via_terminal", "headless", "disable_gpu",
+    "start_delay",
     "auto_start_method", "start_minimized", "hide_dock_icon", "dock_badge",
     "auto_lock_mac", "open_findmy_on_startup",
-    // App UI only.
-    "tutorial_is_done",
     // Bookkeeping, never user-set.
     "last_fcm_restart", "legacy_config_imported",
     // Private API detail read when the helper is launched.
