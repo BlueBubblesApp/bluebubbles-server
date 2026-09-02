@@ -108,7 +108,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// Every write goes through one of these. Recovering the conversation from the message
   /// instead cannot work: an `IMMessageItem` fetched by GUID reports `chatIdentifier = nil`.
   /// The chat GUID travels with the request, resolved by the server from chat.db.
-  private func requireConversation(_ chat: ChatGUID) throws -> CKConversation {
+  private func requireConversation(_ chat: ChatIdentifier) throws -> CKConversation {
     guard let conversation = try CKConversationList.conversation(guid: chat.rawValue) else {
       throw PrivateAPIErrorShim.rejected(
         "ChatKit does not know a conversation with GUID \(chat.rawValue)"
@@ -287,7 +287,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// signature because it is part of the wire contract clients already send.
   public func editMessage(
     _ guid: MessageGUID,
-    in chat: ChatGUID,
+    in chat: ChatIdentifier,
     partIndex: Int,
     newText: String,
     backwardCompatibilityText: String
@@ -308,7 +308,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// unsent. It addresses a PART: a message with text and an attachment has two, and
   /// unsending one leaves the other standing.
   public func unsendMessage(
-    _ guid: MessageGUID, in chat: ChatGUID, partIndex: Int
+    _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int
   ) async throws {
     let part = try await IMChatHistory.messagePartChatItem(
       guid: guid.rawValue, partIndex: partIndex
@@ -335,7 +335,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// untouched, which is the worst shape a failure can take.
   ///
   /// `IMChat.deleteChatItems:` is the model-layer equivalent and needs no view at all.
-  public func deleteMessage(_ guid: MessageGUID, in chat: ChatGUID) async throws {
+  public func deleteMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
     let message = try await IMChatHistory.message(guid: guid.rawValue)
     return try translating {
       let imChat = try IMChatRegistry.requireChat(guid: chat.rawValue)
@@ -457,7 +457,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// that wanted a conversation to exist for the other party has to send something.
   public func createChat(
     addresses: [String], service: String, message: String?
-  ) async throws -> ChatGUID {
+  ) async throws -> ChatIdentifier {
     try translating {
       guard !addresses.isEmpty else {
         throw PrivateAPIErrorShim.rejected("a chat needs at least one address")
@@ -498,7 +498,7 @@ public final class IMCoreBridge: PrivateAPI {
         )
         try IMChat(created).send(outgoing)
       }
-      return ChatGUID(guid)
+      return ChatIdentifier(guid)
     }
   }
 
@@ -509,7 +509,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// earlier passes got this wrong in different ways: `deleteAllHistory` empties a chat and
   /// leaves it in the list, and `IMChatRegistry._chat_remove:` unregisters the in-memory
   /// object without deleting anything.
-  public func deleteChat(_ chat: ChatGUID) async throws {
+  public func deleteChat(_ chat: ChatIdentifier) async throws {
     try translating {
       let conversation = try requireConversation(chat)
       let type: AnyClass = try IMCoreRuntime.requireClass("CKConversationList")
@@ -525,14 +525,14 @@ public final class IMCoreBridge: PrivateAPI {
   }
 
   /// PORTED. ObjC: `[chat leave]`.
-  public func leaveChat(_ chat: ChatGUID) async throws {
+  public func leaveChat(_ chat: ChatIdentifier) async throws {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).leave()
     }
   }
 
   /// PORTED. ObjC: `[chat _setDisplayName:]` (BlueBubblesHelper.m:239).
-  public func setDisplayName(chat: ChatGUID, to name: String) async throws {
+  public func setDisplayName(chat: ChatIdentifier, to name: String) async throws {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).setDisplayName(name)
     }
@@ -545,7 +545,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// goes through the same registration as any attachment, because that is what it is.
   ///
   /// An empty path clears the photo, which is how the reference distinguishes the two.
-  public func updateGroupPhoto(chat: ChatGUID, imagePath: String) async throws {
+  public func updateGroupPhoto(chat: ChatIdentifier, imagePath: String) async throws {
     try translating {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       guard !imagePath.isEmpty else {
@@ -568,7 +568,7 @@ public final class IMCoreBridge: PrivateAPI {
   ///
   /// Goes through ChatKit rather than IMChat, because ChatKit is what enforces the
   /// recipient limit — and IMCore's own add silently does nothing when the group is full.
-  public func addParticipant(_ address: String, to chat: ChatGUID) async throws {
+  public func addParticipant(_ address: String, to chat: ChatIdentifier) async throws {
     try translating {
       let conversation = try requireConversation(chat)
       guard try conversation.canInsertMoreRecipients() else {
@@ -584,7 +584,7 @@ public final class IMCoreBridge: PrivateAPI {
   }
 
   /// PORTED. ObjC: `updateParticipantsForChat:…isAdding:NO` (BlueBubblesHelper.m:245).
-  public func removeParticipant(_ address: String, from chat: ChatGUID) async throws {
+  public func removeParticipant(_ address: String, from chat: ChatIdentifier) async throws {
     try translating {
       let conversation = try requireConversation(chat)
       guard let handle = try IMAccountController.handle(for: address) else {
@@ -613,7 +613,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// An identifier that resolves to nothing is DROPPED rather than reported as a null GUID:
   /// it means a pinned conversation the registry no longer has, which is stale state on
   /// Apple's side and not something a client can do anything with.
-  public func pinnedChats() async throws -> [ChatGUID] {
+  public func pinnedChats() async throws -> [ChatIdentifier] {
     try translating {
       let controller = try IMCoreRuntime.sharedInstance(
         ofClass: "IMPinnedConversationsController"
@@ -623,10 +623,10 @@ public final class IMCoreBridge: PrivateAPI {
         controller, to: NSSelectorFromString("pinnedChats")
       ) {
         let chats = (try? IMCoreRuntime.objects(controller, "pinnedChats")) ?? []
-        return chats.compactMap { chat -> ChatGUID? in
+        return chats.compactMap { chat -> ChatIdentifier? in
           guard let guid = (try? IMCoreRuntime.string(chat, "guid")) ?? nil
           else { return nil }
-          return ChatGUID(guid)
+          return ChatIdentifier(guid)
         }
       }
 
@@ -650,7 +650,7 @@ public final class IMCoreBridge: PrivateAPI {
         guard let chat = try? IMChatRegistry.chat(guid: identifier),
           let guid = (try? IMCoreRuntime.string(chat.object, "guid")) ?? nil
         else { return nil }
-        return ChatGUID(guid)
+        return ChatIdentifier(guid)
       }
     }
   }
@@ -670,7 +670,7 @@ public final class IMCoreBridge: PrivateAPI {
   ///
   /// Order is preserved throughout: pinned conversations display in the order of this
   /// list, so rebuilding it as a set would reshuffle the user's pins whenever one changed.
-  public func setPinned(chat: ChatGUID, pinned: Bool) async throws {
+  public func setPinned(chat: ChatIdentifier, pinned: Bool) async throws {
     try translating {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       let controller = try IMCoreRuntime.sharedInstance(
@@ -740,7 +740,7 @@ public final class IMCoreBridge: PrivateAPI {
   // MARK: - Mute
 
   /// PORTED. New — the shipping Objective-C helper cannot mute at all.
-  public func muteState(chat: ChatGUID) async throws -> ChatMuteState {
+  public func muteState(chat: ChatIdentifier) async throws -> ChatMuteState {
     try translating {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       return try Self.muteState(of: conversation)
@@ -765,7 +765,7 @@ public final class IMCoreBridge: PrivateAPI {
     }
   }
 
-  public func unmute(chat: ChatGUID, syncToPairedDevice: Bool) async throws -> ChatMuteState {
+  public func unmute(chat: ChatIdentifier, syncToPairedDevice: Bool) async throws -> ChatMuteState {
     try translating {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       try IMMutedChats.unmute(conversation, sync: syncToPairedDevice)
@@ -802,7 +802,7 @@ public final class IMCoreBridge: PrivateAPI {
   ///
   /// Returns as soon as the daemon has been asked. See the contract for why there is
   /// nothing to await here.
-  public func refetchChatBackground(chat: ChatGUID) async throws {
+  public func refetchChatBackground(chat: ChatIdentifier) async throws {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).refetchTranscriptBackground()
     }
@@ -815,13 +815,13 @@ public final class IMCoreBridge: PrivateAPI {
   /// Destructive and synced: the messages go from every device on the account. The gate is
   /// above this — the route demands an explicit confirmation and raises a user alert —
   /// because a helper cannot tell an intended clear from an accidental one.
-  public func clearChatHistory(_ chat: ChatGUID) async throws -> Bool {
+  public func clearChatHistory(_ chat: ChatIdentifier) async throws -> Bool {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).deleteAllHistory()
     }
   }
 
-  public func chatFilterState(chat: ChatGUID) async throws -> ChatFilterState {
+  public func chatFilterState(chat: ChatIdentifier) async throws -> ChatFilterState {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).filterState()
     }
@@ -834,7 +834,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// never fires becomes a timeout, not a hang — IMCore calling back is not something this
   /// process can guarantee.
   public func markSenderKnown(
-    chat: ChatGUID, saveInContacts: Bool
+    chat: ChatIdentifier, saveInContacts: Bool
   ) async throws -> ChatFilterState {
     let conversation = try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue)
@@ -906,7 +906,7 @@ public final class IMCoreBridge: PrivateAPI {
     }
   }
 
-  public func setChatFilter(chat: ChatGUID, category: Int) async throws -> ChatFilterState {
+  public func setChatFilter(chat: ChatIdentifier, category: Int) async throws -> ChatFilterState {
     try translating {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       let current = try conversation.filterState()
@@ -922,14 +922,14 @@ public final class IMCoreBridge: PrivateAPI {
   // MARK: - Presence
 
   /// PORTED. ObjC: `[chat setLocalUserIsTyping:YES]` (BlueBubblesHelper.m:194).
-  public func startTyping(chat: ChatGUID) async throws {
+  public func startTyping(chat: ChatIdentifier) async throws {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).setLocalUserIsTyping(true)
     }
   }
 
   /// PORTED. ObjC: `[chat setLocalUserIsTyping:NO]` (BlueBubblesHelper.m:194).
-  public func stopTyping(chat: ChatGUID) async throws {
+  public func stopTyping(chat: ChatIdentifier) async throws {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).setLocalUserIsTyping(false)
     }
@@ -939,7 +939,7 @@ public final class IMCoreBridge: PrivateAPI {
   ///
   /// Derived from the last incoming message rather than read directly: IMCore has no "is
   /// the other person typing" property, only a message that *is* a typing indicator.
-  public func checkTypingStatus(chat: ChatGUID) async throws -> Bool {
+  public func checkTypingStatus(chat: ChatIdentifier) async throws -> Bool {
     try translating {
       try IMChatRegistry.requireChat(guid: chat.rawValue).isRemoteTyping()
     }
@@ -949,14 +949,14 @@ public final class IMCoreBridge: PrivateAPI {
   ///
   /// Read state lives on the CONVERSATION. Calling it on IMChat — which the previous pass
   /// did — reaches a different object graph.
-  public func markRead(chat: ChatGUID) async throws {
+  public func markRead(chat: ChatIdentifier) async throws {
     try translating {
       try requireConversation(chat).markAllMessagesAsRead()
     }
   }
 
   /// PORTED. ObjC: `handleReadStatusForChat:` (BlueBubblesHelper.m:384). Ventura and later.
-  public func markUnread(chat: ChatGUID) async throws {
+  public func markUnread(chat: ChatIdentifier) async throws {
     try translating {
       try requireConversation(chat).markLastMessageAsUnread()
     }
@@ -1116,7 +1116,7 @@ public final class IMCoreBridge: PrivateAPI {
   /// On the CONTROLLER, taking the chat — not a property of the chat, which an earlier
   /// pass looked for and correctly failed to find, then reported as unavailable on this
   /// macOS. It was available; the method was being asked of the wrong object.
-  public func shouldOfferNicknameSharing(chat: ChatGUID) async throws -> Bool {
+  public func shouldOfferNicknameSharing(chat: ChatIdentifier) async throws -> Bool {
     try translating {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       let controller = try IMCoreRuntime.sharedInstance(ofClass: "IMNicknameController")
@@ -1152,7 +1152,7 @@ public final class IMCoreBridge: PrivateAPI {
   ///
   /// `forceSend:` is false. True re-sends a nickname the recipient already has, which is
   /// not what a client asking to share one is asking for.
-  public func shareNickname(chat: ChatGUID) async throws {
+  public func shareNickname(chat: ChatIdentifier) async throws {
     try translating {
       let conversation = try IMChatRegistry.requireChat(guid: chat.rawValue)
       let participants =
@@ -1308,7 +1308,7 @@ public final class IMCoreBridge: PrivateAPI {
     try translating { try FindMyBridge.startSharing(request) }
   }
 
-  public func stopSharingFindMyLocation(chat: ChatGUID, address: String?) async throws {
+  public func stopSharingFindMyLocation(chat: ChatIdentifier, address: String?) async throws {
     try translating { try FindMyBridge.stopSharing(chat: chat, address: address) }
   }
 

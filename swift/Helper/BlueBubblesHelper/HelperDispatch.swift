@@ -40,7 +40,9 @@ enum HelperDispatch {
       return value
     }
     func optionalString(_ key: String) -> String? { data[key]?.stringValue }
-    func chat(_ key: String = "chatGuid") throws -> ChatGUID { ChatGUID(try string(key)) }
+    func chat(_ key: String = "chatGuid") throws -> ChatIdentifier {
+      ChatIdentifier(try string(key))
+    }
     func message(_ key: String = "messageGuid") throws -> MessageGUID {
       MessageGUID(try string(key))
     }

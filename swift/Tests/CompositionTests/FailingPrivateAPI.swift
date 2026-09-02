@@ -36,53 +36,57 @@ struct FailingPrivateAPI: PrivateAPI {
   func sendAttachment(_ request: SendAttachmentRequest) async throws -> SentMessage { throw error }
   func react(_ request: ReactionRequest) async throws { throw error }
   func editMessage(
-    _ guid: MessageGUID, in chat: ChatGUID, partIndex: Int, newText: String,
+    _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String,
     backwardCompatibilityText: String
   ) async throws { throw error }
-  func unsendMessage(_ guid: MessageGUID, in chat: ChatGUID, partIndex: Int) async throws {
+  func unsendMessage(_ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int) async throws {
     throw error
   }
-  func deleteMessage(_ guid: MessageGUID, in chat: ChatGUID) async throws { throw error }
+  func deleteMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws { throw error }
   func notifyAnyways(_ guid: MessageGUID) async throws { throw error }
   func searchMessages(_ request: MessageSearchRequest) async throws -> [MessageGUID] { throw error }
   func balloonBundleMediaPath(for guid: MessageGUID) async throws -> String { throw error }
-  func createChat(addresses: [String], service: String, message: String?) async throws -> ChatGUID {
+  func createChat(addresses: [String], service: String, message: String?) async throws
+    -> ChatIdentifier
+  {
     throw error
   }
-  func deleteChat(_ chat: ChatGUID) async throws { throw error }
-  func leaveChat(_ chat: ChatGUID) async throws { throw error }
-  func setDisplayName(chat: ChatGUID, to name: String) async throws { throw error }
-  func updateGroupPhoto(chat: ChatGUID, imagePath: String) async throws { throw error }
-  func addParticipant(_ address: String, to chat: ChatGUID) async throws { throw error }
-  func removeParticipant(_ address: String, from chat: ChatGUID) async throws { throw error }
-  func setPinned(chat: ChatGUID, pinned: Bool) async throws { throw error }
-  func muteState(chat: ChatGUID) async throws -> ChatMuteState { throw error }
+  func deleteChat(_ chat: ChatIdentifier) async throws { throw error }
+  func leaveChat(_ chat: ChatIdentifier) async throws { throw error }
+  func setDisplayName(chat: ChatIdentifier, to name: String) async throws { throw error }
+  func updateGroupPhoto(chat: ChatIdentifier, imagePath: String) async throws { throw error }
+  func addParticipant(_ address: String, to chat: ChatIdentifier) async throws { throw error }
+  func removeParticipant(_ address: String, from chat: ChatIdentifier) async throws { throw error }
+  func setPinned(chat: ChatIdentifier, pinned: Bool) async throws { throw error }
+  func muteState(chat: ChatIdentifier) async throws -> ChatMuteState { throw error }
   func setMute(_ request: ChatMuteRequest) async throws -> ChatMuteState { throw error }
-  func unmute(chat: ChatGUID, syncToPairedDevice: Bool) async throws -> ChatMuteState {
+  func unmute(chat: ChatIdentifier, syncToPairedDevice: Bool) async throws -> ChatMuteState {
     throw error
   }
-  func refetchChatBackground(chat: ChatGUID) async throws { throw error }
-  func clearChatHistory(_ chat: ChatGUID) async throws -> Bool { throw error }
-  func chatFilterState(chat: ChatGUID) async throws -> ChatFilterState { throw error }
-  func markSenderKnown(chat: ChatGUID, saveInContacts: Bool) async throws -> ChatFilterState {
+  func refetchChatBackground(chat: ChatIdentifier) async throws { throw error }
+  func clearChatHistory(_ chat: ChatIdentifier) async throws -> Bool { throw error }
+  func chatFilterState(chat: ChatIdentifier) async throws -> ChatFilterState { throw error }
+  func markSenderKnown(chat: ChatIdentifier, saveInContacts: Bool) async throws -> ChatFilterState {
     throw error
   }
   func markChatAsSpam(_ request: ChatSpamRequest) async throws -> ChatSpamResult { throw error }
   func reportChatAsJunk(_ request: ChatSpamRequest) async throws -> ChatSpamResult { throw error }
-  func setChatFilter(chat: ChatGUID, category: Int) async throws -> ChatFilterState { throw error }
-  func pinnedChats() async throws -> [ChatGUID] { throw error }
-  func startTyping(chat: ChatGUID) async throws { throw error }
-  func stopTyping(chat: ChatGUID) async throws { throw error }
-  func checkTypingStatus(chat: ChatGUID) async throws -> Bool { throw error }
-  func markRead(chat: ChatGUID) async throws { throw error }
-  func markUnread(chat: ChatGUID) async throws { throw error }
+  func setChatFilter(chat: ChatIdentifier, category: Int) async throws -> ChatFilterState {
+    throw error
+  }
+  func pinnedChats() async throws -> [ChatIdentifier] { throw error }
+  func startTyping(chat: ChatIdentifier) async throws { throw error }
+  func stopTyping(chat: ChatIdentifier) async throws { throw error }
+  func checkTypingStatus(chat: ChatIdentifier) async throws -> Bool { throw error }
+  func markRead(chat: ChatIdentifier) async throws { throw error }
+  func markUnread(chat: ChatIdentifier) async throws { throw error }
   func checkIMessageAvailability(address: String) async throws -> Bool { throw error }
   func checkFaceTimeAvailability(address: String) async throws -> Bool { throw error }
   func checkFocusStatus(address: String) async throws -> String { throw error }
   func accountInfo() async throws -> AccountInfo { throw error }
   func nicknameInfo(for address: String?) async throws -> NicknameInfo { throw error }
-  func shouldOfferNicknameSharing(chat: ChatGUID) async throws -> Bool { throw error }
-  func shareNickname(chat: ChatGUID) async throws { throw error }
+  func shouldOfferNicknameSharing(chat: ChatIdentifier) async throws -> Bool { throw error }
+  func shareNickname(chat: ChatIdentifier) async throws { throw error }
   func modifyActiveAlias(_ alias: String) async throws { throw error }
   func downloadPurgedAttachment(guid: String) async throws -> String { throw error }
   func findMyStatus() async throws -> FindMyStatus { throw error }
@@ -91,7 +95,9 @@ struct FailingPrivateAPI: PrivateAPI {
   func refreshFindMyLocation(handle: String) async throws -> FindMyFriend { throw error }
   func requestFindMyLocationShare(handle: String) async throws { throw error }
   func startSharingFindMyLocation(_ request: FindMyShareRequest) async throws { throw error }
-  func stopSharingFindMyLocation(chat: ChatGUID, address: String?) async throws { throw error }
+  func stopSharingFindMyLocation(chat: ChatIdentifier, address: String?) async throws {
+    throw error
+  }
   func generateFaceTimeLink(invitedAddresses: [String]) async throws -> FaceTimeLink { throw error }
   func dialFaceTime(_ request: FaceTimeStartRequest) async throws -> FaceTimeCall { throw error }
   func generateFaceTimeLinkForCall(callUUID: String) async throws -> FaceTimeLink { throw error }

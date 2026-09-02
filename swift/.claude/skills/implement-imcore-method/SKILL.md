@@ -34,7 +34,7 @@ If you had to hunt for selectors, **commit what you found** — a header dump un
 there is no hand-maintained schema and no drift.
 
 ```swift
-func setDisplayName(chat: ChatGUID, to name: String) async throws
+func setDisplayName(chat: ChatIdentifier, to name: String) async throws
 ```
 
 Fully typed. **No `[String: Any]` payloads.**

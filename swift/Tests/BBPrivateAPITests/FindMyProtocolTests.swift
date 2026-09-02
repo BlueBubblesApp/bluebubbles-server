@@ -308,7 +308,7 @@ struct FindMyWireTests {
 
     try await client.startSharingFindMyLocation(
       FindMyShareRequest(
-        chat: ChatGUID("iMessage;-;+15550000001"),
+        chat: ChatIdentifier("iMessage;-;+15550000001"),
         address: "+15550000001",
         duration: .untilEndOfDay
       )
@@ -331,7 +331,7 @@ struct FindMyWireTests {
     let client = PrivateAPIClient(transport: transport)
 
     try await client.startSharingFindMyLocation(
-      FindMyShareRequest(chat: ChatGUID("iMessage;+;chat123"), duration: .oneHour)
+      FindMyShareRequest(chat: ChatIdentifier("iMessage;+;chat123"), duration: .oneHour)
     )
     let payload = try #require(await transport.lastPayload)
     #expect(payload["address"] == nil)
@@ -344,7 +344,7 @@ struct FindMyWireTests {
     let client = PrivateAPIClient(transport: transport)
 
     try await client.stopSharingFindMyLocation(
-      chat: ChatGUID("iMessage;+;chat123"), address: nil
+      chat: ChatIdentifier("iMessage;+;chat123"), address: nil
     )
     #expect(await transport.actions == ["stop-sharing-findmy-location"])
     #expect(await transport.lastPayload?["chatGuid"]?.stringValue == "iMessage;+;chat123")

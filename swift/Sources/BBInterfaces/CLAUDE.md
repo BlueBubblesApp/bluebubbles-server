@@ -35,7 +35,7 @@ conforms to `MessagesBackedInterface` and wraps **every** such call:
 
 ```swift
 let api = try requirePrivateAPI(for: "leaving a chat")
-try await throughMessages { try await api.leaveChat(ChatGUID(guid)) }
+try await throughMessages { try await api.leaveChat(ChatIdentifier(guid)) }
 ```
 
 `requirePrivateAPI` answers "no helper connected" with the fixed message clients match on.
@@ -57,14 +57,20 @@ once under a different name (`require(for:)`), which is how one went unnoticed.
 `JSONValue` from an interface method: the app consumes this layer in-process, and every JSON
 return grew a parallel `records()`/`…List()` twin the moment a view needed the value.
 
+Absent-vs-null is not your problem here — `SchemaProfile` inside the serializer decides whether
+a field appears, so moving a serialize call cannot change the bytes.
+
+## Two chat identifier types, on purpose
+
+`BBCore.ChatGUID` is the comparison type for values read from `chat.db` (`sameChat`,
+`lookupCandidates`). `BBPrivateAPIContract.ChatIdentifier` is the opaque handle the helper is
+given. Convert at the call site with `ChatIdentifier(guid)`; never compare one with `==`.
+
 ## Capabilities live here
 
 `Capabilities.swift` holds the `…Providing` protocols the handlers, the composition root and
 the app compose. Add a capability here, vend an interface (never a repository), and conform
 `AppContext` in the composition root.
-
-Absent-vs-null is not your problem here — `SchemaProfile` inside the serializer decides whether
-a field appears, so moving a serialize call cannot change the bytes.
 
 ## Tests that will catch you
 

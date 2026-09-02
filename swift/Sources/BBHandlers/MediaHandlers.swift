@@ -94,7 +94,7 @@ public enum MediaHandlers {
       let guid = try request.requirePathParameter("guid")
       let api = try await context.requirePrivateAPI(for: "removing a group photo")
       // An empty path is how IMCore is told to clear the photo rather than set one.
-      try await api.updateGroupPhoto(chat: ChatGUID(guid), imagePath: "")
+      try await api.updateGroupPhoto(chat: ChatIdentifier(guid), imagePath: "")
       return .data(nil)
     }
   }
@@ -219,7 +219,7 @@ public enum MediaHandlers {
   ) async -> Bool {
     guard let api = await context.privateAPIClient() else { return false }
     do {
-      try await api.refetchChatBackground(chat: ChatGUID(chatGUID))
+      try await api.refetchChatBackground(chat: ChatIdentifier(chatGUID))
       return true
     } catch {
       // Not fatal to the request being served: the caller still gets an accurate 404,
@@ -346,14 +346,14 @@ public enum MediaHandlers {
     registry.register(.chatShouldShareContact) { request in
       let api = try await context.requirePrivateAPI(for: "contact sharing")
       let guid = try request.requirePathParameter("guid")
-      let should = try await api.shouldOfferNicknameSharing(chat: ChatGUID(guid))
+      let should = try await api.shouldOfferNicknameSharing(chat: ChatIdentifier(guid))
       return .data(.object(["shouldShare": .bool(should)]))
     }
 
     registry.register(.chatShareContact) { request in
       let api = try await context.requirePrivateAPI(for: "contact sharing")
       let guid = try request.requirePathParameter("guid")
-      try await api.shareNickname(chat: ChatGUID(guid))
+      try await api.shareNickname(chat: ChatIdentifier(guid))
       return .data(nil)
     }
   }

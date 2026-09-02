@@ -259,12 +259,12 @@ public enum FindMyShareDuration: String, Codable, Sendable, CaseIterable {
 /// the chat to pick the caller ID the offer is sent from. There is no chat-less form, and
 /// passing nil would send the offer from whichever alias IMCore happened to pick.
 public struct FindMyShareRequest: Codable, Sendable {
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   /// One participant, or nil for every participant in the chat.
   public let address: String?
   public let duration: FindMyShareDuration
 
-  public init(chat: ChatGUID, address: String? = nil, duration: FindMyShareDuration) {
+  public init(chat: ChatIdentifier, address: String? = nil, duration: FindMyShareDuration) {
     self.chat = chat
     self.address = address
     self.duration = duration

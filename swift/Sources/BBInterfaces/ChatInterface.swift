@@ -452,17 +452,17 @@ public struct ChatInterface: MessagesBackedInterface {
 
   public func delete(guid: String) async throws {
     let api = try requirePrivateAPI(for: "deleting a chat")
-    try await throughMessages { try await api.deleteChat(ChatGUID(guid)) }
+    try await throughMessages { try await api.deleteChat(ChatIdentifier(guid)) }
   }
 
   public func leave(guid: String) async throws {
     let api = try requirePrivateAPI(for: "leaving a chat")
-    try await throughMessages { try await api.leaveChat(ChatGUID(guid)) }
+    try await throughMessages { try await api.leaveChat(ChatIdentifier(guid)) }
   }
 
   public func setPinned(guid: String, pinned: Bool) async throws {
     let api = try requirePrivateAPI(for: "pinning a chat")
-    try await throughMessages { try await api.setPinned(chat: ChatGUID(guid), pinned: pinned) }
+    try await throughMessages { try await api.setPinned(chat: ChatIdentifier(guid), pinned: pinned) }
   }
 
   /// The pinned conversations, in display order, each serialized as a full chat.
@@ -491,7 +491,7 @@ public struct ChatInterface: MessagesBackedInterface {
 
   public func muteState(guid: String) async throws -> ChatMuteState {
     let api = try requirePrivateAPI(for: "reading a chat's mute state")
-    return try await throughMessages { try await api.muteState(chat: ChatGUID(guid)) }
+    return try await throughMessages { try await api.muteState(chat: ChatIdentifier(guid)) }
   }
 
   /// Mutes until `until`, or indefinitely when it is nil.
@@ -516,7 +516,7 @@ public struct ChatInterface: MessagesBackedInterface {
     return try await throughMessages {
       try await api.setMute(
         ChatMuteRequest(
-          chat: ChatGUID(guid), until: until, syncToPairedDevice: syncToPairedDevice
+          chat: ChatIdentifier(guid), until: until, syncToPairedDevice: syncToPairedDevice
         )
       )
     }
@@ -526,7 +526,7 @@ public struct ChatInterface: MessagesBackedInterface {
     let api = try requirePrivateAPI(for: "unmuting a chat")
     return try await throughMessages {
       try await api.unmute(
-        chat: ChatGUID(guid), syncToPairedDevice: syncToPairedDevice
+        chat: ChatIdentifier(guid), syncToPairedDevice: syncToPairedDevice
       )
     }
   }
@@ -534,7 +534,7 @@ public struct ChatInterface: MessagesBackedInterface {
   /// Asks Messages to download this conversation's background asset from iCloud.
   public func refetchBackground(guid: String) async throws {
     let api = try requirePrivateAPI(for: "downloading a chat background")
-    try await throughMessages { try await api.refetchChatBackground(chat: ChatGUID(guid)) }
+    try await throughMessages { try await api.refetchChatBackground(chat: ChatIdentifier(guid)) }
   }
 
   // MARK: History and filtering
@@ -545,12 +545,12 @@ public struct ChatInterface: MessagesBackedInterface {
   /// confirmation and the user-visible alert live in the handler; this layer does the work.
   public func clearHistory(guid: String) async throws -> Bool {
     let api = try requirePrivateAPI(for: "clearing a chat's history")
-    return try await throughMessages { try await api.clearChatHistory(ChatGUID(guid)) }
+    return try await throughMessages { try await api.clearChatHistory(ChatIdentifier(guid)) }
   }
 
   public func filterState(guid: String) async throws -> ChatFilterState {
     let api = try requirePrivateAPI(for: "reading a chat's filter state")
-    return try await throughMessages { try await api.chatFilterState(chat: ChatGUID(guid)) }
+    return try await throughMessages { try await api.chatFilterState(chat: ChatIdentifier(guid)) }
   }
 
   public func markSenderKnown(
@@ -558,7 +558,7 @@ public struct ChatInterface: MessagesBackedInterface {
   ) async throws -> ChatFilterState {
     let api = try requirePrivateAPI(for: "marking a sender as known")
     return try await throughMessages {
-      try await api.markSenderKnown(chat: ChatGUID(guid), saveInContacts: saveInContacts)
+      try await api.markSenderKnown(chat: ChatIdentifier(guid), saveInContacts: saveInContacts)
     }
   }
 
@@ -569,7 +569,7 @@ public struct ChatInterface: MessagesBackedInterface {
     return try await throughMessages {
       try await api.markChatAsSpam(
         ChatSpamRequest(
-          chat: ChatGUID(guid), reportToCarrier: reportToCarrier, dryRun: dryRun
+          chat: ChatIdentifier(guid), reportToCarrier: reportToCarrier, dryRun: dryRun
         )
       )
     }
@@ -582,7 +582,7 @@ public struct ChatInterface: MessagesBackedInterface {
     return try await throughMessages {
       try await api.reportChatAsJunk(
         ChatSpamRequest(
-          chat: ChatGUID(guid), reportToCarrier: reportToCarrier, dryRun: dryRun
+          chat: ChatIdentifier(guid), reportToCarrier: reportToCarrier, dryRun: dryRun
         )
       )
     }
@@ -594,7 +594,7 @@ public struct ChatInterface: MessagesBackedInterface {
       throw InterfaceError.invalidRequest("`category` must be zero or greater")
     }
     return try await throughMessages {
-      try await api.setChatFilter(chat: ChatGUID(guid), category: category)
+      try await api.setChatFilter(chat: ChatIdentifier(guid), category: category)
     }
   }
 
@@ -632,7 +632,7 @@ public struct ChatInterface: MessagesBackedInterface {
 
   public func setDisplayName(guid: String, to name: String) async throws {
     let api = try requirePrivateAPI(for: "renaming a chat")
-    try await throughMessages { try await api.setDisplayName(chat: ChatGUID(guid), to: name) }
+    try await throughMessages { try await api.setDisplayName(chat: ChatIdentifier(guid), to: name) }
   }
 
   public func setGroupPhoto(guid: String, imagePath: String) async throws {
@@ -641,45 +641,45 @@ public struct ChatInterface: MessagesBackedInterface {
       throw InterfaceError.invalidRequest("no file at \(imagePath)")
     }
     try await throughMessages {
-      try await api.updateGroupPhoto(chat: ChatGUID(guid), imagePath: imagePath)
+      try await api.updateGroupPhoto(chat: ChatIdentifier(guid), imagePath: imagePath)
     }
   }
 
   public func addParticipant(_ address: String, to guid: String) async throws {
     let api = try requirePrivateAPI(for: "adding a participant")
-    try await throughMessages { try await api.addParticipant(address, to: ChatGUID(guid)) }
+    try await throughMessages { try await api.addParticipant(address, to: ChatIdentifier(guid)) }
   }
 
   public func removeParticipant(_ address: String, from guid: String) async throws {
     let api = try requirePrivateAPI(for: "removing a participant")
-    try await throughMessages { try await api.removeParticipant(address, from: ChatGUID(guid)) }
+    try await throughMessages { try await api.removeParticipant(address, from: ChatIdentifier(guid)) }
   }
 
   public func setTyping(guid: String, typing: Bool) async throws {
     let api = try requirePrivateAPI(for: "typing indicators")
     try await throughMessages {
       if typing {
-        try await api.startTyping(chat: ChatGUID(guid))
+        try await api.startTyping(chat: ChatIdentifier(guid))
       } else {
-        try await api.stopTyping(chat: ChatGUID(guid))
+        try await api.stopTyping(chat: ChatIdentifier(guid))
       }
     }
   }
 
   public func markRead(guid: String) async throws {
     let api = try requirePrivateAPI(for: "marking a chat read")
-    try await throughMessages { try await api.markRead(chat: ChatGUID(guid)) }
+    try await throughMessages { try await api.markRead(chat: ChatIdentifier(guid)) }
   }
 
   public func markUnread(guid: String) async throws {
     let api = try requirePrivateAPI(for: "marking a chat unread")
-    try await throughMessages { try await api.markUnread(chat: ChatGUID(guid)) }
+    try await throughMessages { try await api.markUnread(chat: ChatIdentifier(guid)) }
   }
 
   public func deleteMessage(_ messageGUID: String, in chatGUID: String) async throws {
     let api = try requirePrivateAPI(for: "deleting a message")
     try await throughMessages {
-      try await api.deleteMessage(MessageGUID(messageGUID), in: ChatGUID(chatGUID))
+      try await api.deleteMessage(MessageGUID(messageGUID), in: ChatIdentifier(chatGUID))
     }
   }
 }

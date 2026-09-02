@@ -251,7 +251,7 @@ public enum FindMyHandlers {
 
       try await api.startSharingFindMyLocation(
         FindMyShareRequest(
-          chat: ChatGUID(chatGUID),
+          chat: ChatIdentifier(chatGUID),
           address: values["address"]?.stringValue,
           duration: duration
         )
@@ -270,7 +270,7 @@ public enum FindMyHandlers {
       let values = try request.values()
       let chatGUID = try values.requireString("chatGuid")
       try await api.stopSharingFindMyLocation(
-        chat: ChatGUID(chatGUID), address: values["address"]?.stringValue
+        chat: ChatIdentifier(chatGUID), address: values["address"]?.stringValue
       )
       return .data(.object(["sharing": .bool(false)]))
     }

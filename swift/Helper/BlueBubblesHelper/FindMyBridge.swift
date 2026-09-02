@@ -517,7 +517,7 @@ enum FindMyBridge {
     }
   }
 
-  static func stopSharing(chat guid: ChatGUID, address: String?) throws {
+  static func stopSharing(chat guid: ChatIdentifier, address: String?) throws {
     let session = try requireSession()
     let chat = try IMChatRegistry.requireChat(guid: guid.rawValue)
 

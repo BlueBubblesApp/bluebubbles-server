@@ -121,7 +121,7 @@ public actor PrivateAPIClient: PrivateAPI {
   /// chat from chat.db instead, which is authoritative and free.
   public func editMessage(
     _ guid: MessageGUID,
-    in chat: ChatGUID,
+    in chat: ChatIdentifier,
     partIndex: Int,
     newText: String,
     backwardCompatibilityText: String
@@ -137,7 +137,7 @@ public actor PrivateAPIClient: PrivateAPI {
       ]))
   }
 
-  public func unsendMessage(_ guid: MessageGUID, in chat: ChatGUID, partIndex: Int) async throws {
+  public func unsendMessage(_ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int) async throws {
     try await transport.request(
       action: "unsend-message",
       data: .object([
@@ -147,7 +147,7 @@ public actor PrivateAPIClient: PrivateAPI {
       ]))
   }
 
-  public func deleteMessage(_ guid: MessageGUID, in chat: ChatGUID) async throws {
+  public func deleteMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
     try await transport.request(
       action: "delete-message",
       data: .object([
@@ -192,7 +192,7 @@ public actor PrivateAPIClient: PrivateAPI {
     addresses: [String],
     service: String,
     message: String?
-  ) async throws -> ChatGUID {
+  ) async throws -> ChatIdentifier {
     let result = try await transport.request(
       action: "create-chat",
       data: .object(dropping: [
@@ -210,18 +210,18 @@ public actor PrivateAPIClient: PrivateAPI {
     else {
       throw PrivateAPIError.rejectedByMessages(reason: "create-chat returned no identifier")
     }
-    return ChatGUID(identifier)
+    return ChatIdentifier(identifier)
   }
 
-  public func deleteChat(_ chat: ChatGUID) async throws {
+  public func deleteChat(_ chat: ChatIdentifier) async throws {
     try await chatAction("delete-chat", chat)
   }
 
-  public func leaveChat(_ chat: ChatGUID) async throws {
+  public func leaveChat(_ chat: ChatIdentifier) async throws {
     try await chatAction("leave-chat", chat)
   }
 
-  public func setDisplayName(chat: ChatGUID, to name: String) async throws {
+  public func setDisplayName(chat: ChatIdentifier, to name: String) async throws {
     try await transport.request(
       action: "set-display-name",
       data: .object([
@@ -230,7 +230,7 @@ public actor PrivateAPIClient: PrivateAPI {
       ]))
   }
 
-  public func updateGroupPhoto(chat: ChatGUID, imagePath: String) async throws {
+  public func updateGroupPhoto(chat: ChatIdentifier, imagePath: String) async throws {
     try await transport.request(
       action: "update-group-photo",
       data: .object([
@@ -239,18 +239,18 @@ public actor PrivateAPIClient: PrivateAPI {
       ]))
   }
 
-  public func addParticipant(_ address: String, to chat: ChatGUID) async throws {
+  public func addParticipant(_ address: String, to chat: ChatIdentifier) async throws {
     try await participantAction("add-participant", address: address, chat: chat)
   }
 
-  public func removeParticipant(_ address: String, from chat: ChatGUID) async throws {
+  public func removeParticipant(_ address: String, from chat: ChatIdentifier) async throws {
     try await participantAction("remove-participant", address: address, chat: chat)
   }
 
   /// Pinning has no route in the Node server, so it reaches the API only through the
   /// additive chat group. The helper action name matches the shipping helper's
   /// (`update-chat-pinned`) so an older helper understands it too.
-  public func setPinned(chat: ChatGUID, pinned: Bool) async throws {
+  public func setPinned(chat: ChatIdentifier, pinned: Bool) async throws {
     try await transport.request(
       action: "update-chat-pinned",
       data: .object([
@@ -266,16 +266,16 @@ public actor PrivateAPIClient: PrivateAPI {
   /// the route reports the helper's error rather than an empty list: "no pins" and "this
   /// helper cannot tell you" are different answers, and a client syncing pins would treat
   /// the first as instruction to unpin everything.
-  public func pinnedChats() async throws -> [ChatGUID] {
+  public func pinnedChats() async throws -> [ChatIdentifier] {
     let reply = try await transport.request(action: "get-pinned-chats", data: .object([:]))
     return (reply?["chats"]?.arrayValue ?? [])
       .compactMap(\.stringValue)
-      .compactMap { ChatGUID($0) }
+      .compactMap { ChatIdentifier($0) }
   }
 
   // MARK: - Mute
 
-  public func muteState(chat: ChatGUID) async throws -> ChatMuteState {
+  public func muteState(chat: ChatIdentifier) async throws -> ChatMuteState {
     try Self.muteState(
       from: await transport.request(
         action: "get-chat-mute", data: .object(["chatGuid": .string(chat.rawValue)])
@@ -298,7 +298,7 @@ public actor PrivateAPIClient: PrivateAPI {
       ))
   }
 
-  public func unmute(chat: ChatGUID, syncToPairedDevice: Bool) async throws -> ChatMuteState {
+  public func unmute(chat: ChatIdentifier, syncToPairedDevice: Bool) async throws -> ChatMuteState {
     try Self.muteState(
       from: await transport.request(
         action: "unmute-chat",
@@ -329,7 +329,7 @@ public actor PrivateAPIClient: PrivateAPI {
 
   // MARK: - History and filtering
 
-  public func clearChatHistory(_ chat: ChatGUID) async throws -> Bool {
+  public func clearChatHistory(_ chat: ChatIdentifier) async throws -> Bool {
     let reply = try await transport.request(
       action: "clear-chat-history", data: .object(["chatGuid": .string(chat.rawValue)])
     )
@@ -340,7 +340,7 @@ public actor PrivateAPIClient: PrivateAPI {
     return reply?["deleted"]?.boolValue ?? true
   }
 
-  public func chatFilterState(chat: ChatGUID) async throws -> ChatFilterState {
+  public func chatFilterState(chat: ChatIdentifier) async throws -> ChatFilterState {
     try Self.filterState(
       from: await transport.request(
         action: "get-chat-filter", data: .object(["chatGuid": .string(chat.rawValue)])
@@ -348,7 +348,7 @@ public actor PrivateAPIClient: PrivateAPI {
   }
 
   public func markSenderKnown(
-    chat: ChatGUID, saveInContacts: Bool
+    chat: ChatIdentifier, saveInContacts: Bool
   ) async throws -> ChatFilterState {
     try Self.filterState(
       from: await transport.request(
@@ -374,7 +374,7 @@ public actor PrivateAPIClient: PrivateAPI {
       ))
   }
 
-  public func setChatFilter(chat: ChatGUID, category: Int) async throws -> ChatFilterState {
+  public func setChatFilter(chat: ChatIdentifier, category: Int) async throws -> ChatFilterState {
     try Self.filterState(
       from: await transport.request(
         action: "set-chat-filter",
@@ -420,21 +420,21 @@ public actor PrivateAPIClient: PrivateAPI {
 
   // MARK: - Chat background
 
-  public func refetchChatBackground(chat: ChatGUID) async throws {
+  public func refetchChatBackground(chat: ChatIdentifier) async throws {
     try await chatAction("refetch-chat-background", chat)
   }
 
   // MARK: - Presence
 
-  public func startTyping(chat: ChatGUID) async throws {
+  public func startTyping(chat: ChatIdentifier) async throws {
     try await chatAction("start-typing", chat)
   }
 
-  public func stopTyping(chat: ChatGUID) async throws {
+  public func stopTyping(chat: ChatIdentifier) async throws {
     try await chatAction("stop-typing", chat)
   }
 
-  public func checkTypingStatus(chat: ChatGUID) async throws -> Bool {
+  public func checkTypingStatus(chat: ChatIdentifier) async throws -> Bool {
     let result = try await transport.request(
       action: "check-typing-status",
       data: .object(["chatGuid": .string(chat.rawValue)])
@@ -442,11 +442,11 @@ public actor PrivateAPIClient: PrivateAPI {
     return result?["typing"]?.boolValue ?? result?.boolValue ?? false
   }
 
-  public func markRead(chat: ChatGUID) async throws {
+  public func markRead(chat: ChatIdentifier) async throws {
     try await chatAction("mark-chat-read", chat)
   }
 
-  public func markUnread(chat: ChatGUID) async throws {
+  public func markUnread(chat: ChatIdentifier) async throws {
     try await chatAction("mark-chat-unread", chat)
   }
 
@@ -496,7 +496,7 @@ public actor PrivateAPIClient: PrivateAPI {
     )
   }
 
-  public func shouldOfferNicknameSharing(chat: ChatGUID) async throws -> Bool {
+  public func shouldOfferNicknameSharing(chat: ChatIdentifier) async throws -> Bool {
     let result = try await transport.request(
       action: "should-offer-nickname-sharing",
       data: .object(["chatGuid": .string(chat.rawValue)])
@@ -504,7 +504,7 @@ public actor PrivateAPIClient: PrivateAPI {
     return result?["shouldOffer"]?.boolValue ?? result?.boolValue ?? false
   }
 
-  public func shareNickname(chat: ChatGUID) async throws {
+  public func shareNickname(chat: ChatIdentifier) async throws {
     try await chatAction("share-nickname", chat)
   }
 
@@ -582,7 +582,7 @@ public actor PrivateAPIClient: PrivateAPI {
     )
   }
 
-  public func stopSharingFindMyLocation(chat: ChatGUID, address: String?) async throws {
+  public func stopSharingFindMyLocation(chat: ChatIdentifier, address: String?) async throws {
     try await transport.request(
       action: "stop-sharing-findmy-location",
       data: .object(dropping: [
@@ -847,13 +847,13 @@ public actor PrivateAPIClient: PrivateAPI {
 
   // MARK: - Shared shapes
 
-  private func chatAction(_ action: String, _ chat: ChatGUID) async throws {
+  private func chatAction(_ action: String, _ chat: ChatIdentifier) async throws {
     try await transport.request(
       action: action, data: .object(["chatGuid": .string(chat.rawValue)])
     )
   }
 
-  private func participantAction(_ action: String, address: String, chat: ChatGUID) async throws {
+  private func participantAction(_ action: String, address: String, chat: ChatIdentifier) async throws {
     try await transport.request(
       action: action,
       data: .object([
@@ -873,7 +873,7 @@ public actor PrivateAPIClient: PrivateAPI {
   ///
   /// The authoritative record still arrives through the chat.db change detector; this is
   /// what lets the two be correlated rather than producing a duplicate.
-  private func sentMessage(from result: WireJSON?, chat: ChatGUID) throws -> SentMessage {
+  private func sentMessage(from result: WireJSON?, chat: ChatIdentifier) throws -> SentMessage {
     guard
       let identifier = result?["identifier"]?.stringValue
         ?? result?["guid"]?.stringValue

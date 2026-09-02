@@ -83,7 +83,7 @@ never `==`, never a literal `c.guid = ?`. See [`.claude/docs/imessage.md`](../..
 
 ```swift
 let api = try requirePrivateAPI(for: "leaving a chat")
-try await throughMessages { try await api.leaveChat(ChatGUID(guid)) }
+try await throughMessages { try await api.leaveChat(ChatIdentifier(guid)) }
 ```
 
 That is what makes a refusal a 500 `iMessage Error` rather than a generic `Server Error`. Skip it

@@ -24,7 +24,8 @@ import Foundation
 
 // MARK: - Identifiers
 
-public struct ChatGUID: Hashable, Sendable, Codable, RawRepresentable, CustomStringConvertible {
+public struct ChatIdentifier: Hashable, Sendable, Codable, RawRepresentable, CustomStringConvertible
+{
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
   public init(_ rawValue: String) { self.rawValue = rawValue }
@@ -44,7 +45,7 @@ public struct MessageGUID: Hashable, Sendable, Codable, RawRepresentable, Custom
 // MARK: - Message payloads
 
 public struct SendMessageRequest: Codable, Sendable {
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   public let text: String
   public let subject: String?
   public let effectId: String?
@@ -56,7 +57,7 @@ public struct SendMessageRequest: Codable, Sendable {
   public let mentions: [String: [Int]]?
 
   public init(
-    chat: ChatGUID,
+    chat: ChatIdentifier,
     text: String,
     subject: String? = nil,
     effectId: String? = nil,
@@ -90,7 +91,7 @@ public struct MessagePart: Codable, Sendable {
 }
 
 public struct SendMultipartRequest: Codable, Sendable {
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   public let parts: [MessagePart]
   public let subject: String?
   public let effectId: String?
@@ -98,7 +99,7 @@ public struct SendMultipartRequest: Codable, Sendable {
   public let replyPartIndex: Int?
 
   public init(
-    chat: ChatGUID,
+    chat: ChatIdentifier,
     parts: [MessagePart],
     subject: String? = nil,
     effectId: String? = nil,
@@ -152,12 +153,13 @@ public enum ReactionType: String, Codable, Sendable, CaseIterable {
 }
 
 public struct ReactionRequest: Codable, Sendable {
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   public let target: MessageGUID
   public let reaction: ReactionType
   public let partIndex: Int
 
-  public init(chat: ChatGUID, target: MessageGUID, reaction: ReactionType, partIndex: Int = 0) {
+  public init(chat: ChatIdentifier, target: MessageGUID, reaction: ReactionType, partIndex: Int = 0)
+  {
     self.chat = chat
     self.target = target
     self.reaction = reaction
@@ -166,11 +168,11 @@ public struct ReactionRequest: Codable, Sendable {
 }
 
 public struct SendAttachmentRequest: Codable, Sendable {
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   public let filePath: String
   public let isAudioMessage: Bool
 
-  public init(chat: ChatGUID, filePath: String, isAudioMessage: Bool = false) {
+  public init(chat: ChatIdentifier, filePath: String, isAudioMessage: Bool = false) {
     self.chat = chat
     self.filePath = filePath
     self.isAudioMessage = isAudioMessage
@@ -181,10 +183,10 @@ public struct SendAttachmentRequest: Codable, Sendable {
 /// chat.db change detector; this is what correlates the two.
 public struct SentMessage: Codable, Sendable {
   public let guid: MessageGUID
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   public let sentAt: Date
 
-  public init(guid: MessageGUID, chat: ChatGUID, sentAt: Date) {
+  public init(guid: MessageGUID, chat: ChatIdentifier, sentAt: Date) {
     self.guid = guid
     self.chat = chat
     self.sentAt = sentAt
@@ -333,7 +335,7 @@ public struct ChatFilterState: Codable, Sendable, Equatable {
 /// user's own number and cannot be withdrawn. A client that omits the field must not trigger
 /// it by accident.
 public struct ChatSpamRequest: Codable, Sendable {
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   public let reportToCarrier: Bool
   /// Reports what WOULD happen — how many messages are eligible — and changes nothing.
   ///
@@ -341,7 +343,7 @@ public struct ChatSpamRequest: Codable, Sendable {
   /// on every device on the account.
   public let dryRun: Bool
 
-  public init(chat: ChatGUID, reportToCarrier: Bool = false, dryRun: Bool = false) {
+  public init(chat: ChatIdentifier, reportToCarrier: Bool = false, dryRun: Bool = false) {
     self.chat = chat
     self.reportToCarrier = reportToCarrier
     self.dryRun = dryRun
@@ -367,7 +369,7 @@ public struct ChatSpamResult: Codable, Sendable, Equatable {
 }
 
 public struct ChatMuteRequest: Codable, Sendable {
-  public let chat: ChatGUID
+  public let chat: ChatIdentifier
   /// When the mute lifts. `nil` means indefinitely, and is written as `Date.distantFuture`
   /// rather than as a nil date — see `ChatMuteState`.
   public let until: Date?
@@ -375,7 +377,7 @@ public struct ChatMuteRequest: Codable, Sendable {
   /// muting here and not there is a legitimate thing to want, and so is the opposite.
   public let syncToPairedDevice: Bool
 
-  public init(chat: ChatGUID, until: Date? = nil, syncToPairedDevice: Bool = true) {
+  public init(chat: ChatIdentifier, until: Date? = nil, syncToPairedDevice: Bool = true) {
     self.chat = chat
     self.until = until
     self.syncToPairedDevice = syncToPairedDevice
@@ -396,7 +398,7 @@ public enum PrivateAPIEvent: Sendable {
   /// `eventRung` names the observation ladder rung it managed to attach to
   /// (`"daemon-listener"`, or `"none"`), and is nil from a helper that predates the field.
   case helperRegistered(process: String, protocolVersion: Int?, eventRung: String?)
-  case typingChanged(chat: ChatGUID, isTyping: Bool)
+  case typingChanged(chat: ChatIdentifier, isTyping: Bool)
   case iMessageAliasesRemoved(aliases: [String])
   case findMyLocationUpdated(payload: [String: String])
   /// A call changed state. Carries the parsed call, so a client sees `incoming` /
@@ -429,34 +431,35 @@ public protocol PrivateAPI: Sendable {
   func sendAttachment(_ request: SendAttachmentRequest) async throws -> SentMessage
   func react(_ request: ReactionRequest) async throws
   func editMessage(
-    _ guid: MessageGUID, in chat: ChatGUID, partIndex: Int, newText: String,
+    _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String,
     backwardCompatibilityText: String) async throws
-  func unsendMessage(_ guid: MessageGUID, in chat: ChatGUID, partIndex: Int) async throws
-  func deleteMessage(_ guid: MessageGUID, in chat: ChatGUID) async throws
+  func unsendMessage(_ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int) async throws
+  func deleteMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
   func notifyAnyways(_ guid: MessageGUID) async throws
   func searchMessages(_ request: MessageSearchRequest) async throws -> [MessageGUID]
   /// Path to the rendered preview for a Digital Touch or handwritten message.
   func balloonBundleMediaPath(for guid: MessageGUID) async throws -> String
 
   // Chats
-  func createChat(addresses: [String], service: String, message: String?) async throws -> ChatGUID
-  func deleteChat(_ chat: ChatGUID) async throws
-  func leaveChat(_ chat: ChatGUID) async throws
-  func setDisplayName(chat: ChatGUID, to name: String) async throws
-  func updateGroupPhoto(chat: ChatGUID, imagePath: String) async throws
-  func addParticipant(_ address: String, to chat: ChatGUID) async throws
-  func removeParticipant(_ address: String, from chat: ChatGUID) async throws
-  func setPinned(chat: ChatGUID, pinned: Bool) async throws
+  func createChat(addresses: [String], service: String, message: String?) async throws
+    -> ChatIdentifier
+  func deleteChat(_ chat: ChatIdentifier) async throws
+  func leaveChat(_ chat: ChatIdentifier) async throws
+  func setDisplayName(chat: ChatIdentifier, to name: String) async throws
+  func updateGroupPhoto(chat: ChatIdentifier, imagePath: String) async throws
+  func addParticipant(_ address: String, to chat: ChatIdentifier) async throws
+  func removeParticipant(_ address: String, from chat: ChatIdentifier) async throws
+  func setPinned(chat: ChatIdentifier, pinned: Bool) async throws
 
   /// Whether a conversation is muted, read from `IMMutedChatList` — the store Messages
   /// actually consults, not the legacy `ignoreAlertsFlag` chat property.
-  func muteState(chat: ChatGUID) async throws -> ChatMuteState
+  func muteState(chat: ChatIdentifier) async throws -> ChatMuteState
 
   /// Mutes, until a date or indefinitely, and reports the resulting state so a client never
   /// has to read back to find out what it did.
   func setMute(_ request: ChatMuteRequest) async throws -> ChatMuteState
 
-  func unmute(chat: ChatGUID, syncToPairedDevice: Bool) async throws -> ChatMuteState
+  func unmute(chat: ChatIdentifier, syncToPairedDevice: Bool) async throws -> ChatMuteState
 
   /// Asks imagent to download a conversation's background asset from iCloud.
   ///
@@ -471,24 +474,24 @@ public protocol PrivateAPI: Sendable {
   /// no completion, so there is nothing to await inside Messages. Completion is observed by
   /// the file appearing in `TranscriptBackgroundCache`, which is the server's job, not the
   /// helper's.
-  func refetchChatBackground(chat: ChatGUID) async throws
+  func refetchChatBackground(chat: ChatIdentifier) async throws
 
   /// Deletes every message in a conversation, leaving the conversation itself.
   ///
   /// NOT `deleteChat`, which removes the conversation through `CKConversationList`. Returns
   /// whether IMCore reported having deleted anything — a scalar return, which `BBInvoke`
   /// boxes rather than dropping.
-  func clearChatHistory(_ chat: ChatGUID) async throws -> Bool
+  func clearChatHistory(_ chat: ChatIdentifier) async throws -> Bool
 
   /// Where a conversation sits in Messages' filtering.
-  func chatFilterState(chat: ChatGUID) async throws -> ChatFilterState
+  func chatFilterState(chat: ChatIdentifier) async throws -> ChatFilterState
 
   /// Accepts an unknown sender: `-markAsKnownAndSaveInContacts:completion:`, which is
   /// `updateIsFiltered:` + accepting the chat + marking it reviewed in one call.
   ///
   /// `saveInContacts` writes to the user's address book and defaults to false at every
   /// layer above this one.
-  func markSenderKnown(chat: ChatGUID, saveInContacts: Bool) async throws -> ChatFilterState
+  func markSenderKnown(chat: ChatIdentifier, saveInContacts: Bool) async throws -> ChatFilterState
 
   /// Marks a conversation as spam, optionally reporting it to the carrier.
   func markChatAsSpam(_ request: ChatSpamRequest) async throws -> ChatSpamResult
@@ -498,18 +501,18 @@ public protocol PrivateAPI: Sendable {
 
   /// Moves a conversation between filters, and back out of Junk. The value is IMCore's
   /// `isFiltered` category; `0` is the unfiltered inbox.
-  func setChatFilter(chat: ChatGUID, category: Int) async throws -> ChatFilterState
+  func setChatFilter(chat: ChatIdentifier, category: Int) async throws -> ChatFilterState
 
   /// The pinned conversations, in display ORDER — pins render in this sequence, so a client
   /// syncing them between devices has to keep it.
-  func pinnedChats() async throws -> [ChatGUID]
+  func pinnedChats() async throws -> [ChatIdentifier]
 
   // Presence
-  func startTyping(chat: ChatGUID) async throws
-  func stopTyping(chat: ChatGUID) async throws
-  func checkTypingStatus(chat: ChatGUID) async throws -> Bool
-  func markRead(chat: ChatGUID) async throws
-  func markUnread(chat: ChatGUID) async throws
+  func startTyping(chat: ChatIdentifier) async throws
+  func stopTyping(chat: ChatIdentifier) async throws
+  func checkTypingStatus(chat: ChatIdentifier) async throws -> Bool
+  func markRead(chat: ChatIdentifier) async throws
+  func markUnread(chat: ChatIdentifier) async throws
 
   // Handles and availability
   func checkIMessageAvailability(address: String) async throws -> Bool
@@ -520,8 +523,8 @@ public protocol PrivateAPI: Sendable {
   func accountInfo() async throws -> AccountInfo
   /// The shared contact card for `address`, or the local user's own when it is nil.
   func nicknameInfo(for address: String?) async throws -> NicknameInfo
-  func shouldOfferNicknameSharing(chat: ChatGUID) async throws -> Bool
-  func shareNickname(chat: ChatGUID) async throws
+  func shouldOfferNicknameSharing(chat: ChatIdentifier) async throws -> Bool
+  func shareNickname(chat: ChatIdentifier) async throws
   func modifyActiveAlias(_ alias: String) async throws
 
   // Attachments
@@ -566,7 +569,7 @@ public protocol PrivateAPI: Sendable {
   func startSharingFindMyLocation(_ request: FindMyShareRequest) async throws
 
   /// Stops sharing with a chat, or with one participant of it.
-  func stopSharingFindMyLocation(chat: ChatGUID, address: String?) async throws
+  func stopSharingFindMyLocation(chat: ChatIdentifier, address: String?) async throws
 
   // FaceTime
   //

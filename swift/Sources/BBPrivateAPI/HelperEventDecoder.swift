@@ -49,11 +49,11 @@ enum HelperEventDecoder {
 
     case .startedTyping, .typing:
       guard let chat = payload["chatGuid"]?.stringValue else { return nil }
-      return .typingChanged(chat: ChatGUID(chat), isTyping: true)
+      return .typingChanged(chat: ChatIdentifier(chat), isTyping: true)
 
     case .stoppedTyping:
       guard let chat = payload["chatGuid"]?.stringValue else { return nil }
-      return .typingChanged(chat: ChatGUID(chat), isTyping: false)
+      return .typingChanged(chat: ChatIdentifier(chat), isTyping: false)
 
     case .aliasesRemoved:
       // Tolerates both shapes the helper has used: a list, or a single string.

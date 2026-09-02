@@ -403,7 +403,7 @@ public struct MessageInterface: MessagesBackedInterface {
       let sent = try await throughMessages {
         try await privateAPI.sendMessage(
           SendMessageRequest(
-            chat: ChatGUID(request.chatGUID),
+            chat: ChatIdentifier(request.chatGUID),
             text: request.text,
             subject: request.subject,
             effectId: request.effectID,
@@ -449,7 +449,7 @@ public struct MessageInterface: MessagesBackedInterface {
       let sent = try await throughMessages {
         try await privateAPI.sendAttachment(
           SendAttachmentRequest(
-            chat: ChatGUID(chatGUID),
+            chat: ChatIdentifier(chatGUID),
             // Messages cannot read outside its container; see AttachmentStaging.
             filePath: try AttachmentStaging.stage(filePath),
             isAudioMessage: isAudioMessage
@@ -495,7 +495,7 @@ public struct MessageInterface: MessagesBackedInterface {
     let sent = try await throughMessages {
       try await api.sendMultipart(
         SendMultipartRequest(
-          chat: ChatGUID(chatGUID),
+          chat: ChatIdentifier(chatGUID),
           parts: try AttachmentStaging.stage(parts: parts),
           subject: subject,
           effectId: effectID,
@@ -525,7 +525,7 @@ public struct MessageInterface: MessagesBackedInterface {
     try await throughMessages {
       try await api.react(
         ReactionRequest(
-          chat: ChatGUID(chatGUID),
+          chat: ChatIdentifier(chatGUID),
           target: MessageGUID(targetGUID),
           reaction: type,
           partIndex: partIndex
@@ -561,12 +561,12 @@ public struct MessageInterface: MessagesBackedInterface {
   ///
   /// A message in more than one chat takes the first; that only happens for rows the
   /// database has duplicated, and either answer names the same conversation.
-  private func owningChat(of messageGUID: String) async throws -> BBPrivateAPIContract.ChatGUID {
+  private func owningChat(of messageGUID: String) async throws -> ChatIdentifier {
     let chats = try await repository.chats(forMessageGUID: messageGUID)
     guard let guid = chats.first?.guid else {
       throw InterfaceError.invalidRequest("no message with GUID \(messageGUID)")
     }
-    return BBPrivateAPIContract.ChatGUID(guid)
+    return ChatIdentifier(guid)
   }
 
   public func unsend(guid: String, partIndex: Int) async throws {

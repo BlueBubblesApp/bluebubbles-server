@@ -17,13 +17,6 @@
 import Foundation
 import Logging
 
-public enum ProxyService: String, SettingValue, CaseIterable, Sendable {
-  case cloudflare, ngrok, zrok
-  case dynamicDNS = "dynamic-dns"
-  case lanURL = "lan-url"
-  public static var typeTag: String { "string" }
-}
-
 public enum AutoStartMethod: String, SettingValue, CaseIterable, Sendable {
   case none, unset
   case loginItem = "login-item"
