@@ -108,6 +108,25 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
+    case .sendSticker:
+      func number(_ key: String) -> Double? { data[key]?.doubleValue }
+      var placement = StickerPlacement.centered
+      if let x = number("xScalar") { placement.xScalar = x }
+      if let y = number("yScalar") { placement.yScalar = y }
+      if let scale = number("scale") { placement.scale = scale }
+      if let rotation = number("rotation") { placement.rotation = rotation }
+      if let width = number("parentPreviewWidth") { placement.parentPreviewWidth = width }
+      let sent = try await bridge.sendSticker(
+        SendStickerRequest(
+          chat: try chat(),
+          filePath: try string("filePath"),
+          target: try message("selectedMessageGuid"),
+          partIndex: integer("partIndex"),
+          placement: placement
+        )
+      )
+      return ["identifier": sent.guid.rawValue]
+
     case .sendReaction:
       guard let reaction = ReactionType(rawValue: try string("reactionType")) else {
         throw PrivateAPIError.rejectedByMessages(reason: "unknown reaction type")

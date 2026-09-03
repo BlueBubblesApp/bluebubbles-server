@@ -179,6 +179,68 @@ public struct SendAttachmentRequest: Codable, Sendable {
   }
 }
 
+/// Where a sticker sits on the message part it is placed over.
+///
+/// This is `stickerUserInfo` as `+[IMSticker userInfoDictionaryWithLayoutIntent:…]` builds
+/// it and as chat.db stores it on the attachment row (`spw`, `sxs`, `sys`, `ssa`, `sro`):
+/// a point in the parent balloon's own coordinate space, expressed as fractions of the
+/// parent's preview width so every device lays the sticker out the same way whatever its
+/// screen. Read back from real rows: a sticker dropped on the lower-right corner of a
+/// four-character message carried `sxs 0.59, sys 1.46, ssa 0.20, sro 0.16, spw 58.7`.
+///
+/// `parentPreviewWidth` is the width in points the sender rendered the parent at, and the
+/// scale is relative to it — so a client that does not know how wide the balloon is on
+/// screen should send the width it laid the message out at and let the other devices
+/// rescale. Rotation is in radians.
+public struct StickerPlacement: Codable, Sendable, Equatable {
+  public var xScalar: Double
+  public var yScalar: Double
+  public var scale: Double
+  public var rotation: Double
+  public var parentPreviewWidth: Double
+
+  public init(
+    xScalar: Double, yScalar: Double, scale: Double, rotation: Double = 0,
+    parentPreviewWidth: Double
+  ) {
+    self.xScalar = xScalar
+    self.yScalar = yScalar
+    self.scale = scale
+    self.rotation = rotation
+    self.parentPreviewWidth = parentPreviewWidth
+  }
+
+  /// Over the middle of the part, about a third as wide as it, upright. What a client
+  /// gets when it says "put a sticker on this message" and nothing about where.
+  public static let centered = StickerPlacement(
+    xScalar: 0.5, yScalar: 0.5, scale: 0.35, rotation: 0, parentPreviewWidth: 200
+  )
+}
+
+/// A sticker placed on a message part.
+///
+/// A sticker is an ASSOCIATED message (`associatedMessageType` 1000) whose payload is a file
+/// transfer flagged `isSticker`, so it needs both what an attachment needs (a file Messages
+/// can read) and what a tapback needs (the message and part it attaches to).
+public struct SendStickerRequest: Codable, Sendable {
+  public let chat: ChatIdentifier
+  public let filePath: String
+  public let target: MessageGUID
+  public let partIndex: Int
+  public let placement: StickerPlacement
+
+  public init(
+    chat: ChatIdentifier, filePath: String, target: MessageGUID, partIndex: Int = 0,
+    placement: StickerPlacement = .centered
+  ) {
+    self.chat = chat
+    self.filePath = filePath
+    self.target = target
+    self.partIndex = partIndex
+    self.placement = placement
+  }
+}
+
 /// Confirmation that Messages accepted a send. The authoritative record still arrives via the
 /// chat.db change detector; this is what correlates the two.
 public struct SentMessage: Codable, Sendable {
@@ -435,6 +497,9 @@ public protocol PrivateAPI: Sendable {
   /// and the v1 route answers with the serialised row behind that GUID, which is why the
   /// identifier has to come back across the wire. This returned nothing until then.
   func react(_ request: ReactionRequest) async throws -> SentMessage
+  /// Places a sticker on a message part and returns the sticker's OWN message, exactly as
+  /// `react` does — a sticker is an association with a file behind it.
+  func sendSticker(_ request: SendStickerRequest) async throws -> SentMessage
   func editMessage(
     _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String,
     backwardCompatibilityText: String) async throws

@@ -46,10 +46,11 @@ BOOL BBCatchingExceptions(void (NS_NOESCAPE ^block)(void), NSError *_Nullable *_
 /// belongs does not fail — it builds a message with nonsense properties.
 ///
 /// `outResult` receives the return value: the object itself when the method returns one, an
-/// `NSNumber` at the declared width when it returns a scalar, and nil for `void` or for a
-/// return this cannot box (a struct, a raw pointer). A dropped scalar is why this boxes at
-/// all — `-[IMChat deleteAllHistory]` returns a BOOL and `-[IMChat markAsSpam:]` returns a
-/// count, and both used to be indistinguishable here from a method returning nothing.
+/// `NSNumber` at the declared width when it returns a scalar, an `NSValue` carrying the
+/// method's type encoding when it returns a struct (`rangeValue` reads an `NSRange` back
+/// out), and nil for `void` or a raw pointer. A dropped scalar is why this boxes at all —
+/// `-[IMChat deleteAllHistory]` returns a BOOL and `-[IMChat markAsSpam:]` returns a count,
+/// and both used to be indistinguishable here from a method returning nothing.
 ///
 /// Returns NO and fills `error` if the target does not respond, the arity does not match, or
 /// the call raises.

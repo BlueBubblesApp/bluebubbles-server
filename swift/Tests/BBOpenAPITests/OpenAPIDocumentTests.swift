@@ -161,7 +161,7 @@ struct RouteCatalogTests {
     let catalogued = Set(RouteCatalog.all.map { "\($0.group.name)|\($0.group.apiVersion)" })
     let expected = [
       AdditiveRoutes.security, AdditiveRoutes.alerts, AdditiveRoutes.contactAvatar,
-      AdditiveRoutes.chatPinning, AdditiveRoutes.webhookEditing,
+      AdditiveRoutes.chatPinning, AdditiveRoutes.stickers, AdditiveRoutes.webhookEditing,
       AdditiveRoutes.chatControls, AdditiveRoutes.findMy, AdditiveRoutes.findMySharing,
       AdditiveRoutes.faceTime, AdditiveRoutes.faceTimeIncoming, AdditiveRoutes.auth,
       AdditiveRoutes.hydration,

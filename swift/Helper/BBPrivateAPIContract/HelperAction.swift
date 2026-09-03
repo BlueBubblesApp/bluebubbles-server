@@ -62,6 +62,7 @@ public enum MessagesHelperAction: String, Sendable, CaseIterable, CustomStringCo
   case sendMessage = "send-message"
   case sendMultipart = "send-multipart"
   case sendReaction = "send-reaction"
+  case sendSticker = "send-sticker"
   case setChatFilter = "set-chat-filter"
   case setChatMute = "set-chat-mute"
   case setDisplayName = "set-display-name"

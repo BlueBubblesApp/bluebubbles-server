@@ -186,6 +186,45 @@ public enum WriteHandlers {
       return try Self.sendResult(sent, interfaces: interfaces)
     }
 
+    registry.register(.messageSendSticker) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      let chatGUID = try values.requireString("chatGuid")
+      let target = try values.requireString("selectedMessageGuid")
+      // A path, not bytes, for the reason the attachment route gives.
+      let path = try values.requireString("filePath", or: "path")
+
+      // Placement is optional and partial: a client that knows where the user dropped
+      // the sticker sends every field; one that only wants "a sticker on this message"
+      // sends none and gets the centred default.
+      func number(_ key: String) -> Double? {
+        switch values[key] {
+        case .double(let value)?: value
+        case .int(let value)?: Double(value)
+        case .int64(let value)?: Double(value)
+        case .string(let value)?: Double(value)
+        default: nil
+        }
+      }
+      var placement = StickerPlacement.centered
+      if let x = number("xScalar") { placement.xScalar = x }
+      if let y = number("yScalar") { placement.yScalar = y }
+      if let scale = number("scale") { placement.scale = scale }
+      if let rotation = number("rotation") { placement.rotation = rotation }
+      if let width = number("parentPreviewWidth") { placement.parentPreviewWidth = width }
+
+      let sent = try await interfaces.message.sendSticker(
+        chatGUID: chatGUID,
+        filePath: path,
+        targetGUID: target,
+        partIndex: values["partIndex"]?.intValue ?? 0,
+        placement: placement
+      )
+      // The sticker's OWN message, as `react` answers with the tapback's. No error check,
+      // matching the attachment route it takes its file from.
+      return try Self.sendResult(sent, interfaces: interfaces)
+    }
+
     registry.register(.messageEdit) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")

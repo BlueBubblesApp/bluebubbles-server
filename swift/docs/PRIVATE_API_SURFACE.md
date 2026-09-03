@@ -329,6 +329,45 @@ the full lifecycle: `editScheduledMessageItem:scheduleType:deliveryTime:`,
 probably the single most requested thing in this whole list and it does not appear to be
 blocked by anything.
 
+### Stickers — `message.sendSticker`
+
+Backs `POST /api/v2/message/sticker` and the wire action `send-sticker`. Measured on macOS
+26.5.2 by disassembling Messages' own drag-and-drop send (`Tools/private-api` resolves the
+IMPs; `lldb` on a throwaway Catalyst process that `dlopen`s ChatKit gives symbolised output —
+never attach to the user's Messages for this).
+
+**What a sticker is.** An ASSOCIATED message, like a tapback, whose payload is a file
+transfer. On the row: `associated_message_type = 1000`, `associated_message_guid =
+p:<part>/<target guid>`, `associated_message_range_{location,length}` = the parent PART's
+range in the message text (so `length` is the part's character count, not 1),
+`message_summary_info = {amc: 0, ust: true}`, text `U+FFFC`. On the attachment row:
+`is_sticker = 1`, `sticker_user_info` (a bplist with the geometry below), `attribution_info`
+(`{bundle-id, name: "Stickers", accessl}`). An emoji sticker is type 1001. A sticker sent AS A
+TAPBACK (iOS 17's "react with a sticker") is a different thing again — `IMStickerTapback`,
+types 2007/3007 — and is not built.
+
+**The chain Messages runs**, from `-[CKChatController(CKChatController_Stickers)
+sendSticker:withDragTarget:draggedSticker:]` down:
+
+| Step | Selector | Notes |
+|---|---|---|
+| model | `-[IMSticker initWithStickerID:stickerPackID:fileURL:accessibilityLabel:accessibilityName:moodCategory:stickerName:]` | `IMSharedUtilities`. `stickerPackID` for a user-made sticker is `com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.Stickers.UserGenerated.MessagesExtension`; the same string goes in `setBallonBundleID:` (sic) for attribution |
+| geometry | `+[IMSticker userInfoDictionaryWithLayoutIntent:parentPreviewWidth:xScalar:yScalar:scale:rotation:initialFrameIndex:stickerPositionVersion:externalURI:]` | writes `sli spw sxs sys ssa sro safi spv suri`. Layout intent, frame index and position version are 0 for a dropped sticker |
+| media | `-[CKMediaObjectManager mediaObjectWithSticker:stickerUserInfo:]` | copies the file into ChatKit's staging dir (MD5-named), adds `sid`/`pid`/`shash`/`sir` to the user info, resolves attribution through `CKBalloonPluginManager balloonPluginForBundleID:`, then `-[CKIMFileTransfer initWithStickerFileURL:transferUserInfo:attributionInfo:animatedImageCacheURL:adaptiveImageGlyphContentIdentifier:adaptiveImageGlyphContentDescription:]` → `IMFileTransferCenter createNewOutgoingTransferWithLocalFileURL:`, `setIsSticker:YES`, `setStickerUserInfo:`, `setAttributionInfo:`. Logs "Create media object for sticker: %@ OK" |
+| composition | `+[CKComposition stickerCompositionWithMediaObjects:]` | = `compositionWithMediaObjects:subject:nil` |
+| parent | `-[IMMessagePartChatItem guid]`, `messagePartRange`, `threadIdentifier` | the chat item for the target part, loaded through `IMChatHistoryController` as edit/unsend already do. An aggregate (photo gallery) item is unwrapped to `aggregateChatItems.firstObject` |
+| message | `-[IMMessage initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:subject:associatedMessageGUID:associatedMessageType:associatedMessageRange:messageSummaryInfo:threadIdentifier:]` | sender nil, time now, text = `-[CKComposition superFormatText:]`, flags **5**, guid `[NSString stringGUID]`, type 1000, range = the part's, summary nil, thread = the part's |
+| link | `-[CKIMFileTransfer setIMMessage:]` on `[mediaObject transfer]` | |
+| send | `-[CKConversation sendMessage:newComposition:NO]` | NO, where a typed message passes YES |
+
+Gate: `-[IMChat _supportsStickers]` (and `_supportsTapbacks`) — worth checking before
+building; SMS conversations say no.
+
+Two hazards the helper handles. `messagePartRange` returns a struct, which the invocation
+bridge now boxes as `NSValue` (it returned nil for every struct before). And
+`superFormatText:` takes an out-pointer for the transfer GUIDs; the bridge only writes nil
+into pointer arguments, so the GUID is read off the media object's `transferGUID` instead.
+
 ### UI-only — do not chase
 
 `CKChatController`, `CKConversationListCollectionViewController`, the `CK*BackgroundView`

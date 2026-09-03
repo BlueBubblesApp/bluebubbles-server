@@ -61,6 +61,17 @@ public final class IMCoreBridge: PrivateAPI {
   /// object graph.
   public static let shared = IMCoreBridge()
 
+  /// `associatedMessageType` values that are not tapbacks. The tapback ones live on
+  /// `ReactionType` in the contract because a client names them; these are only ever
+  /// chosen here.
+  ///
+  /// From `_sendCommSafetyVerifiedSticker:…`: `mov w8, #1000; cinc x27, x8, isEmojiSticker`
+  /// — 1000 for a sticker, 1001 for an emoji sticker. chat.db agrees: every received
+  /// sticker on this Mac is 1000, and the reference serialises 1000 as `"sticker"`.
+  private enum AssociatedMessageType {
+    static let sticker: Int64 = 1000
+  }
+
   // MARK: - Porting plumbing
 
   /// Runs an IMCore call and translates its failure into the contract's vocabulary.
@@ -292,6 +303,87 @@ public final class IMCoreBridge: PrivateAPI {
         )
       }
       return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
+    }
+  }
+
+  /// NEW — no Objective-C counterpart; the shipping helper never sent stickers.
+  ///
+  /// Transcribed from Messages' own drag-and-drop send on macOS 26.5.2 instead:
+  /// `-[CKChatController sendSticker:withDragTarget:draggedSticker:]` down to
+  /// `_sendCommSafetyVerifiedSticker:…` (disassembled; `docs/PRIVATE_API_SURFACE.md`
+  /// § Stickers has the chain). The parts are the ones `IMStickers` documents; what this
+  /// method adds is the ORDER, and two things the tapback path does differently.
+  ///
+  /// The parent part is loaded FIRST and asynchronously, because it comes from
+  /// `IMChatHistoryController` and that is a completion-block load. Everything from the
+  /// sticker object to the send then runs in ONE synchronous block, for the reason
+  /// `sendAttachment` gives: the media object holds a live transfer that is still
+  /// preparing, and a suspension between building it and sending is where that graph
+  /// gets torn down.
+  ///
+  /// `newComposition:NO` — Messages passes NO for a sticker where it passes YES for a
+  /// typed message. The flag tells ChatKit whether the send came from the compose field
+  /// (and so whether to clear it), and a sticker does not.
+  public func sendSticker(_ request: SendStickerRequest) async throws -> SentMessage {
+    let part = try await IMChatHistory.messagePartChatItem(
+      guid: request.target.rawValue, partIndex: request.partIndex
+    )
+    return try translating {
+      let conversation = try requireConversation(request.chat)
+
+      // The chat item's GUID is "p:<part>/<message guid>", and that prefix is what tells
+      // every device which balloon the sticker sits on. The bare message GUID renders
+      // nothing.
+      guard let partGUID = try IMCoreRuntime.string(part, "guid"), !partGUID.isEmpty else {
+        throw PrivateAPIErrorShim.rejected("that message part has no chat item GUID")
+      }
+      let range = try IMStickers.partRange(part)
+      let threadIdentifier = (try? IMCoreRuntime.string(part, "threadIdentifier")) ?? nil
+
+      let sticker = try IMStickers.sticker(path: request.filePath)
+      let userInfo = try IMStickers.userInfo(placement: request.placement)
+      let media = try IMStickers.mediaObject(sticker: sticker, userInfo: userInfo)
+      let composition = try IMStickers.composition(media: media)
+
+      guard conversation.canSend(composition) else {
+        throw PrivateAPIErrorShim.rejected(
+          "ChatKit will not send this sticker — the file may be an unsupported type, or "
+            + "this conversation's service cannot carry stickers"
+        )
+      }
+
+      let text = try IMStickers.superFormatText(composition)
+      guard let transferGUID = try IMCoreRuntime.string(media, "transferGUID"),
+        !transferGUID.isEmpty
+      else {
+        throw PrivateAPIErrorShim.rejected("the sticker's media object has no transfer GUID")
+      }
+
+      let guid = UUID().uuidString
+      let message = try IMMessageBuilder.sticker(
+        text: text,
+        fileTransferGUIDs: [transferGUID],
+        guid: guid,
+        associatedGUID: partGUID,
+        associatedType: AssociatedMessageType.sticker,
+        range: range,
+        summaryInfo: nil,
+        threadIdentifier: threadIdentifier
+      )
+
+      // Messages ties the transfer to the message before sending, and the transfer's
+      // progress reporting keys off it. Best effort: a transfer class without the setter
+      // still sends, it just cannot be looked up from the message afterwards.
+      if let transfer = try? IMCoreRuntime.send(media, "transfer"),
+        IMCoreRuntime.responds(transfer, to: NSSelectorFromString("setIMMessage:"))
+      {
+        try? IMCoreRuntime.invoke(transfer, "setIMMessage:", [message])
+      }
+
+      try conversation.send(message, newComposition: false)
+
+      let sentGUID = ((try? IMCoreRuntime.string(message, "guid")) ?? nil) ?? guid
+      return SentMessage(guid: MessageGUID(sentGUID), chat: request.chat, sentAt: Date())
     }
   }
 

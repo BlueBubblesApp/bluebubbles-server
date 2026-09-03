@@ -8,6 +8,5 @@
 # failing check pass):
 #   swift run bb-openapi coverage --write-allowlist
 #
-# 0 of 148 routes.
-
-
+# 1 of 150 routes.
+POST /api/v2/message/sticker  # needs a live Private API send to record; the conformance recorder runs against the Node server, which has no sticker route

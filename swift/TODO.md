@@ -649,6 +649,44 @@ through it with no special-casing, which is the standing proof it is expressive 
 
 ---
 
+## Stickers: what the first pass left out
+
+`POST /api/v2/message/sticker` (additive, Private API) places a sticker on a message part
+through the chain Messages itself runs — `docs/PRIVATE_API_SURFACE.md` § Stickers has the
+selectors and the disassembly they came from. Sent twice from this Mac on 2 September 2026
+to a test address; both rows landed with `associated_message_type 1000`, `is_sticker 1`,
+the full `sticker_user_info`, `is_delivered 1`. What was verified is the SENDER's side.
+
+- [ ] Look at one on a receiving device. chat.db here says the geometry, attribution and
+      association are what an incoming iOS sticker carries, but the balloon has not been seen
+      drawn. One difference is known: the sent `sticker_user_info` carries
+      `stickerEffectType = -1` (what a bare `IMSticker` reports) where iOS-sent stickers omit
+      the key. If the receiving device draws it wrong, `setStickerEffectType:0` on the
+      `IMSticker` is the first thing to try.
+- [ ] `stickerEffectType`, and animated stickers. `mediaObjectWithSticker:` picks
+      `CKAnimatedStickerMediaObject` for an animated file and an `animatedImageCacheURL`
+      travels with the transfer; nothing here sets either. A GIF/APNG sticker has not been
+      tried.
+- [ ] Emoji stickers (`associatedMessageType` 1001, `IMEmojiSticker`) and sticker TAPBACKS
+      (`IMStickerTapback`, types 2007/3007, `-[IMChat sendTapback:forChatItem:]`) are
+      different objects and are not built. The tapback form is what iOS 17's "react with a
+      sticker" sends.
+- [ ] Repositioning: `-[IMChat repositionSticker:associatedChatItem:]` exists. Not built.
+- [ ] The `send-reaction` path passes the bare message GUID and `(partIndex, 1)` as the
+      association; Messages' own tapbacks carry `p:<part>/<guid>` and the part's real range
+      (chat.db: 19,303 rows with the `p:` prefix on this Mac). Tapbacks render anyway, so
+      this is a parity note, not a defect — but the sticker path needed the real values and
+      the reaction path would be more faithful with them.
+- [ ] Record a fixture. The route sits in `docs/api/uncovered-routes.txt` because the
+      conformance recorder runs against the Node server, which has no sticker route.
+- [ ] An `NSException` raised inside an IMCore call surfaces as
+      `PrivateAPIError.unavailableOnThisOS` (via `IMCoreLookupError.raised`), so a bad
+      argument read as "requires a newer macOS" during this work. The two are different
+      things to a user. Worth a distinct case.
+- [ ] Client side: nothing in the Flutter app sends a sticker yet. It needs a sticker
+      picker/drag target that knows the balloon's width to fill `parentPreviewWidth` and
+      the scalars.
+
 # 4. Robustness and known traps
 
 - [ ] **`DaemonProcess` blocks its drain on an orphaned grandchild.** A daemon that forks a

@@ -200,11 +200,27 @@ static BOOL BBSetArgument(NSInvocation *invocation,
 /// return into an `long long` would leave the upper seven bytes as whatever was on the stack,
 /// and a BOOL of `NO` would come back as a large nonzero number.
 ///
-/// Anything that is not a scalar — void, a struct, a raw pointer — returns nil, which is the
-/// same answer this function's absence used to give for everything. Boxing a struct would
-/// need its layout, and a caller that wants one should say so with its own accessor.
+/// A struct comes back as an `NSValue` carrying the method's own type encoding, so the
+/// caller unboxes it with the accessor that matches (`rangeValue` for an `NSRange`). The
+/// layout is read from the encoding rather than assumed: `messagePartRange` on a chat item
+/// is the reason this exists — a sticker is placed over a PART, and IMCore describes the
+/// part by its range in the message text.
+///
+/// Anything else that is not a scalar — void, a raw pointer — returns nil, which is the
+/// same answer this function's absence used to give for everything.
 static id BBBoxedScalarReturn(NSInvocation *invocation, const char *type) {
     switch (type[0]) {
+        case '{': {
+            NSUInteger size = 0, alignment = 0;
+            NSGetSizeAndAlignment(type, &size, &alignment);
+            if (size == 0) { return nil; }
+            void *buffer = calloc(1, size);
+            if (buffer == NULL) { return nil; }
+            [invocation getReturnValue:buffer];
+            NSValue *value = [NSValue valueWithBytes:buffer objCType:type];
+            free(buffer);
+            return value;
+        }
         case 'c': { char value = 0;               [invocation getReturnValue:&value]; return @(value); }
         case 'C': { unsigned char value = 0;      [invocation getReturnValue:&value]; return @(value); }
         case 'B': { bool value = false;           [invocation getReturnValue:&value]; return @(value); }

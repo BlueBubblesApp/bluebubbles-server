@@ -613,6 +613,22 @@ public enum AdditiveRoutes {
       .init(.post, "hydrate", .messageHydrate)
     ])
 
+  /// Placing a sticker on a message. The Node server never sent one — its helper had no
+  /// action for it and its route table has no path — so this is additive by definition.
+  ///
+  /// Under `message/` beside `react`, because that is what it is: a reaction whose payload
+  /// is a file. The body is the reaction route's (`chatGuid`, `selectedMessageGuid`,
+  /// `partIndex`) plus the attachment route's `filePath` — a path an earlier
+  /// `attachment/upload` answered with, never bytes — and an optional placement
+  /// (`xScalar`, `yScalar`, `scale`, `rotation`, `parentPreviewWidth`) in the coordinate
+  /// space `StickerPlacement` documents. Answers with the sticker's own message row, as
+  /// `react` answers with the tapback's.
+  public static let stickers = RouteGroup(
+    "Stickers", prefix: "message", apiVersion: RouteTable.latestVersion,
+    routes: [
+      .init(.post, "sticker", .messageSendSticker, scope: .messagesWrite, requires: .privateAPI)
+    ])
+
   /// Pinning a conversation. The helper has always been able to do this and the v1 surface
   /// server never exposed it, so it is additive by definition — a default table that
   /// carried it would no longer match.

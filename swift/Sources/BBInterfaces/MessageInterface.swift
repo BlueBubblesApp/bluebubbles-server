@@ -821,6 +821,49 @@ public struct MessageInterface: MessagesBackedInterface {
     )
   }
 
+  /// Places a sticker on a message part and answers with the sticker's OWN message.
+  ///
+  /// The reaction route's shape with an attachment's input: a sticker is an association
+  /// (`associatedMessageType` 1000, the value the serializer already spells `"sticker"`)
+  /// whose payload is a file transfer, so it needs the target message a tapback needs and
+  /// the staged file an attachment needs. Same hydration as a send, because it IS a send —
+  /// the row appears in chat.db with `associated_message_guid = p:<part>/<target>` and an
+  /// attachment row flagged `is_sticker`.
+  ///
+  /// Private API only: AppleScript has no notion of an association at all.
+  public func sendSticker(
+    chatGUID: String,
+    filePath: String,
+    targetGUID: String,
+    partIndex: Int = 0,
+    placement: StickerPlacement = .centered
+  ) async throws -> SendOutcome {
+    let api = try requirePrivateAPI(for: "stickers")
+    guard FileManager.default.fileExists(atPath: filePath) else {
+      throw InterfaceError.invalidRequest("no file at \(filePath)")
+    }
+    // As `react`: a target this server does not have is a 400, before Messages is asked.
+    try await requireMessage(targetGUID)
+
+    let sent = try await throughMessages {
+      try await api.sendSticker(
+        SendStickerRequest(
+          chat: ChatIdentifier(chatGUID),
+          // Messages cannot read outside its container; see AttachmentStaging.
+          filePath: try AttachmentStaging.stage(filePath),
+          target: MessageGUID(targetGUID),
+          partIndex: partIndex,
+          placement: placement
+        )
+      )
+    }
+    return SendOutcome(
+      backend: .privateAPI,
+      messageGUID: sent.guid.rawValue,
+      message: try await awaitSentMessage(guid: sent.guid.rawValue)
+    )
+  }
+
   /// The row behind a GUID, or the reference's refusal.
   ///
   /// `invalidRequest` — a 400 — and not `notFound`. It reads wrong and it is what ships: the

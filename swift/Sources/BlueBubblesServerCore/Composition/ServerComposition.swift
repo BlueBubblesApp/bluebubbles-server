@@ -505,6 +505,8 @@ public struct ServerComposition {
       groups.append(AdditiveRoutes.contactAvatar)
       // Pinning: a helper capability the Node server never had a route for.
       groups.append(AdditiveRoutes.chatPinning)
+      // Stickers: likewise, a send the Node helper never had an action for.
+      groups.append(AdditiveRoutes.stickers)
       // Editing a webhook, which the Node server only ever exposed to its own UI.
       groups.append(AdditiveRoutes.webhookEditing)
       // Conversation controls — wallpaper today, mute and filtering next.

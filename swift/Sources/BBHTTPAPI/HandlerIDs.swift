@@ -157,6 +157,7 @@ extension HandlerID {
   public static let messageSendAttachment = HandlerID("message.sendAttachment")
   public static let messageSendAttachmentChunk = HandlerID("message.sendAttachmentChunk")
   public static let messageSendMultipart = HandlerID("message.sendMultipart")
+  public static let messageSendSticker = HandlerID("message.sendSticker")
   public static let messageSendText = HandlerID("message.sendText")
   public static let messageSentCount = HandlerID("message.sentCount")
   public static let messageUnsend = HandlerID("message.unsend")

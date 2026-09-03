@@ -1419,6 +1419,250 @@ enum IMMessageBuilder {
     }
     return message
   }
+
+  /// A sticker: an association that also carries a file transfer.
+  ///
+  /// TRANSCRIBED from Messages' own send, `-[CKChatController(CKChatController_Stickers)
+  /// _sendCommSafetyVerifiedSticker:withMediaObject:composition:parentMessagePartChatItem:
+  /// messageSummaryInfo:]` on macOS 26.5.2 (disassembled; see `docs/PRIVATE_API_SURFACE.md`
+  /// § Stickers). It is the fourteen-argument association initializer — the tapback one
+  /// with `threadIdentifier:` on the end — called with:
+  ///
+  ///     sender nil · time [NSDate date] · text = composition superFormatText
+  ///     messageSubject nil · fileTransferGUIDs from the composition · flags 5
+  ///     error nil · guid [NSString stringGUID] · subject nil
+  ///     associatedMessageGUID = parent part chat item's guid   ("p:0/<message guid>")
+  ///     associatedMessageType = 1000 (1001 for an emoji sticker)
+  ///     associatedMessageRange = parent part's messagePartRange
+  ///     messageSummaryInfo = whatever the caller had (nil from the drag-and-drop path)
+  ///     threadIdentifier = parent part's threadIdentifier
+  ///
+  /// Two of those are not what the tapback path passes and both matter. The RANGE is the
+  /// part's real range in the message text, not `(partIndex, 1)`: chat.db shows every
+  /// received sticker with the parent part's text length as its range length, and the
+  /// sticker's geometry is expressed relative to that part. The GUID is the CHAT ITEM's,
+  /// with the `p:<part>/` prefix, which is how Messages knows which balloon to draw it on.
+  ///
+  /// The thirteen-argument initializer is used when the fourteen-argument one is absent,
+  /// which loses the thread identifier and nothing else.
+  static func sticker(
+    text: NSAttributedString,
+    fileTransferGUIDs: [String],
+    guid: String,
+    associatedGUID: String,
+    associatedType: Int64,
+    range: NSRange,
+    summaryInfo: [String: Any]?,
+    threadIdentifier: String?
+  ) throws -> AnyObject {
+    let type: AnyClass = try IMCoreRuntime.requireClass("IMMessage")
+    guard
+      let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+        .takeUnretainedValue()
+    else {
+      throw PrivateAPIErrorShim.rejected("Could not allocate an IMMessage")
+    }
+
+    let base =
+      "initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:"
+      + "subject:associatedMessageGUID:associatedMessageType:associatedMessageRange:"
+      + "messageSummaryInfo:"
+    var arguments: [Any] = [
+      NSNull(), NSDate(), text, NSNull(), fileTransferGUIDs,
+      Flags.association,
+      NSNull(), guid, NSNull(),
+      associatedGUID,
+      associatedType,
+      NSValue(range: range),
+      summaryInfo ?? NSNull(),
+    ]
+    let selector: String
+    if IMCoreRuntime.responds(allocated, to: NSSelectorFromString(base + "threadIdentifier:")) {
+      selector = base + "threadIdentifier:"
+      arguments.append(threadIdentifier ?? NSNull())
+    } else {
+      selector = base
+    }
+
+    guard let message = try IMCoreRuntime.invoke(allocated, selector, arguments) else {
+      throw PrivateAPIErrorShim.rejected("IMMessage sticker initializer returned nil")
+    }
+    return message
+  }
+}
+
+// MARK: - Stickers
+
+/// The sticker model and the ChatKit objects that turn one into a sendable composition.
+///
+/// Every selector here was read out of Messages' own drag-and-drop send on macOS 26.5.2
+/// (`-[CKChatController sendSticker:withDragTarget:draggedSticker:]` and what it calls),
+/// so the objects are built the way Messages builds them rather than assembled from the
+/// attachment path with a flag flipped. The difference is visible on every other device:
+/// a plain attachment sent with `associatedMessageType` 1000 has no `stickerUserInfo`,
+/// no `isSticker` on its transfer and no attribution, and iOS draws it as a broken
+/// attachment rather than a sticker.
+///
+/// The chain, in the order Messages runs it:
+///
+///     IMSticker  ──▶  +[IMSticker userInfoDictionaryWithLayoutIntent:…]   (the geometry)
+///                ──▶  -[CKMediaObjectManager mediaObjectWithSticker:stickerUserInfo:]
+///                        copies the file into ChatKit's staging area, creates the
+///                        transfer through -[CKIMFileTransfer initWithStickerFileURL:…]
+///                        (isSticker = YES, stickerUserInfo, attributionInfo), registers
+///                        it with IMFileTransferCenter
+///                ──▶  +[CKComposition stickerCompositionWithMediaObjects:]
+///                ──▶  IMMessage (IMMessageBuilder.sticker)
+///                ──▶  -[CKConversation sendMessage:newComposition:NO]
+enum IMStickers {
+
+  /// The pack every user-made sticker on this Mac belongs to.
+  ///
+  /// Read from the `pid` of received stickers and from the attribution row Messages writes
+  /// for its own: user-generated stickers (the ones lifted out of a photo) are attributed
+  /// to the built-in Stickers extension, and this is its plugin identifier. It doubles as
+  /// the balloon bundle id, which is what `mediaObjectWithSticker:` looks up to attach the
+  /// "Stickers" attribution that the sticker detail sheet shows on the receiving device.
+  static let userGeneratedPackID =
+    "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:"
+    + "com.apple.Stickers.UserGenerated.MessagesExtension"
+
+  /// An `IMSticker` for a file on disk.
+  ///
+  /// ObjC: `-[IMSticker initWithStickerID:stickerPackID:fileURL:accessibilityLabel:
+  /// accessibilityName:moodCategory:stickerName:]`. The sticker id is a fresh UUID with
+  /// the file's extension, which is the shape Messages uses for its own (`sid` on the
+  /// attachment row is `<UUID>.heic`); it identifies the sticker in recents and in the
+  /// dedup of the receiving device's sticker drawer, so it must not repeat across sends.
+  static func sticker(path: String) throws -> AnyObject {
+    guard FileManager.default.fileExists(atPath: path) else {
+      throw PrivateAPIErrorShim.rejected("no file at \(path)")
+    }
+    let type: AnyClass = try IMCoreRuntime.requireClass("IMSticker")
+    guard
+      let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+        .takeUnretainedValue()
+    else {
+      throw PrivateAPIErrorShim.rejected("could not allocate an IMSticker")
+    }
+    let url = URL(fileURLWithPath: path)
+    let extensionPart = url.pathExtension.isEmpty ? "" : "." + url.pathExtension
+    let stickerID = UUID().uuidString + extensionPart
+    guard
+      let sticker = try IMCoreRuntime.invoke(
+        allocated,
+        "initWithStickerID:stickerPackID:fileURL:accessibilityLabel:accessibilityName:"
+          + "moodCategory:stickerName:",
+        [
+          stickerID, userGeneratedPackID, url as NSURL,
+          NSNull(), NSNull(), NSNull(), NSNull(),
+        ]
+      )
+    else {
+      throw PrivateAPIErrorShim.rejected("IMSticker would not initialise for \(path)")
+    }
+    // What `mediaObjectWithSticker:` looks up for attribution. Set separately because the
+    // initializer has no parameter for it.
+    if IMCoreRuntime.responds(sticker, to: NSSelectorFromString("setBallonBundleID:")) {
+      try? IMCoreRuntime.invoke(sticker, "setBallonBundleID:", [userGeneratedPackID])
+    }
+    return sticker
+  }
+
+  /// The `stickerUserInfo` dictionary: where the sticker sits on its parent.
+  ///
+  /// ObjC: `+[IMSticker userInfoDictionaryWithLayoutIntent:parentPreviewWidth:xScalar:
+  /// yScalar:scale:rotation:initialFrameIndex:stickerPositionVersion:externalURI:]`,
+  /// which writes the `sli`/`spw`/`sxs`/`sys`/`ssa`/`sro`/`safi`/`spv`/`suri` keys.
+  /// Messages passes layout intent 0, frame index 0 and position version 0 for a dropped
+  /// sticker, and so does this. The external URI is `[sticker getSafeExternalURI]` there —
+  /// a string, EMPTY for a sticker with no App Store origin — and it must be a string: the
+  /// builder puts all ten values in a dictionary literal, and nil raises
+  /// `attempt to insert nil object from objects[9]` (measured).
+  static func userInfo(placement: StickerPlacement) throws -> AnyObject {
+    let type: AnyClass = try IMCoreRuntime.requireClass("IMSticker")
+    let selector =
+      "userInfoDictionaryWithLayoutIntent:parentPreviewWidth:xScalar:yScalar:scale:"
+      + "rotation:initialFrameIndex:stickerPositionVersion:externalURI:"
+    guard
+      let dictionary = try IMCoreRuntime.invoke(
+        type as AnyObject, selector,
+        [
+          UInt(0), placement.parentPreviewWidth, placement.xScalar, placement.yScalar,
+          placement.scale, placement.rotation, UInt(0), UInt(0), "",
+        ]
+      )
+    else {
+      throw PrivateAPIErrorShim.rejected("IMSticker produced no sticker user info")
+    }
+    return dictionary
+  }
+
+  /// The ChatKit media object wrapping a sticker transfer.
+  ///
+  /// ObjC: `-[CKMediaObjectManager mediaObjectWithSticker:stickerUserInfo:]`. This is the
+  /// step that does the work the attachment path does by hand elsewhere: it copies the
+  /// file into ChatKit's own staging directory, creates the transfer through
+  /// `initWithStickerFileURL:…` — which is where `isSticker`, `stickerUserInfo` and the
+  /// attribution land on the `IMFileTransfer` — and registers it with the transfer center.
+  /// It logs and returns nil when any of that fails, so nil here is reported rather than
+  /// sent.
+  static func mediaObject(sticker: AnyObject, userInfo: AnyObject) throws -> AnyObject {
+    let manager = try IMCoreRuntime.sharedInstance(ofClass: "CKMediaObjectManager")
+    guard
+      let media = try IMCoreRuntime.invoke(
+        manager, "mediaObjectWithSticker:stickerUserInfo:", [sticker, userInfo]
+      )
+    else {
+      throw PrivateAPIErrorShim.rejected(
+        "ChatKit would not build a media object for the sticker — the file may not be an "
+          + "image, or could not be copied into Messages' container"
+      )
+    }
+    return media
+  }
+
+  /// ObjC: `+[CKComposition stickerCompositionWithMediaObjects:]`, which is
+  /// `compositionWithMediaObjects:subject:nil` under a name that says what it is for.
+  static func composition(media: AnyObject) throws -> AnyObject {
+    let type: AnyClass = try IMCoreRuntime.requireClass("CKComposition")
+    guard
+      let composition = try IMCoreRuntime.invoke(
+        type as AnyObject, "stickerCompositionWithMediaObjects:", [[media]]
+      )
+    else {
+      throw PrivateAPIErrorShim.rejected("could not build a sticker composition")
+    }
+    return composition
+  }
+
+  /// The message text a composition sends as: the attachment placeholder character
+  /// carrying the transfer GUID as an attribute.
+  ///
+  /// ObjC: `-[CKComposition superFormatText:]`, called with a NULL out-pointer. Messages
+  /// passes a real one to collect the transfer GUIDs; the GUID is read off the media
+  /// object instead, because the invocation bridge only writes nil into pointer arguments
+  /// (and rightly — see `BBSetArgument`). Same text either way.
+  static func superFormatText(_ composition: AnyObject) throws -> NSAttributedString {
+    guard
+      let text = try IMCoreRuntime.invoke(composition, "superFormatText:", [NSNull()])
+        as? NSAttributedString
+    else {
+      throw PrivateAPIErrorShim.rejected("the sticker composition produced no message text")
+    }
+    return text
+  }
+
+  /// The range of a message part within its message's text.
+  ///
+  /// ObjC: `-[IMMessagePartChatItem messagePartRange]`. A struct return, which is why the
+  /// invocation bridge boxes those as `NSValue`.
+  static func partRange(_ part: AnyObject) throws -> NSRange {
+    guard let value = try IMCoreRuntime.invoke(part, "messagePartRange") as? NSValue else {
+      throw PrivateAPIErrorShim.rejected("that message part reports no range")
+    }
+    return value.rangeValue
+  }
 }
 
 extension IMChat {

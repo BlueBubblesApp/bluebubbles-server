@@ -86,6 +86,7 @@ public enum RouteCatalog {
         CatalogEntry(group: AdditiveRoutes.contactAvatar, availability: .additiveEndpoints),
         CatalogEntry(group: AdditiveRoutes.contactCard, availability: .additiveEndpoints),
         CatalogEntry(group: AdditiveRoutes.chatPinning, availability: .additiveEndpoints),
+        CatalogEntry(group: AdditiveRoutes.stickers, availability: .additiveEndpoints),
         CatalogEntry(group: AdditiveRoutes.webhookEditing, availability: .additiveEndpoints),
         CatalogEntry(group: AdditiveRoutes.chatControls, availability: .additiveEndpoints),
         CatalogEntry(group: AdditiveRoutes.findMy, availability: .findMy),

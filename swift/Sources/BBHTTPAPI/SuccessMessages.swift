@@ -61,6 +61,7 @@ public enum SuccessMessages {
     .messageSendMultipart: "Message sent!",
     .messageSendAttachmentChunk: "Attachment sent!",
     .messageReact: "Reaction sent!",
+    .messageSendSticker: "Sticker sent!",
     .messageUnsend: "Message unsent!",
     .messageEdit: "Message edited!",
 
