@@ -348,17 +348,17 @@ What Messages and the Objective-C helper do, now `IMThreads` in the Swift helper
 |---|---|---|
 | target | `IMChatHistoryController loadMessageWithGUID:` → `_imMessageItem` → `_newChatItems[partIndex]` | the `IMMessagePartChatItem` being replied to |
 | join | `-[IMMessagePartChatItem threadIdentifier]`, `threadOriginator` | non-empty when the target is already in a thread; reuse it so a reply to a reply lands under the original message |
-| create | `IMCreateThreadIdentifierForMessagePartChatItem(part)` | exported C function in IMCore, +1 return. Reads the part's `index`, `messagePartRange` and message GUID |
+| create | `IMCreateThreadIdentifierForMessagePartChatItem(part)` | exported C function in IMCore. **Returns +0** (ends in `objc_autoreleaseReturnValue`; the name is not the CF Create rule) — taking it retained freed a string Messages still held and TextInput crashed on it later. Reads the part's `index`, `messagePartRange` and message GUID |
 | set | `-[IMMessage setThreadIdentifier:]`, `setThreadOriginator:` | on the built message, before `sendMessage:` / `sendMessage:newComposition:` |
 
 Verified on 26.5.2: text, multipart and attachment replies all land with the target's GUID
 and `0:0:<length>`, and a reply to one of them carries the same originator.
 
-**Gated to macOS 26 and later** (`IMThreads.resolvesThreads`). The maintainer reports the
-bare-GUID identifier threads on macOS 15 and earlier and that Tahoe is where it stopped, so
-those releases keep the identifier they shipped with (`IMThreads.Reply.legacy`). Not
-measured here — this Mac runs 26 — and worth a check on a Sequoia machine, in either
-direction: if the resolved form works there too, the gate can go.
+**Used on every macOS, not gated.** This is the Objective-C helper's own reply code
+(`Messages/MacOS-11+/BlueBubblesHelper/BlueBubblesHelper.m:1106`, from "Support sending
+replies on big sur and up", October 2021), which shipped on Big Sur through Ventura and
+works on Tahoe. The port had passed the bare message GUID instead; no release is known to
+accept that, and a check on a Sequoia machine is only owed to the resolved form.
 
 One hazard, recorded because it cost a Messages crash: the originator comes back from an
 accessor at +0 and dies when the autorelease pool drains, which a Swift `await` does. Resolve

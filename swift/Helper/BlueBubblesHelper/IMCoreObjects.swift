@@ -1501,9 +1501,11 @@ enum IMMessageBuilder {
 /// `IMMessageThreadIdentifierGetComponents` into chat.db's `thread_originator_guid` and
 /// `thread_originator_part` (`0:0:29`). Hand it a bare GUID and the split fails, the message
 /// sends, and it is simply not a reply — measured on both send paths, with no error
-/// anywhere. The shipping Objective-C helper never made that mistake: it resolves the target
-/// PART chat item, reuses the thread it is already in, or asks IMCore to create one
-/// (`BlueBubblesHelper.m:1106`). This is that, in the order it does it.
+/// anywhere. The shipping Objective-C helper never made that mistake: from its first reply
+/// support (Big Sur, October 2021) it resolves the target PART chat item, reuses the thread
+/// it is already in, or asks IMCore to create one (`BlueBubblesHelper.m:1106`), on every
+/// macOS it runs on. This is that, in the order it does it, and it is the only path — the
+/// bare GUID was the port's invention and there is no release it is known to be right on.
 ///
 /// **Synchronous, and used inside the same block as the send.** The originator comes back
 /// from an accessor at +0, alive only until the autorelease pool drains — and a Swift
@@ -1519,26 +1521,6 @@ enum IMThreads {
     /// The `IMMessage` that started the thread, for `threadOriginator`. Best effort: a
     /// reply threads without it, but Messages' own sends set it and so does the reference.
     let originator: AnyObject?
-
-    /// The target's bare GUID, which is what this helper has always passed.
-    ///
-    /// Kept for macOS 15 and earlier, where the maintainer reports it threads (not measured
-    /// here — this Mac runs 26). Tahoe is where it stopped, and Tahoe is where
-    /// `reply(for:)` is used instead. Guarding the NEW behaviour rather than the old one is
-    /// the standing rule: the floor is Sonoma and nothing below it needs a branch.
-    static func legacy(target guid: String) -> Reply {
-      Reply(identifier: guid, originator: nil)
-    }
-  }
-
-  /// Whether this macOS needs the thread resolved through IMCore.
-  ///
-  /// True on Tahoe (26) and later. The bare-GUID identifier that `Reply.legacy` carries
-  /// stopped threading there; earlier releases keep it because it is what shipped and
-  /// what the maintainer has seen work.
-  static var resolvesThreads: Bool {
-    if #available(macOS 26, *) { return true }
-    return false
   }
 
   /// The thread a reply to this message part belongs to.
@@ -1557,12 +1539,20 @@ enum IMThreads {
   /// `IMCreateThreadIdentifierForMessagePartChatItem`, an exported C function in IMCore.
   ///
   /// Looked up by name rather than linked, for the reason everything else here is: a
-  /// symbol that moves must degrade to a report, not a helper that fails to load. It is a
-  /// `Create` function and its disassembly confirms the +1: it retains the formatted string
-  /// and returns it without autoreleasing. So the value is taken as retained, which is the
-  /// rule ARC applies to the reference's call. When the symbol is absent the identifier is
-  /// formatted here from the same three values the function reads off the part (its index,
-  /// its range in the message text and the message GUID).
+  /// symbol that moves must degrade to a report, not a helper that fails to load.
+  ///
+  /// **The return is +0, `Create` in the name notwithstanding.** Its disassembly ends in
+  /// `b objc_autoreleaseReturnValue` (and so does `IMCreateThreadIdentifier` under it), and
+  /// the reference declares it as a plain `NSString *` C function, which ARC also treats as
+  /// unretained — the CF "Create rule" does not apply to Objective-C returns. Taking it as
+  /// retained consumed a reference Messages still held through the message's copied
+  /// `threadIdentifier`, and TextInput later crashed reading the freed string
+  /// (Messages-2026-09-02-212814.ips, `-[TIInputContextEntry threadIdentifier]`). So:
+  /// unretained, bridged to a String that keeps its own reference.
+  ///
+  /// When the symbol is absent the identifier is formatted here from the same three values
+  /// the function reads off the part (its index, its range in the message text and the
+  /// message GUID).
   private static func createIdentifier(for part: AnyObject) throws -> String {
     typealias Create = @convention(c) (AnyObject) -> Unmanaged<NSString>?
     if let symbol = dlsym(
@@ -1570,7 +1560,7 @@ enum IMThreads {
       "IMCreateThreadIdentifierForMessagePartChatItem"
     ) {
       let create = unsafeBitCast(symbol, to: Create.self)
-      if let identifier = create(part)?.takeRetainedValue() {
+      if let identifier = create(part)?.takeUnretainedValue() {
         let copied = String(identifier)
         if !copied.isEmpty { return copied }
       }

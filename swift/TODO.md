@@ -649,16 +649,15 @@ through it with no special-casing, which is the standing proof it is expressive 
 
 ---
 
-## Reply threading is gated to Tahoe on the maintainer's word — measure it on Sequoia
+## Reply threading has only been measured on macOS 26
 
-`IMThreads.resolvesThreads` is true on macOS 26 and later; below that the helper still
-passes the target's bare GUID as `threadIdentifier`, because the maintainer reports that
-threads there and that Tahoe is where it stopped. Nothing here has run on Sequoia.
+`IMThreads` resolves a reply's `threadIdentifier` from the target part the way the
+Objective-C helper has since Big Sur (`IMCreateThreadIdentifierForMessagePartChatItem`, or
+the part's existing thread). Verified on 26.5.2 only; the shipping helper's four years on
+Big Sur through Ventura are the evidence for the older releases.
 
-- [ ] On a macOS 15 machine, send a reply through `/message/text` with the Private API and
-      read `thread_originator_guid` back. If it is set, the gate is right and stays. If the
-      resolved form (`r:<part>:<loc>:<len>:<guid>`) also threads there, drop the gate — one
-      path is better than two.
+- [ ] On a macOS 14 or 15 machine, send one reply through `/message/text` with the Private
+      API and confirm `thread_originator_guid` is set. Done = one row.
 
 ## `POST /message/attachment/chunk` reads base64 JSON; the reference reads a multipart `chunk`
 
