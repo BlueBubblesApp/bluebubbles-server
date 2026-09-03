@@ -892,11 +892,14 @@ let package = Package(
 
         .testTarget(
             name: "BBHandlersTests",
-            // `BBIMessage` and `BBSystem` are named by the sticker-library tests: the row
-            // types they build come from the repository, and the MIME derivation they pin
-            // lives in `FileTypes`.
+            // Beyond the handlers themselves: `BBIMessage` and `BBSystem` for the
+            // sticker-library tests (the row types come from the repository, the MIME
+            // derivation from `FileTypes`), and `BBInterfaces` plus
+            // `BBPrivateAPIContract` for the app-balloon refusal, which is interface
+            // logic checked against the Polls bundle id in the contract.
             dependencies: [
                 "BBHandlers", "BBHTTPAPI", "BBSerialization", "BBIMessage", "BBSystem",
+                "BBInterfaces", "BBPrivateAPIContract",
             ],
             swiftSettings: swiftSettings
         ),

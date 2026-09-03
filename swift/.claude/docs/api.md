@@ -178,6 +178,13 @@ anything else — so a client never base64s or percent-encodes by hand. `GET app
 `payload_json` or `payload_fields` symmetrically. `POST game-pigeon` takes fields and does Game
 Pigeon's own scramble for you.
 
+`POST app` REFUSES the Polls bundle id with a 400 naming `POST /api/v2/message/poll`, and
+refuses it even for a well-formed poll payload: the generic encoder writes
+`MSMessageTemplateLayout` and a poll needs `MSMessageLiveLayout`, so anything sent from that
+route arrives as "Sent a poll" with no options. Two such balloons reached a real conversation
+during development before this existed. When the payload is malformed too, the error names
+the missing fields alongside the layout reason.
+
 The server does not model games: fields go out and come back as an ordered name/value list,
 so every Game Pigeon game travels the same way and the client decides what a field means. The
 envelope is built server-side rather than through ChatKit, because ChatKit refuses to compose

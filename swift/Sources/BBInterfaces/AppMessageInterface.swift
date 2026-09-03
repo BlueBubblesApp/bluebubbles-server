@@ -132,6 +132,49 @@ extension MessageInterface {
     case json(JSONValue)
     case fields([(name: String, value: String)])
 
+    /// Which parts of a poll payload are absent, for the refusal message.
+    ///
+    /// Only shaped for the `json` case: a poll's payload is base64 JSON, so a `fields`
+    /// query string or a raw `url` is not a poll at all and is reported as such. This does
+    /// NOT accept a payload as a poll — nothing sent from this route renders as one — it
+    /// only makes the error say what is wrong.
+    var missingPollFields: [String] {
+      switch self {
+      case .url: return ["a JSON body — a poll's payload is base64 JSON, not a URL"]
+      case .fields:
+        return ["a JSON body — a poll's payload is base64 JSON, not a query string"]
+      case .json(let value):
+        var missing: [String] = []
+        if value["version"]?.intValue == nil { missing.append("`version`") }
+        guard let item = value["item"] else { return missing + ["`item`"] }
+        // A poll payload is one of two shapes: a definition carrying the options, or a
+        // vote carrying the selections. Either is legitimate, so neither alone is missing.
+        let options = item["orderedPollOptions"]?.arrayValue
+        let votes = item["votes"]?.arrayValue
+        if options == nil && votes == nil {
+          return missing + ["`item.orderedPollOptions` or `item.votes`"]
+        }
+        if let options {
+          if options.isEmpty { missing.append("any option in `item.orderedPollOptions`") }
+          for (index, option) in options.enumerated() {
+            if option["text"]?.stringValue?.isEmpty ?? true {
+              missing.append("`item.orderedPollOptions[\(index)].text`")
+            }
+            if option["optionIdentifier"]?.stringValue?.isEmpty ?? true {
+              missing.append("`item.orderedPollOptions[\(index)].optionIdentifier`")
+            }
+          }
+        }
+        if let votes {
+          for (index, vote) in votes.enumerated()
+          where vote["voteOptionIdentifier"]?.stringValue?.isEmpty ?? true {
+            missing.append("`item.votes[\(index)].voteOptionIdentifier`")
+          }
+        }
+        return missing
+      }
+    }
+
     func asURL() throws -> String {
       switch self {
       case .url(let url):
@@ -156,6 +199,40 @@ extension MessageInterface {
     }
   }
 
+  /// Balloons this route REFUSES, because sending one from here cannot work.
+  ///
+  /// This route is deliberately generic: it takes a bundle id and a payload and does not
+  /// read the payload. That is right for a third-party app, whose format is its own
+  /// business — but it is wrong for a balloon this server builds properly elsewhere, and
+  /// the failure is silent. `AppMessagePayload.encode` writes
+  /// `layoutClass = MSMessageTemplateLayout`; a poll needs `MSMessageLiveLayout`, which
+  /// only the Polls path sets (through ChatKit, on a real `MSMessage`). A poll sent from
+  /// here therefore arrives as a bare balloon reading "Sent a poll" with an "Add Choice"
+  /// button and NO OPTIONS, whatever its payload says.
+  ///
+  /// Measured the hard way: two such balloons were sent to a real conversation during
+  /// development while testing this route's `json` and `fields` encoders, and they are
+  /// still sitting there — past the unsend window, so they cannot be taken back. Refusing
+  /// is what stops the next person doing that.
+  static func refusal(forBalloon bundleID: String, payload: AppPayload) -> String? {
+    guard bundleID == PollsApp.balloonBundleID else { return nil }
+    var reason =
+      "that is the Polls balloon, and this route cannot produce a poll that renders: it "
+      + "writes a template layout, and a poll needs a live layout. Use "
+      + "`POST /api/v2/message/poll` — it takes `chatGuid` and `options` and builds the "
+      + "payload itself"
+    // Said as well as the above, not instead of it: a client debugging this deserves to
+    // know the payload was wrong too rather than fixing the route and hitting a second
+    // wall.
+    let missing = payload.missingPollFields
+    if !missing.isEmpty {
+      reason +=
+        ". This payload is also not a poll — it is missing "
+        + missing.joined(separator: ", ")
+    }
+    return reason
+  }
+
   /// Sends any app balloon. The payload is the app's own and this server does not read it.
   public func sendAppMessage(
     chatGUID: String, balloonBundleID: String, payload: AppPayload, sessionID: String? = nil,
@@ -165,6 +242,9 @@ extension MessageInterface {
     let api = try requirePrivateAPI(for: "app messages")
     guard !balloonBundleID.isEmpty else {
       throw InterfaceError.invalidRequest("`balloonBundleId` is required")
+    }
+    if let refusal = Self.refusal(forBalloon: balloonBundleID, payload: payload) {
+      throw InterfaceError.invalidRequest(refusal)
     }
     // A new session unless the caller is continuing one. Game Pigeon threads a game
     // through the session, so a reply MUST carry the session it is answering.

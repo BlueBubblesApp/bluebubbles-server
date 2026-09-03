@@ -89,6 +89,24 @@ struct RequestBodyTests {
     }
   }
 
+  @Test("No example sends something the server would refuse")
+  func examplesAreNotRefused() {
+    // The documented example for `POST message/app` used the POLLS bundle id, which is the
+    // one balloon that route refuses — so the spec was telling clients to make the exact
+    // request that had already put two broken balloons in a real conversation. An example
+    // the server rejects is worse than no example, and vigilance is not a mechanism.
+    guard case .object(let members)? = RequestBodies.byHandler[.messageSendApp]?.example,
+      let bundle = members.first(where: { $0.key == "balloonBundleId" })?.value,
+      case .string(let identifier) = bundle
+    else {
+      Issue.record("the app-message example declares no balloonBundleId")
+      return
+    }
+    #expect(
+      !identifier.hasSuffix("com.apple.messages.Polls"),
+      "the app-message example sends the Polls balloon, which that route refuses")
+  }
+
   @Test("A declaration never drops an inferred property")
   func declarationsAreSupersets() {
     // The one real hazard of letting a declaration win. A field recorded against the

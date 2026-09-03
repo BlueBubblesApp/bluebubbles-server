@@ -22498,7 +22498,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "Sends an iMessage app's balloon. Supply the payload in whichever shape fits.",
+                "description": "Sends an iMessage app's balloon. Supply the payload in whichever shape fits. The Polls balloon is REFUSED here — this route writes a template layout and a poll needs a live layout, so it would arrive with no options; use POST message/poll.",
                 "properties": {
                   "chatGuid": {
                     "type": "string",
@@ -22509,7 +22509,7 @@
                     "description": "The app's full balloon bundle id, including the `com.apple.messages.MSMessageExtensionBalloonPlugin:<team>:` prefix."
                   },
                   "json": {
-                    "description": "The payload as JSON, sent as the `data:,<base64>` shape Polls uses. One of `json`, `fields` or `url` is required."
+                    "description": "The payload as JSON, sent as a `data:,<base64>` URL. One of `json`, `fields` or `url` is required."
                   },
                   "fields": {
                     "type": "array",
@@ -22564,15 +22564,19 @@
               },
               "example": {
                 "chatGuid": "iMessage;-;+15551234567",
-                "balloonBundleId": "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.messages.Polls",
-                "appName": "Polls",
-                "caption": "Dinner?",
-                "json": {
-                  "version": 1,
-                  "item": {
-                    "title": "Dinner?"
+                "balloonBundleId": "com.apple.messages.MSMessageExtensionBalloonPlugin:QPU8QS3E62:com.contextoptional.OpenTable.Messages",
+                "appName": "OpenTable",
+                "caption": "Table for two, 7pm",
+                "fields": [
+                  {
+                    "name": "restaurant",
+                    "value": "12345"
+                  },
+                  {
+                    "name": "time",
+                    "value": "19:00"
                   }
-                }
+                ]
               }
             }
           }

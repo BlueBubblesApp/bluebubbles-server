@@ -218,7 +218,7 @@ give the server the payload in whichever of these shapes fits the app:
 
 | Field | Sends | Use it for |
 |---|---|---|
-| `"json": { … }` | `data:,<base64 of the JSON>` | apps whose payload is JSON, like Polls |
+| `"json": { … }` | `data:,<base64 of the JSON>` | apps whose payload is JSON |
 | `"fields": [{"name","value"}]` | `data:?a=1&b=2` | apps whose payload is a query string |
 | `"url": "…"` | exactly what you gave | everything else — an https link, a media-type `data:` URL, anything |
 
@@ -227,11 +227,26 @@ side: `GET app/:guid` adds `payload_json` when the payload decodes as base64 JSO
 `payload_fields` when it is a query string, alongside the raw `url`. So for the two common
 shapes a client never has to base64 or percent-encode anything in either direction.
 
-Measured: a Polls-shaped `json` payload sent and read back with its options intact, and a
-`fields` payload round-tripping including a value with a space and an empty one.
+Measured: a `json` payload sent and read back with its structure intact, and a `fields`
+payload round-tripping including a value with a space and an empty one.
 
 Nothing about this route is Game Pigeon-specific, so any iMessage app can be driven through it
 once you know what that app expects in its payload.
+
+**One balloon is refused: Polls.** `POST app` returns 400 for the
+`…:com.apple.messages.Polls` bundle id and points at `POST /api/v2/message/poll` instead.
+
+This is not a policy choice, it is that the route cannot do it. `AppMessagePayload.encode`
+writes `layoutClass = MSMessageTemplateLayout`; a poll needs `MSMessageLiveLayout`, which
+only the Polls path sets — on a real `MSMessage`, through ChatKit. So a poll sent from here
+arrives as a bare balloon reading "Sent a poll" with an "Add Choice" button and **no
+options**, whatever its payload says. A well-formed poll payload is refused for exactly the
+same reason as a malformed one; when the payload is *also* wrong, the error says which fields
+are missing as well, so a client is not left fixing one problem and hitting the other.
+
+Learned the expensive way. Two such balloons were sent into a real conversation while testing
+this route's `json` and `fields` encoders, and they are still there — long past the unsend
+window, so they cannot be taken back. Refusing is what stops that happening again.
 
 ---
 

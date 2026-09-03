@@ -276,7 +276,10 @@ public enum RequestBodies {
     // MARK: iMessage app balloons
 
     .messageSendApp: Body(
-      summary: "Sends an iMessage app's balloon. Supply the payload in whichever shape fits.",
+      summary:
+        "Sends an iMessage app's balloon. Supply the payload in whichever shape fits. The "
+        + "Polls balloon is REFUSED here — this route writes a template layout and a poll "
+        + "needs a live layout, so it would arrive with no options; use POST message/poll.",
       properties: [
         chatGUID(),
         Property(
@@ -286,8 +289,8 @@ public enum RequestBodies {
           required: true),
         Property(
           "json", .anything,
-          "The payload as JSON, sent as the `data:,<base64>` shape Polls uses. One of `json`, "
-            + "`fields` or `url` is required."),
+          "The payload as JSON, sent as a `data:,<base64>` URL. One of `json`, `fields` or "
+            + "`url` is required."),
         appPayloadFields,
         Property(
           "url", .string,
@@ -302,17 +305,27 @@ public enum RequestBodies {
         Property("caption", .string, "The line shown where the balloon cannot be drawn."),
         Property("summary", .string, "The message's fallback summary text."),
       ],
+      // A THIRD-PARTY app, deliberately. The obvious example to reach for is Polls, and
+      // Polls is the one balloon this route refuses — an example the server would reject
+      // is worse than no example.
       example: .obj([
         ("chatGuid", .string("iMessage;-;+15551234567")),
         (
           "balloonBundleId",
           .string(
-            "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.messages.Polls"
+            "com.apple.messages.MSMessageExtensionBalloonPlugin:QPU8QS3E62"
+              + ":com.contextoptional.OpenTable.Messages"
           )
         ),
-        ("appName", .string("Polls")),
-        ("caption", .string("Dinner?")),
-        ("json", .obj([("version", .int(1)), ("item", .obj([("title", .string("Dinner?"))]))])),
+        ("appName", .string("OpenTable")),
+        ("caption", .string("Table for two, 7pm")),
+        (
+          "fields",
+          .array([
+            .obj([("name", .string("restaurant")), ("value", .string("12345"))]),
+            .obj([("name", .string("time")), ("value", .string("19:00"))]),
+          ])
+        ),
       ])),
 
     .messageSendGamePigeon: Body(
