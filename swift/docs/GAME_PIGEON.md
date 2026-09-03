@@ -267,7 +267,27 @@ a real app would. It is **42 characters** — a UUID plus six alphanumerics
 (`D89782D9-…-B062C02D61B1` + `pkr23n`) — because that is what every genuine payload carries,
 across two games, five app versions and both directions. What the suffix means is unknown; a
 per-device salt and an install counter would both fit. A plain 36-character UUID is
-reproduced by nothing Game Pigeon has ever sent, so it is not used. `ios` is the Mac's own version. `version` defaults to `5`, which is what
+reproduced by nothing Game Pigeon has ever sent, so it is not used.
+
+**What it identifies is the INSTALL, not the person.** Measured across every Game Pigeon
+message on the development Mac:
+
+- One correspondent sent two games two months apart in 2020 — identical `sender`.
+- Another sent Cup Pong and 8 Ball forty-five minutes apart today — identical `sender`.
+- But that same person, from the same address in 2021, has a completely different one. So
+  does a second correspondent between 2021 and 2022. A new phone or a reinstall gets a new
+  identifier.
+
+It is therefore **not an Apple ID, an iCloud address or anything derived from one** — the
+same account produces different values over time, and different accounts on one device would
+presumably share one. The decisive evidence is our own: this server **made its identifier up
+at random**, and Game Pigeon accepted it, stored it, and echoed it back as `player2` in the
+reply. Nothing validates it against Apple or against anything else.
+
+Practically that means it is a stable pseudonym. It carries no account information, but a
+recipient can tell that two games came from the same server — exactly as they could from a
+real install. Clearing the `game_pigeon_sender` setting mints a new one, which is the
+equivalent of reinstalling the app. `ios` is the Mac's own version. `version` defaults to `5`, which is what
 every genuine INVITE carries — **a reply must send its own**, echoing the value it is
 answering. Moves do not agree with each other: a Cup Pong move carried `version=0` where an
 8 Ball move carried `5`, so there is no rule to infer and the server does not try. Anything
