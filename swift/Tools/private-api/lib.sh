@@ -203,11 +203,15 @@ pa_shared_cache_files() {
 
 PA_SYS_FRAMEWORKS="/System/Library/PrivateFrameworks"
 PA_IOS_FRAMEWORKS="/System/iOSSupport/System/Library/PrivateFrameworks"
+# The PUBLIC Catalyst frameworks — Messages.framework (MSMessage) lives here, not under
+# PrivateFrameworks, and a private-only prefix silently fails to load it.
+PA_IOS_PUBLIC_FRAMEWORKS="/System/iOSSupport/System/Library/Frameworks"
 
-## Expands @sys/… and @ios/… in a framework path.
+## Expands @sys/…, @ios/… and @iosfw/… in a framework path.
 pa_expand_path() {
     local path="$1"
     path="${path/#@sys\//$PA_SYS_FRAMEWORKS/}"
+    path="${path/#@iosfw\//$PA_IOS_PUBLIC_FRAMEWORKS/}"
     path="${path/#@ios\//$PA_IOS_FRAMEWORKS/}"
     printf '%s\n' "$path"
 }

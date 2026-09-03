@@ -507,6 +507,8 @@ public struct ServerComposition {
       groups.append(AdditiveRoutes.chatPinning)
       // Stickers: likewise, a send the Node helper never had an action for.
       groups.append(AdditiveRoutes.stickers)
+      // Send Later: Apple's scheduling, distinct from this server's own timer.
+      groups.append(AdditiveRoutes.sendLater)
       // Editing a webhook, which the Node server only ever exposed to its own UI.
       groups.append(AdditiveRoutes.webhookEditing)
       // Conversation controls — wallpaper today, mute and filtering next.

@@ -599,6 +599,8 @@ public struct MessageInterface: MessagesBackedInterface {
     public var scanForLinks: Bool
     /// Inline styles and effects by UTF-16 range. Private API only, macOS 15 and later.
     public var formatting: [FormattedRange]
+    /// "Send Later": when Messages should deliver this. Nil sends now.
+    public var scheduledFor: Date?
     /// Forces AppleScript even when the Private API is available. The current server
     /// exposes this as `method`, and clients use it.
     public var forcedBackend: SendBackend?
@@ -612,6 +614,7 @@ public struct MessageInterface: MessagesBackedInterface {
       partIndex: Int = 0,
       scanForLinks: Bool = false,
       formatting: [FormattedRange] = [],
+      scheduledFor: Date? = nil,
       forcedBackend: SendBackend? = nil
     ) {
       self.chatGUID = chatGUID
@@ -622,6 +625,7 @@ public struct MessageInterface: MessagesBackedInterface {
       self.partIndex = partIndex
       self.scanForLinks = scanForLinks
       self.formatting = formatting
+      self.scheduledFor = scheduledFor
       self.forcedBackend = forcedBackend
     }
   }
@@ -640,6 +644,9 @@ public struct MessageInterface: MessagesBackedInterface {
       backend = await availableBackend()
     }
     try Self.checkFormatting(request.formatting, text: request.text)
+    if let scheduledFor = request.scheduledFor {
+      try Self.checkScheduledSend(scheduledFor)
+    }
 
     switch backend {
     case .privateAPI:
@@ -656,7 +663,8 @@ public struct MessageInterface: MessagesBackedInterface {
             replyTo: request.replyToGUID.map { MessageGUID($0) },
             replyPartIndex: request.partIndex,
             scanForLinks: request.scanForLinks,
-            formatting: request.formatting
+            formatting: request.formatting,
+            scheduledFor: request.scheduledFor
           )
         )
       }
@@ -670,11 +678,11 @@ public struct MessageInterface: MessagesBackedInterface {
       // Stated rather than dropped. A client that asked for a reply and got a plain
       // message would look like the server ignored it.
       if request.subject != nil || request.effectID != nil || request.replyToGUID != nil
-        || !request.formatting.isEmpty
+        || !request.formatting.isEmpty || request.scheduledFor != nil
       {
         throw InterfaceError.invalidRequest(
-          "subjects, effects, replies and text formatting need the Private API; this "
-            + "server is sending through AppleScript"
+          "subjects, effects, replies, text formatting and Send Later need the Private "
+            + "API; this server is sending through AppleScript"
         )
       }
       // Stamped BEFORE the send. Messages back-dates rows by a second or so, and a window
@@ -913,6 +921,41 @@ public struct MessageInterface: MessagesBackedInterface {
       messageGUID: sent.guid.rawValue,
       message: try await awaitSentMessage(guid: sent.guid.rawValue)
     )
+  }
+
+  /// Send Later's floor and its one sanity rule.
+  ///
+  /// macOS 15 is where `scheduleType`/`scheduleState` appeared on `IMMessage`; the helper
+  /// refuses below that too, on the selector, but a version answer is clearer than a
+  /// "selector missing" one. A date in the past would be delivered immediately by Messages,
+  /// which is the opposite of what the caller asked for, so it is refused here — the one
+  /// minute of slack absorbs clock skew between a client and this Mac.
+  static func checkScheduledSend(
+    _ date: Date,
+    now: Date = Date(),
+    majorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+  ) throws {
+    guard majorVersion >= 15 else {
+      throw InterfaceError.invalidRequest(
+        "Send Later is only supported on macOS Sequoia (15) and newer"
+      )
+    }
+    guard date.timeIntervalSince(now) > -60 else {
+      throw InterfaceError.invalidRequest("`scheduledFor` must be in the future")
+    }
+  }
+
+  /// Cancels a scheduled message before Messages delivers it.
+  ///
+  /// The chat is required for the same reason every other message action requires it: an
+  /// `IMMessageItem` fetched by GUID reports no chat identifier.
+  public func cancelScheduledMessage(chatGUID: String, messageGUID: String) async throws {
+    let api = try requirePrivateAPI(for: "Send Later")
+    try await requireMessage(messageGUID)
+    try await throughMessages {
+      try await api.cancelScheduledMessage(
+        MessageGUID(messageGUID), in: ChatIdentifier(chatGUID))
+    }
   }
 
   /// Emoji reactions arrived with macOS 15 / iOS 18 and are refused below it, before the

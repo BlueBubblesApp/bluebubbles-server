@@ -28,6 +28,7 @@ public enum MessagesHelperAction: String, Sendable, CaseIterable, CustomStringCo
   case addParticipant = "add-participant"
   case balloonBundleMediaPath = "balloon-bundle-media-path"
   case checkFaceTimeAvailability = "check-facetime-availability"
+  case cancelScheduledMessage = "cancel-scheduled-message"
   case checkFocusStatus = "check-focus-status"
   case checkIMessageAvailability = "check-imessage-availability"
   case checkTypingStatus = "check-typing-status"

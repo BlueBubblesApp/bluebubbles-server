@@ -202,6 +202,47 @@ public enum WriteHandlers {
       return try Self.sendResult(sent, interfaces: interfaces)
     }
 
+    registry.register(.messageSendLater) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      let chatGUID = try values.requireString("chatGuid")
+      let message = try values.requireString("message")
+      // Epoch MILLISECONDS, the unit every other date on this API uses.
+      guard let milliseconds = values.double("scheduledFor") else {
+        throw BadRequest("`scheduledFor` is required, as epoch milliseconds")
+      }
+      let sent = try await interfaces.message.sendText(
+        MessageInterface.SendTextRequest(
+          chatGUID: chatGUID,
+          text: message,
+          subject: values.string("subject"),
+          effectID: values.string("effectId"),
+          replyToGUID: values.string("selectedMessageGuid"),
+          partIndex: values.int("partIndex") ?? 0,
+          scanForLinks: values.bool("scanForLinks") ?? false,
+          formatting: try TextFormattingBody.parse(values["textFormatting"]),
+          scheduledFor: Date(timeIntervalSince1970: milliseconds / 1000),
+          // Apple's scheduling is a Private API capability; AppleScript cannot express it,
+          // and the interface refuses rather than sending now.
+          forcedBackend: .privateAPI
+        )
+      )
+      return try Self.sendResult(
+        sent, interfaces: interfaces, tempGUID: values.string("tempGuid")
+      )
+    }
+
+    registry.register(.messageCancelScheduled) { request in
+      let interfaces = try await context.requireInterfaces()
+      let guid = try request.requirePathParameter("guid")
+      let values = try request.values()
+      try await interfaces.message.cancelScheduledMessage(
+        chatGUID: try values.requireString("chatGuid"), messageGUID: guid
+      )
+      // No body: there is no row to answer with once it is cancelled.
+      return .data(nil)
+    }
+
     registry.register(.messageSendSticker) { request in
       let interfaces = try await context.requireInterfaces()
       // The same form the attachment route takes — the sticker image under `attachment`,

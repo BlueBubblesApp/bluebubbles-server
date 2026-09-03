@@ -177,6 +177,13 @@ public final class IMCoreBridge: PrivateAPI {
       let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
       let reply = try replyPart.map(IMThreads.reply(for:))
 
+      // Send Later goes through ChatKit, because that is the only path that files a
+      // message as scheduled — see `CKCompositions.setSendLater`, which records what
+      // happens when you try it the other way.
+      if let scheduledFor = request.scheduledFor {
+        return try sendScheduled(request, at: scheduledFor, reply: reply)
+      }
+
       // Styles and effects are attributes on the text itself; the initializer takes an
       // attributed string and imagent stores whatever it carries. See
       // `TextFormattingAttributes`.
@@ -433,6 +440,52 @@ public final class IMCoreBridge: PrivateAPI {
 
       let sentGUID = ((try? IMCoreRuntime.string(message, "guid")) ?? nil) ?? guid
       return SentMessage(guid: MessageGUID(sentGUID), chat: request.chat, sentAt: Date())
+    }
+  }
+
+  /// A Send Later message: a ChatKit composition carrying the delivery date.
+  ///
+  /// Synchronous and called from inside `sendMessage`'s `translating` block, so the
+  /// composition and the send are not separated by a suspension.
+  private func sendScheduled(
+    _ request: SendMessageRequest, at date: Date, reply: IMThreads.Reply?
+  ) throws -> SentMessage {
+    let conversation = try requireConversation(request.chat)
+    var composition = try CKCompositions.empty(
+      subject: request.subject.map { NSAttributedString(string: $0) }
+    )
+    composition = try CKCompositions.appendingText(
+      composition, text: request.text, mention: nil, formatting: request.formatting
+    )
+    CKCompositions.setEffect(composition, request.effectId)
+    try CKCompositions.setSendLater(composition, date)
+
+    guard conversation.canSend(composition) else {
+      throw PrivateAPIErrorShim.rejected(
+        "ChatKit will not send this composition — this conversation may not support "
+          + "Send Later"
+      )
+    }
+    let messages = try conversation.messages(from: composition)
+    for message in messages {
+      if let reply {
+        try? IMCoreRuntime.invoke(message, "setThreadIdentifier:", [reply.identifier])
+        if let originator = reply.originator {
+          try? IMCoreRuntime.invoke(message, "setThreadOriginator:", [originator])
+        }
+      }
+      try conversation.send(message)
+    }
+    let guid =
+      messages.first.flatMap { ((try? IMCoreRuntime.string($0, "guid")) ?? nil) } ?? ""
+    return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
+  }
+
+  /// NEW — no Objective-C counterpart. See `IMChat.cancelScheduledMessage(guid:)`.
+  public func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
+    let item = try await IMChatHistory.messageItem(guid: guid.rawValue)
+    try translating {
+      try IMChatRegistry.requireChat(guid: chat.rawValue).cancelScheduledMessage(item: item)
     }
   }
 

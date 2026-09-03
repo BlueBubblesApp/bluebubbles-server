@@ -613,7 +613,22 @@ public enum AdditiveRoutes {
       .init(.post, "hydrate", .messageHydrate)
     ])
 
-  /// Placing a sticker on a message. The Node server never sent one — its helper had no
+  /// Apple's own "Send Later", which the Node server never had — its `/message/schedule`
+  /// routes are this SERVER's timer, which holds the message and sends it when the Mac is
+  /// awake and the server is running. This is the other thing: the message goes to Apple
+  /// scheduled, and iMessage delivers it whether or not this Mac is on.
+  ///
+  /// Under `message/` with the literal ahead of any `:guid`, per the ordering rule.
+  public static let sendLater = RouteGroup(
+    "Send Later", prefix: "message", apiVersion: RouteTable.latestVersion,
+    routes: [
+      .init(.post, "send-later", .messageSendLater, scope: .messagesWrite, requires: .privateAPI),
+      .init(
+        .delete, "send-later/:guid", .messageCancelScheduled, scope: .messagesWrite,
+        requires: .privateAPI),
+    ])
+
+  /// Placing a sticker on a message.  /// Placing a sticker on a message. The Node server never sent one — its helper had no
   /// action for it and its route table has no path — so this is additive by definition.
   ///
   /// Under `message/` beside `react`, because that is what it is: a reaction whose payload

@@ -55,6 +55,8 @@ public struct SendMessageRequest: Codable, Sendable {
   public let mentions: [String: [Int]]?
   /// Inline styles and effects, by UTF-16 range over `text`. Empty for plain text.
   public let formatting: [FormattedRange]
+  /// When Messages should deliver this — "Send Later". Nil sends now.
+  public let scheduledFor: Date?
 
   public init(
     chat: ChatIdentifier,
@@ -65,7 +67,8 @@ public struct SendMessageRequest: Codable, Sendable {
     replyPartIndex: Int? = nil,
     scanForLinks: Bool = false,
     mentions: [String: [Int]]? = nil,
-    formatting: [FormattedRange] = []
+    formatting: [FormattedRange] = [],
+    scheduledFor: Date? = nil
   ) {
     self.chat = chat
     self.text = text
@@ -76,7 +79,19 @@ public struct SendMessageRequest: Codable, Sendable {
     self.scanForLinks = scanForLinks
     self.mentions = mentions
     self.formatting = formatting
+    self.scheduledFor = scheduledFor
   }
+}
+
+/// How Messages files a scheduled message. Read from
+/// `-[CKComposition(IMSuperFormat) messageWithGUID:…]` on macOS 26.5.2: when the composition
+/// carries a `CKSendLaterPluginInfo` with a `selectedDate`, it passes the date as the
+/// message's `time:` and these two values; without one it passes `[NSDate date]` and 0/0.
+public enum ScheduledSend {
+  /// `scheduleType`. 2 is "the user asked for Send Later".
+  public static let type: UInt = 2
+  /// `scheduleState`. 1 is "scheduled, not yet delivered".
+  public static let state: UInt = 1
 }
 
 /// One segment of a multipart message — text and attachments interleaved in order.
@@ -624,6 +639,8 @@ public protocol PrivateAPI: Sendable {
   /// and the v1 route answers with the serialised row behind that GUID, which is why the
   /// identifier has to come back across the wire. This returned nothing until then.
   func react(_ request: ReactionRequest) async throws -> SentMessage
+  /// Cancels a message scheduled with `SendMessageRequest.scheduledFor`, before it is sent.
+  func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
   /// Places a sticker on a message part and returns the sticker's OWN message, exactly as
   /// `react` does — a sticker is an association with a file behind it.
   func sendSticker(_ request: SendStickerRequest) async throws -> SentMessage

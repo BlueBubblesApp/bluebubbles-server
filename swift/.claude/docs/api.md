@@ -91,6 +91,36 @@ frozen — and the emoji itself is `associatedMessageEmoji`, a field of ours dec
 same message replaces the first, and removing one deletes its row, which is Messages'
 own behaviour and what the tests below observed.
 
+### Send Later — `POST /api/v2/message/send-later`
+
+Apple's own scheduling, not this server's. `/message/schedule` (v1) is a SERVER timer: it holds
+the message and sends it when this Mac is awake and the server is running. Send Later hands the
+message to iMessage already scheduled, and it goes out whether or not this Mac is on.
+
+```json
+POST /api/v2/message/send-later
+{ "chatGuid": "…", "message": "…", "scheduledFor": 1788403440000 }
+```
+
+`scheduledFor` is epoch MILLISECONDS and must be in the future; the rest of the body is
+`/message/text`'s (`subject`, `effectId`, `selectedMessageGuid`, `partIndex`, `textFormatting`,
+`tempGuid`). Private API only, macOS 15 and newer. Answers with the message row, like every
+other send.
+
+`DELETE /api/v2/message/send-later/:guid` cancels one before it is delivered, taking `chatGuid`
+in the body. The row is DELETED from `chat.db`, so a client should drop it rather than expect a
+state change.
+
+Two things a client must know when it reads a scheduled row back:
+
+- `dateCreated` is the DELIVERY time, not the time it was composed — `date` holds the scheduled
+  instant. Sorting a transcript by it puts the message in the future, which is where Messages
+  itself shows it.
+- `scheduleType` and `scheduleState` are ours, present only on scheduled rows (`acceptedDifferences`).
+  Type 2 is Send Later; state 1 is "accepted" and 2 is "scheduled and waiting". A row with
+  neither key is an ordinary message. Without them a pending message looks identical to a sent
+  one — `isSent` is 1 the moment Messages accepts it.
+
 ### Eight routes answer with the MESSAGE, not with an identifier
 
 `POST /message/text`, `/attachment`, `/attachment/chunk`, `/multipart`, `/react`,

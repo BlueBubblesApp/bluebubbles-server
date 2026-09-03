@@ -89,7 +89,11 @@ enum HelperDispatch {
           replyTo: optionalString("selectedMessageGuid").map(MessageGUID.init(_:)),
           replyPartIndex: data["partIndex"]?.intValue,
           scanForLinks: flag("ddScan"),
-          formatting: formatting(data["textFormatting"])
+          formatting: formatting(data["textFormatting"]),
+          // Epoch MILLISECONDS, the unit every date on this wire uses.
+          scheduledFor: data["scheduledFor"]?.doubleValue.map {
+            Date(timeIntervalSince1970: $0 / 1000)
+          }
         )
       )
       return ["identifier": sent.guid.rawValue]
@@ -144,6 +148,10 @@ enum HelperDispatch {
         )
       )
       return ["identifier": sent.guid.rawValue]
+
+    case .cancelScheduledMessage:
+      try await bridge.cancelScheduledMessage(try message("messageGuid"), in: try chat())
+      return nil
 
     case .sendReaction:
       guard let reaction = ReactionType(rawValue: try string("reactionType")) else {

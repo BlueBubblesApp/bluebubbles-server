@@ -315,6 +315,26 @@ struct IMChat {
   }
 
   /// ObjC: `retractMessagePart:` — what a client calls "unsend".
+  /// Cancels a scheduled message before it is delivered.
+  ///
+  /// Takes the message ITEM, not the GUID. MEASURED: the GUID form,
+  /// `cancelScheduledMessageWithGUID:destinations:cancelType:` with nil destinations,
+  /// returns without raising and leaves the row exactly as it was — still
+  /// `schedule_state 2`, still due at its delivery time. The item form is what IMChat's own
+  /// logging calls "(IMChat) Cancel scheduled message items", and it is the one the
+  /// transcript's cancel action reaches.
+  ///
+  /// Cancel type 1 is the value IMCore's own path passes.
+  func cancelScheduledMessage(item: AnyObject) throws {
+    let selector = "cancelScheduledMessageItem:cancelType:"
+    guard IMCoreRuntime.responds(object, to: NSSelectorFromString(selector)) else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "cancelScheduledMessage", requires: selector
+      )
+    }
+    try IMCoreRuntime.invoke(object, selector, [item, UInt(1)])
+  }
+
   func retractMessagePart(_ part: AnyObject) throws {
     try IMCoreRuntime.invoke(object, "retractMessagePart:", [part])
   }
@@ -860,6 +880,41 @@ enum CKCompositions {
       throw PrivateAPIErrorShim.rejected("could not append text to the composition")
     }
     return appended
+  }
+
+  /// Attaches a Send Later date, which is what makes the message scheduled.
+  ///
+  /// MEASURED, after the obvious approach failed: building an `IMMessage` through the
+  /// initializer that takes `scheduleType:scheduleState:` and sending it with
+  /// `-[IMChat sendMessage:]` sends it IMMEDIATELY — the row lands with
+  /// `schedule_type = 0`, `is_delivered = 1` and a delivery time of now. Whatever files a
+  /// message as scheduled is not those two words on the message.
+  ///
+  /// This is Messages' own route instead. `-[CKComposition(IMSuperFormat)
+  /// messageWithGUID:superFormatText:…]` (disassembled on 26.5.2) asks the composition for
+  /// its `sendLaterPluginInfo`; when there is one it passes that info's `selectedDate` as
+  /// the message's `time:` along with `scheduleType 2` / `scheduleState 1`, and when there
+  /// is not it passes `[NSDate date]` and 0 / 0. So the date goes on the COMPOSITION, and
+  /// `messagesFromComposition:` builds a scheduled message from it.
+  static func setSendLater(_ composition: AnyObject, _ date: Date?) throws {
+    guard let date else { return }
+    let type: AnyClass = try IMCoreRuntime.requireClass("CKSendLaterPluginInfo")
+    guard
+      let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+        .takeUnretainedValue(),
+      let info = try IMCoreRuntime.invoke(
+        allocated, "initWithSelectedDate:", [date as NSDate])
+    else {
+      throw PrivateAPIErrorShim.rejected("could not build the Send Later info")
+    }
+    guard
+      IMCoreRuntime.responds(composition, to: NSSelectorFromString("setSendLaterPluginInfo:"))
+    else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "scheduled send", requires: "CKComposition.setSendLaterPluginInfo:"
+      )
+    }
+    try IMCoreRuntime.invoke(composition, "setSendLaterPluginInfo:", [info])
   }
 
   /// An audio composition, which ChatKit builds differently.

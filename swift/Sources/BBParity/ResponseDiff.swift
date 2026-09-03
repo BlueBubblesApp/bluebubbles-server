@@ -61,6 +61,10 @@ public let acceptedDifferences: [String: String] = [
   // An emoji tapback's emoji. The reference serialises the row without it, so a client saw
   // `associatedMessageType: "2006"` and nothing else; present only on rows that have one.
   "associatedMessageEmoji": "the emoji of an emoji tapback; the reference never read the column",
+
+  // Send Later. Present only on scheduled rows; without them a scheduled message looks sent.
+  "scheduleType": "Send Later state; the reference never read the column",
+  "scheduleState": "Send Later state; the reference never read the column",
 ]
 
 public struct Difference: Sendable, Equatable, CustomStringConvertible {

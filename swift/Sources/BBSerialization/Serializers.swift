@@ -118,6 +118,13 @@ public struct MessageSerializer: Sendable {
     if let emoji = message.associatedMessageEmoji, !emoji.isEmpty {
       object.set("associatedMessageEmoji", .string(emoji))
     }
+    // OURS. Send Later: without these a scheduled message is indistinguishable from one
+    // already sent, and a client would show it as delivered. Present only on scheduled
+    // rows — every ordinary message has 0/0 — so nothing changes for anyone else.
+    if message.scheduleType != 0 || message.scheduleState != 0 {
+      object.set("scheduleType", .int(message.scheduleType))
+      object.set("scheduleState", .int(message.scheduleState))
+    }
     object.setOrNull("expressiveSendStyleId", message.expressiveSendStyleID.map(JSONValue.string))
     object.setOrNull("threadOriginatorGuid", message.threadOriginatorGUID.map(JSONValue.string))
     object.set("hasPayloadData", .bool(message.payloadData != nil))

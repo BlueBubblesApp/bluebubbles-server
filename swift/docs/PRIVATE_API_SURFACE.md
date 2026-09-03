@@ -349,6 +349,42 @@ when a new one is sent and deletes the row when one is removed.
 The association-initializer path (bare GUID, range `(part, 1)`, text `TEMP`) is kept only
 as the fallback for a macOS without `IMTapbackSender`, and cannot carry an emoji.
 
+### Polls — an app balloon, not a message type
+
+Researched, not built. The mechanism, the payload format, the message thread and the proposed
+API are in [`docs/POLLS.md`](POLLS.md), which is the reference for this. In short: a poll is an
+iMessage app message from `com.apple.messages.Polls` whose `payload_data` archive carries a
+`data:` URL of JSON; a vote is a custom acknowledgement (`associated_message_type` 4000) built
+by `+[IMMessage customAcknowledgementMessageWithPayloadData:associatedMessageGUID:balloonBundleID:messageSummaryInfo:threadIdentifier:]`.
+macOS 26 only (`-[IMChat _supportsPolls]`).
+
+### Send Later — the date goes on the COMPOSITION
+
+Backs `message.sendLater` / `message.cancelScheduled`. Measured on macOS 26.5.2.
+
+**The obvious approach does not work.** `IMMessage` has `scheduleType` and `scheduleState`, and
+an initializer that takes both (`initWithSender:time:…threadIdentifier:scheduleType:scheduleState:`).
+Building a message that way with type 2 / state 1 and sending it through `-[IMChat sendMessage:]`
+sends it IMMEDIATELY: the row lands `schedule_type 0`, `is_delivered 1`, delivered now. Whatever
+files a message as scheduled is not those two words on the message object.
+
+What Messages does, from `-[CKComposition(IMSuperFormat) messageWithGUID:superFormatText:…]`:
+
+| Step | Selector |
+|---|---|
+| date | `-[CKSendLaterPluginInfo initWithSelectedDate:]` |
+| attach | `-[CKComposition setSendLaterPluginInfo:]` |
+| build | `-[CKConversation messagesFromComposition:]` — reads `sendLaterPluginInfo.selectedDate`, passes it as the message's `time:` with `scheduleType 2` / `scheduleState 1`; with no info it passes `[NSDate date]` and 0 / 0 |
+| send | `-[CKConversation sendMessage:newComposition:]` |
+
+Verified: the row lands `schedule_type 2`, `schedule_state 2` (state moves 1 → 2 once the daemon
+takes it), `is_delivered 0`, and `date` = the delivery instant, 15 minutes out.
+
+**Cancelling takes the message ITEM.** `-[IMChat cancelScheduledMessageWithGUID:destinations:cancelType:]`
+with nil destinations returns without raising and changes nothing — measured, the row stayed
+scheduled. `-[IMChat cancelScheduledMessageItem:cancelType:]` with cancel type 1 works, and the
+row is deleted from `chat.db` outright.
+
 ### Reply threads — `threadIdentifier` is not a GUID
 
 Backs `selectedMessageGuid` on `message.sendText`, `message.sendMultipart` and

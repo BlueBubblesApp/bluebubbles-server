@@ -669,6 +669,25 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
       add a decoded `formatting` array using `TextEffect(attributeValue:)`; v1 is frozen.
 - [ ] The Flutter client neither renders nor sends these yet.
 
+## Send Later and polls: what is left
+
+`POST /api/v2/message/send-later` schedules through Apple (`docs/PRIVATE_API_SURFACE.md`
+§ Send Later); polls are researched only, in [`docs/POLLS.md`](docs/POLLS.md).
+
+- [ ] **Polls are not built.** `docs/POLLS.md` § 5 has the proposed routes and § 6 the two send
+      paths. The read side already works today through `payloadData`, which is why this is not
+      urgent — but a client has to walk an `NSKeyedArchiver` graph to use it.
+- [ ] Send Later has no LIST route. A client can find scheduled messages by querying and
+      filtering on the new `scheduleType`, but there is no "show me what is pending" call.
+- [ ] Editing a scheduled message (`editScheduledMessageItem:scheduleType:deliveryTime:`) and
+      "send now" (`dateCellRequestedScheduledMessageModification:scheduleType:deliveryTime:`
+      with a nil time) are not built. Rescheduling today means cancel and re-send.
+- [ ] Send Later is untested for attachments and multipart — only `sendMessage` carries
+      `scheduledFor`. The same composition trick should work on `sendMultipart`.
+- [ ] `_supportsSendLater` / `_supportsPolls` on IMChat are not consulted. A conversation that
+      cannot schedule (SMS) will fail at ChatKit's `canSend` instead of being refused up front.
+- [ ] Nothing verifies a scheduled message actually ARRIVES at its time; the test cancelled it.
+
 ## Emoji reactions: what the first pass left out
 
 `reaction: emoji` on `/message/react` sends through `IMTapbackSender` (`docs/PRIVATE_API_SURFACE.md`

@@ -85,6 +85,10 @@ public struct IMessageRow: Sendable {
   public let associatedMessageType: Int
   /// The emoji of an emoji tapback (types 2006 / 3006). Sonoma and later; nil elsewhere.
   public let associatedMessageEmoji: String?
+  /// Send Later. 2 means the user scheduled it; 0 means an ordinary message.
+  public let scheduleType: Int
+  /// Where a scheduled message is in its life. 1 is scheduled and undelivered.
+  public let scheduleState: Int
   public let payloadData: Data?
   public let messageSummaryInfo: Data?
 
@@ -154,6 +158,8 @@ public struct IMessageRow: Sendable {
     associatedMessageGUID = row.optional("associated_message_guid")
     associatedMessageType = row.optional("associated_message_type") ?? 0
     associatedMessageEmoji = row.optional("associated_message_emoji")
+    scheduleType = row.optional("schedule_type") ?? 0
+    scheduleState = row.optional("schedule_state") ?? 0
     payloadData = row.optional("payload_data")
     messageSummaryInfo = row.optional("message_summary_info")
 

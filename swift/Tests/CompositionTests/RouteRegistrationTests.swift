@@ -361,7 +361,7 @@ struct RouteRegistrationTests {
     #expect(
       Set(on.map(\.name))
         == [
-          "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers",
+          "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers", "Send Later",
           "Webhook Editing", "Chat Controls", "Contact Card",
         ]
     )

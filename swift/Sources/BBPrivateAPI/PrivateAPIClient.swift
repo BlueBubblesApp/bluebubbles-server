@@ -61,6 +61,9 @@ public actor PrivateAPIClient: PrivateAPI {
       // 0/1 rather than a boolean: the helper reads it as a number.
       "ddScan": .number(request.scanForLinks ? 1 : 0),
       "textFormatting": Self.wireFormatting(request.formatting),
+      "scheduledFor": request.scheduledFor.map {
+        .number($0.timeIntervalSince1970 * 1000)
+      },
     ])
     let result = try await transport.request(
       action: .sendMessage, data: payload)
@@ -105,6 +108,15 @@ public actor PrivateAPIClient: PrivateAPI {
     let result = try await transport.request(
       action: .sendAttachment, data: payload)
     return try sentMessage(from: result, chat: request.chat)
+  }
+
+  public func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
+    _ = try await transport.request(
+      action: .cancelScheduledMessage,
+      data: .object([
+        "chatGuid": .string(chat.rawValue),
+        "messageGuid": .string(guid.rawValue),
+      ]))
   }
 
   public func react(_ request: ReactionRequest) async throws -> SentMessage {
