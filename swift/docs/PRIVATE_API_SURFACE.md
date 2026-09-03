@@ -351,8 +351,14 @@ What Messages and the Objective-C helper do, now `IMThreads` in the Swift helper
 | create | `IMCreateThreadIdentifierForMessagePartChatItem(part)` | exported C function in IMCore, +1 return. Reads the part's `index`, `messagePartRange` and message GUID |
 | set | `-[IMMessage setThreadIdentifier:]`, `setThreadOriginator:` | on the built message, before `sendMessage:` / `sendMessage:newComposition:` |
 
-Verified: text, multipart and attachment replies all land with the target's GUID and
-`0:0:<length>`, and a reply to one of them carries the same originator.
+Verified on 26.5.2: text, multipart and attachment replies all land with the target's GUID
+and `0:0:<length>`, and a reply to one of them carries the same originator.
+
+**Gated to macOS 26 and later** (`IMThreads.resolvesThreads`). The maintainer reports the
+bare-GUID identifier threads on macOS 15 and earlier and that Tahoe is where it stopped, so
+those releases keep the identifier they shipped with (`IMThreads.Reply.legacy`). Not
+measured here — this Mac runs 26 — and worth a check on a Sequoia machine, in either
+direction: if the resolved form works there too, the gate can go.
 
 One hazard, recorded because it cost a Messages crash: the originator comes back from an
 accessor at +0 and dies when the autorelease pool drains, which a Swift `await` does. Resolve

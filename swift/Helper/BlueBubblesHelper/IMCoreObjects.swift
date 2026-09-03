@@ -1519,6 +1519,26 @@ enum IMThreads {
     /// The `IMMessage` that started the thread, for `threadOriginator`. Best effort: a
     /// reply threads without it, but Messages' own sends set it and so does the reference.
     let originator: AnyObject?
+
+    /// The target's bare GUID, which is what this helper has always passed.
+    ///
+    /// Kept for macOS 15 and earlier, where the maintainer reports it threads (not measured
+    /// here — this Mac runs 26). Tahoe is where it stopped, and Tahoe is where
+    /// `reply(for:)` is used instead. Guarding the NEW behaviour rather than the old one is
+    /// the standing rule: the floor is Sonoma and nothing below it needs a branch.
+    static func legacy(target guid: String) -> Reply {
+      Reply(identifier: guid, originator: nil)
+    }
+  }
+
+  /// Whether this macOS needs the thread resolved through IMCore.
+  ///
+  /// True on Tahoe (26) and later. The bare-GUID identifier that `Reply.legacy` carries
+  /// stopped threading there; earlier releases keep it because it is what shipped and
+  /// what the maintainer has seen work.
+  static var resolvesThreads: Bool {
+    if #available(macOS 26, *) { return true }
+    return false
   }
 
   /// The thread a reply to this message part belongs to.

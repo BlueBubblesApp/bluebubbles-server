@@ -649,6 +649,17 @@ through it with no special-casing, which is the standing proof it is expressive 
 
 ---
 
+## Reply threading is gated to Tahoe on the maintainer's word — measure it on Sequoia
+
+`IMThreads.resolvesThreads` is true on macOS 26 and later; below that the helper still
+passes the target's bare GUID as `threadIdentifier`, because the maintainer reports that
+threads there and that Tahoe is where it stopped. Nothing here has run on Sequoia.
+
+- [ ] On a macOS 15 machine, send a reply through `/message/text` with the Private API and
+      read `thread_originator_guid` back. If it is set, the gate is right and stays. If the
+      resolved form (`r:<part>:<loc>:<len>:<guid>`) also threads there, drop the gate — one
+      path is better than two.
+
 ## `POST /message/attachment/chunk` reads base64 JSON; the reference reads a multipart `chunk`
 
 Found while fixing `/message/attachment`, which had the same problem: the reference's chunk

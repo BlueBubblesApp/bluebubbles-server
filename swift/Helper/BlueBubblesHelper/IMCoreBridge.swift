@@ -157,24 +157,39 @@ public final class IMCoreBridge: PrivateAPI {
 
   // MARK: - Messages
 
+  /// The target part of a reply, when this macOS needs it to build the thread.
+  ///
+  /// Nil before Tahoe on purpose: the legacy identifier needs no lookup, and loading a
+  /// part there would be a new failure mode in a path that works.
+  private func replyPart(for target: MessageGUID?, partIndex: Int?) async throws -> AnyObject? {
+    guard let target, IMThreads.resolvesThreads else { return nil }
+    return try await IMChatHistory.messagePartChatItem(
+      guid: target.rawValue, partIndex: partIndex ?? 0
+    )
+  }
+
+  /// What the message's `threadIdentifier` (and `threadOriginator`) should be.
+  ///
+  /// Synchronous — call it inside the send block, see `IMThreads`.
+  private static func replyThread(target: MessageGUID?, part: AnyObject?) throws -> IMThreads.Reply?
+  {
+    guard let target else { return nil }
+    if let part { return try IMThreads.reply(for: part) }
+    return .legacy(target: target.rawValue)
+  }
+
   /// PORTED. ObjC: `sendMessage:transfers:attributedString:transaction:`
   /// (BlueBubblesHelper.m:1013).
   public func sendMessage(_ request: SendMessageRequest) async throws -> SentMessage {
     // Reply threading. IMCore has no reply parameter — a reply is an ordinary message
-    // whose threadIdentifier names the THREAD it joins, which is not the target's GUID.
-    // See `IMThreads`. Only the part is loaded here, because that is asynchronous; the
+    // whose threadIdentifier names the THREAD it joins. On Tahoe that has to be resolved
+    // from the target part (see `IMThreads`); before Tahoe the target's GUID is passed as
+    // it always was. Only the part is loaded here, because that is asynchronous; the
     // thread is read off it inside the block, with no suspension before the send.
-    let replyPart: AnyObject? =
-      if let target = request.replyTo {
-        try await IMChatHistory.messagePartChatItem(
-          guid: target.rawValue, partIndex: request.replyPartIndex ?? 0
-        )
-      } else {
-        nil
-      }
+    let replyPart = try await replyPart(for: request.replyTo, partIndex: request.replyPartIndex)
     return try translating {
       let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
-      let reply = try replyPart.map(IMThreads.reply(for:))
+      let reply = try Self.replyThread(target: request.replyTo, part: replyPart)
 
       let message = try IMMessageBuilder.message(
         text: NSAttributedString(string: request.text),
@@ -210,19 +225,12 @@ public final class IMCoreBridge: PrivateAPI {
   /// Parts append in order, so text and attachments interleave as the caller asked. One
   /// synchronous block for the same reason as `sendAttachment`.
   public func sendMultipart(_ request: SendMultipartRequest) async throws -> SentMessage {
-    // As `sendMessage`: the part is loaded first, the thread read off it inside the
-    // block. A bare GUID here sent fine and threaded nothing.
-    let replyPart: AnyObject? =
-      if let target = request.replyTo {
-        try await IMChatHistory.messagePartChatItem(
-          guid: target.rawValue, partIndex: request.replyPartIndex ?? 0
-        )
-      } else {
-        nil
-      }
+    // As `sendMessage`: the part is loaded first (Tahoe only), the thread read off it
+    // inside the block.
+    let replyPart = try await replyPart(for: request.replyTo, partIndex: request.replyPartIndex)
     return try translating {
       let conversation = try requireConversation(request.chat)
-      let reply = try replyPart.map(IMThreads.reply(for:))
+      let reply = try Self.replyThread(target: request.replyTo, part: replyPart)
 
       var composition = try CKCompositions.empty(
         subject: request.subject.map { NSAttributedString(string: $0) }
