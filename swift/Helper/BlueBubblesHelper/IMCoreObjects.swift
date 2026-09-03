@@ -1491,6 +1491,92 @@ enum IMMessageBuilder {
   }
 }
 
+// MARK: - Reply threads
+
+/// What a reply carries so that Messages threads it.
+///
+/// A thread identifier is not a message GUID. `IMCreateThreadIdentifier` formats it as
+/// `r:<part index>:<range location>:<range length>:<message guid>` (disassembled from IMCore
+/// on macOS 26.5.2), and imagent splits it back with
+/// `IMMessageThreadIdentifierGetComponents` into chat.db's `thread_originator_guid` and
+/// `thread_originator_part` (`0:0:29`). Hand it a bare GUID and the split fails, the message
+/// sends, and it is simply not a reply — measured on both send paths, with no error
+/// anywhere. The shipping Objective-C helper never made that mistake: it resolves the target
+/// PART chat item, reuses the thread it is already in, or asks IMCore to create one
+/// (`BlueBubblesHelper.m:1106`). This is that, in the order it does it.
+///
+/// **Synchronous, and used inside the same block as the send.** The originator comes back
+/// from an accessor at +0, alive only until the autorelease pool drains — and a Swift
+/// `await` drains it. The first version of this returned it from an `async` function and
+/// Messages crashed in `objc_retain` on the way back (Messages-2026-09-02-211127.ips). The
+/// caller loads the part asynchronously (that reference is retained by the Swift array it
+/// came out of) and then does everything else without suspending.
+enum IMThreads {
+
+  struct Reply {
+    /// What goes in `threadIdentifier`.
+    let identifier: String
+    /// The `IMMessage` that started the thread, for `threadOriginator`. Best effort: a
+    /// reply threads without it, but Messages' own sends set it and so does the reference.
+    let originator: AnyObject?
+  }
+
+  /// The thread a reply to this message part belongs to.
+  static func reply(for part: AnyObject) throws -> Reply {
+    // Already in a thread: join it, so a reply to a reply lands under the same originator
+    // rather than starting a thread under the reply.
+    if let existing = ((try? IMCoreRuntime.string(part, "threadIdentifier")) ?? nil),
+      !existing.isEmpty
+    {
+      let originatorItem = ((try? IMCoreRuntime.send(part, "threadOriginator")) ?? nil)
+      return Reply(identifier: existing, originator: originatorItem.flatMap(message(of:)))
+    }
+    return Reply(identifier: try createIdentifier(for: part), originator: message(of: part))
+  }
+
+  /// `IMCreateThreadIdentifierForMessagePartChatItem`, an exported C function in IMCore.
+  ///
+  /// Looked up by name rather than linked, for the reason everything else here is: a
+  /// symbol that moves must degrade to a report, not a helper that fails to load. It is a
+  /// `Create` function and its disassembly confirms the +1: it retains the formatted string
+  /// and returns it without autoreleasing. So the value is taken as retained, which is the
+  /// rule ARC applies to the reference's call. When the symbol is absent the identifier is
+  /// formatted here from the same three values the function reads off the part (its index,
+  /// its range in the message text and the message GUID).
+  private static func createIdentifier(for part: AnyObject) throws -> String {
+    typealias Create = @convention(c) (AnyObject) -> Unmanaged<NSString>?
+    if let symbol = dlsym(
+      UnsafeMutableRawPointer(bitPattern: -2),  // RTLD_DEFAULT
+      "IMCreateThreadIdentifierForMessagePartChatItem"
+    ) {
+      let create = unsafeBitCast(symbol, to: Create.self)
+      if let identifier = create(part)?.takeRetainedValue() {
+        let copied = String(identifier)
+        if !copied.isEmpty { return copied }
+      }
+    }
+
+    // The function's own recipe, from its disassembly: `r:%lu:%lu:%lu:%@`.
+    let index = (try? IMCoreRuntime.integer(part, "index")) ?? 0
+    let range = try IMStickers.partRange(part)
+    guard let message = message(of: part),
+      let guid = ((try? IMCoreRuntime.string(message, "guid")) ?? nil), !guid.isEmpty
+    else {
+      throw PrivateAPIErrorShim.rejected("could not identify the message being replied to")
+    }
+    return "r:\(max(index, 0)):\(range.location):\(range.length):\(guid)"
+  }
+
+  /// The `IMMessage` behind a chat item or a message item.
+  ///
+  /// Both answer `message`; guarded because an aggregate (gallery) part is a different
+  /// class and a missing selector here must cost the originator, not the send.
+  private static func message(of item: AnyObject) -> AnyObject? {
+    guard IMCoreRuntime.responds(item, to: NSSelectorFromString("message")) else { return nil }
+    return (try? IMCoreRuntime.send(item, "message")) ?? nil
+  }
+}
+
 // MARK: - Stickers
 
 /// The sticker model and the ChatKit objects that turn one into a sendable composition.

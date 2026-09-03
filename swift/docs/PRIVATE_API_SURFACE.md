@@ -329,6 +329,35 @@ the full lifecycle: `editScheduledMessageItem:scheduleType:deliveryTime:`,
 probably the single most requested thing in this whole list and it does not appear to be
 blocked by anything.
 
+### Reply threads — `threadIdentifier` is not a GUID
+
+Backs `selectedMessageGuid` on `message.sendText`, `message.sendMultipart` and
+`message.sendAttachment`. Measured 2 September 2026 on macOS 26.5.2 after every reply the
+helper sent landed with an empty `thread_originator_guid`.
+
+`IMMessage.threadIdentifier` names a THREAD, and IMCore formats one as
+`r:<part index>:<range location>:<range length>:<originator guid>` (`IMCreateThreadIdentifier`,
+disassembled). imagent parses it back with `IMMessageThreadIdentifierGetComponents` into
+chat.db's `thread_originator_guid` and `thread_originator_part` (`0:0:55`). A bare message
+GUID fails that parse: the message sends, is delivered, and is not a reply — no error at any
+layer. The helper had passed the bare GUID on both send paths.
+
+What Messages and the Objective-C helper do, now `IMThreads` in the Swift helper:
+
+| Step | Selector | Notes |
+|---|---|---|
+| target | `IMChatHistoryController loadMessageWithGUID:` → `_imMessageItem` → `_newChatItems[partIndex]` | the `IMMessagePartChatItem` being replied to |
+| join | `-[IMMessagePartChatItem threadIdentifier]`, `threadOriginator` | non-empty when the target is already in a thread; reuse it so a reply to a reply lands under the original message |
+| create | `IMCreateThreadIdentifierForMessagePartChatItem(part)` | exported C function in IMCore, +1 return. Reads the part's `index`, `messagePartRange` and message GUID |
+| set | `-[IMMessage setThreadIdentifier:]`, `setThreadOriginator:` | on the built message, before `sendMessage:` / `sendMessage:newComposition:` |
+
+Verified: text, multipart and attachment replies all land with the target's GUID and
+`0:0:<length>`, and a reply to one of them carries the same originator.
+
+One hazard, recorded because it cost a Messages crash: the originator comes back from an
+accessor at +0 and dies when the autorelease pool drains, which a Swift `await` does. Resolve
+the thread inside the same synchronous block as the send, never across a suspension.
+
 ### Stickers — `message.sendSticker`
 
 Backs `POST /api/v2/message/sticker` and the wire action `send-sticker`. Measured on macOS

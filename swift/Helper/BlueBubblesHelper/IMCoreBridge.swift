@@ -160,19 +160,33 @@ public final class IMCoreBridge: PrivateAPI {
   /// PORTED. ObjC: `sendMessage:transfers:attributedString:transaction:`
   /// (BlueBubblesHelper.m:1013).
   public func sendMessage(_ request: SendMessageRequest) async throws -> SentMessage {
-    try translating {
+    // Reply threading. IMCore has no reply parameter — a reply is an ordinary message
+    // whose threadIdentifier names the THREAD it joins, which is not the target's GUID.
+    // See `IMThreads`. Only the part is loaded here, because that is asynchronous; the
+    // thread is read off it inside the block, with no suspension before the send.
+    let replyPart: AnyObject? =
+      if let target = request.replyTo {
+        try await IMChatHistory.messagePartChatItem(
+          guid: target.rawValue, partIndex: request.replyPartIndex ?? 0
+        )
+      } else {
+        nil
+      }
+    return try translating {
       let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
+      let reply = try replyPart.map(IMThreads.reply(for:))
 
       let message = try IMMessageBuilder.message(
         text: NSAttributedString(string: request.text),
         subject: request.subject.map { NSAttributedString(string: $0) },
         fileTransferGUIDs: [],
         effectID: request.effectId,
-        // Reply threading. IMCore has no reply parameter — a reply is an ordinary
-        // message whose threadIdentifier names the message it answers.
-        threadIdentifier: request.replyTo?.rawValue,
+        threadIdentifier: reply?.identifier,
         isAudioMessage: false
       )
+      if let originator = reply?.originator {
+        try? IMCoreRuntime.invoke(message, "setThreadOriginator:", [originator])
+      }
       try chat.send(message)
 
       // Read AFTER the send: `sendMessage:` returns nothing, and the GUID does not
@@ -196,8 +210,19 @@ public final class IMCoreBridge: PrivateAPI {
   /// Parts append in order, so text and attachments interleave as the caller asked. One
   /// synchronous block for the same reason as `sendAttachment`.
   public func sendMultipart(_ request: SendMultipartRequest) async throws -> SentMessage {
-    try translating {
+    // As `sendMessage`: the part is loaded first, the thread read off it inside the
+    // block. A bare GUID here sent fine and threaded nothing.
+    let replyPart: AnyObject? =
+      if let target = request.replyTo {
+        try await IMChatHistory.messagePartChatItem(
+          guid: target.rawValue, partIndex: request.replyPartIndex ?? 0
+        )
+      } else {
+        nil
+      }
+    return try translating {
       let conversation = try requireConversation(request.chat)
+      let reply = try replyPart.map(IMThreads.reply(for:))
 
       var composition = try CKCompositions.empty(
         subject: request.subject.map { NSAttributedString(string: $0) }
@@ -219,10 +244,11 @@ public final class IMCoreBridge: PrivateAPI {
 
       let messages = try conversation.messages(from: composition)
       for message in messages {
-        if let replyTo = request.replyTo {
-          _ = try? IMCoreRuntime.invoke(
-            message, "setThreadIdentifier:", [replyTo.rawValue]
-          )
+        if let reply {
+          try IMCoreRuntime.invoke(message, "setThreadIdentifier:", [reply.identifier])
+          if let originator = reply.originator {
+            try? IMCoreRuntime.invoke(message, "setThreadOriginator:", [originator])
+          }
         }
         try conversation.send(message)
       }

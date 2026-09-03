@@ -649,25 +649,6 @@ through it with no special-casing, which is the standing proof it is expressive 
 
 ---
 
-## Replies do not thread on macOS 26.5.2 — through either send path
-
-Measured on 2 September 2026 while checking the attachment route's reply passthrough: a
-`POST /message/text` with `method: private-api` and `selectedMessageGuid`, and a
-`POST /message/multipart` with the same, both sent and both landed with an EMPTY
-`thread_originator_guid`. The row exists, the message arrives, it is just not a reply.
-The attachment route's new `selectedMessageGuid` support inherits this, since it goes
-through the multipart action.
-
-The likely cause is the same one the sticker path hit: the helper sets `threadIdentifier`
-to the BARE message GUID (`IMMessageBuilder.message`, and `setThreadIdentifier:` in
-`sendMultipart`), while Messages' own replies carry `p:<part>/<guid>` — every
-`thread_originator_guid` on this Mac that Messages wrote has that prefix, and the sticker
-send only worked once its association GUID did too. Not yet tried.
-
-- [ ] Pass `p:\(partIndex)/\(guid)` as the thread identifier on both paths and re-measure.
-      Done = the two control sends above land with `thread_originator_guid` set and
-      `thread_originator_part` = `0:0:1`.
-
 ## `POST /message/attachment/chunk` reads base64 JSON; the reference reads a multipart `chunk`
 
 Found while fixing `/message/attachment`, which had the same problem: the reference's chunk
