@@ -186,6 +186,12 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
+    case .editScheduledMessage:
+      try await bridge.editScheduledMessage(
+        try message("messageGuid"), in: try chat(), partIndex: integer("partIndex"),
+        newText: try string("editedMessage"))
+      return nil
+
     case .rescheduleMessage:
       guard let milliseconds = data["scheduledFor"]?.doubleValue else {
         throw PrivateAPIError.rejectedByMessages(reason: "reschedule requires 'scheduledFor'")

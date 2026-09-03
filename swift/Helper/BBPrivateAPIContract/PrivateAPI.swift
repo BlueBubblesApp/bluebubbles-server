@@ -731,6 +731,12 @@ public protocol PrivateAPI: Sendable {
   func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
   /// Moves a scheduled message to a new delivery time.
   func rescheduleMessage(_ guid: MessageGUID, in chat: ChatIdentifier, to date: Date) async throws
+  /// Rewrites one part of a scheduled message, before it is sent. Not an edit in the
+  /// iMessage sense — nothing has been delivered, so there is no edit history and the
+  /// recipient never sees the earlier text.
+  func editScheduledMessage(
+    _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String
+  ) async throws
   /// Delivers a scheduled message now, leaving the schedule behind.
   func sendScheduledMessageNow(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
   /// Sends a new poll and answers with its message. macOS 26 and later.

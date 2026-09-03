@@ -512,6 +512,17 @@ public final class IMCoreBridge: PrivateAPI {
     try await editScheduled(guid, in: chat, scheduleType: 0, deliveryTime: nil)
   }
 
+  /// NEW. See `IMChat.editScheduledMessageText(item:partIndex:text:)`.
+  public func editScheduledMessage(
+    _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String
+  ) async throws {
+    let item = try await IMChatHistory.messageItem(guid: guid.rawValue)
+    try translating {
+      try IMChatRegistry.requireChat(guid: chat.rawValue).editScheduledMessageText(
+        item: item, partIndex: partIndex, text: NSAttributedString(string: newText))
+    }
+  }
+
   private func editScheduled(
     _ guid: MessageGUID, in chat: ChatIdentifier, scheduleType: UInt, deliveryTime: Date?
   ) async throws {

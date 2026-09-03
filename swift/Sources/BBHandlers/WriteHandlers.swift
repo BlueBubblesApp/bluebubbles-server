@@ -248,17 +248,30 @@ public enum WriteHandlers {
         metadata: .object(["count": .int(messages.count)]))
     }
 
+    // One PUT for both things a pending message can have changed: its text, its delivery
+    // time, or both in a single call. Either field alone is a complete request.
     registry.register(.messageReschedule) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()
-      guard let milliseconds = values.double("scheduledFor") else {
-        throw BadRequest("`scheduledFor` is required, as epoch milliseconds")
+      let chatGUID = try values.requireString("chatGuid")
+      let guid = try request.requirePathParameter("guid")
+      let newText = values.string("message", or: "editedMessage")
+      let milliseconds = values.double("scheduledFor")
+      guard newText != nil || milliseconds != nil else {
+        throw BadRequest("`message` or `scheduledFor` is required")
       }
-      try await interfaces.message.rescheduleMessage(
-        chatGUID: try values.requireString("chatGuid"),
-        messageGUID: try request.requirePathParameter("guid"),
-        to: Date(timeIntervalSince1970: milliseconds / 1000)
-      )
+      // Text first: it is the one that can be refused, and a rejected edit should not
+      // leave the message already moved.
+      if let newText {
+        try await interfaces.message.editScheduledMessage(
+          chatGUID: chatGUID, messageGUID: guid,
+          partIndex: values.int("partIndex") ?? 0, newText: newText)
+      }
+      if let milliseconds {
+        try await interfaces.message.rescheduleMessage(
+          chatGUID: chatGUID, messageGUID: guid,
+          to: Date(timeIntervalSince1970: milliseconds / 1000))
+      }
       return .data(nil)
     }
 

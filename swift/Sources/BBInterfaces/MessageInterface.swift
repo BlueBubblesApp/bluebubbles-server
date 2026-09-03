@@ -978,6 +978,23 @@ public struct MessageInterface: MessagesBackedInterface {
     }
   }
 
+  /// Rewrites a scheduled message's text before it is sent. Nothing is delivered until its
+  /// time, so this leaves no edit history — unlike `edit`, which amends a sent message.
+  public func editScheduledMessage(
+    chatGUID: String, messageGUID: String, partIndex: Int = 0, newText: String
+  ) async throws {
+    let api = try requirePrivateAPI(for: "Send Later")
+    guard !newText.isEmpty else {
+      throw InterfaceError.invalidRequest("`message` must not be empty")
+    }
+    try await requireMessage(messageGUID)
+    try await throughMessages {
+      try await api.editScheduledMessage(
+        MessageGUID(messageGUID), in: ChatIdentifier(chatGUID), partIndex: partIndex,
+        newText: newText)
+    }
+  }
+
   /// Releases a scheduled message now. The row stops being pending and is delivered.
   public func sendScheduledMessageNow(chatGUID: String, messageGUID: String) async throws {
     let api = try requirePrivateAPI(for: "Send Later")

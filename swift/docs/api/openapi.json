@@ -20410,7 +20410,7 @@
                 },
                 "example": {
                   "status": 200,
-                  "message": "Message rescheduled!"
+                  "message": "Scheduled message updated!"
                 }
               }
             }

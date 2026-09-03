@@ -39,6 +39,7 @@ public enum MessagesHelperAction: String, Sendable, CaseIterable, CustomStringCo
   case deleteMessage = "delete-message"
   case downloadPurgedAttachment = "download-purged-attachment"
   case editMessage = "edit-message"
+  case editScheduledMessage = "edit-scheduled-message"
   case findMyFriends = "findmy-friends"
   case findMyStatus = "findmy-status"
   case getAccountInfo = "get-account-info"

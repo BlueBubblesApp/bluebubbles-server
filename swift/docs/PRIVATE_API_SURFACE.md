@@ -371,6 +371,8 @@ used first, with the chat-item form kept as the fallback for a release without i
 
 ### Send Later — the date goes on the COMPOSITION
 
+High-level write-up and the REST surface: [`docs/SEND_LATER.md`](SEND_LATER.md).
+
 Backs `message.sendLater` / `message.cancelScheduled`. Measured on macOS 26.5.2.
 
 **The obvious approach does not work.** `IMMessage` has `scheduleType` and `scheduleState`, and
@@ -398,6 +400,10 @@ type **0 and a nil date**, which are the values `-[CKScheduledSectionDateCell ha
 forwards and the branch IMCore logs as "Modifying scheduled time to be immediate". Measured:
 a message at 08:09 moved to 08:54, then send-now delivered it at once and the row dropped to
 `schedule_type 0`, `schedule_state 0`, `is_delivered 1`.
+
+**Editing a scheduled message's text** is `-[IMChat editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:]`
+(translation nil), which rewrites the pending item in place — no edit history, because nothing
+has been delivered.
 
 **Cancelling takes the message ITEM.** `-[IMChat cancelScheduledMessageWithGUID:destinations:cancelType:]`
 with nil destinations returns without raising and changes nothing — measured, the row stayed

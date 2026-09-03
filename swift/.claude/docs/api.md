@@ -93,6 +93,8 @@ own behaviour and what the tests below observed.
 
 ### Send Later — `POST /api/v2/message/send-later`
 
+Full reference, including the client notes: [`docs/SEND_LATER.md`](../../docs/SEND_LATER.md).
+
 Apple's own scheduling, not this server's. `/message/schedule` (v1) is a SERVER timer: it holds
 the message and sends it when this Mac is awake and the server is running. Send Later hands the
 message to iMessage already scheduled, and it goes out whether or not this Mac is on.
@@ -107,7 +109,8 @@ POST /api/v2/message/send-later
 `tempGuid`). Private API only, macOS 15 and newer. Answers with the message row, like every
 other send.
 
-`PUT /api/v2/message/send-later/:guid` moves one to a new `scheduledFor`, and
+`PUT /api/v2/message/send-later/:guid` changes a pending message's `message` text, its
+`scheduledFor`, or both in one call (at least one required), and
 `POST /api/v2/message/send-later/:guid/send-now` releases one immediately; both take
 `chatGuid` in the body and answer with no data. After a send-now the row reads
 `scheduleType 0`, `scheduleState 0`, delivered — it becomes an ordinary message and leaves

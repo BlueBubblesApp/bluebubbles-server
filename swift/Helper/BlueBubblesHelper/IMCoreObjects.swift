@@ -363,6 +363,26 @@ struct IMChat {
     try IMCoreRuntime.invoke(object, plural, [[item], scheduleType, time])
   }
 
+  /// Rewrites one part of a scheduled message before it goes out.
+  ///
+  /// ObjC: `-[IMChat editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:]`,
+  /// which takes the message ITEM, the part index as a `long long`, the replacement as an
+  /// attributed string, and a translation this passes nil for. Distinct from editing a SENT
+  /// message (`CKConversation editMessageItem:partIndex:withNewComposition:`): nothing has
+  /// been delivered, so IMCore rewrites the pending item in place rather than sending an
+  /// edit that recipients see as one.
+  func editScheduledMessageText(
+    item: AnyObject, partIndex: Int, text: NSAttributedString
+  ) throws {
+    let selector = "editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:"
+    guard IMCoreRuntime.responds(object, to: NSSelectorFromString(selector)) else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "editScheduledMessage", requires: selector
+      )
+    }
+    try IMCoreRuntime.invoke(object, selector, [item, partIndex, text, NSNull()])
+  }
+
   func retractMessagePart(_ part: AnyObject) throws {
     try IMCoreRuntime.invoke(object, "retractMessagePart:", [part])
   }

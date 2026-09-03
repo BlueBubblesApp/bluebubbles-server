@@ -52,6 +52,11 @@ struct FailingPrivateAPI: PrivateAPI {
   func rescheduleMessage(_ guid: MessageGUID, in chat: ChatIdentifier, to date: Date) async throws {
     throw error
   }
+  func editScheduledMessage(
+    _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String
+  ) async throws {
+    throw error
+  }
   func sendScheduledMessageNow(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
     throw error
   }

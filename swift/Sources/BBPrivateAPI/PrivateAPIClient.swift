@@ -155,6 +155,19 @@ public actor PrivateAPIClient: PrivateAPI {
     return try sentMessage(from: result, chat: request.chat)
   }
 
+  public func editScheduledMessage(
+    _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String
+  ) async throws {
+    _ = try await transport.request(
+      action: .editScheduledMessage,
+      data: .object([
+        "chatGuid": .string(chat.rawValue),
+        "messageGuid": .string(guid.rawValue),
+        "partIndex": .number(Double(partIndex)),
+        "editedMessage": .string(newText),
+      ]))
+  }
+
   public func rescheduleMessage(
     _ guid: MessageGUID, in chat: ChatIdentifier, to date: Date
   ) async throws {
