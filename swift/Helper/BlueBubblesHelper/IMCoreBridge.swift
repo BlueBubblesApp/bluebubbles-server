@@ -1309,7 +1309,8 @@ public final class IMCoreBridge: PrivateAPI {
           filter: try conversation.filterState()
         )
       }
-      let reported = try conversation.reportJunk(toCarrier: request.reportToCarrier)
+      let reported = try conversation.reportJunk(
+        toCarrier: request.reportToCarrier, pendingCount: count)
       return ChatSpamResult(
         messageCount: reported ? count : 0,
         reportedToCarrier: request.reportToCarrier,

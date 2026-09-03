@@ -526,7 +526,13 @@ curl -s -X DELETE "$BB/messages?$P" -d '{"confirm": true}'
 
 A `dryRun: true` on the spam and filter routes, reporting what *would* be reported
 (`-allMessagesToReportAsSpam`'s count, the current `filterCategory`) without calling the
-mutating selector, makes those two testable on any conversation. Worth building; it is four
+mutating selector, makes those two testable on any conversation.
+
+**Since measured, and the count is narrower than this paragraph assumes.**
+`-allMessagesToReportAsSpam` is `[self messagesToReportAsSpamFromChatItems:[self chatItems]]`,
+and `-chatItems` is built from the chat's in-memory `_items` — no `chat.db` query anywhere in
+that path. So the dry run reports on the LOADED transcript, and a conversation nobody has
+opened answers zero. Same on 14.6.1, 15.6.1 and 26.5.2. See `../TODO.md`. Worth building; it is four
 lines and it is the difference between a testable feature and an untested one.
 
 Automated coverage, alongside:

@@ -70,6 +70,37 @@ The Sonoma VM is gone; a Sequoia VM existed as of 3 September 2026.
 - [ ] On Sonoma, if a machine appears: the above plus send a sticker, revoke a FaceTime link,
       send a named tapback, and mute a chat — the four whose Sonoma rung nothing else exercises.
 
+## Spam counts only see the transcript Messages has already loaded
+
+`-[IMChat allMessagesToReportAsSpam]` disassembles to one line —
+`[self messagesToReportAsSpamFromChatItems:[self chatItems]]` — and `-chatItems` builds from
+the chat's in-memory `_items` through `chatItemRulesClass`. **Nothing in that path queries
+`chat.db`.** So `messagesToReportAsSpamCount()` answers about the loaded transcript window,
+not the conversation:
+
+- a chat the user has never opened in Messages reports **0 messages to report**, which a
+  client reads as "nothing to report" and shows as a disabled button;
+- a chat the user has scrolled a long way back in reports more than a freshly opened one;
+- and `markAsSpam(count:)` is HANDED that number, so the count it records is whatever
+  happened to be in memory.
+
+Not a version difference — same selectors on 14.6.1, 15.6.1 and 26.5.2, and it is Messages'
+own behaviour rather than something this port does wrong: Messages never asks unless the
+conversation is on screen. But this server is asked over HTTP about conversations nobody has
+opened, which is the case Apple's implementation does not have.
+
+`IMChat` carries `loadMessagesUpToGUID:`, `loadMessagesBeforeDate:` and
+`loadUnreadMessagesWithLimit:` on all three releases. Nothing in `Helper/` calls any of them.
+
+- [ ] Decide whether the junk/spam routes should load first, and how far back. It is a
+      product question before a technical one: "report this conversation as junk" probably
+      means the whole conversation, but the API cannot express that today and silently means
+      "the part of it that happens to be in memory".
+- [ ] Until then, say so where a client can see it. `ChatSpamResult.messageCount` reads as
+      authoritative and is not.
+- [ ] Cross-check against `chat.db`, which this server can already query, rather than
+      trusting IMCore's in-memory view for the COUNT while still using IMCore for the report.
+
 ## `canReportJunk` reports false on Sonoma while reporting works
 
 Read from `-_messageToReportJunk`, which only 26 has, so it defaults to `false` on 14 — while

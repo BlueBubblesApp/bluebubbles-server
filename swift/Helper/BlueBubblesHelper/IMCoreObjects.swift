@@ -203,6 +203,22 @@ struct IMChat {
   ///
   /// This is what makes a dry run possible: the count is readable without reporting
   /// anything, so the path can be exercised against a real conversation.
+  ///
+  /// **It counts LOADED items, not the conversation.** Disassembled on 26.5.2,
+  /// `-allMessagesToReportAsSpam` is one line — `[self messagesToReportAsSpamFromChatItems:
+  /// [self chatItems]]` — and `-chatItems` builds its answer from the chat's in-memory
+  /// `_items` through `chatItemRulesClass`. Nothing in that path queries `chat.db`. So a
+  /// conversation whose transcript Messages has not loaded reports **zero** here, and a
+  /// conversation the user has scrolled through reports more than one it has not.
+  ///
+  /// That is not a version difference — the same selectors are on 14.6.1, 15.6.1 and
+  /// 26.5.2, and `IMChat` carries `loadMessagesUpToGUID:`, `loadMessagesBeforeDate:` and
+  /// `loadUnreadMessagesWithLimit:` on all three. Nothing here calls them yet; see
+  /// `../TODO.md`.
+  ///
+  /// Also not free: each call constructs a rules object, walks every loaded item and
+  /// replaces the chat-item array, which is why `reportJunk(toCarrier:pendingCount:)` takes
+  /// the count rather than reading it a second time.
   func messagesToReportAsSpamCount() throws -> Int {
     let messages = (try? IMCoreRuntime.objects(object, "allMessagesToReportAsSpam")) ?? []
     return messages.count
@@ -248,7 +264,13 @@ struct IMChat {
   /// is on all three releases and is what `messagesToReportAsSpamCount()` already uses.
   ///
   /// Measured on 14.6.1, 15.6.1 and 26.5.2 — `docs/MACOS_COMPATIBILITY.md` §2b.
-  func reportJunk(toCarrier: Bool) throws -> Bool {
+  /// `pendingCount` is what `messagesToReportAsSpamCount()` answered BEFORE this call, and
+  /// it is a parameter rather than a second lookup for two reasons. It has to be read
+  /// before the report, because afterwards the list is no longer the answer to "was there
+  /// anything to report" — and every caller has already read it, to decide the dry run.
+  /// Reading it again here would be a second walk of `chatItems`, which is not free: see
+  /// `messagesToReportAsSpamCount()` for what that costs.
+  func reportJunk(toCarrier: Bool, pendingCount: Int) throws -> Bool {
     if IMCoreRuntime.responds(object, to: NSSelectorFromString("reportJunk")) {
       let reported = try IMCoreRuntime.callReturningBool(object, "reportJunk")
       if toCarrier,
@@ -266,11 +288,8 @@ struct IMChat {
       throw PrivateAPIError.unavailableOnThisOS(
         method: "reportJunk", requires: "-reportJunk or -reportJunkToCarrier on IMChat")
     }
-    // Read before reporting: afterwards the conversation has been dealt with and the list
-    // is no longer the answer to "was there anything to report".
-    let pending = try messagesToReportAsSpamCount()
     try IMCoreRuntime.invoke(object, "reportJunkToCarrier")
-    return pending > 0
+    return pendingCount > 0
   }
 
   /// ObjC: `-updateIsFiltered:`, or recovery from Junk, which is not the same operation.
