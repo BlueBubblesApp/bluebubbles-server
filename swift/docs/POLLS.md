@@ -4,12 +4,13 @@ What an iMessage poll actually is, what this server would have to send to make o
 a client has to do to show one. Measured on macOS 26.5.2 (Tahoe) from real poll threads in
 `chat.db` and by disassembling ChatKit, IMCore and Messages.framework.
 
-**Status: built and sent, not yet seen on a receiving device.** `GET /api/v2/message/poll/:guid`
-assembles a poll from its thread, `POST /api/v2/message/poll` creates one and
-`POST /api/v2/message/poll/:guid/vote` votes. All three ran on 3 September 2026 against a real
-chat: the poll and the vote landed in `chat.db` as `com.apple.messages.Polls` rows with the
-same payload shapes Apple's own carry, and the read route reproduces a six-participant thread
-Messages made. What has not been seen is either message drawn on another device — § 8.
+**Status: built, sent, and rendering.** `GET /api/v2/message/poll/:guid` assembles a poll from
+its thread, `POST /api/v2/message/poll` creates one and `POST /api/v2/message/poll/:guid/vote`
+votes. All three ran on 3 September 2026 against a real chat: the poll and the vote landed in
+`chat.db` as `com.apple.messages.Polls` rows with the same payload shapes Apple's own carry, the
+read route reproduces a six-participant thread Messages made, and the transcript on this Mac
+draws the poll as a poll — three options, the vote filled in against its option. What has not
+been checked is another participant's device — § 8.
 
 Polls are **macOS 26 and newer**. `-[IMChat _supportsPolls]` and `-[CKConversation supportsPolls]`
 gate them, and the Polls extension does not exist on earlier releases.
@@ -298,8 +299,7 @@ thread and read `options` and `votes` back assembled. Steps 1 and 5 are the clie
   needs it or falls back to the installed extension's icon is unknown.
 - **Adding an option** (`type 2`) is not covered above beyond its shape, and the server
   cannot send one.
-- **Delivery.** The poll and the vote this server sent were accepted (`is_sent 1`, `error 0`)
-  and had not shown a delivery receipt after two minutes, where a text to the same address
-  shows one within seconds. The recipient's devices may simply not support polls; nobody has
-  looked at them there yet. That is the next test.
+- **The other side.** Seen rendering on this Mac's own transcript; not yet on a participant's
+  device. The rows had no delivery receipt after two minutes where a text gets one in seconds,
+  which may just be how app messages report. Worth one look on a phone.
 - **`associated_message_type`** is 0 on a poll we create and 3 on one Messages creates.

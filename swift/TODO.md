@@ -674,9 +674,9 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
 `POST /api/v2/message/send-later` schedules through Apple (`docs/PRIVATE_API_SURFACE.md`
 § Send Later); polls are researched only, in [`docs/POLLS.md`](docs/POLLS.md).
 
-- [ ] **Polls: look at one on a receiving device.** Created and voted from here; neither row
-      had a delivery receipt after two minutes. `docs/POLLS.md` § 8 lists what differs from
-      Apple's rows (`associated_message_type` 0 vs 3, a smaller payload without the icon).
+- [ ] **Polls: look at one on a participant's phone.** Created and voted from here and both
+      render on this Mac's transcript (options, vote); neither row showed a delivery receipt
+      after two minutes. `docs/POLLS.md` § 8 has the remaining differences from Apple's rows.
 - [ ] Polls cannot be EDITED from here (adding an option is a type-2 re-send of the whole
       poll, and the JSON shape is known — `docs/POLLS.md` § 3).
 - [ ] Send Later has no LIST route. A client can find scheduled messages by querying and
