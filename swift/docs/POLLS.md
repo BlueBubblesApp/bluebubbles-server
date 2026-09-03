@@ -290,8 +290,10 @@ thread and read `options` and `votes` back assembled. Steps 1 and 5 are the clie
 - **Multi-select and titles.** Every poll observed here has `"title": ""` and one vote per
   participant. Whether the UI can produce a titled or multi-select poll, and what the JSON looks
   like when it does, has not been seen.
-- **`liveLayoutInfo`** (318 bytes) is unexplained. A poll sent without it may render as a plain
-  app balloon rather than a live one.
+- **`liveLayoutInfo`** is `{layoutClass: MSMessageLiveLayout}` and it is REQUIRED: a poll sent
+  with only a template layout arrived on this Mac as a plain "Sent a poll" balloon with an
+  "Add Choice" button and no options. Wrapping the template in an `MSMessageLiveLayout` makes
+  `MSMessage` write it, and the archive then carries Apple's exact key set.
 - **`ai`**, the app icon, is 4 KB of JPEG on every poll message. Whether the receiving device
   needs it or falls back to the installed extension's icon is unknown.
 - **Adding an option** (`type 2`) is not covered above beyond its shape, and the server

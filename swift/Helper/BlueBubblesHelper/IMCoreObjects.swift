@@ -1727,13 +1727,26 @@ enum IMPolls {
       throw PrivateAPIErrorShim.rejected("MSMessage would not initialise")
     }
     try IMCoreRuntime.invoke(message, "setURL:", [url])
-    // The layout is what other devices show while the extension loads, and what the
-    // notification says. Messages' own polls carry exactly this caption.
-    let layoutClass = try requireMessagesClass("MSMessageTemplateLayout")
-    if let layout = try IMCoreRuntime.invoke(try allocate(layoutClass), "init") {
-      try? IMCoreRuntime.invoke(layout, "setCaption:", ["Sent a poll"])
-      try IMCoreRuntime.invoke(message, "setLayout:", [layout])
+    // A LIVE layout wrapping the template, not the template alone. MEASURED: a poll sent
+    // with only `MSMessageTemplateLayout` arrives as a plain balloon reading "Sent a poll"
+    // with an "Add Choice" button and no options — the transcript falls back to the
+    // template because the archive has no `liveLayoutInfo`. Apple's polls carry one
+    // (`{layoutClass: MSMessageLiveLayout}`), which `MSMessage` writes itself when its
+    // layout is an `MSMessageLiveLayout`; the template becomes the `alternateLayout` and
+    // still supplies the caption other devices show while the poll loads.
+    let templateClass = try requireMessagesClass("MSMessageTemplateLayout")
+    guard let template = try IMCoreRuntime.invoke(try allocate(templateClass), "init") else {
+      throw PrivateAPIErrorShim.rejected("MSMessageTemplateLayout would not initialise")
     }
+    try? IMCoreRuntime.invoke(template, "setCaption:", ["Sent a poll"])
+    let liveClass = try requireMessagesClass("MSMessageLiveLayout")
+    guard
+      let live = try IMCoreRuntime.invoke(
+        try allocate(liveClass), "initWithAlternateLayout:", [template])
+    else {
+      throw PrivateAPIErrorShim.rejected("MSMessageLiveLayout would not initialise")
+    }
+    try IMCoreRuntime.invoke(message, "setLayout:", [live])
     try? IMCoreRuntime.invoke(message, "setSummaryText:", ["Sent a poll"])
 
     let compositionClass: AnyClass = try IMCoreRuntime.requireClass("CKComposition")
