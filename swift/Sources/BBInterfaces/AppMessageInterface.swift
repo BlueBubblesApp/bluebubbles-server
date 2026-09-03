@@ -286,8 +286,10 @@ extension MessageInterface {
   /// nothing: a field the caller supplied keeps its own value AND its own position, because
   /// a reply has to echo the `version` it was answering rather than take the invite default.
   public enum GamePigeonBoilerplate {
-    /// `5` on every genuine invite seen. A REPLY carries the value it is answering — his
-    /// move read `version = 0` — so a client sending one should pass it explicitly.
+    /// `5` on every genuine INVITE seen, and on some moves but not all: a Cup Pong move
+    /// read `0` where an 8 Ball move read `5`. So it is not simply invite-versus-move, and
+    /// nothing here should pretend to know the rule — a client sending a REPLY should echo
+    /// the value it is answering rather than take this default.
     public static let payloadVersion = "5"
     /// `5` on every genuine payload seen, invites and moves alike.
     public static let transportVersion = "5"

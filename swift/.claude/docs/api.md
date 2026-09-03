@@ -195,7 +195,8 @@ build avatar2` plus the game's own.
 the `game_pigeon_sender` setting), `version` (5, the invite value), `tver` (5) and `ios` (this
 Mac's version) — prepending them in the order genuine payloads carry them, and only where the
 caller said nothing. A caller's own value keeps its position too, so a REPLY can echo the
-`version=0` a move carries. The rest is still the client's: capture a real invite with
+`version` it is answering — moves disagree (Cup Pong sent 0, 8 Ball sent 5), so there is no
+rule to infer. The rest is still the client's: capture a real invite with
 `GET app/:guid` and vary it. `docs/GAME_PIGEON.md` § 4.
 
 The server does not model games: fields go out and come back as an ordered name/value list,

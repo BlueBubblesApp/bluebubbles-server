@@ -269,8 +269,9 @@ across two games, five app versions and both directions. What the suffix means i
 per-device salt and an install counter would both fit. A plain 36-character UUID is
 reproduced by nothing Game Pigeon has ever sent, so it is not used. `ios` is the Mac's own version. `version` defaults to `5`, which is what
 every genuine INVITE carries — **a reply must send its own**, echoing the value it is
-answering, because a move carries `version=0`. Anything you supply yourself is left exactly
-as you sent it, value and position, so echoing works.
+answering. Moves do not agree with each other: a Cup Pong move carried `version=0` where an
+8 Ball move carried `5`, so there is no rule to infer and the server does not try. Anything
+you supply yourself is left exactly as you sent it, value and position, so echoing works.
 
 Everything else is still yours. The server does not model games — that is what lets an
 unknown Game Pigeon game work without a server change — so `seed`, `mode`, `num`, `player2`
@@ -355,10 +356,17 @@ enough for a sensible bubble, and you can skip the rest.
   a complete field list.
 - **Writing:** a Cup Pong invite sent from the API landed with the right bundle id, a 1.2 KB
   payload, and `is_delivered = 1`, and read back through our own route with its fields intact.
-- **Playing, end to end.** Someone opened that Cup Pong invite on their phone, played a move,
-  and the reply arrived and decoded here — `num = 2`, `round = 1`, both scores, and a
-  `replay` field holding the shot. So a game sent from this server is a real, playable game,
-  and its moves come back through `GET app/:guid` intact. This is the test that was open.
+- **Playing, end to end, in two different games.** Someone opened a Cup Pong invite on their
+  phone, played, and the reply arrived and decoded here — `num = 2`, `round = 1`, both
+  scores, a `replay` field holding the shot. Then an 8 Ball invite built from a genuine 2021
+  payload did the same: his move came back carrying the game `id` this server minted, a
+  `replay` with the shot physics (`d:12.537708&x:0.000000&y:28.600000&p:2000.000000&balls:…`),
+  and `player2` set to **this server's own `sender`** — so the identity the server mints is
+  read by the app and echoed back. A game sent from here is a real, playable game.
+- **What a MOVE looks like** differs from an invite and from game to game. Both moves add
+  `player1`, `avatar1` and `replay`, and drop `caption`, `start` and `game_name`. Cup Pong's
+  carried `seed`, `round` and four score fields; 8 Ball's carried none of those. This is why
+  the server does not model games: two games one release apart do not agree on their fields.
 - **The codec:** round-trips at every length tested, and matches vectors computed by a separate
   implementation of the same algorithm.
 

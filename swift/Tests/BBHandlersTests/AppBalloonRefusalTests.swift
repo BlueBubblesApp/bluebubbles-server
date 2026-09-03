@@ -155,9 +155,9 @@ struct GamePigeonBoilerplateTests {
 
   @Test("A caller's own value is never overwritten, and never moved")
   func suppliedFieldsWin() {
-    // The case this protects: a REPLY has to echo the `version` it is answering. A genuine
-    // move read `version = 0` where an invite reads 5, so defaulting over the caller would
-    // corrupt every reply.
+    // The case this protects: a REPLY has to echo the `version` it is answering. Moves do
+    // not agree with each other — a Cup Pong move read 0 where an 8 Ball move read 5 — so
+    // there is no rule to infer, and defaulting over the caller would corrupt replies.
     let filled = Boilerplate.applied(
       to: [("game", "beer"), ("version", "0"), ("sender", "THEIRS")], sender: "OURS")
     #expect(filled.filter { $0.name == "version" }.map(\.value) == ["0"])
