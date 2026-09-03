@@ -70,9 +70,11 @@ choice was added from Messages' own UI, then read 3.
 
 Two more things the "Add Choice" control taught us, watching what it wrote:
 
-- **Titles do not survive.** The poll was created here with a title; Messages' own re-send
-  carried `"title": ""`. The Polls UI has no title field, so it does not preserve one. Treat
-  `title` as write-only and probably invisible.
+- **Titles are not a thing on Tahoe.** The poll was created here with a title; Messages' own
+  re-send carried `"title": ""`. Messages 26 offers no way to set a title when creating a
+  poll, shows none, and its re-sends drop one. The field is in the JSON and `IMPollHelper`
+  reads it, so it may mean something on a later release. Until then `title` on this API is
+  write-only: accepted, sent, never rendered, and gone after the first UI-made update.
 - **Every state re-send is a full copy**, so a server-made option and a UI-made option in the
   same poll coexist as long as each side builds its update from the latest state. Building it
   from an older state silently drops the other side's options — which is why the server reads
@@ -227,6 +229,10 @@ At least two non-empty options. The server mints an `optionIdentifier` UUID per 
 helper mints the session; `creatorHandle` is the account's own address. Answers with the
 serialised message, like every send route — recognisable by its `balloonBundleId`.
 
+`title` is optional and, on macOS 26, does nothing visible: Messages neither sets nor shows
+poll titles, and its own updates clear the field (§ 2). It is kept because the format carries
+it and a later release may use it; a client should not build UI on it today.
+
 ### Write: vote
 
 ```
@@ -322,7 +328,8 @@ junk arguments, so they are not callable through `IMCoreRuntime`. Decoding the p
    until you reach a message whose type is `3`; that GUID is the poll's identity. Cache it.
 3. **Render** from the newest state message in the chain — the latest `2`, or the root (type
    `3`, or `0` if never updated). Its option list is authoritative; options only ever get
-   added. Do not show `title`; Messages does not.
+   added. Do not show `title`: Messages on Tahoe neither sets nor shows one, and any title
+   present will vanish on the next update. Revisit if a later release starts using it.
 4. **Tally** by participant: group `4000` messages by `participantHandle` (or by the message's
    `handle`), keep only each participant's newest, and count the `voteOptionIdentifier`s in it.
    Never accumulate across a participant's messages — the newest one replaces the older.
