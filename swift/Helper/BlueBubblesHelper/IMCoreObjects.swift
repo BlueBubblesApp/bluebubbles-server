@@ -232,29 +232,69 @@ struct IMChat {
 
   /// ObjC: `-reportJunk`, plus the carrier relay when asked for.
   ///
-  /// Returns IMCore's BOOL — whether there was anything to report.
+  /// TWO GENERATIONS, and macOS 26 renamed both halves at once:
+  ///
+  ///   26        -reportJunk                    -reportJunkToCarrierViaRelay:(BOOL)
+  ///   14, 15    -reportJunkToCarrier           (the same call does both)
+  ///
+  /// On 14 and 15 there is only `-reportJunkToCarrier`, which reports and relays together —
+  /// so `toCarrier` cannot be honoured as a choice there. It is honoured as a FLOOR: the
+  /// report happens either way, and asking not to relay does not suppress it. Refusing the
+  /// whole call to respect the flag would be worse; reporting junk is the point.
+  ///
+  /// **The return has to be reconstructed on the older path.** `-reportJunk` returns whether
+  /// there was anything to report; `-reportJunkToCarrier` returns void. So the count that
+  /// `-reportJunk` is answering about is read first, from `-allMessagesToReportAsSpam`, which
+  /// is on all three releases and is what `messagesToReportAsSpamCount()` already uses.
+  ///
+  /// Measured on 14.6.1, 15.6.1 and 26.5.2 — `docs/MACOS_COMPATIBILITY.md` §2b.
   func reportJunk(toCarrier: Bool) throws -> Bool {
-    let reported = try IMCoreRuntime.callReturningBool(object, "reportJunk")
-    if toCarrier,
-      IMCoreRuntime.responds(
-        object, to: NSSelectorFromString("reportJunkToCarrierViaRelay:")
-      )
-    {
-      try IMCoreRuntime.invoke(object, "reportJunkToCarrierViaRelay:", [true])
+    if IMCoreRuntime.responds(object, to: NSSelectorFromString("reportJunk")) {
+      let reported = try IMCoreRuntime.callReturningBool(object, "reportJunk")
+      if toCarrier,
+        IMCoreRuntime.responds(
+          object, to: NSSelectorFromString("reportJunkToCarrierViaRelay:")
+        )
+      {
+        try IMCoreRuntime.invoke(object, "reportJunkToCarrierViaRelay:", [true])
+      }
+      return reported
     }
-    return reported
+
+    guard IMCoreRuntime.responds(object, to: NSSelectorFromString("reportJunkToCarrier"))
+    else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "reportJunk", requires: "-reportJunk or -reportJunkToCarrier on IMChat")
+    }
+    // Read before reporting: afterwards the conversation has been dealt with and the list
+    // is no longer the answer to "was there anything to report".
+    let pending = try messagesToReportAsSpamCount()
+    try IMCoreRuntime.invoke(object, "reportJunkToCarrier")
+    return pending > 0
   }
 
-  /// ObjC: `-updateIsFiltered:`, or `-recoverFromJunkTo:` when leaving Junk.
+  /// ObjC: `-updateIsFiltered:`, or recovery from Junk, which is not the same operation.
   ///
-  /// Two selectors because they are not the same operation: `updateIsFiltered:` moves the
-  /// chat between filters, while recovery from Junk has to undo the junk state as well.
+  /// `updateIsFiltered:` moves the chat between filters. Recovery has to undo the junk state
+  /// as well, and macOS 26 folded both into one call:
+  ///
+  ///   26        -recoverFromJunkTo:(category)      undoes junk AND sets the filter
+  ///   14, 15    -recoverFromJunk                   undoes junk only — the filter is ours
+  ///
+  /// So the older path is two calls, in that order. It used to be one: the `else` fell
+  /// straight through to `updateIsFiltered:`, which moved the conversation out of the Junk
+  /// FILTER while leaving it marked as junk — half the job, silently, on both releases that
+  /// needed it. `docs/SEQUOIA_COMPATIBILITY.md` §3.
   func updateFilter(category: Int, recovering: Bool) throws {
-    if recovering,
-      IMCoreRuntime.responds(object, to: NSSelectorFromString("recoverFromJunkTo:"))
-    {
-      try IMCoreRuntime.invoke(object, "recoverFromJunkTo:", [NSNumber(value: category)])
-      return
+    if recovering {
+      if IMCoreRuntime.responds(object, to: NSSelectorFromString("recoverFromJunkTo:")) {
+        try IMCoreRuntime.invoke(object, "recoverFromJunkTo:", [NSNumber(value: category)])
+        return
+      }
+      if IMCoreRuntime.responds(object, to: NSSelectorFromString("recoverFromJunk")) {
+        try IMCoreRuntime.invoke(object, "recoverFromJunk")
+        // Falls through to the filter move below, which is the other half.
+      }
     }
     try IMCoreRuntime.invoke(object, "updateIsFiltered:", [NSNumber(value: category)])
   }
@@ -2195,6 +2235,18 @@ enum IMStickers {
   /// the file's extension, which is the shape Messages uses for its own (`sid` on the
   /// attachment row is `<UUID>.heic`); it identifies the sticker in recents and in the
   /// dedup of the receiving device's sticker drawer, so it must not repeat across sends.
+  ///
+  /// TWO GENERATIONS. `accessibilityName:` was inserted **in the middle** of the keyword
+  /// list in macOS 15, right after `accessibilityLabel:`:
+  ///
+  ///   15, 26    …fileURL:accessibilityLabel:accessibilityName:moodCategory:stickerName:
+  ///   14        …fileURL:accessibilityLabel:moodCategory:stickerName:
+  ///
+  /// so the older form takes one fewer argument, not the same arguments under another name.
+  /// Calling only the newer meant stickers did not send at all on Sonoma
+  /// (`docs/SONOMA_COMPATIBILITY.md` §3). Every argument after the URL is `NSNull` here —
+  /// Messages leaves them nil for a user-generated sticker — which is why dropping one
+  /// changes nothing about the sticker that gets built.
   static func sticker(path: String) throws -> AnyObject {
     guard FileManager.default.fileExists(atPath: path) else {
       throw PrivateAPIErrorShim.rejected("no file at \(path)")
@@ -2209,15 +2261,33 @@ enum IMStickers {
     let url = URL(fileURLWithPath: path)
     let extensionPart = url.pathExtension.isEmpty ? "" : "." + url.pathExtension
     let stickerID = UUID().uuidString + extensionPart
+
+    let leading: [Any] = [stickerID, userGeneratedPackID, url as NSURL]
+    let candidates: [(String, [Any])] = [
+      (
+        "initWithStickerID:stickerPackID:fileURL:accessibilityLabel:accessibilityName:"
+          + "moodCategory:stickerName:",
+        leading + [NSNull(), NSNull(), NSNull(), NSNull()]
+      ),
+      (
+        "initWithStickerID:stickerPackID:fileURL:accessibilityLabel:moodCategory:"
+          + "stickerName:",
+        leading + [NSNull(), NSNull(), NSNull()]
+      ),
+    ]
+    guard
+      let (selector, arguments) = candidates.first(where: {
+        IMCoreRuntime.responds(allocated, to: NSSelectorFromString($0.0))
+      })
+    else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "sendSticker", requires: "an IMSticker initWithStickerID: initializer")
+    }
     guard
       let sticker = try IMCoreRuntime.invoke(
         allocated,
-        "initWithStickerID:stickerPackID:fileURL:accessibilityLabel:accessibilityName:"
-          + "moodCategory:stickerName:",
-        [
-          stickerID, userGeneratedPackID, url as NSURL,
-          NSNull(), NSNull(), NSNull(), NSNull(),
-        ]
+        selector,
+        arguments
       )
     else {
       throw PrivateAPIErrorShim.rejected("IMSticker would not initialise for \(path)")
@@ -2240,19 +2310,42 @@ enum IMStickers {
   /// a string, EMPTY for a sticker with no App Store origin — and it must be a string: the
   /// builder puts all ten values in a dictionary literal, and nil raises
   /// `attempt to insert nil object from objects[9]` (measured).
+  ///
+  /// TWO GENERATIONS, and unlike the initializer above the difference is at the END:
+  /// `externalURI:` was appended in macOS 15. Sonoma's longest form stops at
+  /// `stickerPositionVersion:`, so it takes eight values rather than nine and the
+  /// dictionary it builds simply has no `suri` key — which is what a Sonoma sticker
+  /// legitimately looks like, since `externalURI` is empty for a user-generated one
+  /// anyway. `docs/SONOMA_COMPATIBILITY.md` §3.
   static func userInfo(placement: StickerPlacement) throws -> AnyObject {
     let type: AnyClass = try IMCoreRuntime.requireClass("IMSticker")
-    let selector =
-      "userInfoDictionaryWithLayoutIntent:parentPreviewWidth:xScalar:yScalar:scale:"
-      + "rotation:initialFrameIndex:stickerPositionVersion:externalURI:"
+    let geometry: [Any] = [
+      UInt(0), placement.parentPreviewWidth, placement.xScalar, placement.yScalar,
+      placement.scale, placement.rotation, UInt(0), UInt(0),
+    ]
+    let candidates: [(String, [Any])] = [
+      (
+        "userInfoDictionaryWithLayoutIntent:parentPreviewWidth:xScalar:yScalar:scale:"
+          + "rotation:initialFrameIndex:stickerPositionVersion:externalURI:",
+        geometry + [""]
+      ),
+      (
+        "userInfoDictionaryWithLayoutIntent:parentPreviewWidth:xScalar:yScalar:scale:"
+          + "rotation:initialFrameIndex:stickerPositionVersion:",
+        geometry
+      ),
+    ]
     guard
-      let dictionary = try IMCoreRuntime.invoke(
-        type as AnyObject, selector,
-        [
-          UInt(0), placement.parentPreviewWidth, placement.xScalar, placement.yScalar,
-          placement.scale, placement.rotation, UInt(0), UInt(0), "",
-        ]
-      )
+      let (selector, arguments) = candidates.first(where: {
+        (type as AnyObject).responds(to: NSSelectorFromString($0.0))
+      })
+    else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "sendSticker",
+        requires: "an IMSticker userInfoDictionaryWithLayoutIntent: class method")
+    }
+    guard
+      let dictionary = try IMCoreRuntime.invoke(type as AnyObject, selector, arguments)
     else {
       throw PrivateAPIErrorShim.rejected("IMSticker produced no sticker user info")
     }

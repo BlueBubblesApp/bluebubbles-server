@@ -10,11 +10,11 @@ What works on each macOS this server supports, and which private selector decide
 | Reactions — the six named ones | ✅ | ✅ | ✅ |
 | Reactions — any emoji | ⛔️ | ✅ | ✅ |
 | Reactions — stickers | ⛔️ | ✅ | ✅ |
-| Send a sticker | ⚠️ | ✅ | ✅ |
+| Send a sticker | ✅ | ✅ | ✅ |
 | Mute and unmute a conversation | ✅ | ✅ | ✅ |
 | Rename, pin, leave, manage a group | ✅ | ✅ | ✅ |
 | Mark as spam | ✅ | ✅ | ✅ |
-| Report junk to Apple / your carrier | ⚠️ | ⚠️ | ✅ |
+| Report junk to Apple / your carrier | ✅ † | ✅ † | ✅ |
 | Schedule a message (Send Later) | ⛔️ | ✅ | ✅ |
 | Edit a scheduled message | ⛔️ | ⚠️ | ✅ |
 | Polls | ⛔️ | ⛔️ | ✅ |
@@ -22,7 +22,7 @@ What works on each macOS this server supports, and which private selector decide
 | Screen Unknown Senders | ⛔️ | ⛔️ | ✅ |
 | Shared contact cards (nicknames) | ✅ † | ✅ | ✅ |
 | FaceTime — answer, end, join by link | ✅ | ✅ | ✅ |
-| FaceTime — start a call | ⚠️ | ⚠️ | ✅ |
+| FaceTime — start a call | ✅ | ✅ | ✅ |
 | FaceTime — revoke a link you made | ⚠️ | ✅ | ✅ |
 | Find My — locations, friends, devices | ✅ | ✅ | ✅ |
 
@@ -38,6 +38,11 @@ Nothing marked ⚠️ crashes or corrupts anything; the request fails and says s
 † On Sonoma the nickname itself works; whether the **avatar photo** resolves is the one thing
 no dump has measured (§4). It is read through a `try?` and falls back to no photo, so the
 worst case is a contact card without a picture.
+
+† Junk reporting works on 14 and 15 through the older `-reportJunkToCarrier`, which reports
+and relays to the carrier in one call. So on those releases "report, but not to my carrier"
+cannot be honoured as a choice — the report happens either way. Reporting is the point, so it
+is treated as a floor rather than a refusal.
 
 ---
 
@@ -123,20 +128,31 @@ refuse a working feature, which is why these are laddered rather than gated.
 | Typing indicators | `isIncomingTypingMessage` | `isTypingMessage` | same | ✓ |
 | Mute state | `-[IMChat setMuteUntilDate:]` | `IMMutedChatList` | same | ✓ |
 | Named tapbacks | association initializer | `+tapbackWithAssociatedMessageType:` | same | ✓ |
-| **Report junk** | `reportJunkToCarrier` | `reportJunkToCarrier` | `reportJunk`, `reportJunkToCarrierViaRelay:` | **✗** |
-| **Recover from Junk** | `recoverFromJunk` | `recoverFromJunk` | `recoverFromJunkTo:` | **✗** |
-| **Outgoing FaceTime call** | `dialWithRequest:completion:` | same | `dialWithRequest:completionWithError:` | **✗** |
-| **Send a sticker** | no `accessibilityName:`, no `externalURI:` | current | current | **✗** |
+| Report junk | `reportJunkToCarrier` | `reportJunkToCarrier` | `reportJunk`, `reportJunkToCarrierViaRelay:` | ✓ |
+| Recover from Junk | `recoverFromJunk` + `updateIsFiltered:` | same | `recoverFromJunkTo:` | ✓ |
+| Outgoing FaceTime call | `dialWithRequest:completion:` | same | `dialWithRequest:completionWithError:` | ✓ |
+| Send a sticker | no `accessibilityName:`, no `externalURI:` | current | current | ✓ |
 | Invalidate a FaceTime link | `invalidateLink:completionHandler:` | 3-argument | 3-argument | ✗ |
 | Availability fetch | `_fetchUpdatedStatusForHandle:completion:` | unprefixed | unprefixed | ✗ |
 | Edit a scheduled message | *(no Send Later)* | `…atPartIndex:withNewPartText:` | `…newPartTranslation:` | ✗ |
 
-**Junk reporting and outgoing FaceTime calls are broken on two of the three releases this
-server supports** — not just on Sonoma, which is how the Sequoia dump changed the priority.
-Each is one ladder, in one file.
+The four that mattered are done. Two of them — junk reporting and outgoing FaceTime calls —
+were broken on **both** older releases, which is how the Sequoia dump changed their priority:
+14 and 15 share the older spelling and only 26 has the new one, so one ladder fixed two
+releases each.
 
-Sending a sticker is broken on Sonoma only: `accessibilityName:` and `externalURI:` both
-arrived in 15, so 15 and 26 take the same call.
+Three remain, all narrow: a FaceTime link cannot be revoked on Sonoma, availability status is
+not refreshed there, and a scheduled message cannot be edited on Sequoia. Each fails cleanly
+with `unavailableOnThisOS` rather than misbehaving.
+
+### Reading the tool's numbers
+
+`compare-releases.py` reports how many dispatched selectors are **absent on the older
+release**, and that number does not move when a ladder is added — a laddered call still names
+the 26-only selector, it just asks `responds(to:)` first. So treat that count as a list of
+**candidates to check**, never as a count of bugs. This table is the answer to which is which,
+and it is maintained by hand because the distinction is a judgement about control flow that
+no selector index can see.
 
 ## 3. Capabilities
 
@@ -147,22 +163,22 @@ arrived in 15, so 15 and 26 take the same call.
 | Named tapbacks | via fallback | yes | yes | one-argument `IMTapback` constructor arrived in 15 |
 | Emoji tapbacks | **—** | yes | yes | `IMEmojiTapback` |
 | Sticker tapbacks | **—** | yes | yes | `IMStickerTapback` |
-| **Send a sticker** | **broken** | yes | yes | `initWithStickerID:…accessibilityName:…` |
+| Send a sticker | via fallback | yes | yes | `accessibilityName:` and `externalURI:` arrived in 15 |
 | Mute / unmute a chat | via fallback | yes | yes | `IMMutedChatList` arrived in 15 |
 | Pin conversations | yes | yes | yes | `IMPinnedConversationsController` |
 | Leave a group | yes | yes | yes | three-rung ladder |
 | Mark as spam | yes | yes | yes | `markAsSpam:isJunkReportedToCarrier:` on all three |
-| **Report junk** | **broken** | **broken** | yes | `reportJunk` is 26-only |
-| Recover from Junk | partial | partial | yes | fallback moves the filter, leaves junk state |
+| Report junk | via fallback | via fallback | yes | `reportJunkToCarrier` on 14/15 reports and relays together |
+| Recover from Junk | via fallback | via fallback | yes | `recoverFromJunk` then `updateIsFiltered:` — two calls, one on 26 |
 | Screen Unknown Senders | **—** | **—** | yes | `markAsKnownAndSaveInContacts:completion:` |
 | Send Later | **—** | yes | yes | `CKSendLaterPluginInfo` |
-| Edit a scheduled message | **—** | **broken** | yes | `…newPartTranslation:` is 26-only |
+| Edit a scheduled message | **—** | **broken** | yes | `newPartTranslation:` is 26-only |
 | Cancel a scheduled message | **—** | yes | yes | `cancelScheduledMessageItem:cancelType:` |
 | Polls | **—** | **—** | yes | `IMPollHelper` |
 | Chat backgrounds | **—** | **—** | yes | `refetchLocalTranscriptBackgroundAssetIfNecessary` |
 | Nicknames | ? | yes | yes | `IMNickname` not yet dumped on 14 — §4 |
-| **Outgoing FaceTime call** | **broken** | **broken** | yes | `dialWithRequest:completionWithError:` is 26-only |
-| Invalidate a FaceTime link | **broken** | yes | yes | gained its middle argument in 15 |
+| Outgoing FaceTime call | via fallback | via fallback | yes | older block carries no error; the call is unaffected |
+| Invalidate a FaceTime link | **broken** | yes | yes | `deleteReason:` arrived in 15 |
 | Answer / end a FaceTime call | yes | yes | yes | `TUCallCenter` answer and disconnect paths |
 | FaceTime caller-ID / group UUID fields | **—** | **—** | yes | `TUCall` properties, read through `try?` |
 | FindMy locations | yes | yes | yes | `FMFSession` and friends, identical on all three |

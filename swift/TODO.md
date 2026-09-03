@@ -55,46 +55,38 @@ confidence in one, and none can be answered from here now.
       initializer — the fallback is correct but has coarser part ranges, which is what the
       sender path was introduced to improve. `probe.sh` / `trace.sh` on a 14 machine.
 
-## Junk reporting and outgoing FaceTime calls are broken on TWO of three releases
+## Three narrow version ladders still missing
 
-Recorded as Sonoma problems; the Sequoia runtime dump showed both are broken on **macOS 15
-as well**. 14 and 15 share the older spellings and only 26 has the new ones, so each is one
-ladder that fixes two releases at once. `docs/SEQUOIA_COMPATIBILITY.md` §3.
+The four that cost a whole feature are done — junk reporting, leaving Junk, the FaceTime dial
+and sticker sending all ladder now. These three remain, each affecting one release and each
+failing cleanly with `unavailableOnThisOS` rather than misbehaving.
+`docs/MACOS_COMPATIBILITY.md` §2b has the selector for each.
 
-- [ ] **Outgoing FaceTime calls.** `-dialWithRequest:completionWithError:` is 26-only; 14 and
-      15 both have `-dialWithRequest:completion:`, whose block carries no error — so the
-      fallback needs `callAwaitingCompletion` rather than `callAwaitingCompletion2` and loses
-      the error text, not the call.
-- [ ] **Junk reporting.** `-reportJunk` → `-reportJunkToCarrier`, and
-      `-reportJunkToCarrierViaRelay:` → the same. Both older spellings are on 14 and 15.
-- [ ] **Leaving Junk.** `-recoverFromJunkTo:` → `-recoverFromJunk`. Today the `else` falls
-      through to `updateIsFiltered:`, which moves the chat between filters **without undoing
-      the junk state** — so 14 and 15 both silently do half the job.
-
-## Smaller version ladders, each affecting one release
-
-- [ ] **Sending a sticker — Sonoma only.** `initWithStickerID:…accessibilityLabel:`
-      **`accessibilityName:`** `moodCategory:…` and
-      `userInfoDictionaryWithLayoutIntent:…initialFrameIndex:stickerPositionVersion:`
-      **`externalURI:`**. Both keywords arrived in 15, so 15 and 26 take the current call and
-      only 14 needs the shorter form. Neither call has a ladder, so stickers do not send on
-      Sonoma at all.
-- [ ] **Editing a scheduled message — Sequoia only.** 15 has
-      `-editScheduledMessageItem:atPartIndex:withNewPartText:`; 26 added
-      `newPartTranslation:`. Sonoma has no Send Later at all, so it cannot hit this. Fails
-      cleanly with `unavailableOnThisOS` today rather than crashing.
-- [ ] **Invalidating a FaceTime link — Sonoma only.** 14 has the two-argument
+- [ ] **Revoking a FaceTime link — Sonoma only.** 14 has the two-argument
       `-invalidateLink:completionHandler:`; the `deleteReason:` argument arrived in 15.
-- [ ] **Availability fetch — Sonoma only.** 14 has `-_fetchUpdatedStatusForHandle:completion:`;
-      the underscore was dropped in 15.
-- [ ] **`canReportJunk` is wrong, not merely absent.** Read from `-_messageToReportJunk`,
-      which only 26 has, so it defaults to `false` on 14 — while `-allMessagesToReportAsSpam`,
-      which `messagesToReportAsSpamCount()` already calls two methods below, is on all three.
-      A client that hides the button on this flag hides a working feature. (15 has
-      `_messageToReportJunk`, so this one is Sonoma-only.)
-- [ ] `_STKStickerObjCFacade` is a `class` line in `hosts.conf` and resolves on **no**
-      release — absent on 14.6.1, 15.6.1 and 26.5.2 alike. Either it moved and the name needs
-      chasing with `probe.sh --host "Messages stickers" classes Sticker`, or the line should go.
+- [ ] **Editing a scheduled message — Sequoia only.** 15 has
+      `-editScheduledMessageItem:atPartIndex:withNewPartText:`; 26 added `newPartTranslation:`.
+      Sonoma has no Send Later at all, so it cannot reach this.
+- [ ] **Availability refresh — Sonoma only.** 14 has
+      `-_fetchUpdatedStatusForHandle:completion:`; the underscore was dropped in 15.
+
+## `canReportJunk` reports false on Sonoma while reporting works
+
+Read from `-_messageToReportJunk`, which only 26 has, so it defaults to `false` on 14 — while
+`-allMessagesToReportAsSpam`, which `messagesToReportAsSpamCount()` already calls two methods
+below and which the junk ladder now uses for its return value, is on all three releases. A
+client that hides the button on this flag hides a working feature. Sequoia has
+`_messageToReportJunk`, so this one is Sonoma-only.
+
+- [ ] Fall back to `allMessagesToReportAsSpam` being non-empty.
+
+## `_STKStickerObjCFacade` resolves on no release
+
+A `class` line in `hosts.conf` that is absent on 14.6.1, 15.6.1 and 26.5.2 alike. Surfaced by
+the load-failure audit in `docs/SONOMA_COMPATIBILITY.md` §0.
+
+- [ ] Either chase where it went with
+      `probe.sh --host "Messages stickers" classes Sticker`, or delete the line.
 
 ## Two 26-only features a client cannot tell from a bug
 

@@ -350,12 +350,43 @@ enum FaceTimeBridge {
       .map { String(describing: $0) } ?? "none"
     let requestDescription = (try? IMCoreRuntime.string(request0, "description")) ?? nil
 
+    // TWO GENERATIONS of the dial, and the difference is the completion block:
+    //
+    //   26        -dialWithRequest:completionWithError:   block is (call, error)
+    //   14, 15    -dialWithRequest:completion:            block is (call)
+    //
+    // Both releases below 26 have only the older one, so calling the newer unconditionally
+    // meant outgoing calls failed outright on two of the three supported releases
+    // (`docs/SEQUOIA_COMPATIBILITY.md` §3). Newest first, like every other ladder here.
+    //
+    // WHAT THE OLDER PATH LOSES is the error object, and nothing else. That costs only the
+    // `; <reason>` clause in the failure message below — `validityErrors`, which is
+    // TelephonyUtilities' own verdict on the request and the more useful diagnostic anyway,
+    // is read before the dial and is unaffected. A block declared with FEWER parameters than
+    // the caller passes is safe on arm64: the extra argument stays in its register and is
+    // ignored. The reverse would not be, which is why the older path does not simply reuse
+    // the two-argument block.
     let box = ResultBox()
-    await callAwaitingCompletion2(
-      center, "dialWithRequest:completionWithError:", leading: [request0]
-    ) { result, error in
-      box.value = result
-      box.error = error
+    if IMCoreRuntime.responds(
+      center, to: NSSelectorFromString("dialWithRequest:completionWithError:"))
+    {
+      await callAwaitingCompletion2(
+        center, "dialWithRequest:completionWithError:", leading: [request0]
+      ) { result, error in
+        box.value = result
+        box.error = error
+      }
+    } else if IMCoreRuntime.responds(
+      center, to: NSSelectorFromString("dialWithRequest:completion:"))
+    {
+      await callAwaitingCompletion(
+        center, "dialWithRequest:completion:", leading: [request0]
+      ) { result in
+        box.value = result
+      }
+    } else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "startCall", requires: "a dialWithRequest: completion selector on TUCallCenter")
     }
 
     // The call is discoverable on the center whether or not the completion handed one back.

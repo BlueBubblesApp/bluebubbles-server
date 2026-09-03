@@ -1,6 +1,6 @@
 # Sonoma (macOS 14) compatibility — Private API gap analysis
 
-**Status: §2.1 and §2.2 are fixed. Everything else is evaluation only.**
+**Status: §2 and the four ladders in §3 are fixed. The rest is evaluation only.**
 
 Everything in the port's Private API surface was developed against **macOS 26.5.2 (Tahoe)**.
 This document answers "what breaks on Sonoma" by cross-referencing every selector and class
@@ -235,8 +235,14 @@ Neither call has a ladder — each is a single `invoke` of the 26 spelling — s
 (no `accessibilityName`, no `externalURI`), so the ladder is mechanical: drop the argument
 with the keyword.
 
-**The two whole features that fail on Sonoma are outgoing FaceTime calls and sending a
-sticker.** Everything else in §3 degrades a detail rather than a capability.
+**FIXED.** Both calls now ladder: the newer spelling is tried first and Sonoma's shorter form
+second. Every argument the older form drops is one this code passes as `NSNull` or `""`
+anyway, so the sticker it builds on Sonoma is the same sticker minus a `suri` key that is
+empty on 26 too.
+
+The other three §3 rows — junk reporting, leaving Junk, and the FaceTime dial — are laddered
+as well. What remains from this section is the FaceTime link revoke and the availability
+refresh, both Sonoma-only and both failing cleanly with `unavailableOnThisOS`.
 
 ---
 

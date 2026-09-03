@@ -91,24 +91,24 @@ chat backgrounds (`refetchLocalTranscriptBackgroundAssetIfNecessary`) and two `T
 (`callerIDBlocked`, `conversationGroupUUID`) — all genuinely 26-only, all already refused or
 read through `try?`. One more, `editMessageItem:…newPartTranslation:…`, is handled by a ladder.
 
-That leaves four, and they are the same rows Sonoma has:
+That left four, and they were the same rows Sonoma has. **All four are now laddered:**
 
-| Called | On Sequoia | Effect | Site |
-|---|---|---|---|
-| `-reportJunk` | `-reportJunkToCarrier` | **junk reporting fails** | `IMCoreObjects.swift:237` |
-| `-reportJunkToCarrierViaRelay:` | `-reportJunkToCarrier` | carrier report skipped | `IMCoreObjects.swift:240` |
-| `-recoverFromJunkTo:` | `-recoverFromJunk` | falls through to `updateIsFiltered:`, which moves the filter **without undoing the junk state** | `IMCoreObjects.swift:254` |
-| `-dialWithRequest:completionWithError:` | `-dialWithRequest:completion:` | **outgoing FaceTime calls fail** | `FaceTimeBridge.swift:355` |
+| Called | On Sequoia | Status |
+|---|---|---|
+| `-reportJunk` | `-reportJunkToCarrier` | ✓ laddered; the older call reports and relays together, so `toCarrier` is a floor rather than a choice on 14 and 15 |
+| `-reportJunkToCarrierViaRelay:` | folded into the above | ✓ laddered |
+| `-recoverFromJunkTo:` | `-recoverFromJunk` **then** `updateIsFiltered:` | ✓ laddered — the older path is two calls, and doing only the second was the bug |
+| `-dialWithRequest:completionWithError:` | `-dialWithRequest:completion:` | ✓ laddered; the older block carries no error, which costs the reason clause in a failure message and nothing else |
 
-**This is the finding that changes priority.** Junk reporting and outgoing FaceTime calls were
-recorded as Sonoma problems. They are broken on **Sequoia too** — two of the three releases
-this server supports — and each is one ladder in one file.
+**This was the finding that changed priority.** Junk reporting and outgoing FaceTime calls
+were recorded as Sonoma problems; they were broken on **Sequoia too**, so one ladder each
+fixed two of the three releases this server supports.
 
 Plus one Sequoia-only row, which Sonoma cannot have because it has no Send Later at all:
 
 | Called | On Sequoia | Effect |
 |---|---|---|
-| `-editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:` | `-editScheduledMessageItem:atPartIndex:withNewPartText:` | editing a scheduled message is refused with `unavailableOnThisOS` — a clean failure, not a crash |
+| `-editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:` | `-editScheduledMessageItem:atPartIndex:withNewPartText:` | editing a scheduled message is refused with `unavailableOnThisOS` — a clean failure, not a crash. **Still open.** |
 
 ## 4. What Sequoia settled that Sonoma could not
 
@@ -123,17 +123,14 @@ Sonoma and Tahoe bracket Sequoia, and several things sat in the gap. Now measure
 - **`cancelScheduledMessageItem:cancelType:` is on 15 and 26.** Cancelling a scheduled message
   works wherever Send Later does.
 
-## 5. What to do
+## 5. What is left
 
-1. **Ladder `reportJunk` / `reportJunkToCarrierViaRelay:` / `recoverFromJunkTo:`** onto the
-   no-argument Sequoia-and-Sonoma spellings. One file, three ladders, fixes two releases.
-2. **Ladder `dialWithRequest:completionWithError:`** onto `dialWithRequest:completion:`. The
-   older block carries no error, so the fallback needs `callAwaitingCompletion` rather than
-   `callAwaitingCompletion2` and loses the error text — not the call.
-3. **Ladder the scheduled-message edit** onto `…atPartIndex:withNewPartText:`.
-4. Consider a guard for chat backgrounds and Screen Unknown Senders (§2a of
+1. ~~Ladder the junk selectors and the FaceTime dial~~ — done.
+2. [ ] **Ladder the scheduled-message edit** onto `…atPartIndex:withNewPartText:`. Sequoia-only;
+   Sonoma has no Send Later to reach it.
+3. [ ] Consider a guard for chat backgrounds and Screen Unknown Senders (§2a of
    [`MACOS_COMPATIBILITY.md`](MACOS_COMPATIBILITY.md)) — the only two 26-only features a
    client cannot distinguish from a bug.
 
-No new version gates are needed. Every gate this server already has is now confirmed correct
+No new version gates are needed. Every gate this server already has is confirmed correct
 against runtime dumps of all three supported releases.
