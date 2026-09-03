@@ -62,6 +62,7 @@ public enum MessagesHelperAction: String, Sendable, CaseIterable, CustomStringCo
   case reportChatJunk = "report-chat-junk"
   case requestFindMyLocationShare = "request-findmy-location-share"
   case searchMessages = "search-messages"
+  case sendAppMessage = "send-app-message"
   case sendAttachment = "send-attachment"
   case sendMessage = "send-message"
   case sendMultipart = "send-multipart"

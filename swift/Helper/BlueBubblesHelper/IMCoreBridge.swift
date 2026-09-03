@@ -563,6 +563,32 @@ public final class IMCoreBridge: PrivateAPI {
     }
   }
 
+  /// NEW. An app balloon whose payload the SERVER built (`AppMessagePayload.encode`).
+  ///
+  /// Straight down IMCore rather than through ChatKit: `+[CKComposition
+  /// compositionWithMSMessage:appExtensionIdentifier:]` resolves the extension through the
+  /// balloon plugin manager, and a Mac usually does not have the extension installed — Game
+  /// Pigeon is iOS-only. The `IMMessage` initializer already takes `balloonBundleID:` and
+  /// `payloadData:`, which is all a balloon needs; the receiving device renders it.
+  public func sendAppMessage(_ request: SendAppMessageRequest) async throws -> SentMessage {
+    try translating {
+      let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
+      let message = try IMMessageBuilder.appMessage(
+        balloonBundleID: request.balloonBundleID,
+        payload: request.payload,
+        summary: request.summary
+      )
+      try chat.send(message)
+      var guid = ((try? IMCoreRuntime.string(message, "guid")) ?? nil)
+      if guid == nil || guid?.isEmpty == true { guid = try chat.lastSentMessageGUID() }
+      guard let guid else {
+        throw PrivateAPIErrorShim.rejected(
+          "Messages accepted the app message but reported no GUID")
+      }
+      return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
+    }
+  }
+
   /// NEW. See `IMPolls.updateComposition`: the same send as a create, in the poll's session.
   public func updatePoll(_ request: PollUpdateRequest) async throws -> SentMessage {
     try translating {

@@ -479,6 +479,30 @@ public struct PollVoteRequest: Codable, Sendable {
   }
 }
 
+/// An iMessage-app message — a balloon another app renders. Polls and Game Pigeon are both
+/// this; so is anything else with an iMessage extension. The server builds the payload (it
+/// is a keyed archive of Foundation types) and the helper only has to attach it to a
+/// message, which is why this carries bytes rather than a model.
+public struct SendAppMessageRequest: Codable, Sendable {
+  public let chat: ChatIdentifier
+  /// The full `balloon_bundle_id`, including the
+  /// `com.apple.messages.MSMessageExtensionBalloonPlugin:<team>:` prefix.
+  public let balloonBundleID: String
+  /// The archived `MSMessage` payload.
+  public let payload: Data
+  /// What the message reads as where the balloon cannot be drawn.
+  public let summary: String?
+
+  public init(
+    chat: ChatIdentifier, balloonBundleID: String, payload: Data, summary: String? = nil
+  ) {
+    self.chat = chat
+    self.balloonBundleID = balloonBundleID
+    self.payload = payload
+    self.summary = summary
+  }
+}
+
 /// Confirmation that Messages accepted a send. The authoritative record still arrives via the
 /// chat.db change detector; this is what correlates the two.
 public struct SentMessage: Codable, Sendable {
@@ -747,6 +771,8 @@ public protocol PrivateAPI: Sendable {
   ) async throws
   /// Delivers a scheduled message now, leaving the schedule behind.
   func sendScheduledMessageNow(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
+  /// Sends an iMessage-app balloon built by the caller, and answers with its message.
+  func sendAppMessage(_ request: SendAppMessageRequest) async throws -> SentMessage
   /// Sends a new poll and answers with its message. macOS 26 and later.
   func createPoll(_ request: PollCreateRequest) async throws -> SentMessage
   /// Casts (or replaces) the local user's vote, and answers with the vote's own message.

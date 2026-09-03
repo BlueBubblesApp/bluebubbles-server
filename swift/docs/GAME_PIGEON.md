@@ -1,0 +1,235 @@
+# Game Pigeon, and iMessage apps in general
+
+How Game Pigeon messages are put together, what this server does with them, and what a client
+has to do to actually play a game. Measured on macOS 26.5.2 against real Game Pigeon threads —
+four different games across five format versions.
+
+The short version: **the server reads and writes the payloads, the client plays the games.**
+That split is not a design preference, it is forced — see § 1.
+
+---
+
+## 1. Why the Mac cannot play
+
+Game Pigeon is an iOS-only iMessage app. There is no Mac version, so the extension is not
+installed on the server's Mac and never will be. Messages on macOS shows a received game as a
+plain fallback bubble ("Let's play Cup Pong!") with no board and no controls.
+
+So the Mac cannot render a game, cannot compute a move, and cannot be asked to. What it *can*
+do is read the payload out of a message and put a new one back on the wire, which it turns out
+is all a client needs — the game state travels in the message itself.
+
+This server therefore offers a **flexible pass-through**: it decodes the payload into fields
+and sends fields back. It does not know what "8 Ball" is, and deliberately so. There are two
+dozen Game Pigeon games and they share nothing but the envelope.
+
+---
+
+## 2. The envelope: every iMessage app is the same shape
+
+Game Pigeon, Polls, and any third-party iMessage app all send the same structure. The message
+row carries:
+
+- `balloon_bundle_id` — `com.apple.messages.MSMessageExtensionBalloonPlugin:<team>:<bundle>`.
+  Game Pigeon's is `…:EWFNLB79LQ:com.gamerdelights.gamepigeon.ext`. The team id belongs to the
+  developer, so match on the **suffix**, not the whole string.
+- `payload_data` — an `NSKeyedArchiver` archive of the `MSMessage` the extension built.
+- empty `text`.
+
+Unarchived, that payload is a dictionary:
+
+| Key | What it is |
+|---|---|
+| `URL` | the app's own payload — everything game-specific is in here |
+| `an` | app name, e.g. `GamePigeon` |
+| `appid` | App Store id — Game Pigeon is `1124197642` |
+| `sessionIdentifier` | `MSSession` UUID, shared by every message of one game |
+| `ldtext` | fallback summary line |
+| `layoutClass` / `userInfo` | the template layout, whose `caption` is the human-readable line |
+| `ai` | the app's icon, a few KB of JPEG |
+
+`AppMessagePayload` reads and writes this, and it is not Game Pigeon-specific — the poll code
+uses the same reader.
+
+One practical note on writing: ChatKit's `+[CKComposition compositionWithMSMessage:appExtensionIdentifier:]`
+resolves the extension through the balloon plugin manager and **fails when the extension is not
+installed**, which on a Mac is the normal case for a third-party app. So the server builds the
+archive itself (plain Foundation types) and hands the bytes to the helper, which attaches them
+to an `IMMessage` with `balloonBundleID:` and `payloadData:`. That path does not care whether
+the Mac has ever heard of the app.
+
+---
+
+## 3. Game Pigeon's URL
+
+This is the only part that is actually Game Pigeon's own:
+
+```
+data:?ver=<N>&data=<scrambled>
+```
+
+`ver` is Game Pigeon's format version — 42, 45, 48, 49, 50 and 52 have all been seen in the
+wild, and they coexist because it is whatever version the sender's app was.
+
+`data` is **a permutation of a plain URL query string**. Not encryption, not compression: the
+characters are shuffled with Fisher-Yates, driven by `drand48` seeded with `length * 0xEF`.
+The only input is the string's own length, so it reverses with no secret at all. `drand48`
+being the classic one:
+
+```
+state = (seed << 16) + 0x330E
+next  = (25214903917 * state + 11) mod 2^48
+drand = next / 2^48
+```
+
+Scrambling draws characters out of the remaining pool one at a time at
+`floor(drand() * remaining.count)`. Unscrambling replays the same draws and undoes them. That
+is the whole thing, and `GamePigeonCodec` is our own implementation of it, with a round-trip
+test and vectors computed independently.
+
+Unscrambled, you get an ordinary query string. A Cup Pong invite:
+
+```
+?sender=<id>&version=5&tver=5&ios=12.4.1&start=&caption=Let's play Cup Pong!
+&id=NlHyspTMBsictrrI&player=2&player2=<id>&avatar2=body,1|eyes,4|…
+&game=beer&game_name=Cup Pong&seed=947177914&mode=n&style2=0&num=1&build=…
+```
+
+Fields worth knowing, though none are guaranteed:
+
+| Field | Meaning |
+|---|---|
+| `game` | the game's internal name — `beer` is Cup Pong, `pool` is 8 Ball, `pool3` is 8 Ball+, `crazy` is Crazy 8 |
+| `game_name` | its display name, on invites |
+| `id` | Game Pigeon's own game id, stable for the whole game, distinct from the `MSSession` UUID |
+| `player`, `player1`, `player2` | whose turn it is, and the two player ids |
+| `sender` | who sent this message — a UUID with six extra characters appended |
+| `caption` | the line shown on the bubble |
+| `seed` | the game's RNG seed, so both sides simulate the same thing |
+| `avatar1`, `avatar2` | the pigeon avatars, as `body,5\|eyes,7\|mouth,5\|…` |
+| `start` | present and empty on an invite |
+| `replay` | the move itself. 8 Ball's is 2.4 KB of physics (`&d:…&x:…&y:…&balls:#…`) |
+
+**Do not build a client around that table.** Every game puts what it likes in there — a word
+game's fields look nothing like pool's — which is exactly why the API hands back a list of
+name/value pairs and stops.
+
+---
+
+## 4. The API
+
+### Read any app message
+
+```http
+GET /api/v2/message/app/:guid
+```
+
+```json
+{ "status": 200, "data": {
+  "guid": "…",
+  "balloon_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:EWFNLB79LQ:com.gamerdelights.gamepigeon.ext",
+  "app_name": "GamePigeon",
+  "app_id": 1124197642,
+  "session_id": "2B62987D-…",
+  "caption": "Let's play Cup Pong!",
+  "summary": "Cup Pong",
+  "url": "data:?ver=45&data=…",
+  "game_pigeon": {
+    "version": 45,
+    "game": "beer",
+    "game_id": "NlHyspTMBsictrrI",
+    "fields": [ { "name": "sender", "value": "…" }, { "name": "player", "value": "2" } ]
+  }
+} }
+```
+
+Works for **any** app balloon; `game_pigeon` appears only when the bundle id says so. `url` is
+always the raw payload, so a client that understands an app this server has never heard of can
+work from that alone.
+
+`fields` is an ordered list rather than an object on purpose: a query string may repeat a name,
+and some games care about order. Build a map from it if you would rather have one.
+
+### Send a Game Pigeon message
+
+```http
+POST /api/v2/message/game-pigeon
+{
+  "chatGuid": "iMessage;-;+15551234567",
+  "version": 45,
+  "caption": "Let's play Cup Pong!",
+  "sessionId": "2B62987D-…",
+  "fields": [
+    { "name": "game", "value": "beer" },
+    { "name": "id", "value": "NlHyspTMBsictrrI" },
+    { "name": "player", "value": "2" }
+  ]
+}
+```
+
+The server scrambles the fields, wraps them in the envelope and sends. `fields` may also be a
+plain object when order does not matter. `version` defaults to 52, `teamId` to Game Pigeon's
+own — override it if you are ever talking to a differently-signed build.
+
+**`sessionId` is how a game stays one game.** Omit it on an invite and the server mints one;
+include the session from the message you are answering on every reply. Game Pigeon's own `id`
+field does its own threading, but the session is what Messages uses to group the balloons.
+
+### Send any other app's message
+
+```http
+POST /api/v2/message/app
+{ "chatGuid": "…", "balloonBundleId": "…", "url": "data:…",
+  "appName": "…", "appId": 123, "sessionId": "…", "caption": "…", "summary": "…" }
+```
+
+The generic version: you supply the payload URL, the server does the envelope. Nothing about it
+is Game Pigeon-specific, so any iMessage app can be driven this way once you know its format.
+
+---
+
+## 5. Writing a client
+
+The server has done its half when it hands you fields. Yours looks like this:
+
+1. **Spot a game.** `balloonBundleId` ends `com.gamerdelights.gamepigeon.ext`. Fetch
+   `GET /message/app/:guid` for the decoded payload.
+2. **Group by game.** Use the `id` field, not the message guid — every move in a game repeats
+   it. The `session_id` groups the same messages at the Messages level and is what you send back.
+3. **Work out whose turn it is.** `player` against `player1`/`player2`, compared with your own
+   account's identifier from `sender` on messages you sent.
+4. **Render and play.** This is all yours. The state you need is in `fields`, in whatever shape
+   that game uses.
+5. **Send a move** as a new Game Pigeon message with the same `id` and `sessionId`, `player`
+   flipped, and whatever fields the game expects. Keep the fields you did not change: these
+   payloads are full state, not deltas.
+6. **Be version-tolerant.** Echo back the `version` you received rather than assuming; a thread
+   can span several as people update their apps.
+
+If you only want to *show* that a game happened rather than play it, `caption` and `game` are
+enough for a sensible bubble, and you can skip the rest.
+
+---
+
+## 6. What has actually been tested
+
+- **Reading:** all eight real Game Pigeon messages on the development Mac, spanning Cup Pong,
+  Crazy 8, 8 Ball and 8 Ball+, and format versions 42, 45, 48, 49 and 50. Every one decoded to
+  a complete field list.
+- **Writing:** a Cup Pong invite sent from the API landed with the right bundle id, a 1.2 KB
+  payload, and `is_delivered = 1`, and read back through our own route with its fields intact.
+- **The codec:** round-trips at every length tested, and matches vectors computed by a separate
+  implementation of the same algorithm.
+
+## 7. Loose ends
+
+- **Nobody has opened one of our messages in Game Pigeon on an iPhone.** The invite was
+  accepted and delivered, but whether the app renders it as a playable Cup Pong game is
+  unverified. That is the next test and it needs a phone.
+- Our archive omits `ai`, the app icon, which Apple's carry. A receiving device presumably
+  falls back to the installed app's icon; not confirmed.
+- The `build` field on real messages looks like a per-app-version token. We do not send one and
+  it has not obviously mattered.
+- Nothing reads Game Pigeon *attachments* — some games send images alongside the payload.
+- Game Pigeon is a third-party app and none of this is a supported interface. A future version
+  could change the format; `ver` is the thing to watch.

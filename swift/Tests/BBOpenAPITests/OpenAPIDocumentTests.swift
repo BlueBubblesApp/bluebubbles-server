@@ -162,7 +162,7 @@ struct RouteCatalogTests {
     let expected = [
       AdditiveRoutes.security, AdditiveRoutes.alerts, AdditiveRoutes.contactAvatar,
       AdditiveRoutes.chatPinning, AdditiveRoutes.stickers, AdditiveRoutes.sendLater,
-      AdditiveRoutes.polls,
+      AdditiveRoutes.polls, AdditiveRoutes.appMessages,
       AdditiveRoutes.webhookEditing,
       AdditiveRoutes.chatControls, AdditiveRoutes.findMy, AdditiveRoutes.findMySharing,
       AdditiveRoutes.faceTime, AdditiveRoutes.faceTimeIncoming, AdditiveRoutes.auth,

@@ -511,6 +511,8 @@ public struct ServerComposition {
       groups.append(AdditiveRoutes.sendLater)
       // Polls, macOS 26.
       groups.append(AdditiveRoutes.polls)
+      // Any iMessage app's balloon, Game Pigeon included.
+      groups.append(AdditiveRoutes.appMessages)
       // Editing a webhook, which the Node server only ever exposed to its own UI.
       groups.append(AdditiveRoutes.webhookEditing)
       // Conversation controls — wallpaper today, mute and filtering next.

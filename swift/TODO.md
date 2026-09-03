@@ -717,6 +717,17 @@ client appears to use the chunk route today, which is why it has not bitten.
       names, keeping the base64 body for whoever it was written for. Then add a
       `UploadedFileBodyTests` case for it.
 
+## Game Pigeon: what is left
+
+`docs/GAME_PIGEON.md` § 7. Reading and sending both work and are measured; the gap is the
+other end.
+
+- [ ] **Nobody has opened one of our Game Pigeon messages on an iPhone.** The invite was
+      delivered and reads back correctly, but whether the app treats it as a playable game is
+      unverified. Needs a phone with Game Pigeon installed.
+- [ ] Our archive omits the `ai` app-icon blob that Apple's carry.
+- [ ] Some games send attachments alongside the payload; nothing reads those.
+
 ## Stickers: what the first pass left out
 
 `POST /api/v2/message/sticker` (additive, Private API) places a sticker on a message part

@@ -296,6 +296,59 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
+    registry.register(.messageAppPayload) { request in
+      let interfaces = try await context.requireInterfaces()
+      let message = try await interfaces.message.appMessage(
+        guid: try request.requirePathParameter("guid"))
+      return .data(interfaces.message.serialize(message))
+    }
+
+    registry.register(.messageSendApp) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      let sent = try await interfaces.message.sendAppMessage(
+        chatGUID: try values.requireString("chatGuid"),
+        balloonBundleID: try values.requireString("balloonBundleId"),
+        url: try values.requireString("url"),
+        sessionID: values.string("sessionId"),
+        appName: values.string("appName"),
+        appID: values.int("appId"),
+        summary: values.string("summary"),
+        caption: values.string("caption")
+      )
+      return try Self.sendResult(sent, interfaces: interfaces)
+    }
+
+    registry.register(.messageSendGamePigeon) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      // `fields` is an ORDERED list of {name, value}; a plain object is accepted too, for
+      // the games that do not care about order.
+      var fields: [(name: String, value: String)] = []
+      if let array = values.array("fields") {
+        for entry in array {
+          guard let name = entry["name"]?.stringValue else {
+            throw BadRequest("every entry in `fields` needs a `name`")
+          }
+          fields.append((name: name, value: entry["value"]?.stringValue ?? ""))
+        }
+      } else if case .object(let map)? = values["fields"] {
+        fields = map.map { (name: $0.key, value: $0.value.stringValue ?? "") }
+          .sorted { $0.name < $1.name }
+      } else {
+        throw BadRequest("`fields` is required, as a list of {name, value} or an object")
+      }
+      let sent = try await interfaces.message.sendGamePigeon(
+        chatGUID: try values.requireString("chatGuid"),
+        version: values.int("version") ?? 52,
+        fields: fields,
+        sessionID: values.string("sessionId"),
+        caption: values.string("caption"),
+        teamID: values.string("teamId") ?? "EWFNLB79LQ"
+      )
+      return try Self.sendResult(sent, interfaces: interfaces)
+    }
+
     registry.register(.messageCreatePoll) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()

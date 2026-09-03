@@ -1526,6 +1526,39 @@ enum IMMessageBuilder {
     return message
   }
 
+  /// An iMessage-app balloon: a plain message carrying a plugin bundle id and its payload.
+  ///
+  /// The same eleven-argument initializer everything else uses, with the two arguments the
+  /// text path passes nil for actually filled in. The TEXT is the fallback line a device
+  /// shows when it cannot draw the balloon; Apple's own app messages carry an empty one and
+  /// let the layout's caption speak, and that is what is sent when no summary is given.
+  static func appMessage(
+    balloonBundleID: String, payload: Data, summary: String?
+  ) throws -> AnyObject {
+    let type: AnyClass = try IMCoreRuntime.requireClass("IMMessage")
+    guard
+      let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+        .takeUnretainedValue()
+    else {
+      throw PrivateAPIErrorShim.rejected("Could not allocate an IMMessage")
+    }
+    guard
+      let message = try IMCoreRuntime.invoke(
+        allocated,
+        "initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:"
+          + "subject:balloonBundleID:payloadData:expressiveSendStyleID:",
+        [
+          NSNull(), NSNull(), NSAttributedString(string: summary ?? ""), NSNull(), [],
+          Flags.plain, NSNull(), NSNull(), NSNull(),
+          balloonBundleID, payload, NSNull(),
+        ]
+      )
+    else {
+      throw PrivateAPIErrorShim.rejected("IMMessage would not build the app message")
+    }
+    return message
+  }
+
   /// A sticker: an association that also carries a file transfer.
   ///
   /// TRANSCRIBED from Messages' own send, `-[CKChatController(CKChatController_Stickers)

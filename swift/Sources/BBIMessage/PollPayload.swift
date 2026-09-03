@@ -56,25 +56,13 @@ public enum PollPayload {
 
   /// Pulls the JSON and session out of an archive. Nil when the blob is not one of ours.
   ///
-  /// Unarchived with secure coding OFF and a delegate that stands a placeholder in for any
-  /// class this process does not have — `MSMessageTemplateLayout` and friends exist only
-  /// inside Messages.app. The two values read here are Foundation's own (`NSURL`,
-  /// `NSUUID`), so the substitution costs nothing; a secure unarchive would refuse the
-  /// whole graph on the first unknown name.
+  /// The archive itself is every iMessage app's — see `AppMessagePayload`, which does the
+  /// unarchiving. What is specific to Polls is that its `URL` body is base64 JSON.
   public static func envelope(from data: Data?) -> Envelope? {
-    guard let data, !data.isEmpty,
-      let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data)
-    else { return nil }
-    unarchiver.requiresSecureCoding = false
-    let substitute = UnknownClassSubstitute()
-    unarchiver.delegate = substitute
-    defer { unarchiver.finishDecoding() }
-    guard let root = unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? [String: Any],
-      let url = (root["URL"] as? URL)?.absoluteString ?? (root["URL"] as? String),
+    guard let app = AppMessagePayload.envelope(from: data), let url = app.url,
       let json = jsonBody(ofDataURL: url)
     else { return nil }
-    let session = (root["sessionIdentifier"] as? UUID)?.uuidString
-    return Envelope(json: json, sessionID: session)
+    return Envelope(json: json, sessionID: app.sessionID)
   }
 
   /// The base64 body of a `data:,…` URL, with the query Messages appends (`?src=p&c=3`)
@@ -92,18 +80,3 @@ public enum PollPayload {
 
 /// Stands in for any archived class this process cannot instantiate. It decodes nothing
 /// and keeps nothing; the top-level dictionary still comes back with the keys we read.
-@objc(BBPollArchivePlaceholder)
-private final class ArchivePlaceholder: NSObject, NSCoding {
-  override init() { super.init() }
-  required init?(coder: NSCoder) { super.init() }
-  func encode(with coder: NSCoder) {}
-}
-
-private final class UnknownClassSubstitute: NSObject, NSKeyedUnarchiverDelegate {
-  func unarchiver(
-    _ unarchiver: NSKeyedUnarchiver, cannotDecodeObjectOfClassName name: String,
-    originalClasses classNames: [String]
-  ) -> AnyClass? {
-    ArchivePlaceholder.self
-  }
-}

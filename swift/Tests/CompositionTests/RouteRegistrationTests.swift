@@ -362,7 +362,7 @@ struct RouteRegistrationTests {
       Set(on.map(\.name))
         == [
           "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers", "Send Later",
-          "Polls", "Webhook Editing", "Chat Controls", "Contact Card",
+          "Polls", "App Messages", "Webhook Editing", "Chat Controls", "Contact Card",
         ]
     )
 

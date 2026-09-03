@@ -637,7 +637,23 @@ public enum AdditiveRoutes {
         requires: .privateAPI),
     ])
 
-  /// Polls — `docs/POLLS.md`. macOS 26 only, and the interface says so.
+  /// iMessage-app balloons: read any app's payload, send one back. Game Pigeon is the
+  /// motivating case (`docs/GAME_PIGEON.md`), but nothing here is specific to it beyond the
+  /// one convenience route that does its scramble.
+  ///
+  /// The server does not model games. `app/:guid` hands back the payload; `game-pigeon`
+  /// takes fields and sends them. What a field means is the client's business.
+  public static let appMessages = RouteGroup(
+    "App Messages", prefix: "message", apiVersion: RouteTable.latestVersion,
+    routes: [
+      .init(.get, "app/:guid", .messageAppPayload),
+      .init(.post, "app", .messageSendApp, scope: .messagesWrite, requires: .privateAPI),
+      .init(
+        .post, "game-pigeon", .messageSendGamePigeon, scope: .messagesWrite,
+        requires: .privateAPI),
+    ])
+
+  /// Polls — `docs/POLLS.md`.  /// Polls — `docs/POLLS.md`. macOS 26 only, and the interface says so.
   ///
   /// `poll` before `poll/:guid` before `poll/:guid/vote`: literals ahead of parameters,
   /// and the longer path registered after the shorter so neither swallows the other.

@@ -45,6 +45,7 @@ struct FailingPrivateAPI: PrivateAPI {
   func sendMessage(_ request: SendMessageRequest) async throws -> SentMessage { throw error }
   func sendMultipart(_ request: SendMultipartRequest) async throws -> SentMessage { throw error }
   func sendAttachment(_ request: SendAttachmentRequest) async throws -> SentMessage { throw error }
+  func sendAppMessage(_ request: SendAppMessageRequest) async throws -> SentMessage { throw error }
   func react(_ request: ReactionRequest) async throws -> SentMessage { throw error }
   func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
     throw error

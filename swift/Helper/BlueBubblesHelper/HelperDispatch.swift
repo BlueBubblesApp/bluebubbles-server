@@ -120,6 +120,18 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
+    case .sendAppMessage:
+      guard let payload = data["payload"]?.stringValue.flatMap({ Data(base64Encoded: $0) })
+      else {
+        throw PrivateAPIError.rejectedByMessages(
+          reason: "send-app-message requires 'payload' as base64")
+      }
+      let sent = try await bridge.sendAppMessage(
+        SendAppMessageRequest(
+          chat: try chat(), balloonBundleID: try string("balloonBundleId"),
+          payload: payload, summary: optionalString("summary")))
+      return ["identifier": sent.guid.rawValue]
+
     case .sendAttachment:
       let sent = try await bridge.sendAttachment(
         SendAttachmentRequest(

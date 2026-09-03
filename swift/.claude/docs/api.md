@@ -142,6 +142,19 @@ Two things a client must know when it reads a scheduled row back:
   neither key is an ordinary message. Without them a pending message looks identical to a sent
   one — `isSent` is 1 the moment Messages accepts it.
 
+### iMessage app balloons — `/api/v2/message/app`, and Game Pigeon
+
+`docs/GAME_PIGEON.md` is the reference. `GET app/:guid` decodes any app balloon (bundle id,
+app name, session, caption, raw payload URL) and adds a `game_pigeon` block when the message
+is one. `POST app` sends any app's balloon from a payload URL you supply; `POST game-pigeon`
+takes fields and does Game Pigeon's own scramble for you.
+
+The server does not model games: fields go out and come back as an ordered name/value list,
+so every Game Pigeon game travels the same way and the client decides what a field means. The
+envelope is built server-side rather than through ChatKit, because ChatKit refuses to compose
+for an extension the Mac does not have installed — which is every third-party iMessage app,
+since they are iOS-only.
+
 ### Polls — `/api/v2/message/poll`
 
 `docs/POLLS.md` is the reference. Three routes, macOS 26 only: `GET poll/:guid` assembles a

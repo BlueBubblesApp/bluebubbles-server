@@ -92,6 +92,19 @@ public actor PrivateAPIClient: PrivateAPI {
     return try sentMessage(from: result, chat: request.chat)
   }
 
+  public func sendAppMessage(_ request: SendAppMessageRequest) async throws -> SentMessage {
+    let result = try await transport.request(
+      action: .sendAppMessage,
+      data: .object(dropping: [
+        "chatGuid": .string(request.chat.rawValue),
+        "balloonBundleId": .string(request.balloonBundleID),
+        // Base64: the wire is JSON and the payload is an archive.
+        "payload": .string(request.payload.base64EncodedString()),
+        "summary": request.summary.map(WireJSON.string),
+      ]))
+    return try sentMessage(from: result, chat: request.chat)
+  }
+
   public func sendAttachment(_ request: SendAttachmentRequest) async throws -> SentMessage {
     // Checked here, because the helper reports a missing file as a generic failure and
     // the caller then has no idea which path was wrong.
