@@ -391,6 +391,44 @@ public struct SendStickerRequest: Codable, Sendable {
   }
 }
 
+/// A sticker added to this Mac's sticker store, so it shows up in the picker.
+///
+/// The store is `stickers.stickerdb` in the `com.apple.stickersd.group` container, and the
+/// only write into it Messages exposes is `-[_STKMessagesObjCStoreFacade
+/// donateStickerToRecentsWithIdentifier:…]` — a DONATION to recents, which is what Messages
+/// itself calls after a send. There is no "add to the saved library" call on that facade, so
+/// this adds a recent and says so; see `docs/STICKER_LIBRARY.md`.
+public struct SaveStickerRequest: Codable, Sendable {
+  /// An image on disk. PNG, HEIC and the other UTIs Messages reads; the UTI is taken from
+  /// the file rather than declared, because the store records one per representation.
+  public let filePath: String
+  /// The sticker's own name. Messages leaves this empty for a user-generated sticker.
+  public let name: String?
+  /// What VoiceOver reads, and what the picker searches. Messages fills this in from its
+  /// own subject recognition ("loudly crying face"); a client that knows better should say.
+  public let accessibilityName: String?
+
+  public init(filePath: String, name: String? = nil, accessibilityName: String? = nil) {
+    self.filePath = filePath
+    self.name = name
+    self.accessibilityName = accessibilityName
+  }
+}
+
+/// What the store recorded, so a client can fetch the sticker straight back.
+public struct SavedSticker: Codable, Sendable {
+  /// The UUID the store filed it under, which is the id every read route takes.
+  public let identifier: String
+  public let externalURI: String
+  public let byteCount: Int
+
+  public init(identifier: String, externalURI: String, byteCount: Int) {
+    self.identifier = identifier
+    self.externalURI = externalURI
+    self.byteCount = byteCount
+  }
+}
+
 // MARK: - Polls
 
 /// The Polls iMessage app, which is what a poll IS on the wire — see `docs/POLLS.md`.
@@ -771,6 +809,12 @@ public protocol PrivateAPI: Sendable {
   ) async throws
   /// Delivers a scheduled message now, leaving the schedule behind.
   func sendScheduledMessageNow(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
+  /// Adds a sticker to this Mac's sticker store so it appears in the picker.
+  ///
+  /// Not a send — nothing reaches a conversation. It exists so a client can put a sticker
+  /// on the Mac once and then send it by identifier, rather than uploading the same bytes
+  /// on every send.
+  func saveSticker(_ request: SaveStickerRequest) async throws -> SavedSticker
   /// Sends an iMessage-app balloon built by the caller, and answers with its message.
   func sendAppMessage(_ request: SendAppMessageRequest) async throws -> SentMessage
   /// Sends a new poll and answers with its message. macOS 26 and later.

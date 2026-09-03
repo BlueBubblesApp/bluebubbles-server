@@ -82,6 +82,25 @@ public enum QueryParameters {
       sort, after, before, offset, limit,
     ],
     .chatFind: [with("`participants`, `lastmessage`")],
+    .stickerList: [
+      Parameter(
+        "source", "string",
+        "Which shelf of the library to list. `all` is both, and is the default because a "
+          + "client showing the user their stickers wants the whole picker. A "
+          + "comma-separated pair (`saved,recent`) means the same as `all`. Every row says "
+          + "which shelf it came from either way.",
+        allowed: ["all", "saved", "recent"], defaultValue: "all"),
+      limit, offset,
+    ],
+    .stickerImage: [
+      Parameter(
+        "role", "string",
+        "Which rendition to serve. `still` is the full-size image and `keyboard` the "
+          + "picker thumbnail; the store's own reverse-DNS role string is accepted too. "
+          + "Omitted serves the preferred rendition, which is the full-size one. A role "
+          + "this sticker does not have falls back to preferred rather than 404ing.",
+        allowed: ["still", "keyboard"])
+    ],
     .chatCount: [
       Parameter(
         "includeArchived", "boolean",

@@ -55,6 +55,13 @@ public enum NonJSONResponses {
       "application/octet-stream",
       "The media embedded in a digital-touch or handwritten message."
     ),
+    .stickerImage: (
+      "application/octet-stream",
+      "The sticker's image bytes. The actual Content-Type is the representation's own — "
+        + "`image/png` or `image/heic` — and is set per response from the UTI the store "
+        + "holds for that representation. `?role=` picks which one; omitted serves the "
+        + "preferred representation."
+    ),
     .uiIndex: (
       "text/html",
       "The landing page. HTML, not JSON — this is the route a person opens in a browser to "

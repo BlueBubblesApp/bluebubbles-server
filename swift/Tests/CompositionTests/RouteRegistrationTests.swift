@@ -12,6 +12,7 @@
 import BBAuth
 import BBEvents
 import BBHTTPAPI
+import BBOpenAPI
 import BBServiceKit
 import BBSettings
 import Foundation
@@ -32,8 +33,8 @@ struct RouteRegistrationTests {
   /// interesting claim is "nothing else *beyond the baseline* is mounted", and conflating the
   /// two would make every flag test pass for the wrong reason.
   static let alwaysMounted: Set<String> = [
-    "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers", "Send Later",
-    "Polls", "App Messages", "Webhook Editing", "Chat Controls", "Contact Card",
+    "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers", "Sticker Library",
+    "Send Later", "Polls", "App Messages", "Webhook Editing", "Chat Controls", "Contact Card",
   ]
 
   /// Group names beyond the always-mounted baseline.
@@ -357,6 +358,31 @@ struct RouteRegistrationTests {
       faceTime: true, faceTimeIncoming: true
     )
     #expect(Self.gated(both) == ["FaceTime Enhanced", "FaceTime Incoming"])
+  }
+
+  /// The converse of the test above, and it was missing.
+  ///
+  /// That asymmetry cost a real bug: the sticker library group was added to the catalog and
+  /// to the handler registry but never appended in `routeGroups`, so all four routes were
+  /// fully DOCUMENTED and returned 404. The one-directional check passed, because a group
+  /// in the catalog that nothing mounts is not a group the composition root failed to
+  /// document — it is worse, and nothing was looking for it.
+  @Test("Nothing is documented that the composition root does not mount")
+  func catalogueIsReachable() async {
+    let mounted = Set(
+      await ServerComposition.routeGroups(
+        authMode: .both, codecs: .full(preference: .sealedV2),
+        features: Set(Features.allKeys.map { $0.replacingOccurrences(of: "feature_", with: "") }),
+        faceTime: true, faceTimeIncoming: true
+      ).map { "\($0.name)|\($0.apiVersion)" }
+    )
+    for entry in RouteCatalog.all
+    where entry.group.apiVersion != 1 && !entry.group.mountsAtRoot {
+      let name = entry.group.name
+      #expect(
+        mounted.contains("\(name)|\(entry.group.apiVersion)"),
+        "\(name) is documented but no configuration mounts it")
+    }
   }
 
   /// v2 is mounted for everyone, with no setting to turn it on and none to turn it off.

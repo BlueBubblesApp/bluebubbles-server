@@ -162,14 +162,23 @@ envelope swap described below. What it still does not do:
       — exactly where the helper work lives. Needs a dedicated throwaway conversation and a
       driver that is explicit about what it will send. Note that the replay DENY-LISTS all of
       these (see below), so recording them buys `bb-parity` coverage, not CI coverage.
-- [ ] **Response shapes for the v2 routes are still inferred-or-nothing.** Request bodies are
-      now declared by hand (`RequestBodies`, with an `example` per route, each one sent to a
-      live Mac verbatim), but the *responses* of the routes this server added have no fixture
-      either, so the spec describes their envelope and not their `data`. A client reading the
-      poll or app-message document still has to guess at `options[].id` and
-      `game_pigeon.fields`. The same trick would work: a hand-written response table keyed by
-      `HandlerID`, with the superset rule against `FixtureSchemas` and the bodyless-style
-      ratchet, so a new v2 route cannot ship with an undocumented answer.
+- [ ] **Declare the remaining v2 responses.** `ResponseBodies` now exists and the four
+      sticker-library routes use it, with fields described and a real example each. The other
+      v2 routes still answer with a bare envelope in the spec: polls (`options[].id`,
+      `votes[]`), Send Later's pending list, and the app-message read (`game_pigeon.fields`).
+      Every shape has been seen on a live Mac during development, so this is transcription
+      rather than research — and there is no ratchet forcing it yet, which there should be:
+      the bodyless-style rule that a v2 route must appear in one table or the other.
+- [ ] **A sticker can be added to recents but not to the saved drawer.** The only write
+      `_STKMessagesObjCStoreFacade` exposes is a donation to recents; creating a saved
+      sticker is a Stickers-extension UI flow. Worth another look at whether `stickersd` has
+      an XPC interface that takes one, since "save this to my stickers" is the thing a user
+      would actually ask for. See `docs/STICKER_LIBRARY.md` § 2.
+- [ ] **Deleting a sticker is not exposed.** `_STKImageGlyphRecencyObjCFacade` has
+      `resetRecentsWithCompletionHandler:`, which clears the WHOLE recents shelf — too blunt
+      to put behind a route. There is no per-sticker delete on any facade found so far, so a
+      test sticker added through `POST /api/v2/sticker` has to be removed from Messages'
+      picker by hand.
 - [ ] **Capture the socket transcript.** The HTTP half is recorded; the handshake and frame
       sequence are not, and `Fixtures/` has no `socket/` directory yet.
 - [ ] **Re-record after any Node-side change.** The fixture is a snapshot of a server that is

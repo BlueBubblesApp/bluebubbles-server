@@ -8,7 +8,7 @@
 # failing check pass):
 #   swift run bb-openapi coverage --write-allowlist
 #
-# 13 of 162 routes.
+# 17 of 166 routes.
 POST /api/v2/message/sticker  # needs a live Private API send to record; the conformance recorder runs against the Node server, which has no sticker route
 POST /api/v2/message/send-later  # needs a live Private API send to record; the conformance recorder runs against the Node server, which has no Send Later route
 GET /api/v2/message/send-later  # same
@@ -22,3 +22,7 @@ POST /api/v2/message/poll/:guid/option  # same
 GET /api/v2/message/app/:guid  # needs an app-message row in the fixture chat.db; the recorder's Node server has no app-message route
 POST /api/v2/message/app  # same
 POST /api/v2/message/game-pigeon  # same
+GET /api/v2/sticker  # reads this Mac's own stickers.stickerdb, which no fixture can carry — the recorder's Node server has no sticker library route either
+GET /api/v2/sticker/:id  # same
+GET /api/v2/sticker/:id/image  # same, and it answers with image bytes rather than an envelope
+POST /api/v2/sticker  # needs a live helper to donate into the real sticker store

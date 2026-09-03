@@ -344,6 +344,26 @@ shipping undocumented.
 
 Each example in this table was sent to a live Mac verbatim, with only the chat GUID changed.
 
+### Response bodies
+
+Inferred where a fixture exists, and declared in `Sources/BBOpenAPI/ResponseBodies.swift`
+where one cannot.
+
+The routes this server added have no recording, so their `data` was absent from the document
+entirely — a client could see the route and not one field it returns. For some of them a
+fixture is not merely missing but impossible: the sticker library reads a Core Data store
+Apple owns, in a container that only exists on a Mac that has had a sticker, so a fixture
+would pin the shape of a hand-built copy rather than of the real thing.
+
+One rule, and it is stricter than the request table's: **a declaration applies only where
+inference produced nothing.** It never overrides a recorded response. A fixture is evidence
+and a declaration is testimony, so if a declared route is ever recorded the declaration must
+be deleted rather than left to disagree in silence — which `ResponseBodyTests` enforces,
+along with an example that is a real response and carries every required field.
+
+A route that answers with bytes rather than an envelope is declared in
+`NonJSONResponses.binary`, and a handler in both tables is a build failure.
+
 ### Why scopes are an extension
 
 A route's required scope appears as `x-required-scope`, not inside the operation's

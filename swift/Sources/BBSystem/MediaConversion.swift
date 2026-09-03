@@ -166,6 +166,23 @@ public enum FileTypes {
     return mime
   }
 
+  /// The MIME type for a UNIFORM TYPE IDENTIFIER, as a store or a database records one.
+  ///
+  /// Separate from `mimeType(for:)` because there is no path involved: the sticker store
+  /// keeps `public.png` and `public.heic` per representation and never a filename, so
+  /// deriving a type from an extension would mean inventing one first.
+  public static func mimeType(forIdentifier identifier: String) -> String {
+    guard let type = UTType(identifier), let mime = type.preferredMIMEType else {
+      return "application/octet-stream"
+    }
+    return mime
+  }
+
+  /// The filename extension for a uniform type identifier, for a download's filename.
+  public static func fileExtension(forIdentifier identifier: String) -> String? {
+    UTType(identifier)?.preferredFilenameExtension
+  }
+
   public static func isImage(_ path: String) -> Bool { conforms(path, to: .image) }
   public static func isAudio(_ path: String) -> Bool { conforms(path, to: .audio) }
   public static func isVideo(_ path: String) -> Bool { conforms(path, to: .movie) }

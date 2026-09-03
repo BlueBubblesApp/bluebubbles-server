@@ -163,6 +163,20 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
+    case .saveSticker:
+      let saved = try await bridge.saveSticker(
+        SaveStickerRequest(
+          filePath: try string("filePath"),
+          name: optionalString("name"),
+          accessibilityName: optionalString("accessibilityName")
+        )
+      )
+      return [
+        "identifier": saved.identifier,
+        "externalURI": saved.externalURI,
+        "byteCount": String(saved.byteCount),
+      ]
+
     case .createPoll:
       let sent = try await bridge.createPoll(
         PollCreateRequest(

@@ -20,8 +20,10 @@
 //  See `.claude/docs/private-api.md`.
 
 import BBPrivateAPIContract
+import CoreGraphics
 import Foundation
 import HelperShared
+import ImageIO
 import ObjectiveC.runtime
 
 /// `IMChatRegistry` — the map from chat GUID to live chat object.
@@ -2250,6 +2252,172 @@ enum IMStickers {
       throw PrivateAPIErrorShim.rejected("that message part reports no range")
     }
     return value.rangeValue
+  }
+}
+
+// MARK: - The sticker store
+
+/// Writing into this Mac's sticker store, which is what puts a sticker in the picker.
+///
+/// The store is `stickers.stickerdb` inside the `com.apple.stickersd.group` container, owned
+/// by `stickersd`. READING it needs none of this — the server opens that SQLite file
+/// directly, so listing stickers works on a Mac with no helper at all (see
+/// `StickerLibrary`). Writing does: the container is entitled to the group, and Messages
+/// holds that entitlement while this server does not.
+///
+/// The only write Messages exposes is a DONATION to recents:
+///
+///     -[_STKMessagesObjCStoreFacade
+///         donateStickerToRecentsWithIdentifier:representations:stickerEffectEnum:
+///         externalURI:name:accessibilityName:metadata:attributionInfo:error:]
+///
+/// which is what Messages itself calls after sending a sticker. There is no "add to the
+/// saved library" call on the facade, and that asymmetry is real rather than an oversight
+/// on our part — saved stickers are created by the Stickers extension lifting a subject out
+/// of a photo, which is a UI flow, not an API. `docs/STICKER_LIBRARY.md` records the
+/// measurements.
+enum IMStickerStore {
+
+  /// Stickers.framework is private and may not be loaded until the picker is first opened.
+  private static let frameworkPath =
+    "/System/Library/PrivateFrameworks/Stickers.framework/Stickers"
+
+  private static func requireStickersClass(_ name: String) throws -> AnyClass {
+    if let found = IMCoreRuntime.lookUpClass(name) { return found }
+    _ = dlopen(frameworkPath, RTLD_NOW)
+    return try IMCoreRuntime.requireClass(name)
+  }
+
+  private static func allocate(_ type: AnyClass) throws -> AnyObject {
+    guard
+      let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+        .takeUnretainedValue()
+    else {
+      throw PrivateAPIErrorShim.rejected("could not allocate \(type)")
+    }
+    return allocated
+  }
+
+  /// The role the store files a single-image sticker under.
+  ///
+  /// Messages writes TWO representations for a sticker it made itself — a `still` HEIC at
+  /// full size and a `keyboard` PNG preview — and NO role at all (an empty string) for the
+  /// emoji and Genmoji rows. A single uploaded image is the second shape, so the role is
+  /// left empty rather than claimed to be a still of something with no keyboard preview.
+  static let singleImageRole = ""
+
+  /// One representation over an image's bytes.
+  ///
+  /// **`_STKStickerUIStickerRepresentation`, not `STKStickerRepresentation`** — and the
+  /// difference is not cosmetic. `STKStickerRepresentation` is the archivable model, and its
+  /// `-init` is a Swift **unimplemented initializer**: it loads the strings
+  /// `"Stickers.Representation"` and `"init()"` and executes `brk #0x1`. Calling it does not
+  /// fail, it TRAPS — measured, and it took Messages down with `EXC_BREAKPOINT` at
+  /// `Stickers` + 0x7306c, which is that `brk` exactly.
+  ///
+  /// The type the donation actually wants was read out of the facade itself:
+  /// `-donateStickerToRecentsWithIdentifier:…` calls `type metadata accessor for
+  /// Stickers._STKStickerUIStickerRepresentation` at +76, before it touches anything else.
+  /// That class has a real, complete initializer — `-initWithData:type:size:role:` — which
+  /// is why nothing here needs setters.
+  static func representation(data: Data, role: String = singleImageRole) throws -> AnyObject {
+    let type: AnyClass = try requireStickersClass("_STKStickerUIStickerRepresentation")
+    let (uti, size) = try Self.describe(data)
+    guard
+      let representation = try IMCoreRuntime.invoke(
+        try allocate(type), "initWithData:type:size:role:",
+        [data as NSData, uti, NSValue(size: size), role]
+      )
+    else {
+      throw PrivateAPIErrorShim.rejected(
+        "the sticker store would not accept that image as a representation")
+    }
+    return representation
+  }
+
+  /// The image's uniform type identifier and pixel size, read from the bytes.
+  ///
+  /// Read rather than taken from the filename: the store records a UTI per representation
+  /// and a size it draws with, and a client that uploads a PNG named `.heic` should not end
+  /// up with a row that lies about either. ImageIO is the same decoder Messages uses.
+  private static func describe(_ data: Data) throws -> (uti: String, size: CGSize) {
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+      let uti = CGImageSourceGetType(source) as String?
+    else {
+      throw PrivateAPIErrorShim.rejected(
+        "that file is not an image any installed decoder recognises")
+    }
+    let properties =
+      CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+    let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 0
+    let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 0
+    guard width > 0, height > 0 else {
+      throw PrivateAPIErrorShim.rejected("that image reports no dimensions")
+    }
+    return (uti, CGSize(width: width, height: height))
+  }
+
+  /// Attribution: who this sticker came from, shown on the sticker detail sheet.
+  ///
+  /// Attributed to the built-in Stickers extension, the same as `IMStickers` uses for a
+  /// send, because that is what a sticker made on this Mac genuinely is as far as the
+  /// receiving device can tell.
+  static func attribution() throws -> AnyObject {
+    let type: AnyClass = try requireStickersClass("_STKStickerAttributionInfo")
+    guard
+      let info = try IMCoreRuntime.invoke(
+        try allocate(type), "initWithAdamID:bundleIdentifier:name:",
+        [NSNull(), IMStickers.userGeneratedPackID, "Stickers"]
+      )
+    else {
+      throw PrivateAPIErrorShim.rejected("_STKStickerAttributionInfo would not initialise")
+    }
+    return info
+  }
+
+  /// Donates a sticker to recents, and answers with the identifier the store filed it under.
+  ///
+  /// The identifier is minted here rather than by the store — the selector takes it — and
+  /// the external URI is built in the store's own `sticker:///user/identifier/<UUID>` shape,
+  /// which is what every user-generated row in `stickers.stickerdb` carries.
+  static func donateToRecents(
+    data: Data, name: String?, accessibilityName: String?
+  ) throws -> (identifier: UUID, externalURI: String) {
+    let type: AnyClass = try requireStickersClass("_STKMessagesObjCStoreFacade")
+    guard let facade = try IMCoreRuntime.invoke(try allocate(type), "init") else {
+      throw PrivateAPIErrorShim.rejected("_STKMessagesObjCStoreFacade would not initialise")
+    }
+
+    let identifier = UUID()
+    let externalURI = "sticker:///user/identifier/\(identifier.uuidString)"
+    let representation = try representation(data: data)
+
+    // -1 is what every row Messages wrote for a plain sticker carries; 0 is what the two
+    // rows with an effect carry. No effect is the honest value for an uploaded image.
+    let noEffect = Int64(-1)
+    let result = try IMCoreRuntime.invoke(
+      facade,
+      "donateStickerToRecentsWithIdentifier:representations:stickerEffectEnum:externalURI:"
+        + "name:accessibilityName:metadata:attributionInfo:error:",
+      [
+        // A STRING, not an NSUUID. Measured: passing the UUID object raises
+        // `-[__NSConcreteUUID length]: unrecognized selector`, so the facade takes the
+        // uppercase dashed form the store's own `ZEXTERNALURI` rows use.
+        identifier.uuidString, [representation], noEffect, externalURI,
+        name ?? "", accessibilityName ?? "", NSNull(), try attribution(), NSNull(),
+      ]
+    )
+
+    // The selector returns BOOL and reports why through its `error` out-parameter, which
+    // the invocation bridge cannot fill in — so a false here is reported as a refusal
+    // rather than dressed up with a reason we do not have.
+    if let answered = result as? NSNumber, !answered.boolValue {
+      throw PrivateAPIErrorShim.rejected(
+        "the sticker store refused the donation — the image may not be a type Stickers "
+          + "reads, or stickersd may not be running"
+      )
+    }
+    return (identifier, externalURI)
   }
 }
 

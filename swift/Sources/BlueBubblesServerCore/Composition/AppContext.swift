@@ -153,6 +153,38 @@ public actor AppContext {
     return callHistoryRepository
   }
 
+  /// This Mac's sticker store, opened on first use and then held.
+  ///
+  /// Lazy for the same reasons as the call log, and a missing file is a real state rather
+  /// than an error: `stickers.stickerdb` does not exist until the user has had a sticker.
+  /// `loaded` is separate from the value so that Mac is not retried on every request.
+  private var stickerRepository: StickerRepository?
+  private var stickerRepositoryLoaded = false
+
+  public func stickerLibrary() async -> StickerRepository? {
+    if stickerRepositoryLoaded { return stickerRepository }
+    stickerRepositoryLoaded = true
+    let path = StickerRepository.defaultPath()
+    guard FileManager.default.fileExists(atPath: path) else {
+      // Not warned about: a Mac with no stickers is ordinary, and a warning on every such
+      // server would be noise that trains people to ignore warnings.
+      logger.debug("This Mac has no sticker store", metadata: ["path": .string(path)])
+      return nil
+    }
+    do {
+      stickerRepository = StickerRepository(database: try ReadOnlyDatabase(path: path))
+    } catch {
+      // Almost always Full Disk Access, same as the call log.
+      logger.warning(
+        "Could not open this Mac's sticker store",
+        metadata: [
+          "path": .string(path),
+          "error": .string(String(describing: error)),
+        ])
+    }
+    return stickerRepository
+  }
+
   /// Services, once the registry has built them. Populated by the registry rather than
   /// here, which is what keeps this from being a second construction path.
   private var registry: ServiceRegistry<AppContext>?

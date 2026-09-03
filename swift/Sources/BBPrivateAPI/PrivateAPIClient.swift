@@ -248,6 +248,31 @@ public actor PrivateAPIClient: PrivateAPI {
     return try sentMessage(from: result, chat: request.chat)
   }
 
+  public func saveSticker(_ request: SaveStickerRequest) async throws -> SavedSticker {
+    guard FileManager.default.fileExists(atPath: request.filePath) else {
+      throw PrivateAPIError.rejectedByMessages(
+        reason: "sticker not found at \(request.filePath)"
+      )
+    }
+    let result = try await transport.request(
+      action: .saveSticker,
+      data: .object([
+        "filePath": .string(request.filePath),
+        "name": request.name.map(WireJSON.string) ?? .null,
+        "accessibilityName": request.accessibilityName.map(WireJSON.string) ?? .null,
+      ]))
+    guard let identifier = result?["identifier"]?.stringValue, !identifier.isEmpty else {
+      throw PrivateAPIError.rejectedByMessages(
+        reason: "the sticker store accepted the sticker but reported no identifier"
+      )
+    }
+    return SavedSticker(
+      identifier: identifier,
+      externalURI: result?["externalURI"]?.stringValue ?? "",
+      byteCount: Int(result?["byteCount"]?.stringValue ?? "") ?? 0
+    )
+  }
+
   /// Editing needs the chat, and the helper cannot derive it.
   ///
   /// MEASURED: an `IMMessageItem` retrieved by GUID reports `chatIdentifier = nil`, so

@@ -514,6 +514,8 @@ public struct ServerComposition {
     groups.append(AdditiveRoutes.chatPinning)
     // Stickers: likewise, a send the Node helper never had an action for.
     groups.append(AdditiveRoutes.stickers)
+    // The sticker library. Reads need no helper — the store is a SQLite file.
+    groups.append(AdditiveRoutes.stickerLibrary)
     // Send Later: Apple's scheduling, distinct from this server's own timer.
     groups.append(AdditiveRoutes.sendLater)
     // Polls, macOS 26.
@@ -585,6 +587,7 @@ public struct ServerComposition {
     ScheduleHandlers.register(into: &registry, context: context)
     SystemHandlers.register(into: &registry, context: context, logSink: logSink)
     MediaHandlers.register(into: &registry, context: context)
+    StickerHandlers.register(into: &registry, context: context)
     PushHandlers.register(into: &registry, context: context)
     UploadHandlers.register(into: &registry, context: context)
     UpdateHandlers.register(into: &registry, context: context)

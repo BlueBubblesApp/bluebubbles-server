@@ -670,7 +670,7 @@ public enum AdditiveRoutes {
         requires: .privateAPI),
     ])
 
-  /// Placing a sticker on a message.  /// Placing a sticker on a message.  /// Placing a sticker on a message. The Node server never sent one — its helper had no
+  /// Placing a sticker on a message. The Node server never sent one — its helper had no
   /// action for it and its route table has no path — so this is additive by definition.
   ///
   /// Under `message/` beside `react`, because that is what it is: a reaction whose payload
@@ -684,6 +684,27 @@ public enum AdditiveRoutes {
     "Stickers", prefix: "message", apiVersion: RouteTable.latestVersion,
     routes: [
       .init(.post, "sticker", .messageSendSticker, scope: .messagesWrite, requires: .privateAPI)
+    ])
+
+  /// This Mac's sticker library: what is in the picker, and putting something new in it.
+  ///
+  /// Separate from `stickers` above because it is not messaging — nothing here reaches a
+  /// conversation. It exists so a client can show the user their own stickers and send one
+  /// by identifier, instead of shipping the same bytes up on every send.
+  ///
+  /// The three READS need no Private API, which is why they carry no `.privateAPI`
+  /// requirement: the store is a SQLite file this server opens read-only, so listing and
+  /// downloading work on a Mac with no helper. The WRITE does need it — the store's
+  /// container is entitled to `com.apple.stickersd.group` and this server is not.
+  public static let stickerLibrary = RouteGroup(
+    "Sticker Library", prefix: "sticker", apiVersion: RouteTable.latestVersion,
+    routes: [
+      // MORE SPECIFIC FIRST. `:id/image` has to register ahead of `:id`, and both ahead of
+      // nothing — the bare path is the collection and takes no parameter at all.
+      .init(.get, ":id/image", .stickerImage, scope: .attachmentsRead),
+      .init(.get, ":id", .stickerDetail, scope: .messagesRead),
+      .init(.get, "", .stickerList, scope: .messagesRead),
+      .init(.post, "", .stickerSave, scope: .messagesWrite, requires: .privateAPI),
     ])
 
   /// Pinning a conversation. The helper has always been able to do this and the v1 surface

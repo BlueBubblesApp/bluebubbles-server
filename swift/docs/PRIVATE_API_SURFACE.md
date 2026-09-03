@@ -447,6 +447,10 @@ the thread inside the same synchronous block as the send, never across a suspens
 
 ### Stickers — `message.sendSticker`
 
+> Reading and adding to the sticker **library** — the picker's contents, which live in a
+> separate Core Data store and mostly need no helper at all — is a different surface, and
+> `docs/STICKER_LIBRARY.md` covers it. This section is about SENDING one onto a message.
+
 Backs `POST /api/v2/message/sticker` and the wire action `send-sticker`. Measured on macOS
 26.5.2 by disassembling Messages' own drag-and-drop send (`Tools/private-api` resolves the
 IMPs; `lldb` on a throwaway Catalyst process that `dlopen`s ChatKit gives symbolised output —

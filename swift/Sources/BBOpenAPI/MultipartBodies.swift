@@ -82,6 +82,19 @@ public enum MultipartBodies {
         "parentPreviewWidth", "string",
         "Width in points the sender rendered the parent balloon at."),
     ],
+    .stickerSave: [
+      Field(
+        "attachment", "binary",
+        "The sticker image. PNG and HEIC are what Messages writes; the store reads the "
+          + "type out of the bytes, so no type field is needed.", required: true),
+      Field(
+        "name", "string",
+        "The sticker's own name. Messages leaves this empty for a sticker made on the Mac."),
+      Field(
+        "accessibilityName", "string",
+        "What VoiceOver reads, and what the picker's search matches — e.g. `loudly crying "
+          + "face`. Worth sending: the store has no other searchable text."),
+    ],
     .chatSetGroupIcon: [
       Field("icon", "binary", "Image to use as the group photo.", required: true)
     ],

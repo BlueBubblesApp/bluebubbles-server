@@ -542,8 +542,18 @@ public enum OpenAPIDocument {
     // `allOf` rather than a standalone schema so the envelope stays defined in ONE place.
     // Inference contributes the `data` member; `status`, `message` and `metadata` are
     // hand-written and stay that way.
+    //
+    // A DECLARED response (`ResponseBodies`) fills in only where inference produced
+    // nothing — the routes this server added, which have no fixture and would otherwise
+    // document a bare envelope with no payload at all. A fixture always wins: it is
+    // evidence, and a declaration is testimony.
+    let declared =
+      FixtureSchemas.table[operationID]?.response == nil
+      ? ResponseBodies.byHandler[entry.route.handlerID] : nil
+    let dataSchema =
+      FixtureSchemas.table[operationID]?.response ?? declared.map(ResponseBodies.schema(for:))
     let successSchema: OrderedJSON =
-      FixtureSchemas.table[operationID]?.response.map { schema in
+      dataSchema.map { schema in
         .obj([
           ("allOf", .array([ref("ResponseEnvelope")])),
           ("description", .string(schemaNote)),
@@ -567,6 +577,10 @@ public enum OpenAPIDocument {
                     .obj([
                       ("status", .int(200)),
                       ("message", .string(successMessage)),
+                      // Only on a declared response: an inferred one came from a recorded
+                      // body, and the example alongside it would be a second, unverified
+                      // account of the same thing.
+                      ("data", declared?.example),
                     ])
                   ),
                 ])

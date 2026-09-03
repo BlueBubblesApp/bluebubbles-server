@@ -610,6 +610,9 @@ let package = Package(
                 // them from one suite is expected: what this suite tests IS the wiring.
                 "BlueBubblesServerCore", "BBBuiltIns", "BBFaceTime", "BBInterfaces", "BBHandlers",
                 "BBHTTPAPI", "BBSocketIO", "BBAuth", "BBEvents",
+                // `RouteRegistrationTests` compares the generated catalog against what the
+                // composition root actually mounts, which needs both sides in one suite.
+                "BBOpenAPI",
                 "BBSettings", "BBServiceKit", "BBTooling", "BBPushKit", "BBPersistence",
                 "BBDiagnostics", "BBSerialization", "BBCore",
                 // For the one-method `AppleScriptRunning` seam. `SendFailureTests` drives a
@@ -889,7 +892,12 @@ let package = Package(
 
         .testTarget(
             name: "BBHandlersTests",
-            dependencies: ["BBHandlers", "BBHTTPAPI", "BBSerialization"],
+            // `BBIMessage` and `BBSystem` are named by the sticker-library tests: the row
+            // types they build come from the repository, and the MIME derivation they pin
+            // lives in `FileTypes`.
+            dependencies: [
+                "BBHandlers", "BBHTTPAPI", "BBSerialization", "BBIMessage", "BBSystem",
+            ],
             swiftSettings: swiftSettings
         ),
 

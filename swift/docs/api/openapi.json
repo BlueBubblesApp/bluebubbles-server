@@ -164,6 +164,13 @@
       "kind": "nav"
     },
     {
+      "name": "sticker-library-v2",
+      "summary": "Sticker Library",
+      "description": "Always available.",
+      "parent": "v2",
+      "kind": "nav"
+    },
+    {
       "name": "send-later-v2",
       "summary": "Send Later",
       "description": "Always available.",
@@ -20150,6 +20157,945 @@
           }
         },
         "x-handler-id": "message.sendSticker",
+        "x-api-version": 2,
+        "x-availability": "always",
+        "x-required-scope": "messages:write",
+        "x-request-timeout-seconds": 60,
+        "x-response-timeout-seconds": 300
+      }
+    },
+    "/api/v2/sticker/{id}/image": {
+      "get": {
+        "operationId": "getV2StickerByIdImage",
+        "summary": "Image",
+        "description": "Always available.\n\nRequires the `attachments:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "tags": [
+          "sticker-library-v2"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The numeric or string identifier of the resource.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "description": "Which rendition to serve. `still` is the full-size image and `keyboard` the picker thumbnail; the store's own reverse-DNS role string is accepted too. Omitted serves the preferred rendition, which is the full-size one. A role this sticker does not have falls back to preferred rather than 404ing.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "still",
+                "keyboard"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/pretty"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sticker's image bytes. The actual Content-Type is the representation's own — `image/png` or `image/heic` — and is set per response from the UTI the store holds for that representation. `?role=` picks which one; omitted serves the preferred representation.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 401,
+                  "message": "Authentication Error",
+                  "error": {
+                    "type": "Authentication Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource. Note the error type is `Database Error`, not `Not Found` — inherited from the previous server and part of the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 404,
+                  "message": "Database Error",
+                  "error": {
+                    "type": "Database Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The route exceeded its response timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 504,
+                  "message": "Gateway Timeout",
+                  "error": {
+                    "type": "Gateway Timeout",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-handler-id": "sticker.image",
+        "x-api-version": 2,
+        "x-availability": "always",
+        "x-required-scope": "attachments:read",
+        "x-request-timeout-seconds": 60,
+        "x-response-timeout-seconds": 300
+      }
+    },
+    "/api/v2/sticker/{id}": {
+      "get": {
+        "operationId": "getV2StickerById",
+        "summary": "Detail",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "tags": [
+          "sticker-library-v2"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The numeric or string identifier of the resource.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/pretty"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "One sticker, with every representation it has.",
+                      "properties": {
+                        "identifier": {
+                          "type": "string",
+                          "description": "The sticker's own UUID, and the `:id` every other sticker route takes."
+                        },
+                        "shelf": {
+                          "type": "string",
+                          "description": "`saved` for the sticker drawer, `recent` for recently used. Emoji and Memoji stickers only ever appear as `recent`."
+                        },
+                        "external_uri": {
+                          "type": "string",
+                          "description": "Where the sticker came from: `sticker:///emoji/identifier/😭`, `sticker:///memoji/cow/…`, or `sticker:///user/identifier/<UUID>`."
+                        },
+                        "kind": {
+                          "type": "string",
+                          "description": "The external URI's source, parsed for you: `emoji`, `memoji`, `user`, or `unknown` for a source this server does not recognise."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The sticker's own name. Usually null — Messages leaves it empty."
+                        },
+                        "accessibility_name": {
+                          "type": "string",
+                          "description": "What VoiceOver reads, e.g. `loudly crying face`. The only searchable text the store keeps, so it is what a client should filter on."
+                        },
+                        "search_text": {
+                          "type": "string",
+                          "description": "Additional search text. Usually null."
+                        },
+                        "byte_count": {
+                          "type": "integer",
+                          "description": "Total size of every representation."
+                        },
+                        "effect": {
+                          "type": "integer",
+                          "description": "`-1` for a plain sticker; `0` or more when an effect is applied."
+                        },
+                        "created_at": {
+                          "type": "integer",
+                          "description": "When it entered the store, epoch MILLISECONDS."
+                        },
+                        "last_used_at": {
+                          "type": "integer",
+                          "description": "When it was last sent, epoch MILLISECONDS."
+                        },
+                        "library_index": {
+                          "type": "number",
+                          "description": "The store's own ordering value within a shelf. Larger is newer, and it is what the list is sorted by — it does not always agree with `last_used_at`."
+                        },
+                        "attribution_name": {
+                          "type": "string",
+                          "description": "Shown on the sticker detail sheet, e.g. `Stickers`."
+                        },
+                        "attribution_bundle_id": {
+                          "type": "string",
+                          "description": "The balloon bundle id behind that attribution."
+                        },
+                        "representations": {
+                          "type": "array",
+                          "description": "Every rendition the store holds. A sticker Messages made has two — a full-size `still` and a small `keyboard` preview; an emoji sticker has one.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "description": "The representation's own UUID."
+                              },
+                              "role": {
+                                "type": "string",
+                                "description": "`com.apple.stickers.role.still`, `com.apple.stickers.role.keyboard`, or an EMPTY string for a sticker with a single rendition. Send it back as `?role=`."
+                              },
+                              "uti": {
+                                "type": "string",
+                                "description": "The store's uniform type identifier, e.g. `public.heic`."
+                              },
+                              "mime_type": {
+                                "type": "string",
+                                "description": "That UTI as a MIME type, so a client need not map it."
+                              },
+                              "width": {
+                                "type": "number",
+                                "description": "Width the store draws it at. Not always integral."
+                              },
+                              "height": {
+                                "type": "number",
+                                "description": "Height, same unit."
+                              },
+                              "byte_count": {
+                                "type": "integer",
+                                "description": "This rendition's size."
+                              },
+                              "is_preferred": {
+                                "type": "boolean",
+                                "description": "The rendition `:id/image` serves when no role is asked for."
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "role",
+                              "uti",
+                              "mime_type",
+                              "is_preferred"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "identifier",
+                        "shelf",
+                        "external_uri",
+                        "kind",
+                        "byte_count",
+                        "effect",
+                        "representations"
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "status": 200,
+                  "message": "Success",
+                  "data": {
+                    "identifier": "7608FF1D-006B-4E00-B15A-DDB5001BCBF6",
+                    "shelf": "recent",
+                    "external_uri": "sticker:///memoji/cow/cow_smiling_face_with_heart-shaped_eyes",
+                    "kind": "memoji",
+                    "name": null,
+                    "accessibility_name": "Smiling face with heart-shaped eyes",
+                    "search_text": null,
+                    "byte_count": 109962,
+                    "effect": -1,
+                    "created_at": 1788393987536,
+                    "last_used_at": 1788393987536,
+                    "library_index": 13312,
+                    "attribution_name": "Stickers",
+                    "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.Stickers.UserGenerated.MessagesExtension",
+                    "representations": [
+                      {
+                        "identifier": "6F696C19-523D-4F5C-B0F4-15C3317BB676",
+                        "role": "",
+                        "uti": "public.png",
+                        "mime_type": "image/png",
+                        "width": 420,
+                        "height": 420,
+                        "byte_count": 109962,
+                        "is_preferred": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 401,
+                  "message": "Authentication Error",
+                  "error": {
+                    "type": "Authentication Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource. Note the error type is `Database Error`, not `Not Found` — inherited from the previous server and part of the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 404,
+                  "message": "Database Error",
+                  "error": {
+                    "type": "Database Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The route exceeded its response timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 504,
+                  "message": "Gateway Timeout",
+                  "error": {
+                    "type": "Gateway Timeout",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-handler-id": "sticker.detail",
+        "x-api-version": 2,
+        "x-availability": "always",
+        "x-required-scope": "messages:read",
+        "x-request-timeout-seconds": 60,
+        "x-response-timeout-seconds": 300
+      }
+    },
+    "/api/v2/sticker": {
+      "get": {
+        "operationId": "getV2Sticker",
+        "summary": "List",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "tags": [
+          "sticker-library-v2"
+        ],
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "description": "Which shelf of the library to list. `all` is both, and is the default because a client showing the user their stickers wants the whole picker. A comma-separated pair (`saved,recent`) means the same as `all`. Every row says which shelf it came from either way.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "saved",
+                "recent"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum rows to return.",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Rows to skip, for paging.",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "$ref": "#/components/parameters/pretty"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "description": "Every sticker on the requested shelves, newest first. `metadata` carries `saved` and `recent` totals whatever `?source=` asked for, so one request is enough to render both sections and page either.",
+                      "items": {
+                        "type": "object",
+                        "description": "Every sticker on the requested shelves, newest first. `metadata` carries `saved` and `recent` totals whatever `?source=` asked for, so one request is enough to render both sections and page either.",
+                        "properties": {
+                          "identifier": {
+                            "type": "string",
+                            "description": "The sticker's own UUID, and the `:id` every other sticker route takes."
+                          },
+                          "shelf": {
+                            "type": "string",
+                            "description": "`saved` for the sticker drawer, `recent` for recently used. Emoji and Memoji stickers only ever appear as `recent`."
+                          },
+                          "external_uri": {
+                            "type": "string",
+                            "description": "Where the sticker came from: `sticker:///emoji/identifier/😭`, `sticker:///memoji/cow/…`, or `sticker:///user/identifier/<UUID>`."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "The external URI's source, parsed for you: `emoji`, `memoji`, `user`, or `unknown` for a source this server does not recognise."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "The sticker's own name. Usually null — Messages leaves it empty."
+                          },
+                          "accessibility_name": {
+                            "type": "string",
+                            "description": "What VoiceOver reads, e.g. `loudly crying face`. The only searchable text the store keeps, so it is what a client should filter on."
+                          },
+                          "search_text": {
+                            "type": "string",
+                            "description": "Additional search text. Usually null."
+                          },
+                          "byte_count": {
+                            "type": "integer",
+                            "description": "Total size of every representation."
+                          },
+                          "effect": {
+                            "type": "integer",
+                            "description": "`-1` for a plain sticker; `0` or more when an effect is applied."
+                          },
+                          "created_at": {
+                            "type": "integer",
+                            "description": "When it entered the store, epoch MILLISECONDS."
+                          },
+                          "last_used_at": {
+                            "type": "integer",
+                            "description": "When it was last sent, epoch MILLISECONDS."
+                          },
+                          "library_index": {
+                            "type": "number",
+                            "description": "The store's own ordering value within a shelf. Larger is newer, and it is what the list is sorted by — it does not always agree with `last_used_at`."
+                          },
+                          "attribution_name": {
+                            "type": "string",
+                            "description": "Shown on the sticker detail sheet, e.g. `Stickers`."
+                          },
+                          "attribution_bundle_id": {
+                            "type": "string",
+                            "description": "The balloon bundle id behind that attribution."
+                          },
+                          "representations": {
+                            "type": "array",
+                            "description": "Every rendition the store holds. A sticker Messages made has two — a full-size `still` and a small `keyboard` preview; an emoji sticker has one.",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "identifier": {
+                                  "type": "string",
+                                  "description": "The representation's own UUID."
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "description": "`com.apple.stickers.role.still`, `com.apple.stickers.role.keyboard`, or an EMPTY string for a sticker with a single rendition. Send it back as `?role=`."
+                                },
+                                "uti": {
+                                  "type": "string",
+                                  "description": "The store's uniform type identifier, e.g. `public.heic`."
+                                },
+                                "mime_type": {
+                                  "type": "string",
+                                  "description": "That UTI as a MIME type, so a client need not map it."
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "description": "Width the store draws it at. Not always integral."
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "description": "Height, same unit."
+                                },
+                                "byte_count": {
+                                  "type": "integer",
+                                  "description": "This rendition's size."
+                                },
+                                "is_preferred": {
+                                  "type": "boolean",
+                                  "description": "The rendition `:id/image` serves when no role is asked for."
+                                }
+                              },
+                              "required": [
+                                "identifier",
+                                "role",
+                                "uti",
+                                "mime_type",
+                                "is_preferred"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "identifier",
+                          "shelf",
+                          "external_uri",
+                          "kind",
+                          "byte_count",
+                          "effect",
+                          "representations"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "status": 200,
+                  "message": "Success",
+                  "data": [
+                    {
+                      "identifier": "7608FF1D-006B-4E00-B15A-DDB5001BCBF6",
+                      "shelf": "recent",
+                      "external_uri": "sticker:///memoji/cow/cow_smiling_face_with_heart-shaped_eyes",
+                      "kind": "memoji",
+                      "name": null,
+                      "accessibility_name": "Smiling face with heart-shaped eyes",
+                      "search_text": null,
+                      "byte_count": 109962,
+                      "effect": -1,
+                      "created_at": 1788393987536,
+                      "last_used_at": 1788393987536,
+                      "library_index": 13312,
+                      "attribution_name": "Stickers",
+                      "attribution_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.Stickers.UserGenerated.MessagesExtension",
+                      "representations": [
+                        {
+                          "identifier": "6F696C19-523D-4F5C-B0F4-15C3317BB676",
+                          "role": "",
+                          "uti": "public.png",
+                          "mime_type": "image/png",
+                          "width": 420,
+                          "height": 420,
+                          "byte_count": 109962,
+                          "is_preferred": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 401,
+                  "message": "Authentication Error",
+                  "error": {
+                    "type": "Authentication Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource. Note the error type is `Database Error`, not `Not Found` — inherited from the previous server and part of the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 404,
+                  "message": "Database Error",
+                  "error": {
+                    "type": "Database Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The route exceeded its response timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 504,
+                  "message": "Gateway Timeout",
+                  "error": {
+                    "type": "Gateway Timeout",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-handler-id": "sticker.list",
+        "x-api-version": 2,
+        "x-availability": "always",
+        "x-required-scope": "messages:read",
+        "x-request-timeout-seconds": 60,
+        "x-response-timeout-seconds": 300
+      },
+      "post": {
+        "operationId": "postV2Sticker",
+        "summary": "Save",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "tags": [
+          "sticker-library-v2"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pretty"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "attachment": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The sticker image. PNG and HEIC are what Messages writes; the store reads the type out of the bytes, so no type field is needed."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The sticker's own name. Messages leaves this empty for a sticker made on the Mac."
+                  },
+                  "accessibilityName": {
+                    "type": "string",
+                    "description": "What VoiceOver reads, and what the picker's search matches — e.g. `loudly crying face`. Worth sending: the store has no other searchable text."
+                  }
+                },
+                "required": [
+                  "attachment"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "The sticker as the store now holds it — read back rather than echoed, so the `identifier` is one the read routes accept and the representation carries the UTI and size the store derived from the bytes. It lands on the `recent` shelf.",
+                      "properties": {
+                        "identifier": {
+                          "type": "string",
+                          "description": "The sticker's own UUID, and the `:id` every other sticker route takes."
+                        },
+                        "shelf": {
+                          "type": "string",
+                          "description": "`saved` for the sticker drawer, `recent` for recently used. Emoji and Memoji stickers only ever appear as `recent`."
+                        },
+                        "external_uri": {
+                          "type": "string",
+                          "description": "Where the sticker came from: `sticker:///emoji/identifier/😭`, `sticker:///memoji/cow/…`, or `sticker:///user/identifier/<UUID>`."
+                        },
+                        "kind": {
+                          "type": "string",
+                          "description": "The external URI's source, parsed for you: `emoji`, `memoji`, `user`, or `unknown` for a source this server does not recognise."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The sticker's own name. Usually null — Messages leaves it empty."
+                        },
+                        "accessibility_name": {
+                          "type": "string",
+                          "description": "What VoiceOver reads, e.g. `loudly crying face`. The only searchable text the store keeps, so it is what a client should filter on."
+                        },
+                        "search_text": {
+                          "type": "string",
+                          "description": "Additional search text. Usually null."
+                        },
+                        "byte_count": {
+                          "type": "integer",
+                          "description": "Total size of every representation."
+                        },
+                        "effect": {
+                          "type": "integer",
+                          "description": "`-1` for a plain sticker; `0` or more when an effect is applied."
+                        },
+                        "created_at": {
+                          "type": "integer",
+                          "description": "When it entered the store, epoch MILLISECONDS."
+                        },
+                        "last_used_at": {
+                          "type": "integer",
+                          "description": "When it was last sent, epoch MILLISECONDS."
+                        },
+                        "library_index": {
+                          "type": "number",
+                          "description": "The store's own ordering value within a shelf. Larger is newer, and it is what the list is sorted by — it does not always agree with `last_used_at`."
+                        },
+                        "attribution_name": {
+                          "type": "string",
+                          "description": "Shown on the sticker detail sheet, e.g. `Stickers`."
+                        },
+                        "attribution_bundle_id": {
+                          "type": "string",
+                          "description": "The balloon bundle id behind that attribution."
+                        },
+                        "representations": {
+                          "type": "array",
+                          "description": "Every rendition the store holds. A sticker Messages made has two — a full-size `still` and a small `keyboard` preview; an emoji sticker has one.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "description": "The representation's own UUID."
+                              },
+                              "role": {
+                                "type": "string",
+                                "description": "`com.apple.stickers.role.still`, `com.apple.stickers.role.keyboard`, or an EMPTY string for a sticker with a single rendition. Send it back as `?role=`."
+                              },
+                              "uti": {
+                                "type": "string",
+                                "description": "The store's uniform type identifier, e.g. `public.heic`."
+                              },
+                              "mime_type": {
+                                "type": "string",
+                                "description": "That UTI as a MIME type, so a client need not map it."
+                              },
+                              "width": {
+                                "type": "number",
+                                "description": "Width the store draws it at. Not always integral."
+                              },
+                              "height": {
+                                "type": "number",
+                                "description": "Height, same unit."
+                              },
+                              "byte_count": {
+                                "type": "integer",
+                                "description": "This rendition's size."
+                              },
+                              "is_preferred": {
+                                "type": "boolean",
+                                "description": "The rendition `:id/image` serves when no role is asked for."
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "role",
+                              "uti",
+                              "mime_type",
+                              "is_preferred"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "identifier",
+                        "shelf",
+                        "external_uri",
+                        "kind",
+                        "byte_count",
+                        "effect",
+                        "representations"
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "status": 200,
+                  "message": "Success",
+                  "data": {
+                    "identifier": "EADAA97E-1126-409E-9000-74BD19B39E32",
+                    "shelf": "recent",
+                    "external_uri": "sticker:///user/identifier/8A7657D3-E58A-440B-8FCA-7F4389F49DEA",
+                    "kind": "user",
+                    "name": "BB Test",
+                    "accessibility_name": "teal circle",
+                    "search_text": null,
+                    "byte_count": 528,
+                    "effect": -1,
+                    "created_at": 1788396119000,
+                    "last_used_at": 1788396119000,
+                    "library_index": 14336,
+                    "attribution_name": "Stickers",
+                    "attribution_bundle_id": null,
+                    "representations": [
+                      {
+                        "identifier": "2E9C7A10-4D3B-41F8-9A62-0C5B7E1D8F44",
+                        "role": "",
+                        "uti": "public.png",
+                        "mime_type": "image/png",
+                        "width": 160,
+                        "height": 160,
+                        "byte_count": 528,
+                        "is_preferred": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 401,
+                  "message": "Authentication Error",
+                  "error": {
+                    "type": "Authentication Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource. Note the error type is `Database Error`, not `Not Found` — inherited from the previous server and part of the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 404,
+                  "message": "Database Error",
+                  "error": {
+                    "type": "Database Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The Private API helper is not connected, or the operation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 500,
+                  "message": "iMessage Error",
+                  "error": {
+                    "type": "iMessage Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The route exceeded its response timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 504,
+                  "message": "Gateway Timeout",
+                  "error": {
+                    "type": "Gateway Timeout",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-handler-id": "sticker.save",
         "x-api-version": 2,
         "x-availability": "always",
         "x-required-scope": "messages:write",

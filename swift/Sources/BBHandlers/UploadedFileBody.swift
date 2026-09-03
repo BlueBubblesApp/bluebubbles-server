@@ -42,7 +42,8 @@ struct UploadedFileBody {
   ///     works.
   ///   - uploads: where a multipart file lands. A JSON path is used in place.
   static func parse(
-    _ request: APIRequestContext, filePart: String, uploads: UploadStore
+    _ request: APIRequestContext, filePart: String, uploads: UploadStore,
+    nameField: String? = "name"
   ) throws -> UploadedFileBody {
     if let contentType = request.header("content-type"),
       contentType.lowercased().contains("multipart/form-data")
@@ -51,7 +52,7 @@ struct UploadedFileBody {
         throw BadRequest("the request body is empty")
       }
       let form = try MultipartForm.parse(body: body, contentType: contentType)
-      return try parse(form: form, filePart: filePart, uploads: uploads)
+      return try parse(form: form, filePart: filePart, uploads: uploads, nameField: nameField)
     }
     let values = try request.values()
     return UploadedFileBody(values: values, path: try values.requireString("filePath", or: "path"))
@@ -59,7 +60,8 @@ struct UploadedFileBody {
 
   /// The multipart half, separable so the recorded form can be replayed through it.
   static func parse(
-    form: MultipartForm, filePart: String, uploads: UploadStore
+    form: MultipartForm, filePart: String, uploads: UploadStore,
+    nameField: String? = "name"
   ) throws -> UploadedFileBody {
     guard let file = form[filePart] ?? form.parts.first(where: { $0.filename != nil }),
       file.filename != nil || file.name == filePart
@@ -69,9 +71,14 @@ struct UploadedFileBody {
     // `name` is the reference's own field for what the recipient sees, and it outranks
     // the part's filename because the client sets both from the same value and a client
     // that sets only one sets `name`.
+    //
+    // `nameField` exists for the route where that is NOT true. The sticker-library save
+    // takes a `name` meaning the STICKER's name — `STKSticker.name`, what the picker shows
+    // — which has nothing to do with what the file on disk is called. Passing nil there
+    // keeps the part's own filename, and its extension with it.
     let fields = form.parts.filter { $0.filename == nil }
     let name =
-      fields.first(where: { $0.name == "name" })?.text
+      nameField.flatMap({ field in fields.first(where: { $0.name == field })?.text })
       ?? file.filename
       ?? filePart
     // Staged under that name, not `write`'s prefixed one: the filename travels to the

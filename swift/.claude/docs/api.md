@@ -142,6 +142,31 @@ Two things a client must know when it reads a scheduled row back:
   neither key is an ordinary message. Without them a pending message looks identical to a sent
   one — `isSent` is 1 the moment Messages accepts it.
 
+### The sticker library — `/api/v2/sticker`
+
+`docs/STICKER_LIBRARY.md` is the reference. Four routes over
+`~/Library/Group Containers/com.apple.stickersd.group/Stickers/stickers.stickerdb`, a Core
+Data store whose `ZMANAGEDREPRESENTATION.ZDATA` holds the image bytes INLINE — so the three
+reads open a read-only SQLite handle and need no helper at all, only the Full Disk Access
+chat.db already needs. `GET sticker` lists the library (`?source=saved|recent|all`, default
+all, with both shelf totals in `metadata` either way), `GET sticker/:id` is one of them, and
+`GET sticker/:id/image` serves bytes with the representation's own Content-Type
+(`?role=still|keyboard`, falling back to preferred rather than 404ing).
+
+`ZTYPE` is the shelf: 0 is `recent`, 1 is `saved`. Read off a live store and then confirmed
+by donating — the `POST` produced a type-0 row. `ZEXTERNALURI` is the origin
+(`sticker:///emoji/…`, `/memoji/…`, `/user/…`) and is reported parsed as `kind`.
+
+`POST sticker` is the only write and needs the helper, because the store's container is
+entitled to the app group and the server is not. It donates to RECENTS — the one write
+`_STKMessagesObjCStoreFacade` exposes — so it cannot add to the saved drawer, and the
+response says `"shelf": "recent"` rather than implying otherwise. Two traps are recorded in
+the doc: the store mints its own row identifier and puts the given one in the external URI
+(so the route resolves the row by URI, not by the identifier it passed), and
+`STKStickerRepresentation.init` is an unimplemented Swift initializer that TRAPS — the
+donation wants `_STKStickerUIStickerRepresentation` and its
+`-initWithData:type:size:role:`.
+
 ### iMessage app balloons — `/api/v2/message/app`, and Game Pigeon
 
 `docs/GAME_PIGEON.md` is the reference. `GET app/:guid` decodes any iMessage APP balloon (bundle id,
@@ -448,12 +473,16 @@ entry names a route that no longer exists.
 5. Put the logic in `Sources/BBInterfaces/`. If it touches chat GUIDs, read
    [`imessage.md`](imessage.md) first.
 6. Add a `SuccessMessages` entry only if the route needs a non-default `message`.
-7. **Declare its request body.** A route this server added has no fixture, so nothing is
+7. **Declare its response too**, if no fixture can cover it. `ResponseBodies.byHandler`
+   supplies the `data` schema and an example where inference produced nothing — a fixture
+   always wins, and `ResponseBodyTests` fails the build if a route has both. A route that
+   answers with bytes goes in `NonJSONResponses.binary` instead.
+8. **Declare its request body.** A route this server added has no fixture, so nothing is
    inferred and the spec would document no input at all. Add a `RequestBodies.byHandler`
    entry with a description per field and an `example` a client can copy — or, if it takes
    no body, a `RequestBodies.bodyless` entry saying why. `RequestBodyTests` fails the build
    for a v2 write route that is in neither. A declaration for a route that *does* have a
    fixture must be a superset of the inferred schema; a file upload goes in
    `MultipartBodies` instead, which wins over both.
-8. Regenerate the OpenAPI document and update the coverage list.
-9. `swift test --filter CompatibilityTests` and `--filter BBOpenAPITests`.
+9. Regenerate the OpenAPI document and update the coverage list.
+10. `swift test --filter CompatibilityTests` and `--filter BBOpenAPITests`.

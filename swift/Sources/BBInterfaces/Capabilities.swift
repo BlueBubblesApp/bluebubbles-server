@@ -34,6 +34,7 @@ import BBCore
 import BBDiagnostics
 import BBEvents
 import BBFaceTime
+import BBIMessage
 import BBPrivateAPI
 import BBPrivateAPIContract
 import BBSettings
@@ -125,6 +126,16 @@ public protocol FaceTimeProviding: Sendable {
   func faceTime() async -> FaceTimeCoordinator
   /// The macOS call log, or nil when it cannot be opened — almost always Full Disk Access.
   func callHistory() async -> CallHistoryRepository?
+}
+
+/// This Mac's sticker store, or nil when it cannot be opened.
+///
+/// Optional for two distinct reasons that a client sees the same way: a Mac that has never
+/// had a sticker has no `stickers.stickerdb` at all, and one without Full Disk Access cannot
+/// read the group container it lives in. Both are "no stickers to show" rather than an
+/// error, so the routes answer with an empty list and say which it was.
+public protocol StickerLibraryProviding: Sendable {
+  func stickerLibrary() async -> StickerRepository?
 }
 
 public protocol FindMyProviding: Sendable {
