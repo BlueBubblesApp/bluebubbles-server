@@ -1,5 +1,9 @@
 //  limneos-scrape.js
-//  Collects the private headers that `docs/headers/macos-15.6/` is MISSING, from
+//  SUPERSEDED for macOS 15: `docs/headers/macos-15.6.1/` is a runtime dump now, and this
+//  script's output was replaced wholesale. Kept for the NEXT release nobody has hardware
+//  for — read the caveat below before trusting anything it produces.
+//
+//  Collects private headers a borrowed class-dump can supply, from
 //  developer.limneos.net, for the classes this port actually messages.
 //
 //  WHY THIS EXISTS: `dump-headers.sh` is the real tool and its output supersedes anything

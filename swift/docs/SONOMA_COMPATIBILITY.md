@@ -9,13 +9,9 @@ the helpers dispatch against `docs/headers/macos-14.6.1/` and `docs/headers/maco
 It is the companion to [`SEQUOIA_COMPATIBILITY.md`](SEQUOIA_COMPATIBILITY.md), and it is a
 **stronger** document than that one, for one reason stated up front.
 
-## 0. Why this one can be trusted and the Sequoia one cannot
+## 0. Why this can be trusted
 
-`macos-15.6/` is a borrowed third-party class-dump: read from the Mach-O rather than the
-runtime, and from the *native* macOS frameworks rather than the Catalyst copies Messages.app
-actually loads. Every row in the Sequoia document carries that doubt.
-
-`macos-14.6.1/` has neither problem. It was produced by `Tools/private-api/collect.sh` on a
+`macos-14.6.1/`  was produced by `Tools/private-api/collect.sh` on a
 real macOS 14.6.1 (23G93, arm64) machine, read from the Objective-C **runtime**, out of a
 process built for the **same platform as each host app** — `environment.txt` records
 `com.apple.MobileSMS … catalyst`, so `IMChat.h` here is the same IMCore the helper is
@@ -141,9 +137,11 @@ one-argument constructor for a named one — and `react(_:)` takes the Messages 
 that *and* `senderAvailable` agree. Sonoma therefore reaches the association fallback and
 sends all six named tapbacks.
 
-Asking per kind rather than once is deliberate: macOS 15 has `IMEmojiTapback` and nobody has
-measured whether it also has the one-argument `IMTapback` constructor, so the runtime answers
-instead of the code assuming.
+Asking per kind rather than once was deliberate, and the Sequoia dump has since settled what
+it was hedging: **the one-argument constructor arrived in macOS 15**, alongside
+`IMEmojiTapback`. So both kinds take the Messages path on 15 and 26, and only 14 falls back.
+The question stays asked per kind, because that is what makes the next release's answer a
+measurement rather than an assumption.
 
 Still open, and a real improvement rather than a fix: **ladder the constructor** the way
 `editMessage` is laddered — `tapbackWithAssociatedMessageType:` → `…:messageSummaryInfo:` →
@@ -290,10 +288,10 @@ Three corrections this raises:
    the initializer the code checks for. The gate's *conclusion* is right — Sonoma cannot send
    an emoji reaction — but the stated reason is the thing that made §2.1 invisible.
 2. **`macos-versions.md` can promote a row.** Chat backgrounds were listed as
-   *"unverified — expected absent on 14 and 15"*. Verified absent on 14.6.1.
-3. **The Send Later gate is verified at its lower edge only.** Sonoma is confirmed to lack it;
-   whether *Sequoia* has `CKSendLaterPluginInfo` is still unknown, because ChatKit has no
-   native copy for the borrowed 15.6 dump to have captured. Unchanged by this work.
+   *"unverified — expected absent on 14 and 15"*. Verified absent on both.
+3. **The Send Later gate is now verified at both edges.** Sonoma lacks `CKSendLaterPluginInfo`
+   and Sequoia has it, so `>= 15` is exactly right — measured on
+   `docs/headers/macos-15.6.1/`, which replaced the borrowed dump that could not answer it.
 
 ---
 

@@ -1713,10 +1713,13 @@ enum IMTapbacks {
   /// Measured — `docs/SONOMA_COMPATIBILITY.md` §2.1.
   ///
   /// Asked per RECEIVED REACTION rather than once, because the two kinds need different
-  /// things and a release may well have one without the other. Which is not hypothetical:
-  /// macOS 15 has `IMEmojiTapback` (the emoji-reaction gate depends on it) and nobody has
-  /// yet measured whether it also has the one-argument `IMTapback` constructor. Asking the
-  /// runtime per kind makes that a question the code answers rather than one it assumes.
+  /// things and a release may have one without the other.
+  ///
+  /// MEASURED across all three releases since: the one-argument constructor arrived in
+  /// **macOS 15**, alongside `IMEmojiTapback`, so both kinds take the Messages path on 15
+  /// and 26 and only 14 falls back. The per-kind question is therefore answered the same
+  /// way on every release we support today — and it stays asked per kind, because that is
+  /// what makes the next release's answer a measurement rather than an assumption.
   static func canBuild(_ reaction: ReactionType) -> Bool {
     if reaction.isEmoji {
       guard let emojiTapback = IMCoreRuntime.lookUpClass("IMEmojiTapback") else { return false }

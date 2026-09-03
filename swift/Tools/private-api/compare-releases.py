@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """compare-releases.py — what moved between two macOS releases, for the selectors we call.
 
-This is the analysis behind `docs/SEQUOIA_COMPATIBILITY.md`, checked in so it can be re-run
-rather than reconstructed. Point it at two header directories; it reads every Objective-C
+This is the analysis behind `docs/SONOMA_COMPATIBILITY.md`, `docs/SEQUOIA_COMPATIBILITY.md`
+and `docs/MACOS_COMPATIBILITY.md`, checked in so they can be re-run rather than reconstructed. Point it at two header directories; it reads every Objective-C
 selector the helpers actually dispatch and reports which ones diverge.
 
-    ./compare-releases.py                                  # 15.6 vs 26.5.2, the default pair
+    ./compare-releases.py                                  # 15.6.1 vs 26.5.2, the default pair
     ./compare-releases.py docs/headers/macos-14.7 docs/headers/macos-26.5.2
     ./compare-releases.py --unresolved                     # selectors no dumped class explains
     ./compare-releases.py --markdown                       # a table to paste into the doc
@@ -353,7 +353,7 @@ def run_matrix(directories):
 def main():
     parser = argparse.ArgumentParser(add_help=True, description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("older", nargs="?", default="docs/headers/macos-15.6")
+    parser.add_argument("older", nargs="?", default="docs/headers/macos-15.6.1")
     parser.add_argument("newer", nargs="?", default="docs/headers/macos-26.5.2")
     parser.add_argument("--unresolved", action="store_true",
                         help="list selectors no dumped class on either side declares")

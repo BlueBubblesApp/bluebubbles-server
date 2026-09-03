@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 //  import-limneos.mjs
-//  Turns the JSON that `limneos-scrape.js` downloads into `docs/headers/macos-15.6/*.h`.
+//  Turns the JSON that `limneos-scrape.js` downloads into `docs/headers/macos-<version>/*.h`.
+//
+//  SUPERSEDED for macOS 15 — that directory is a runtime dump now. Kept for a release with
+//  no hardware behind it; what it writes is evidence, not measurement, and the header it
+//  stamps on each file has to keep saying so.
 //
 //  The scrape banks raw HTML pages; this extracts the class dump out of each one and writes
 //  it in the same shape as the files already in that directory, banner and all. It is the

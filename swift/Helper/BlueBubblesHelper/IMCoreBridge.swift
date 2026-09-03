@@ -402,14 +402,15 @@ public final class IMCoreBridge: PrivateAPI {
         // Two classes, and naming the one that is actually missing is the difference
         // between a report that leads somewhere and one that sends the reader to the
         // wrong release. `IMTapbackSender` is present as far back as macOS 14;
-        // `IMStickerTapback` arrived in 26.
+        // `IMStickerTapback` arrived in 15 — measured on 14.6.1, 15.6.1 and 26.5.2, not
+        // guessed, which is the only reason this names a version at all.
         guard IMTapbacks.senderAvailable else {
           throw PrivateAPIError.unavailableOnThisOS(
             method: "sticker tapback", requires: "IMTapbackSender")
         }
         guard IMCoreRuntime.lookUpClass("IMStickerTapback") != nil else {
           throw PrivateAPIError.unavailableOnThisOS(
-            method: "sticker tapback", requires: "IMStickerTapback (macOS 26 or later)")
+            method: "sticker tapback", requires: "IMStickerTapback (macOS 15 or later)")
         }
         let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
         let sticker = try IMStickers.sticker(path: request.filePath)

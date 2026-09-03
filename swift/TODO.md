@@ -45,43 +45,63 @@ loose ends need the VM, so they could not go in with the change.
       reports success and Messages still notifies" is the kind of thing only `trace.sh` on
       the VM will tell us before a user does.
 - [ ] **Ladder `+[IMTapback tapbackWithAssociatedMessageType:]` instead of falling back.**
+      Now measured: the one-argument form arrived in **15**, so this affects Sonoma only.
       Sonoma has the `…:messageSummaryInfo:` and `…:representation:` forms, so the modern
       send path — and its better part ranges — is reachable there. Needs the shape of
       `messageSummaryInfo:` read off the Sonoma binary (`probe.sh`, `trace.sh`). Today Sonoma
       takes the association fallback, which is correct but is what the sender path was
       introduced to improve on.
 
-## Six Sonoma selectors that need a ladder, and one flag that lies
+## Junk reporting and outgoing FaceTime calls are broken on TWO of three releases
 
-The rest of `docs/SONOMA_COMPATIBILITY.md` §3 and §4. None is subtle — each is a selector
-Apple renamed or re-signed, with the older spelling still on the Sonoma binary — but two cost
-a whole feature and one reports a working feature as unavailable.
+Recorded as Sonoma problems; the Sequoia runtime dump showed both are broken on **macOS 15
+as well**. 14 and 15 share the older spellings and only 26 has the new ones, so each is one
+ladder that fixes two releases at once. `docs/SEQUOIA_COMPATIBILITY.md` §3.
 
-- [ ] **Outgoing FaceTime calls.** `-dialWithRequest:completionWithError:` is 26-only; Sonoma
-      has `-dialWithRequest:completion:`, whose block carries no error, so the Sonoma branch
-      needs `callAwaitingCompletion` rather than `callAwaitingCompletion2`.
-- [ ] **FaceTime link invalidation.** `-invalidateLink:deleteReason:completionHandler:` is
-      26-only; Sonoma has the two-argument `-invalidateLink:completionHandler:`.
+- [ ] **Outgoing FaceTime calls.** `-dialWithRequest:completionWithError:` is 26-only; 14 and
+      15 both have `-dialWithRequest:completion:`, whose block carries no error — so the
+      fallback needs `callAwaitingCompletion` rather than `callAwaitingCompletion2` and loses
+      the error text, not the call.
 - [ ] **Junk reporting.** `-reportJunk` → `-reportJunkToCarrier`, and
-      `-reportJunkToCarrierViaRelay:` → the same. `-recoverFromJunkTo:` → `-recoverFromJunk`:
-      today the `else` falls through to `updateIsFiltered:`, which moves the chat between
-      filters without undoing the junk state, so Sonoma silently does half the job.
-- [ ] **Sending a sticker.** Two selectors, each of which gained a keyword in the middle:
-      `initWithStickerID:…accessibilityLabel:` **`accessibilityName:`** `moodCategory:…` and
-      `userInfoDictionaryWithLayoutIntent:…stickerPositionVersion:` **`externalURI:`**.
-      Sonoma's forms take one fewer argument in each case. Neither call has a ladder, so
-      both throw on Sonoma and stickers do not send at all. Found by `compare-releases.py`,
-      which joins literals concatenated across source lines — a hand-rolled scan misses both.
-- [ ] **`-fetchUpdatedStatusForHandle:completion:`** → the underscore-prefixed
-      `-_fetchUpdatedStatusForHandle:completion:` on Sonoma.
-- [ ] **`canReportJunk` is wrong, not merely absent.** It is read from `-_messageToReportJunk`,
-      which Sonoma lacks, so it defaults to `false` — while `-allMessagesToReportAsSpam`, which
-      `messagesToReportAsSpamCount()` already calls two methods below, works fine there. A
-      client that hides the button on this flag hides a working feature.
+      `-reportJunkToCarrierViaRelay:` → the same. Both older spellings are on 14 and 15.
+- [ ] **Leaving Junk.** `-recoverFromJunkTo:` → `-recoverFromJunk`. Today the `else` falls
+      through to `updateIsFiltered:`, which moves the chat between filters **without undoing
+      the junk state** — so 14 and 15 both silently do half the job.
+
+## Smaller version ladders, each affecting one release
+
+- [ ] **Sending a sticker — Sonoma only.** `initWithStickerID:…accessibilityLabel:`
+      **`accessibilityName:`** `moodCategory:…` and
+      `userInfoDictionaryWithLayoutIntent:…initialFrameIndex:stickerPositionVersion:`
+      **`externalURI:`**. Both keywords arrived in 15, so 15 and 26 take the current call and
+      only 14 needs the shorter form. Neither call has a ladder, so stickers do not send on
+      Sonoma at all.
+- [ ] **Editing a scheduled message — Sequoia only.** 15 has
+      `-editScheduledMessageItem:atPartIndex:withNewPartText:`; 26 added
+      `newPartTranslation:`. Sonoma has no Send Later at all, so it cannot hit this. Fails
+      cleanly with `unavailableOnThisOS` today rather than crashing.
+- [ ] **Invalidating a FaceTime link — Sonoma only.** 14 has the two-argument
+      `-invalidateLink:completionHandler:`; the `deleteReason:` argument arrived in 15.
+- [ ] **Availability fetch — Sonoma only.** 14 has `-_fetchUpdatedStatusForHandle:completion:`;
+      the underscore was dropped in 15.
+- [ ] **`canReportJunk` is wrong, not merely absent.** Read from `-_messageToReportJunk`,
+      which only 26 has, so it defaults to `false` on 14 — while `-allMessagesToReportAsSpam`,
+      which `messagesToReportAsSpamCount()` already calls two methods below, is on all three.
+      A client that hides the button on this flag hides a working feature. (15 has
+      `_messageToReportJunk`, so this one is Sonoma-only.)
 - [ ] `_STKStickerObjCFacade` is a `class` line in `hosts.conf` and resolves on **no**
-      release — absent on 14.6.1 and on 26.5.2 alike. Either it moved and the name needs
-      chasing with `probe.sh --host "Messages stickers" classes Sticker`, or the line should
-      go. Surfaced by the load-failure audit in `SONOMA_COMPATIBILITY.md` §0.
+      release — absent on 14.6.1, 15.6.1 and 26.5.2 alike. Either it moved and the name needs
+      chasing with `probe.sh --host "Messages stickers" classes Sticker`, or the line should go.
+
+## Two 26-only features a client cannot tell from a bug
+
+Both are genuinely absent below macOS 26, and neither is refused before the helper is asked —
+so a client sees a thrown selector or a `false` flag rather than "not supported here".
+`docs/MACOS_COMPATIBILITY.md` §2a.
+
+- [ ] Chat backgrounds — `refetchLocalTranscriptBackgroundAssetIfNecessary` throws on 14 and 15.
+- [ ] Screen Unknown Senders — `cachedIsKnownSender` and `inUnknownSendersFilter` default to
+      `false`, and `markAsKnownAndSaveInContacts:completion:` throws.
 
 ## The Sonoma dump has one hole left, and it is one VM run wide
 

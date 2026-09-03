@@ -1,8 +1,9 @@
 # Private framework headers
 
-Headers for the private classes this port calls, one directory per macOS release. Every
-directory but one is read from the Objective-C **runtime** on a machine running that release;
-`macos-15.6/` is borrowed, and says so on every file — see below.
+Headers for the private classes this port calls, one directory per macOS release. **Every
+directory is read from the Objective-C runtime** on a machine running that release, out of a
+process built for the same platform as the host app — so each one describes the framework
+Messages.app actually loads, not a lookalike copy.
 
 Regenerate with:
 
@@ -23,126 +24,49 @@ Private API feature stops working.
 | Directory | Release | How it was produced |
 |---|---|---|
 | `macos-14.6.1/` | Sonoma, build 23G93, arm64 | runtime dump, in a VM |
-| `macos-15.6/` | Sequoia, build 24G84, arm64e | **borrowed** third-party class-dump — see below |
+| `macos-15.6.1/` | Sequoia, build 24G90, arm64 | runtime dump, in a VM |
 | `macos-26.5.2/` | Tahoe, build 25F84, arm64 | runtime dump, the release this project develops against |
 
 Each carries an `environment.txt` recording the machine, the toolchain, whether each host app
 was Catalyst or native, and the classes that release does not have. Read it first: the
 `app … catalyst` lines are what decide which copy of a shared framework the dump describes.
-`macos-15.6/environment.txt` is the exception and says so on its first line — nothing was
-executed to produce that directory.
+Each was produced by `Tools/private-api/collect.sh`, and each records the toolchain that
+built the dumper as well as the machine it ran on.
 
 [`../MACOS_COMPATIBILITY.md`](../MACOS_COMPATIBILITY.md) is what these directories are FOR:
 one capability-and-selector matrix across all three, generated from them by
 `Tools/private-api/compare-releases.py --matrix`. The per-release analyses behind it are
-[`../SONOMA_COMPATIBILITY.md`](../SONOMA_COMPATIBILITY.md) — measured — and
-[`../SEQUOIA_COMPATIBILITY.md`](../SEQUOIA_COMPATIBILITY.md), which is weaker for exactly the
-reason the next section gives.
+[`../SONOMA_COMPATIBILITY.md`](../SONOMA_COMPATIBILITY.md) and
+[`../SEQUOIA_COMPATIBILITY.md`](../SEQUOIA_COMPATIBILITY.md).
 
-## macOS 15.6 is a borrowed dump
+## All three are runtime dumps
 
-`macos-26.5.2/` is a runtime dump. `macos-15.6/` is **not**, and must not be read as one. Its
-63 files were transcribed from a third-party class-dump published at
-[developer.limneos.net](https://developer.limneos.net/index.php?ios=macos_15.6)
-(classdump-dyld 3.0, arm64e Macmini9,1, build 24G84). Two differences change how they read:
+There used to be a long section here explaining why `macos-15.6/` had to be read differently
+from its neighbours: it was a third-party class-dump transcribed from
+[developer.limneos.net](https://developer.limneos.net/), read from the Mach-O rather than the
+runtime, and taken from the **native** macOS frameworks rather than the `/System/iOSSupport`
+copies Messages.app actually loads. ChatKit has no native copy at all, so the entire send
+path was simply missing from it.
 
-- **Read from the Mach-O in the dyld shared cache, not from the runtime.** So the caveat at
-  the top of the next section applies in reverse here: this describes what is *in the binary*,
-  which is not always what the runtime will dispatch. Categories loaded at runtime by another
-  framework do not appear.
-- **The native macOS framework, not the Catalyst copy.** `hosts.conf` dumps the Messages
-  groups out of `com.apple.MobileSMS`, which is Catalyst, so `macos-26.5.2/IMChat.h` records
-  `/System/iOSSupport/System/Library/…/IMCore`. The 15.6 files record
-  `/System/Library/PrivateFrameworks/…/IMCore` instead. The two copies are not guaranteed
-  identical, and where they differ this directory is describing the wrong one.
+**It is gone.** `macos-15.6.1/` is a runtime dump from a Sequoia VM, Catalyst-built, 140
+classes — the same coverage as 26.5.2. Nothing in this directory is borrowed any more, and
+no conclusion about Sequoia needs hedging.
 
-So it is evidence about Sequoia, not ground truth. `dump-headers.sh` run on a Sequoia machine
-overwrites the directory in place and supersedes it. Until then, confirm anything load-bearing
-with `Tools/private-api/probe.sh` on that release before shipping a behaviour change that
-depends on it.
+Two things are worth keeping from that episode:
 
-limneos publishes no macOS 14 dump, so Sonoma could only ever be covered by running
-`dump-headers.sh` on it. **That has now been done** — `macos-14.6.1/` is a runtime dump out of
-a Catalyst process on real hardware, and it carries none of the doubt this section describes.
-Where the two disagree about Sequoia, 14.6.1 plus 26.5.2 bracket it and 15.6 does not settle
-it.
+- **Roughly two-thirds of the "differences" the borrowed dump showed were artefacts of the
+  dump.** `compare-releases.py --matrix` listed 129 divergent selectors across the three
+  releases before, and 43 after. Every one of the 86 that disappeared was a `?` that read
+  like a finding.
+- **`Tools/private-api/limneos-scrape.js` and `import-limneos.mjs` built that dump.** They
+  are kept for the next release nobody has hardware for, and they carry the same caveat they
+  always did: what they produce is evidence, not measurement, and it should be labelled as
+  such in the directory it lands in.
 
-### What the 15.6 diff shows
-
-**The two directories no longer line up file-for-file.** `macos-26.5.2/` carries 89 headers;
-`macos-15.6/` carries the original 63. The extra twenty-six are classes the helpers message
-that `hosts.conf` never dumped — fifteen found by
-[`SEQUOIA_COMPATIBILITY.md`](../SEQUOIA_COMPATIBILITY.md) §3, eleven more by §5.4, which are
-reached only as return values and so never appear as a class name in `Helper/` at all. None
-has a 15.6 counterpart, because limneos is the only source for that release and it was
-scraped before the list grew.
-
-`Tools/private-api/limneos-scrape.js` collects the twenty of them that limneos can supply.
-**The six ChatKit classes are not among them and cannot be**: ChatKit has no native macOS
-copy — it exists only under `/System/iOSSupport` — so it is not in the native dyld shared
-cache limneos publishes, and `ChatKit.framework` is absent from the 15.6 index. That is the
-whole send path, and only `dump-headers.sh` on a Sequoia machine will cover it.
-
-So for these classes, "absent from `macos-15.6/`" means *not dumped*, never *not present*.
-Do not read the missing file as evidence. They are:
-
-`CKChatController` `CKComposition` `CKConversationList` `CKMediaObjectManager`
-`CKConversation` `CKMediaObject` `IMMessage` `IMMessageItem` `IMChatHistoryController`
-`IMFileTransferCenter` `IMFileTransfer` `IMDPersistentAttachmentController`
-`IMAggregateAttachmentMessagePartChatItem` `IMAccountController` `IMAccount` `IMHandle`
-`IMNicknameController` `IMHandleAvailabilityManager` `IDSIDQueryController`
-`IMPinnedConversationsController` `IMDaemonController` `IMDaemonListener`
-`_IMLegacyDaemonListener` `IMDaemonProtocol` `IMDaemonListenerProtocol` `IMDaemonAnyProtocol`
-
-The comparison below concerns the 63 names both directories share. Four are `NOT PRESENT` on
-15.6:
-
-| Missing on 15.6 | Notes |
-|---|---|
-| `IMChatInfo` | Not in IMCore, and not anywhere else in the 15.6 index. Newer than Sequoia. |
-| `FindMyLocate.FenceServiceDaemonXPC` | 15.6 has `FindMyLocate.FenceServiceClientXPC` — the client half, not the daemon half. |
-| `FindMyLocate.FriendshipServiceClientXPC` | 15.6 exposes only the mangled Swift `_TtCC12FindMyLocate7Session20FriendshipConnection`. |
-| `FindMyLocate.LocationServiceClientXPC` | 15.6 exposes only the mangled Swift `_TtCC12FindMyLocate7Session18LocationConnection`. |
-
-`ChatKit.framework` is also absent from the 15.6 index. Harmless — `hosts.conf` only `load`s
-it and dumps nothing out of it.
-
-Selector counts:
-
-| Class | 26.5.2 | 15.6 | Gone on Sequoia |
-|---|---:|---:|---|
-| `IMFMFSession` | 78 | 78 | *nothing* |
-| `FindMyLocateSession` | 31 | 28 | the three `*UpdateCallback` properties |
-| `IMChat` | 915 | 760 | incl. the `__ck_*` watermark/read-receipt family |
-| `TUCallCenter` | 230 | 211 | incl. `performTranslationRequest`, `performSmartHoldingRequest` |
-| `TUConversation` | 187 | 175 | incl. `isNearbySession`, `localParticipantCluster` |
-| `TUConversationManager` | 152 | 142 | incl. `approveExternalParticipants`, `activeAdvertisements` |
-
-### Selectors this port calls that Sequoia does not have
-
-Of the selector literals in `Helper/` and `Sources/BBPrivateAPI/`, four are present on 26.5.2
-and absent on 15.6, all on `IMChat`:
-
-| Called as | On 15.6 | Call site |
-|---|---|---|
-| `reportJunkToCarrierViaRelay:` | `reportJunkToCarrier` (no argument) | [`IMCoreObjects.swift:211`](../../Helper/BlueBubblesHelper/IMCoreObjects.swift) |
-| `recoverFromJunkTo:` | `recoverFromJunk` (no argument) | [`IMCoreObjects.swift:223`](../../Helper/BlueBubblesHelper/IMCoreObjects.swift) |
-| `markAsKnownAndSaveInContacts:completion:` | **absent entirely** | [`IMCoreBridge.swift:1441`](../../Helper/BlueBubblesHelper/IMCoreBridge.swift) |
-| `setTranscriptBackgroundAndSendToChat:…` | **absent entirely** (both arities) | [`IMCoreBridge.swift:897`](../../Helper/BlueBubblesHelper/IMCoreBridge.swift), [`:1006`](../../Helper/BlueBubblesHelper/IMCoreBridge.swift) |
-
-The two junk selectors are `responds(to:)`-guarded, so they do not crash on Sequoia — but they
-fall back *silently* and not to an equivalent: the carrier report is skipped outright, and
-recovery falls through to `updateIsFiltered:`, which moves the chat between filters without
-undoing the junk state. The no-argument Sequoia spellings exist and are not tried.
-
-The other two are unguarded, and `IMCoreRuntime.invoke` throws on a selector the target does
-not implement, so chat backgrounds and accept-unknown-sender raise on 15.6 rather than
-degrading. Neither has a 15.6 spelling under any arity, so there is nothing to fall back to;
-the handling for those is to detect the release and report unsupported.
-
-**`IMFMFSession` is selector-identical across the two releases**, including
-`_dateFromShareDuration:` and `_initializeFindMySessionIfInAllowedProcess`, both documented
-below off the 26.5.2 disassembly. That surface needs no version fork.
+The one rule that outlived it is in `dump-headers.m` and in every `environment.txt`: **a dump
+is only about the platform it was taken on.** `app com.apple.MobileSMS … catalyst` is the
+line that says which copy of each shared framework a directory describes, and it is the first
+thing to read when two directories disagree.
 
 ## Why these are read from the runtime
 

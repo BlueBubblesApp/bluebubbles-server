@@ -94,7 +94,7 @@ Eight rules override anything you would otherwise infer from the code.
 | Why something is the way it is; what is deliberately deferred | [`.claude/docs/decisions.md`](.claude/docs/decisions.md) |
 | Building, running, testing, and what CI will fail you on | [`.claude/docs/workflow.md`](.claude/docs/workflow.md) |
 | Naming — DB columns, settings keys, wire keys, spelling | [`docs/NAMING.md`](docs/NAMING.md) |
-| What works on which macOS | [`docs/MACOS_COMPATIBILITY.md`](docs/MACOS_COMPATIBILITY.md) — start here |
+| What works on which macOS, and what needs a guard vs a ladder | [`docs/MACOS_COMPATIBILITY.md`](docs/MACOS_COMPATIBILITY.md) — start here |
 | Selector-level IMCore reference, per-release analysis | [`docs/PRIVATE_API_SURFACE.md`](docs/PRIVATE_API_SURFACE.md), [`docs/SONOMA_COMPATIBILITY.md`](docs/SONOMA_COMPATIBILITY.md), [`docs/SEQUOIA_COMPATIBILITY.md`](docs/SEQUOIA_COMPATIBILITY.md) |
 
 Nested `CLAUDE.md` files load automatically when you touch files under them:
@@ -223,7 +223,7 @@ Full loop, including the generated-artifact checks CI runs → [`.claude/docs/wo
 | [`docs/PRIVATE_API_SURFACE.md`](docs/PRIVATE_API_SURFACE.md) | ~47 KB | Every IMCore call and its selectors |
 | [`docs/MACOS_COMPATIBILITY.md`](docs/MACOS_COMPATIBILITY.md) | ~24 KB | Capability and selector matrix across 14 / 15 / 26 |
 | [`docs/SONOMA_COMPATIBILITY.md`](docs/SONOMA_COMPATIBILITY.md) | ~16 KB | What breaks on macOS 14 — **measured**, from a runtime dump |
-| [`docs/SEQUOIA_COMPATIBILITY.md`](docs/SEQUOIA_COMPATIBILITY.md) | ~37 KB | The same for macOS 15 — inferred from a borrowed dump, so weaker |
+| [`docs/SEQUOIA_COMPATIBILITY.md`](docs/SEQUOIA_COMPATIBILITY.md) | ~8 KB | The same for macOS 15 — also measured, since 15.6.1 replaced the borrowed dump |
 | [`docs/OBSERVATION_LADDER.md`](docs/OBSERVATION_LADDER.md) | ~21 KB | How each inbound event is observed, and the fallbacks |
 | [`docs/TESTING.md`](docs/TESTING.md) | ~10 KB | **What** the suites assert and why |
 | [`docs/EVENTS.md`](docs/EVENTS.md) | ~9 KB | Event routing, sinks, payload codecs, socket delivery |
