@@ -248,6 +248,30 @@ public enum WriteHandlers {
         metadata: .object(["count": .int(messages.count)]))
     }
 
+    registry.register(.messageReschedule) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      guard let milliseconds = values.double("scheduledFor") else {
+        throw BadRequest("`scheduledFor` is required, as epoch milliseconds")
+      }
+      try await interfaces.message.rescheduleMessage(
+        chatGUID: try values.requireString("chatGuid"),
+        messageGUID: try request.requirePathParameter("guid"),
+        to: Date(timeIntervalSince1970: milliseconds / 1000)
+      )
+      return .data(nil)
+    }
+
+    registry.register(.messageSendScheduledNow) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      try await interfaces.message.sendScheduledMessageNow(
+        chatGUID: try values.requireString("chatGuid"),
+        messageGUID: try request.requirePathParameter("guid")
+      )
+      return .data(nil)
+    }
+
     registry.register(.messageCancelScheduled) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")

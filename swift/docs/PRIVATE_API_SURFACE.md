@@ -391,6 +391,14 @@ What Messages does, from `-[CKComposition(IMSuperFormat) messageWithGUID:superFo
 Verified: the row lands `schedule_type 2`, `schedule_state 2` (state moves 1 → 2 once the daemon
 takes it), `is_delivered 0`, and `date` = the delivery instant, 15 minutes out.
 
+**Rescheduling and "send now" are one selector**, `-[IMChat editScheduledMessageItem:scheduleType:deliveryTime:]`
+(plural variant as the fallback — the transcript uses it because a scheduled section can hold
+several messages due together). Reschedule passes type 2 and the new date; send now passes
+type **0 and a nil date**, which are the values `-[CKScheduledSectionDateCell handleSendNowAction:]`
+forwards and the branch IMCore logs as "Modifying scheduled time to be immediate". Measured:
+a message at 08:09 moved to 08:54, then send-now delivered it at once and the row dropped to
+`schedule_type 0`, `schedule_state 0`, `is_delivered 1`.
+
 **Cancelling takes the message ITEM.** `-[IMChat cancelScheduledMessageWithGUID:destinations:cancelType:]`
 with nil destinations returns without raising and changes nothing — measured, the row stayed
 scheduled. `-[IMChat cancelScheduledMessageItem:cancelType:]` with cancel type 1 works, and the

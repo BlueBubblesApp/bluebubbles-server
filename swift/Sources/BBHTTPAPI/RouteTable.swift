@@ -625,6 +625,13 @@ public enum AdditiveRoutes {
       .init(.post, "send-later", .messageSendLater, scope: .messagesWrite, requires: .privateAPI),
       // Pending ones, from chat.db — no helper needed to read them.
       .init(.get, "send-later", .messagePendingScheduled),
+      // The longer path first, so `:guid` cannot swallow `send-now`.
+      .init(
+        .post, "send-later/:guid/send-now", .messageSendScheduledNow, scope: .messagesWrite,
+        requires: .privateAPI),
+      .init(
+        .put, "send-later/:guid", .messageReschedule, scope: .messagesWrite,
+        requires: .privateAPI),
       .init(
         .delete, "send-later/:guid", .messageCancelScheduled, scope: .messagesWrite,
         requires: .privateAPI),

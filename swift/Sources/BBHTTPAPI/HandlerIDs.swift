@@ -161,6 +161,8 @@ extension HandlerID {
   public static let messageSendLater = HandlerID("message.sendLater")
   public static let messageCancelScheduled = HandlerID("message.cancelScheduled")
   public static let messagePendingScheduled = HandlerID("message.pendingScheduled")
+  public static let messageReschedule = HandlerID("message.reschedule")
+  public static let messageSendScheduledNow = HandlerID("message.sendScheduledNow")
   public static let messagePoll = HandlerID("message.poll")
   public static let messageCreatePoll = HandlerID("message.createPoll")
   public static let messageVotePoll = HandlerID("message.votePoll")

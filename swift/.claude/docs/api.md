@@ -107,6 +107,12 @@ POST /api/v2/message/send-later
 `tempGuid`). Private API only, macOS 15 and newer. Answers with the message row, like every
 other send.
 
+`PUT /api/v2/message/send-later/:guid` moves one to a new `scheduledFor`, and
+`POST /api/v2/message/send-later/:guid/send-now` releases one immediately; both take
+`chatGuid` in the body and answer with no data. After a send-now the row reads
+`scheduleType 0`, `scheduleState 0`, delivered — it becomes an ordinary message and leaves
+the pending list.
+
 `GET /api/v2/message/send-later` lists what is still pending, soonest first, as ordinary
 message rows (`?chatGuid=` scopes it; `?with=chat,attachment` as on `message/query`), with
 `count` in `metadata`. Read from `chat.db`, so it needs no helper. `DELETE

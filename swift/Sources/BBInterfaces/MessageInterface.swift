@@ -967,6 +967,27 @@ public struct MessageInterface: MessagesBackedInterface {
     }
   }
 
+  /// Moves a scheduled message to a new delivery time. Same rules as scheduling one.
+  public func rescheduleMessage(chatGUID: String, messageGUID: String, to date: Date) async throws {
+    let api = try requirePrivateAPI(for: "Send Later")
+    try Self.checkScheduledSend(date)
+    try await requireMessage(messageGUID)
+    try await throughMessages {
+      try await api.rescheduleMessage(
+        MessageGUID(messageGUID), in: ChatIdentifier(chatGUID), to: date)
+    }
+  }
+
+  /// Releases a scheduled message now. The row stops being pending and is delivered.
+  public func sendScheduledMessageNow(chatGUID: String, messageGUID: String) async throws {
+    let api = try requirePrivateAPI(for: "Send Later")
+    try await requireMessage(messageGUID)
+    try await throughMessages {
+      try await api.sendScheduledMessageNow(
+        MessageGUID(messageGUID), in: ChatIdentifier(chatGUID))
+    }
+  }
+
   /// Emoji reactions arrived with macOS 15 / iOS 18 and are refused below it, before the
   /// helper is asked: Sonoma has neither `IMEmojiTapback` nor `IMTapbackSender`, and the
   /// fallback send path there cannot carry an emoji. Same shape as the text-formatting gate.

@@ -683,9 +683,9 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
       pending values observed. The states a DELIVERED scheduled message moves through were
       not observed (the test cancelled it); if one shows up in the list after delivery, that
       is the filter to widen.
-- [ ] Editing a scheduled message (`editScheduledMessageItem:scheduleType:deliveryTime:`) and
-      "send now" (`dateCellRequestedScheduledMessageModification:scheduleType:deliveryTime:`
-      with a nil time) are not built. Rescheduling today means cancel and re-send.
+- [ ] Editing a scheduled message's TEXT is not built; moving its time and releasing it early
+      are (`PUT` and `…/send-now`). `editScheduledMessageItem:atPartIndex:withNewPartText:
+      newPartTranslation:` is the selector for the text.
 - [ ] Send Later is untested for attachments and multipart — only `sendMessage` carries
       `scheduledFor`. The same composition trick should work on `sendMultipart`.
 - [ ] `_supportsSendLater` / `_supportsPolls` on IMChat are not consulted. A conversation that

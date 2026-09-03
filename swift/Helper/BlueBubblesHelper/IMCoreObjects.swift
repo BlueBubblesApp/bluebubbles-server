@@ -335,6 +335,34 @@ struct IMChat {
     try IMCoreRuntime.invoke(object, selector, [item, UInt(1)])
   }
 
+  /// Moves a scheduled message, or releases it to send now.
+  ///
+  /// ObjC: `-[IMChat editScheduledMessageItem:scheduleType:deliveryTime:]`, with the plural
+  /// as the fallback — the transcript's own "Send Now" goes through the plural because a
+  /// scheduled SECTION can hold several messages due at the same time
+  /// (`-[CKTranscriptCollectionViewController dateCellRequestedScheduledMessageModification:
+  /// scheduleType:deliveryTime:]` fetches them with `messagesForScheduledMessageSectionWithTranscriptItem:`).
+  /// Addressing one message, the singular is the direct form.
+  ///
+  /// Send now is `scheduleType 0` with a NIL delivery time — the values that cell passes,
+  /// and the branch IMCore logs as "Modifying scheduled time to be immediate". Rescheduling
+  /// keeps `ScheduledSend.type` and gives the new date.
+  func editScheduledMessage(item: AnyObject, scheduleType: UInt, deliveryTime: Date?) throws {
+    let time: Any = deliveryTime.map { $0 as NSDate } ?? NSNull()
+    let singular = "editScheduledMessageItem:scheduleType:deliveryTime:"
+    if IMCoreRuntime.responds(object, to: NSSelectorFromString(singular)) {
+      try IMCoreRuntime.invoke(object, singular, [item, scheduleType, time])
+      return
+    }
+    let plural = "editScheduledMessageItems:scheduleType:deliveryTime:"
+    guard IMCoreRuntime.responds(object, to: NSSelectorFromString(plural)) else {
+      throw PrivateAPIError.unavailableOnThisOS(
+        method: "editScheduledMessage", requires: singular
+      )
+    }
+    try IMCoreRuntime.invoke(object, plural, [[item], scheduleType, time])
+  }
+
   func retractMessagePart(_ part: AnyObject) throws {
     try IMCoreRuntime.invoke(object, "retractMessagePart:", [part])
   }

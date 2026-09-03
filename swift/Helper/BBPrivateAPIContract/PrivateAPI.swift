@@ -729,6 +729,10 @@ public protocol PrivateAPI: Sendable {
   func react(_ request: ReactionRequest) async throws -> SentMessage
   /// Cancels a message scheduled with `SendMessageRequest.scheduledFor`, before it is sent.
   func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
+  /// Moves a scheduled message to a new delivery time.
+  func rescheduleMessage(_ guid: MessageGUID, in chat: ChatIdentifier, to date: Date) async throws
+  /// Delivers a scheduled message now, leaving the schedule behind.
+  func sendScheduledMessageNow(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
   /// Sends a new poll and answers with its message. macOS 26 and later.
   func createPoll(_ request: PollCreateRequest) async throws -> SentMessage
   /// Casts (or replaces) the local user's vote, and answers with the vote's own message.

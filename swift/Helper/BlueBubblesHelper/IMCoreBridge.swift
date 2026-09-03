@@ -499,6 +499,30 @@ public final class IMCoreBridge: PrivateAPI {
     }
   }
 
+  /// NEW. See `IMChat.editScheduledMessage(item:scheduleType:deliveryTime:)`.
+  public func rescheduleMessage(
+    _ guid: MessageGUID, in chat: ChatIdentifier, to date: Date
+  ) async throws {
+    try await editScheduled(guid, in: chat, scheduleType: ScheduledSend.type, deliveryTime: date)
+  }
+
+  /// Send now: schedule type 0 and no delivery time, which is what the transcript's own
+  /// "Send Now" passes.
+  public func sendScheduledMessageNow(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
+    try await editScheduled(guid, in: chat, scheduleType: 0, deliveryTime: nil)
+  }
+
+  private func editScheduled(
+    _ guid: MessageGUID, in chat: ChatIdentifier, scheduleType: UInt, deliveryTime: Date?
+  ) async throws {
+    // The message ITEM, as cancelling needs — see `cancelScheduledMessage`.
+    let item = try await IMChatHistory.messageItem(guid: guid.rawValue)
+    try translating {
+      try IMChatRegistry.requireChat(guid: chat.rawValue).editScheduledMessage(
+        item: item, scheduleType: scheduleType, deliveryTime: deliveryTime)
+    }
+  }
+
   /// NEW. See `IMPolls.updateComposition`: the same send as a create, in the poll's session.
   public func updatePoll(_ request: PollUpdateRequest) async throws -> SentMessage {
     try translating {
