@@ -329,13 +329,18 @@ public enum RequestBodies {
       ])),
 
     .messageSendGamePigeon: Body(
-      summary: "Sends a Game Pigeon message, doing its payload scramble for you.",
+      summary:
+        "Sends a Game Pigeon message, doing its payload scramble for you. Send a COMPLETE "
+        + "field set: a short one arrives and renders, and then tells the recipient to "
+        + "update GamePigeon. Capture a real invite with GET message/app/:guid and vary it.",
       properties: [
         chatGUID(),
         appPayloadFields,
         Property(
           "version", .integer,
-          "Game Pigeon's own payload version. Echo back the one you received; defaults to 52."),
+          "Game Pigeon's own payload version, the `ver=` on the payload URL. Echo back the "
+            + "one you received; defaults to 52. Genuine invites carry 45 through 50 "
+            + "depending on the game and how old the sending app is."),
         Property(
           "sessionId", .string,
           "The `MSSession` UUID of the game being continued. Omit only for a new invite."),
@@ -344,17 +349,38 @@ public enum RequestBodies {
           "teamId", .string,
           "The developer team id in the balloon bundle id. Defaults to Game Pigeon's own."),
       ],
+      // A COMPLETE field set, modelled on an invite that was actually opened and played.
+      // The three-field example this replaced was the one that made a recipient's app say
+      // "You need to update to the latest version of GamePigeon".
       example: .obj([
         ("chatGuid", .string("iMessage;-;+15551234567")),
-        ("version", .int(50)),
+        ("version", .int(45)),
         ("sessionId", .string("2B62987D-4F1C-4A2E-9C3D-6E5B1A7F0C22")),
-        ("caption", .string("Your move.")),
+        ("caption", .string("Let's play Cup Pong!")),
         (
           "fields",
           .array([
-            .obj([("name", .string("game")), ("value", .string("pool"))]),
-            .obj([("name", .string("id")), ("value", .string("2ENROYU7St5CF6e8"))]),
-            .obj([("name", .string("player")), ("value", .string("1"))]),
+            .obj([
+              ("name", .string("sender")),
+              ("value", .string("0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D")),
+            ]),
+            .obj([("name", .string("version")), ("value", .string("5"))]),
+            .obj([("name", .string("tver")), ("value", .string("5"))]),
+            .obj([("name", .string("ios")), ("value", .string("26.5.2"))]),
+            .obj([("name", .string("start")), ("value", .string(""))]),
+            .obj([("name", .string("caption")), ("value", .string("Let's play Cup Pong!"))]),
+            .obj([("name", .string("id")), ("value", .string("frWzzfHEQ8COyfyp"))]),
+            .obj([("name", .string("player")), ("value", .string("2"))]),
+            .obj([
+              ("name", .string("player2")),
+              ("value", .string("0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D")),
+            ]),
+            .obj([("name", .string("game")), ("value", .string("beer"))]),
+            .obj([("name", .string("game_name")), ("value", .string("Cup Pong"))]),
+            .obj([("name", .string("seed")), ("value", .string("947177914"))]),
+            .obj([("name", .string("mode")), ("value", .string("n"))]),
+            .obj([("name", .string("style2")), ("value", .string("0"))]),
+            .obj([("name", .string("num")), ("value", .string("1"))]),
           ])
         ),
       ])),

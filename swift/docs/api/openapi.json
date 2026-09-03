@@ -25827,7 +25827,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "Sends a Game Pigeon message, doing its payload scramble for you.",
+                "description": "Sends a Game Pigeon message, doing its payload scramble for you. Send a COMPLETE field set: a short one arrives and renders, and then tells the recipient to update GamePigeon. Capture a real invite with GET message/app/:guid and vary it.",
                 "properties": {
                   "chatGuid": {
                     "type": "string",
@@ -25856,7 +25856,7 @@
                   },
                   "version": {
                     "type": "integer",
-                    "description": "Game Pigeon's own payload version. Echo back the one you received; defaults to 52."
+                    "description": "Game Pigeon's own payload version, the `ver=` on the payload URL. Echo back the one you received; defaults to 52. Genuine invites carry 45 through 50 depending on the game and how old the sending app is."
                   },
                   "sessionId": {
                     "type": "string",
@@ -25877,20 +25877,68 @@
               },
               "example": {
                 "chatGuid": "iMessage;-;+15551234567",
-                "version": 50,
+                "version": 45,
                 "sessionId": "2B62987D-4F1C-4A2E-9C3D-6E5B1A7F0C22",
-                "caption": "Your move.",
+                "caption": "Let's play Cup Pong!",
                 "fields": [
                   {
-                    "name": "game",
-                    "value": "pool"
+                    "name": "sender",
+                    "value": "0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D"
+                  },
+                  {
+                    "name": "version",
+                    "value": "5"
+                  },
+                  {
+                    "name": "tver",
+                    "value": "5"
+                  },
+                  {
+                    "name": "ios",
+                    "value": "26.5.2"
+                  },
+                  {
+                    "name": "start",
+                    "value": ""
+                  },
+                  {
+                    "name": "caption",
+                    "value": "Let's play Cup Pong!"
                   },
                   {
                     "name": "id",
-                    "value": "2ENROYU7St5CF6e8"
+                    "value": "frWzzfHEQ8COyfyp"
                   },
                   {
                     "name": "player",
+                    "value": "2"
+                  },
+                  {
+                    "name": "player2",
+                    "value": "0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D"
+                  },
+                  {
+                    "name": "game",
+                    "value": "beer"
+                  },
+                  {
+                    "name": "game_name",
+                    "value": "Cup Pong"
+                  },
+                  {
+                    "name": "seed",
+                    "value": "947177914"
+                  },
+                  {
+                    "name": "mode",
+                    "value": "n"
+                  },
+                  {
+                    "name": "style2",
+                    "value": "0"
+                  },
+                  {
+                    "name": "num",
                     "value": "1"
                   }
                 ]

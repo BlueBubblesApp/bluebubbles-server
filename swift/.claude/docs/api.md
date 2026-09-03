@@ -185,6 +185,14 @@ route arrives as "Sent a poll" with no options. Two such balloons reached a real
 during development before this existed. When the payload is malformed too, the error names
 the missing fields alongside the layout reason.
 
+**A Game Pigeon invite needs a COMPLETE field set.** A short one is delivered and renders,
+and then tells the recipient to update GamePigeon — measured: a 15-field Cup Pong invite was
+opened and played, a 3-field 8 Ball invite sent minutes later produced the update message.
+Every genuine payload carries `sender version tver ios game id player player2 seed mode num
+build avatar2` plus the game's own. The server fills in none of it, so a client should
+capture a real invite with `GET app/:guid` and vary it. `docs/GAME_PIGEON.md` § 4 has the
+comparison.
+
 The server does not model games: fields go out and come back as an ordered name/value list,
 so every Game Pigeon game travels the same way and the client decides what a field means. The
 envelope is built server-side rather than through ChatKit, because ChatKit refuses to compose

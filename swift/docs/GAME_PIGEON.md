@@ -189,9 +189,21 @@ POST /api/v2/message/game-pigeon
   "caption": "Let's play Cup Pong!",
   "sessionId": "2B62987D-…",
   "fields": [
-    { "name": "game", "value": "beer" },
-    { "name": "id", "value": "NlHyspTMBsictrrI" },
-    { "name": "player", "value": "2" }
+    { "name": "sender",    "value": "<your install's UUID>" },
+    { "name": "version",   "value": "5" },
+    { "name": "tver",      "value": "5" },
+    { "name": "ios",       "value": "26.5.2" },
+    { "name": "start",     "value": "" },
+    { "name": "caption",   "value": "Let's play Cup Pong!" },
+    { "name": "id",        "value": "<16-character game id>" },
+    { "name": "player",    "value": "2" },
+    { "name": "player2",   "value": "<your install's UUID>" },
+    { "name": "game",      "value": "beer" },
+    { "name": "game_name", "value": "Cup Pong" },
+    { "name": "seed",      "value": "947177914" },
+    { "name": "mode",      "value": "n" },
+    { "name": "style2",    "value": "0" },
+    { "name": "num",       "value": "1" }
   ]
 }
 ```
@@ -203,6 +215,46 @@ own — override it if you are ever talking to a differently-signed build.
 **`sessionId` is how a game stays one game.** Omit it on an invite and the server mints one;
 include the session from the message you are answering on every reply. Game Pigeon's own `id`
 field does its own threading, but the session is what Messages uses to group the balloons.
+
+#### Send a COMPLETE field set, or the recipient is told to update the app
+
+This is the failure that will cost you an afternoon, because it does not look like a payload
+problem. A too-short field set arrives, renders as a Game Pigeon balloon, and on tapping it
+the recipient is told:
+
+> You need to update to the latest version of GamePigeon
+
+Nothing is wrong with the version. The app cannot parse the payload and says the most likely
+reason it knows for that, which is not the actual one.
+
+Measured. Two messages were sent to the same person minutes apart. The one that WORKED —
+he opened it, played a move and the reply came back and decoded — carried 15 fields, copied
+from a real Cup Pong invite. The one that produced the update message carried three:
+
+| | fields | result |
+|---|---|---|
+| Cup Pong, copied from a genuine invite | 15 of 17 | played, and the reply came back |
+| 8 Ball, `game` + `id` + `player` only | 3 of 20 | "You need to update…" |
+
+Every genuine payload seen — two games, four years of app versions, invites and moves —
+carries all of these:
+
+```
+sender  version  tver  ios  game  id  player  player2  seed  mode  num  build  avatar2
+```
+
+`version` and `tver` are the ones that most plausibly produce that particular message: with
+no `version` at all the app reads nothing where it expects a format number. `seed` matters
+just as much for play — it is what makes both devices rack the balls or place the cups the
+same way — and a game will have its own required fields on top (8 Ball adds `v2`–`v5` and
+`game_name`; Cup Pong adds `style2`).
+
+**The server does not and will not fill these in.** It does not model games — that is the
+whole design, and it is what lets an unknown Game Pigeon game work without a server change.
+So the reliable way to build an invite is to **capture a real one from the game you want and
+vary it**: `GET app/:guid` on any invite in the user's history hands you the complete field
+list, in order, ready to edit. Invent a payload from the field names alone and you will get
+the update message.
 
 ### Send any other app's message
 
@@ -280,18 +332,28 @@ enough for a sensible bubble, and you can skip the rest.
   a complete field list.
 - **Writing:** a Cup Pong invite sent from the API landed with the right bundle id, a 1.2 KB
   payload, and `is_delivered = 1`, and read back through our own route with its fields intact.
+- **Playing, end to end.** Someone opened that Cup Pong invite on their phone, played a move,
+  and the reply arrived and decoded here — `num = 2`, `round = 1`, both scores, and a
+  `replay` field holding the shot. So a game sent from this server is a real, playable game,
+  and its moves come back through `GET app/:guid` intact. This is the test that was open.
 - **The codec:** round-trips at every length tested, and matches vectors computed by a separate
   implementation of the same algorithm.
 
 ## 7. Loose ends
 
-- **Nobody has opened one of our messages in Game Pigeon on an iPhone.** The invite was
-  accepted and delivered, but whether the app renders it as a playable Cup Pong game is
-  unverified. That is the next test and it needs a phone.
 - Our archive omits `ai`, the app icon, which Apple's carry. A receiving device presumably
   falls back to the installed app's icon; not confirmed.
-- The `build` field on real messages looks like a per-app-version token. We do not send one and
-  it has not obviously mattered.
+- **`build` and `avatar2` are on every genuine payload and we send neither.** The Cup Pong
+  invite that was actually played was missing both, so neither is required to play — but a
+  short field set is what produces the "update to the latest version" message (§ 4), and
+  these are the only two universal fields still unaccounted for. Worth sending, once we know
+  what a valid `build` token looks like.
+- **Nothing fills in the boilerplate.** `sender`, `ios`, `version` and `tver` are the same on
+  every message a given install sends, and a client has to supply all four every time. The
+  server could hold a per-install `sender` UUID and fill those in without modelling any game,
+  which would make an invite noticeably harder to get wrong. Deliberately not done yet: it is
+  the first step from "we do not model games" toward doing so, and it should be a decision
+  rather than a drift.
 - Nothing reads Game Pigeon *attachments* — some games send images alongside the payload.
 - Game Pigeon is a third-party app and none of this is a supported interface. A future version
   could change the format; `ver` is the thing to watch.
