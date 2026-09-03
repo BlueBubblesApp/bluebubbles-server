@@ -298,6 +298,34 @@ extension MessageInterface {
       return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
     }
 
+    /// A `sender` in the shape Game Pigeon actually writes: a UUID with SIX more characters.
+    ///
+    /// Measured across every genuine payload on the development Mac — two games, five app
+    /// versions, 2019 to today, sent and received — and all seven are exactly 42 characters:
+    /// a 36-character uppercase UUID followed by six mixed-case alphanumerics
+    /// (`…ABBCED` + `qXSTE6`). A plain `UUID().uuidString` is 36 and would be the only
+    /// sender of that length any of them has seen.
+    ///
+    /// What the suffix means is unknown — a per-device salt or an install counter would both
+    /// fit. It is reproduced because a field this consistent is not decoration, and a
+    /// too-short payload is precisely what makes the receiving app claim it needs updating.
+    public static func mintSender() -> String {
+      let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+      let suffix = String((0..<6).map { _ in alphabet.randomElement() ?? "0" })
+      return UUID().uuidString + suffix
+    }
+
+    /// Whether a stored sender still looks like one Game Pigeon would write.
+    ///
+    /// Used to re-mint a value saved before the six-character suffix was known about, rather
+    /// than keep sending a 36-character sender no real app has ever produced.
+    public static func isWellFormedSender(_ sender: String) -> Bool {
+      guard sender.count == 42 else { return false }
+      let uuid = String(sender.prefix(36))
+      return UUID(uuidString: uuid) != nil
+        && sender.dropFirst(36).allSatisfy { $0.isLetter || $0.isNumber }
+    }
+
     public static func applied(
       to fields: [(name: String, value: String)], sender: String
     ) -> [(name: String, value: String)] {

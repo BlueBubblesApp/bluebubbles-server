@@ -145,8 +145,11 @@ public enum WriteHandlers {
   /// game because a settings write failed would be the wrong trade.
   private static func gamePigeonSender(_ context: some SettingsProviding) async -> String {
     let existing = await context.settings.get(Settings.gamePigeonSender)
-    if !existing.isEmpty { return existing }
-    let minted = UUID().uuidString
+    // Re-minted rather than kept if it is not the shape Game Pigeon writes — which covers a
+    // value saved before the six-character suffix was measured. Changing it costs nothing:
+    // it identifies this install to the app, and no game in flight is keyed on it.
+    if MessageInterface.GamePigeonBoilerplate.isWellFormedSender(existing) { return existing }
+    let minted = MessageInterface.GamePigeonBoilerplate.mintSender()
     try? await context.settings.set(Settings.gamePigeonSender, to: minted)
     return minted
   }

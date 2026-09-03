@@ -263,7 +263,11 @@ sender=<this server's UUID>&version=5&tver=5&ios=26.5.2&game=beer&id=…&player=
 ```
 
 `sender` is minted once and kept, so every game from this server claims the same install, as
-a real app would. `ios` is the Mac's own version. `version` defaults to `5`, which is what
+a real app would. It is **42 characters** — a UUID plus six alphanumerics
+(`D89782D9-…-B062C02D61B1` + `pkr23n`) — because that is what every genuine payload carries,
+across two games, five app versions and both directions. What the suffix means is unknown; a
+per-device salt and an install counter would both fit. A plain 36-character UUID is
+reproduced by nothing Game Pigeon has ever sent, so it is not used. `ios` is the Mac's own version. `version` defaults to `5`, which is what
 every genuine INVITE carries — **a reply must send its own**, echoing the value it is
 answering, because a move carries `version=0`. Anything you supply yourself is left exactly
 as you sent it, value and position, so echoing works.
@@ -367,8 +371,13 @@ enough for a sensible bubble, and you can skip the rest.
   short field set is what produces the "update to the latest version" message (§ 4), and
   these are the only two universal fields still unaccounted for. Worth sending, once we know
   what a valid `build` token looks like.
+- **`player2` has to equal `sender` on an invite, and a client cannot know the sender.**
+  Every genuine invite carries `player2 == sender`; a move carries the opponent's. The server
+  owns `sender` and does not report it anywhere, so a client has no way to fill `player2` in
+  correctly. Exposing the server's own identifier read-only would fix it without modelling
+  any game — the 8 Ball test invite had to read it out of the settings table by hand.
 - **The boilerplate is filled in now** (§ 4), but the rest of a valid payload is still the
-  client's problem — `seed`, `mode`, `num`, `player2` and the game's own fields. Whether the
+  client's problem — `seed`, `mode`, `num` and the game's own fields. Whether the
   server should go further is a real question and the answer is probably no: past these four
   it would be modelling games.
 - Nothing reads Game Pigeon *attachments* — some games send images alongside the payload.

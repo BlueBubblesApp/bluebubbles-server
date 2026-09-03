@@ -187,6 +187,32 @@ struct GamePigeonBoilerplateTests {
     #expect(filled.contains { $0.name == "tver" })
   }
 
+  @Test("A minted sender has the shape Game Pigeon writes")
+  func sendersAreFortyTwoCharacters() {
+    // Every genuine payload measured — two games, five app versions, 2019 to today, sent
+    // and received — carries a 42-character sender: a UUID plus six alphanumerics. A plain
+    // `UUID().uuidString` is 36, which no real app has ever produced.
+    let sender = Boilerplate.mintSender()
+    #expect(sender.count == 42)
+    #expect(UUID(uuidString: String(sender.prefix(36))) != nil)
+    #expect(sender.dropFirst(36).allSatisfy { $0.isLetter || $0.isNumber })
+    #expect(Boilerplate.isWellFormedSender(sender))
+    // Distinct per call, so two installs cannot collide.
+    #expect(Boilerplate.mintSender() != Boilerplate.mintSender())
+  }
+
+  @Test("A sender of the wrong shape is not accepted as well-formed")
+  func malformedSendersAreRejected() {
+    // This is what makes a value stored before the suffix was known get re-minted rather
+    // than kept and sent forever.
+    #expect(!Boilerplate.isWellFormedSender(""))
+    #expect(!Boilerplate.isWellFormedSender(UUID().uuidString))
+    #expect(!Boilerplate.isWellFormedSender(UUID().uuidString + "abc"))
+    #expect(!Boilerplate.isWellFormedSender("not-a-uuid-at-all-but-exactly-42-chars-long"))
+    // Right length, right suffix, but the UUID half is not one.
+    #expect(!Boilerplate.isWellFormedSender(String(repeating: "Z", count: 42)))
+  }
+
   @Test("The OS version is reported the way Game Pigeon writes it")
   func osVersionIsDotted() {
     // Genuine payloads carry `14.6`, `12.4.1`, `26.5.2` — a dotted version, not a build.
