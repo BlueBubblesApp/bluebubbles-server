@@ -16,24 +16,24 @@ What works on each macOS this server supports, and which private selector decide
 | Mark as spam | ✅ | ✅ | ✅ |
 | Report junk to Apple / your carrier | ✅ † | ✅ † | ✅ |
 | Schedule a message (Send Later) | ⛔️ | ✅ | ✅ |
-| Edit a scheduled message | ⛔️ | ⚠️ | ✅ |
+| Edit a scheduled message | ⛔️ | ✅ | ✅ |
 | Polls | ⛔️ | ⛔️ | ✅ |
 | Chat backgrounds | ⛔️ | ⛔️ | ✅ |
 | Screen Unknown Senders | ⛔️ | ⛔️ | ✅ |
 | Shared contact cards (nicknames) | ✅ † | ✅ | ✅ |
 | FaceTime — answer, end, join by link | ✅ | ✅ | ✅ |
 | FaceTime — start a call | ✅ | ✅ | ✅ |
-| FaceTime — revoke a link you made | ⚠️ | ✅ | ✅ |
+| FaceTime — revoke a link you made | ✅ | ✅ | ✅ |
 | Find My — locations, friends, devices | ✅ | ✅ | ✅ |
 
 ✅ works &nbsp;·&nbsp; ⛔️ **your Mac cannot do this** — Apple added the feature in a later
-macOS, and the server refuses it rather than failing &nbsp;·&nbsp; ⚠️ **this server has a bug**
-— your Mac supports it and we call the wrong selector
+macOS, and the server refuses it with a message naming the release rather than failing
 
-The difference between ⛔️ and ⚠️ is the only thing to take from this table. ⛔️ is closed
-unless you upgrade macOS. **⚠️ is ours**, it is a handful of one-line fixes, and every one is
-an open item in [`../TODO.md`](../TODO.md) — §2b below says exactly which selector each needs.
-Nothing marked ⚠️ crashes or corrupts anything; the request fails and says so.
+**There is no third state left.** Everything this server can do on Tahoe, it now does on
+Sonoma and Sequoia too, except where the ⛔️ says macOS itself does not have the feature —
+and those refusals are deliberate, not crashes. Getting here took twelve selector ladders
+(§2b); an earlier version of this table had six ⚠️ rows meaning "your Mac supports this and
+we call the wrong selector", and they are all closed.
 
 † On Sonoma the nickname itself works; whether the **avatar photo** resolves is the one thing
 no dump has measured (§4). It is read through a `try?` and falls back to no photo, so the
@@ -132,18 +132,16 @@ refuse a working feature, which is why these are laddered rather than gated.
 | Recover from Junk | `recoverFromJunk` + `updateIsFiltered:` | same | `recoverFromJunkTo:` | ✓ |
 | Outgoing FaceTime call | `dialWithRequest:completion:` | same | `dialWithRequest:completionWithError:` | ✓ |
 | Send a sticker | no `accessibilityName:`, no `externalURI:` | current | current | ✓ |
-| Invalidate a FaceTime link | `invalidateLink:completionHandler:` | 3-argument | 3-argument | ✗ |
+| Invalidate a FaceTime link | `invalidateLink:completionHandler:` | 3-argument | 3-argument | ✓ |
 | Availability fetch | `_fetchUpdatedStatusForHandle:completion:` | unprefixed | unprefixed | ✓ |
-| Edit a scheduled message | *(no Send Later)* | `…atPartIndex:withNewPartText:` | `…newPartTranslation:` | ✗ |
+| Edit a scheduled message | *(no Send Later)* | `…atPartIndex:withNewPartText:` | `…newPartTranslation:` | ✓ |
 
-The four that mattered are done. Two of them — junk reporting and outgoing FaceTime calls —
-were broken on **both** older releases, which is how the Sequoia dump changed their priority:
-14 and 15 share the older spelling and only 26 has the new one, so one ladder fixed two
-releases each.
+**All twelve are laddered.** Two of them — junk reporting and outgoing FaceTime calls — were
+broken on *both* older releases, which is how the Sequoia dump changed their priority: 14 and
+15 share the older spelling and only 26 has the new one, so one ladder fixed two releases each.
 
-Two remain, both narrow: a FaceTime link cannot be revoked on Sonoma, and a scheduled message
-cannot be edited on Sequoia. Each fails cleanly with `unavailableOnThisOS` rather than
-misbehaving.
+Every ✓ above was verified by reading its call site, not by reading the tool. See below for
+why that distinction is not pedantic.
 
 ### Reading the tool's numbers
 
@@ -156,8 +154,10 @@ no selector index can see.
 
 That is not a hypothetical failure mode. The availability-fetch row above was written into
 this table as missing a ladder, and into `../TODO.md` as work to do, on the strength of the
-tool listing it absent on 14.6.1 — which it is. It has been laddered the whole time, at
-`IMCoreObjects.swift:1413`. **Read the call site before believing a row here.**
+tool listing it absent on 14.6.1 — which it is. It had been laddered the whole time, at
+`IMCoreObjects.swift:1413`. **Read the call site before believing a row here**, which is now
+how every ✓ in this table was checked: each modern selector was confirmed to have its older
+spelling present in `Helper/` outside a comment.
 
 ## 3. Capabilities
 
@@ -177,13 +177,13 @@ tool listing it absent on 14.6.1 — which it is. It has been laddered the whole
 | Recover from Junk | via fallback | via fallback | yes | `recoverFromJunk` then `updateIsFiltered:` — two calls, one on 26 |
 | Screen Unknown Senders | **—** | **—** | yes | `markAsKnownAndSaveInContacts:completion:` |
 | Send Later | **—** | yes | yes | `CKSendLaterPluginInfo` |
-| Edit a scheduled message | **—** | **broken** | yes | `newPartTranslation:` is 26-only |
+| Edit a scheduled message | **—** | via fallback | yes | `newPartTranslation:` is 26-only |
 | Cancel a scheduled message | **—** | yes | yes | `cancelScheduledMessageItem:cancelType:` |
 | Polls | **—** | **—** | yes | `IMPollHelper` |
 | Chat backgrounds | **—** | **—** | yes | `refetchLocalTranscriptBackgroundAssetIfNecessary` |
 | Nicknames | ? | yes | yes | `IMNickname` not yet dumped on 14 — §4 |
 | Outgoing FaceTime call | via fallback | via fallback | yes | older block carries no error; the call is unaffected |
-| Invalidate a FaceTime link | **broken** | yes | yes | `deleteReason:` arrived in 15 |
+| Invalidate a FaceTime link | via fallback | yes | yes | `deleteReason:` arrived in 15 |
 | Answer / end a FaceTime call | yes | yes | yes | `TUCallCenter` answer and disconnect paths |
 | FaceTime caller-ID / group UUID fields | **—** | **—** | yes | `TUCall` properties, read through `try?` |
 | FindMy locations | yes | yes | yes | `FMFSession` and friends, identical on all three |

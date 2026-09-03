@@ -108,7 +108,7 @@ Plus one Sequoia-only row, which Sonoma cannot have because it has no Send Later
 
 | Called | On Sequoia | Effect |
 |---|---|---|
-| `-editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:` | `-editScheduledMessageItem:atPartIndex:withNewPartText:` | editing a scheduled message is refused with `unavailableOnThisOS` — a clean failure, not a crash. **Still open.** |
+| `-editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:` | `-editScheduledMessageItem:atPartIndex:withNewPartText:` | ✓ laddered; the older form drops the argument this already passes as `NSNull()` |
 
 ## 4. What Sequoia settled that Sonoma could not
 
@@ -125,12 +125,13 @@ Sonoma and Tahoe bracket Sequoia, and several things sat in the gap. Now measure
 
 ## 5. What is left
 
-1. ~~Ladder the junk selectors and the FaceTime dial~~ — done.
-2. [ ] **Ladder the scheduled-message edit** onto `…atPartIndex:withNewPartText:`. Sequoia-only;
-   Sonoma has no Send Later to reach it.
-3. [ ] Consider a guard for chat backgrounds and Screen Unknown Senders (§2a of
+Every selector ladder is done — nothing Sequoia supports is refused any more.
+
+1. [ ] Consider a guard for chat backgrounds and Screen Unknown Senders (§2a of
    [`MACOS_COMPATIBILITY.md`](MACOS_COMPATIBILITY.md)) — the only two 26-only features a
    client cannot distinguish from a bug.
+2. [ ] Exercise the ladders on the Sequoia VM. They are verified against the dump and by
+   reading every call site, which is not the same as a message actually sending.
 
 No new version gates are needed. Every gate this server already has is confirmed correct
 against runtime dumps of all three supported releases.

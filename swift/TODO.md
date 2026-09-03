@@ -55,30 +55,20 @@ confidence in one, and none can be answered from here now.
       initializer — the fallback is correct but has coarser part ranges, which is what the
       sender path was introduced to improve. `probe.sh` / `trace.sh` on a 14 machine.
 
-## Two narrow version ladders still missing
+## Verify the version ladders on real hardware
 
-The four that cost a whole feature are done — junk reporting, leaving Junk, the FaceTime dial
-and sticker sending all ladder now. These two remain, each affecting one release and each
-failing cleanly with `unavailableOnThisOS` rather than misbehaving.
-`docs/MACOS_COMPATIBILITY.md` §2b has the selector for each.
+All twelve selector ladders are written and none is runtime-tested below macOS 26. They are
+verified three ways — every rung resolves against the runtime dump for its release, each
+release matches exactly one rung, and every call site was read rather than inferred from
+`compare-releases.py` — but that is not the same as a message actually sending.
 
-- [ ] **Revoking a FaceTime link — Sonoma only.** `FaceTimeBridge.swift:785` calls
-      `-invalidateLink:deleteReason:completionHandler:` unguarded. 14 has the two-argument
-      `-invalidateLink:completionHandler:`; `deleteReason:` arrived in 15. The code passes
-      reason `1`, so the older rung just drops that argument. Both completions are
-      `(BOOL, NSError *)`, so `callAwaitingCompletionBool` serves either.
-- [ ] **Editing a scheduled message — Sequoia only.** `IMCoreObjects.swift:419` calls
-      `-editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:`, guarded but
-      with no second rung. 15 has `…atPartIndex:withNewPartText:`; `newPartTranslation:`
-      arrived in 26 and this code passes `NSNull()` for it, so the older rung drops it and
-      loses nothing. Sonoma has no Send Later at all, so it never reaches here.
+The Sonoma VM is gone; a Sequoia VM existed as of 3 September 2026.
 
-**A third was listed here and was wrong.** The availability refresh
-(`IMHandleAvailabilityManager`) is *already* laddered — `IMCoreObjects.swift:1413` tries
-`fetchUpdatedStatusForHandle:completion:` then the underscored Sonoma spelling, and has since
-before this work. It was mistakenly added because `compare-releases.py` lists it as absent on
-14.6.1, which it is: the tool indexes selector NAMES and cannot see that the call is guarded.
-That is the caveat in `docs/MACOS_COMPATIBILITY.md` §2b, walked straight into.
+- [ ] On Sequoia, exercise the four paths whose fallback that release actually takes: report
+      junk, leave Junk, start a FaceTime call, edit a scheduled message. The first three are
+      shared with Sonoma, so they cover both.
+- [ ] On Sonoma, if a machine appears: the above plus send a sticker, revoke a FaceTime link,
+      send a named tapback, and mute a chat — the four whose Sonoma rung nothing else exercises.
 
 ## `canReportJunk` reports false on Sonoma while reporting works
 

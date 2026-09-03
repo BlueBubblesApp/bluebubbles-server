@@ -1,6 +1,6 @@
 # Sonoma (macOS 14) compatibility — Private API gap analysis
 
-**Status: §2 and the four ladders in §3 are fixed. The rest is evaluation only.**
+**Status: every §2 and §3 row is fixed. §4–§6 remain evaluation only.**
 
 Everything in the port's Private API surface was developed against **macOS 26.5.2 (Tahoe)**.
 This document answers "what breaks on Sonoma" by cross-referencing every selector and class
@@ -202,7 +202,7 @@ and the ladder finds it. These five need the same treatment.
 | Report to carrier | `-reportJunkToCarrierViaRelay:` | folded into the above | ✓ laddered |
 | Leave Junk | `-recoverFromJunkTo:` | `-recoverFromJunk`, then `updateIsFiltered:` | ✓ laddered |
 | FaceTime dial | `-dialWithRequest:completionWithError:` | `-dialWithRequest:completion:` | ✓ laddered |
-| Invalidate link | `-invalidateLink:deleteReason:completionHandler:` | `-invalidateLink:completionHandler:` | **open** |
+| Invalidate link | `-invalidateLink:deleteReason:completionHandler:` | `-invalidateLink:completionHandler:` | ✓ laddered |
 | ~~Availability fetch~~ | `-fetchUpdatedStatusForHandle:completion:` | `-_fetchUpdatedStatusForHandle:completion:` | **was already laddered — listed here in error** |
 
 Two need more than a rename:
@@ -240,9 +240,8 @@ second. Every argument the older form drops is one this code passes as `NSNull` 
 anyway, so the sticker it builds on Sonoma is the same sticker minus a `suri` key that is
 empty on 26 too.
 
-The other three §3 rows — junk reporting, leaving Junk, and the FaceTime dial — are laddered
-as well. What remains from this section is the FaceTime link revoke, Sonoma-only and failing
-cleanly with `unavailableOnThisOS`.
+The other §3 rows — junk reporting, leaving Junk, the FaceTime dial and the link revoke — are
+laddered as well. **Nothing in this section is open any more.**
 
 The availability-refresh row in §3 was a **false positive** and is struck: that call has been
 laddered since long before this work (`IMCoreObjects.swift:1413` tries the unprefixed spelling

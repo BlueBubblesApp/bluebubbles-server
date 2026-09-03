@@ -413,16 +413,41 @@ struct IMChat {
   /// message (`CKConversation editMessageItem:partIndex:withNewComposition:`): nothing has
   /// been delivered, so IMCore rewrites the pending item in place rather than sending an
   /// edit that recipients see as one.
+  ///
+  /// TWO GENERATIONS. `newPartTranslation:` was appended in macOS 26:
+  ///
+  ///   26        …atPartIndex:withNewPartText:newPartTranslation:
+  ///   15        …atPartIndex:withNewPartText:
+  ///
+  /// The older rung drops the argument this already passes as `NSNull()`, so nothing about
+  /// the edit changes — Sequoia simply has no translation parameter to pass nil to.
+  ///
+  /// **macOS 14 reaches neither, and that is correct.** Sonoma has no Send Later at all
+  /// (`CKSendLaterPluginInfo` is absent), so there is no scheduled message to edit and the
+  /// request is refused by the gate at `MessageInterface.swift` long before it arrives here.
+  /// `docs/SEQUOIA_COMPATIBILITY.md` §3.
   func editScheduledMessageText(
     item: AnyObject, partIndex: Int, text: NSAttributedString
   ) throws {
-    let selector = "editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:"
-    guard IMCoreRuntime.responds(object, to: NSSelectorFromString(selector)) else {
-      throw PrivateAPIError.unavailableOnThisOS(
-        method: "editScheduledMessage", requires: selector
-      )
+    let candidates: [(String, [Any])] = [
+      (
+        "editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:",
+        [item, partIndex, text, NSNull()]
+      ),
+      (
+        "editScheduledMessageItem:atPartIndex:withNewPartText:",
+        [item, partIndex, text]
+      ),
+    ]
+    for (selector, arguments) in candidates
+    where IMCoreRuntime.responds(object, to: NSSelectorFromString(selector)) {
+      try IMCoreRuntime.invoke(object, selector, arguments)
+      return
     }
-    try IMCoreRuntime.invoke(object, selector, [item, partIndex, text, NSNull()])
+    throw PrivateAPIError.unavailableOnThisOS(
+      method: "editScheduledMessage",
+      requires: "an IMChat editScheduledMessageItem:atPartIndex:withNewPartText: selector"
+    )
   }
 
   func retractMessagePart(_ part: AnyObject) throws {

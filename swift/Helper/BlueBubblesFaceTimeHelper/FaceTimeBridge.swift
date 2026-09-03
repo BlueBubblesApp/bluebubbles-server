@@ -766,6 +766,25 @@ enum FaceTimeBridge {
     var seen = Set<String>()
     var lastError: String?
     var matched = 0
+
+    // TWO GENERATIONS, resolved once for the whole batch rather than per link — it is the
+    // same client object every time round:
+    //
+    //   15, 26    -invalidateLink:deleteReason:completionHandler:
+    //   14        -invalidateLink:completionHandler:
+    //
+    // `deleteReason:` arrived in macOS 15. This passes reason 1 on the releases that take
+    // one, and simply omits the argument on Sonoma — there is no reason to translate,
+    // because the older call has no notion of one. Both completions are
+    // `(BOOL success, NSError *error)`, so the same bool-first block serves either.
+    //
+    // Resolved to an OPTIONAL and thrown from inside the loop, so a Mac with no links to
+    // invalidate still succeeds rather than reporting a selector problem it never hit.
+    let invalidateSelector: String? = [
+      "invalidateLink:deleteReason:completionHandler:",
+      "invalidateLink:completionHandler:",
+    ]
+    .first { IMCoreRuntime.responds(client, to: NSSelectorFromString($0)) }
     for link in links {
       guard
         let url =
@@ -776,14 +795,21 @@ enum FaceTimeBridge {
       if let urls, !urls.contains(url) { continue }
       matched += 1
 
+      guard let invalidateSelector else {
+        throw PrivateAPIError.unavailableOnThisOS(
+          method: "invalidateLinks",
+          requires: "an invalidateLink: selector on TUConversationManagerXPCClient")
+      }
+
       // The completion is `(BOOL success, NSError *error)` — arg0 is a BOOL, not an
       // object, so it needs a bool-first block. Only count a link as invalidated when
       // the daemon reports success; otherwise carry the reason so the failure is visible
       // rather than a false "done".
       let box = ResultBox()
       await callAwaitingCompletionBool(
-        client, "invalidateLink:deleteReason:completionHandler:",
-        leading: [link, NSNumber(value: 1)]
+        client, invalidateSelector,
+        leading: invalidateSelector.contains("deleteReason:")
+          ? [link, NSNumber(value: 1)] : [link]
       ) { success, error in
         box.success = success
         box.error = error
