@@ -65,16 +65,9 @@ public enum PollPayload {
     return Envelope(json: json, sessionID: app.sessionID)
   }
 
-  /// The base64 body of a `data:,…` URL, with the query Messages appends (`?src=p&c=3`)
-  /// stripped — it is not part of the base64 and breaks the decode if left on.
-  static func jsonBody(ofDataURL url: String) -> Data? {
-    guard url.hasPrefix("data:"), let comma = url.firstIndex(of: ",") else { return nil }
-    var body = String(url[url.index(after: comma)...])
-    if let query = body.firstIndex(of: "?") { body = String(body[..<query]) }
-    body = body.removingPercentEncoding ?? body
-    let padding = (4 - body.count % 4) % 4
-    return Data(base64Encoded: body + String(repeating: "=", count: padding))
-  }
+  /// The base64 body of a `data:,…` URL — `AppPayloadURL` does the work, since Polls is
+  /// only one of the apps that uses that shape.
+  static func jsonBody(ofDataURL url: String) -> Data? { AppPayloadURL.decodeJSON(url) }
 
 }
 

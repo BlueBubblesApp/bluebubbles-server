@@ -33,6 +33,11 @@ extension MessageInterface {
     public let url: String?
     /// Decoded Game Pigeon fields, when the message is one.
     public let gamePigeon: GamePigeonCodec.Payload?
+    /// The payload decoded, when it is in one of the shapes this server can read — a
+    /// `data:,<base64 JSON>` body, or a query string. A client that wants the raw thing
+    /// still has `url`.
+    public let payloadJSON: JSONValue?
+    public let payloadFields: [(name: String, value: String)]?
   }
 
   public func appMessage(guid: String) async throws -> AppMessage {
@@ -53,10 +58,20 @@ extension MessageInterface {
       GamePigeonCodec.isGamePigeon(balloonBundleID: bundleID)
       ? envelope.url.flatMap(GamePigeonCodec.decode(url:))
       : nil
+    // Decoded for the caller when the shape allows. Suppressed for Game Pigeon, whose
+    // outer query is just `ver` and the scrambled blob — `game_pigeon` is the real answer
+    // and showing both would invite a client to read the wrong one.
+    var json: JSONValue?
+    var fields: [(name: String, value: String)]?
+    if pigeon == nil, let url = envelope.url {
+      json = AppPayloadURL.decodeJSON(url).flatMap { try? JSONValue.parse($0) }
+      if json == nil { fields = AppPayloadURL.decodeFields(url) }
+    }
     return AppMessage(
       guid: row.guid, balloonBundleID: bundleID, appName: envelope.appName,
       appID: envelope.appID, sessionID: envelope.sessionID, summary: envelope.summary,
-      caption: envelope.caption, url: envelope.url, gamePigeon: pigeon)
+      caption: envelope.caption, url: envelope.url, gamePigeon: pigeon,
+      payloadJSON: json, payloadFields: fields)
   }
 
   /// Why a balloon could not be read, in terms a client can act on.
@@ -87,6 +102,11 @@ extension MessageInterface {
       "caption": message.caption.map(JSONValue.string) ?? .null,
       "url": message.url.map(JSONValue.string) ?? .null,
     ]
+    if let json = message.payloadJSON { object["payload_json"] = json }
+    if let fields = message.payloadFields {
+      object["payload_fields"] = .array(
+        fields.map { .object(["name": .string($0.name), "value": .string($0.value)]) })
+    }
     if let pigeon = message.gamePigeon {
       object["game_pigeon"] = .object([
         "version": .int(pigeon.version),
@@ -101,11 +121,47 @@ extension MessageInterface {
     return .object(object)
   }
 
-  /// Sends any app balloon. `url` is the app's payload and this server does not read it.
+  /// The payload a caller wants sent, in whichever shape suits the app.
+  ///
+  /// A client should not have to know that Polls base64s its JSON into a `data:,` URL while
+  /// Game Pigeon uses a query string — so it can hand over the JSON or the fields and let
+  /// the server shape it. `url` stays for an app whose format is neither, which is most of
+  /// the ones that just link somewhere.
+  public enum AppPayload: Sendable {
+    case url(String)
+    case json(JSONValue)
+    case fields([(name: String, value: String)])
+
+    func asURL() throws -> String {
+      switch self {
+      case .url(let url):
+        guard !url.isEmpty else {
+          throw InterfaceError.invalidRequest("`url` must not be empty")
+        }
+        return url
+      case .json(let value):
+        guard
+          let data = try? JSONSerialization.data(
+            withJSONObject: value.foundationObject, options: [.sortedKeys, .fragmentsAllowed])
+        else {
+          throw InterfaceError.invalidRequest("`json` could not be encoded")
+        }
+        return AppPayloadURL.encodeJSON(data)
+      case .fields(let fields):
+        guard !fields.isEmpty else {
+          throw InterfaceError.invalidRequest("`fields` must not be empty")
+        }
+        return AppPayloadURL.encodeFields(fields)
+      }
+    }
+  }
+
+  /// Sends any app balloon. The payload is the app's own and this server does not read it.
   public func sendAppMessage(
-    chatGUID: String, balloonBundleID: String, url: String, sessionID: String? = nil,
+    chatGUID: String, balloonBundleID: String, payload: AppPayload, sessionID: String? = nil,
     appName: String? = nil, appID: Int? = nil, summary: String? = nil, caption: String? = nil
   ) async throws -> SendOutcome {
+    let url = try payload.asURL()
     let api = try requirePrivateAPI(for: "app messages")
     guard !balloonBundleID.isEmpty else {
       throw InterfaceError.invalidRequest("`balloonBundleId` is required")
@@ -149,7 +205,7 @@ extension MessageInterface {
       chatGUID: chatGUID,
       balloonBundleID:
         "com.apple.messages.MSMessageExtensionBalloonPlugin:\(teamID):\(GamePigeonCodec.extensionSuffix)",
-      url: url, sessionID: sessionID, appName: "GamePigeon",
+      payload: .url(url), sessionID: sessionID, appName: "GamePigeon",
       appID: GamePigeonCodec.appStoreID, summary: caption, caption: caption)
   }
 }

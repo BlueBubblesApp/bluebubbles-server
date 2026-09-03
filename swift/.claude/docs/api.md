@@ -147,8 +147,11 @@ Two things a client must know when it reads a scheduled row back:
 `docs/GAME_PIGEON.md` is the reference. `GET app/:guid` decodes any iMessage APP balloon (bundle id,
 app name, session, caption, raw payload URL) and adds a `game_pigeon` block when the message
 is one. Apple's built-in balloon providers — rich links, handwriting, Digital Touch — are not
-apps and are refused with a sentence naming the alternative route. `POST app` sends any app's balloon from a payload URL you supply; `POST game-pigeon`
-takes fields and does Game Pigeon's own scramble for you.
+apps and are refused with a sentence naming the alternative route. `POST app` sends any app's balloon, taking the payload as `json` (encoded as the
+`data:,<base64>` shape Polls uses), `fields` (a `data:?a=1` query string), or a raw `url` for
+anything else — so a client never base64s or percent-encodes by hand. `GET app/:guid` fills in
+`payload_json` or `payload_fields` symmetrically. `POST game-pigeon` takes fields and does Game
+Pigeon's own scramble for you.
 
 The server does not model games: fields go out and come back as an ordered name/value list,
 so every Game Pigeon game travels the same way and the client decides what a field means. The

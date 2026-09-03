@@ -134,6 +134,8 @@ GET /api/v2/message/app/:guid
   "caption": "Let's play Cup Pong!",
   "summary": "Cup Pong",
   "url": "data:?ver=45&data=…",
+  "payload_json": null,
+  "payload_fields": null,
   "game_pigeon": {
     "version": 45,
     "game": "beer",
@@ -171,6 +173,12 @@ Do not assume a scheme.
 `fields` is an ordered list rather than an object on purpose: a query string may repeat a name,
 and some games care about order. Build a map from it if you would rather have one.
 
+`payload_json` and `payload_fields` are the same convenience going the other way, for apps that
+are not Game Pigeon: whichever one the payload decodes as is filled in, and both are null when
+it is a plain link or a format this server does not recognise. They are suppressed for Game
+Pigeon, whose outer query is only `ver` and the scrambled blob — `game_pigeon` is the real
+answer there and showing both would invite reading the wrong one.
+
 ### Send a Game Pigeon message
 
 ```http
@@ -200,12 +208,30 @@ field does its own threading, but the session is what Messages uses to group the
 
 ```http
 POST /api/v2/message/app
-{ "chatGuid": "…", "balloonBundleId": "…", "url": "data:…",
-  "appName": "…", "appId": 123, "sessionId": "…", "caption": "…", "summary": "…" }
+{ "chatGuid": "…", "balloonBundleId": "…",
+  "appName": "…", "appId": 123, "sessionId": "…", "caption": "…", "summary": "…",
+  <one of: "url" | "json" | "fields"> }
 ```
 
-The generic version: you supply the payload URL, the server does the envelope. Nothing about it
-is Game Pigeon-specific, so any iMessage app can be driven this way once you know its format.
+The generic version. You do **not** have to build the payload URL yourself unless you want to —
+give the server the payload in whichever of these shapes fits the app:
+
+| Field | Sends | Use it for |
+|---|---|---|
+| `"json": { … }` | `data:,<base64 of the JSON>` | apps whose payload is JSON, like Polls |
+| `"fields": [{"name","value"}]` | `data:?a=1&b=2` | apps whose payload is a query string |
+| `"url": "…"` | exactly what you gave | everything else — an https link, a media-type `data:` URL, anything |
+
+`fields` also accepts a plain object when order does not matter. The reverse holds on the read
+side: `GET app/:guid` adds `payload_json` when the payload decodes as base64 JSON, or
+`payload_fields` when it is a query string, alongside the raw `url`. So for the two common
+shapes a client never has to base64 or percent-encode anything in either direction.
+
+Measured: a Polls-shaped `json` payload sent and read back with its options intact, and a
+`fields` payload round-tripping including a value with a space and an empty one.
+
+Nothing about this route is Game Pigeon-specific, so any iMessage app can be driven through it
+once you know what that app expects in its payload.
 
 ---
 

@@ -128,45 +128,22 @@ public enum GamePigeonCodec {
   /// Decodes a Game Pigeon `data:` URL. Nil when it is not one.
   public static func decode(url: String) -> Payload? {
     guard url.hasPrefix("data:"), let query = url.firstIndex(of: "?") else { return nil }
-    let outer = parseQuery(String(url[url.index(after: query)...]))
+    let outer = AppPayloadURL.parseQuery(String(url[url.index(after: query)...]))
     guard let scrambled = outer.first(where: { $0.name == "data" })?.value else { return nil }
     let version = outer.first { $0.name == "ver" }.flatMap { Int($0.value) } ?? 0
     let plain = unscramble(scrambled)
     // The unscrambled body is itself a query string, leading `?` and all.
     let body = plain.hasPrefix("?") ? String(plain.dropFirst()) : plain
-    return Payload(version: version, fields: parseQuery(body))
+    return Payload(version: version, fields: AppPayloadURL.parseQuery(body))
   }
 
   /// Builds a Game Pigeon `data:` URL from fields.
   public static func encode(_ payload: Payload) -> String {
     let body =
       "?"
-      + payload.fields.map { "\(escape($0.name))=\(escape($0.value))" }
+      + payload.fields
+      .map { "\(AppPayloadURL.escape($0.name))=\(AppPayloadURL.escape($0.value))" }
       .joined(separator: "&")
-    return "data:?ver=\(payload.version)&data=\(escape(scramble(body)))"
-  }
-
-  /// Percent-decoding pairs, keeping order and keeping empty values (`start=` is a real
-  /// field and means something).
-  static func parseQuery(_ query: String) -> [(name: String, value: String)] {
-    query.split(separator: "&", omittingEmptySubsequences: true).map { pair in
-      let halves = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-      let name = unescape(String(halves.first ?? ""))
-      let value = halves.count > 1 ? unescape(String(halves[1])) : ""
-      return (name: name, value: value)
-    }
-  }
-
-  /// `+` means a space in a query string, and a stray `%` that is not an escape has to
-  /// survive rather than blank the whole field — Game Pigeon's `replay` is full of them.
-  static func unescape(_ text: String) -> String {
-    let plussed = text.replacingOccurrences(of: "+", with: " ")
-    return plussed.removingPercentEncoding ?? plussed
-  }
-
-  static func escape(_ text: String) -> String {
-    var allowed = CharacterSet.alphanumerics
-    allowed.insert(charactersIn: "-._~")
-    return text.addingPercentEncoding(withAllowedCharacters: allowed) ?? text
+    return "data:?ver=\(payload.version)&data=\(AppPayloadURL.escape(scramble(body)))"
   }
 }
