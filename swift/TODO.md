@@ -34,6 +34,63 @@ when the answer came back immediately.
       reference's cache changes what a concurrent duplicate does, not what a single send
       returns — so this is a behaviour question rather than a parity one.
 
+## Two Sonoma follow-ups the fix could not settle from here
+
+The reaction and mute breakages are fixed (`docs/SONOMA_COMPATIBILITY.md` §2.1, §2.2). Two
+loose ends need the VM, so they could not go in with the change.
+
+- [ ] **Confirm `setMuteUntilDate:` on Sonoma writes somewhere Messages consults.**
+      `CHAT_CONTROLS_PLAN.md` §0 measured the `CKDNDList` defaults store on **Tahoe**, and
+      that measurement does not transfer. The mute path is correct either way, but "mute
+      reports success and Messages still notifies" is the kind of thing only `trace.sh` on
+      the VM will tell us before a user does.
+- [ ] **Ladder `+[IMTapback tapbackWithAssociatedMessageType:]` instead of falling back.**
+      Sonoma has the `…:messageSummaryInfo:` and `…:representation:` forms, so the modern
+      send path — and its better part ranges — is reachable there. Needs the shape of
+      `messageSummaryInfo:` read off the Sonoma binary (`probe.sh`, `trace.sh`). Today Sonoma
+      takes the association fallback, which is correct but is what the sender path was
+      introduced to improve on.
+
+## Six Sonoma selectors that need a ladder, and one flag that lies
+
+The rest of `docs/SONOMA_COMPATIBILITY.md` §3 and §4. None is subtle — each is a selector
+Apple renamed or re-signed, with the older spelling still on the Sonoma binary — but two cost
+a whole feature and one reports a working feature as unavailable.
+
+- [ ] **Outgoing FaceTime calls.** `-dialWithRequest:completionWithError:` is 26-only; Sonoma
+      has `-dialWithRequest:completion:`, whose block carries no error, so the Sonoma branch
+      needs `callAwaitingCompletion` rather than `callAwaitingCompletion2`.
+- [ ] **FaceTime link invalidation.** `-invalidateLink:deleteReason:completionHandler:` is
+      26-only; Sonoma has the two-argument `-invalidateLink:completionHandler:`.
+- [ ] **Junk reporting.** `-reportJunk` → `-reportJunkToCarrier`, and
+      `-reportJunkToCarrierViaRelay:` → the same. `-recoverFromJunkTo:` → `-recoverFromJunk`:
+      today the `else` falls through to `updateIsFiltered:`, which moves the chat between
+      filters without undoing the junk state, so Sonoma silently does half the job.
+- [ ] **`-fetchUpdatedStatusForHandle:completion:`** → the underscore-prefixed
+      `-_fetchUpdatedStatusForHandle:completion:` on Sonoma.
+- [ ] **`canReportJunk` is wrong, not merely absent.** It is read from `-_messageToReportJunk`,
+      which Sonoma lacks, so it defaults to `false` — while `-allMessagesToReportAsSpam`, which
+      `messagesToReportAsSpamCount()` already calls two methods below, works fine there. A
+      client that hides the button on this flag hides a working feature.
+- [ ] While in that file: `markAsSpam(count:reportToCarrier:)` prefers
+      `-markAsSpam:isJunkReportedToCarrier:`, which exists on **neither** 14.6.1 nor 26.5.2.
+      The branch has never fired on any supported release.
+- [ ] `_STKStickerObjCFacade` is a `class` line in `hosts.conf` and resolves on **no**
+      release — absent on 14.6.1 and on 26.5.2 alike. Either it moved and the name needs
+      chasing with `probe.sh --host "Messages stickers" classes Sticker`, or the line should
+      go. Surfaced by the load-failure audit in `SONOMA_COMPATIBILITY.md` §0.
+
+## The Sonoma dump has one hole left, and it is one VM run wide
+
+`IMNickname`, `IMNicknameAvatar` and `IMNicknameAvatarImage` were in no `hosts.conf` group, so
+they were dumped on neither release and `-avatar` / `-imageExists` / `-imageFilePath` read as
+"absent on Sonoma" when nobody had asked. They are in `hosts.conf` now and `macos-26.5.2/`
+carries all three, but the Sonoma side is still unanswered.
+
+- [ ] Re-run `dump-headers-sonoma.sh` on the VM and commit the refreshed `macos-14.6.1/`.
+      The three call sites are wrapped in `try?` and degrade to a nil avatar path, so nothing
+      is broken meanwhile — this closes an unknown, not a bug.
+
 ## The client audit that should shape the notification event list
 
 `bluebubbles-app` references **11 of the 31** event types this server emits. The other 20 it

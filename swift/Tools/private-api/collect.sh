@@ -44,15 +44,22 @@ headers="$staging/$label"
 pa_step "Dumping headers for macOS $version ($(pa_arch))"
 "$PA_TOOLS_DIR/dump-headers.sh" --quiet --out "$headers"
 
+xcode_version="$(xcodebuild -version 2>/dev/null | sed -n 1p || true)"
+clang_version="$(clang --version 2>/dev/null | sed -n 1p || true)"
+hardware="$(sysctl -n machdep.cpu.brand_string 2>/dev/null | sed -n 1p || true)"
+
 {
     echo "# Collected by Tools/private-api/collect.sh"
     echo
     echo "macos_version   $(pa_macos_version)"
     echo "macos_build     $(pa_macos_build)"
     echo "architecture    $(pa_arch)"
-    echo "hardware        $(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo unknown)"
-    echo "xcode           $(xcodebuild -version 2>/dev/null | head -1 || echo 'command line tools only')"
-    echo "clang           $(clang --version 2>/dev/null | head -1)"
+    echo "hardware        ${hardware:-unknown}"
+    # `cmd | head -1` under `set -o pipefail` reports FAILURE whenever head exits first and
+    # the writer takes a SIGPIPE for it — which is a race, so `|| echo ...` fired sometimes
+    # and appended a second line to a one-line field. Take the first line, then decide.
+    echo "xcode           ${xcode_version:-command line tools only}"
+    echo "clang           ${clang_version:-unknown}"
     echo "sdk             $(pa_sdk_path)"
     echo
     echo "# Host apps. 'platform' is what decides which copy of a shared framework the"

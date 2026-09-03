@@ -18,6 +18,24 @@ each macOS we support and commit the result — the diff between two directories
 to "what did Apple move this time", which is the question that costs the most time when a
 Private API feature stops working.
 
+## What is here
+
+| Directory | Release | How it was produced |
+|---|---|---|
+| `macos-14.6.1/` | Sonoma, build 23G93, arm64 | runtime dump, in a VM |
+| `macos-15.6/` | Sequoia, build 24G84, arm64e | **borrowed** third-party class-dump — see below |
+| `macos-26.5.2/` | Tahoe, build 25F84, arm64 | runtime dump, the release this project develops against |
+
+Each carries an `environment.txt` recording the machine, the toolchain, whether each host app
+was Catalyst or native, and the classes that release does not have. Read it first: the
+`app … catalyst` lines are what decide which copy of a shared framework the dump describes.
+`macos-15.6/environment.txt` is the exception and says so on its first line — nothing was
+executed to produce that directory.
+
+The Sonoma dump is analysed against the helper code in
+[`../SONOMA_COMPATIBILITY.md`](../SONOMA_COMPATIBILITY.md), which is the more reliable of the
+two compatibility documents for exactly the reason the next section gives.
+
 ## macOS 15.6 is a borrowed dump
 
 `macos-26.5.2/` is a runtime dump. `macos-15.6/` is **not**, and must not be read as one. Its
@@ -40,8 +58,11 @@ overwrites the directory in place and supersedes it. Until then, confirm anythin
 with `Tools/private-api/probe.sh` on that release before shipping a behaviour change that
 depends on it.
 
-There is no `macos-14.x/` directory. limneos publishes no macOS 14 dump, so Sonoma can only be
-covered by running `dump-headers.sh` on it.
+limneos publishes no macOS 14 dump, so Sonoma could only ever be covered by running
+`dump-headers.sh` on it. **That has now been done** — `macos-14.6.1/` is a runtime dump out of
+a Catalyst process on real hardware, and it carries none of the doubt this section describes.
+Where the two disagree about Sequoia, 14.6.1 plus 26.5.2 bracket it and 15.6 does not settle
+it.
 
 ### What the 15.6 diff shows
 

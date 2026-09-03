@@ -14,7 +14,7 @@ one of those releases settles it — see [Collecting headers](collecting-headers
 |---|---|---|
 | 26 | Tahoe | measured; the release this project develops against |
 | 15 | Sequoia | *unverified* — expected to work |
-| 14 | Sonoma | *unverified* — the floor the tools allow |
+| 14 | Sonoma | measured on 14.6.1 (23G93) — the floor the tools allow |
 | 13 and older | Ventura ↓ | refused; override with `PA_ALLOW_OLD_MACOS=1` |
 
 The floor is a judgement, not a technical limit. The tools may well run further back. It is
@@ -80,9 +80,24 @@ checkable after the fact rather than assumed:
 
 ### On other releases
 
-Messages has been Catalyst since Big Sur (11), so Sonoma and Sequoia are expected to behave
-the same way — *unverified*. Detection is automatic either way. `--list` reporting `macos`
-for Messages on any release would be a genuine finding and worth recording.
+Messages has been Catalyst since Big Sur (11). **Confirmed on Sonoma**:
+`docs/headers/macos-14.6.1/environment.txt` records `com.apple.MobileSMS … catalyst`, and the
+headers there carry the `/System/iOSSupport/…` image line. Sequoia remains *unverified*.
+Detection is automatic either way. `--list` reporting `macos` for Messages on any release
+would be a genuine finding and worth recording.
+
+One release-to-release difference the Sonoma dump did turn up: **FaceTime.app is native macOS
+on 14.6.1 and Catalyst on 26.5.2** (`app com.apple.FaceTime … macos` versus `… catalyst`).
+Nothing was assumed about it — the dumper reads each app's Mach-O and built itself to match,
+which is the whole point of that line.
+
+It changes nothing for `TU*`, and the dumps prove it rather than argue it: every `TUCall`,
+`TUCallCenter` and `TUConversationManagerXPCClient` header in **both** directories records the
+same native `/System/Library/PrivateFrameworks/TelephonyUtilities` image, because
+TelephonyUtilities has no iOSSupport copy to be redirected to. Comparing the `// Image:` lines
+of all 137 shared headers turns up no class read from a different framework on one release
+than the other. So a `TU*` selector that differs between the two directories is a release
+difference, not a platform artefact.
 
 Not every app is Catalyst. On 26.5.2, Messages, FaceTime and FindMy are; **Notes is a native
 macOS app** (platform 1) and gets the macOS dumper. TelephonyUtilities, which FaceTime uses,
@@ -143,7 +158,9 @@ Confirmed differences worth knowing when a dump from an older release looks wron
 | FindMy caches encrypted — `~/Library/Caches/com.apple.findmy.fmipcore/*.data` became binary plists wrapping `encryptedData`, no longer plaintext JSON | 15 (Sequoia) | this repo already gates on it: `FindMy.cacheIsEncrypted` in `BBSystem/FindMy.swift` |
 | `FMFSession`, `FMFSessionDataManager`, `FMFHandle`, `FMFLocation` absent from IMCore; `IMFindMyHandle` / `IMFindMyLocation` / `IMFindMyDevice` are the current types | by 26 | [`../headers/README.md`](../headers/README.md) |
 | `com.apple.icloud.fmfd` no longer vended by any launchd job, making `FMFSession` a dead XPC client | by 26 | [`../PRIVATE_API_SURFACE.md`](../PRIVATE_API_SURFACE.md) § 7 |
-| Chat backgrounds (`-[IMChat setTranscriptBackgroundAndSendToChat:transferID:]` and friends) | 26 | *unverified* — expected absent on 14 and 15 |
+| Chat backgrounds (`-[IMChat setTranscriptBackgroundAndSendToChat:transferID:]` and friends) | 26 | **confirmed absent on 14.6.1**; 15 still *unverified* |
+| `IMMutedChatList` — the whole class. Mute state moved here from `-[IMChat setMuteUntilDate:]`, which survives on both releases | by 26 | **confirmed absent on 14.6.1**; [`../SONOMA_COMPATIBILITY.md`](../SONOMA_COMPATIBILITY.md) §2.2 |
+| `+[IMTapback tapbackWithAssociatedMessageType:]` narrowed to one argument; 14.6.1 has only the `…:messageSummaryInfo:` and `…:representation:` forms | by 26 | **measured**; `SONOMA_COMPATIBILITY.md` §2.1 |
 
 That last row is a good example of what a dump settles in seconds. If `IMChat.h` for a
 release has no `transcriptBackground` methods, the feature is genuinely unavailable there,

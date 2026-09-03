@@ -16,6 +16,19 @@ Method, so the numbers can be reproduced:
 3. The two were intersected, and every divergence was confirmed by hand against the raw
    header text.
 
+## 0a. There is now a measured document next door
+
+[`SONOMA_COMPATIBILITY.md`](SONOMA_COMPATIBILITY.md) does the same comparison against
+`docs/headers/macos-14.6.1/`, which is a **runtime dump taken on real macOS 14 hardware, out
+of a Catalyst process**. It carries none of the caveats below.
+
+That matters here in both directions. Sonoma and Tahoe bracket Sequoia: a selector present on
+**both** 14.6.1 and 26.5.2 is almost certainly on 15 too, whatever the borrowed dump says —
+and several ⚠ rows below are of exactly that shape. A selector Apple added in 26 and that 14
+lacks tells you nothing about 15 on its own.
+
+Read that document first when a row here is marked ⚠ or ❓.
+
 ## 0. Read the confidence caveats before acting on any row
 
 `docs/headers/README.md` already states these; they are load-bearing for everything below.

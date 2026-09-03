@@ -6,6 +6,7 @@ the highest-risk subsystem here: a mistake crashes **the user's Messages**, not 
 Directory-local rules: [`Helper/CLAUDE.md`](../../Helper/CLAUDE.md).
 Deep references: [`docs/PRIVATE_API_SURFACE.md`](../../docs/PRIVATE_API_SURFACE.md),
 [`docs/OBSERVATION_LADDER.md`](../../docs/OBSERVATION_LADDER.md),
+[`docs/SONOMA_COMPATIBILITY.md`](../../docs/SONOMA_COMPATIBILITY.md),
 [`docs/SEQUOIA_COMPATIBILITY.md`](../../docs/SEQUOIA_COMPATIBILITY.md).
 
 ---

@@ -408,31 +408,53 @@ struct IMChat {
   }
 }
 
-/// `IMMutedChatList` — where Messages actually keeps mute state.
+/// Mute state, from whichever of the two stores this macOS has.
 ///
-/// MEASURED (see `docs/CHAT_CONTROLS_PLAN.md` §0): the store is the
-/// `com.apple.MobileSMS.CKDNDList` defaults domain under `CKDNDListKey`, keyed by MUTE
-/// IDENTIFIER rather than chat GUID — a hash for a 1:1 chat, the group id for a group — and
-/// the value is an unmute instant in epoch seconds. Muted-ness is that instant compared
-/// against now, which is why a timed mute needs nothing scheduled and why an expired entry
-/// is not the same as a muted chat.
+/// MEASURED on macOS 26 (see `docs/CHAT_CONTROLS_PLAN.md` §0): `IMMutedChatList` is the
+/// store, it is the `com.apple.MobileSMS.CKDNDList` defaults domain under `CKDNDListKey`,
+/// keyed by MUTE IDENTIFIER rather than chat GUID — a hash for a 1:1 chat, the group id for
+/// a group — and the value is an unmute instant in epoch seconds. Muted-ness is that instant
+/// compared against now, which is why a timed mute needs nothing scheduled and why an
+/// expired entry is not the same as a muted chat.
+///
+/// **`IMMutedChatList` does not exist on macOS 14** — not the selectors, the whole class
+/// (`docs/SONOMA_COMPATIBILITY.md` §2.2). What Sonoma has, and what macOS 26 still has
+/// alongside the list, is the older pair on `IMChat` itself: `-isMuted`, `-muteUntilDate`
+/// and `-setMuteUntilDate:`.
+///
+/// So every operation here is written twice, and `list()` returning nil is the switch. That
+/// is a change from an earlier shape where the chat-level calls were written as a "last
+/// resort" AFTER a `try list()` that threw first — the fallback was unreachable on the only
+/// release that needed it, which is the whole lesson of §2 of that document.
+///
+/// The list is still PREFERRED wherever it exists, and not out of habit: it carries
+/// `syncToPairedDevice:`, and it is where Messages itself reads on 26.
 ///
 /// The chat property `ignoreAlertsFlag` still appears in `chat.properties` on older
-/// conversations. It is not consulted here: Messages does not consult it either.
+/// conversations. It is not consulted on either path: Messages does not consult it either.
 enum IMMutedChats {
 
-  static func list() throws -> AnyObject {
-    try IMCoreRuntime.sharedInstance(
+  /// The shared list, or nil on a macOS without the class.
+  ///
+  /// **Optional, not throwing.** Absent is a supported configuration with a working path
+  /// behind it, not a failure, and the type is what says so — a `throws` signature here is
+  /// what made every caller open with `try list()` and strand the fallback.
+  static func list() -> AnyObject? {
+    guard IMCoreRuntime.lookUpClass("IMMutedChatList") != nil else { return nil }
+    return try? IMCoreRuntime.sharedInstance(
       ofClass: "IMMutedChatList", accessors: ["sharedList", "sharedInstance"]
     )
   }
 
   /// The identifiers this chat is muted under. IMCore derives them; they are not
   /// constructible from a chat GUID by string manipulation.
-  static func muteIdentifiers(for chat: IMChat) throws -> AnyObject {
+  ///
+  /// List-only by nature: the identifiers exist to key the list, so there is nothing to
+  /// ask for on a release without one.
+  static func muteIdentifiers(for chat: IMChat, in list: AnyObject) throws -> AnyObject {
     guard
       let identifiers = try IMCoreRuntime.invoke(
-        try list(), "muteIdentifiersForChat:", [chat.object]
+        list, "muteIdentifiersForChat:", [chat.object]
       )
     else {
       throw PrivateAPIErrorShim.rejected(
@@ -446,18 +468,28 @@ enum IMMutedChats {
   ///
   /// A DATE rather than a bool, because the two questions a client asks — "is it muted"
   /// and "until when" — are one lookup, and `-isMutedChat:` is derived from this anyway.
+  ///
+  /// Both stores answer in the same units, so the caller cannot tell which one replied —
+  /// `-muteUntilDate` is the property the list's entry is written from.
   static func unmuteDate(for chat: IMChat) throws -> Date? {
-    try IMCoreRuntime.invoke(try list(), "unmuteDateForChat:", [chat.object]) as? Date
+    if let list = list() {
+      return try IMCoreRuntime.invoke(list, "unmuteDateForChat:", [chat.object]) as? Date
+    }
+    return try IMCoreRuntime.send(chat.object, "muteUntilDate") as? Date
   }
 
   /// IMCore's own answer, used to cross-check the date rather than to replace it.
   ///
-  /// Takes an argument, so it cannot go through `IMCoreRuntime.bool` — that one uses a
-  /// typed IMP and only handles zero-argument getters. This is the first caller of
-  /// `callReturningBool`, which exists because a dropped BOOL return is indistinguishable
-  /// from a void method.
+  /// The list's form takes an argument, so it cannot go through `IMCoreRuntime.bool` — that
+  /// one uses a typed IMP and only handles zero-argument getters. This was the first caller
+  /// of `callReturningBool`, which exists because a dropped BOOL return is indistinguishable
+  /// from a void method. The chat's `-isMuted` IS a zero-argument getter, so it takes the
+  /// typed path.
   static func isMuted(_ chat: IMChat) throws -> Bool {
-    try IMCoreRuntime.callReturningBool(try list(), "isMutedChat:", [chat.object])
+    if let list = list() {
+      return try IMCoreRuntime.callReturningBool(list, "isMutedChat:", [chat.object])
+    }
+    return try IMCoreRuntime.bool(chat.object, "isMuted")
   }
 
   /// Mutes until `date`, or indefinitely when it is nil.
@@ -467,42 +499,47 @@ enum IMMutedChats {
   /// reads back as unmuted — a mute that reports success and does nothing.
   static func mute(_ chat: IMChat, until date: Date?, sync: Bool) throws {
     let untilDate = date ?? Date.distantFuture
-    let list = try list()
 
-    // The three-argument form carries `syncToPairedDevice:`, which is the whole reason
-    // to prefer the list over `IMChat -setMuteUntilDate:`.
-    if IMCoreRuntime.responds(
-      list, to: NSSelectorFromString("muteChat:untilDate:syncToPairedDevice:")
-    ) {
-      try IMCoreRuntime.invoke(
-        list, "muteChat:untilDate:syncToPairedDevice:",
-        [chat.object, untilDate as NSDate, sync]
-      )
-      return
+    if let list = list() {
+      // The three-argument form carries `syncToPairedDevice:`, which is the whole reason
+      // to prefer the list over `IMChat -setMuteUntilDate:`.
+      if IMCoreRuntime.responds(
+        list, to: NSSelectorFromString("muteChat:untilDate:syncToPairedDevice:")
+      ) {
+        try IMCoreRuntime.invoke(
+          list, "muteChat:untilDate:syncToPairedDevice:",
+          [chat.object, untilDate as NSDate, sync]
+        )
+        return
+      }
+      if IMCoreRuntime.responds(list, to: NSSelectorFromString("muteChat:untilDate:")) {
+        try IMCoreRuntime.invoke(
+          list, "muteChat:untilDate:", [chat.object, untilDate as NSDate]
+        )
+        return
+      }
     }
-    if IMCoreRuntime.responds(list, to: NSSelectorFromString("muteChat:untilDate:")) {
-      try IMCoreRuntime.invoke(
-        list, "muteChat:untilDate:", [chat.object, untilDate as NSDate]
-      )
-      return
-    }
-    // Last resort: the property on the chat. It reaches the same store, and it decides
-    // `syncToPairedDevice` for us.
+
+    // The property on the chat, which is all of macOS 14 and the tail of every ladder
+    // above. It decides `syncToPairedDevice` for us, so `sync` is not refused here — the
+    // request is honoured, just not steered.
     try IMCoreRuntime.invoke(chat.object, "setMuteUntilDate:", [untilDate as NSDate])
   }
 
   /// Removes the entry outright.
   ///
   /// Not "mute until a date in the past". Both read as unmuted, but only this one takes the
-  /// conversation out of the list Messages syncs.
+  /// conversation out of the list Messages syncs — where there is a list. Where there is
+  /// not, a nil `muteUntilDate` is the only spelling of "not muted" there is, and it is the
+  /// same one Messages writes.
   static func unmute(_ chat: IMChat, sync: Bool) throws {
-    let list = try list()
-    if IMCoreRuntime.responds(
-      list, to: NSSelectorFromString("unmuteChatWithMuteIdentifiers:syncToPairedDevice:")
-    ) {
+    if let list = list(),
+      IMCoreRuntime.responds(
+        list, to: NSSelectorFromString("unmuteChatWithMuteIdentifiers:syncToPairedDevice:"))
+    {
       try IMCoreRuntime.invoke(
         list, "unmuteChatWithMuteIdentifiers:syncToPairedDevice:",
-        [try muteIdentifiers(for: chat), sync]
+        [try muteIdentifiers(for: chat, in: list), sync]
       )
       return
     }
@@ -1653,11 +1690,42 @@ enum IMMessageBuilder {
 enum IMTapbacks {
 
   /// Whether Messages' own sender is available here.
+  ///
+  /// The SENDER only. Whether the tapback OBJECT it needs can be built is a separate
+  /// question with a different answer per release, and `canBuild(_:)` is that question —
+  /// see the comment there for why the two were once conflated and what it cost.
   static var senderAvailable: Bool {
     guard let sender = IMCoreRuntime.lookUpClass("IMTapbackSender") else { return false }
     return (sender as AnyObject).responds(to: NSSelectorFromString("alloc"))
       && class_getInstanceMethod(
         sender, NSSelectorFromString("initWithTapback:chat:messagePartChatItem:")) != nil
+  }
+
+  /// Whether `tapback(_:emoji:)` can actually construct this reaction on this macOS.
+  ///
+  /// **This is not the same question as `senderAvailable`, and treating it as one broke
+  /// every reaction on Sonoma.** `IMTapbackSender` and its initializer are present on macOS
+  /// 14.6.1, so the caller took the modern branch — and then
+  /// `+[IMTapback tapbackWithAssociatedMessageType:]` was missing, because Apple NARROWED
+  /// that constructor rather than adding it: 14.6.1 has only the
+  /// `…:messageSummaryInfo:` and `…:representation:` forms. The association-initializer
+  /// fallback, which sends all six named tapbacks correctly, was never reached.
+  /// Measured — `docs/SONOMA_COMPATIBILITY.md` §2.1.
+  ///
+  /// Asked per RECEIVED REACTION rather than once, because the two kinds need different
+  /// things and a release may well have one without the other. Which is not hypothetical:
+  /// macOS 15 has `IMEmojiTapback` (the emoji-reaction gate depends on it) and nobody has
+  /// yet measured whether it also has the one-argument `IMTapback` constructor. Asking the
+  /// runtime per kind makes that a question the code answers rather than one it assumes.
+  static func canBuild(_ reaction: ReactionType) -> Bool {
+    if reaction.isEmoji {
+      guard let emojiTapback = IMCoreRuntime.lookUpClass("IMEmojiTapback") else { return false }
+      return class_getInstanceMethod(
+        emojiTapback, NSSelectorFromString("initWithEmoji:isRemoved:")) != nil
+    }
+    guard let tapback = IMCoreRuntime.lookUpClass("IMTapback") else { return false }
+    return (tapback as AnyObject).responds(
+      to: NSSelectorFromString("tapbackWithAssociatedMessageType:"))
   }
 
   /// The tapback object: `IMEmojiTapback` for an emoji, `IMTapback` for a named one.

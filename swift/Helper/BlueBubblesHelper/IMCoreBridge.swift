@@ -310,8 +310,15 @@ public final class IMCoreBridge: PrivateAPI {
   public func react(_ request: ReactionRequest) async throws -> SentMessage {
     // Messages' own path (`IMTapbacks`) wants the target PART chat item; loaded first
     // because that is asynchronous, used inside the block with no suspension after.
+    //
+    // BOTH halves are asked for, and that is the fix for the Sonoma reaction bug: the
+    // sender being present does not mean the tapback object can be built. On macOS 14
+    // `IMTapbackSender` is there and `+[IMTapback tapbackWithAssociatedMessageType:]` is
+    // not, so asking only the first sent every reaction down a path that then threw, with
+    // a working fallback sitting directly below. `docs/SONOMA_COMPATIBILITY.md` §2.1.
+    let useMessagesPath = IMTapbacks.senderAvailable && IMTapbacks.canBuild(request.reaction)
     let part: AnyObject? =
-      IMTapbacks.senderAvailable
+      useMessagesPath
       ? try await IMChatHistory.messagePartChatItem(
         guid: request.target.rawValue, partIndex: request.partIndex)
       : nil
@@ -330,11 +337,14 @@ public final class IMCoreBridge: PrivateAPI {
         return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
       }
 
-      // Fallback for a macOS without IMTapbackSender: the association initializer, which
-      // has no way to carry an emoji.
+      // Fallback for a macOS that cannot take the Messages path: the association
+      // initializer. It is how the shipping ObjC helper has always sent the six named
+      // tapbacks, and on macOS 14 it is the only way — but it writes the reaction into an
+      // `associatedMessageType`, and there is no such number for "emoji", so an emoji
+      // reaction genuinely cannot come this way.
       guard !request.reaction.isEmoji else {
         throw PrivateAPIError.unavailableOnThisOS(
-          method: "react(_:)", requires: "IMTapbackSender (macOS 15 or later)")
+          method: "react(_:)", requires: "IMEmojiTapback (macOS 15 or later)")
       }
       // A tapback still carries text, and IMCore rejects an empty one — the shipping
       // helper substitutes "TEMP" for exactly this reason (BlueBubblesHelper.m:1024).
@@ -389,9 +399,17 @@ public final class IMCoreBridge: PrivateAPI {
       // transfer, but the message comes from `IMStickerTapback` through `IMTapbackSender`
       // rather than being built here. Messages positions it, so `placement` is unused.
       if request.asTapback {
+        // Two classes, and naming the one that is actually missing is the difference
+        // between a report that leads somewhere and one that sends the reader to the
+        // wrong release. `IMTapbackSender` is present as far back as macOS 14;
+        // `IMStickerTapback` arrived in 26.
         guard IMTapbacks.senderAvailable else {
           throw PrivateAPIError.unavailableOnThisOS(
-            method: "sticker tapback", requires: "IMTapbackSender (macOS 15 or later)")
+            method: "sticker tapback", requires: "IMTapbackSender")
+        }
+        guard IMCoreRuntime.lookUpClass("IMStickerTapback") != nil else {
+          throw PrivateAPIError.unavailableOnThisOS(
+            method: "sticker tapback", requires: "IMStickerTapback (macOS 26 or later)")
         }
         let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
         let sticker = try IMStickers.sticker(path: request.filePath)
