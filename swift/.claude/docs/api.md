@@ -204,6 +204,15 @@ distinct between machines, and no state to keep. `player<N> == sender` held on e
 payload measured (three games, seven years, both directions, 12/12). The rest is still the client's: capture a real invite with
 `GET app/:guid` and vary it. `docs/GAME_PIGEON.md` § 4.
 
+**A move cannot be composed server-side, and that is measured rather than assumed.** A move's
+`replay` carries `balls:` — 31 ball states, position and velocity — which is the
+AUTHORITATIVE post-shot outcome computed by the sender; the `d`/`p` shot parameters only
+drive the animation. A move sent with someone else's ball state played an animation and then
+showed a wrong table, and 8 Ball has no score field at all (the score is derived from which
+balls are pocketed). So composing a move means simulating the game. Clients that want to play
+must model it themselves; the server carries the payload, threads the session and fills in
+identity. Reading moves is unaffected.
+
 The server does not model games: fields go out and come back as an ordered name/value list,
 so every Game Pigeon game travels the same way and the client decides what a field means. The
 envelope is built server-side rather than through ChatKit, because ChatKit refuses to compose

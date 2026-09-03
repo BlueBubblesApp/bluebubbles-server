@@ -307,6 +307,42 @@ fail. The reliable way to build an invite is to **capture a real one from the ga
 and vary it**: `GET app/:guid` on any invite in the user's history hands you the complete
 field list, in order, ready to edit.
 
+#### A MOVE cannot be composed by this server, and that is settled
+
+An invite is a payload. A **move is a physics result**, and the difference was measured by
+sending one and asking the recipient what he saw.
+
+The move went out correctly as an envelope: right game `id`, `num` incremented, roles
+flipped, threaded onto the same `MSSession`. Its `replay` carried his own ball state back
+verbatim with only the shot parameters (`d`, `p`) changed. What he reported:
+
+> It's weird I saw a ball go in but you have no score
+>
+> Oh wait the entire end state is totally wrong
+
+Both halves are explained by the same fact:
+
+- **The shot parameters drive an animation.** The app happily replayed a shot from `d` and
+  `p` — a ball went in on screen — so those are inputs it acts on.
+- **`balls:` is the AUTHORITATIVE outcome, computed by the sender.** 31 entries of eight
+  values, position and velocity per ball. Ours said the table was exactly as he had left it,
+  which contradicted the animation it had just drawn. Hence "the entire end state is totally
+  wrong".
+- **8 Ball carries no score field at all** — checked across every 8 Ball payload, invites
+  and moves: there is none. The score is *derived* from which balls are pocketed in `balls:`.
+  Echoing his state meant none of ours were down, so "you have no score". (Cup Pong is
+  different again: its moves carry `score1`, `score2`, `skip_score1`, `skip_score2`,
+  `round`, `seed` and `seed2` — another reminder that two games do not agree.)
+
+So composing a move means simulating the game: running the shot and computing where 31 balls
+come to rest. That is exactly the modelling this server does not do, and this is the
+measurement that says it should not start — there is no shortcut where the app recomputes
+the result for you. **A client that wants to play must simulate the game itself**; the server
+carries the payload, threads the session, and fills in identity.
+
+Reading moves is unaffected and works: `GET app/:guid` decodes the whole `replay`, so a
+client that does model the game has everything it needs.
+
 ### Send any other app's message
 
 ```http
@@ -399,8 +435,10 @@ enough for a sensible bubble, and you can skip the rest.
 
 ## 7. Loose ends
 
-- Our archive omits `ai`, the app icon, which Apple's carry. A receiving device presumably
-  falls back to the installed app's icon; not confirmed.
+- Our archive omits `ai`, the app icon, which Apple's carry. **Confirmed harmless:** on a
+  message we sent, the recipient — who has Game Pigeon installed — saw the app icon, while
+  the sending Mac, which does not, showed none. The receiving device falls back to the
+  installed app's icon, so the omission costs nothing where it matters.
 - **`build` and `avatar2` are on every genuine payload and we send neither.** The Cup Pong
   invite that was actually played was missing both, so neither is required to play — but a
   short field set is what produces the "update to the latest version" message (§ 4), and
