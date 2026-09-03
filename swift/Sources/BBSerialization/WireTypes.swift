@@ -301,27 +301,19 @@ public struct MessageSerializerConfig: Sendable {
   public var parsePayloadData: Bool
   public var loadChatParticipants: Bool
   public var includeChats: Bool
-  /// FCM caps a data payload at 4KB, so the notification variant sheds chat participants
-  /// when it would overflow.
-  public var enforceMaxSize: Bool
-  public var maxSizeBytes: Int
 
   public init(
     parseAttributedBody: Bool = false,
     parseMessageSummary: Bool = false,
     parsePayloadData: Bool = false,
     loadChatParticipants: Bool = true,
-    includeChats: Bool = true,
-    enforceMaxSize: Bool = false,
-    maxSizeBytes: Int = 4000
+    includeChats: Bool = true
   ) {
     self.parseAttributedBody = parseAttributedBody
     self.parseMessageSummary = parseMessageSummary
     self.parsePayloadData = parsePayloadData
     self.loadChatParticipants = loadChatParticipants
     self.includeChats = includeChats
-    self.enforceMaxSize = enforceMaxSize
-    self.maxSizeBytes = maxSizeBytes
   }
 
   /// What the socket receives: everything.
@@ -330,9 +322,26 @@ public struct MessageSerializerConfig: Sendable {
     loadChatParticipants: false, includeChats: true
   )
 
-  /// What FCM and webhooks receive: trimmed, size-capped.
+  /// What every notification transport and every webhook receives: the smaller CONTENT
+  /// shape, and nothing to do with size.
+  ///
+  /// It used to carry `enforceMaxSize: true`, which put FCM's 4 KB limit — a constraint of
+  /// one transport, imposed by Google — into a projection that webhooks, ntfy and anything
+  /// else built later all consume. ntfy's limit is configurable by whoever runs the server;
+  /// a UnifiedPush endpoint's belongs to a distributor this server cannot see; a webhook has
+  /// none at all. A single number here was wrong for all of them.
+  ///
+  /// The cap now lives in `FCMSender`, next to Google's own rejection. See `docs/EVENTS.md`.
+  /// Participants ARE loaded here and are NOT on `.full`, which looks backwards and is the
+  /// reference's own arrangement: its socket emit passes `loadChatParticipants: false`
+  /// explicitly, while its notification emit passes only `enforceMaxSize` and inherits
+  /// `true` from `DEFAULT_MESSAGE_CONFIG`. A push for a group chat carries the roster; the
+  /// socket payload does not, because a socket client can ask.
+  ///
+  /// It also makes the FCM trim mean something: participants are what `FCMSender` sheds when
+  /// a payload is over 4 KB, and with them never loaded there was nothing to shed.
   public static let notification = MessageSerializerConfig(
-    loadChatParticipants: false, includeChats: true, enforceMaxSize: true
+    loadChatParticipants: true, includeChats: true
   )
 }
 

@@ -40,6 +40,31 @@ under `message/`, `chat/`, `facetime/`, `handle/` and `icloud/` — bar the four
 read. This is not tidiness: the first run of the harness locked the developer's Mac and restarted
 Messages, on a machine being used over a remote session. `ReplayDenyListTests` asserts it.
 
+### The event pipeline, end to end
+
+`Tools/event-probe/probe.mjs` attaches to a RUNNING server on all three delivery channels at
+once — the socket, a webhook it registers against itself, and ntfy (point `ntfy_server` at the
+probe) — triggers real activity, and prints what each channel received.
+
+It exists because neither half of the pipeline was ever tested against a payload the change
+detector produced. `SocketEndToEndTests` drives the transport with hand-built events and the
+webhook suite drives delivery with hand-built events, so both were green while every emitted
+event carried `chats: []`.
+
+```bash
+node Tools/event-probe/probe.mjs --password "$PW" --seconds 40 \
+    --send 'any;-;someone@example.com' --react
+```
+
+No dependencies: the socket is Engine.IO v4 over long-polling, the same path
+`SocketEndToEndTests` uses. `--send` and `--react` reach a real conversation — pass them
+deliberately, and only to an address cleared for testing.
+
+**What it cannot show on every Mac.** Typing indicators and FindMy locations are INBOUND
+events, observed through the helper. When the server logs "The helper attached to no
+inbound-event source on this macOS", neither is ever emitted and neither channel can be
+checked — see `docs/OBSERVATION_LADDER.md`.
+
 ### What a fixture database cannot tell you
 
 **A fixture database has its rows already complete. A live one does not, and the difference is

@@ -32,8 +32,9 @@ Eight rules override anything you would otherwise infer from the code.
    `acceptedDifferences` (`Sources/BBParity/ResponseDiff.swift`) with a line saying what it
    is, and one you did not mean fails — which is the point. Two things to know before adding
    one anyway: it becomes a contract as soon as a client reads it, so taking it back later IS
-   a break; and the **FCM payload is capped at 4000 bytes**, where an extra field can push a
-   notification over and it is dropped. The bar is real — `backend` on `POST /message/text`
+   a break; and the **FCM payload is capped at 4096 bytes** (`FCMSender.maximumPayloadBytes`),
+   where an extra field can push a notification over and `FCMSender` has to shed the chat
+   roster to fit. The bar is real — `backend` on `POST /message/text`
    was declared for a day and then deleted, because nothing read it and the comment saying
    clients did was never true.
 

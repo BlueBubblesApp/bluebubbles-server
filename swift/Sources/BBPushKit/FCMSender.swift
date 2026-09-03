@@ -55,6 +55,40 @@ public actor FCMSender {
 
   /// FCM's hard limit on a data payload.
   public static let maximumPayloadBytes = 4096
+
+  /// What Google weighs: the whole `data` map, serialised.
+  static func payloadSize(of data: [String: String]) -> Int? {
+    (try? JSONSerialization.data(withJSONObject: data))?.count
+  }
+
+  /// Sheds the largest droppable field from an oversized payload.
+  ///
+  /// `chats[].participants` is the concession, and it is the reference's too: it is by far
+  /// the biggest optional field, and a notification without it still routes and renders —
+  /// the client reads the chat GUID, not the roster, to decide where the message goes.
+  ///
+  /// Operates on the JSON inside `data["data"]`, which is a STRING: FCM data payloads are
+  /// string-to-string maps, so the message rides as encoded JSON. Anything that cannot be
+  /// decoded is returned untouched rather than mangled — an oversized payload is better than
+  /// a corrupt one, and the caller refuses it a moment later either way.
+  static func trimmed(_ data: [String: String]) -> [String: String] {
+    guard let encoded = data["data"],
+      var object = (try? JSONSerialization.jsonObject(with: Data(encoded.utf8)))
+        as? [String: Any],
+      var chats = object["chats"] as? [[String: Any]]
+    else { return data }
+
+    for index in chats.indices { chats[index].removeValue(forKey: "participants") }
+    object["chats"] = chats
+
+    guard let reencoded = try? JSONSerialization.data(withJSONObject: object),
+      let string = String(data: reencoded, encoding: .utf8)
+    else { return data }
+
+    var trimmed = data
+    trimmed["data"] = string
+    return trimmed
+  }
   /// Concurrency ceiling. High enough that a household's devices go out together, low
   /// enough that a stalled network cannot pile up unboundedly.
   public static let maximumConcurrentSends = 8
@@ -92,19 +126,38 @@ public actor FCMSender {
 
     // Checked once rather than per token: the payload is identical for all of them, so
     // failing 30 requests to learn the same fact is pure waste.
-    if let size = try? JSONSerialization.data(withJSONObject: data).count,
-      size > Self.maximumPayloadBytes
-    {
+    //
+    // THIS is where the 4 KB limit lives, and the only place it should. It is Google's
+    // number, not a property of an event or of a notification in general — ntfy's is set by
+    // whoever runs the server, a UnifiedPush distributor's is invisible from here, and a
+    // webhook has none. The serializer used to apply a 4000-byte cap for everyone, which was
+    // wrong for every transport including this one: it measured the message object plus two
+    // bytes for brackets, guessing at a wrapper it could not see, while what Google actually
+    // weighs is the `data` map below — keys, JSON-string escaping and all.
+    var shrunk = data
+    if let size = Self.payloadSize(of: data), size > Self.maximumPayloadBytes {
+      shrunk = Self.trimmed(data)
+      let trimmedSize = Self.payloadSize(of: shrunk) ?? size
       logger.warning(
-        "Notification payload exceeds FCM's size limit",
+        "Notification payload exceeded FCM's size limit and was trimmed",
         metadata: [
           "bytes": .stringConvertible(size),
+          "trimmedTo": .stringConvertible(trimmedSize),
           "limit": .stringConvertible(Self.maximumPayloadBytes),
         ])
-      return DeliveryReport(
-        outcomes: Dictionary(uniqueKeysWithValues: tokens.map { ($0, .payloadTooLarge) })
-      )
+
+      // Still over after shedding what can be shed. Refused rather than sent, because
+      // Google refuses it anyway and a per-token round trip to learn that is waste.
+      if trimmedSize > Self.maximumPayloadBytes {
+        return DeliveryReport(
+          outcomes: Dictionary(uniqueKeysWithValues: tokens.map { ($0, .payloadTooLarge) })
+        )
+      }
     }
+
+    // Bound before the sends: the task group below captures it, and a mutable binding may
+    // not cross into a concurrently-running closure.
+    let payload = shrunk
 
     logger.debug(
       "Sending FCM notification",
@@ -123,7 +176,7 @@ public actor FCMSender {
         guard let token = iterator.next() else { return }
         running += 1
         group.addTask { [self] in
-          (token, await deliver(data: data, to: token, priority: priority))
+          (token, await deliver(data: payload, to: token, priority: priority))
         }
       }
 

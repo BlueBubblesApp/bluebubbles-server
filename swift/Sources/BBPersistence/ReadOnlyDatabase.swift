@@ -61,6 +61,13 @@ public struct ReadOnlyDatabase: Sendable {
     var configuration = Configuration()
     configuration.readonly = true
     configuration.maximumReaderCount = max(1, maximumReaders)
+    // WAIT for a lock rather than failing on it. GRDB's default is `.immediateError`, so a
+    // read that lands while the writer holds the database throws "database is locked" —
+    // and the writer here is Messages.app, which we do not control and cannot ask to
+    // pause. chat.db is normally in WAL mode, where readers do not block, but a checkpoint
+    // still takes a brief exclusive lock; two seconds is far longer than one needs and far
+    // shorter than any request timeout.
+    configuration.busyMode = .timeout(2)
 
     self.path = path
 

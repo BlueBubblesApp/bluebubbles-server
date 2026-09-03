@@ -76,8 +76,12 @@ actor PushDeliveryService: ContextualService, GatedService, ConfigurableService 
     // starts, reports itself configured, and is never asked to send anything: the bus
     // fans out only to sinks that registered, and this one never did. Nothing failed —
     // `server/info` said push was active and Android clients received nothing.
-    await context.events.register(
-      PushSink(
+    // The sink is shared with every other notification transport and registering it is
+    // idempotent — whichever service starts first puts it on the bus, and the second
+    // replaces it with the same object. Attaching is what makes THIS transport deliver.
+    await context.events.register(context.notifications)
+    await context.notifications.attach(
+      FirebaseProvider(
         service: push,
         tokens: { [weak context] in await context?.deviceDirectory.tokens() ?? [] },
         negotiator: context.codecs

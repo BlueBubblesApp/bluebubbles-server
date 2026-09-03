@@ -214,11 +214,27 @@ public struct NtfyTarget: Sendable {
   }
 }
 
-public struct NtfySink: CustomEventSink {
+/// ntfy as a notification transport, not as a webhook.
+///
+/// It was an `EventSink` routed `.webhook`, which gave the same ntfy topic a different event
+/// set depending on whether it was configured here or as a plain webhook URL. ntfy is a
+/// Firebase REPLACEMENT — someone configuring it is leaving Google, not subscribing a URL —
+/// so it routes with push and stops receiving typing indicators and FindMy bursts, which are
+/// exactly the two the reference already keeps off push.
+///
+/// Its size limit, if the operator set one, is its own: ntfy's `message-size-limit` is
+/// configurable and its docs warn that anything over 4 KB is "not recommended, and largely
+/// untested". That is a different number from Firebase's and belongs here, not above.
+public struct NtfyProvider: NotificationProvider {
 
-  public let id = SinkID.ntfy
-  public let routing = SinkRouting.webhook
-  public let projection = PayloadProjection.notification
+  public let providerID = "ntfy"
+  public var subscription: EventSubscription {
+    // The topic's own event list, which the settings UI already exposes and which ships as
+    // `*`. `.all` when it is, so the routing policy alone decides.
+    target.events.contains("*")
+      ? .all
+      : .only(Set(EventName.webhookSubscribable.filter { target.matches($0) }))
+  }
 
   private let target: NtfyTarget
   private let transport: any HTTPPosting
@@ -234,11 +250,11 @@ public struct NtfySink: CustomEventSink {
     self.logger = logger
   }
 
-  public func accepts(_ event: ServerEvent) async -> Bool {
-    target.matches(event.name)
-  }
+  /// A configured topic is always ready: ntfy needs no registration handshake and no token
+  /// list, so there is nothing that can be absent the way FCM's devices can.
+  public var isReady: Bool { get async { !target.topic.isEmpty } }
 
-  public func deliver(_ event: ServerEvent) async throws {
+  public func send(_ event: ServerEvent) async throws {
     var headers = ["Content-Type": "text/plain; charset=utf-8"]
     headers["Title"] = Self.title(for: event)
     headers["Priority"] = event.priority == .high ? "high" : "default"

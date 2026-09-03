@@ -69,8 +69,9 @@ actor WebhookDeliveryService: ContextualService, ConfigurableService {
     // not registered at all. The settings row says so where the boxes are unticked.
     guard !events.isEmpty else { return }
 
-    await context.events.register(
-      NtfySink(
+    await context.events.register(context.notifications)
+    await context.notifications.attach(
+      NtfyProvider(
         target: NtfyTarget(
           serverURL: await context.settings.get(Settings.ntfyServer),
           topic: topic,
@@ -83,7 +84,9 @@ actor WebhookDeliveryService: ContextualService, ConfigurableService {
 
   func stop() async {
     await context.events.unregister(.webhook)
-    await context.events.unregister(.ntfy)
+    // Detached rather than unregistering the sink: Firebase may still be attached to it,
+    // and pulling the sink off the bus would silently stop push as well.
+    await context.notifications.detach(providerID: "ntfy")
   }
 
   func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }

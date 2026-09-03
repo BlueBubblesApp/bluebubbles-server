@@ -5,6 +5,53 @@ Module: `Sources/BBEvents`. Agent-facing rules: [`../.claude/docs/architecture.m
 
 ---
 
+## Where a size limit lives
+
+**In the transport, never above it.** FCM's 4096 bytes is Google's number and lives in
+`FCMSender`, next to Google's own rejection: it measures the `data` map that actually goes on
+the wire and sheds `chats[].participants` if it must, sending what fits rather than refusing
+the lot. ntfy's `message-size-limit` is whatever the operator configured — its docs warn that
+over 4 KB is "not recommended, and largely untested" — and a UnifiedPush endpoint's belongs to
+a distributor this server cannot see. A webhook has none.
+
+It used to be a single 4000-byte cap inside `MessageSerializer`, applied to the projection that
+push, webhooks and ntfy all consume. One number, wrong for every transport including FCM: it
+weighed the message object plus two bytes for brackets, guessing at a wrapper it could not see.
+And it never once fired, because the projection it lived in had already set
+`loadChatParticipants: false`, so there was nothing left to drop.
+
+## One sink, many providers
+
+`NotificationSink` holds every notification transport and is routed `.push`. Firebase and ntfy
+are `NotificationProvider`s attached to it as their services start.
+
+The sink owns **routing** — which events reach notification transports at all — because that is
+a parity construct: `EventRouting.policy(for:)` transcribes the reference's per-event
+`sendFcmMessage` argument and is not configurable. A provider owns **everything about its own
+transport**: encoding, credentials, retries, and its size limit. The payload codecs
+(`legacy-v1`, `reference-v2`, `sealed-v2`) moved down with it — they describe what the
+BlueBubbles client app can parse, which is nothing to do with ntfy.
+
+Each provider declares an `EventSubscription`. `.all` is the shipping default and means
+"whatever routing allows", which is what the reference sends; `.only([…])` narrows. It can
+never widen, so a subscription cannot resurrect an event the reference suppresses.
+
+**ntfy routes with push now, not with webhooks.** It is a Firebase replacement — someone
+configuring it is leaving Google, not subscribing a URL. It still receives
+`typing-indicator` and `new-findmy-location`, as it did under v1 where it is a webhook: those
+two are declined by **`FirebaseProvider.referenceSubscription`**, not by the bus.
+
+That distinction is the whole reason subscriptions exist. The reference passes
+`sendFcmMessage: false` for exactly those two events, and that is a fact about Firebase — it
+delivers both to webhooks quite happily. Applied at the bus, as `EventRouting(allowsPush:
+false)`, it read as a rule about notifications in general and silently took them from every
+transport that later joined the push lane. `allowsPush` remains as the class gate and is
+currently open for every event; a suppression that genuinely applied to *every* notification
+transport would belong there.
+
+The move also removes a live inconsistency: the same ntfy topic used to get a different event
+set depending on whether it was configured as a webhook or through its own settings.
+
 ## `ServerEvent`
 
 One vocabulary, client-facing and wire-constrained — **every case exists because a client
@@ -64,7 +111,7 @@ should warn about the sinks it does not have.
 | socket | always | The only route many desktop (Linux/Windows) clients use |
 | push | a Firebase config being present | **Optional.** No config means the sink is simply not registered — not a degraded state |
 | `WebhookSink` | any configured webhook | Per-webhook event subscription |
-| `NtfySink` | a configured ntfy target | Maps the event onto ntfy's actual header protocol — title, body, priority, tags, click action, auth token, self-hosted server URL |
+| `NtfyProvider` | a configured ntfy target | Maps the event onto ntfy's actual header protocol — title, body, priority, tags, click action, auth token, self-hosted server URL |
 
 **Registration is the on-switch.** `EventBus.register(_:)` is what makes a sink active; an
 unconfigured sink is *not registered*, never registered-and-disabled. That distinction is what
@@ -114,7 +161,7 @@ object, never envelope-wrapped. **This is the default for every target and does 
 
 - Message content never transits Google's infrastructure, so there is **no key management problem
   to get wrong**.
-- Removes the 4000-byte FCM ceiling that otherwise forces participants to be stripped from
+- Fits under the 4096-byte FCM ceiling that otherwise forces participants to be stripped from
   notifications.
 - Socket and push converge on one envelope, so the socket stops being a second serialization path.
 - **Honest downsides:** the client cannot render a notification body without a round trip, so a
@@ -215,7 +262,7 @@ encrypted; the presence of a client ack callback changes delivery from channel-e
 
 ## Extending delivery
 
-`CustomEventSink` is the extension point. `WebhookSink` and `NtfySink` are written against it
+`CustomEventSink` is the extension point. `WebhookSink` is written against it
 rather than being special-cased, which is what keeps the surface honest — if it cannot express the
 built-ins, it is not good enough.
 

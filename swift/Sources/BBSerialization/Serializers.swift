@@ -212,35 +212,7 @@ public struct MessageSerializer: Sendable {
       profile.supportsMessageParts, "partCount",
       message.partCount.map(JSONValue.int))
 
-    // MARK: The FCM size ceiling
-    //
-    // Last, because it has to measure the WHOLE response. Weighing `chats` alone measures
-    // the wrong thing: a message whose text runs to 3.9 KB has a tiny chats array, so the
-    // cap never fires, the payload goes over FCM's 4 KB data limit, and Google rejects the
-    // send. The user sees one missing notification and nothing anywhere says why.
-    //
-    // Node measures `JSON.stringify(messageResponses)` — an ARRAY, because the singular
-    // `serialize` delegates to `serializeList` with one element. Hence `+ 2`: two bytes
-    // of brackets, which only matters at the boundary and is free to get right.
-    guard config.enforceMaxSize, config.includeChats else { return object.build() }
-
-    var built = object.build()
-    let size = ((try? built.serialize().count) ?? 0) + 2
-    guard size > config.maxSizeBytes else { return built }
-
-    // Participants are the concession, matching the current server exactly: they are the
-    // largest droppable field, and a notification without them still routes and renders.
-    object.set(
-      "chats",
-      .array(
-        context.chats.map {
-          ChatSerializer.serialize(
-            $0, participants: [], includeParticipants: false,
-            isForNotification: isForNotification
-          )
-        }))
-    built = object.build()
-    return built
+    return object.build()
   }
 }
 

@@ -47,8 +47,16 @@ actor ChangeDetectionService: ContextualService, PermissionDependentService,
     pump?.cancel()
     pump = Task {
       for await changes in await detector.changes(watching: ChatDatabase.defaultPath) {
+        // One hydrator per batch: long enough to collapse a burst in a single chat into
+        // one participants query, short enough that a roster change cannot go stale. See
+        // `EventHydrator`.
+        var hydrator = EventHydrator(repository: repository)
         for change in changes {
-          guard let event = Self.event(for: change, serializer: serializer) else {
+          guard
+            let event = await Self.event(
+              for: change, serializer: serializer, hydrator: &hydrator
+            )
+          else {
             continue
           }
           // Rate-limited per chat where the policy asks for it, so a busy
@@ -87,14 +95,22 @@ actor ChangeDetectionService: ContextualService, PermissionDependentService,
   /// no client knows.
   static func event(
     for change: MessageChange,
-    serializer: MessageSerializer?
-  ) -> ServerEvent? {
+    serializer: MessageSerializer?,
+    hydrator: inout EventHydrator
+  ) async -> ServerEvent? {
     guard let serializer else { return nil }
+
+    // ONE context for both payloads. The two projections differ in whether they EMIT
+    // participants — `.full` sets `loadChatParticipants: false` and ignores whatever the
+    // context holds — so loading them once and letting the socket projection drop them is
+    // the same output for half the queries.
+    let relations = await hydrator.context(for: change.message, withParticipants: true)
+
     let payload = serializer.serialize(
-      change.message, context: MessageSerializer.Context(), config: .full
+      change.message, context: relations, config: .full
     )
     let notification = serializer.serialize(
-      change.message, context: MessageSerializer.Context(),
+      change.message, context: relations,
       config: .notification, isForNotification: true
     )
 

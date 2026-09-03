@@ -72,23 +72,31 @@ func makeEvent(
 @Suite("Event routing")
 struct EventRoutingTests {
 
-  @Test("Typing indicators skip push and keep the socket")
-  func typingIndicatorRouting() async {
-    // From `emitMessage(TYPING_INDICATOR, …, "normal", false)` — the fourth argument is
-    // sendFcmMessage, not sendSocket. Getting this backwards silently kills typing
-    // indicators for every socket client.
-    let routing = EventRouting.policy(for: .typingIndicator)
-    #expect(routing.allowsSocket)
-    #expect(!routing.allowsPush)
-    #expect(routing.allowsWebhooks)
+  /// The reference's two push suppressions are asserted at their new home,
+  /// `FirebaseProvider.referenceSubscription` — see `NotificationSubscriptionTests`. What is
+  /// asserted here is that the BUS no longer applies them, because doing so took them away
+  /// from every other notification transport too: ntfy is a webhook under v1 and receives
+  /// both.
+  @Test("The bus no longer suppresses push for anyone")
+  func busDoesNotSuppressPush() {
+    for name in [EventName.typingIndicator, .newFindMyLocation] {
+      let routing = EventRouting.policy(for: name)
+      #expect(routing.allowsSocket)
+      #expect(routing.allowsWebhooks)
+      #expect(
+        routing.allowsPush,
+        "\(name) is suppressed for FIREBASE, by its subscription — not for every transport")
+    }
   }
 
-  @Test("FindMy locations skip push and are rate limited")
+  /// The rate limit stays on the event, because it protects Apple from this server's
+  /// polling — true whatever the event is delivered over. Only the suppression moved.
+  @Test("FindMy locations are still rate limited")
   func findMyRouting() {
     let routing = EventRouting.policy(for: .newFindMyLocation)
     #expect(routing.allowsSocket)
-    #expect(!routing.allowsPush)
     #expect(routing.minimumInterval == .milliseconds(250))
+    #expect(EventRouting.policy(for: .newFindMyLocation).isRateLimitGlobal)
   }
 
   @Test("iMessage alias removal reaches every sink")
@@ -110,8 +118,11 @@ struct EventRoutingTests {
     }
   }
 
-  @Test("Suppression actually stops delivery")
-  func suppressionIsEnforced() async {
+  /// A typing indicator now REACHES the notification lane, and which transports there act
+  /// on it is each transport's own decision. That is the change: the bus used to answer for
+  /// all of them.
+  @Test("A typing indicator reaches every lane, and providers decide")
+  func typingIndicatorReachesEveryLane() async {
     let bus = EventBus()
     let socket = RecordingSink(id: .socket, projection: .full)
     let push = RecordingSink(id: .push)
@@ -122,7 +133,7 @@ struct EventRoutingTests {
     await bus.settle()
 
     #expect(await socket.names() == [.typingIndicator])
-    #expect(await push.names().isEmpty)
+    #expect(await push.names() == [.typingIndicator])
   }
 
   @Test("The rate limit is keyed, so a busy chat cannot starve a quiet one")

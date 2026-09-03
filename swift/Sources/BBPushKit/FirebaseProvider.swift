@@ -20,14 +20,30 @@ import BBSerialization
 import Foundation
 import Logging
 
-public struct PushSink: EventSink {
+public struct FirebaseProvider: NotificationProvider {
 
-  public let id = SinkID.push
-  public let routing = SinkRouting.push
-  /// The TRIMMED payload. The socket takes `.full`; FCM has a 4 KB limit and a full
-  /// message body with its attachments will not fit. Mixing these up is the single most
-  /// likely way to break clients while every test still passes.
-  public let projection = PayloadProjection.notification
+  public let providerID = "firebase"
+  public let subscription: EventSubscription
+
+  /// What the reference sends over FCM: everything except two.
+  ///
+  /// Transcribed from `emitMessage(type, data, priority, sendFcmMessage: false)` at the two
+  /// call sites that pass `false`:
+  ///
+  /// - `typing-indicator` — a typing indicator delivered through push would arrive after the
+  ///   message it was announcing, which is worse than not sending it.
+  /// - `new-findmy-location` — location updates arrive in bursts and would burn FCM quota.
+  ///
+  /// It lives here rather than in `EventRouting` because it is a fact about FIREBASE, not
+  /// about notifications: the reference delivers both events to webhooks, and ntfy — a
+  /// webhook under v1 — received them. Applied at the bus, it silently took them away from
+  /// every other transport too.
+  ///
+  /// `.allExcept` and not `.only`, so an event type added later reaches FCM without anyone
+  /// remembering to list it. That is how it behaves today.
+  public static let referenceSubscription = EventSubscription.allExcept([
+    .typingIndicator, .newFindMyLocation,
+  ])
 
   private let service: PushService
   private let tokens: @Sendable () async -> [String]
@@ -38,24 +54,26 @@ public struct PushSink: EventSink {
     service: PushService,
     tokens: @escaping @Sendable () async -> [String],
     negotiator: CodecNegotiator = .legacyOnly(),
-    logger: Logger = Logger(label: "bluebubbles.push.sink")
+    subscription: EventSubscription = FirebaseProvider.referenceSubscription,
+    logger: Logger = Logger(label: "bluebubbles.push.firebase")
   ) {
+    self.subscription = subscription
     self.service = service
     self.tokens = tokens
     self.negotiator = negotiator
     self.logger = logger
   }
 
-  public func accepts(_ event: ServerEvent) async -> Bool {
-    // Suppression by event type is `EventRouting`'s job and is applied by the bus before
-    // this is called. What is left is the only question this sink can answer: is push
-    // configured, and is anything registered to receive it. Both are ordinary states —
-    // a socket-only install is a supported deployment, not a broken one.
-    guard await service.isConfigured else { return false }
-    return await !tokens().isEmpty
+  /// Configured, with somewhere to send. Both are ordinary states — a socket-only install
+  /// is a supported deployment, not a broken one.
+  public var isReady: Bool {
+    get async {
+      guard await service.isConfigured else { return false }
+      return await !tokens().isEmpty
+    }
   }
 
-  public func deliver(_ event: ServerEvent) async throws {
+  public func send(_ event: ServerEvent) async throws {
     let devices = await tokens()
     guard !devices.isEmpty else { return }
 
@@ -64,8 +82,12 @@ public struct PushSink: EventSink {
     // would mean one send per capability group; that only becomes worth it when a
     // non-legacy codec is actually enabled, and this resolves to legacy until then.
     let codec = negotiator.resolve(for: .legacy)
+    // `.notification` here rather than from a sink property: the codec is FIREBASE's
+    // business — `legacy-v1`, `reference-v2` and `sealed-v2` describe what the BlueBubbles
+    // client app can parse, which is nothing to do with ntfy or a webhook. It moved down
+    // here with the size limit, for the same reason.
     let encoded = try await codec.encode(
-      event, projection: projection, capabilities: .legacy
+      event, projection: .notification, capabilities: .legacy
     )
 
     // `{ type, data }`, with `data` a JSON STRING rather than an object.

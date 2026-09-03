@@ -34,19 +34,33 @@ when the answer came back immediately.
       reference's cache changes what a concurrent duplicate does, not what a single send
       returns — so this is a behaviour question rather than a parity one.
 
-## The notification payload drops chat participants
+## The client audit that should shape the notification event list
 
-`MessageSerializerConfig.notification` sets `loadChatParticipants: false`; the reference
-inherits `true` from `DEFAULT_MESSAGE_CONFIG` and only strips participants when the payload
-exceeds 4000 bytes. So every push notification for a group chat carries less than it does
-today — and the size cap, which exists precisely to drop participants, can never fire because
-there is nothing there to drop. `ChangeDetectionService.event(for:serializer:)` compounds it:
-both projections are built from an empty `MessageSerializer.Context()`.
+`bluebubbles-app` references **11 of the 31** event types this server emits. The other 20 it
+never mentions — not in `action_handler.dart`'s switch, not in the socket listeners, not in the
+Android notification path:
 
-- [ ] Load participants for the notification projection, with a per-chat cache for the fan-out
-      (the reference keeps a `chatCache` in `serializeList` for the same reason). Done = a group
-      message's FCM payload carries `chats[0].participants`, and `NotificationSizeCapTests`
-      proves the cap trims them when it must.
+    group-icon-changed        group-icon-removed        message-send-error
+    server-update             server-update-downloading server-update-installing
+    new-server                hello-world
+    scheduled-message-{created,updated,deleted,sent,error}
+    settings-backup-{created,updated,deleted}
+    theme-backup-{created,updated,deleted}
+
+All of them are the reference's events and all reach FCM today, so every one is a wake-up the
+official client does nothing with. `message-send-error` is the interesting case: it looks
+load-bearing and is not, because the client reads `message.error` off the ordinary
+`new-message` / `updated-message` payloads instead.
+
+Deliberately NOT acted on. `FirebaseProvider` and `NtfyProvider` ship with
+`EventSubscription.all`, which is exactly today's behaviour, so the split changed no delivery.
+Narrowing is a behaviour change for third-party clients too, and that is a judgement about
+whose clients to break, not a refactor.
+
+- [ ] Decide which of the 20 to drop from the default push subscription. The machinery is
+      there: give the provider `.only([…])`. Worth checking a third-party client or two first
+      — the audit above covers the official app only, and webhooks are unaffected either way
+      since they route separately.
 
 ## An upgrading user who finished the old tutorial is shown onboarding again
 

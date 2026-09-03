@@ -75,6 +75,12 @@ public actor AppContext {
 
   // Delivery
   public nonisolated let events: EventBus
+  /// Every notification transport, behind one sink.
+  ///
+  /// Held here rather than built by a service because the transports start independently —
+  /// Firebase once its credentials load, ntfy once its settings are read — and they share
+  /// one routing policy. Each attaches itself; see `NotificationSink`.
+  public nonisolated let notifications = NotificationSink()
   public nonisolated let codecs: CodecNegotiator
   /// Connected socket clients, and the Engine.IO sessions carrying them.
   ///

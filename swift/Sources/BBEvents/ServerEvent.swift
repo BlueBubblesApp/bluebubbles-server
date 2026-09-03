@@ -176,20 +176,25 @@ public struct EventRouting: Sendable {
 
   public static let `default` = EventRouting()
 
-  /// The exceptions, each transcribed from the call site's `emitMessage` arguments —
-  /// signature `(type, data, priority, sendFcmMessage = true, sendSocket = true)`.
+  /// Per-event routing.
   ///
-  /// There are exactly two, and both suppress PUSH while keeping the socket. Webhooks have
-  /// no suppression flag at all: `webhookService.dispatch` runs unconditionally, so every
-  /// event reaches subscribed webhooks.
+  /// **The reference's two push suppressions are NOT here any more.** They were, transcribed
+  /// from `emitMessage(type, data, priority, sendFcmMessage: false)` at two call sites — and
+  /// they were applied by the BUS, above every notification transport, which made them a
+  /// rule about notifications in general. They are not: they are a rule about FIREBASE, and
+  /// the reference delivers both events to webhooks quite happily. Applying them at the bus
+  /// meant ntfy lost `typing-indicator` and `new-findmy-location` the moment it moved to
+  /// push routing, when under v1 — where ntfy is a webhook — it received them.
+  ///
+  /// They now live in `FirebaseProvider.referenceSubscription`, where the transcription
+  /// comment sits next to the transport it describes. `allowsPush` stays as the class gate
+  /// and is currently open for every event; a suppression that genuinely applies to every
+  /// notification transport would belong here.
+  ///
+  /// Webhooks have no suppression flag at all: `webhookService.dispatch` runs
+  /// unconditionally, so every event reaches subscribed webhooks.
   public static func policy(for name: EventName) -> EventRouting {
     switch name {
-    case .typingIndicator:
-      // `emitMessage(TYPING_INDICATOR, …, "normal", false)` — push off, socket on.
-      // A typing indicator delivered through push would arrive after the message it
-      // was announcing, which is worse than not sending it.
-      EventRouting(allowsSocket: true, allowsPush: false, allowsWebhooks: true)
-
     case .newFindMyLocation:
       // `emitMessage(NEW_FINDMY_LOCATION, …, "normal", false, true)` — push off,
       // socket on. Location updates arrive in bursts and would burn FCM quota.
@@ -206,8 +211,10 @@ public struct EventRouting: Sendable {
       // of devices, which is exactly the pressure the limit exists to avoid. The
       // limiter coalesces rather than drops, so the newest batch still gets through —
       // it is the RATE that is capped, not the freshness.
+      // The RATE limit stays here: it protects Apple from this server's polling, which is
+      // true whatever the event is delivered over. Only the push suppression moved.
       EventRouting(
-        allowsSocket: true, allowsPush: false, allowsWebhooks: true,
+        allowsSocket: true, allowsPush: true, allowsWebhooks: true,
         minimumInterval: .milliseconds(250),
         isRateLimitGlobal: true
       )
