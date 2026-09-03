@@ -1,5 +1,5 @@
 //  MultipartBodies
-//  The five routes that take a file upload.
+//  The six routes that take a file upload.
 //
 //  HAND-WRITTEN for the same reason the query table is, plus one of its own: the recorder
 //  stores a multipart body as `kind: "text"` — the raw `Content-Disposition` blob — so
@@ -67,6 +67,20 @@ public enum MultipartBodies {
       Field(
         "isComplete", "string",
         "Truthy on the final slice. Assembly and sending happen only then.", required: true),
+    ],
+    .messageSendSticker: [
+      Field("attachment", "binary", "The sticker image to place.", required: true),
+      Field("chatGuid", "string", "Conversation the target message is in.", required: true),
+      Field(
+        "selectedMessageGuid", "string", "Message the sticker is placed on.", required: true),
+      Field("partIndex", "string", "Which part of that message. Defaults to 0."),
+      Field("xScalar", "string", "Horizontal centre, as a fraction of the parent's preview width."),
+      Field("yScalar", "string", "Vertical centre, same unit."),
+      Field("scale", "string", "Sticker width relative to the parent's preview width."),
+      Field("rotation", "string", "Radians, clockwise."),
+      Field(
+        "parentPreviewWidth", "string",
+        "Width in points the sender rendered the parent balloon at."),
     ],
     .chatSetGroupIcon: [
       Field("icon", "binary", "Image to use as the group photo.", required: true)

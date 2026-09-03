@@ -39,8 +39,32 @@ public struct UploadStore: Sendable {
   }
 
   /// Writes a complete file and returns its path.
+  ///
+  /// The name is made unique by prefixing it, so a path from here is not one to hand to
+  /// Messages as-is: the prefix becomes the attachment's name on the recipient's device.
+  /// `stage(_:named:)` keeps the name; this is for files a later call renames or reads.
   public func write(_ data: Data, named name: String) throws -> String {
     let url = try prepared().appendingPathComponent(Self.uniqueName(for: name))
+    try data.write(to: url, options: [.atomic])
+    return url.path
+  }
+
+  /// Writes a complete file under EXACTLY the name given, in a directory of its own.
+  ///
+  /// For a file that is about to be sent: `AttachmentStaging` preserves the last path
+  /// component because it becomes the attachment's filename in the conversation, and the
+  /// reference (`FileSystem.copyAttachment(path, name)`) names the copy after the client's
+  /// `name` field for the same reason. Uniqueness moves to the directory so two uploads of
+  /// `IMG_0001.jpg` do not collide and neither is renamed.
+  public func stage(_ data: Data, named name: String) throws -> String {
+    let base = (name as NSString).lastPathComponent
+    let sanitised = String(base.map { $0 == "/" || $0 == ":" ? "-" : $0 })
+    let directory = try prepared().appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(
+      at: directory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700]
+    )
+    let url = directory.appendingPathComponent(sanitised.isEmpty ? "attachment" : sanitised)
     try data.write(to: url, options: [.atomic])
     return url.path
   }

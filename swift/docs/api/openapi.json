@@ -19898,6 +19898,60 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "attachment": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The sticker image to place."
+                  },
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "Conversation the target message is in."
+                  },
+                  "selectedMessageGuid": {
+                    "type": "string",
+                    "description": "Message the sticker is placed on."
+                  },
+                  "partIndex": {
+                    "type": "string",
+                    "description": "Which part of that message. Defaults to 0."
+                  },
+                  "xScalar": {
+                    "type": "string",
+                    "description": "Horizontal centre, as a fraction of the parent's preview width."
+                  },
+                  "yScalar": {
+                    "type": "string",
+                    "description": "Vertical centre, same unit."
+                  },
+                  "scale": {
+                    "type": "string",
+                    "description": "Sticker width relative to the parent's preview width."
+                  },
+                  "rotation": {
+                    "type": "string",
+                    "description": "Radians, clockwise."
+                  },
+                  "parentPreviewWidth": {
+                    "type": "string",
+                    "description": "Width in points the sender rendered the parent balloon at."
+                  }
+                },
+                "required": [
+                  "attachment",
+                  "chatGuid",
+                  "selectedMessageGuid"
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",

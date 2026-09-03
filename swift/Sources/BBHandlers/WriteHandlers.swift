@@ -29,7 +29,8 @@ public enum WriteHandlers {
   // MARK: - Sending
 
   private static func registerSending(
-    into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
+    into registry: inout HandlerRegistry,
+    context: some AlertProviding & InterfaceProviding & UploadStoring
   ) {
     registry.register(.messageSendText) { request in
       let interfaces = try await context.requireInterfaces()
@@ -68,15 +69,23 @@ public enum WriteHandlers {
 
     registry.register(.messageSendAttachment) { request in
       let interfaces = try await context.requireInterfaces()
-      let values = try request.values()
+      // The client's form — an `attachment` part and string fields — or a JSON `filePath`
+      // for a file `attachment/upload` already staged. See `UploadedFileBody`.
+      let body = try UploadedFileBody.parse(
+        request, filePart: "attachment", uploads: context.uploads
+      )
+      let values = body.values
       let chatGUID = try values.requireString("chatGuid")
-      // A path, not bytes. Multipart upload lands the file first; this sends what is
-      // already on disk, which is what keeps a 500 MB video out of the heap.
-      let path = try values.requireString("filePath", or: "path")
+      // The reference validator forces `method` to private-api when any of these is
+      // present, and `sendAttachment` does the same by needing the helper for them.
       let sent = try await interfaces.message.sendAttachment(
         chatGUID: chatGUID,
-        filePath: path,
-        isAudioMessage: values["isAudioMessage"]?.boolValue ?? false
+        filePath: body.path,
+        isAudioMessage: values.bool("isAudioMessage") ?? false,
+        subject: values.string("subject"),
+        effectID: values.string("effectId"),
+        replyToGUID: values.string("selectedMessageGuid"),
+        partIndex: values.int("partIndex")
       )
       // No `tempGuid`, and no error check. The reference injects the temp GUID only on
       // text and multipart — the attachment route reads it from the body for its send cache
@@ -164,7 +173,8 @@ public enum WriteHandlers {
   // MARK: - Message actions
 
   private static func registerMessageActions(
-    into registry: inout HandlerRegistry, context: some AlertProviding & InterfaceProviding
+    into registry: inout HandlerRegistry,
+    context: some AlertProviding & InterfaceProviding & UploadStoring
   ) {
     registry.register(.messageReact) { request in
       let interfaces = try await context.requireInterfaces()
@@ -188,36 +198,30 @@ public enum WriteHandlers {
 
     registry.register(.messageSendSticker) { request in
       let interfaces = try await context.requireInterfaces()
-      let values = try request.values()
+      // The same form the attachment route takes — the sticker image under `attachment`,
+      // everything else as string fields — or a JSON `filePath` for a staged file.
+      let body = try UploadedFileBody.parse(
+        request, filePart: "attachment", uploads: context.uploads
+      )
+      let values = body.values
       let chatGUID = try values.requireString("chatGuid")
       let target = try values.requireString("selectedMessageGuid")
-      // A path, not bytes, for the reason the attachment route gives.
-      let path = try values.requireString("filePath", or: "path")
 
       // Placement is optional and partial: a client that knows where the user dropped
       // the sticker sends every field; one that only wants "a sticker on this message"
       // sends none and gets the centred default.
-      func number(_ key: String) -> Double? {
-        switch values[key] {
-        case .double(let value)?: value
-        case .int(let value)?: Double(value)
-        case .int64(let value)?: Double(value)
-        case .string(let value)?: Double(value)
-        default: nil
-        }
-      }
       var placement = StickerPlacement.centered
-      if let x = number("xScalar") { placement.xScalar = x }
-      if let y = number("yScalar") { placement.yScalar = y }
-      if let scale = number("scale") { placement.scale = scale }
-      if let rotation = number("rotation") { placement.rotation = rotation }
-      if let width = number("parentPreviewWidth") { placement.parentPreviewWidth = width }
+      if let x = values.double("xScalar") { placement.xScalar = x }
+      if let y = values.double("yScalar") { placement.yScalar = y }
+      if let scale = values.double("scale") { placement.scale = scale }
+      if let rotation = values.double("rotation") { placement.rotation = rotation }
+      if let width = values.double("parentPreviewWidth") { placement.parentPreviewWidth = width }
 
       let sent = try await interfaces.message.sendSticker(
         chatGUID: chatGUID,
-        filePath: path,
+        filePath: body.path,
         targetGUID: target,
-        partIndex: values["partIndex"]?.intValue ?? 0,
+        partIndex: values.int("partIndex") ?? 0,
         placement: placement
       )
       // The sticker's OWN message, as `react` answers with the tapback's. No error check,

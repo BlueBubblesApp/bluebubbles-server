@@ -110,8 +110,18 @@ extension APIRequestContext {
 struct RequestValues {
 
   private let json: JSONValue
+  /// Whether a numeric or boolean read accepts a STRING holding one.
+  ///
+  /// Off for JSON, where a wrong-typed field reads as absent so the route's default applies
+  /// (`RequestValuesTests` holds that line). On for a multipart form, which has no types —
+  /// `partIndex` arrives as `"0"` and `isAudioMessage` as `"true"` — and whose values the
+  /// reference coerces with `isTruthyBool` and `parseInt`.
+  private let coercingStrings: Bool
 
-  init(_ json: JSONValue) { self.json = json }
+  init(_ json: JSONValue, coercingStrings: Bool = false) {
+    self.json = json
+    self.coercingStrings = coercingStrings
+  }
 
   /// The whole document, for the routes that hand the body onward rather than reading fields
   /// out of it — a contact to create, a backup to store, a capability set to parse.
@@ -130,11 +140,46 @@ struct RequestValues {
   }
 
   func int(_ key: String, or alias: String? = nil) -> Int? {
-    json[key]?.intValue ?? alias.flatMap { json[$0]?.intValue }
+    integer(json[key]) ?? alias.flatMap { integer(json[$0]) }
   }
 
   func bool(_ key: String, or alias: String? = nil) -> Bool? {
-    json[key]?.boolValue ?? alias.flatMap { json[$0]?.boolValue }
+    boolean(json[key]) ?? alias.flatMap { boolean(json[$0]) }
+  }
+
+  func double(_ key: String, or alias: String? = nil) -> Double? {
+    decimal(json[key]) ?? alias.flatMap { decimal(json[$0]) }
+  }
+
+  private func integer(_ value: JSONValue?) -> Int? {
+    switch value {
+    case .int, .int64: value?.intValue
+    case .string(let text)? where coercingStrings:
+      Int(text.trimmingCharacters(in: .whitespaces))
+    default: nil
+    }
+  }
+
+  private func decimal(_ value: JSONValue?) -> Double? {
+    switch value {
+    case .double(let number)?: number
+    case .int(let number)?: Double(number)
+    case .int64(let number)?: Double(number)
+    case .string(let text)? where coercingStrings:
+      Double(text.trimmingCharacters(in: .whitespaces))
+    default: nil
+    }
+  }
+
+  /// A form boolean follows `isTruthyBool`: `"1"`, `"true"` and `"yes"` are true and
+  /// anything else is false.
+  private func boolean(_ value: JSONValue?) -> Bool? {
+    switch value {
+    case .bool(let flag)?: flag
+    case .string(let text)? where coercingStrings:
+      ["1", "true", "yes"].contains(text.lowercased())
+    default: nil
+    }
   }
 
   func array(_ key: String, or alias: String? = nil) -> [JSONValue]? {

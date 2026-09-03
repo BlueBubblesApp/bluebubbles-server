@@ -649,6 +649,39 @@ through it with no special-casing, which is the standing proof it is expressive 
 
 ---
 
+## Replies do not thread on macOS 26.5.2 — through either send path
+
+Measured on 2 September 2026 while checking the attachment route's reply passthrough: a
+`POST /message/text` with `method: private-api` and `selectedMessageGuid`, and a
+`POST /message/multipart` with the same, both sent and both landed with an EMPTY
+`thread_originator_guid`. The row exists, the message arrives, it is just not a reply.
+The attachment route's new `selectedMessageGuid` support inherits this, since it goes
+through the multipart action.
+
+The likely cause is the same one the sticker path hit: the helper sets `threadIdentifier`
+to the BARE message GUID (`IMMessageBuilder.message`, and `setThreadIdentifier:` in
+`sendMultipart`), while Messages' own replies carry `p:<part>/<guid>` — every
+`thread_originator_guid` on this Mac that Messages wrote has that prefix, and the sticker
+send only worked once its association GUID did too. Not yet tried.
+
+- [ ] Pass `p:\(partIndex)/\(guid)` as the thread identifier on both paths and re-measure.
+      Done = the two control sends above land with `thread_originator_guid` set and
+      `thread_originator_part` = `0:0:1`.
+
+## `POST /message/attachment/chunk` reads base64 JSON; the reference reads a multipart `chunk`
+
+Found while fixing `/message/attachment`, which had the same problem: the reference's chunk
+route (`messageRouter.sendAttachmentChunk`) reads `files.chunk` from a multipart form plus
+`attachmentGuid`, `chunkIndex`, `totalChunks`, `isComplete` and the send fields as form
+strings. This server's handler wants `attachmentChunkData` as base64 inside JSON, with
+`index`/`total` keys the reference does not use. `MultipartBodies` documents the reference's
+form, so the OpenAPI document promises one shape and the handler accepts another. No shipped
+client appears to use the chunk route today, which is why it has not bitten.
+
+- [ ] Accept the reference's form through `UploadedFileBody` (part `chunk`) and its field
+      names, keeping the base64 body for whoever it was written for. Then add a
+      `UploadedFileBodyTests` case for it.
+
 ## Stickers: what the first pass left out
 
 `POST /api/v2/message/sticker` (additive, Private API) places a sticker on a message part

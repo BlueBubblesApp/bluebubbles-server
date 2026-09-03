@@ -295,8 +295,8 @@ value it rejects.
 
 ### Multipart uploads
 
-Five routes take a file: attachment upload, send-attachment, send-attachment-chunk, group
-icon, and VCF import. They are declared in `Sources/BBOpenAPI/MultipartBodies.swift`.
+Six routes take a file: attachment upload, send-attachment, send-sticker,
+send-attachment-chunk, group icon, and VCF import. They are declared in `Sources/BBOpenAPI/MultipartBodies.swift`.
 
 Also not inferable: the recorder stores a multipart body as `kind: "text"` — the raw
 `Content-Disposition` blob — so inference sees a string where every other route gives it

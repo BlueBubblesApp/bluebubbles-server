@@ -39,6 +39,21 @@ struct RequestValuesTests {
     #expect((body.int("limit") ?? 25) == 25)
   }
 
+  /// The one place a string IS read as a number: a multipart form, which has no other way
+  /// to carry one. Opt-in on the values, not a property of the key, so a JSON client's
+  /// quoted number still falls back exactly as above.
+  @Test("A form's string fields coerce to numbers and booleans when asked")
+  func formStringsCoerce() {
+    let form = RequestValues(
+      .object(["limit": .string("100"), "flag": .string("true"), "x": .string("0.25")]),
+      coercingStrings: true
+    )
+    #expect(form.int("limit") == 100)
+    #expect(form.bool("flag") == true)
+    #expect(form.double("x") == 0.25)
+    #expect(form.bool("nope") == nil)
+  }
+
   @Test("A missing field is simply nil")
   func missingIsNil() {
     let body = values([:])

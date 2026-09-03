@@ -685,14 +685,44 @@ public struct MessageInterface: MessagesBackedInterface {
     }
   }
 
+  /// Sends one file.
+  ///
+  /// The reply, effect and subject fields are the reference's `sendAttachmentSync`
+  /// parameters (`subject`, `effectId`, `selectedMessageGuid`, `partIndex`), and its
+  /// validator forces the Private API whenever one is present. The helper's single-file
+  /// action carries none of them, so a send that names one goes through the multipart
+  /// action as a one-part message instead — same file, same row, with the association
+  /// the client asked for. A voice memo cannot travel that way (`isAudioMessage` is its own
+  /// composition), so an audio message keeps the plain path and the fields are refused
+  /// rather than silently dropped.
   public func sendAttachment(
     chatGUID: String,
     filePath: String,
-    isAudioMessage: Bool = false
+    isAudioMessage: Bool = false,
+    subject: String? = nil,
+    effectID: String? = nil,
+    replyToGUID: String? = nil,
+    partIndex: Int? = nil
   ) async throws -> SendOutcome {
     let backend = await availableBackend()
     guard FileManager.default.fileExists(atPath: filePath) else {
       throw InterfaceError.invalidRequest("no file at \(filePath)")
+    }
+
+    if subject != nil || effectID != nil || replyToGUID != nil {
+      guard !isAudioMessage else {
+        throw InterfaceError.invalidRequest(
+          "a voice memo cannot carry a subject, an effect or a reply"
+        )
+      }
+      return try await sendMultipart(
+        chatGUID: chatGUID,
+        parts: [MessagePart(attachmentPath: filePath)],
+        subject: subject,
+        effectID: effectID,
+        replyToGUID: replyToGUID,
+        partIndex: partIndex
+      )
     }
 
     switch backend {
