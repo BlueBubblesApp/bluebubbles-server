@@ -226,6 +226,18 @@ let package = Package(
 
         // MARK: - Private API (server side of the boundary)
 
+        // MARK: - Capabilities
+
+        .target(
+            name: "BBCapabilities",
+            // BBCore only. Both the version gates in BBInterfaces and the settings screen
+            // read this, so it has to sit below both — and it must NOT land in
+            // BBPrivateAPIContract, whose whole constraint is that it is injected into
+            // Messages.app and links nothing extra.
+            dependencies: ["BBCore"],
+            swiftSettings: swiftSettings
+        ),
+
         .target(
             name: "BBPrivateAPIContract",
             // Nothing but Foundation, deliberately: this type travels into Messages.app's
@@ -400,7 +412,7 @@ let package = Package(
                 // for. Deliberately does NOT depend on BBHTTPAPI — it throws `InterfaceError`
                 // and the projection onto status codes lives one target up. That absence is
                 // the point of this target existing, and the compiler now enforces it.
-                "BBIMessage", "BBContacts", "BBSerialization", "BBPersistence",
+                "BBCapabilities", "BBIMessage", "BBContacts", "BBSerialization", "BBPersistence",
                 "BBPrivateAPI", "BBPrivateAPIContract", "BBAppleScript", "BBShortcuts",
                 "BBSystem", "BBSettings", "BBPushKit", "BBEvents", "BBDiagnostics",
                 // `Capabilities.swift` names the FaceTime coordinator. The auth, tooling and
@@ -540,6 +552,12 @@ let package = Package(
         // MARK: - Tests
 
         .testTarget(
+            name: "BBCapabilitiesTests",
+            dependencies: ["BBCapabilities"],
+            swiftSettings: swiftSettings
+        ),
+
+        .testTarget(
             name: "BBShortcutsTests",
             dependencies: ["BBShortcuts"],
             swiftSettings: swiftSettings
@@ -658,7 +676,7 @@ let package = Package(
             name: "BlueBubblesApp",
             dependencies: [
                 "BlueBubblesServerCore", "BBBuiltIns", "BBFaceTime", "BBInterfaces", "BBSettings",
-                "BBSystem", "BBAuth",
+                "BBSystem", "BBAuth", "BBCapabilities",
                 "BBServiceKit", "BBDiagnostics", "BBUpdates", "BBSerialization",
                 // The Private API status card and the FaceTime maintenance screen name
                 // `PrivateAPIRuntime.StartOutcome` and the contract's reply types directly.

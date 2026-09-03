@@ -5,6 +5,7 @@
 //  type-2 updates that point at it, and the type-4000 votes that point at whichever state
 //  message was current when they were cast. The writes go through the helper. macOS 26 only.
 
+import BBCapabilities
 import BBIMessage
 import BBPrivateAPIContract
 import BBSerialization
@@ -215,7 +216,7 @@ extension MessageInterface {
   static func checkPollsSupported(
     majorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
   ) throws {
-    guard majorVersion >= 26 else {
+    guard majorVersion >= PrivateAPICapability.polls.minimumMacOS else {
       throw InterfaceError.invalidRequest("Polls are only supported on macOS 26 and newer")
     }
   }

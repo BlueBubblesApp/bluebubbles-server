@@ -8,6 +8,7 @@
 //  Private API and AppleScript per operation and reports capability, rather than failing late
 //  with an obscure error — see `.claude/docs/imessage.md`.
 
+import BBCapabilities
 import BBAppleScript
 import BBCore
 import BBIMessage
@@ -948,7 +949,7 @@ public struct MessageInterface: MessagesBackedInterface {
     now: Date = Date(),
     majorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
   ) throws {
-    guard majorVersion >= 15 else {
+    guard majorVersion >= PrivateAPICapability.sendLater.minimumMacOS else {
       throw InterfaceError.invalidRequest(
         "Send Later is only supported on macOS Sequoia (15) and newer"
       )
@@ -1015,7 +1016,7 @@ public struct MessageInterface: MessagesBackedInterface {
   static func checkEmojiReactionSupported(
     majorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
   ) throws {
-    guard majorVersion >= 15 else {
+    guard majorVersion >= PrivateAPICapability.emojiReactions.minimumMacOS else {
       throw InterfaceError.invalidRequest(
         "Emoji reactions are only supported on macOS Sequoia (15) and newer"
       )
@@ -1029,7 +1030,9 @@ public struct MessageInterface: MessagesBackedInterface {
   /// that is the unit the attributes are applied in.
   static func checkFormatting(_ ranges: [FormattedRange], text: String) throws {
     guard !ranges.isEmpty else { return }
-    if ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 15 {
+    if ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+      < PrivateAPICapability.textFormatting.minimumMacOS
+    {
       throw InterfaceError.invalidRequest(
         "Text formatting is only supported on macOS Sequoia (15) and newer"
       )

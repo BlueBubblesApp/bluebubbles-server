@@ -88,6 +88,13 @@ struct SettingsView: View {
           FaceTimeMaintenance(model: model)
         }
 
+        // Above the Private API settings rather than below them: the question "can my Mac
+        // do this at all" comes before "is it switched on", and a toggle for something the
+        // OS does not have is a confusing thing to meet first.
+        if model.settingsTab == .privateAPI {
+          FeatureAvailabilityView()
+        }
+
         // Under Features, because that is where the capability it turns on is described.
         if model.settingsTab == .general {
           GroupChatShortcutSection(model: model)

@@ -101,6 +101,21 @@ opened, which is the case Apple's implementation does not have.
 - [ ] Cross-check against `chat.db`, which this server can already query, rather than
       trusting IMCore's in-memory view for the COUNT while still using IMCore for the report.
 
+## Whether muting reaches paired devices on macOS 14 is unmeasured
+
+`IMMutedChatList` arrives in macOS 15 and carries `muteChat:untilDate:syncToPairedDevice:`.
+The Sonoma path goes through `-[IMChat setMuteUntilDate:]`, which takes no such argument —
+but that does not mean it fails to sync, only that this code cannot steer it. IMCore may
+sync it anyway.
+
+It matters because it is the difference between two sentences a user would read very
+differently: "muting works" and "muting works but might not reach your iPhone". The
+capability catalog deliberately carries neither, because a row there has to be a fact.
+
+- [ ] Measure on a macOS 14 machine with a paired device: mute here, see whether the iPhone
+      goes quiet. If it does not sync, add a `PrivateAPICapability` for it; if it does, this
+      entry can be deleted.
+
 ## `canReportJunk` reports false on Sonoma while reporting works
 
 Read from `-_messageToReportJunk`, which only 26 has, so it defaults to `false` on 14 — while
@@ -123,7 +138,7 @@ the load-failure audit in `docs/SONOMA_COMPATIBILITY.md` §0.
 
 Both are genuinely absent below macOS 26, and neither is refused before the helper is asked —
 so a client sees a thrown selector or a `false` flag rather than "not supported here".
-`docs/MACOS_COMPATIBILITY.md` §2a.
+`docs/MACOS_COMPATIBILITY.md` §3a.
 
 - [ ] Chat backgrounds — `refetchLocalTranscriptBackgroundAssetIfNecessary` throws on 14 and 15.
 - [ ] Screen Unknown Senders — `cachedIsKnownSender` and `inUnknownSendersFilter` default to

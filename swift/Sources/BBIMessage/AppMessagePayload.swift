@@ -60,6 +60,15 @@ public enum AppMessagePayload {
     )
   }
 
+  /// The `ai` blob out of an archive: the balloon artwork the sending app supplied.
+  ///
+  /// Read through the same tolerant unarchiver the rest of this type uses, because the
+  /// archive names Messages-only classes this process does not have.
+  public static func icon(in payload: Data) -> Data? {
+    guard let root = root(of: payload) else { return nil }
+    return root["ai"] as? Data
+  }
+
   /// Builds the archive an app balloon carries, which is what `payload_data` holds.
   ///
   /// Written rather than obtained from ChatKit on purpose. `+[CKComposition
@@ -72,7 +81,7 @@ public enum AppMessagePayload {
   /// Secure coding on, matching Apple's own (`$version 100000`).
   public static func encode(
     url: String, sessionID: UUID, appName: String?, appID: Int?, summary: String?,
-    caption: String?
+    caption: String?, icon: Data? = nil
   ) throws -> Data {
     var root: [String: Any] = ["sessionIdentifier": sessionID as NSUUID]
     // NSURL, not a string: `-[MSMessage _payloadDataFromAppIconData:…]` writes the URL
@@ -83,6 +92,10 @@ public enum AppMessagePayload {
       throw AppMessageError("that payload URL cannot be represented as a URL")
     }
     if let appName { root["an"] = appName as NSString }
+    // `ai` is the balloon's app artwork. Apple's payloads carry one; ours can only when the
+    // bytes came from somewhere, since a Mac without the extension installed has no icon to
+    // read. See `AppMessageInterface`, which sources it from a message the app itself sent.
+    if let icon, !icon.isEmpty { root["ai"] = icon as NSData }
     if let appID { root["appid"] = NSNumber(value: appID) }
     if let summary { root["ldtext"] = summary as NSString }
     if caption != nil {

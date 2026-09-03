@@ -248,6 +248,38 @@ public struct MessageRepository: Sendable {
     }
   }
 
+  /// The balloon artwork an app sent us, for re-use on a message we send as that app.
+  ///
+  /// A Mac generally does not have a third-party iMessage app installed — Game Pigeon ships
+  /// iOS-only — so there is no local icon to read, and a balloon we send draws without one.
+  /// The app's own artwork IS present, though, in the `ai` key of any message that app sent
+  /// to this Mac. This finds the most recent one.
+  ///
+  /// Read on demand rather than cached: it is one indexed lookup on a send, and caching it
+  /// would mean holding another app's artwork in a store we would then have to invalidate.
+  /// Nil when this Mac has never received a message from that app, which is the honest
+  /// answer — there is nowhere else the icon could come from.
+  public func balloonIcon(bundleID: String) async throws -> Data? {
+    try await database.read { db in
+      let rows = try Row.fetchAll(
+        db,
+        sql: """
+          SELECT m.payload_data AS payload FROM message m
+          WHERE m.is_from_me = 0 AND m.balloon_bundle_id = ? AND m.payload_data IS NOT NULL
+          ORDER BY m.ROWID DESC LIMIT 5
+          """,
+        arguments: [bundleID]
+      )
+      for row in rows {
+        guard let payload = row["payload"] as Data?,
+          let icon = AppMessagePayload.icon(in: payload)
+        else { continue }
+        return icon
+      }
+      return nil
+    }
+  }
+
   public func message(guid: String) async throws -> IMessageRow? {
     let columns = profile.select(Self.messageColumns, from: .message, alias: "m")
     let unit = dateUnit

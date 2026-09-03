@@ -251,11 +251,17 @@ extension MessageInterface {
     // A new session unless the caller is continuing one. Game Pigeon threads a game
     // through the session, so a reply MUST carry the session it is answering.
     let session = sessionID.flatMap(UUID.init(uuidString:)) ?? UUID()
+    // The app's own artwork, if this Mac has ever received a message from it. A Mac
+    // generally does not have a third-party iMessage app installed, so there is no local
+    // icon to read and the balloon draws bare; the app's icon IS in any message it sent
+    // here. Best effort — a failed lookup costs an icon, never a send.
+    let icon = try? await repository.balloonIcon(bundleID: balloonBundleID)
+
     let payload: Data
     do {
       payload = try AppMessagePayload.encode(
         url: url, sessionID: session, appName: appName, appID: appID, summary: summary,
-        caption: caption)
+        caption: caption, icon: icon)
     } catch let error as AppMessageError {
       throw InterfaceError.invalidRequest(error.description)
     }

@@ -32,11 +32,11 @@ macOS, and the server refuses it with a message naming the release rather than f
 **There is no third state left.** Everything this server can do on Tahoe, it now does on
 Sonoma and Sequoia too, except where the ⛔️ says macOS itself does not have the feature —
 and those refusals are deliberate, not crashes. Getting here took twelve selector ladders
-(§2b); an earlier version of this table had six ⚠️ rows meaning "your Mac supports this and
+(§3b); an earlier version of this table had six ⚠️ rows meaning "your Mac supports this and
 we call the wrong selector", and they are all closed.
 
 † On Sonoma the nickname itself works; whether the **avatar photo** resolves is the one thing
-no dump has measured (§4). It is read through a `try?` and falls back to no photo, so the
+no dump has measured (§5). It is read through a `try?` and falls back to no photo, so the
 worst case is a contact card without a picture.
 
 † Junk reporting works on 14 and 15 through the older `-reportJunkToCarrier`, which reports
@@ -50,8 +50,8 @@ is treated as a floor rather than a refusal.
 borrowed data left in this table and no inference in any cell — which is new, and is why
 this document is much shorter than it used to be.
 
-Three layers. **§3 is the one to read** — capabilities against releases. §2 says what needs
-a version guard and what needs a selector ladder, which are different fixes. §5 is the
+Three layers. **§4 is the one to read** — capabilities against releases. §3 says what needs
+a version guard and what needs a selector ladder, which are different fixes. §6 is the
 generated detail: every selector the helpers dispatch, one column per release, grouped by
 the `hosts.conf` category it belongs to.
 
@@ -62,7 +62,20 @@ the `hosts.conf` category it belongs to.
 | Where the headers come from | [`headers/README.md`](headers/README.md) |
 | What differs between releases, and why | [`private-api/macos-versions.md`](private-api/macos-versions.md) |
 
-## 1. The dumps
+## 1. The executable half of this document
+
+`Sources/BBCapabilities` carries the same facts as §3a, as code:
+`PrivateAPICapability.all` declares each feature macOS itself gates, with the class or
+selector that decides it. Three things read it and nothing repeats it — the version gates
+take their number from it, the settings screen enumerates it, and a test re-derives every
+minimum from `docs/headers/` and fails if a declaration disagrees with the dumps.
+
+So a new capability is two lines there, and this document's §3a is the prose mirror rather
+than a second source. **What is deliberately NOT in that catalog is anything the helper
+ladders** — §3b. Those work on every supported release, so listing them as version-dependent
+would advertise an upgrade that buys nothing.
+
+## 2. The dumps
 
 | Release | Build | Dumped | Messages.app | Absent classes |
 |---|---|---|---|---:|
@@ -92,12 +105,12 @@ to list were artefacts of that dump rather than real differences.
 
 The distinction between **`no`** and **`—`** is the whole point, and §2 is built on it.
 
-## 2. What needs a version guard, and what needs a ladder
+## 3. What needs a version guard, and what needs a ladder
 
 Two different problems with two different fixes, and picking the wrong one is how a feature
 that Apple merely renamed ends up refused on a release that supports it.
 
-### 2a. Genuinely absent — these need a guard, and all but two have one
+### 3a. Genuinely absent — these need a guard, and are what the catalog declares
 
 The class does not exist. No selector will bring the feature back, so the request should be
 refused before the helper is asked, with a sentence naming the release.
@@ -116,7 +129,7 @@ inferred. The two without one are not urgent — both degrade to a clear failure
 defensible default — but they are the two places a client cannot tell "unsupported here"
 from "broken".
 
-### 2b. Renamed or re-signed — these need a ladder, and four do not have one
+### 3b. Renamed or re-signed — these need a ladder, and all twelve have one
 
 The feature exists on every release; Apple changed the selector. A version guard here would
 refuse a working feature, which is why these are laddered rather than gated.
@@ -159,7 +172,7 @@ tool listing it absent on 14.6.1 — which it is. It had been laddered the whole
 how every ✓ in this table was checked: each modern selector was confirmed to have its older
 spelling present in `Helper/` outside a comment.
 
-## 3. Capabilities
+## 4. Capabilities
 
 | Capability | 14 Sonoma | 15 Sequoia | 26 Tahoe | Decided by |
 |---|:-:|:-:|:-:|---|
@@ -189,9 +202,9 @@ spelling present in `Helper/` outside a comment.
 | FindMy locations | yes | yes | yes | `FMFSession` and friends, identical on all three |
 
 Everything marked **broken** has an open entry in [`../TODO.md`](../TODO.md). Nothing marked
-**—** needs code: those are §2a rows.
+**—** needs code: those are §3a rows.
 
-## 4. The one hole left, and it is now stuck
+## 5. The one hole left, and it is now stuck
 
 `IMNickname`, `IMNicknameAvatar` and `IMNicknameAvatarImage` were added to `hosts.conf`
 *after* the Sonoma dump was taken, so they are in the 15.6.1 and 26.5.2 directories and not
@@ -216,7 +229,7 @@ reading the shape of `+[IMTapback tapbackWithAssociatedMessageType:messageSummar
 ladder the reaction path rather than fall back to the association initializer. Neither blocks
 a fix; both would have raised confidence in one.
 
-## 5. Every dispatched selector, by category
+## 6. Every dispatched selector, by category
 
 Generated — do not hand-edit. Categories are `hosts.conf` groups, which is the categorisation
 this repository already maintains, so this document cannot drift into a second taxonomy.

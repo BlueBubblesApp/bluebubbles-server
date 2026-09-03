@@ -127,7 +127,7 @@ Sonoma and Tahoe bracket Sequoia, and several things sat in the gap. Now measure
 
 Every selector ladder is done — nothing Sequoia supports is refused any more.
 
-1. [ ] Consider a guard for chat backgrounds and Screen Unknown Senders (§2a of
+1. [ ] Consider a guard for chat backgrounds and Screen Unknown Senders (§3a of
    [`MACOS_COMPATIBILITY.md`](MACOS_COMPATIBILITY.md)) — the only two 26-only features a
    client cannot distinguish from a bug.
 2. [ ] Exercise the ladders on the Sequoia VM. They are verified against the dump and by
