@@ -843,8 +843,11 @@ public struct MessageInterface: MessagesBackedInterface {
     }
     // `emoji` / `-emoji` carry the emoji in its own field; without one there is nothing
     // to send. A named tapback ignores the field rather than refusing it.
-    if type.isEmoji, (emoji ?? "").isEmpty {
-      throw InterfaceError.invalidRequest("an `emoji` is required for the emoji reaction")
+    if type.isEmoji {
+      try Self.checkEmojiReactionSupported()
+      if (emoji ?? "").isEmpty {
+        throw InterfaceError.invalidRequest("an `emoji` is required for the emoji reaction")
+      }
     }
     // The reference reads the target first and refuses a reaction to a message it does not
     // have, before reaching Messages at all — so a bad `selectedMessageGuid` is a 400 rather
@@ -910,6 +913,19 @@ public struct MessageInterface: MessagesBackedInterface {
       messageGUID: sent.guid.rawValue,
       message: try await awaitSentMessage(guid: sent.guid.rawValue)
     )
+  }
+
+  /// Emoji reactions arrived with macOS 15 / iOS 18 and are refused below it, before the
+  /// helper is asked: Sonoma has neither `IMEmojiTapback` nor `IMTapbackSender`, and the
+  /// fallback send path there cannot carry an emoji. Same shape as the text-formatting gate.
+  static func checkEmojiReactionSupported(
+    majorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+  ) throws {
+    guard majorVersion >= 15 else {
+      throw InterfaceError.invalidRequest(
+        "Emoji reactions are only supported on macOS Sequoia (15) and newer"
+      )
+    }
   }
 
   /// The reference's two gates on `textFormatting`, then its range rules.

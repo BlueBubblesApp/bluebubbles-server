@@ -720,8 +720,9 @@ the full `sticker_user_info`, `is_delivered 1`. What was verified is the SENDER'
       sticker" sends.
 - [ ] Repositioning: `-[IMChat repositionSticker:associatedChatItem:]` exists. Not built.
 - [ ] The fallback reaction path (no `IMTapbackSender`) still passes the bare message GUID
-      and `(partIndex, 1)`. It is only reached on a macOS without the sender class, which
-      is none of the supported ones as far as is known; worth a check on Sonoma.
+      and `(partIndex, 1)`. Emoji reactions are gated to macOS 15 at the interface, so on
+      Sonoma only the six named tapbacks reach it; whether Sonoma has `IMTapbackSender` at
+      all has not been checked.
 - [ ] Record a fixture. The route sits in `docs/api/uncovered-routes.txt` because the
       conformance recorder runs against the Node server, which has no sticker route.
 - [ ] An `NSException` raised inside an IMCore call surfaces as

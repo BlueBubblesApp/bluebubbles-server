@@ -82,6 +82,8 @@ formatting.
 route rather than a new one: a reaction is a reaction, the client already has this call, and
 the reference validator's `in:` list of six names is the only thing that changes — an
 unknown name was a 400 there and `emoji` is a new name here. IMCore types 2006 / 3006.
+**macOS 15 and later only**: below it the route answers 400 with "Emoji reactions are only
+supported on macOS Sequoia (15) and newer", before the helper is asked.
 
 On the read side the row's type is still the reference's numeric string (`"2006"`) — v1 is
 frozen — and the emoji itself is `associatedMessageEmoji`, a field of ours declared in
