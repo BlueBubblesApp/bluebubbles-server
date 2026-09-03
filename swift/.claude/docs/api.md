@@ -144,9 +144,10 @@ Two things a client must know when it reads a scheduled row back:
 
 ### iMessage app balloons — `/api/v2/message/app`, and Game Pigeon
 
-`docs/GAME_PIGEON.md` is the reference. `GET app/:guid` decodes any app balloon (bundle id,
+`docs/GAME_PIGEON.md` is the reference. `GET app/:guid` decodes any iMessage APP balloon (bundle id,
 app name, session, caption, raw payload URL) and adds a `game_pigeon` block when the message
-is one. `POST app` sends any app's balloon from a payload URL you supply; `POST game-pigeon`
+is one. Apple's built-in balloon providers — rich links, handwriting, Digital Touch — are not
+apps and are refused with a sentence naming the alternative route. `POST app` sends any app's balloon from a payload URL you supply; `POST game-pigeon`
 takes fields and does Game Pigeon's own scramble for you.
 
 The server does not model games: fields go out and come back as an ordered name/value list,

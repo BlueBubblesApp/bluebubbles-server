@@ -41,8 +41,13 @@ extension MessageInterface {
       throw InterfaceError.invalidRequest("\(guid) is not an app message")
     }
     guard let envelope = AppMessagePayload.envelope(from: row.payloadData) else {
+      // MEASURED across every balloon type on a real Mac: the `MSMessageExtensionBalloonPlugin`
+      // ones all carry an `MSMessage` archive and decode here, Apple's built-in balloon
+      // PROVIDERS do not, because they are not iMessage apps and each has its own format —
+      // a rich link is an archived `RichLink`/`LPLinkMetadata`, and Digital Touch and
+      // handwriting are not property lists at all. Saying which it is beats "no payload".
       throw InterfaceError.invalidRequest(
-        "\(guid) carries no readable app payload — it may not have been downloaded yet")
+        Self.unreadablePayloadReason(bundleID: bundleID, guid: guid))
     }
     let pigeon =
       GamePigeonCodec.isGamePigeon(balloonBundleID: bundleID)
@@ -52,6 +57,23 @@ extension MessageInterface {
       guid: row.guid, balloonBundleID: bundleID, appName: envelope.appName,
       appID: envelope.appID, sessionID: envelope.sessionID, summary: envelope.summary,
       caption: envelope.caption, url: envelope.url, gamePigeon: pigeon)
+  }
+
+  /// Why a balloon could not be read, in terms a client can act on.
+  static func unreadablePayloadReason(bundleID: String, guid: String) -> String {
+    if !bundleID.contains("MSMessageExtensionBalloonPlugin") {
+      let alternative =
+        bundleID.contains("Handwriting") || bundleID.contains("DigitalTouch")
+        ? " Its rendered media is available from `GET /message/:guid/embedded-media`."
+        : bundleID.contains("URLBalloonProvider")
+          ? " Its link metadata is in the message's own `payloadData`, with `?with=payloadData`."
+          : ""
+      return
+        "\(guid) is a built-in balloon (\(bundleID)), not an iMessage app, so it has no app "
+        + "payload to decode." + alternative
+    }
+    return
+      "\(guid) carries no readable app payload — the attachment may not have been downloaded yet"
   }
 
   public func serialize(_ message: AppMessage) -> JSONValue {

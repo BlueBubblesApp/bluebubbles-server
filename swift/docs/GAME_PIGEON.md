@@ -143,9 +143,30 @@ GET /api/v2/message/app/:guid
 } }
 ```
 
-Works for **any** app balloon; `game_pigeon` appears only when the bundle id says so. `url` is
-always the raw payload, so a client that understands an app this server has never heard of can
-work from that alone.
+Works for **any iMessage app**, not just Game Pigeon; the `game_pigeon` block appears only when
+the bundle id says so. `url` is always the raw payload, so a client that understands an app this
+server has never heard of can work from that alone.
+
+Tested against every balloon type on the development Mac:
+
+| Balloon | Reads? |
+|---|---|
+| Polls, Photos, Find My, Apple Pay, Game Center (Apple's own iMessage apps) | yes |
+| Game Pigeon, OpenTable, YouTube, third-party poll apps | yes |
+| Rich links (`com.apple.messages.URLBalloonProvider`) | **no** |
+| Handwriting, Digital Touch | **no** |
+
+The rule is the bundle id: anything with `MSMessageExtensionBalloonPlugin` in it is an iMessage
+app and carries an `MSMessage` archive, which is what this route reads. The three that fail are
+Apple's built-in balloon *providers*, which are not apps and have their own formats — a rich
+link is an archived `RichLink`/`LPLinkMetadata`, and Digital Touch and handwriting are not even
+property lists. The route says which case it hit and points at the alternative: rich-link
+metadata already comes back from the ordinary read routes with `?with=payloadData`, and
+handwriting and Digital Touch render through `GET /message/:guid/embedded-media`.
+
+The payload URL is whatever the app chose, and it is not always a `data:` URL — Photos sends an
+iCloud share link, YouTube a watch URL, Find My its own `?FindMyMessagePayloadVersion…` string.
+Do not assume a scheme.
 
 `fields` is an ordered list rather than an object on purpose: a query string may repeat a name,
 and some games care about order. Build a map from it if you would rather have one.
