@@ -4,10 +4,12 @@ What an iMessage poll actually is, what this server would have to send to make o
 a client has to do to show one. Measured on macOS 26.5.2 (Tahoe) from real poll threads in
 `chat.db` and by disassembling ChatKit, IMCore and Messages.framework.
 
-**Status: researched, not built.** Nothing in the server sends a poll or a vote yet. The read
-side already carries everything a client needs (see § What a client gets today). The send side
-is designed here from Apple's own code path but has not been run — treat every "send" section
-as a plan, not a description of working code.
+**Status: built and sent, not yet seen on a receiving device.** `GET /api/v2/message/poll/:guid`
+assembles a poll from its thread, `POST /api/v2/message/poll` creates one and
+`POST /api/v2/message/poll/:guid/vote` votes. All three ran on 3 September 2026 against a real
+chat: the poll and the vote landed in `chat.db` as `com.apple.messages.Polls` rows with the
+same payload shapes Apple's own carry, and the read route reproduces a six-participant thread
+Messages made. What has not been seen is either message drawn on another device — § 8.
 
 Polls are **macOS 26 and newer**. `-[IMChat _supportsPolls]` and `-[CKConversation supportsPolls]`
 gate them, and the Polls extension does not exist on earlier releases.
@@ -43,7 +45,7 @@ points back at the poll with `associated_message_guid`.
 | `associated_message_type` | What it is | `associated_message_guid` | `payload_data` |
 |---|---|---|---|
 | `3` | The poll, as created | its **own** GUID | the whole poll (title + options) |
-| `2` | The poll, **updated** — an option added or edited | the ORIGINAL poll's GUID | the whole poll again, in its new state |
+| `2` | The poll, **re-sent in a new state** (the extension does this when the poll changes; the thread observed here has one, with the same three options) | the ORIGINAL poll's GUID | the whole poll again |
 | `4000` | One participant's **vote** | the GUID of the most recent poll-state message (`3`, or the latest `2`) | that voter's votes |
 
 Observed on a real thread here (GUIDs shortened):
@@ -53,10 +55,14 @@ FA3F941D  type 3     -> FA3F941D   poll created, 3 options
 70DB8EC5  type 4000  -> FA3F941D   a vote
 6C157B7B  type 4000  -> FA3F941D   a vote
 CED3396B  type 4000  -> FA3F941D   a vote
-3CC5FC21  type 2     -> FA3F941D   poll updated: a 4th option added
+3CC5FC21  type 2     -> FA3F941D   the poll re-sent in a new state
 C2E97DC1  type 4000  -> 3CC5FC21   a vote, now against the UPDATED poll
 78FD4E3E  type 4000  -> 3CC5FC21   our own vote
 ```
+
+A poll THIS server creates lands with `associated_message_type` **0** and no
+`associated_message_guid`, where Apple's root above carries `3` pointing at itself. The read
+route treats both as a root. Whether the receiving device cares is one of the open questions.
 
 Two consequences a client cannot ignore:
 
@@ -166,35 +172,35 @@ base64/JSON decode itself. That is the honest state of things.
 
 ---
 
-## 5. What the server should add
+## 5. The server's routes
 
-Two read helpers and two writes. Nothing here is built; this is the proposal.
+All three are v2, additive, and answer 400 below macOS 26 ("Polls are only supported on
+macOS 26 and newer"). Our own fields are snake_case, as every v2 response.
 
-### Read: decode it once, server-side
-
-The archive walk is the same for every client and is easy to get wrong. A v2 read route should
-return the poll already assembled:
+### Read: the poll, assembled
 
 ```
-GET /api/v2/message/:guid/poll
+GET /api/v2/message/poll/:guid
 ```
+
+`:guid` may be ANY message of the thread — the root, an update, or a vote — and resolves to
+the poll. The reply:
 
 ```json
 { "status": 200, "data": {
-  "guid": "FA3F941D-…", "title": "Dinner?",
-  "creatorHandle": "someone@example.com",
-  "sessionId": "609D6A68-24D1-4D15-B54C-2CBB576758DC",
-  "options": [ { "id": "16D8D418-…", "text": "Pizza", "creatorHandle": "…", "canBeEdited": false } ],
-  "votes":   [ { "handle": "someone@example.com", "optionIds": ["16D8D418-…"], "date": 1788… } ],
-  "latestStateGuid": "3CC5FC21-…"
+  "guid": "FA3F941D-…",                      // the root
+  "title": "Dinner?",
+  "creator_handle": "someone@example.com",
+  "session_id": "609D6A68-24D1-4D15-B54C-2CBB576758DC",
+  "latest_state_guid": "3CC5FC21-…",         // newest type-2 update, or the root
+  "options": [ { "id": "16D8D418-…", "text": "Pizza", "creator_handle": "…", "can_be_edited": false } ],
+  "votes":   [ { "guid": "…", "handle": "someone@example.com", "option_ids": ["16D8D418-…"], "date": 1788… } ]
 } }
 ```
 
-`latestStateGuid` matters: it is what a vote must be associated with, and only the server can
-know it cheaply (it is the newest `type 2` in the chain, or the root).
-
-The tally is deliberately NOT computed here — one vote per participant, latest wins, is a rule
-a client can apply and a server that guesses wrong is worse than no server help.
+`votes` is already ONE entry per participant, that participant's newest vote — the rule in § 7
+applied for you. `options` come from the latest state message. The tally itself is left to the
+client, since counting is trivial and a wrong server count would be worse than none.
 
 ### Write: create a poll
 
@@ -203,9 +209,9 @@ POST /api/v2/message/poll
 { "chatGuid": "…", "title": "Dinner?", "options": ["Pizza", "Sushi"] }
 ```
 
-The server mints an `optionIdentifier` UUID per option and a `sessionIdentifier` UUID for the
-poll, builds the JSON, wraps it in the archive, and sends. Answers with the serialised message,
-like every other send route.
+At least two non-empty options. The server mints an `optionIdentifier` UUID per option and the
+helper mints the session; `creatorHandle` is the account's own address. Answers with the
+serialised message, like every send route — recognisable by its `balloonBundleId`.
 
 ### Write: vote
 
@@ -214,44 +220,42 @@ POST /api/v2/message/poll/:guid/vote
 { "chatGuid": "…", "optionIds": ["16D8D418-…"] }
 ```
 
-`:guid` is the poll's ROOT guid; the server resolves the latest state message itself. The body
-is the voter's **complete** selection — an empty array retracts every vote. The server fills in
-`participantHandle` from the account's own address.
+`:guid` is any message of the thread; the server resolves the latest state message to
+associate the vote with. The body is the voter's **complete** selection — an empty array
+retracts every vote — and every id must be an option on the poll. Answers with the vote's own
+message row (`associatedMessageType` `"4000"`).
 
 ---
 
-## 6. How a send would work in the helper
+## 6. How the helper sends
 
 From `+[CKComposition compositionWithMSMessage:appExtensionIdentifier:]` and
 `-[CKCoreChatController transcriptCollectionViewController:balloonViewDidRequestSendCustomAcknowledgementPayload:forPlugin:error:]`,
 both disassembled on 26.5.2.
 
-**Creating a poll** — two routes into the same place:
+**Creating a poll** goes through ChatKit the way the extension does (`IMPolls.composition`):
+an `MSMessage` from `Messages.framework` (the public iMessage-app API, `@iosfw/` in
+`hosts.conf`, `dlopen`ed on first use because Messages.app does not load it until an
+extension runs) with its `URL`, an `MSMessageTemplateLayout` captioned "Sent a poll", and a
+fresh `MSSession`; then `+[CKComposition compositionWithMSMessage:appExtensionIdentifier:]`
+with `com.apple.messages.Polls`, `messagesFromComposition:`, `sendMessage:newComposition:`.
+ChatKit does the archive, looks the plugin up and attaches the icon. Worked first time; the
+row it produced is 2.9 KB against Apple's 6 KB, the difference presumably the `ai` icon and
+`liveLayoutInfo` — see § 8.
 
-1. *Through ChatKit, the way the extension does it.* Build an `MSMessage` (`Messages.framework`,
-   `@iosfw/Messages.framework` in `hosts.conf`) with its `URL`, `layout` and `session`, then
-   `+[CKComposition compositionWithMSMessage:appExtensionIdentifier:]` →
-   `-[CKConversation sendMessage:newComposition:]`. ChatKit does the archive encoding, looks the
-   plugin up through `+[IMBalloonPluginManager sharedInstance] balloonPluginForBundleID:`, and
-   attaches the app icon. Closest to Apple's path; depends on the most surface.
-2. *Build the payload directly.* `NSKeyedArchiver` the dictionary in § 3 and hand it to the
-   `IMMessage` initializer that takes `balloonBundleID:payloadData:` — the one the helper already
-   uses for text, with those two arguments filled in. Fewer moving parts, and the format is
-   documented above, but the icon and the live-layout blob would be ours to reproduce.
-
-Start with (1); fall back to (2) if `MSMessage` cannot be built outside an extension context.
-
-**Voting** is its own IMCore call and does not need ChatKit at all:
+**Voting** is IMCore's custom acknowledgement (`IMPolls.voteMessage`):
+`_MSMessageCustomAcknowledgement` on the poll's session with the votes `data:` URL,
+`_payloadDataFromAppName:adamID:` for the archive, then
 
 ```
 +[IMMessage customAcknowledgementMessageWithPayloadData:associatedMessageGUID:balloonBundleID:messageSummaryInfo:threadIdentifier:]
 ```
 
-ChatKit passes `associatedMessageGUID` as `bp:<poll state guid>` — the `bp:` prefix is how a
-balloon payload association is addressed, the same way a tapback uses `p:<part>/<guid>`. The
-prefix does not survive into `chat.db`, where the column holds the bare GUID. The summary info
-comes from `+[IMChat configureMessageSummaryInfoForChatItem:]`, and the result is sent with
-`-[CKCoreChatController sendCustomAcknowledgementMessage:]` or plain `-[IMChat sendMessage:]`.
+and `-[IMChat sendMessage:]`. The associated GUID is the poll's latest state, BARE: ChatKit
+formats `bp:<guid>` only to look the chat item up, and the column holds the bare value. The
+summary is written directly (`amc 9`, `ams "Sent a vote"`, `amb`, `amd "Polls"`) rather than
+through `+[IMChat configureMessageSummaryInfoForChatItem:]`, which wants a ChatKit chat item.
+The vote payload came out 695 bytes — byte-for-byte the size of Apple's.
 
 `IMPollHelper` (IMCore) exists and reads polls back — `pollOptionsFromPluginPayload:completionHandler:`,
 `pollResponseFromChatItem:…`, `synchronousPollOptionCountFromChatItem:` — but its completion
@@ -276,8 +280,8 @@ junk arguments, so they are not callable through `IMCoreRuntime`. Decoding the p
 6. **Expect gaps.** A poll from a device that has never voted has no `4000` messages, and a
    participant who cleared their vote sends a `4000` with an empty `votes` array.
 
-Until the routes in § 5 exist, steps 2 to 4 need `payloadData` on the read, and there is no way
-to create a poll or vote through the API at all.
+With `GET /api/v2/message/poll/:guid`, steps 2 to 4 are done for you: pass any message of the
+thread and read `options` and `votes` back assembled. Steps 1 and 5 are the client's.
 
 ---
 
@@ -290,5 +294,10 @@ to create a poll or vote through the API at all.
   app balloon rather than a live one.
 - **`ai`**, the app icon, is 4 KB of JPEG on every poll message. Whether the receiving device
   needs it or falls back to the installed extension's icon is unknown.
-- **Adding an option** (`type 2`) is not covered above beyond its shape.
-- Nothing here has been **sent**. The first poll this server sends is the test of all of it.
+- **Adding an option** (`type 2`) is not covered above beyond its shape, and the server
+  cannot send one.
+- **Delivery.** The poll and the vote this server sent were accepted (`is_sent 1`, `error 0`)
+  and had not shown a delivery receipt after two minutes, where a text to the same address
+  shows one within seconds. The recipient's devices may simply not support polls; nobody has
+  looked at them there yet. That is the next test.
+- **`associated_message_type`** is 0 on a poll we create and 3 on one Messages creates.

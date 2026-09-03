@@ -149,6 +149,27 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
+    case .createPoll:
+      let sent = try await bridge.createPoll(
+        PollCreateRequest(
+          chat: try chat(),
+          title: optionalString("title") ?? "",
+          options: (data["options"]?.arrayValue ?? []).compactMap(\.stringValue)
+        )
+      )
+      return ["identifier": sent.guid.rawValue]
+
+    case .votePoll:
+      let sent = try await bridge.votePoll(
+        PollVoteRequest(
+          chat: try chat(),
+          stateGUID: try message("stateGuid"),
+          sessionID: try string("sessionId"),
+          optionIDs: (data["optionIds"]?.arrayValue ?? []).compactMap(\.stringValue)
+        )
+      )
+      return ["identifier": sent.guid.rawValue]
+
     case .cancelScheduledMessage:
       try await bridge.cancelScheduledMessage(try message("messageGuid"), in: try chat())
       return nil

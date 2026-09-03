@@ -243,6 +243,37 @@ public enum WriteHandlers {
       return .data(nil)
     }
 
+    registry.register(.messageCreatePoll) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      let options = (values.array("options") ?? []).compactMap(\.stringValue)
+      let sent = try await interfaces.message.createPoll(
+        chatGUID: try values.requireString("chatGuid"),
+        title: values.string("title") ?? "",
+        options: options
+      )
+      return try Self.sendResult(sent, interfaces: interfaces)
+    }
+
+    registry.register(.messagePoll) { request in
+      let interfaces = try await context.requireInterfaces()
+      let poll = try await interfaces.message.poll(guid: try request.requirePathParameter("guid"))
+      return .data(interfaces.message.serialize(poll))
+    }
+
+    registry.register(.messageVotePoll) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      // The voter's COMPLETE selection; an empty array retracts every vote.
+      let optionIDs = (values.array("optionIds") ?? []).compactMap(\.stringValue)
+      let sent = try await interfaces.message.votePoll(
+        chatGUID: try values.requireString("chatGuid"),
+        pollGUID: try request.requirePathParameter("guid"),
+        optionIDs: optionIDs
+      )
+      return try Self.sendResult(sent, interfaces: interfaces)
+    }
+
     registry.register(.messageSendSticker) { request in
       let interfaces = try await context.requireInterfaces()
       // The same form the attachment route takes — the sticker image under `attachment`,

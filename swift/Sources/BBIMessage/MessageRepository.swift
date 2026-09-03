@@ -201,6 +201,27 @@ public struct MessageRepository: Sendable {
     }
   }
 
+  /// Every message associated with one of `guids` — a poll's updates and votes, oldest
+  /// first. Chat-independent: a poll's thread is addressed by GUID alone.
+  public func messages(
+    associatedWith guids: [String], limit: Int = 2000
+  ) async throws -> [IMessageRow] {
+    guard !guids.isEmpty else { return [] }
+    let columns = profile.select(Self.messageColumns, from: .message, alias: "m")
+    let placeholders = Array(repeating: "?", count: guids.count).joined(separator: ", ")
+    let statement =
+      "SELECT \(columns) FROM message m WHERE m.associated_message_guid IN (\(placeholders)) "
+      + "ORDER BY m.date ASC LIMIT ?"
+    var arguments: [(any DatabaseValueConvertible)?] = guids.map { $0 }
+    arguments.append(limit)
+    let statementArguments = StatementArguments(arguments)
+    let unit = dateUnit
+    return try await database.read { db in
+      try Row.fetchAll(db, sql: statement, arguments: statementArguments)
+        .map { IMessageRow(row: $0, dateUnit: unit) }
+    }
+  }
+
   public func message(guid: String) async throws -> IMessageRow? {
     let columns = profile.select(Self.messageColumns, from: .message, alias: "m")
     let unit = dateUnit

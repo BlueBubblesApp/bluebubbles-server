@@ -34,6 +34,7 @@ public enum MessagesHelperAction: String, Sendable, CaseIterable, CustomStringCo
   case checkTypingStatus = "check-typing-status"
   case clearChatHistory = "clear-chat-history"
   case createChat = "create-chat"
+  case createPoll = "create-poll"
   case deleteChat = "delete-chat"
   case deleteMessage = "delete-message"
   case downloadPurgedAttachment = "download-purged-attachment"
@@ -77,6 +78,7 @@ public enum MessagesHelperAction: String, Sendable, CaseIterable, CustomStringCo
   case unsendMessage = "unsend-message"
   case updateChatPinned = "update-chat-pinned"
   case updateGroupPhoto = "update-group-photo"
+  case votePoll = "vote-poll"
 
   public var description: String { rawValue }
 }

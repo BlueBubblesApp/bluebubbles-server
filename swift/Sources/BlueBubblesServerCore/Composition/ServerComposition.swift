@@ -509,6 +509,8 @@ public struct ServerComposition {
       groups.append(AdditiveRoutes.stickers)
       // Send Later: Apple's scheduling, distinct from this server's own timer.
       groups.append(AdditiveRoutes.sendLater)
+      // Polls, macOS 26.
+      groups.append(AdditiveRoutes.polls)
       // Editing a webhook, which the Node server only ever exposed to its own UI.
       groups.append(AdditiveRoutes.webhookEditing)
       // Conversation controls — wallpaper today, mute and filtering next.

@@ -110,6 +110,29 @@ public actor PrivateAPIClient: PrivateAPI {
     return try sentMessage(from: result, chat: request.chat)
   }
 
+  public func createPoll(_ request: PollCreateRequest) async throws -> SentMessage {
+    let result = try await transport.request(
+      action: .createPoll,
+      data: .object([
+        "chatGuid": .string(request.chat.rawValue),
+        "title": .string(request.title),
+        "options": .array(request.options.map(WireJSON.string)),
+      ]))
+    return try sentMessage(from: result, chat: request.chat)
+  }
+
+  public func votePoll(_ request: PollVoteRequest) async throws -> SentMessage {
+    let result = try await transport.request(
+      action: .votePoll,
+      data: .object([
+        "chatGuid": .string(request.chat.rawValue),
+        "stateGuid": .string(request.stateGUID.rawValue),
+        "sessionId": .string(request.sessionID),
+        "optionIds": .array(request.optionIDs.map(WireJSON.string)),
+      ]))
+    return try sentMessage(from: result, chat: request.chat)
+  }
+
   public func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws {
     _ = try await transport.request(
       action: .cancelScheduledMessage,

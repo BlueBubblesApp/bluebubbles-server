@@ -383,6 +383,51 @@ public struct SendStickerRequest: Codable, Sendable {
   }
 }
 
+// MARK: - Polls
+
+/// The Polls iMessage app, which is what a poll IS on the wire — see `docs/POLLS.md`.
+public enum PollsApp {
+  /// The extension's own bundle identifier, and the `appExtensionIdentifier` ChatKit takes.
+  public static let extensionIdentifier = "com.apple.messages.Polls"
+  /// `balloon_bundle_id` on every poll and vote row. `0000000000` is the team-id slot,
+  /// which is literally that for Apple's own extensions.
+  public static let balloonBundleID =
+    "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.messages.Polls"
+  public static let appName = "Polls"
+}
+
+public struct PollCreateRequest: Codable, Sendable {
+  public let chat: ChatIdentifier
+  public let title: String
+  /// In order. The helper mints each option's identifier.
+  public let options: [String]
+
+  public init(chat: ChatIdentifier, title: String, options: [String]) {
+    self.chat = chat
+    self.title = title
+    self.options = options
+  }
+}
+
+/// One participant's COMPLETE selection on a poll — not a delta. Empty retracts every vote.
+public struct PollVoteRequest: Codable, Sendable {
+  public let chat: ChatIdentifier
+  /// The poll's LATEST state message (the newest type-2 update, or the type-3 root), which
+  /// is what a vote is associated with. The server resolves it from the thread.
+  public let stateGUID: MessageGUID
+  /// The `MSSession` identifier every message of the poll shares, as a UUID string.
+  public let sessionID: String
+  public let optionIDs: [String]
+
+  public init(chat: ChatIdentifier, stateGUID: MessageGUID, sessionID: String, optionIDs: [String])
+  {
+    self.chat = chat
+    self.stateGUID = stateGUID
+    self.sessionID = sessionID
+    self.optionIDs = optionIDs
+  }
+}
+
 /// Confirmation that Messages accepted a send. The authoritative record still arrives via the
 /// chat.db change detector; this is what correlates the two.
 public struct SentMessage: Codable, Sendable {
@@ -641,6 +686,10 @@ public protocol PrivateAPI: Sendable {
   func react(_ request: ReactionRequest) async throws -> SentMessage
   /// Cancels a message scheduled with `SendMessageRequest.scheduledFor`, before it is sent.
   func cancelScheduledMessage(_ guid: MessageGUID, in chat: ChatIdentifier) async throws
+  /// Sends a new poll and answers with its message. macOS 26 and later.
+  func createPoll(_ request: PollCreateRequest) async throws -> SentMessage
+  /// Casts (or replaces) the local user's vote, and answers with the vote's own message.
+  func votePoll(_ request: PollVoteRequest) async throws -> SentMessage
   /// Places a sticker on a message part and returns the sticker's OWN message, exactly as
   /// `react` does — a sticker is an association with a file behind it.
   func sendSticker(_ request: SendStickerRequest) async throws -> SentMessage

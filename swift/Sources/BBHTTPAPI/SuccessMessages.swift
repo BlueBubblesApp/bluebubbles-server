@@ -64,6 +64,9 @@ public enum SuccessMessages {
     .messageSendSticker: "Sticker sent!",
     .messageSendLater: "Message scheduled!",
     .messageCancelScheduled: "Scheduled message cancelled!",
+    .messagePoll: "Successfully fetched poll!",
+    .messageCreatePoll: "Poll sent!",
+    .messageVotePoll: "Vote sent!",
     .messageUnsend: "Message unsent!",
     .messageEdit: "Message edited!",
 

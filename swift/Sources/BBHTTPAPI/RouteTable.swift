@@ -628,7 +628,21 @@ public enum AdditiveRoutes {
         requires: .privateAPI),
     ])
 
-  /// Placing a sticker on a message.  /// Placing a sticker on a message. The Node server never sent one — its helper had no
+  /// Polls — `docs/POLLS.md`. macOS 26 only, and the interface says so.
+  ///
+  /// `poll` before `poll/:guid` before `poll/:guid/vote`: literals ahead of parameters,
+  /// and the longer path registered after the shorter so neither swallows the other.
+  public static let polls = RouteGroup(
+    "Polls", prefix: "message", apiVersion: RouteTable.latestVersion,
+    routes: [
+      .init(.post, "poll", .messageCreatePoll, scope: .messagesWrite, requires: .privateAPI),
+      .init(.get, "poll/:guid", .messagePoll),
+      .init(
+        .post, "poll/:guid/vote", .messageVotePoll, scope: .messagesWrite,
+        requires: .privateAPI),
+    ])
+
+  /// Placing a sticker on a message.  /// Placing a sticker on a message.  /// Placing a sticker on a message. The Node server never sent one — its helper had no
   /// action for it and its route table has no path — so this is additive by definition.
   ///
   /// Under `message/` beside `react`, because that is what it is: a reaction whose payload

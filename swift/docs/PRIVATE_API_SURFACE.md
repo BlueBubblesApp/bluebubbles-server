@@ -351,8 +351,9 @@ as the fallback for a macOS without `IMTapbackSender`, and cannot carry an emoji
 
 ### Polls — an app balloon, not a message type
 
-Researched, not built. The mechanism, the payload format, the message thread and the proposed
-API are in [`docs/POLLS.md`](POLLS.md), which is the reference for this. In short: a poll is an
+Built: `message.poll`, `message.createPoll`, `message.votePoll`. The mechanism, the payload
+format, the message thread and the routes are in [`docs/POLLS.md`](POLLS.md), which is the
+reference for this. In short: a poll is an
 iMessage app message from `com.apple.messages.Polls` whose `payload_data` archive carries a
 `data:` URL of JSON; a vote is a custom acknowledgement (`associated_message_type` 4000) built
 by `+[IMMessage customAcknowledgementMessageWithPayloadData:associatedMessageGUID:balloonBundleID:messageSummaryInfo:threadIdentifier:]`.

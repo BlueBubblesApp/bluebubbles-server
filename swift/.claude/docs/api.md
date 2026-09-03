@@ -121,6 +121,14 @@ Two things a client must know when it reads a scheduled row back:
   neither key is an ordinary message. Without them a pending message looks identical to a sent
   one — `isSent` is 1 the moment Messages accepts it.
 
+### Polls — `/api/v2/message/poll`
+
+`docs/POLLS.md` is the reference. Three routes, macOS 26 only: `GET poll/:guid` assembles a
+poll from its message thread (options from the latest state, one newest vote per participant),
+`POST poll` creates one (`chatGuid`, `title`, `options`), `POST poll/:guid/vote` casts the
+voter's complete selection (`chatGuid`, `optionIds`). A poll or vote row is recognised by its
+`balloonBundleId`; the read side needed no new fields.
+
 ### Eight routes answer with the MESSAGE, not with an identifier
 
 `POST /message/text`, `/attachment`, `/attachment/chunk`, `/multipart`, `/react`,

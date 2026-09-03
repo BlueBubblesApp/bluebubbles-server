@@ -19,7 +19,7 @@ import Logging
 
 public struct MessageInterface: MessagesBackedInterface {
 
-  private let repository: MessageRepository
+  let repository: MessageRepository
   private let serializer: MessageSerializer
   let privateAPI: (any PrivateAPI)?
   private let appleScript: AppleScriptMessageSender
