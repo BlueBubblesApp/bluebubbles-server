@@ -191,12 +191,17 @@ opened and played, a 3-field 8 Ball invite sent minutes later produced the updat
 Every genuine payload carries `sender version tver ios game id player player2 seed mode num
 build avatar2` plus the game's own.
 
-`POST game-pigeon` fills in the four a client cannot know — `sender` (minted once and held in
-the `game_pigeon_sender` setting), `version` (5, the invite value), `tver` (5) and `ios` (this
-Mac's version) — prepending them in the order genuine payloads carry them, and only where the
-caller said nothing. A caller's own value keeps its position too, so a REPLY can echo the
-`version` it is answering — moves disagree (Cup Pong sent 0, 8 Ball sent 5), so there is no
-rule to infer. The rest is still the client's: capture a real invite with
+`POST game-pigeon` handles the fields a client cannot know. `sender` and `player<N>` (where N
+is the payload's own `player`) are FORCED — one correct value each and the client cannot know
+it, so accepting one could only let it be wrong, and echoing a received payload is the obvious
+way to do that. `version` (5), `tver` (5) and `ios` are FILLED when absent, keeping a caller's
+own value and position, so a reply can echo the `version` it is answering — moves disagree
+(Cup Pong sent 0, 8 Ball sent 5), so there is no rule to infer. The OTHER player's slot is
+never touched; a client reads it off the message it is answering.
+
+The sender is DERIVED from the Mac's `IOPlatformUUID`, not stored — stable per machine,
+distinct between machines, and no state to keep. `player<N> == sender` held on every genuine
+payload measured (three games, seven years, both directions, 12/12). The rest is still the client's: capture a real invite with
 `GET app/:guid` and vary it. `docs/GAME_PIGEON.md` § 4.
 
 The server does not model games: fields go out and come back as an ordered name/value list,

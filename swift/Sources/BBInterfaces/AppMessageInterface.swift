@@ -15,6 +15,8 @@
 import BBIMessage
 import BBPrivateAPIContract
 import BBSerialization
+import BBSystem
+import CryptoKit
 import Foundation
 
 extension MessageInterface {
@@ -300,45 +302,115 @@ extension MessageInterface {
       return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
     }
 
-    /// A `sender` in the shape Game Pigeon actually writes: a UUID with SIX more characters.
+    /// This server's `sender`, DERIVED rather than stored.
     ///
-    /// Measured across every genuine payload on the development Mac — two games, five app
-    /// versions, 2019 to today, sent and received — and all seven are exactly 42 characters:
-    /// a 36-character uppercase UUID followed by six mixed-case alphanumerics
-    /// (`…ABBCED` + `qXSTE6`). A plain `UUID().uuidString` is 36 and would be the only
-    /// sender of that length any of them has seen.
+    /// Game Pigeon's own senders are per-install and stable — the same correspondent's two
+    /// games two months apart carry the same one, while a reinstall years later carries a
+    /// different one. So a server needs an answer that does not change between messages.
     ///
-    /// What the suffix means is unknown — a per-device salt or an install counter would both
-    /// fit. It is reproduced because a field this consistent is not decoration, and a
-    /// too-short payload is precisely what makes the receiving app claim it needs updating.
-    public static func mintSender() -> String {
-      let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
-      let suffix = String((0..<6).map { _ in alphabet.randomElement() ?? "0" })
-      return UUID().uuidString + suffix
+    /// It is computed from the Mac's `IOPlatformUUID` instead of minted and saved, which
+    /// keeps the server stateless: there is no row to write, back up, migrate or reset, and
+    /// two servers on two Macs cannot collide. The hash is one-way, so what goes on the wire
+    /// reveals nothing about the machine — it is exactly as identifying as a random UUID
+    /// would have been, and no more.
+    ///
+    /// **42 characters: a UUID plus six alphanumerics.** Measured across every genuine
+    /// payload on the development Mac — two games, five app versions, 2019 to today, sent
+    /// and received — and all of them are that shape. A bare 36-character UUID is a length
+    /// Game Pigeon has never produced, and a too-short payload is what makes the receiving
+    /// app claim it needs updating.
+    public static var sender: String {
+      derivedSender(from: MachineIdentity.stableSeed)
     }
 
-    /// Whether a stored sender still looks like one Game Pigeon would write.
-    ///
-    /// Used to re-mint a value saved before the six-character suffix was known about, rather
-    /// than keep sending a 36-character sender no real app has ever produced.
+    /// Separated from the machine lookup so the derivation itself is testable.
+    static func derivedSender(from seed: String) -> String {
+      guard !seed.isEmpty else { return "" }
+      let digest = Array(SHA256.hash(data: Data(("bluebubbles.gamepigeon.sender:" + seed).utf8)))
+      let hex = digest.prefix(16).map { String(format: "%02X", $0) }.joined()
+      let groups = [0..<8, 8..<12, 12..<16, 16..<20, 20..<32]
+      let characters = Array(hex)
+      let uuid = groups.map { String(characters[$0]) }.joined(separator: "-")
+
+      // The suffix is mixed-case alphanumeric in every genuine payload. Taken from the rest
+      // of the same digest so it is stable with the UUID half rather than independent of it.
+      let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+      let suffix = String(digest.suffix(6).map { alphabet[Int($0) % alphabet.count] })
+      return uuid + suffix
+    }
+
+    /// Whether a sender looks like one Game Pigeon would write.
     public static func isWellFormedSender(_ sender: String) -> Bool {
       guard sender.count == 42 else { return false }
-      let uuid = String(sender.prefix(36))
-      return UUID(uuidString: uuid) != nil
+      return UUID(uuidString: String(sender.prefix(36))) != nil
         && sender.dropFirst(36).allSatisfy { $0.isLetter || $0.isNumber }
     }
 
+    /// Fills in what a client cannot know, and FORCES what only the server can be right about.
+    ///
+    /// Two different rules, and the difference matters:
+    ///
+    /// - `version`, `tver` and `ios` are FILLED when absent. A caller's own value wins,
+    ///   because a reply has to echo the `version` it is answering and no rule can be
+    ///   inferred for it.
+    /// - `sender` and the caller's own player slot are FORCED, overwriting whatever arrived.
+    ///   There is exactly one correct value for both — this install's identifier — and a
+    ///   client cannot know it. Letting a caller supply one would only ever let it be wrong,
+    ///   and the obvious way to get it wrong is the common one: relaying a payload that was
+    ///   received, which carries the OTHER player's identifier.
+    ///
+    /// The player slot is `player<N>` where `N` is the payload's own `player` field. That is
+    /// not game knowledge — it is the envelope agreeing with itself, and it holds across
+    /// every genuine payload measured: three games, seven years, invites and moves, both
+    /// directions, twelve for twelve. An invite reads `player=2` with `player2=sender`; a
+    /// move reads `player=1` with `player1=sender`.
     public static func applied(
       to fields: [(name: String, value: String)], sender: String
     ) -> [(name: String, value: String)] {
-      let supplied = Set(fields.map(\.name))
-      let boilerplate = [
-        ("sender", sender), ("version", payloadVersion),
-        ("tver", transportVersion), ("ios", osVersion),
+      // An empty sender means nothing was minted, which should not happen — but writing
+      // `sender=` would claim an identity of the empty string, so nothing is forced.
+      guard !sender.isEmpty else { return filled(fields) }
+
+      var forced = ["sender": sender]
+      // The slot the sender occupies in this message, when the payload says which.
+      if let player = fields.first(where: { $0.name == "player" })?.value,
+        !player.isEmpty, player.allSatisfy(\.isNumber)
+      {
+        forced["player\(player)"] = sender
+      }
+      var result = fields.map { field in
+        forced[field.name].map { (name: field.name, value: $0) } ?? field
+      }
+
+      // A forced field that was not there at all still has to be added. `player<N>` goes
+      // directly after `player`, which is where genuine payloads carry it.
+      let present = Set(result.map(\.name))
+      for (name, value) in forced.sorted(by: { $0.key < $1.key }) where !present.contains(name) {
+        if name != "sender", let index = result.firstIndex(where: { $0.name == "player" }) {
+          result.insert((name: name, value: value), at: index + 1)
+        } else {
+          result.insert((name: name, value: value), at: 0)
+        }
+      }
+      return filled(result)
+    }
+
+    /// The three a caller may override, prepended in the order genuine payloads carry them.
+    private static func filled(
+      _ fields: [(name: String, value: String)]
+    ) -> [(name: String, value: String)] {
+      let present = Set(fields.map(\.name))
+      let optional = [
+        ("version", payloadVersion), ("tver", transportVersion), ("ios", osVersion),
       ]
-      // An empty `sender` means the server has not minted one, which should not happen —
-      // but writing `sender=` would be worse than leaving the field out, so it is dropped.
-      return boilerplate.filter { !supplied.contains($0.0) && !$0.1.isEmpty } + fields
+      let prefix = optional.filter { !present.contains($0.0) && !$0.1.isEmpty }
+        .map { (name: $0.0, value: $0.1) }
+      // After `sender` when the sender is already first, which is the genuine order:
+      // sender, version, tver, ios, …
+      if let first = fields.first, first.name == "sender" {
+        return [first] + prefix + fields.dropFirst()
+      }
+      return prefix + fields
     }
   }
 
@@ -350,7 +422,7 @@ extension MessageInterface {
     guard !fields.isEmpty else {
       throw InterfaceError.invalidRequest("`fields` must not be empty")
     }
-    let fields = GamePigeonBoilerplate.applied(to: fields, sender: senderIdentifier)
+    let fields = GamePigeonBoilerplate.applied(to: fields, sender: GamePigeonBoilerplate.sender)
     let url = GamePigeonCodec.encode(
       GamePigeonCodec.Payload(version: version, fields: fields))
     return try await sendAppMessage(

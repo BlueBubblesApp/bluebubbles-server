@@ -56,7 +56,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 # undeclared package dependency must not be waved through because it looked SDK-ish.
 SDK_MODULES = {
     "AVFoundation", "AppKit", "Carbon", "Contacts", "CoreGraphics", "CoreLocation",
-    "CoreServices", "Darwin", "Dispatch", "Foundation", "FoundationNetworking", "IOKit",
+    "CoreServices", "CryptoKit", "Darwin", "Dispatch", "Foundation", "FoundationNetworking",
+    "IOKit",
     "ImageIO", "ObjectiveC", "Observation", "Security", "ServiceManagement", "SwiftUI",
     "Testing", "UniformTypeIdentifiers", "UserNotifications", "WebKit", "fcntl", "os",
 }

@@ -207,6 +207,6 @@ struct WatchedSettingsTests {
     "auto_start_method", "start_minimized", "hide_dock_icon", "dock_badge",
     "auto_lock_mac", "open_findmy_on_startup",
     // Bookkeeping, never user-set.
-    "last_fcm_restart", "legacy_config_imported", "game_pigeon_sender",
+    "last_fcm_restart", "legacy_config_imported",
   ]
 }

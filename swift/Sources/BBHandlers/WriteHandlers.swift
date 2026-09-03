@@ -11,7 +11,6 @@ import BBHTTPAPI
 import BBInterfaces
 import BBPrivateAPIContract
 import BBSerialization
-import BBSettings
 import BBSystem
 import Foundation
 
@@ -19,7 +18,7 @@ public enum WriteHandlers {
 
   public static func register(
     into registry: inout HandlerRegistry,
-    context: some AlertProviding & InterfaceProviding & UploadStoring & SettingsProviding
+    context: some AlertProviding & InterfaceProviding & UploadStoring
   ) {
     registerSending(into: &registry, context: context)
     registerMultipart(into: &registry, context: context)
@@ -31,7 +30,7 @@ public enum WriteHandlers {
 
   private static func registerSending(
     into registry: inout HandlerRegistry,
-    context: some AlertProviding & InterfaceProviding & UploadStoring & SettingsProviding
+    context: some AlertProviding & InterfaceProviding & UploadStoring
   ) {
     registry.register(.messageSendText) { request in
       let interfaces = try await context.requireInterfaces()
@@ -133,27 +132,6 @@ public enum WriteHandlers {
   ///   message in `data` and let the client read `error` itself. Both are transcribed rather
   ///   than tidied — a client that has been shown a 200 for a failed attachment since the
   ///   Electron server would start seeing 500s.
-  /// This install's Game Pigeon `sender`, minted once and then held.
-  ///
-  /// Every genuine payload carries one, and it is the same UUID for every message a given
-  /// install sends — so it belongs to the server, not to a request. A client cannot know
-  /// what to put here, and leaving it out is part of what makes a recipient's app say it
-  /// needs updating.
-  ///
-  /// A failed WRITE is not a failed send: the identifier is still used for this message, and
-  /// the only cost of not persisting it is a different one next time. Refusing to send a
-  /// game because a settings write failed would be the wrong trade.
-  private static func gamePigeonSender(_ context: some SettingsProviding) async -> String {
-    let existing = await context.settings.get(Settings.gamePigeonSender)
-    // Re-minted rather than kept if it is not the shape Game Pigeon writes — which covers a
-    // value saved before the six-character suffix was measured. Changing it costs nothing:
-    // it identifies this install to the app, and no game in flight is keyed on it.
-    if MessageInterface.GamePigeonBoilerplate.isWellFormedSender(existing) { return existing }
-    let minted = MessageInterface.GamePigeonBoilerplate.mintSender()
-    try? await context.settings.set(Settings.gamePigeonSender, to: minted)
-    return minted
-  }
-
   private static func sendResult(
     _ outcome: MessageInterface.SendOutcome,
     interfaces: ServerInterfaces,
@@ -222,7 +200,7 @@ public enum WriteHandlers {
 
   private static func registerMessageActions(
     into registry: inout HandlerRegistry,
-    context: some AlertProviding & InterfaceProviding & UploadStoring & SettingsProviding
+    context: some AlertProviding & InterfaceProviding & UploadStoring
   ) {
     registry.register(.messageReact) { request in
       let interfaces = try await context.requireInterfaces()
@@ -391,8 +369,7 @@ public enum WriteHandlers {
         fields: fields,
         sessionID: values.string("sessionId"),
         caption: values.string("caption"),
-        teamID: values.string("teamId") ?? "EWFNLB79LQ",
-        senderIdentifier: await Self.gamePigeonSender(context)
+        teamID: values.string("teamId") ?? "EWFNLB79LQ"
       )
       return try Self.sendResult(sent, interfaces: interfaces)
     }

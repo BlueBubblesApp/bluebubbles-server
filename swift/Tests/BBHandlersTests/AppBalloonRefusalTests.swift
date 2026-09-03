@@ -153,17 +153,68 @@ struct GamePigeonBoilerplateTests {
     #expect(names.suffix(2) == ["game", "id"])
   }
 
-  @Test("A caller's own value is never overwritten, and never moved")
+  @Test("A caller's own version is never overwritten, and never moved")
   func suppliedFieldsWin() {
     // The case this protects: a REPLY has to echo the `version` it is answering. Moves do
     // not agree with each other — a Cup Pong move read 0 where an 8 Ball move read 5 — so
     // there is no rule to infer, and defaulting over the caller would corrupt replies.
     let filled = Boilerplate.applied(
-      to: [("game", "beer"), ("version", "0"), ("sender", "THEIRS")], sender: "OURS")
+      to: [("game", "beer"), ("version", "0")], sender: "OURS")
     #expect(filled.filter { $0.name == "version" }.map(\.value) == ["0"])
-    #expect(filled.filter { $0.name == "sender" }.map(\.value) == ["THEIRS"])
-    // Position preserved too: the caller's fields keep their order among themselves.
-    #expect(filled.map(\.name) == ["tver", "ios", "game", "version", "sender"])
+    // Position preserved: the caller's fields keep their order among themselves.
+    #expect(filled.map(\.name) == ["sender", "tver", "ios", "game", "version"])
+  }
+
+  @Test("A caller's sender is overwritten, not honoured")
+  func senderIsForced() {
+    // There is exactly one right value and the caller cannot know it, so accepting one
+    // could only ever let it be wrong. The obvious way to get it wrong is the common one:
+    // relaying a payload that was RECEIVED, which carries the other player's identifier.
+    let filled = Boilerplate.applied(
+      to: [("sender", "THEIRS"), ("game", "beer")], sender: "OURS")
+    #expect(filled.filter { $0.name == "sender" }.map(\.value) == ["OURS"])
+    // Overwritten in place, so the genuine field order survives.
+    #expect(filled.first?.name == "sender")
+  }
+
+  @Test("The caller's own player slot is set to the sender")
+  func playerSlotMatchesSender() {
+    // `player<N>` where N is the payload's `player`. Not game knowledge — the envelope
+    // agreeing with itself, and it held across every genuine payload measured: three games,
+    // seven years, invites and moves, both directions.
+    let invite = Boilerplate.applied(
+      to: [("player", "2"), ("player2", "THEIRS"), ("game", "pool")], sender: "OURS")
+    #expect(invite.first { $0.name == "player2" }?.value == "OURS")
+
+    // A MOVE puts the sender in slot 1 instead, and must not touch slot 2 — that is the
+    // opponent, and overwriting it would tell the app it is playing itself.
+    let move = Boilerplate.applied(
+      to: [("player", "1"), ("player1", "STALE"), ("player2", "OPPONENT")], sender: "OURS")
+    #expect(move.first { $0.name == "player1" }?.value == "OURS")
+    #expect(move.first { $0.name == "player2" }?.value == "OPPONENT")
+  }
+
+  @Test("An absent player slot is added next to `player`")
+  func playerSlotIsAddedInPlace() {
+    // The gap this closes: a client could not fill `player2` because it cannot know the
+    // sender, so before this it simply went missing from every invite a client built.
+    let filled = Boilerplate.applied(
+      to: [("game", "pool"), ("player", "2"), ("seed", "1")], sender: "OURS")
+    #expect(filled.first { $0.name == "player2" }?.value == "OURS")
+    let names = filled.map(\.name)
+    // Directly after `player`, which is where genuine payloads carry it.
+    #expect(names.firstIndex(of: "player2") == names.firstIndex(of: "player").map { $0 + 1 })
+  }
+
+  @Test("No player slot is invented when the payload does not say which")
+  func noPlayerFieldMeansNoSlot() {
+    // Without `player` there is nothing to derive a slot number from, and guessing one
+    // would be modelling the game rather than reading the envelope.
+    let filled = Boilerplate.applied(to: [("game", "pool")], sender: "OURS")
+    #expect(!filled.contains { $0.name.hasPrefix("player") })
+    // A non-numeric `player` is not a slot number either.
+    let odd = Boilerplate.applied(to: [("player", "me")], sender: "OURS")
+    #expect(!odd.contains { $0.name == "playerme" })
   }
 
   @Test("No field is added twice")
@@ -171,10 +222,11 @@ struct GamePigeonBoilerplateTests {
     // Sending a payload straight back through — which is what a client replaying a received
     // game does — must not accumulate duplicates. A repeated name is legal in a query
     // string, so nothing downstream would catch it.
-    let once = Boilerplate.applied(to: [("game", "beer")], sender: "S")
+    let once = Boilerplate.applied(to: [("game", "beer"), ("player", "2")], sender: "S")
     let twice = Boilerplate.applied(to: once, sender: "S")
     #expect(once.map(\.name) == twice.map(\.name))
     #expect(twice.filter { $0.name == "sender" }.count == 1)
+    #expect(twice.filter { $0.name == "player2" }.count == 1)
   }
 
   @Test("An unminted sender is left out rather than sent empty")
@@ -187,18 +239,36 @@ struct GamePigeonBoilerplateTests {
     #expect(filled.contains { $0.name == "tver" })
   }
 
-  @Test("A minted sender has the shape Game Pigeon writes")
+  @Test("A derived sender has the shape Game Pigeon writes")
   func sendersAreFortyTwoCharacters() {
     // Every genuine payload measured — two games, five app versions, 2019 to today, sent
     // and received — carries a 42-character sender: a UUID plus six alphanumerics. A plain
     // `UUID().uuidString` is 36, which no real app has ever produced.
-    let sender = Boilerplate.mintSender()
+    let sender = Boilerplate.derivedSender(from: "a-machine")
     #expect(sender.count == 42)
     #expect(UUID(uuidString: String(sender.prefix(36))) != nil)
     #expect(sender.dropFirst(36).allSatisfy { $0.isLetter || $0.isNumber })
     #expect(Boilerplate.isWellFormedSender(sender))
-    // Distinct per call, so two installs cannot collide.
-    #expect(Boilerplate.mintSender() != Boilerplate.mintSender())
+    // And the real one, off this machine.
+    #expect(Boilerplate.isWellFormedSender(Boilerplate.sender))
+  }
+
+  @Test("The sender is stable for a machine and different between machines")
+  func sendersAreStableAndDistinct() {
+    // The property that makes storing it unnecessary. Game Pigeon's own senders are stable
+    // per install — the same correspondent's two games two months apart carry the same one —
+    // so the server needs the same answer every time WITHOUT keeping a row to remember it.
+    #expect(
+      Boilerplate.derivedSender(from: "mac-one") == Boilerplate.derivedSender(from: "mac-one"))
+    #expect(Boilerplate.sender == Boilerplate.sender)
+    // Two machines must not collide, or their games would look like one install's.
+    #expect(
+      Boilerplate.derivedSender(from: "mac-one") != Boilerplate.derivedSender(from: "mac-two"))
+  }
+
+  @Test("A machine with no identifier yields no sender rather than a wrong one")
+  func emptySeedYieldsNoSender() {
+    #expect(Boilerplate.derivedSender(from: "") == "")
   }
 
   @Test("A sender of the wrong shape is not accepted as well-formed")

@@ -176,11 +176,6 @@ envelope swap described below. What it still does not do:
       — exactly where the helper work lives. Needs a dedicated throwaway conversation and a
       driver that is explicit about what it will send. Note that the replay DENY-LISTS all of
       these (see below), so recording them buys `bb-parity` coverage, not CI coverage.
-- [ ] **A Game Pigeon client cannot fill in `player2`.** Every genuine invite carries
-      `player2 == sender`, and `sender` is the server's own minted identifier, reported
-      nowhere. So a client cannot build a correct invite without it. Exposing it read-only —
-      on `server/info`, or in the send response — would close the gap without modelling any
-      game. The 8 Ball test invite read it out of the `setting` table by hand.
 - [ ] **A sticker can be added to recents but not to the saved drawer.** The only write
       `_STKMessagesObjCStoreFacade` exposes is a donation to recents; creating a saved
       sticker is a Stickers-extension UI flow. Worth another look at whether `stickersd` has

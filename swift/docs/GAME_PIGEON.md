@@ -262,12 +262,19 @@ them when you leave them out:
 sender=<this server's UUID>&version=5&tver=5&ios=26.5.2&game=beer&id=…&player=2
 ```
 
-`sender` is minted once and kept, so every game from this server claims the same install, as
-a real app would. It is **42 characters** — a UUID plus six alphanumerics
-(`D89782D9-…-B062C02D61B1` + `pkr23n`) — because that is what every genuine payload carries,
-across two games, five app versions and both directions. What the suffix means is unknown; a
-per-device salt and an install counter would both fit. A plain 36-character UUID is
-reproduced by nothing Game Pigeon has ever sent, so it is not used.
+### Where the sender comes from
+
+**Derived, not stored.** It is a hash of the Mac's `IOPlatformUUID`, so the same machine
+produces the same answer forever and two machines cannot collide — with no row to write, back
+up, migrate or reset. The server keeps no Game Pigeon state at all.
+
+It is **42 characters**: a UUID plus six alphanumerics, because that is what every genuine
+payload carries across two games, five app versions and both directions. What the suffix
+means is unknown; a per-device salt and an install counter would both fit. A bare
+36-character UUID is a length Game Pigeon has never sent.
+
+The hash is one-way, so nothing about the machine goes on the wire — it is exactly as
+identifying as a random UUID would have been, and no more.
 
 **What it identifies is the INSTALL, not the person.** Measured across every Game Pigeon
 message on the development Mac:
@@ -286,8 +293,8 @@ reply. Nothing validates it against Apple or against anything else.
 
 Practically that means it is a stable pseudonym. It carries no account information, but a
 recipient can tell that two games came from the same server — exactly as they could from a
-real install. Clearing the `game_pigeon_sender` setting mints a new one, which is the
-equivalent of reinstalling the app. `ios` is the Mac's own version. `version` defaults to `5`, which is what
+real install. Because it is derived from the machine rather than
+stored, there is nothing to clear — it changes only if the Mac does. `ios` is the Mac's own version. `version` defaults to `5`, which is what
 every genuine INVITE carries — **a reply must send its own**, echoing the value it is
 answering. Moves do not agree with each other: a Cup Pong move carried `version=0` where an
 8 Ball move carried `5`, so there is no rule to infer and the server does not try. Anything
