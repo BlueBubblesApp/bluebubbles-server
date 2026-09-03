@@ -432,10 +432,36 @@ public enum OpenAPIDocument {
     -> OrderedJSON?
   {
     if let multipart = multipartBody(for: entry) { return multipart }
-    return jsonRequestBody(for: operationID)
+    return jsonRequestBody(for: entry, operationID: operationID)
   }
 
-  private static func jsonRequestBody(for operationID: String) -> OrderedJSON? {
+  /// A DECLARED body wins over an inferred one, and carries an example.
+  ///
+  /// Inference is the better source where a recording exists, but it can only describe what
+  /// was recorded — and the routes this server added have no recording at all, so without
+  /// this they reach the document with no documented input. Where both exist the declaration
+  /// has to be a superset of the inferred one, which `RequestBodyTests` enforces.
+  private static func jsonRequestBody(for entry: RouteCatalog.Entry, operationID: String)
+    -> OrderedJSON?
+  {
+    if let declared = RequestBodies.byHandler[entry.route.handlerID] {
+      return .obj([
+        ("description", .string(schemaNote)),
+        ("required", .bool(declared.isRequired)),
+        (
+          "content",
+          .obj([
+            (
+              "application/json",
+              .obj([
+                ("schema", RequestBodies.schema(for: declared)),
+                ("example", declared.example),
+              ])
+            )
+          ])
+        ),
+      ])
+    }
     guard let schema = FixtureSchemas.table[operationID]?.request else { return nil }
     return .obj([
       ("description", .string(schemaNote)),

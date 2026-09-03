@@ -8075,30 +8075,104 @@
           "content": {
             "application/json": {
               "schema": {
+                "type": "object",
+                "description": "Sends a text message.",
                 "properties": {
                   "chatGuid": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The conversation to send to."
                   },
                   "message": {
-                    "type": "string"
-                  },
-                  "method": {
-                    "type": "string"
-                  },
-                  "subject": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The text to send."
                   },
                   "tempGuid": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Client-generated id echoed back on the sent message, so a client can match the response to the row it inserted optimistically. Required for AppleScript."
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "`apple-script` or `private-api`. AppleScript needs no helper; the Private API is required for subjects, effects, replies and formatting."
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "Subject line. Private API only."
+                  },
+                  "effectId": {
+                    "type": "string",
+                    "description": "A send effect, e.g. `com.apple.MobileSMS.expressivesend.impact`. Private API only."
+                  },
+                  "selectedMessageGuid": {
+                    "type": "string",
+                    "description": "The message this one replies to, threading it. Private API only."
+                  },
+                  "partIndex": {
+                    "type": "integer",
+                    "description": "Which part of the replied-to message. Defaults to 0."
+                  },
+                  "ddScan": {
+                    "type": "boolean",
+                    "description": "Scan the text for links and data detectors."
+                  },
+                  "textFormatting": {
+                    "type": "array",
+                    "description": "Inline styles and animated effects, by range. A range needs a style or an effect. Private API only, macOS 15 and newer.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "integer",
+                          "description": "Offset in UTF-16 code units."
+                        },
+                        "length": {
+                          "type": "integer",
+                          "description": "Length in UTF-16 code units."
+                        },
+                        "styles": {
+                          "type": "array",
+                          "description": "Any of `bold`, `italic`, `underline`, `strikethrough`.",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "effect": {
+                          "type": "string",
+                          "description": "One of `big`, `small`, `shake`, `nod`, `explode`, `ripple`, `bloom`, `jitter`."
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "length"
+                      ]
+                    }
                   }
                 },
                 "required": [
                   "chatGuid",
                   "message",
-                  "method",
-                  "tempGuid"
-                ],
-                "type": "object"
+                  "tempGuid",
+                  "method"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "tempGuid": "6E2C1A2B-0F2E-4E77-9B6C-2E5A3D9F1A44",
+                "message": "bold and shaking",
+                "method": "private-api",
+                "textFormatting": [
+                  {
+                    "start": 0,
+                    "length": 4,
+                    "styles": [
+                      "bold"
+                    ]
+                  },
+                  {
+                    "start": 9,
+                    "length": 8,
+                    "effect": "shake"
+                  }
+                ]
               }
             }
           }
@@ -10244,27 +10318,41 @@
           "content": {
             "application/json": {
               "schema": {
+                "type": "object",
+                "description": "Sends a tapback, including an emoji one.",
                 "properties": {
                   "chatGuid": {
-                    "type": "string"
-                  },
-                  "partIndex": {
-                    "type": "integer"
-                  },
-                  "reaction": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The conversation the target message is in."
                   },
                   "selectedMessageGuid": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The message being reacted to."
+                  },
+                  "reaction": {
+                    "type": "string",
+                    "description": "`love`, `like`, `dislike`, `laugh`, `emphasize`, `question` or `emoji`, each with a `-` prefix to remove it (`-love`, `-emoji`)."
+                  },
+                  "emoji": {
+                    "type": "string",
+                    "description": "The emoji, required for `emoji` and `-emoji` and ignored otherwise. macOS 15 and newer."
+                  },
+                  "partIndex": {
+                    "type": "integer",
+                    "description": "Which part of the target message. Defaults to 0."
                   }
                 },
                 "required": [
                   "chatGuid",
-                  "partIndex",
-                  "reaction",
-                  "selectedMessageGuid"
-                ],
-                "type": "object"
+                  "selectedMessageGuid",
+                  "reaction"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "selectedMessageGuid": "4D50CFE4-87A5-49D6-9687-4A5D6C94A29B",
+                "reaction": "emoji",
+                "emoji": "🔥"
               }
             }
           }
@@ -20082,6 +20170,94 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Schedules a message with Apple, so it sends whether or not this Mac is awake.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation to send to."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The text to send."
+                  },
+                  "scheduledFor": {
+                    "type": "integer",
+                    "description": "When to deliver it, in epoch MILLISECONDS. Must be in the future."
+                  },
+                  "tempGuid": {
+                    "type": "string",
+                    "description": "Echoed back on the sent message."
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "Subject line."
+                  },
+                  "effectId": {
+                    "type": "string",
+                    "description": "A send effect."
+                  },
+                  "selectedMessageGuid": {
+                    "type": "string",
+                    "description": "The message this one replies to."
+                  },
+                  "partIndex": {
+                    "type": "integer",
+                    "description": "Which part of the replied-to message."
+                  },
+                  "textFormatting": {
+                    "type": "array",
+                    "description": "Inline styles and animated effects, by range. A range needs a style or an effect. Private API only, macOS 15 and newer.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "integer",
+                          "description": "Offset in UTF-16 code units."
+                        },
+                        "length": {
+                          "type": "integer",
+                          "description": "Length in UTF-16 code units."
+                        },
+                        "styles": {
+                          "type": "array",
+                          "description": "Any of `bold`, `italic`, `underline`, `strikethrough`.",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "effect": {
+                          "type": "string",
+                          "description": "One of `big`, `small`, `shake`, `nod`, `explode`, `ripple`, `bloom`, `jitter`."
+                        }
+                      },
+                      "required": [
+                        "start",
+                        "length"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "chatGuid",
+                  "message",
+                  "scheduledFor"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "message": "Happy birthday!",
+                "scheduledFor": 1788440082220
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -20289,6 +20465,30 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Delivers a pending message immediately.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation the scheduled message is in."
+                  }
+                },
+                "required": [
+                  "chatGuid"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -20407,6 +20607,44 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Changes a pending message's text, its delivery time, or both.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation the scheduled message is in."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Replacement text. Leaves the time alone if sent alone."
+                  },
+                  "scheduledFor": {
+                    "type": "integer",
+                    "description": "A new delivery time, epoch MILLISECONDS. Leaves the text alone if sent alone."
+                  },
+                  "partIndex": {
+                    "type": "integer",
+                    "description": "Which part to rewrite. Defaults to 0."
+                  }
+                },
+                "required": [
+                  "chatGuid"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "message": "Actually, happy anniversary!",
+                "scheduledFor": 1788443682220
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -20523,6 +20761,30 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Cancels a pending message. Its row is deleted, not marked cancelled.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation the scheduled message is in."
+                  }
+                },
+                "required": [
+                  "chatGuid"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -20632,6 +20894,47 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Sends a new poll. macOS 26 and newer.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation to send to."
+                  },
+                  "options": {
+                    "type": "array",
+                    "description": "The choices, in order. At least two, none empty.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Accepted and sent, but Messages 26 neither shows a poll title nor keeps one — its own updates clear the field. Do not build UI on it."
+                  }
+                },
+                "required": [
+                  "chatGuid",
+                  "options"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "options": [
+                  "Pizza",
+                  "Sushi",
+                  "Either"
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -20850,6 +21153,41 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Casts this account's vote. The selection is complete, not a delta.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation the poll is in."
+                  },
+                  "optionIds": {
+                    "type": "array",
+                    "description": "Every option this account is voting for. An empty array retracts every vote. Each id must be an option on the poll.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "chatGuid",
+                  "optionIds"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "optionIds": [
+                  "16D8D418-28B5-4606-8A71-98C28D556B9C"
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -20968,6 +21306,36 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Adds a choice, which re-sends the poll in its new state.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation the poll is in."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "The choice to add."
+                  }
+                },
+                "required": [
+                  "chatGuid",
+                  "text"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "text": "Thai"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -21177,6 +21545,92 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Sends an iMessage app's balloon. Supply the payload in whichever shape fits.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation to send to."
+                  },
+                  "balloonBundleId": {
+                    "type": "string",
+                    "description": "The app's full balloon bundle id, including the `com.apple.messages.MSMessageExtensionBalloonPlugin:<team>:` prefix."
+                  },
+                  "json": {
+                    "description": "The payload as JSON, sent as the `data:,<base64>` shape Polls uses. One of `json`, `fields` or `url` is required."
+                  },
+                  "fields": {
+                    "type": "array",
+                    "description": "The payload as a query string, in order. A plain object is accepted too when order does not matter.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The field's name."
+                        },
+                        "value": {
+                          "type": "string",
+                          "description": "Its value. An empty string is a real value."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "value"
+                      ]
+                    }
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "The payload URL verbatim, for an app whose format is neither of the above — an https link, or a `data:` URL with a media type."
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "The `MSSession` UUID. Omit to start a new one; pass the session of the message being answered to continue a conversation."
+                  },
+                  "appName": {
+                    "type": "string",
+                    "description": "The app's display name, shown on the balloon."
+                  },
+                  "appId": {
+                    "type": "integer",
+                    "description": "The app's App Store id."
+                  },
+                  "caption": {
+                    "type": "string",
+                    "description": "The line shown where the balloon cannot be drawn."
+                  },
+                  "summary": {
+                    "type": "string",
+                    "description": "The message's fallback summary text."
+                  }
+                },
+                "required": [
+                  "chatGuid",
+                  "balloonBundleId"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "balloonBundleId": "com.apple.messages.MSMessageExtensionBalloonPlugin:0000000000:com.apple.messages.Polls",
+                "appName": "Polls",
+                "caption": "Dinner?",
+                "json": {
+                  "version": 1,
+                  "item": {
+                    "title": "Dinner?"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -21286,6 +21740,84 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Sends a Game Pigeon message, doing its payload scramble for you.",
+                "properties": {
+                  "chatGuid": {
+                    "type": "string",
+                    "description": "The conversation to send to."
+                  },
+                  "fields": {
+                    "type": "array",
+                    "description": "The payload as a query string, in order. A plain object is accepted too when order does not matter.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The field's name."
+                        },
+                        "value": {
+                          "type": "string",
+                          "description": "Its value. An empty string is a real value."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "value"
+                      ]
+                    }
+                  },
+                  "version": {
+                    "type": "integer",
+                    "description": "Game Pigeon's own payload version. Echo back the one you received; defaults to 52."
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "The `MSSession` UUID of the game being continued. Omit only for a new invite."
+                  },
+                  "caption": {
+                    "type": "string",
+                    "description": "The line shown on the balloon, e.g. `Your move.`"
+                  },
+                  "teamId": {
+                    "type": "string",
+                    "description": "The developer team id in the balloon bundle id. Defaults to Game Pigeon's own."
+                  }
+                },
+                "required": [
+                  "chatGuid"
+                ]
+              },
+              "example": {
+                "chatGuid": "iMessage;-;+15551234567",
+                "version": 50,
+                "sessionId": "2B62987D-4F1C-4A2E-9C3D-6E5B1A7F0C22",
+                "caption": "Your move.",
+                "fields": [
+                  {
+                    "name": "game",
+                    "value": "pool"
+                  },
+                  {
+                    "name": "id",
+                    "value": "2ENROYU7St5CF6e8"
+                  },
+                  {
+                    "name": "player",
+                    "value": "1"
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -22231,6 +22763,27 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Unmutes a conversation and answers with the resulting state.",
+                "properties": {
+                  "syncToPairedDevice": {
+                    "type": "boolean",
+                    "description": "Push the change to the user's other devices. Defaults to true, which is what Messages' own toggle does."
+                  }
+                }
+              },
+              "example": {
+                "syncToPairedDevice": true
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -22704,6 +23257,27 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Accepts a sender, moving the conversation out of Unknown Senders.",
+                "properties": {
+                  "saveInContacts": {
+                    "type": "boolean",
+                    "description": "Also write the sender to the address book. Defaults to FALSE — accepting a sender is not the same as editing the user's contacts."
+                  }
+                }
+              },
+              "example": {
+                "saveInContacts": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -22860,6 +23434,32 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Marks a conversation as spam.",
+                "properties": {
+                  "reportToCarrier": {
+                    "type": "boolean",
+                    "description": "Also report it to the carrier. Defaults to FALSE, and think before setting it: the report is an SMS sent from the user's own number and cannot be undone."
+                  },
+                  "dryRun": {
+                    "type": "boolean",
+                    "description": "Answer with what would happen and change nothing. Defaults to false."
+                  }
+                }
+              },
+              "example": {
+                "reportToCarrier": false,
+                "dryRun": true
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -23036,6 +23636,32 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Reports a conversation as junk, which also deletes it locally.",
+                "properties": {
+                  "reportToCarrier": {
+                    "type": "boolean",
+                    "description": "Also report it to the carrier. Defaults to FALSE, and the report is an SMS from the user's own number that cannot be withdrawn."
+                  },
+                  "dryRun": {
+                    "type": "boolean",
+                    "description": "Answer with what would happen and change nothing. Defaults to false."
+                  }
+                }
+              },
+              "example": {
+                "reportToCarrier": false,
+                "dryRun": true
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -24143,6 +24769,32 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Mints a FaceTime link that anyone holding it can join.",
+                "properties": {
+                  "addresses": {
+                    "type": "array",
+                    "description": "People to pre-invite onto the link. The link is created either way.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "example": {
+                "addresses": [
+                  "+15551234567"
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -24280,6 +24932,32 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Invalidates links this server minted.",
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "description": "The links to invalidate. Omit the field entirely to invalidate all of them.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "example": {
+                "urls": [
+                  "https://facetime.apple.com/join#v=1&p=…"
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -24418,15 +25096,24 @@
           "content": {
             "application/json": {
               "schema": {
+                "type": "object",
+                "description": "Hangs up this Mac's side of a call.",
                 "properties": {
+                  "callUUID": {
+                    "type": "string",
+                    "description": "The call to leave."
+                  },
                   "call_uuid": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The same thing under the name the reference server's clients send. Either is accepted; send one."
                   }
                 },
                 "required": [
-                  "call_uuid"
-                ],
-                "type": "object"
+                  "callUUID"
+                ]
+              },
+              "example": {
+                "callUUID": "9E3C0B77-1A44-4D2E-8F51-7C2B9D6E0A13"
               }
             }
           }
@@ -24562,6 +25249,44 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Places a FaceTime call and hands back a join link for it.",
+                "properties": {
+                  "addresses": {
+                    "type": "array",
+                    "description": "Everyone to ring. Use this for a group call.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "address": {
+                    "type": "string",
+                    "description": "A single callee, accepted in place of `addresses`."
+                  },
+                  "video": {
+                    "type": "boolean",
+                    "description": "Ring as FaceTime Video. Defaults to true; false rings as FaceTime Audio."
+                  }
+                },
+                "required": [
+                  "addresses"
+                ]
+              },
+              "example": {
+                "addresses": [
+                  "+15551234567"
+                ],
+                "video": true
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -24680,6 +25405,30 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Admits someone knocking at a call. The call is `:group_uuid` in the path.",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "The knocker's handle, as reported by the members route."
+                  }
+                },
+                "required": [
+                  "address"
+                ]
+              },
+              "example": {
+                "address": "+15551234567"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -26277,6 +27026,30 @@
             "$ref": "#/components/parameters/pretty"
           }
         ],
+        "requestBody": {
+          "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Revokes a device's token, so its client has to enrol again.",
+                "properties": {
+                  "device_id": {
+                    "type": "string",
+                    "description": "The device to revoke, as returned by enrollment."
+                  }
+                },
+                "required": [
+                  "device_id"
+                ]
+              },
+              "example": {
+                "device_id": "F2A7C1D0-93B4-4E6A-8C15-0D7E2B9A4F38"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",

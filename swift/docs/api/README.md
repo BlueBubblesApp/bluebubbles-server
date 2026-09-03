@@ -307,6 +307,37 @@ Emitted as `multipart/form-data` with `format: binary` on the file field, which 
 a viewer offer a file picker rather than a text box. A multipart declaration takes precedence
 over an inferred JSON body, so an operation never claims both.
 
+### Request bodies
+
+Hand-written, in `Sources/BBOpenAPI/RequestBodies.swift`, keyed by `HandlerID`.
+
+Inference is the right default for a JSON body — a schema derived from a payload the
+reference server really accepted cannot invent a field — but it needs a *recording*, and the
+conformance recorder replays against Node. Every route this server added on its own therefore
+has no fixture, no inferred body, and reached the document as a path with a summary and no
+documented input at all. Polls, Send Later, app balloons, Game Pigeon: a client author had
+nothing to go on but the source.
+
+So they are declared, and two rules keep the declarations honest:
+
+- **A declaration wins over an inferred body**, because it is the fuller description — but
+  for a route that *does* have a fixture it must be a **superset** of what was inferred. A
+  declaration can add a field the reference never had (`emoji` on `POST message/react`,
+  `textFormatting` on `POST message/text`) and cannot quietly drop one that was recorded.
+  This caught a real omission: `POST facetime/leave` accepts `callUUID` *and* the
+  `call_uuid` spelling its clients send, and the first draft documented only one.
+- **Every body carries an `example`.** That is the point of the exercise — it is what a
+  client author copies. Tests assert an example is an object, sends nothing undeclared, and
+  omits nothing required.
+
+A write route that takes no body at all is declared too, in `RequestBodies.bodyless`, with a
+one-line reason. Otherwise "this route has no input" and "nobody documented this route" look
+identical in the emitted file. `RequestBodyTests` fails the build if any v2 write route
+appears in neither table and has no fixture, which is the ratchet that keeps a new route from
+shipping undocumented.
+
+Each example in this table was sent to a live Mac verbatim, with only the chat GUID changed.
+
 ### Why scopes are an extension
 
 A route's required scope appears as `x-required-scope`, not inside the operation's

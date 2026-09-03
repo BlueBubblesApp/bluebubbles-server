@@ -441,5 +441,12 @@ entry names a route that no longer exists.
 5. Put the logic in `Sources/BBInterfaces/`. If it touches chat GUIDs, read
    [`imessage.md`](imessage.md) first.
 6. Add a `SuccessMessages` entry only if the route needs a non-default `message`.
-7. Regenerate the OpenAPI document and update the coverage list.
-8. `swift test --filter CompatibilityTests` and `--filter BBOpenAPITests`.
+7. **Declare its request body.** A route this server added has no fixture, so nothing is
+   inferred and the spec would document no input at all. Add a `RequestBodies.byHandler`
+   entry with a description per field and an `example` a client can copy — or, if it takes
+   no body, a `RequestBodies.bodyless` entry saying why. `RequestBodyTests` fails the build
+   for a v2 write route that is in neither. A declaration for a route that *does* have a
+   fixture must be a superset of the inferred schema; a file upload goes in
+   `MultipartBodies` instead, which wins over both.
+8. Regenerate the OpenAPI document and update the coverage list.
+9. `swift test --filter CompatibilityTests` and `--filter BBOpenAPITests`.

@@ -162,6 +162,14 @@ envelope swap described below. What it still does not do:
       — exactly where the helper work lives. Needs a dedicated throwaway conversation and a
       driver that is explicit about what it will send. Note that the replay DENY-LISTS all of
       these (see below), so recording them buys `bb-parity` coverage, not CI coverage.
+- [ ] **Response shapes for the v2 routes are still inferred-or-nothing.** Request bodies are
+      now declared by hand (`RequestBodies`, with an `example` per route, each one sent to a
+      live Mac verbatim), but the *responses* of the routes this server added have no fixture
+      either, so the spec describes their envelope and not their `data`. A client reading the
+      poll or app-message document still has to guess at `options[].id` and
+      `game_pigeon.fields`. The same trick would work: a hand-written response table keyed by
+      `HandlerID`, with the superset rule against `FixtureSchemas` and the bodyless-style
+      ratchet, so a new v2 route cannot ship with an undocumented answer.
 - [ ] **Capture the socket transcript.** The HTTP half is recorded; the handshake and frame
       sequence are not, and `Fixtures/` has no `socket/` directory yet.
 - [ ] **Re-record after any Node-side change.** The fixture is a snapshot of a server that is
