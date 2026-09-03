@@ -50,6 +50,7 @@ export class IMessageListener extends Loggable {
 
     stop() {
         this.stopped = true;
+        this.watcher?.stop();
         this.removeAllListeners();
     }
 
@@ -60,9 +61,13 @@ export class IMessageListener extends Loggable {
     getEarliestModifiedDate() {
         let earliest = new Date();
         for (const filePath of this.filePaths) {
-            const stat = fs.statSync(filePath);
-            if (stat.mtime < earliest) {
-                earliest = stat.mtime;
+            try {
+                const stat = fs.statSync(filePath);
+                if (stat.mtime < earliest) {
+                    earliest = stat.mtime;
+                }
+            } catch (error) {
+                this.log.debug(`Unable to stat ${filePath}: ${error}`);
             }
         }
 
@@ -70,13 +75,10 @@ export class IMessageListener extends Loggable {
     }
 
     async start() {
-        this.lastCheck = this.getEarliestModifiedDate().getTime() - 60000;
+        this.lastCheck = this.getEarliestModifiedDate().getTime();
         this.stopped = false;
 
-        // Perform an initial poll to kinda seed the cache.
-        // We'll use the earliest modified date of the files to determine the initial poll date.
-        // We'll also subtract 1 minute just to pre-load the cache with a little bit of data.
-        await this.poll(new Date(this.lastCheck), false);
+        await this.poll(new Date(this.lastCheck));
 
         this.watcher = new MultiFileWatcher(this.filePaths);
         this.watcher.on("change", async (event: FileChangeEvent) => {
