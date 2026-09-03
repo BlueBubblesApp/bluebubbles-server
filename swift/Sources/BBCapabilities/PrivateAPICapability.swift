@@ -24,6 +24,7 @@
 //
 //  See `docs/MACOS_COMPATIBILITY.md`, which this file is the executable half of.
 
+import BBPrivateAPIContract
 import Foundation
 
 /// What decides whether a capability exists, in terms a header dump can answer.
@@ -36,6 +37,14 @@ public enum CapabilityEvidence: Sendable, Hashable {
   case classExists(String)
   /// The class is present throughout and only this selector arrived later.
   case selectorExists(String, onClass: String)
+  /// A LADDER: the feature exists wherever any one of these spellings does.
+  ///
+  /// Needed because a laddered capability has no single selector present on every release —
+  /// that is what laddering means. Editing a message is on every supported macOS, but under
+  /// three different names, so asking about any one of them would report it missing
+  /// somewhere it works. Checking the set makes the ladder itself testable: if a future
+  /// release drops every rung, this fails instead of the feature quietly vanishing.
+  case anySelectorExists([String], onClass: String)
   /// **No header dump can answer this one**, and the string says why.
   ///
   /// A real case, not an escape hatch: text formatting is carried as attribute NAMES on an
@@ -65,6 +74,15 @@ public struct PrivateAPICapability: Identifiable, Sendable, Hashable {
   public let evidence: CapabilityEvidence
   /// The heading it sits under on screen.
   public let category: Category
+  /// The helper actions this capability covers.
+  ///
+  /// The real enum cases, not strings, so renaming one is a compile error here rather than a
+  /// catalog entry that quietly stops matching. This is what makes the catalog answerable to
+  /// the Private API's actual surface: a test walks every action and fails unless it is
+  /// claimed by a capability or explicitly declared not user-facing. Adding an action
+  /// without deciding which it is does not compile-and-ship — it fails.
+  public let messagesActions: [MessagesHelperAction]
+  public let faceTimeActions: [FaceTimeHelperAction]
 
   public enum Category: String, Sendable, CaseIterable, Comparable {
     case messages = "Messages"
@@ -84,7 +102,9 @@ public struct PrivateAPICapability: Identifiable, Sendable, Hashable {
 
   public init(
     id: String, title: String, summary: String, minimumMacOS: Int,
-    evidence: CapabilityEvidence, category: Category
+    evidence: CapabilityEvidence, category: Category,
+    messagesActions: [MessagesHelperAction] = [],
+    faceTimeActions: [FaceTimeHelperAction] = []
   ) {
     self.id = id
     self.title = title
@@ -92,5 +112,7 @@ public struct PrivateAPICapability: Identifiable, Sendable, Hashable {
     self.minimumMacOS = minimumMacOS
     self.evidence = evidence
     self.category = category
+    self.messagesActions = messagesActions
+    self.faceTimeActions = faceTimeActions
   }
 }

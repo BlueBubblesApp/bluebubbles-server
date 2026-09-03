@@ -230,11 +230,15 @@ let package = Package(
 
         .target(
             name: "BBCapabilities",
-            // BBCore only. Both the version gates in BBInterfaces and the settings screen
-            // read this, so it has to sit below both — and it must NOT land in
+            // The contract, for the helper-action enums: a capability names the actions it
+            // covers with the real cases rather than strings, so a renamed one is a compile
+            // error instead of a silently stale entry. The contract itself links nothing, so
+            // this costs nothing.
+            //
+            // The dependency runs this way ONLY. Nothing here may end up in
             // BBPrivateAPIContract, whose whole constraint is that it is injected into
             // Messages.app and links nothing extra.
-            dependencies: ["BBCore"],
+            dependencies: ["BBCore", "BBPrivateAPIContract"],
             swiftSettings: swiftSettings
         ),
 
@@ -553,7 +557,7 @@ let package = Package(
 
         .testTarget(
             name: "BBCapabilitiesTests",
-            dependencies: ["BBCapabilities"],
+            dependencies: ["BBCapabilities", "BBPrivateAPIContract"],
             swiftSettings: swiftSettings
         ),
 

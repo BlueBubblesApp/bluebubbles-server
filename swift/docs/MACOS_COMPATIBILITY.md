@@ -4,76 +4,96 @@ What works on each macOS this server supports, and which private selector decide
 
 ## TL;DR — what works where
 
+Two different things gate a feature, and mixing them up is the mistake this page exists to
+prevent. **Almost everything here needs the Private API**, which is a setup step on your side.
+A few things additionally need a newer macOS, which is not.
+
+### What the Private API adds — on every supported release
+
+Without it the server can do what AppleScript can do: send text, send an attachment, and start
+a one-to-one conversation. That is the whole list. Everything below works on macOS 14, 15 and
+26 alike once the helper is running.
+
+| | Without the Private API | With it |
+|---|:-:|:-:|
+| Send text, send an attachment, start a 1:1 chat | ✅ | ✅ |
+| Read messages, chats and attachments · events to clients | ✅ | ✅ |
+| Improved message sending — subject lines, screen and bubble effects | ⛔️ | ✅ |
+| Threaded replies and mentions | ⛔️ | ✅ |
+| Edit a sent message | ⛔️ | ✅ |
+| Unsend a message | ⛔️ | ✅ |
+| Typing indicators | ⛔️ | ✅ |
+| Mark as read or unread | ⛔️ | ✅ |
+| Reactions — the six named ones | ⛔️ | ✅ |
+| Stickers | ⛔️ | ✅ |
+| Managing groups — rename, add or remove people, photo, leave | ⛔️ | ✅ |
+| Start a **group** chat | Shortcut | ✅ |
+| Pinning conversations | ⛔️ | ✅ |
+| Muting conversations | ⛔️ | ✅ |
+| Spam and junk | ⛔️ | ✅ |
+| FaceTime from a client | ⛔️ | ✅ |
+| Find My | ⛔️ | ✅ |
+
+### What a newer macOS adds — on top of the above
+
 | | 14 Sonoma | 15 Sequoia | 26 Tahoe |
 |---|:-:|:-:|:-:|
-| Send, reply, edit, unsend, typing indicators | ✅ | ✅ | ✅ |
-| Reactions — the six named ones | ✅ | ✅ | ✅ |
 | Reactions — any emoji | ⛔️ | ✅ | ✅ |
 | Reactions — stickers | ⛔️ | ✅ | ✅ |
-| Send a sticker | ✅ | ✅ | ✅ |
-| Mute and unmute a conversation | ✅ | ✅ | ✅ |
-| Rename, pin, leave, manage a group | ✅ | ✅ | ✅ |
-| Mark as spam | ✅ | ✅ | ✅ |
-| Report junk to Apple / your carrier | ✅ † | ✅ † | ✅ |
+| Text formatting — bold, italics, underline, strikethrough | ⛔️ | ✅ | ✅ |
 | Schedule a message (Send Later) | ⛔️ | ✅ | ✅ |
 | Edit a scheduled message | ⛔️ | ✅ | ✅ |
 | Polls | ⛔️ | ⛔️ | ✅ |
-| Chat backgrounds | ⛔️ | ⛔️ | ✅ |
+| Conversation backgrounds | ⛔️ | ⛔️ | ✅ |
 | Screen Unknown Senders | ⛔️ | ⛔️ | ✅ |
-| Shared contact cards (nicknames) | ✅ † | ✅ | ✅ |
-| FaceTime — answer, end, join by link | ✅ | ✅ | ✅ |
-| FaceTime — start a call | ✅ | ✅ | ✅ |
-| FaceTime — revoke a link you made | ✅ | ✅ | ✅ |
-| Find My — locations, friends, devices | ✅ | ✅ | ✅ |
 
-✅ works &nbsp;·&nbsp; ⛔️ **your Mac cannot do this** — Apple added the feature in a later
-macOS, and the server refuses it with a message naming the release rather than failing
+✅ works &nbsp;·&nbsp; ⛔️ **not available** — either macOS itself lacks it, or the Private API
+is not set up. Neither is a bug, and the server refuses both with a message saying which.
 
-**There is no third state left.** Everything this server can do on Tahoe, it now does on
-Sonoma and Sequoia too, except where the ⛔️ says macOS itself does not have the feature —
-and those refusals are deliberate, not crashes. Getting here took twelve selector ladders
-(§3b); an earlier version of this table had six ⚠️ rows meaning "your Mac supports this and
-we call the wrong selector", and they are all closed.
+**There is no third state.** Everything this server does on Tahoe it now does on Sonoma and
+Sequoia too, except where macOS itself lacks the feature. Getting there took twelve selector
+ladders (§3b); an earlier version of this table had six rows meaning "your Mac supports this
+and we call the wrong selector", and they are all closed.
 
-† On Sonoma the nickname itself works; whether the **avatar photo** resolves is the one thing
-no dump has measured (§5). It is read through a `try?` and falls back to no photo, so the
-worst case is a contact card without a picture.
+† Junk reporting works on 14 and 15 through an older call that reports and relays to the
+carrier together. On those releases "report, but not to my carrier" cannot be honoured as a
+choice — the report happens either way. Reporting is the point, so it is treated as a floor
+rather than a refusal.
 
-† Junk reporting works on 14 and 15 through the older `-reportJunkToCarrier`, which reports
-and relays to the carrier in one call. So on those releases "report, but not to my carrier"
-cannot be honoured as a choice — the report happens either way. Reporting is the point, so it
-is treated as a floor rather than a refusal.
-
----
-
-**Every release here is now a runtime dump taken on a machine running it.** There is no
-borrowed data left in this table and no inference in any cell — which is new, and is why
-this document is much shorter than it used to be.
-
-Three layers. **§4 is the one to read** — capabilities against releases. §3 says what needs
-a version guard and what needs a selector ladder, which are different fixes. §6 is the
-generated detail: every selector the helpers dispatch, one column per release, grouped by
-the `hosts.conf` category it belongs to.
-
-| | |
-|---|---|
-| Per-release gap analysis, Sonoma | [`SONOMA_COMPATIBILITY.md`](SONOMA_COMPATIBILITY.md) |
-| Per-release gap analysis, Sequoia | [`SEQUOIA_COMPATIBILITY.md`](SEQUOIA_COMPATIBILITY.md) |
-| Where the headers come from | [`headers/README.md`](headers/README.md) |
-| What differs between releases, and why | [`private-api/macos-versions.md`](private-api/macos-versions.md) |
+† On Sonoma, shared contact cards work but whether the **avatar photo** resolves is the one
+thing no dump has measured (§5). It falls back to no photo, so the worst case is a contact
+card without a picture.
 
 ## 1. The executable half of this document
 
-`Sources/BBCapabilities` carries the same facts as §3a, as code:
-`PrivateAPICapability.all` declares each feature macOS itself gates, with the class or
-selector that decides it. Three things read it and nothing repeats it — the version gates
-take their number from it, the settings screen enumerates it, and a test re-derives every
-minimum from `docs/headers/` and fails if a declaration disagrees with the dumps.
+`Sources/BBCapabilities` carries the same facts as the TL;DR, as code:
+`PrivateAPICapability.all` declares each feature the Private API provides — both the ones
+every release has and the ones macOS gates. Three things read it and nothing repeats it: the
+version gates take their number from it, the settings screen enumerates it, and the tests
+below re-derive it.
 
-So a new capability is two lines there, and this document's §3a is the prose mirror rather
-than a second source. **What is deliberately NOT in that catalog is anything the helper
-ladders** — §3b. Those work on every supported release, so listing them as version-dependent
-would advertise an upgrade that buys nothing.
+**A capability is written by hand. What it claims cannot be wrong for long**, and that is the
+whole design — three separate checks, each closing a different way this could rot:
+
+| The catalog could... | Caught by |
+|---|---|
+| declare a wrong macOS minimum | `evidence` names the class or selector that decides it; a test re-derives the minimum from `docs/headers/` and fails if they disagree |
+| **miss a feature entirely** | every capability names the `MessagesHelperAction`/`FaceTimeHelperAction` cases it covers, and a test walks *every* action, failing unless it is claimed or explicitly listed as not user-facing, with a reason |
+| leak API vocabulary onto the screen | a test rejects any title, summary or heading containing a selector, a function, a framework or an Apple type prefix |
+
+The middle row is the one that makes this a registry rather than a list. Adding a helper
+action already fails to compile until `HelperDispatch` handles it; once it does, the coverage
+test fails until somebody decides whether a user would recognise it. Both were verified by
+adding a fake `pin-message` action and watching each gate fire in turn.
+
+What is **not** automatic: writing the entry. Nothing infers a title or a one-line summary
+from a selector, and nothing should — that copy is the product decision, and the tests exist
+to make sure it is made rather than to make it.
+
+A laddered feature IS in the catalog, as something the Private API adds on every release,
+with every rung of its ladder as evidence — so the test fails if a future macOS drops them
+all. What it is not is version-gated, because listing it that way would advertise an upgrade
+that gains nothing.
 
 ## 2. The dumps
 

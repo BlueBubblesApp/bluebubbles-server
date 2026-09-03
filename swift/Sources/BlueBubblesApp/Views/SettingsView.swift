@@ -20,6 +20,14 @@ struct SettingsView: View {
 
   @Bindable var model: AppModel
 
+  /// What state the Private API is in, decided by `FeatureAvailabilityView` and read here so
+  /// the rest of the page follows it — see `PrivateAPIPresence` for why three states and not
+  /// two.
+  ///
+  /// Starts connected so a page that has not polled yet does not open by telling somebody
+  /// with a working setup to go and disable SIP.
+  @State private var privateAPIPresence: PrivateAPIPresence = .connected
+
   var body: some View {
     @Bindable var model = model
     return Group {
@@ -61,9 +69,22 @@ struct SettingsView: View {
         // without SIP disabled — every switch here injects a dylib — and a user who has not
         // done that will otherwise turn one on, see it fail, and have no idea the two are
         // connected.
+        // The features card is FIRST: "what does this get me" is the question somebody
+        // arrives with, and it is the one that makes the rest of the page worth reading.
         if model.settingsTab == .privateAPI {
-          PrivateAPIPrerequisiteNote()
-          PrivateAPIStatusCard(model: model)
+          FeatureAvailabilityView(model: model, presence: $privateAPIPresence)
+          // The SIP note is a prerequisite for SETTING THIS UP, so it is noise once the
+          // helper is answering — it can only tell somebody who has already done it that
+          // they need to do it.
+          if privateAPIPresence.showsPrerequisiteNote {
+            PrivateAPIPrerequisiteNote()
+          }
+          // And the connection status is only worth showing once there is a connection to
+          // have an opinion about. Switched off, it would explain at length that nothing
+          // has been injected, on a page already saying what injecting it would get you.
+          if privateAPIPresence.showsStatusCard {
+            PrivateAPIStatusCard(model: model)
+          }
         }
 
         // Driven off the TAB's section list rather than the registry's order, so the
@@ -86,13 +107,6 @@ struct SettingsView: View {
         // Under the FaceTime toggles that produce the links it clears.
         if model.settingsTab == .privateAPI {
           FaceTimeMaintenance(model: model)
-        }
-
-        // Above the Private API settings rather than below them: the question "can my Mac
-        // do this at all" comes before "is it switched on", and a toggle for something the
-        // OS does not have is a confusing thing to meet first.
-        if model.settingsTab == .privateAPI {
-          FeatureAvailabilityView()
         }
 
         // Under Features, because that is where the capability it turns on is described.

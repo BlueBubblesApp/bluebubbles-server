@@ -108,6 +108,13 @@ struct CapabilityCatalogTests {
             try Self.classPresent(name, in: release.url)
           case .selectorExists(let selector, let className):
             try Self.selectorPresent(selector, onClass: className, in: release.url)
+          case .anySelectorExists(let selectors, let className):
+            try selectors.reduce(nil as Bool?) { answer, selector in
+              // nil (class not dumped) only survives if EVERY rung is unanswerable.
+              let one = try Self.selectorPresent(selector, onClass: className, in: release.url)
+              guard let one else { return answer }
+              return (answer ?? false) || one
+            }
           case .notVisibleInHeaders:
             nil
           }
@@ -184,13 +191,141 @@ struct CapabilityCatalogTests {
     }
   }
 
-  @Test("Upgrade paths group by release, oldest upgrade first")
+  @Test("Upgrade paths group by release, newest first to match the upward arrows")
   func upgradePathsAreOrdered() {
     let paths = PrivateAPICapability.all.upgradePaths(from: 14)
-    #expect(paths.map(\.macOS) == [15, 26])
+    #expect(paths.map(\.macOS) == [26, 15])
     #expect(paths.allSatisfy { !$0.capabilities.isEmpty })
     // Nothing is offered as an upgrade on the newest release we know about.
     #expect(PrivateAPICapability.all.upgradePaths(from: 26).isEmpty)
     #expect(PrivateAPICapability.all.available(on: 26).count == PrivateAPICapability.all.count)
+  }
+}
+
+@Suite("Feature listing")
+struct FeatureListingTests {
+
+  @Test("Connected on the newest release lists everything and offers no upgrade")
+  func connectedOnNewest() {
+    let entries = PrivateAPICapability.listing(macOSMajor: 26, privateAPIConnected: true)
+    #expect(entries.featureCount == PrivateAPICapability.all.count)
+    #expect(entries.allSatisfy { entry in
+      if case .feature(_, let availability) = entry { return availability == .available }
+      return true
+    })
+    #expect(!entries.contains { if case .heading(let t, _) = $0 { return t.contains("Upgrade") } else { return false } })
+  }
+
+  @Test("Connected on an older release separates what an upgrade would add")
+  func connectedOnOlder() {
+    let entries = PrivateAPICapability.listing(macOSMajor: 14, privateAPIConnected: true)
+    let upgradeHeadings = entries.compactMap { entry -> String? in
+      if case .heading(let text, true) = entry, text.hasPrefix("Upgrade") { return text }
+      return nil
+    }
+    // Newest first, matching the upward arrows the view draws.
+    #expect(upgradeHeadings.count == 2)
+    #expect(upgradeHeadings.first?.contains("26") == true)
+    #expect(upgradeHeadings.last?.contains("15") == true)
+    #expect(entries.featureCount == PrivateAPICapability.all.count)
+  }
+
+  /// The bug that started this: a macOS 14 user with the Private API off saw an empty card,
+  /// because the catalog only held version-gated features and none of them are on 14.
+  @Test("Not connected always lists something to gain, on every release")
+  func notConnectedIsNeverEmpty() {
+    for macOS in [14, 15, 26] {
+      let entries = PrivateAPICapability.listing(macOSMajor: macOS, privateAPIConnected: false)
+      #expect(entries.featureCount > 0, "macOS \(macOS) with no Private API showed nothing")
+      let reachable = entries.filter {
+        if case .feature(_, let availability) = $0 { return availability == .needsPrivateAPI }
+        return false
+      }
+      #expect(
+        reachable.count == PrivateAPICapability.all.available(on: macOS).count,
+        "everything this macOS supports should be offered as something to unlock")
+    }
+  }
+
+  @Test("Collapsing counts features, not headings, and never ends on a heading")
+  func collapsing() {
+    let entries = PrivateAPICapability.listing(macOSMajor: 14, privateAPIConnected: false)
+    #expect(entries.featureCount > 6)
+
+    let collapsed = entries.collapsed(toFeatures: 6)
+    #expect(collapsed.featureCount == 6, "headings must not consume the budget")
+    #expect(
+      collapsed.last?.isFeature == true,
+      "a collapsed list must not end on a heading, separator or note")
+    #expect(collapsed.count < entries.count)
+    // The prefix is a prefix: order is preserved and nothing is reordered on collapse.
+    #expect(Array(entries.prefix(collapsed.count)).map(\.id) == collapsed.map(\.id))
+  }
+
+  @Test("A listing that already fits is returned whole")
+  func collapsingShortList() {
+    let entries = PrivateAPICapability.listing(macOSMajor: 26, privateAPIConnected: true)
+    let limit = entries.featureCount
+    #expect(entries.collapsed(toFeatures: limit).count == entries.count)
+    #expect(entries.collapsed(toFeatures: limit + 5).count == entries.count)
+  }
+
+  @Test("The upgrade block is separated, and its order is explained once")
+  func upgradeBlockIsMarkedOff() {
+    let entries = PrivateAPICapability.listing(macOSMajor: 14, privateAPIConnected: true)
+
+    // A rule before each upgrade group, and never as the first thing on the card.
+    #expect(entries.first != .separator)
+    let separators = entries.filter { $0 == .separator }.count
+    #expect(separators == PrivateAPICapability.all.upgradePaths(from: 14).count)
+
+    // The ordering note is said once, and it sits above the first upgrade heading.
+    let notes = entries.compactMap { entry -> String? in
+      if case .note(let text) = entry { return text }
+      return nil
+    }
+    #expect(notes.count == 1)
+    let noteIndex = entries.firstIndex { if case .note = $0 { return true } else { return false } }
+    let firstUpgradeHeading = entries.firstIndex {
+      if case .heading(let text, _) = $0 { return text.hasPrefix("Upgrade") }
+      return false
+    }
+    #expect(noteIndex != nil && firstUpgradeHeading != nil)
+    #expect(noteIndex! < firstUpgradeHeading!)
+  }
+
+  @Test("With one upgrade there is no order to explain, so nothing is said")
+  func noOrderingNoteForASingleUpgrade() {
+    let entries = PrivateAPICapability.listing(macOSMajor: 15, privateAPIConnected: true)
+    #expect(PrivateAPICapability.all.upgradePaths(from: 15).count == 1)
+    #expect(!entries.contains { if case .note = $0 { return true } else { return false } })
+    #expect(entries.contains(.separator), "the block is still marked off")
+  }
+
+  @Test("The not-connected card separates the part an upgrade also gates")
+  func notConnectedSeparatesUpgradeHalf() {
+    let entries = PrivateAPICapability.listing(macOSMajor: 14, privateAPIConnected: false)
+    #expect(entries.contains(.separator))
+    #expect(entries.first != .separator)
+    // Only one rule: there is one block below the line, not one per release.
+    #expect(entries.filter { $0 == .separator }.count == 1)
+  }
+
+  @Test("Every heading is plain language too")
+  func headingsAreReadable() {
+    for macOS in [14, 15, 26] {
+      for connected in [true, false] {
+        let entries = PrivateAPICapability.listing(
+          macOSMajor: macOS, privateAPIConnected: connected)
+        for entry in entries {
+          guard case .heading(let text, _) = entry else { continue }
+          // `(` alone is not a smell — "macOS Tahoe (26)" is exactly how a release should
+          // be named. `()` is, because that is a function.
+          #expect(!text.contains(":"), "heading looks like a selector: \(text)")
+          #expect(!text.contains("()"), "heading names a function: \(text)")
+          #expect(!text.contains("_"), "heading contains an identifier: \(text)")
+        }
+      }
+    }
   }
 }
