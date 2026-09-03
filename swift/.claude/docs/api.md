@@ -76,6 +76,19 @@ the read side the attributes come back as they are stored — `__kIMTextBoldAttr
 `TextEffect` in the contract. Measured 2 September 2026: `.claude/docs/imessage.md` § Text
 formatting.
 
+### Emoji reactions on `/message/react`
+
+`reaction: "emoji"` or `"-emoji"` plus an `emoji` field (`"🔥"`). Additive on the existing
+route rather than a new one: a reaction is a reaction, the client already has this call, and
+the reference validator's `in:` list of six names is the only thing that changes — an
+unknown name was a 400 there and `emoji` is a new name here. IMCore types 2006 / 3006.
+
+On the read side the row's type is still the reference's numeric string (`"2006"`) — v1 is
+frozen — and the emoji itself is `associatedMessageEmoji`, a field of ours declared in
+`acceptedDifferences`, present only on rows that have one. Sending a second reaction to the
+same message replaces the first, and removing one deletes its row, which is Messages'
+own behaviour and what the tests below observed.
+
 ### Eight routes answer with the MESSAGE, not with an identifier
 
 `POST /message/text`, `/attachment`, `/attachment/chunk`, `/multipart`, `/react`,

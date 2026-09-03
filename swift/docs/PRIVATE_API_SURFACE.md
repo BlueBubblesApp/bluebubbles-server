@@ -329,6 +329,26 @@ the full lifecycle: `editScheduledMessageItem:scheduleType:deliveryTime:`,
 probably the single most requested thing in this whole list and it does not appear to be
 blocked by anything.
 
+### Tapbacks, including emoji — `IMTapbackSender`
+
+Backs `message.react`. Disassembled from `-[IMChat(CKMessageAcknowledgment)
+sendTapback:forChatItem:languageIdentifier:]` on macOS 26.5.2, which is what Messages calls
+for every tapback:
+
+| Step | Selector | Notes |
+|---|---|---|
+| tapback | `+[IMTapback tapbackWithAssociatedMessageType:]` | the six named ones |
+| tapback (emoji) | `-[IMEmojiTapback initWithEmoji:isRemoved:]` | types 2006 / 3006, emoji in `associatedMessageEmoji` |
+| part | `IMChatHistoryController` → `_newChatItems[partIndex]` | as replies and stickers |
+| send | `-[IMTapbackSender initWithTapback:chat:messagePartChatItem:]`, then `send` | a Swift class in IMCore; the three-argument initializer derives the GUID (`p:<part>/<guid>`), the part's range, the summary via `+[IMChat configureMessageSummaryInfoForChatItem:]` and the thread identifier itself. `send` answers the tapback's `IMMessage` |
+
+Verified: love, 🔥 and −🔥 all land with `p:0/<guid>` and the part's range `0:55`; the
+emoji rows carry `associated_message_emoji`. Messages replaces a prior reaction of yours
+when a new one is sent and deletes the row when one is removed.
+
+The association-initializer path (bare GUID, range `(part, 1)`, text `TEMP`) is kept only
+as the fallback for a macOS without `IMTapbackSender`, and cannot carry an emoji.
+
 ### Reply threads — `threadIdentifier` is not a GUID
 
 Backs `selectedMessageGuid` on `message.sendText`, `message.sendMultipart` and

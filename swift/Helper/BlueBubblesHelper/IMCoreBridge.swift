@@ -301,9 +301,34 @@ public final class IMCoreBridge: PrivateAPI {
   /// PORTED. ObjC: the association initializer plus `[chat sendMessage:]`
   /// (BlueBubblesHelper.m:1053).
   public func react(_ request: ReactionRequest) async throws -> SentMessage {
-    try translating {
+    // Messages' own path (`IMTapbacks`) wants the target PART chat item; loaded first
+    // because that is asynchronous, used inside the block with no suspension after.
+    let part: AnyObject? =
+      IMTapbacks.senderAvailable
+      ? try await IMChatHistory.messagePartChatItem(
+        guid: request.target.rawValue, partIndex: request.partIndex)
+      : nil
+    return try translating {
       let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
 
+      if let part {
+        let tapback = try IMTapbacks.tapback(request.reaction, emoji: request.emoji)
+        let sent = try IMTapbacks.send(tapback, chat: chat, part: part)
+        var guid = sent.flatMap { ((try? IMCoreRuntime.string($0, "guid")) ?? nil) }
+        if guid == nil { guid = try chat.lastSentMessageGUID() }
+        guard let guid else {
+          throw PrivateAPIErrorShim.rejected(
+            "Messages accepted the reaction but reported no message GUID")
+        }
+        return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
+      }
+
+      // Fallback for a macOS without IMTapbackSender: the association initializer, which
+      // has no way to carry an emoji.
+      guard !request.reaction.isEmoji else {
+        throw PrivateAPIError.unavailableOnThisOS(
+          method: "react(_:)", requires: "IMTapbackSender (macOS 15 or later)")
+      }
       // A tapback still carries text, and IMCore rejects an empty one — the shipping
       // helper substitutes "TEMP" for exactly this reason (BlueBubblesHelper.m:1024).
       // The text is never displayed; the association is what renders.

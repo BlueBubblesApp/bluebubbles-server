@@ -192,7 +192,10 @@ public enum WriteHandlers {
         chatGUID: chatGUID,
         targetGUID: target,
         reaction: reaction,
-        partIndex: values["partIndex"]?.intValue ?? 0
+        partIndex: values["partIndex"]?.intValue ?? 0,
+        // `reaction: "emoji"` (or `"-emoji"`) plus the emoji itself. Additive: the
+        // reference's route knows only the six named tapbacks.
+        emoji: values["emoji"]?.stringValue
       )
       // The tapback's OWN message, not the one it reacts to. No error check: the
       // reference's reaction route answers 200 whatever the row's `error` says.

@@ -556,9 +556,6 @@ content stops transiting Google.
 
 ## Private API — design follow-ups
 
-- [ ] **Move `react` onto ChatKit.** It goes through IMCore today. The reference uses
-      `CKChatItem` + `chat.sendTapback:forChatItem:`, which is also where the macOS 26
-      `IMEmojiTapback` path lives — so arbitrary-emoji tapbacks are unreachable until this moves.
 - [ ] **Consider routing text-only `sendMultipart` through IMCore.** It goes through ChatKit
       today for uniformity. ChatKit is the larger and less stable surface and text does not need
       it; narrowing the ChatKit dependency to attachments only would reduce the blast radius of
@@ -672,6 +669,19 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
       add a decoded `formatting` array using `TextEffect(attributeValue:)`; v1 is frozen.
 - [ ] The Flutter client neither renders nor sends these yet.
 
+## Emoji reactions: what the first pass left out
+
+`reaction: emoji` on `/message/react` sends through `IMTapbackSender` (`docs/PRIVATE_API_SURFACE.md`
+§ Tapbacks). Verified on 26.5.2 from the sender's side.
+
+- [ ] Nothing has looked at an emoji reaction on a receiving device.
+- [ ] The read side reports `associatedMessageType: "2006"` (the reference's numeric
+      fallback) plus our `associatedMessageEmoji`. A v2 read could spell the type `emoji`;
+      v1 stays as it is.
+- [ ] The Flutter client neither renders nor sends emoji reactions.
+- [ ] Sticker tapbacks (`IMStickerTapback`, 2007 / 3007) are the same sender with a
+      different tapback object and a sticker transfer; not built.
+
 ## `POST /message/attachment/chunk` reads base64 JSON; the reference reads a multipart `chunk`
 
 Found while fixing `/message/attachment`, which had the same problem: the reference's chunk
@@ -709,11 +719,9 @@ the full `sticker_user_info`, `is_delivered 1`. What was verified is the SENDER'
       different objects and are not built. The tapback form is what iOS 17's "react with a
       sticker" sends.
 - [ ] Repositioning: `-[IMChat repositionSticker:associatedChatItem:]` exists. Not built.
-- [ ] The `send-reaction` path passes the bare message GUID and `(partIndex, 1)` as the
-      association; Messages' own tapbacks carry `p:<part>/<guid>` and the part's real range
-      (chat.db: 19,303 rows with the `p:` prefix on this Mac). Tapbacks render anyway, so
-      this is a parity note, not a defect — but the sticker path needed the real values and
-      the reaction path would be more faithful with them.
+- [ ] The fallback reaction path (no `IMTapbackSender`) still passes the bare message GUID
+      and `(partIndex, 1)`. It is only reached on a macOS without the sender class, which
+      is none of the supported ones as far as is known; worth a check on Sonoma.
 - [ ] Record a fixture. The route sits in `docs/api/uncovered-routes.txt` because the
       conformance recorder runs against the Node server, which has no sticker route.
 - [ ] An `NSException` raised inside an IMCore call surfaces as

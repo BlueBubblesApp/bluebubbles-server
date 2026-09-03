@@ -110,11 +110,12 @@ public actor PrivateAPIClient: PrivateAPI {
   public func react(_ request: ReactionRequest) async throws -> SentMessage {
     let result = try await transport.request(
       action: .sendReaction,
-      data: .object([
+      data: .object(dropping: [
         "chatGuid": .string(request.chat.rawValue),
         "selectedMessageGuid": .string(request.target.rawValue),
         "reactionType": .string(request.reaction.rawValue),
         "partIndex": .number(Double(request.partIndex)),
+        "reactionEmoji": request.emoji.map(WireJSON.string),
       ]))
     return try sentMessage(from: result, chat: request.chat)
   }

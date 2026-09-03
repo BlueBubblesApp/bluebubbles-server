@@ -229,12 +229,15 @@ public struct SendMultipartRequest: Codable, Sendable {
 
 public enum ReactionType: String, Codable, Sendable, CaseIterable {
   case love, like, dislike, laugh, emphasize, question
+  /// Any emoji, with the emoji itself in `ReactionRequest.emoji`. iOS 18 / macOS 15.
+  case emoji
   case removeLove = "-love"
   case removeLike = "-like"
   case removeDislike = "-dislike"
   case removeLaugh = "-laugh"
   case removeEmphasize = "-emphasize"
   case removeQuestion = "-question"
+  case removeEmoji = "-emoji"
 
   /// The `associatedMessageType` IMCore expects.
   ///
@@ -257,11 +260,18 @@ public enum ReactionType: String, Codable, Sendable, CaseIterable {
     case .removeLaugh: 3003
     case .removeEmphasize: 3004
     case .removeQuestion: 3005
+    // Read from `-[IMEmojiTapback initWithEmoji:isRemoved:]` on macOS 26.5.2 (2006 / 3006),
+    // and from every emoji reaction row in chat.db on this Mac.
+    case .emoji: 2006
+    case .removeEmoji: 3006
     }
   }
 
   /// Whether this removes a tapback rather than adding one.
   public var isRemoval: Bool { associatedMessageType >= 3000 }
+
+  /// Whether this is an emoji tapback, which needs an emoji to go with it.
+  public var isEmoji: Bool { self == .emoji || self == .removeEmoji }
 }
 
 public struct ReactionRequest: Codable, Sendable {
@@ -269,13 +279,18 @@ public struct ReactionRequest: Codable, Sendable {
   public let target: MessageGUID
   public let reaction: ReactionType
   public let partIndex: Int
+  /// The emoji, for `.emoji` and `.removeEmoji`. Ignored for the six named tapbacks.
+  public let emoji: String?
 
-  public init(chat: ChatIdentifier, target: MessageGUID, reaction: ReactionType, partIndex: Int = 0)
-  {
+  public init(
+    chat: ChatIdentifier, target: MessageGUID, reaction: ReactionType, partIndex: Int = 0,
+    emoji: String? = nil
+  ) {
     self.chat = chat
     self.target = target
     self.reaction = reaction
     self.partIndex = partIndex
+    self.emoji = emoji
   }
 }
 

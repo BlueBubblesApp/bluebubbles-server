@@ -834,11 +834,17 @@ public struct MessageInterface: MessagesBackedInterface {
     chatGUID: String,
     targetGUID: String,
     reaction: String,
-    partIndex: Int = 0
+    partIndex: Int = 0,
+    emoji: String? = nil
   ) async throws -> SendOutcome {
     let api = try requirePrivateAPI(for: "reactions")
     guard let type = ReactionType(rawValue: reaction) else {
       throw InterfaceError.invalidRequest("unknown reaction type: \(reaction)")
+    }
+    // `emoji` / `-emoji` carry the emoji in its own field; without one there is nothing
+    // to send. A named tapback ignores the field rather than refusing it.
+    if type.isEmoji, (emoji ?? "").isEmpty {
+      throw InterfaceError.invalidRequest("an `emoji` is required for the emoji reaction")
     }
     // The reference reads the target first and refuses a reaction to a message it does not
     // have, before reaching Messages at all — so a bad `selectedMessageGuid` is a 400 rather
@@ -851,7 +857,8 @@ public struct MessageInterface: MessagesBackedInterface {
           chat: ChatIdentifier(chatGUID),
           target: MessageGUID(targetGUID),
           reaction: type,
-          partIndex: partIndex
+          partIndex: partIndex,
+          emoji: type.isEmoji ? emoji : nil
         )
       )
     }

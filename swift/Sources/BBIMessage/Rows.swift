@@ -83,6 +83,8 @@ public struct IMessageRow: Sendable {
   /// Prefixed: `p:0/GUID`, `bp:GUID`, or bare. The prefix is meaningful.
   public let associatedMessageGUID: String?
   public let associatedMessageType: Int
+  /// The emoji of an emoji tapback (types 2006 / 3006). Sonoma and later; nil elsewhere.
+  public let associatedMessageEmoji: String?
   public let payloadData: Data?
   public let messageSummaryInfo: Data?
 
@@ -151,6 +153,7 @@ public struct IMessageRow: Sendable {
     expressiveSendStyleID = row.optional("expressive_send_style_id")
     associatedMessageGUID = row.optional("associated_message_guid")
     associatedMessageType = row.optional("associated_message_type") ?? 0
+    associatedMessageEmoji = row.optional("associated_message_emoji")
     payloadData = row.optional("payload_data")
     messageSummaryInfo = row.optional("message_summary_info")
 

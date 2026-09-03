@@ -111,6 +111,13 @@ public struct MessageSerializer: Sendable {
       "associatedMessageType",
       ReactionWireType.name(for: message.associatedMessageType).map(JSONValue.string)
     )
+    // OURS, not the reference's: the reference never read this column, so an emoji
+    // tapback reached clients as type "2006" with no way to know which emoji. Present
+    // only when there is one — never a null key — so a plain message's payload, and the
+    // 4000-byte FCM cap, are untouched. Declared in `acceptedDifferences`.
+    if let emoji = message.associatedMessageEmoji, !emoji.isEmpty {
+      object.set("associatedMessageEmoji", .string(emoji))
+    }
     object.setOrNull("expressiveSendStyleId", message.expressiveSendStyleID.map(JSONValue.string))
     object.setOrNull("threadOriginatorGuid", message.threadOriginatorGUID.map(JSONValue.string))
     object.set("hasPayloadData", .bool(message.payloadData != nil))

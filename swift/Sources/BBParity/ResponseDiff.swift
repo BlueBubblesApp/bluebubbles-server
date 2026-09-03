@@ -56,7 +56,11 @@ public let acceptedDifferences: [String: String] = [
   // not catch it. A bare link-local address cannot be dialled without a zone index, and this
   // field feeds the "how do I reach my server" setup screen, so publishing them is noise a
   // client cannot act on. Confirmed as a deliberate keep.
-  "local_ipv6s": "link-local addresses are dropped; the reference publishes them"
+  "local_ipv6s": "link-local addresses are dropped; the reference publishes them",
+
+  // An emoji tapback's emoji. The reference serialises the row without it, so a client saw
+  // `associatedMessageType: "2006"` and nothing else; present only on rows that have one.
+  "associatedMessageEmoji": "the emoji of an emoji tapback; the reference never read the column",
 ]
 
 public struct Difference: Sendable, Equatable, CustomStringConvertible {

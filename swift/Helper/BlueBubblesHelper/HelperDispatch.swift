@@ -154,7 +154,9 @@ enum HelperDispatch {
           chat: try chat(),
           target: try message("selectedMessageGuid"),
           reaction: reaction,
-          partIndex: integer("partIndex")
+          partIndex: integer("partIndex"),
+          // The Objective-C helper's own key for it.
+          emoji: optionalString("reactionEmoji")
         )
       )
       return ["identifier": reacted.guid.rawValue]

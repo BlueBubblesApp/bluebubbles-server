@@ -1494,6 +1494,77 @@ enum IMMessageBuilder {
   }
 }
 
+// MARK: - Tapbacks
+
+/// A tapback sent the way Messages sends one.
+///
+/// `-[IMChat(CKMessageAcknowledgment) sendTapback:forChatItem:languageIdentifier:]`,
+/// disassembled on macOS 26.5.2, reduces to: an `IMTapback` (or `IMEmojiTapback`), the
+/// part chat item's GUID, `originalMessagePartRange`, a summary from
+/// `+[IMChat configureMessageSummaryInfoForChatItem:]` and `threadIdentifierForTapback`,
+/// all handed to `IMTapbackSender`, whose `send` builds and sends the message.
+/// `IMTapbackSender` also has `initWithTapback:chat:messagePartChatItem:`, which derives
+/// those from the part itself; that is what is used here.
+///
+/// This is the only way to send an EMOJI tapback — `IMEmojiTapback` carries the emoji and
+/// the sender writes it into `associatedMessageEmoji`. It is also what Messages uses for
+/// the six named ones, so they go through it too when it exists, which fixes what the
+/// association-initializer path got wrong (a bare target GUID where Messages writes
+/// `p:<part>/<guid>`, and a range of `(part, 1)` where Messages writes the part's own).
+/// That path stays as the fallback for a macOS without `IMTapbackSender`.
+enum IMTapbacks {
+
+  /// Whether Messages' own sender is available here.
+  static var senderAvailable: Bool {
+    guard let sender = IMCoreRuntime.lookUpClass("IMTapbackSender") else { return false }
+    return (sender as AnyObject).responds(to: NSSelectorFromString("alloc"))
+      && class_getInstanceMethod(
+        sender, NSSelectorFromString("initWithTapback:chat:messagePartChatItem:")) != nil
+  }
+
+  /// The tapback object: `IMEmojiTapback` for an emoji, `IMTapback` for a named one.
+  static func tapback(_ reaction: ReactionType, emoji: String?) throws -> AnyObject {
+    if reaction.isEmoji {
+      guard let emoji, !emoji.isEmpty else {
+        throw PrivateAPIErrorShim.rejected("an emoji reaction needs an emoji")
+      }
+      let type: AnyClass = try IMCoreRuntime.requireClass("IMEmojiTapback")
+      guard
+        let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+          .takeUnretainedValue(),
+        let tapback = try IMCoreRuntime.invoke(
+          allocated, "initWithEmoji:isRemoved:", [emoji, reaction.isRemoval])
+      else {
+        throw PrivateAPIErrorShim.rejected("IMEmojiTapback would not initialise for \(emoji)")
+      }
+      return tapback
+    }
+    let type: AnyClass = try IMCoreRuntime.requireClass("IMTapback")
+    guard
+      let tapback = try IMCoreRuntime.invoke(
+        type as AnyObject, "tapbackWithAssociatedMessageType:",
+        [reaction.associatedMessageType])
+    else {
+      throw PrivateAPIErrorShim.rejected("IMTapback would not build type \(reaction.rawValue)")
+    }
+    return tapback
+  }
+
+  /// Sends, and returns the message `send` answered with — the tapback's own `IMMessage`.
+  static func send(_ tapback: AnyObject, chat: IMChat, part: AnyObject) throws -> AnyObject? {
+    let type: AnyClass = try IMCoreRuntime.requireClass("IMTapbackSender")
+    guard
+      let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+        .takeUnretainedValue(),
+      let sender = try IMCoreRuntime.invoke(
+        allocated, "initWithTapback:chat:messagePartChatItem:", [tapback, chat.object, part])
+    else {
+      throw PrivateAPIErrorShim.rejected("IMTapbackSender would not initialise")
+    }
+    return try IMCoreRuntime.invoke(sender, "send")
+  }
+}
+
 // MARK: - Reply threads
 
 /// What a reply carries so that Messages threads it.
