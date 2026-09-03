@@ -133,7 +133,7 @@ refuse a working feature, which is why these are laddered rather than gated.
 | Outgoing FaceTime call | `dialWithRequest:completion:` | same | `dialWithRequest:completionWithError:` | ✓ |
 | Send a sticker | no `accessibilityName:`, no `externalURI:` | current | current | ✓ |
 | Invalidate a FaceTime link | `invalidateLink:completionHandler:` | 3-argument | 3-argument | ✗ |
-| Availability fetch | `_fetchUpdatedStatusForHandle:completion:` | unprefixed | unprefixed | ✗ |
+| Availability fetch | `_fetchUpdatedStatusForHandle:completion:` | unprefixed | unprefixed | ✓ |
 | Edit a scheduled message | *(no Send Later)* | `…atPartIndex:withNewPartText:` | `…newPartTranslation:` | ✗ |
 
 The four that mattered are done. Two of them — junk reporting and outgoing FaceTime calls —
@@ -141,9 +141,9 @@ were broken on **both** older releases, which is how the Sequoia dump changed th
 14 and 15 share the older spelling and only 26 has the new one, so one ladder fixed two
 releases each.
 
-Three remain, all narrow: a FaceTime link cannot be revoked on Sonoma, availability status is
-not refreshed there, and a scheduled message cannot be edited on Sequoia. Each fails cleanly
-with `unavailableOnThisOS` rather than misbehaving.
+Two remain, both narrow: a FaceTime link cannot be revoked on Sonoma, and a scheduled message
+cannot be edited on Sequoia. Each fails cleanly with `unavailableOnThisOS` rather than
+misbehaving.
 
 ### Reading the tool's numbers
 
@@ -153,6 +153,11 @@ the 26-only selector, it just asks `responds(to:)` first. So treat that count as
 **candidates to check**, never as a count of bugs. This table is the answer to which is which,
 and it is maintained by hand because the distinction is a judgement about control flow that
 no selector index can see.
+
+That is not a hypothetical failure mode. The availability-fetch row above was written into
+this table as missing a ladder, and into `../TODO.md` as work to do, on the strength of the
+tool listing it absent on 14.6.1 — which it is. It has been laddered the whole time, at
+`IMCoreObjects.swift:1413`. **Read the call site before believing a row here.**
 
 ## 3. Capabilities
 

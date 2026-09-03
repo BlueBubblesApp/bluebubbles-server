@@ -55,20 +55,30 @@ confidence in one, and none can be answered from here now.
       initializer — the fallback is correct but has coarser part ranges, which is what the
       sender path was introduced to improve. `probe.sh` / `trace.sh` on a 14 machine.
 
-## Three narrow version ladders still missing
+## Two narrow version ladders still missing
 
 The four that cost a whole feature are done — junk reporting, leaving Junk, the FaceTime dial
-and sticker sending all ladder now. These three remain, each affecting one release and each
+and sticker sending all ladder now. These two remain, each affecting one release and each
 failing cleanly with `unavailableOnThisOS` rather than misbehaving.
 `docs/MACOS_COMPATIBILITY.md` §2b has the selector for each.
 
-- [ ] **Revoking a FaceTime link — Sonoma only.** 14 has the two-argument
-      `-invalidateLink:completionHandler:`; the `deleteReason:` argument arrived in 15.
-- [ ] **Editing a scheduled message — Sequoia only.** 15 has
-      `-editScheduledMessageItem:atPartIndex:withNewPartText:`; 26 added `newPartTranslation:`.
-      Sonoma has no Send Later at all, so it cannot reach this.
-- [ ] **Availability refresh — Sonoma only.** 14 has
-      `-_fetchUpdatedStatusForHandle:completion:`; the underscore was dropped in 15.
+- [ ] **Revoking a FaceTime link — Sonoma only.** `FaceTimeBridge.swift:785` calls
+      `-invalidateLink:deleteReason:completionHandler:` unguarded. 14 has the two-argument
+      `-invalidateLink:completionHandler:`; `deleteReason:` arrived in 15. The code passes
+      reason `1`, so the older rung just drops that argument. Both completions are
+      `(BOOL, NSError *)`, so `callAwaitingCompletionBool` serves either.
+- [ ] **Editing a scheduled message — Sequoia only.** `IMCoreObjects.swift:419` calls
+      `-editScheduledMessageItem:atPartIndex:withNewPartText:newPartTranslation:`, guarded but
+      with no second rung. 15 has `…atPartIndex:withNewPartText:`; `newPartTranslation:`
+      arrived in 26 and this code passes `NSNull()` for it, so the older rung drops it and
+      loses nothing. Sonoma has no Send Later at all, so it never reaches here.
+
+**A third was listed here and was wrong.** The availability refresh
+(`IMHandleAvailabilityManager`) is *already* laddered — `IMCoreObjects.swift:1413` tries
+`fetchUpdatedStatusForHandle:completion:` then the underscored Sonoma spelling, and has since
+before this work. It was mistakenly added because `compare-releases.py` lists it as absent on
+14.6.1, which it is: the tool indexes selector NAMES and cannot see that the call is guarded.
+That is the caveat in `docs/MACOS_COMPATIBILITY.md` §2b, walked straight into.
 
 ## `canReportJunk` reports false on Sonoma while reporting works
 

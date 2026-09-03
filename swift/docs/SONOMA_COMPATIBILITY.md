@@ -196,14 +196,14 @@ Same shape as the three-generation `editMessage` ladder, which is already correc
 has generation 2 (`editMessageItem:atPartIndex:withNewPartText:backwardCompatabilityText:`)
 and the ladder finds it. These five need the same treatment.
 
-| Feature | Called | On Sonoma instead | Site |
+| Feature | Called | On Sonoma instead | Status |
 |---|---|---|---|
-| Report junk | `-reportJunk` | `-reportJunkToCarrier` | `IMCoreObjects.swift:237` |
-| Report to carrier | `-reportJunkToCarrierViaRelay:` | `-reportJunkToCarrier` | `IMCoreObjects.swift:240` |
-| Leave Junk | `-recoverFromJunkTo:` | `-recoverFromJunk` (no argument) | `IMCoreObjects.swift:254` |
-| FaceTime dial | `-dialWithRequest:completionWithError:` | `-dialWithRequest:completion:` | `FaceTimeBridge.swift:355` |
-| Invalidate link | `-invalidateLink:deleteReason:completionHandler:` | `-invalidateLink:completionHandler:` | `FaceTimeBridge.swift:754` |
-| Availability fetch | `-fetchUpdatedStatusForHandle:completion:` | `-_fetchUpdatedStatusForHandle:completion:` | `IMCoreObjects.swift:1337` |
+| Report junk | `-reportJunk` | `-reportJunkToCarrier` | ✓ laddered |
+| Report to carrier | `-reportJunkToCarrierViaRelay:` | folded into the above | ✓ laddered |
+| Leave Junk | `-recoverFromJunkTo:` | `-recoverFromJunk`, then `updateIsFiltered:` | ✓ laddered |
+| FaceTime dial | `-dialWithRequest:completionWithError:` | `-dialWithRequest:completion:` | ✓ laddered |
+| Invalidate link | `-invalidateLink:deleteReason:completionHandler:` | `-invalidateLink:completionHandler:` | **open** |
+| ~~Availability fetch~~ | `-fetchUpdatedStatusForHandle:completion:` | `-_fetchUpdatedStatusForHandle:completion:` | **was already laddered — listed here in error** |
 
 Two need more than a rename:
 
@@ -241,8 +241,13 @@ anyway, so the sticker it builds on Sonoma is the same sticker minus a `suri` ke
 empty on 26 too.
 
 The other three §3 rows — junk reporting, leaving Junk, and the FaceTime dial — are laddered
-as well. What remains from this section is the FaceTime link revoke and the availability
-refresh, both Sonoma-only and both failing cleanly with `unavailableOnThisOS`.
+as well. What remains from this section is the FaceTime link revoke, Sonoma-only and failing
+cleanly with `unavailableOnThisOS`.
+
+The availability-refresh row in §3 was a **false positive** and is struck: that call has been
+laddered since long before this work (`IMCoreObjects.swift:1413` tries the unprefixed spelling
+then Sonoma's underscored one). It appeared here because `compare-releases.py` lists the 26
+spelling as absent on 14.6.1 — true, and not the same thing as unguarded.
 
 ---
 
