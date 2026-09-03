@@ -272,13 +272,55 @@ extension MessageInterface {
   ///
   /// `teamID` is part of the balloon bundle id and belongs to the developer, so it is taken
   /// from the message being answered where there is one, and defaults to Game Pigeon's own.
+  /// The four fields that never vary for a given install, filled in when a caller omits them.
+  ///
+  /// The server does NOT model games — that is what lets an unknown Game Pigeon game work
+  /// without a server change — and these four are not game state. `sender` identifies the
+  /// install, `ios` is the sending OS, and `version`/`tver` are format numbers. A client has
+  /// no way to know the right answer for any of them, and omitting them is what produces
+  /// "You need to update to the latest version of GamePigeon" on the recipient's device: the
+  /// app finds no format number where it expects one. Measured — see `docs/GAME_PIGEON.md`
+  /// § 4, where a three-field invite produced exactly that while a complete one was played.
+  ///
+  /// Prepended in the order genuine payloads carry them, and only where the caller said
+  /// nothing: a field the caller supplied keeps its own value AND its own position, because
+  /// a reply has to echo the `version` it was answering rather than take the invite default.
+  public enum GamePigeonBoilerplate {
+    /// `5` on every genuine invite seen. A REPLY carries the value it is answering — his
+    /// move read `version = 0` — so a client sending one should pass it explicitly.
+    public static let payloadVersion = "5"
+    /// `5` on every genuine payload seen, invites and moves alike.
+    public static let transportVersion = "5"
+
+    /// The sending OS, as Game Pigeon writes it: `14.6`, `26.5.2`.
+    public static var osVersion: String {
+      let version = ProcessInfo.processInfo.operatingSystemVersion
+      return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+    }
+
+    public static func applied(
+      to fields: [(name: String, value: String)], sender: String
+    ) -> [(name: String, value: String)] {
+      let supplied = Set(fields.map(\.name))
+      let boilerplate = [
+        ("sender", sender), ("version", payloadVersion),
+        ("tver", transportVersion), ("ios", osVersion),
+      ]
+      // An empty `sender` means the server has not minted one, which should not happen —
+      // but writing `sender=` would be worse than leaving the field out, so it is dropped.
+      return boilerplate.filter { !supplied.contains($0.0) && !$0.1.isEmpty } + fields
+    }
+  }
+
   public func sendGamePigeon(
     chatGUID: String, version: Int, fields: [(name: String, value: String)],
-    sessionID: String? = nil, caption: String? = nil, teamID: String = "EWFNLB79LQ"
+    sessionID: String? = nil, caption: String? = nil, teamID: String = "EWFNLB79LQ",
+    senderIdentifier: String = ""
   ) async throws -> SendOutcome {
     guard !fields.isEmpty else {
       throw InterfaceError.invalidRequest("`fields` must not be empty")
     }
+    let fields = GamePigeonBoilerplate.applied(to: fields, sender: senderIdentifier)
     let url = GamePigeonCodec.encode(
       GamePigeonCodec.Payload(version: version, fields: fields))
     return try await sendAppMessage(

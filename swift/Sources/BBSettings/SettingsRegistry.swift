@@ -441,6 +441,18 @@ public enum Settings {
     "legacy_config_imported", default: false
   )
 
+  /// This install's Game Pigeon `sender` identifier.
+  ///
+  /// Every genuine Game Pigeon payload carries a `sender` UUID identifying the install that
+  /// sent it, and it is the SAME UUID for every message that install ever sends — which is
+  /// why it belongs here rather than in a request. Minted on first use and then held, so a
+  /// conversation's messages all claim the same sender, as they would from a real app.
+  ///
+  /// Bookkeeping: never user-set, and hidden. Empty means "not minted yet".
+  public static let gamePigeonSender = Setting<String>(
+    "game_pigeon_sender", default: ""
+  )
+
   /// The Firebase remote-restart channel.
   ///
   /// Defaults ON, because a shipping client has a restart button and turning it off by
@@ -648,6 +660,7 @@ public enum Settings {
       rateLimitBlockSeconds.erased,
       lastFcmRestart.erased,
       legacyConfigImported.erased,
+      gamePigeonSender.erased,
     ] + Legacy.all
 
   /// Keys whose values must never appear in a log, an alert, or an exported diagnostic.

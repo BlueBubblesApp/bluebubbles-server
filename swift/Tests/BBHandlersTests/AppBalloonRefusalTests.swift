@@ -131,3 +131,68 @@ struct AppBalloonRefusalTests {
     #expect(vote.missingPollFields.isEmpty)
   }
 }
+
+@Suite("Game Pigeon boilerplate")
+struct GamePigeonBoilerplateTests {
+
+  private typealias Boilerplate = MessageInterface.GamePigeonBoilerplate
+
+  @Test("The four fields a client cannot know are filled in")
+  func absentFieldsAreFilled() {
+    // Omitting these is what makes a recipient's app say it needs updating: it finds no
+    // format number where one belongs. A client has no way to know the right values.
+    let filled = Boilerplate.applied(
+      to: [("game", "beer"), ("id", "frWzzfHEQ8COyfyp")], sender: "SENDER-UUID")
+    let names = filled.map(\.name)
+    #expect(names.prefix(4) == ["sender", "version", "tver", "ios"])
+    #expect(filled.first(where: { $0.name == "sender" })?.value == "SENDER-UUID")
+    #expect(filled.first(where: { $0.name == "version" })?.value == "5")
+    #expect(filled.first(where: { $0.name == "tver" })?.value == "5")
+    // The caller's own fields survive, in their own order, after the boilerplate — which is
+    // the order genuine payloads carry them in.
+    #expect(names.suffix(2) == ["game", "id"])
+  }
+
+  @Test("A caller's own value is never overwritten, and never moved")
+  func suppliedFieldsWin() {
+    // The case this protects: a REPLY has to echo the `version` it is answering. A genuine
+    // move read `version = 0` where an invite reads 5, so defaulting over the caller would
+    // corrupt every reply.
+    let filled = Boilerplate.applied(
+      to: [("game", "beer"), ("version", "0"), ("sender", "THEIRS")], sender: "OURS")
+    #expect(filled.filter { $0.name == "version" }.map(\.value) == ["0"])
+    #expect(filled.filter { $0.name == "sender" }.map(\.value) == ["THEIRS"])
+    // Position preserved too: the caller's fields keep their order among themselves.
+    #expect(filled.map(\.name) == ["tver", "ios", "game", "version", "sender"])
+  }
+
+  @Test("No field is added twice")
+  func fillingIsIdempotent() {
+    // Sending a payload straight back through — which is what a client replaying a received
+    // game does — must not accumulate duplicates. A repeated name is legal in a query
+    // string, so nothing downstream would catch it.
+    let once = Boilerplate.applied(to: [("game", "beer")], sender: "S")
+    let twice = Boilerplate.applied(to: once, sender: "S")
+    #expect(once.map(\.name) == twice.map(\.name))
+    #expect(twice.filter { $0.name == "sender" }.count == 1)
+  }
+
+  @Test("An unminted sender is left out rather than sent empty")
+  func emptySenderIsOmitted() {
+    // `sender=` is worse than no sender: it claims an identity of the empty string. This
+    // should not happen — the handler mints one — but the payload is what reaches a
+    // stranger's phone, so it does not depend on that.
+    let filled = Boilerplate.applied(to: [("game", "beer")], sender: "")
+    #expect(!filled.contains { $0.name == "sender" })
+    #expect(filled.contains { $0.name == "tver" })
+  }
+
+  @Test("The OS version is reported the way Game Pigeon writes it")
+  func osVersionIsDotted() {
+    // Genuine payloads carry `14.6`, `12.4.1`, `26.5.2` — a dotted version, not a build.
+    let version = Boilerplate.osVersion
+    #expect(version.split(separator: ".").count == 3)
+    #expect(version.allSatisfy { $0.isNumber || $0 == "." })
+    #expect(version.first != ".")
+  }
+}

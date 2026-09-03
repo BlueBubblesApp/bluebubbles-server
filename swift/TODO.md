@@ -176,13 +176,6 @@ envelope swap described below. What it still does not do:
       — exactly where the helper work lives. Needs a dedicated throwaway conversation and a
       driver that is explicit about what it will send. Note that the replay DENY-LISTS all of
       these (see below), so recording them buys `bb-parity` coverage, not CI coverage.
-- [ ] **Game Pigeon invites need a complete field set and nothing helps a client build one.**
-      A short payload is delivered, renders, and then tells the recipient to update the app —
-      measured against a real recipient. `sender`, `ios`, `version` and `tver` are identical
-      on every message a given install sends, so the server could hold a per-install `sender`
-      UUID and fill those four in without modelling any game. Not done: it is the first step
-      from "we do not model games" toward doing so, and should be a decision rather than a
-      drift. See `docs/GAME_PIGEON.md` § 4.
 - [ ] **A sticker can be added to recents but not to the saved drawer.** The only write
       `_STKMessagesObjCStoreFacade` exposes is a donation to recents; creating a saved
       sticker is a Stickers-extension UI flow. Worth another look at whether `stickersd` has

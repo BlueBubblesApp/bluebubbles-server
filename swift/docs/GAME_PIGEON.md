@@ -249,12 +249,31 @@ just as much for play — it is what makes both devices rack the balls or place 
 same way — and a game will have its own required fields on top (8 Ball adds `v2`–`v5` and
 `game_name`; Cup Pong adds `style2`).
 
-**The server does not and will not fill these in.** It does not model games — that is the
-whole design, and it is what lets an unknown Game Pigeon game work without a server change.
-So the reliable way to build an invite is to **capture a real one from the game you want and
-vary it**: `GET app/:guid` on any invite in the user's history hands you the complete field
-list, in order, ready to edit. Invent a payload from the field names alone and you will get
-the update message.
+**The server fills in four of them, and no more.** `sender`, `version`, `tver` and `ios` are
+not game state — they identify the install, the sending OS and the payload format — and a
+client has no way to know the right value for any of them. So `POST game-pigeon` prepends
+them when you leave them out:
+
+```jsonc
+// what you send
+"fields": [ {"game": "beer"}, {"id": "…"}, {"player": "2"} ]
+
+// what goes on the wire
+sender=<this server's UUID>&version=5&tver=5&ios=26.5.2&game=beer&id=…&player=2
+```
+
+`sender` is minted once and kept, so every game from this server claims the same install, as
+a real app would. `ios` is the Mac's own version. `version` defaults to `5`, which is what
+every genuine INVITE carries — **a reply must send its own**, echoing the value it is
+answering, because a move carries `version=0`. Anything you supply yourself is left exactly
+as you sent it, value and position, so echoing works.
+
+Everything else is still yours. The server does not model games — that is what lets an
+unknown Game Pigeon game work without a server change — so `seed`, `mode`, `num`, `player2`
+and whatever the game itself needs are not filled in, and a payload without them will still
+fail. The reliable way to build an invite is to **capture a real one from the game you want
+and vary it**: `GET app/:guid` on any invite in the user's history hands you the complete
+field list, in order, ready to edit.
 
 ### Send any other app's message
 
@@ -348,12 +367,10 @@ enough for a sensible bubble, and you can skip the rest.
   short field set is what produces the "update to the latest version" message (§ 4), and
   these are the only two universal fields still unaccounted for. Worth sending, once we know
   what a valid `build` token looks like.
-- **Nothing fills in the boilerplate.** `sender`, `ios`, `version` and `tver` are the same on
-  every message a given install sends, and a client has to supply all four every time. The
-  server could hold a per-install `sender` UUID and fill those in without modelling any game,
-  which would make an invite noticeably harder to get wrong. Deliberately not done yet: it is
-  the first step from "we do not model games" toward doing so, and it should be a decision
-  rather than a drift.
+- **The boilerplate is filled in now** (§ 4), but the rest of a valid payload is still the
+  client's problem — `seed`, `mode`, `num`, `player2` and the game's own fields. Whether the
+  server should go further is a real question and the answer is probably no: past these four
+  it would be modelling games.
 - Nothing reads Game Pigeon *attachments* — some games send images alongside the payload.
 - Game Pigeon is a third-party app and none of this is a supported interface. A future version
   could change the format; `ver` is the thing to watch.

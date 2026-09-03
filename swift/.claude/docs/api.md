@@ -189,9 +189,14 @@ the missing fields alongside the layout reason.
 and then tells the recipient to update GamePigeon — measured: a 15-field Cup Pong invite was
 opened and played, a 3-field 8 Ball invite sent minutes later produced the update message.
 Every genuine payload carries `sender version tver ios game id player player2 seed mode num
-build avatar2` plus the game's own. The server fills in none of it, so a client should
-capture a real invite with `GET app/:guid` and vary it. `docs/GAME_PIGEON.md` § 4 has the
-comparison.
+build avatar2` plus the game's own.
+
+`POST game-pigeon` fills in the four a client cannot know — `sender` (minted once and held in
+the `game_pigeon_sender` setting), `version` (5, the invite value), `tver` (5) and `ios` (this
+Mac's version) — prepending them in the order genuine payloads carry them, and only where the
+caller said nothing. A caller's own value keeps its position too, so a REPLY can echo the
+`version=0` a move carries. The rest is still the client's: capture a real invite with
+`GET app/:guid` and vary it. `docs/GAME_PIGEON.md` § 4.
 
 The server does not model games: fields go out and come back as an ordered name/value list,
 so every Game Pigeon game travels the same way and the client decides what a field means. The

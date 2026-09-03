@@ -330,9 +330,10 @@ public enum RequestBodies {
 
     .messageSendGamePigeon: Body(
       summary:
-        "Sends a Game Pigeon message, doing its payload scramble for you. Send a COMPLETE "
-        + "field set: a short one arrives and renders, and then tells the recipient to "
-        + "update GamePigeon. Capture a real invite with GET message/app/:guid and vary it.",
+        "Sends a Game Pigeon message, doing its payload scramble for you. `sender`, "
+        + "`version`, `tver` and `ios` are filled in when absent; everything else is yours, "
+        + "and a SHORT field set arrives, renders, and then tells the recipient to update "
+        + "GamePigeon. Capture a real invite with GET message/app/:guid and vary it.",
       properties: [
         chatGUID(),
         appPayloadFields,
