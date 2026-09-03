@@ -235,20 +235,53 @@ What it rejects is genuine garbage, which we silently ignore.
       behaviour — `ValidationFailure` already documents the second half. Done = the
       `post_api_v1_message_query-5baa61-400` baseline entry is deleted.
 
-## A contact created through the API gets a UUID where the reference gives a number
+## Contact ids are UUIDs where the reference gives integers — checked, and kept
 
 `POST /api/v1/contact` answers `data[0].id: 554` in the reference — a row id in its own contacts
-table — and `data[0].id: "<uuid>"` here. `PUT /contact/:id` and `DELETE /contact/:id` take that
-id back, and the reference `parseInt`s it. Address-book contacts are a UUID string on both sides
-(`identifier ?? id` in `mapContacts`), so the reference genuinely emits both types; only the
-locally created ones differ.
+table — and a UUID string here. It is not only the create route: every Node-recorded contact id
+in the corpus is an integer (1, 2, 3, 553, 554, 555), so `GET /contact`, the two `PUT`s,
+`DELETE`, `contact/query`, `import/vcf` and `contact/external/:externalId` all differ the same
+way.
 
-Held back from the parity pass because it is a primary-key change, not a serializer one:
-`ContactRecord.id` is a `String` used as the key throughout `ContactIndex`, and moving locally
-created contacts onto an autoincrementing integer needs a migration plus every `:id` route.
+Where the UUID comes from: this server has ONE `contact` table with a TEXT primary key, because
+it merges both sources. An address-book record is `"macos:" + CNContact.identifier`; a
+client-created one is a freshly generated `UUID()` — invented, nothing to do with Contacts. The
+reference has two stores instead and concatenates them, so its ids are integers for its own rows
+(`sourceType: "db"`) and bare Contacts UUIDs for the address book (`sourceType: "api"`).
 
-- [ ] Decide it deliberately. Done = the `post_api_v1_contact-5baa61-200` baseline entry is
-      deleted, or the entry is rewritten to say the divergence is accepted and why.
+**Checked against the client before deciding** (`bluebubbles-app`, `contact_service_v2.dart` and
+`contact_v2_actions.dart`). Both consumers do the same thing:
+
+```dart
+nativeContactId: (map['id'] ?? displayName).toString(),
+```
+
+- **Stringified**, so an integer and a UUID are the same to it, and stored as a `String`.
+- **Never sent back.** The app calls only `fetchAll`, `query` and `create`; there is no PUT or
+  DELETE by id and no external-id lookup. `create` does not read the response body at all — only
+  its error. `query` is not called from anywhere.
+- Used as a local dedup key and, sanitised, as an avatar FILENAME.
+- Its own comment already expects UUIDs from us: "macOS IDs look like `<uuid>:ABPerson`".
+
+And the decisive general point: **the reference itself returns UUIDs for address-book contacts**
+(`identifier ?? id` in `mapContacts`), so no client can assume an integer from these routes. One
+that parses this field as a number is already broken against the reference.
+
+**Decision: keep the UUIDs.** Changing them buys parity on a field whose type is not uniform in
+the reference either, and costs a schema change plus a re-download of every cached avatar on
+every client — the filename is derived from this id.
+
+The `macos:` prefix is gone from the wire. It was ours — one table holds both sources and the
+keys must not collide — and the reference sends the identifier as Contacts gives it.
+`ContactIndex.contact(id:)` resolves either spelling, so an id read from `GET /contact` still
+round-trips to `PUT`, `DELETE` and `/contact/:id/avatar`; `update` and `delete` write by the
+STORED id, because resolving and then writing by the client's spelling would have created a
+duplicate row and deleted nothing.
+
+- [ ] Still unverified against a reference recording: no fixture contains an `api`-source
+      contact, so the bare identifier is what the reference's `mapContacts` says it sends
+      (`identifier ?? id`) rather than something the corpus has seen. Record a contact list from
+      a Node server with the address book populated.
 
 ## Two statuses the reference's `ValidStatuses` does not contain
 

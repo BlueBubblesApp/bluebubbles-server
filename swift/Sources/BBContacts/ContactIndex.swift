@@ -136,6 +136,15 @@ public struct ContactRecord: Sendable, Identifiable, Codable {
   /// which fixes the @Unique(["firstName","lastName","displayName"]) constraint on the
   /// current contact table that makes two people with the same name collide.
   public var externalID: String?
+  /// The id as clients see it: the stored key with the address-book prefix removed.
+  ///
+  /// A computed projection rather than a second stored column, because there is only one
+  /// identifier — the prefix is a namespacing detail of sharing one table between two
+  /// sources, and nothing outside storage should know about it.
+  public var wireID: String {
+    id.hasPrefix(ContactIndex.addressBookPrefix)
+      ? String(id.dropFirst(ContactIndex.addressBookPrefix.count)) : id
+  }
   public var phoneNumbers: [String]
   public var emailAddresses: [String]
   /// Which address-book account this came from, when it came from one.
@@ -449,19 +458,38 @@ public actor ContactIndex {
     }
   }
 
+  /// Accepts the id as STORED or as SERIALISED, which are not the same for an address-book
+  /// record.
+  ///
+  /// One table holds both sources, so an address-book row is keyed `macos:<identifier>` to
+  /// keep it from colliding with a client-created one. The reference has two stores and sends
+  /// the bare identifier, so that is what goes on the wire — and a client that reads an `id`
+  /// from `GET /contact` and hands it back to `PUT`, `DELETE` or `/contact/:id/avatar` sends
+  /// the bare form. Looking up only the stored form would 404 every address-book contact the
+  /// client had just been given.
   public func contact(id: String) async throws -> ContactRecord? {
     try await database.read { db in
-      let row = try Row.fetchOne(
-        db,
-        sql: """
-          SELECT id, source, first_name, last_name, display_name, nickname,
-                 birthday, external_id, account_kind, account_name
-          FROM contact WHERE id = ?
-          """, arguments: [id])
-      guard let row else { return nil }
-      return try Self.hydrate(row: row, db: db)
+      // Exact first: a client-created id is stored as it is serialised, and an id that
+      // already carries the prefix must not be prefixed twice.
+      let candidates =
+        id.hasPrefix(Self.addressBookPrefix)
+        ? [id] : [id, Self.addressBookPrefix + id]
+      for candidate in candidates {
+        let row = try Row.fetchOne(
+          db,
+          sql: """
+            SELECT id, source, first_name, last_name, display_name, nickname,
+                   birthday, external_id, account_kind, account_name
+            FROM contact WHERE id = ?
+            """, arguments: [candidate])
+        if let row { return try Self.hydrate(row: row, db: db) }
+      }
+      return nil
     }
   }
+
+  /// Namespaces an address-book record's primary key. Storage only — never on the wire.
+  public static let addressBookPrefix = "macos:"
 
   /// Every contact, paged. Used by GET /api/v1/contact, which must still return the full
   /// list — but it streams a page at a time rather than materializing everything.

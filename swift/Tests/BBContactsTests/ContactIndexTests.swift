@@ -426,3 +426,58 @@ struct ContactAccountInferenceTests {
     #expect(account.label == "Fastmail")
   }
 }
+
+/// The address-book prefix is a STORAGE detail and must not reach a client.
+///
+/// One `contact` table holds both sources, so an address-book row is keyed
+/// `macos:<CNContact.identifier>` to keep it from colliding with a client-created one. The
+/// reference has two stores and sends the identifier bare, which is what clients have always
+/// been given — so the prefix goes on the wire and nowhere else.
+///
+/// The round trip is the part that bites. A client reads an `id` from `GET /contact` and hands
+/// it back to `PUT`, `DELETE` or `/contact/:id/avatar`; if the lookup only knew the stored
+/// spelling, every one of those would 404 on a contact the client had just been handed. Worse,
+/// an update that FOUND the row and then wrote under the bare id would silently create a
+/// second one.
+@Suite("Address-book id round trip")
+struct AddressBookIDTests {
+
+  private static let identifier = "882BB792-0AD7-4F41-9C99-2E5F2BE8AEDF"
+
+  private func stored() -> ContactRecord {
+    ContactRecord(
+      id: ContactIndex.addressBookPrefix + Self.identifier,
+      source: .macOS,
+      firstName: "Sam",
+      phoneNumbers: ["+12025550143"]
+    )
+  }
+
+  @Test("The wire id drops the prefix; a client-created id is untouched")
+  func wireIDStripsThePrefix() {
+    #expect(stored().wireID == Self.identifier)
+
+    let local = ContactRecord(id: "9E1C2B44-DEAD-BEEF", source: .local)
+    #expect(local.wireID == local.id)
+  }
+
+  @Test("A contact is found by the id a client was given, and by the stored one")
+  func lookupAcceptsEitherSpelling() async throws {
+    let index = try makeIndex()
+    try await index.upsert([stored()])
+
+    #expect(try await index.contact(id: Self.identifier)?.id == stored().id)
+    #expect(try await index.contact(id: stored().id)?.id == stored().id)
+    #expect(try await index.contact(id: "nothing-like-it") == nil)
+  }
+
+  /// The prefix must not be applied twice, which is what a naive "always prefix" fallback
+  /// would do to an id that already carries one.
+  @Test("An already-prefixed id is not prefixed again")
+  func doesNotDoublePrefix() async throws {
+    let index = try makeIndex()
+    try await index.upsert([stored()])
+    let doubled = ContactIndex.addressBookPrefix + stored().id
+    #expect(try await index.contact(id: doubled) == nil)
+  }
+}

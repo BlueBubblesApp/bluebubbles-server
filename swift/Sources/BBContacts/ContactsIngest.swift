@@ -328,7 +328,7 @@ public actor ContactsIngestor {
       }
 
       return ContactRecord(
-        id: "macos:\(contact.identifier)",
+        id: ContactIndex.addressBookPrefix + contact.identifier,
         source: .macOS,
         firstName: contact.givenName.isEmpty ? nil : contact.givenName,
         lastName: contact.familyName.isEmpty ? nil : contact.familyName,

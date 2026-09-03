@@ -93,19 +93,26 @@ public struct ContactInterface: Sendable {
   }
 
   public func update(id: String, body: JSONValue) async throws -> ContactRecord {
-    guard try await index.contact(id: id) != nil else {
+    guard let existing = try await index.contact(id: id) else {
       throw InterfaceError.notFound("no contact with id \(id)")
     }
-    let record = try Self.parse(body, existingID: id)
+    // The STORED id, not the one the client sent. They differ for an address-book record —
+    // the wire carries the bare identifier and storage keys it `macos:<identifier>` — and
+    // upserting under the bare form would write a SECOND row rather than update the one
+    // just found.
+    let record = try Self.parse(body, existingID: existing.id)
     try await index.upsert([record])
     return record
   }
 
   public func delete(id: String) async throws {
-    guard try await index.contact(id: id) != nil else {
+    guard let existing = try await index.contact(id: id) else {
       throw InterfaceError.notFound("no contact with id \(id)")
     }
-    try await index.remove(ids: [id])
+    // Removed by the STORED id, for the same reason `update` writes by it: a bare
+    // address-book identifier matches no row, so the delete would report success and
+    // remove nothing.
+    try await index.remove(ids: [existing.id])
   }
 
   // MARK: - Batch writes
@@ -299,7 +306,13 @@ public struct ContactInterface: Sendable {
     // omitted, so a client rendering an avatar found no key where it has always found one.
     object.set("avatar", .string(avatar ?? ""))
     object.set("sourceType", .string(record.source.wireName))
-    object.set("id", .string(record.id))
+    // The BARE identifier. An address-book record is keyed `macos:<identifier>` in storage,
+    // because one table holds both sources and the keys must not collide — but the reference
+    // has two stores and sends the identifier as Contacts gives it. The prefix was ours and
+    // was leaking a storage decision onto the wire. `ContactIndex.contact(id:)` accepts
+    // either form, so an id read from here still round-trips to `PUT`, `DELETE` and
+    // `/contact/:id/avatar`.
+    object.set("id", .string(record.wireID))
     object.setOrNull("externalId", record.externalID.map(JSONValue.string))
     return object.build()
   }
