@@ -32,9 +32,12 @@ was Catalyst or native, and the classes that release does not have. Read it firs
 `macos-15.6/environment.txt` is the exception and says so on its first line — nothing was
 executed to produce that directory.
 
-The Sonoma dump is analysed against the helper code in
-[`../SONOMA_COMPATIBILITY.md`](../SONOMA_COMPATIBILITY.md), which is the more reliable of the
-two compatibility documents for exactly the reason the next section gives.
+[`../MACOS_COMPATIBILITY.md`](../MACOS_COMPATIBILITY.md) is what these directories are FOR:
+one capability-and-selector matrix across all three, generated from them by
+`Tools/private-api/compare-releases.py --matrix`. The per-release analyses behind it are
+[`../SONOMA_COMPATIBILITY.md`](../SONOMA_COMPATIBILITY.md) — measured — and
+[`../SEQUOIA_COMPATIBILITY.md`](../SEQUOIA_COMPATIBILITY.md), which is weaker for exactly the
+reason the next section gives.
 
 ## macOS 15.6 is a borrowed dump
 

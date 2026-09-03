@@ -9,6 +9,12 @@ selector the helpers actually dispatch and reports which ones diverge.
     ./compare-releases.py docs/headers/macos-14.7 docs/headers/macos-26.5.2
     ./compare-releases.py --unresolved                     # selectors no dumped class explains
     ./compare-releases.py --markdown                       # a table to paste into the doc
+    ./compare-releases.py --matrix                         # ALL releases at once, by category
+
+--matrix is the N-way form, and it is what generates `docs/MACOS_COMPATIBILITY.md`. Instead
+of two columns it emits one per header directory, grouped by the `hosts.conf` group each
+class belongs to — which is the categorisation this repository already maintains, so the
+document does not invent a second taxonomy that can drift from the first.
 
 THE ONE THING TO UNDERSTAND BEFORE READING THE OUTPUT
 -----------------------------------------------------
@@ -180,6 +186,101 @@ def collect_selectors(class_names):
     return found, skipped_files
 
 
+# --------------------------------------------------------------------------- categories
+
+def parse_hosts_conf(path=None):
+    """class name -> the hosts.conf group that asks for it.
+
+    The manifest is already the curated answer to "what belongs with what" — `Messages
+    tapbacks`, `Messages sendlater`, `FaceTime` — so the matrix reuses it rather than
+    inventing a second taxonomy. A second one would drift from this one, and then a reader
+    would have to know which was current.
+
+    A class named by several groups keeps the FIRST, so each row appears once.
+    """
+    path = path or os.path.join(HERE, "hosts.conf")
+    groups, current = {}, None
+    for line in open(path, encoding="utf-8"):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        directive, _, value = line.partition(" ")
+        value = value.strip()
+        if directive == "group":
+            current = value
+        elif directive in ("class", "protocol") and current:
+            groups.setdefault(value, current)
+    return groups
+
+
+# FOUR states, not three, and the difference between the middle two is the difference
+# between "Apple removed a method" and "Apple removed the class it was on" — which need
+# different fixes. The fourth is the one `docs/headers/README.md` exists to protect: a class
+# with no header here was never asked about, and rendering that as absent manufactures a
+# finding out of a gap in our own coverage.
+CELL_PRESENT = "yes"          # the selector is on a class that is present here
+CELL_GONE = "**no**"          # the class is here; this selector is not
+CELL_NO_CLASS = "**—**"       # the class itself is not on this release
+CELL_UNKNOWN = "?"            # no header for it here; the dump cannot answer
+
+
+def owning_classes(selector, flats):
+    for flat in flats:
+        if selector in flat:
+            return flat[selector]
+    return set()
+
+
+def render_matrix(labels, indexes, presents, flats, used, out=sys.stdout):
+    categories = parse_hosts_conf()
+
+    def cell_for(selector, i):
+        if selector in flats[i]:
+            return CELL_PRESENT
+        owners = owning_classes(selector, flats)
+        # A class that WAS dumped here and came back NOT PRESENT is a definite answer, and a
+        # different one from a class whose header is simply missing. Both used to render as
+        # "?", which threw away the more useful half.
+        dumped = [c for c in owners if c in indexes[i]]
+        if any(presents[i].get(c) for c in dumped):
+            return CELL_GONE
+        if dumped:
+            return CELL_NO_CLASS
+        return CELL_UNKNOWN
+
+    rows_by_category = collections.defaultdict(list)
+    for selector in sorted(used):
+        owners = owning_classes(selector, flats)
+        if not owners:
+            continue  # UNRESOLVED: no dump on any side explains it
+        cells = [cell_for(selector, i) for i in range(len(labels))]
+        category = next(
+            (categories[c] for c in sorted(owners) if c in categories), "Uncategorised")
+        rows_by_category[category].append((selector, sorted(owners), cells))
+
+    order = list(dict.fromkeys(list(categories.values()) + ["Uncategorised"]))
+    for category in order:
+        rows = rows_by_category.get(category)
+        if not rows:
+            continue
+        uniform = [r for r in rows if set(r[2]) == {CELL_PRESENT}]
+        varied = [r for r in rows if r not in uniform]
+        print(f"\n### {category}\n", file=out)
+        print(f"{len(rows)} selectors the helpers dispatch; "
+              f"**{len(varied)}** differ between releases.\n", file=out)
+        if varied:
+            print("| Selector | Class | " + " | ".join(labels) + " |", file=out)
+            print("|---|---|" + ":-:|" * len(labels), file=out)
+            for selector, owners, cells in varied:
+                print(f"| `{selector}` | `{'/'.join(owners)}` | "
+                      + " | ".join(cells) + " |", file=out)
+        if uniform:
+            print(f"\n<details><summary>{len(uniform)} present on every release</summary>\n",
+                  file=out)
+            print(" ".join(f"`{s}`" for s, _, _ in uniform), file=out)
+            print("\n</details>", file=out)
+
+
 # --------------------------------------------------------------------------- compare
 
 def classify(selector, a_flat, b_flat, a_index, b_index):
@@ -211,6 +312,44 @@ def flatten(index):
     return flat
 
 
+def version_key(directory):
+    """Sort macos-14.6.1 before macos-15.6 before macos-26.5.2.
+
+    Numeric, component by component, because a string sort puts 26 before 9 and 15.6 before
+    15.10 — and macOS went 15 → 26 with nothing in between, so the gap is real and the
+    ordering has to survive it.
+    """
+    name = os.path.basename(directory)
+    digits = re.findall(r"\d+", name)
+    return [int(d) for d in digits] or [0]
+
+
+def run_matrix(directories):
+    if not directories:
+        headers = os.path.join(ROOT, "docs/headers")
+        directories = [os.path.join(headers, d) for d in os.listdir(headers)
+                       if d.startswith("macos-") and os.path.isdir(os.path.join(headers, d))]
+    directories = sorted(
+        (d if os.path.isabs(d) else os.path.join(ROOT, d) for d in directories),
+        key=version_key)
+    labels = [os.path.basename(d).replace("macos-", "") for d in directories]
+
+    indexes, presents = [], []
+    for directory in directories:
+        index, present = parse_header_dir(directory)
+        indexes.append(index)
+        presents.append(present)
+    flats = [flatten(i) for i in indexes]
+
+    class_names = set()
+    for index in indexes:
+        class_names |= set(index)
+    used, _ = collect_selectors(class_names)
+
+    render_matrix(labels, indexes, presents, flats, used)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(add_help=True, description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -220,7 +359,13 @@ def main():
                         help="list selectors no dumped class on either side declares")
     parser.add_argument("--markdown", action="store_true", help="emit a Markdown table")
     parser.add_argument("--strict", action="store_true", help="exit 1 if anything diverges")
+    parser.add_argument("--matrix", nargs="*", metavar="DIR",
+                        help="N-way table by hosts.conf category; defaults to every "
+                             "docs/headers/macos-* directory, oldest first")
     args = parser.parse_args()
+
+    if args.matrix is not None:
+        return run_matrix(args.matrix)
 
     older = args.older if os.path.isabs(args.older) else os.path.join(ROOT, args.older)
     newer = args.newer if os.path.isabs(args.newer) else os.path.join(ROOT, args.newer)

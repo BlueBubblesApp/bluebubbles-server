@@ -76,21 +76,34 @@ is worth chasing separately.
 
 ## 1. Scoreboard
 
-Reproduce by parsing both header directories into class → selector indexes and intersecting
-them with the selector-shaped string literals in `Helper/` and `Sources/BBPrivateAPI/`.
+Every number below is `Tools/private-api/compare-releases.py`, which is checked in so this can
+be re-run rather than reconstructed — and which must be used rather than a hand-rolled scan,
+for the reason §7 gives.
+
+```bash
+./Tools/private-api/compare-releases.py docs/headers/macos-14.6.1 docs/headers/macos-26.5.2
+```
 
 | | Count |
 |---|---:|
-| Classes shared by both directories | 137 |
-| Selectors indexed | 26.5.2: 11 547 · 14.6.1: 9 795 |
+| Classes dumped · selectors indexed | 14.6.1: 137 · 11 831   26.5.2: 140 · 13 956 |
 | Classes reported `NOT PRESENT` | 26.5.2: 1 · **14.6.1: 13** |
-| String literals scanned | 575 |
-| …that 26.5.2 vouches for as real selectors | 293 |
-| …present on **both** releases | 256 |
-| **…absent on Sonoma** | **37** — one false positive, three unmeasured → **33 real** |
+| Selectors the helpers dispatch | 338 |
+| Present on **both** releases | 227 |
+| **Present on 26.5.2, absent on Sonoma** | **36** — the regressions |
+| Present on Sonoma, absent on 26.5.2 | 4 — three are ladder rungs, one is a live fallback |
+| `UNCOMPARABLE` — class dumped on one side only | 3 (the `IMNickname` trio, §6) |
+| `UNRESOLVED` — no dumped class on either side declares it | 68 |
 
-Those 33 land in six groups, and the ordering matters: the first two are bugs in **our**
-fallback logic, not in Apple's API surface.
+The four that go the *other* way are worth naming, because three of them are the system
+working as designed: `editMessageItem:…backwardCompatabilityText:` and `leaveiMessageGroup`
+are older rungs of ladders that already exist, `_fetchUpdatedStatusForHandle:completion:` is
+the Sonoma spelling of a §3 row — and `isIncomingTypingMessage` is a live fallback, ORed with
+`isTypingMessage` in `EventObservation.swift` after this same tool caught typing indicators
+half-working. That is what a correctly handled divergence looks like.
+
+The 36 regressions land in six groups, and the ordering matters: the first two were bugs in
+**our** fallback logic, not in Apple's API surface.
 
 ---
 
@@ -205,8 +218,27 @@ Two need more than a rename:
   added — so the Sonoma branch needs `callAwaitingCompletion` rather than
   `callAwaitingCompletion2`, and loses the error text, not the call.
 
-**Outgoing FaceTime calls are the highest-impact item in this table.** Nothing else here
-fails a whole feature.
+### Sending a sticker fails on Sonoma, in two places
+
+Found by `compare-releases.py`, not by the first pass over this data, because both selectors
+are built by concatenating string literals across source lines and a literal-by-literal read
+sees four fragments rather than one selector. The tool joins them first; anything hand-rolled
+should too.
+
+Apple added a keyword to the middle of each:
+
+| | 14.6.1 | 26.5.2 (what the code calls) |
+|---|---|---|
+| `IMStickers.sticker(path:)` | `initWithStickerID:stickerPackID:fileURL:accessibilityLabel:` **`moodCategory:stickerName:`** | `…accessibilityLabel:` **`accessibilityName:`** `moodCategory:stickerName:` |
+| `IMStickers.userInfo(placement:)` | `userInfoDictionaryWithLayoutIntent:…initialFrameIndex:` **`stickerPositionVersion:`** | `…initialFrameIndex:stickerPositionVersion:` **`externalURI:`** |
+
+Neither call has a ladder — each is a single `invoke` of the 26 spelling — so both throw
+`selectorMissing` on Sonoma. Sonoma's forms take one fewer argument in each case
+(no `accessibilityName`, no `externalURI`), so the ladder is mechanical: drop the argument
+with the keyword.
+
+**The two whole features that fail on Sonoma are outgoing FaceTime calls and sending a
+sticker.** Everything else in §3 degrades a detail rather than a capability.
 
 ---
 
@@ -287,12 +319,35 @@ avatar path — nothing is broken meanwhile.
 
 ---
 
-## 7. Dead on every release
+## 7. A correction, and why the tool exists
 
-`markAsSpam(count:reportToCarrier:)` prefers `-markAsSpam:isJunkReportedToCarrier:` and falls
-back to `-markAsSpam:`. **The preferred selector exists on neither 14.6.1 nor 26.5.2** — the
-`if` never fires on any release this project supports. Not a Sonoma issue; noted because this
-comparison is what surfaced it. `IMCoreObjects.swift:224`.
+An earlier draft of this document claimed `-markAsSpam:isJunkReportedToCarrier:` existed on
+neither release and that the preferred branch of `markAsSpam(count:reportToCarrier:)` was dead
+code. **That was wrong.** It is on `IMChat` in both directories, at `macos-14.6.1/IMChat.h:551`
+and `macos-26.5.2/IMChat.h:805`. The branch fires, on every supported release.
+
+The mistake is worth keeping in writing, because it is the one anybody re-deriving this by
+hand will make. Grepping a header for the SELECTOR does not work — a declaration interleaves
+the argument types between the keywords:
+
+```objc
+- (unsigned long long)markAsSpam:(unsigned long long)arg0 isJunkReportedToCarrier:(bool)arg1;
+```
+
+The string `markAsSpam:isJunkReportedToCarrier:` does not occur in that line. `grep` for it
+and every multi-argument selector on the machine reports as missing — silently, and in the
+direction that manufactures findings.
+
+`Tools/private-api/compare-releases.py` reconstructs selectors from the declarations instead,
+and it is what every number in this document now comes from. Two rows here exist only because
+of it: the sticker initializers in §3, whose selectors are built by concatenating literals
+across three source lines and which a literal-by-literal scan reads as unrelated fragments.
+Re-derive with:
+
+```bash
+./Tools/private-api/compare-releases.py docs/headers/macos-14.6.1 docs/headers/macos-26.5.2
+./Tools/private-api/compare-releases.py --matrix        # all releases, by category
+```
 
 ---
 

@@ -66,15 +66,18 @@ a whole feature and one reports a working feature as unavailable.
       `-reportJunkToCarrierViaRelay:` → the same. `-recoverFromJunkTo:` → `-recoverFromJunk`:
       today the `else` falls through to `updateIsFiltered:`, which moves the chat between
       filters without undoing the junk state, so Sonoma silently does half the job.
+- [ ] **Sending a sticker.** Two selectors, each of which gained a keyword in the middle:
+      `initWithStickerID:…accessibilityLabel:` **`accessibilityName:`** `moodCategory:…` and
+      `userInfoDictionaryWithLayoutIntent:…stickerPositionVersion:` **`externalURI:`**.
+      Sonoma's forms take one fewer argument in each case. Neither call has a ladder, so
+      both throw on Sonoma and stickers do not send at all. Found by `compare-releases.py`,
+      which joins literals concatenated across source lines — a hand-rolled scan misses both.
 - [ ] **`-fetchUpdatedStatusForHandle:completion:`** → the underscore-prefixed
       `-_fetchUpdatedStatusForHandle:completion:` on Sonoma.
 - [ ] **`canReportJunk` is wrong, not merely absent.** It is read from `-_messageToReportJunk`,
       which Sonoma lacks, so it defaults to `false` — while `-allMessagesToReportAsSpam`, which
       `messagesToReportAsSpamCount()` already calls two methods below, works fine there. A
       client that hides the button on this flag hides a working feature.
-- [ ] While in that file: `markAsSpam(count:reportToCarrier:)` prefers
-      `-markAsSpam:isJunkReportedToCarrier:`, which exists on **neither** 14.6.1 nor 26.5.2.
-      The branch has never fired on any supported release.
 - [ ] `_STKStickerObjCFacade` is a `class` line in `hosts.conf` and resolves on **no**
       release — absent on 14.6.1 and on 26.5.2 alike. Either it moved and the name needs
       chasing with `probe.sh --host "Messages stickers" classes Sticker`, or the line should
