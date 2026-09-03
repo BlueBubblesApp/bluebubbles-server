@@ -6,12 +6,12 @@ Everything in the port's Private API surface was developed against **macOS 26.5.
 This document answers "what breaks on Sonoma" by cross-referencing every selector and class
 the helpers dispatch against `docs/headers/macos-14.6.1/` and `docs/headers/macos-26.5.2/`.
 
-It is the companion to [`SEQUOIA_COMPATIBILITY.md`](SEQUOIA_COMPATIBILITY.md), and it is a
-**stronger** document than that one, for one reason stated up front.
+It is the companion to [`SEQUOIA_COMPATIBILITY.md`](SEQUOIA_COMPATIBILITY.md); both feed
+[`MACOS_COMPATIBILITY.md`](MACOS_COMPATIBILITY.md), which is the one to read first.
 
 ## 0. Why this can be trusted
 
-`macos-14.6.1/`  was produced by `Tools/private-api/collect.sh` on a
+`macos-14.6.1/` was produced by `Tools/private-api/collect.sh` on a
 real macOS 14.6.1 (23G93, arm64) machine, read from the Objective-C **runtime**, out of a
 process built for the **same platform as each host app** — `environment.txt` records
 `com.apple.MobileSMS … catalyst`, so `IMChat.h` here is the same IMCore the helper is
@@ -129,7 +129,7 @@ Apple did not remove the constructor; it *narrowed* it. Sonoma requires the summ
 representation argument that 26 dropped.
 
 The association-initializer fallback below the branch would send all six named tapbacks
-correctly on Sonoma, and is never reached. Two ways to fix it, and the second is better:
+correctly on Sonoma, and was never reached.
 
 **FIXED.** `IMTapbacks.canBuild(_:)` now asks, per reaction kind, whether the tapback object
 can actually be constructed — `IMEmojiTapback`'s initializer for an emoji, `IMTapback`'s
@@ -310,10 +310,11 @@ generated set is a strict superset of it, and it settles the shape the bridge as
 `imageExists` / `imageFilePath` are that class's, not `IMNickname`'s — matching
 `PRIVATE_API_SURFACE.md` §3b.
 
-**Sonoma is still unmeasured.** Closing it is one more run of `dump-headers-sonoma.sh` on the
-VM. `IMNicknameController` *is* dumped and is present on Sonoma with 87 methods, so nicknames
-exist there in some form, and all three call sites are wrapped in `try?` and degrade to a nil
-avatar path — nothing is broken meanwhile.
+**Sonoma is still unmeasured, and the VM has since been deleted**, so this now waits on a
+macOS 14 machine existing again rather than on a command. `IMNicknameController` *is* dumped
+and is present on Sonoma with 87 methods, so nicknames exist there in some form, and all three
+call sites are wrapped in `try?` and degrade to a nil avatar path — the exposure is a contact
+card without a photo, not an error.
 
 ---
 
@@ -355,8 +356,8 @@ Re-derive with:
    still outstanding.
 2. **§3 FaceTime dial and link invalidation** — a whole feature each.
 3. **§3 junk ladder** and **§4 `canReportJunk`** — one file, four small changes.
-4. **§6** — `hosts.conf` is done; re-run `dump-headers-sonoma.sh` on the VM to fill in
-   the Sonoma half.
+4. **§6** — `hosts.conf` is done. The Sonoma half waits on a macOS 14 machine; the VM is
+   gone. Cosmetic either way.
 5. **§5 corrections** — the comment at `MessageInterface.swift:1013` and the
    `macos-versions.md` row.
 

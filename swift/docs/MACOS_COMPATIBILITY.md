@@ -2,6 +2,45 @@
 
 What works on each macOS this server supports, and which private selector decides it.
 
+## TL;DR — what works where
+
+| | 14 Sonoma | 15 Sequoia | 26 Tahoe |
+|---|:-:|:-:|:-:|
+| Send, reply, edit, unsend, typing indicators | ✅ | ✅ | ✅ |
+| Reactions — the six named ones | ✅ | ✅ | ✅ |
+| Reactions — any emoji | ⛔️ | ✅ | ✅ |
+| Reactions — stickers | ⛔️ | ✅ | ✅ |
+| Send a sticker | ⚠️ | ✅ | ✅ |
+| Mute and unmute a conversation | ✅ | ✅ | ✅ |
+| Rename, pin, leave, manage a group | ✅ | ✅ | ✅ |
+| Mark as spam | ✅ | ✅ | ✅ |
+| Report junk to Apple / your carrier | ⚠️ | ⚠️ | ✅ |
+| Schedule a message (Send Later) | ⛔️ | ✅ | ✅ |
+| Edit a scheduled message | ⛔️ | ⚠️ | ✅ |
+| Polls | ⛔️ | ⛔️ | ✅ |
+| Chat backgrounds | ⛔️ | ⛔️ | ✅ |
+| Screen Unknown Senders | ⛔️ | ⛔️ | ✅ |
+| Shared contact cards (nicknames) | ✅ † | ✅ | ✅ |
+| FaceTime — answer, end, join by link | ✅ | ✅ | ✅ |
+| FaceTime — start a call | ⚠️ | ⚠️ | ✅ |
+| FaceTime — revoke a link you made | ⚠️ | ✅ | ✅ |
+| Find My — locations, friends, devices | ✅ | ✅ | ✅ |
+
+✅ works &nbsp;·&nbsp; ⛔️ **your Mac cannot do this** — Apple added the feature in a later
+macOS, and the server refuses it rather than failing &nbsp;·&nbsp; ⚠️ **this server has a bug**
+— your Mac supports it and we call the wrong selector
+
+The difference between ⛔️ and ⚠️ is the only thing to take from this table. ⛔️ is closed
+unless you upgrade macOS. **⚠️ is ours**, it is a handful of one-line fixes, and every one is
+an open item in [`../TODO.md`](../TODO.md) — §2b below says exactly which selector each needs.
+Nothing marked ⚠️ crashes or corrupts anything; the request fails and says so.
+
+† On Sonoma the nickname itself works; whether the **avatar photo** resolves is the one thing
+no dump has measured (§4). It is read through a `try?` and falls back to no photo, so the
+worst case is a contact card without a picture.
+
+---
+
 **Every release here is now a runtime dump taken on a machine running it.** There is no
 borrowed data left in this table and no inference in any cell — which is new, and is why
 this document is much shorter than it used to be.
@@ -131,14 +170,30 @@ arrived in 15, so 15 and 26 take the same call.
 Everything marked **broken** has an open entry in [`../TODO.md`](../TODO.md). Nothing marked
 **—** needs code: those are §2a rows.
 
-## 4. The one hole left
+## 4. The one hole left, and it is now stuck
 
-`IMNickname`, `IMNicknameAvatar` and `IMNicknameAvatarImage` were added to `hosts.conf` after
-the Sonoma dump was taken, so they are in the 15.6.1 and 26.5.2 directories and not in
-14.6.1 — the three `?` cells below. `IMNicknameController` is present on all three, so
-nicknames exist on Sonoma in some form; what is unknown is whether the avatar accessors do.
-One more run of `dump-headers-vm.sh` in the Sonoma VM closes it. All three call sites are
-wrapped in `try?` and degrade to a nil avatar path meanwhile.
+`IMNickname`, `IMNicknameAvatar` and `IMNicknameAvatarImage` were added to `hosts.conf`
+*after* the Sonoma dump was taken, so they are in the 15.6.1 and 26.5.2 directories and not
+in 14.6.1 — the three `?` cells in §5. **The Sonoma VM has since been deleted**, so this
+cannot be closed by re-running the dump; it needs a macOS 14 machine to exist again.
+
+How much that costs, precisely:
+
+- **Three selectors, one feature, cosmetic.** `-avatar`, `-imageExists` and `-imageFilePath`,
+  all read through `try?` at `IMCoreBridge.swift:1493`–`1496`. If they are absent on Sonoma
+  the nickname still resolves and the avatar path comes back nil — a contact card without a
+  photo, not an error.
+- **`IMNicknameController` is present on Sonoma** with 87 methods, so nicknames exist there;
+  it is only the avatar accessors that are unmeasured.
+- **Nothing else is affected.** Every other row in this document is measured on all three
+  releases, and the remaining Sonoma work in `../TODO.md` is readable off the headers we
+  already have — the older spellings are all in `macos-14.6.1/`.
+
+Two smaller things also wanted that VM and no longer have it, both listed in `../TODO.md`:
+confirming that `-[IMChat setMuteUntilDate:]` on Sonoma writes where Messages reads, and
+reading the shape of `+[IMTapback tapbackWithAssociatedMessageType:messageSummaryInfo:]` to
+ladder the reaction path rather than fall back to the association initializer. Neither blocks
+a fix; both would have raised confidence in one.
 
 ## 5. Every dispatched selector, by category
 

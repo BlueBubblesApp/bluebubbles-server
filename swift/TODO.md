@@ -34,23 +34,26 @@ when the answer came back immediately.
       reference's cache changes what a concurrent duplicate does, not what a single send
       returns — so this is a behaviour question rather than a parity one.
 
-## Two Sonoma follow-ups the fix could not settle from here
+## Three Sonoma questions that now need a macOS 14 machine to exist again
 
-The reaction and mute breakages are fixed (`docs/SONOMA_COMPATIBILITY.md` §2.1, §2.2). Two
-loose ends need the VM, so they could not go in with the change.
+The Sonoma VM has been deleted. None of these blocks a fix — every remaining ladder is
+readable off `docs/headers/macos-14.6.1/`, which we still have — but each would have raised
+confidence in one, and none can be answered from here now.
 
-- [ ] **Confirm `setMuteUntilDate:` on Sonoma writes somewhere Messages consults.**
+- [ ] **The `IMNickname` avatar accessors on Sonoma.** `IMNickname`, `IMNicknameAvatar` and
+      `IMNicknameAvatarImage` went into `hosts.conf` after that dump was taken, so `-avatar`,
+      `-imageExists` and `-imageFilePath` are unmeasured on 14. All three are `try?`-wrapped
+      and degrade to a contact card with no photo, so the exposure is cosmetic. Closing it is
+      one `dump-headers-vm.sh` run whenever a Sonoma machine is next available.
+- [ ] **Whether `-[IMChat setMuteUntilDate:]` on Sonoma writes where Messages reads.**
       `CHAT_CONTROLS_PLAN.md` §0 measured the `CKDNDList` defaults store on **Tahoe**, and
-      that measurement does not transfer. The mute path is correct either way, but "mute
-      reports success and Messages still notifies" is the kind of thing only `trace.sh` on
-      the VM will tell us before a user does.
-- [ ] **Ladder `+[IMTapback tapbackWithAssociatedMessageType:]` instead of falling back.**
-      Now measured: the one-argument form arrived in **15**, so this affects Sonoma only.
-      Sonoma has the `…:messageSummaryInfo:` and `…:representation:` forms, so the modern
-      send path — and its better part ranges — is reachable there. Needs the shape of
-      `messageSummaryInfo:` read off the Sonoma binary (`probe.sh`, `trace.sh`). Today Sonoma
-      takes the association fallback, which is correct but is what the sender path was
-      introduced to improve on.
+      that does not transfer. The Sonoma mute path is correct as written; what is unverified
+      is whether Messages honours it, and "mute reports success and Messages still notifies"
+      is the failure a user would find first.
+- [ ] **The shape of `+[IMTapback tapbackWithAssociatedMessageType:messageSummaryInfo:]`.**
+      Needed to ladder the reaction path on Sonoma instead of falling back to the association
+      initializer — the fallback is correct but has coarser part ranges, which is what the
+      sender path was introduced to improve. `probe.sh` / `trace.sh` on a 14 machine.
 
 ## Junk reporting and outgoing FaceTime calls are broken on TWO of three releases
 
@@ -102,17 +105,6 @@ so a client sees a thrown selector or a `false` flag rather than "not supported 
 - [ ] Chat backgrounds — `refetchLocalTranscriptBackgroundAssetIfNecessary` throws on 14 and 15.
 - [ ] Screen Unknown Senders — `cachedIsKnownSender` and `inUnknownSendersFilter` default to
       `false`, and `markAsKnownAndSaveInContacts:completion:` throws.
-
-## The Sonoma dump has one hole left, and it is one VM run wide
-
-`IMNickname`, `IMNicknameAvatar` and `IMNicknameAvatarImage` were in no `hosts.conf` group, so
-they were dumped on neither release and `-avatar` / `-imageExists` / `-imageFilePath` read as
-"absent on Sonoma" when nobody had asked. They are in `hosts.conf` now and `macos-26.5.2/`
-carries all three, but the Sonoma side is still unanswered.
-
-- [ ] Re-run `dump-headers-sonoma.sh` on the VM and commit the refreshed `macos-14.6.1/`.
-      The three call sites are wrapped in `try?` and degrade to a nil avatar path, so nothing
-      is broken meanwhile — this closes an unknown, not a bug.
 
 ## The client audit that should shape the notification event list
 
