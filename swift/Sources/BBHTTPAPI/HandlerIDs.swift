@@ -163,6 +163,7 @@ extension HandlerID {
   public static let messagePoll = HandlerID("message.poll")
   public static let messageCreatePoll = HandlerID("message.createPoll")
   public static let messageVotePoll = HandlerID("message.votePoll")
+  public static let messageAddPollOption = HandlerID("message.addPollOption")
   public static let messageSendText = HandlerID("message.sendText")
   public static let messageSentCount = HandlerID("message.sentCount")
   public static let messageUnsend = HandlerID("message.unsend")

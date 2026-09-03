@@ -46,7 +46,7 @@ points back at the poll with `associated_message_guid`.
 | `associated_message_type` | What it is | `associated_message_guid` | `payload_data` |
 |---|---|---|---|
 | `3` | The poll, as created | its **own** GUID | the whole poll (title + options) |
-| `2` | The poll, **re-sent in a new state** (the extension does this when the poll changes; the thread observed here has one, with the same three options) | the ORIGINAL poll's GUID | the whole poll again |
+| `2` | The poll, **re-sent in a new state** — this is what "Add Choice" produces, and what `POST …/option` sends | the ROOT poll's GUID | the whole poll again, with the new option |
 | `4000` | One participant's **vote** | the GUID of the most recent poll-state message (`3`, or the latest `2`) | that voter's votes |
 
 Observed on a real thread here (GUIDs shortened):
@@ -61,9 +61,22 @@ C2E97DC1  type 4000  -> 3CC5FC21   a vote, now against the UPDATED poll
 78FD4E3E  type 4000  -> 3CC5FC21   our own vote
 ```
 
-A poll THIS server creates lands with `associated_message_type` **0** and no
-`associated_message_guid`, where Apple's root above carries `3` pointing at itself. The read
-route treats both as a root. Whether the receiving device cares is one of the open questions.
+**The root's type is not fixed.** A freshly created poll — ours or one made in Messages — lands
+with `associated_message_type` **0** and no `associated_message_guid`. The moment its first
+update arrives, Messages rewrites the root row to type **3** pointing at itself. So type 3
+means "a poll that has been updated", type 0 "a poll nobody has changed yet", and a reader has
+to accept both as a root. Measured on this Mac: the poll this server created sat at 0 until a
+choice was added from Messages' own UI, then read 3.
+
+Two more things the "Add Choice" control taught us, watching what it wrote:
+
+- **Titles do not survive.** The poll was created here with a title; Messages' own re-send
+  carried `"title": ""`. The Polls UI has no title field, so it does not preserve one. Treat
+  `title` as write-only and probably invisible.
+- **Every state re-send is a full copy**, so a server-made option and a UI-made option in the
+  same poll coexist as long as each side builds its update from the latest state. Building it
+  from an older state silently drops the other side's options — which is why the server reads
+  the latest state at request time rather than trusting a client-supplied list.
 
 Two consequences a client cannot ignore:
 
@@ -226,6 +239,23 @@ associate the vote with. The body is the voter's **complete** selection — an e
 retracts every vote — and every id must be an option on the poll. Answers with the vote's own
 message row (`associatedMessageType` `"4000"`).
 
+### Write: add a choice
+
+```
+POST /api/v2/message/poll/:guid/option
+{ "chatGuid": "…", "text": "Purple" }
+```
+
+The poll re-sent in its new state: the server reads the latest state, appends the option with
+a fresh identifier credited to this account (anyone may add a choice to anyone's poll), and
+sends it in the poll's session. Answers with the update's message row
+(`associatedMessageType` `"2"`, `associatedMessageGuid` = the root). Existing options keep
+their identifiers and creators, so votes already cast stay valid.
+
+**The server keeps no poll state.** Every route reads the thread from `chat.db` at request time
+and forgets it. The only reason a write reads first is the wire format: an update must carry
+every existing option with its original identifier, and a vote must name the latest state.
+
 ---
 
 ## 6. How the helper sends
@@ -258,6 +288,23 @@ summary is written directly (`amc 9`, `ams "Sent a vote"`, `amb`, `amd "Polls"`)
 through `+[IMChat configureMessageSummaryInfoForChatItem:]`, which wants a ChatKit chat item.
 The vote payload came out 695 bytes — byte-for-byte the size of Apple's.
 
+**Adding a choice** is the one that took three attempts, and the failures are the lesson:
+
+1. *Same session, sent like a create.* Lands as a brand-new poll (type 0, no association).
+   The session identifier alone does not make an update.
+2. *Same session, plus `setAssociatedMessageGUID:` on the composition's plugin payload.*
+   Still a new poll. ChatKit's `_messageFromPayload:firstGUID:` branches on
+   `-[IMPluginPayload isUpdate]`, which is a bare ivar with no setter — only the extension
+   host sets it, when it builds a payload for a message the user is updating.
+3. *Reproduce the update branch directly.* Build the composition in the poll's session for its
+   payload, then hand that payload to
+   `+[IMMessage breadcrumbMessageWithText:associatedMessageGUID:balloonBundleID:fileTransferGUIDs:payloadData:threadIdentifier:]`
+   with the ROOT guid, and `-[CKConversation sendMessage:newComposition:NO]`. The builder writes
+   type 2 with flags 5 (disassembled), and the row matches what Messages' own "Add Choice"
+   wrote to the byte in shape.
+
+(`IMPolls.updateMessage`.) Attempt 1 left a stray four-option poll in the test chat.
+
 `IMPollHelper` (IMCore) exists and reads polls back — `pollOptionsFromPluginPayload:completionHandler:`,
 `pollResponseFromChatItem:…`, `synchronousPollOptionCountFromChatItem:` — but its completion
 handlers are Swift closures with mangled signatures that the ObjC runtime reports as dozens of
@@ -271,13 +318,16 @@ junk arguments, so they are not callable through `IMCoreRuntime`. Decoding the p
 1. **Recognise** a poll: `balloonBundleId` ends `:com.apple.messages.Polls`.
 2. **Group** by the root GUID. Walk `associatedMessageGuid` up from any `2` or `4000` message
    until you reach a message whose type is `3`; that GUID is the poll's identity. Cache it.
-3. **Render** from the newest state message in the chain — the latest `2`, or the `3` if there is
-   none. Its option list is authoritative; options only ever get added, but text can change.
+3. **Render** from the newest state message in the chain — the latest `2`, or the root (type
+   `3`, or `0` if never updated). Its option list is authoritative; options only ever get
+   added. Do not show `title`; Messages does not.
 4. **Tally** by participant: group `4000` messages by `participantHandle` (or by the message's
    `handle`), keep only each participant's newest, and count the `voteOptionIdentifier`s in it.
    Never accumulate across a participant's messages — the newest one replaces the older.
 5. **Vote** by posting the voter's full selection. Reflect it optimistically, then reconcile when
-   the message row appears, exactly as with a sent message.
+   the message row appears, exactly as with a sent message. **Add a choice** with
+   `POST …/option`; the update row that comes back is the new latest state, so re-render from
+   it — and expect other participants' choices to arrive the same way, as type-2 rows.
 6. **Expect gaps.** A poll from a device that has never voted has no `4000` messages, and a
    participant who cleared their vote sends a `4000` with an empty `votes` array.
 
@@ -297,9 +347,10 @@ thread and read `options` and `votes` back assembled. Steps 1 and 5 are the clie
   `MSMessage` write it, and the archive then carries Apple's exact key set.
 - **`ai`**, the app icon, is 4 KB of JPEG on every poll message. Whether the receiving device
   needs it or falls back to the installed extension's icon is unknown.
-- **Adding an option** (`type 2`) is not covered above beyond its shape, and the server
-  cannot send one.
+- **Editing an existing option's text** is not built; only adding is. The JSON allows it
+  (`canBeEdited`), and it would be the same type-2 re-send.
 - **The other side.** Seen rendering on this Mac's own transcript; not yet on a participant's
   device. The rows had no delivery receipt after two minutes where a text gets one in seconds,
   which may just be how app messages report. Worth one look on a phone.
-- **`associated_message_type`** is 0 on a poll we create and 3 on one Messages creates.
+- **A stray poll.** Attempt 1 at adding a choice left a second, four-option "Live layout poll"
+  in the test chat; it is a real poll and can be ignored or deleted.

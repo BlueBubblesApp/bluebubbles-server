@@ -20616,6 +20616,124 @@
         "x-response-timeout-seconds": 300
       }
     },
+    "/api/v2/message/poll/{guid}/option": {
+      "post": {
+        "operationId": "postV2MessagePollByGuidOption",
+        "summary": "Add poll option",
+        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "tags": [
+          "polls-v2"
+        ],
+        "parameters": [
+          {
+            "name": "guid",
+            "in": "path",
+            "required": true,
+            "description": "The GUID of the resource this route's group is about — a chat GUID under `/chat`, a message GUID under `/message`, an attachment GUID under `/attachment`, a handle address under `/handle`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/pretty"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                },
+                "example": {
+                  "status": 200,
+                  "message": "Poll choice added!"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 401,
+                  "message": "Authentication Error",
+                  "error": {
+                    "type": "Authentication Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource. Note the error type is `Database Error`, not `Not Found` — inherited from the previous server and part of the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 404,
+                  "message": "Database Error",
+                  "error": {
+                    "type": "Database Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The Private API helper is not connected, or the operation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 500,
+                  "message": "iMessage Error",
+                  "error": {
+                    "type": "iMessage Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The route exceeded its response timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 504,
+                  "message": "Gateway Timeout",
+                  "error": {
+                    "type": "Gateway Timeout",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-handler-id": "message.addPollOption",
+        "x-api-version": 2,
+        "x-availability": "setting:additive_endpoints",
+        "x-required-scope": "messages:write",
+        "x-request-timeout-seconds": 60,
+        "x-response-timeout-seconds": 300
+      }
+    },
     "/api/v2/webhook/{id}": {
       "put": {
         "operationId": "putV2WebhookById",

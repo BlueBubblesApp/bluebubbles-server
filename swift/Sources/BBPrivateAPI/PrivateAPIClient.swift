@@ -121,6 +121,28 @@ public actor PrivateAPIClient: PrivateAPI {
     return try sentMessage(from: result, chat: request.chat)
   }
 
+  public func updatePoll(_ request: PollUpdateRequest) async throws -> SentMessage {
+    let result = try await transport.request(
+      action: .updatePoll,
+      data: .object(dropping: [
+        "chatGuid": .string(request.chat.rawValue),
+        "rootGuid": .string(request.rootGUID.rawValue),
+        "sessionId": .string(request.sessionID),
+        "title": .string(request.title),
+        "creatorHandle": request.creatorHandle.map(WireJSON.string),
+        "options": .array(
+          request.options.map { option in
+            WireJSON.object(dropping: [
+              "id": .string(option.id),
+              "text": .string(option.text),
+              "creatorHandle": option.creatorHandle.map(WireJSON.string),
+              "canBeEdited": .bool(option.canBeEdited),
+            ])
+          }),
+      ]))
+    return try sentMessage(from: result, chat: request.chat)
+  }
+
   public func votePoll(_ request: PollVoteRequest) async throws -> SentMessage {
     let result = try await transport.request(
       action: .votePoll,

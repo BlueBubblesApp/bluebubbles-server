@@ -159,6 +159,22 @@ enum HelperDispatch {
       )
       return ["identifier": sent.guid.rawValue]
 
+    case .updatePoll:
+      let options = (data["options"]?.arrayValue ?? []).compactMap { entry -> PollOptionSpec? in
+        guard let id = entry["id"]?.stringValue, let text = entry["text"]?.stringValue else {
+          return nil
+        }
+        return PollOptionSpec(
+          id: id, text: text, creatorHandle: entry["creatorHandle"]?.stringValue,
+          canBeEdited: entry["canBeEdited"]?.boolValue ?? false)
+      }
+      let sent = try await bridge.updatePoll(
+        PollUpdateRequest(
+          chat: try chat(), rootGUID: try message("rootGuid"), sessionID: try string("sessionId"),
+          title: optionalString("title") ?? "", creatorHandle: optionalString("creatorHandle"),
+          options: options))
+      return ["identifier": sent.guid.rawValue]
+
     case .votePoll:
       let sent = try await bridge.votePoll(
         PollVoteRequest(

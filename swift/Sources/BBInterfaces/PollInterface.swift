@@ -180,6 +180,37 @@ extension MessageInterface {
       message: try await awaitSentMessage(guid: sent.guid.rawValue))
   }
 
+  /// Adds a choice: the poll re-sent in its new state, in its own session, which lands as a
+  /// type-2 update the thread walk already follows. Anyone may add a choice to anyone's
+  /// poll, so the new option is credited to this account while the rest keep theirs.
+  public func addPollOption(chatGUID: String, pollGUID: String, text: String) async throws
+    -> SendOutcome
+  {
+    let api = try requirePrivateAPI(for: "polls")
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { throw InterfaceError.invalidRequest("`text` is required") }
+    let poll = try await poll(guid: pollGUID)
+    guard let sessionID = poll.sessionID else {
+      throw InterfaceError.invalidRequest(
+        "this poll carries no session id, so it cannot be updated")
+    }
+    var options = poll.options.map {
+      PollOptionSpec(
+        id: $0.id, text: $0.text, creatorHandle: $0.creatorHandle, canBeEdited: $0.canBeEdited)
+    }
+    options.append(PollOptionSpec(id: UUID().uuidString, text: trimmed))
+    let sent = try await throughMessages {
+      try await api.updatePoll(
+        PollUpdateRequest(
+          chat: ChatIdentifier(chatGUID), rootGUID: MessageGUID(poll.guid),
+          sessionID: sessionID, title: poll.title, creatorHandle: poll.creatorHandle,
+          options: options))
+    }
+    return SendOutcome(
+      backend: .privateAPI, messageGUID: sent.guid.rawValue,
+      message: try await awaitSentMessage(guid: sent.guid.rawValue))
+  }
+
   /// Polls arrived with macOS 26; the Polls extension does not exist below it.
   static func checkPollsSupported(
     majorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion

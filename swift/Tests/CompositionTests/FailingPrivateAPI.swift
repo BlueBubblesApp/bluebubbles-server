@@ -51,6 +51,7 @@ struct FailingPrivateAPI: PrivateAPI {
   }
   func createPoll(_ request: PollCreateRequest) async throws -> SentMessage { throw error }
   func votePoll(_ request: PollVoteRequest) async throws -> SentMessage { throw error }
+  func updatePoll(_ request: PollUpdateRequest) async throws -> SentMessage { throw error }
   func sendSticker(_ request: SendStickerRequest) async throws -> SentMessage { throw error }
   func editMessage(
     _ guid: MessageGUID, in chat: ChatIdentifier, partIndex: Int, newText: String,

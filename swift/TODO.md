@@ -677,8 +677,8 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
 - [ ] **Polls: look at one on a participant's phone.** Created and voted from here and both
       render on this Mac's transcript (options, vote); neither row showed a delivery receipt
       after two minutes. `docs/POLLS.md` § 8 has the remaining differences from Apple's rows.
-- [ ] Polls cannot be EDITED from here (adding an option is a type-2 re-send of the whole
-      poll, and the JSON shape is known — `docs/POLLS.md` § 3).
+- [ ] Polls: an existing option's TEXT cannot be edited from here; adding one can
+      (`POST /api/v2/message/poll/:guid/option`). Same type-2 re-send, `docs/POLLS.md` § 6.
 - [ ] Send Later has no LIST route. A client can find scheduled messages by querying and
       filtering on the new `scheduleType`, but there is no "show me what is pending" call.
 - [ ] Editing a scheduled message (`editScheduledMessageItem:scheduleType:deliveryTime:`) and

@@ -78,6 +78,7 @@ public enum MessagesHelperAction: String, Sendable, CaseIterable, CustomStringCo
   case unsendMessage = "unsend-message"
   case updateChatPinned = "update-chat-pinned"
   case updateGroupPhoto = "update-group-photo"
+  case updatePoll = "update-poll"
   case votePoll = "vote-poll"
 
   public var description: String { rawValue }

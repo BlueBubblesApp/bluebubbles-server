@@ -261,6 +261,17 @@ public enum WriteHandlers {
       return .data(interfaces.message.serialize(poll))
     }
 
+    registry.register(.messageAddPollOption) { request in
+      let interfaces = try await context.requireInterfaces()
+      let values = try request.values()
+      let sent = try await interfaces.message.addPollOption(
+        chatGUID: try values.requireString("chatGuid"),
+        pollGUID: try request.requirePathParameter("guid"),
+        text: try values.requireString("text")
+      )
+      return try Self.sendResult(sent, interfaces: interfaces)
+    }
+
     registry.register(.messageVotePoll) { request in
       let interfaces = try await context.requireInterfaces()
       let values = try request.values()

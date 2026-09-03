@@ -126,7 +126,9 @@ Two things a client must know when it reads a scheduled row back:
 `docs/POLLS.md` is the reference. Three routes, macOS 26 only: `GET poll/:guid` assembles a
 poll from its message thread (options from the latest state, one newest vote per participant),
 `POST poll` creates one (`chatGuid`, `title`, `options`), `POST poll/:guid/vote` casts the
-voter's complete selection (`chatGuid`, `optionIds`). A poll or vote row is recognised by its
+voter's complete selection (`chatGuid`, `optionIds`), `POST poll/:guid/option` adds a choice
+(`chatGuid`, `text`). The server keeps no poll state; each route reads the thread from
+chat.db when called. A poll or vote row is recognised by its
 `balloonBundleId`; the read side needed no new fields.
 
 ### Eight routes answer with the MESSAGE, not with an identifier

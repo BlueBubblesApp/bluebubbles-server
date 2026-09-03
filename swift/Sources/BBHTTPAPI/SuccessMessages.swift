@@ -67,6 +67,7 @@ public enum SuccessMessages {
     .messagePoll: "Successfully fetched poll!",
     .messageCreatePoll: "Poll sent!",
     .messageVotePoll: "Vote sent!",
+    .messageAddPollOption: "Poll choice added!",
     .messageUnsend: "Message unsent!",
     .messageEdit: "Message edited!",
 

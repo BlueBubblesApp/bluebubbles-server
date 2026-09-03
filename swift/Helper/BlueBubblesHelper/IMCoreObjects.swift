@@ -1675,9 +1675,7 @@ enum IMPolls {
     return url
   }
 
-  static func pollJSON(title: String, options: [(id: String, text: String)], creator: String)
-    -> [String: Any]
-  {
+  static func pollJSON(title: String, options: [PollOptionSpec], creator: String) -> [String: Any] {
     [
       "version": 1,
       "item": [
@@ -1688,8 +1686,8 @@ enum IMPolls {
             "optionIdentifier": option.id,
             "text": option.text,
             "attributedText": option.text,
-            "canBeEdited": false,
-            "creatorHandle": creator,
+            "canBeEdited": option.canBeEdited,
+            "creatorHandle": option.creatorHandle ?? creator,
           ]
         },
       ] as [String: Any],
@@ -1709,14 +1707,84 @@ enum IMPolls {
   /// lookup; the caller sends it like any composition.
   static func composition(title: String, options: [String]) throws -> AnyObject {
     let creator = try ownHandle()
-    let identified = options.map { (id: UUID().uuidString, text: $0) }
+    let specs = options.map {
+      PollOptionSpec(id: UUID().uuidString, text: $0, creatorHandle: creator)
+    }
+    return try composition(title: title, options: specs, creator: creator, session: nil)
+  }
+
+  /// The composition for a poll re-sent in a new state: the SAME session, so ChatKit files
+  /// it as an update of the original rather than a new poll. Options added by this account
+  /// carry its handle; the ones already there keep their creators.
+  static func updateComposition(_ request: PollUpdateRequest) throws -> AnyObject {
+    let own = try ownHandle()
+    guard let uuid = UUID(uuidString: request.sessionID) else {
+      throw PrivateAPIErrorShim.rejected("the poll session id is not a UUID")
+    }
+    let specs = request.options.map {
+      PollOptionSpec(
+        id: $0.id, text: $0.text, creatorHandle: $0.creatorHandle ?? own,
+        canBeEdited: $0.canBeEdited)
+    }
+    return try composition(
+      title: request.title, options: specs, creator: request.creatorHandle ?? own,
+      session: uuid)
+  }
+
+  /// The UPDATE message for a poll re-sent in a new state, ready for `sendMessage:`.
+  ///
+  /// MEASURED twice before this: the same session alone lands as a second poll, and so
+  /// does naming the root on the composition's plugin payload — `IMPluginPayload.isUpdate`
+  /// is a bare ivar with no setter, filled in only when the extension host builds the
+  /// payload. So the update branch of `-[CKComposition(IMSuperFormat)
+  /// _messageFromPayload:firstGUID:]` is reproduced here instead: the payload the
+  /// composition built, handed to `+[IMMessage breadcrumbMessageWithText:
+  /// associatedMessageGUID:balloonBundleID:fileTransferGUIDs:payloadData:threadIdentifier:]`,
+  /// which writes `associatedMessageType` 2 (disassembled: `mov w8, #2`, flags 5) against the
+  /// root. That is the row Messages' own "Add Choice" produces.
+  static func updateMessage(_ request: PollUpdateRequest) throws -> AnyObject {
+    let composition = try updateComposition(request)
+    guard let payload = try IMCoreRuntime.send(composition, "shelfPluginPayload"),
+      let data = try IMCoreRuntime.send(payload, "data")
+    else {
+      throw PrivateAPIErrorShim.rejected("the poll composition carries no plugin payload")
+    }
+    guard
+      let text = try IMCoreRuntime.invoke(composition, "superFormatText:", [NSNull()])
+        as? NSAttributedString
+    else {
+      throw PrivateAPIErrorShim.rejected("the poll composition produced no message text")
+    }
+    let messageClass: AnyClass = try IMCoreRuntime.requireClass("IMMessage")
+    guard
+      let message = try IMCoreRuntime.invoke(
+        messageClass as AnyObject,
+        "breadcrumbMessageWithText:associatedMessageGUID:balloonBundleID:fileTransferGUIDs:"
+          + "payloadData:threadIdentifier:",
+        [text, request.rootGUID.rawValue, PollsApp.balloonBundleID, NSNull(), data, NSNull()])
+    else {
+      throw PrivateAPIErrorShim.rejected("IMMessage would not build the poll update")
+    }
+    return message
+  }
+
+  private static func composition(
+    title: String, options: [PollOptionSpec], creator: String, session uuid: UUID?
+  ) throws -> AnyObject {
     let url = try dataURL(
-      json: pollJSON(title: title, options: identified, creator: creator),
-      suffix: "?src=p&c=\(identified.count)"
+      json: pollJSON(title: title, options: options, creator: creator),
+      suffix: "?src=p&c=\(options.count)"
     )
 
     let sessionClass = try requireMessagesClass("MSSession")
-    guard let session = try IMCoreRuntime.invoke(try allocate(sessionClass), "init") else {
+    let session: AnyObject? =
+      if let uuid {
+        try IMCoreRuntime.invoke(
+          try allocate(sessionClass), "initWithIdentifier:", [uuid as NSUUID])
+      } else {
+        try IMCoreRuntime.invoke(try allocate(sessionClass), "init")
+      }
+    guard let session else {
       throw PrivateAPIErrorShim.rejected("MSSession would not initialise")
     }
     let messageClass = try requireMessagesClass("MSMessage")

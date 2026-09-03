@@ -409,6 +409,49 @@ public struct PollCreateRequest: Codable, Sendable {
   }
 }
 
+/// One option as the poll JSON carries it. `creatorHandle` nil means "this account", which
+/// the helper fills in — the server does not know the login handle as reliably as IMCore.
+public struct PollOptionSpec: Codable, Sendable, Equatable {
+  public let id: String
+  public let text: String
+  public let creatorHandle: String?
+  public let canBeEdited: Bool
+
+  public init(id: String, text: String, creatorHandle: String? = nil, canBeEdited: Bool = false) {
+    self.id = id
+    self.text = text
+    self.creatorHandle = creatorHandle
+    self.canBeEdited = canBeEdited
+  }
+}
+
+/// The poll re-sent in a new state — how a choice is added. Same session as the poll, the
+/// COMPLETE option list (existing ones with their identifiers, new ones with fresh ones),
+/// and the root's own creator; lands as an `associated_message_type` 2 update.
+public struct PollUpdateRequest: Codable, Sendable {
+  public let chat: ChatIdentifier
+  /// The poll's ROOT message. Naming it on the plugin payload is what makes ChatKit file
+  /// the send as an update (`IMPluginPayload.isUpdate`) rather than a new poll — the
+  /// session alone does not; measured, a same-session send landed as a second poll.
+  public let rootGUID: MessageGUID
+  public let sessionID: String
+  public let title: String
+  public let creatorHandle: String?
+  public let options: [PollOptionSpec]
+
+  public init(
+    chat: ChatIdentifier, rootGUID: MessageGUID, sessionID: String, title: String,
+    creatorHandle: String?, options: [PollOptionSpec]
+  ) {
+    self.chat = chat
+    self.rootGUID = rootGUID
+    self.sessionID = sessionID
+    self.title = title
+    self.creatorHandle = creatorHandle
+    self.options = options
+  }
+}
+
 /// One participant's COMPLETE selection on a poll — not a delta. Empty retracts every vote.
 public struct PollVoteRequest: Codable, Sendable {
   public let chat: ChatIdentifier
@@ -690,6 +733,8 @@ public protocol PrivateAPI: Sendable {
   func createPoll(_ request: PollCreateRequest) async throws -> SentMessage
   /// Casts (or replaces) the local user's vote, and answers with the vote's own message.
   func votePoll(_ request: PollVoteRequest) async throws -> SentMessage
+  /// Re-sends a poll in a new state (a choice added) and answers with the update's message.
+  func updatePoll(_ request: PollUpdateRequest) async throws -> SentMessage
   /// Places a sticker on a message part and returns the sticker's OWN message, exactly as
   /// `react` does — a sticker is an association with a file behind it.
   func sendSticker(_ request: SendStickerRequest) async throws -> SentMessage

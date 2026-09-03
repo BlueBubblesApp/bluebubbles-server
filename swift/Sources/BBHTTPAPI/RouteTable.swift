@@ -640,6 +640,9 @@ public enum AdditiveRoutes {
       .init(
         .post, "poll/:guid/vote", .messageVotePoll, scope: .messagesWrite,
         requires: .privateAPI),
+      .init(
+        .post, "poll/:guid/option", .messageAddPollOption, scope: .messagesWrite,
+        requires: .privateAPI),
     ])
 
   /// Placing a sticker on a message.  /// Placing a sticker on a message.  /// Placing a sticker on a message. The Node server never sent one — its helper had no

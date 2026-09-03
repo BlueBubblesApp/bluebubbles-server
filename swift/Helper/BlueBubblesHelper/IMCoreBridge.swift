@@ -499,6 +499,20 @@ public final class IMCoreBridge: PrivateAPI {
     }
   }
 
+  /// NEW. See `IMPolls.updateComposition`: the same send as a create, in the poll's session.
+  public func updatePoll(_ request: PollUpdateRequest) async throws -> SentMessage {
+    try translating {
+      let conversation = try requireConversation(request.chat)
+      let message = try IMPolls.updateMessage(request)
+      try conversation.send(message, newComposition: false)
+      let guid = ((try? IMCoreRuntime.string(message, "guid")) ?? nil) ?? ""
+      guard !guid.isEmpty else {
+        throw PrivateAPIErrorShim.rejected("Messages accepted the poll update but reported no GUID")
+      }
+      return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
+    }
+  }
+
   /// NEW. See `IMPolls.voteMessage`.
   public func votePoll(_ request: PollVoteRequest) async throws -> SentMessage {
     try translating {
