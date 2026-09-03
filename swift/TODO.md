@@ -559,8 +559,6 @@ content stops transiting Google.
 - [ ] **Move `react` onto ChatKit.** It goes through IMCore today. The reference uses
       `CKChatItem` + `chat.sendTapback:forChatItem:`, which is also where the macOS 26
       `IMEmojiTapback` path lives — so arbitrary-emoji tapbacks are unreachable until this moves.
-- [ ] **Move replies onto `IMCreateThreadIdentifierForMessagePartChatItem` + `threadOriginator`,**
-      matching the reference.
 - [ ] **Consider routing text-only `sendMultipart` through IMCore.** It goes through ChatKit
       today for uniformity. ChatKit is the larger and less stable surface and text does not need
       it; narrowing the ChatKit dependency to attachments only would reduce the blast radius of
