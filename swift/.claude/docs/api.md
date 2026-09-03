@@ -59,6 +59,23 @@ Two pairings look like bugs and are **not**:
   payload; it is the most depended-on error response in the API. See below — a send answers
   with the message either way, and the status is decided by the row's `error` column.
 
+### Text formatting on `/message/text` and `/message/multipart`
+
+Both take `textFormatting`: an array of `{start, length, styles, effect}` — on the text
+route over `message`, on the multipart route inside each part over that part's `text`.
+`start` and `length` are UTF-16 code units (what JavaScript and Dart indices are; an emoji is
+two). `styles` is any of `bold`, `italic`, `underline`, `strikethrough`; `effect` is one of
+`big`, `small`, `shake`, `nod`, `explode`, `ripple`, `bloom`, `jitter`. A range needs at
+least one of the two. Private API only, macOS 15 and later; the refusals are the reference's
+sentences (`textFormatting[0] range exceeds message length`, and so on).
+
+The shape and the style names are the reference's `textFormatting` (`TextFormattingUtils.ts`),
+which it validated and never forwarded to its helper; `effect` is this server's addition. On
+the read side the attributes come back as they are stored — `__kIMTextBoldAttributeName: 1`,
+`__kIMTextEffectAttributeName: 12` — in `attributedBody` runs; the number-to-name table is
+`TextEffect` in the contract. Measured 2 September 2026: `.claude/docs/imessage.md` § Text
+formatting.
+
 ### Eight routes answer with the MESSAGE, not with an identifier
 
 `POST /message/text`, `/attachment`, `/attachment/chunk`, `/multipart`, `/react`,

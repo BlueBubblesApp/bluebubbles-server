@@ -838,9 +838,11 @@ enum CKCompositions {
     return appended
   }
 
-  /// Appends text, carrying a confirmed mention when there is one.
+  /// Appends text, carrying a confirmed mention when there is one and any inline styles
+  /// or effects the part asked for (`TextFormattingAttributes`).
   static func appendingText(
-    _ composition: AnyObject, text: String, mention: String?
+    _ composition: AnyObject, text: String, mention: String?,
+    formatting: [FormattedRange] = []
   ) throws -> AnyObject {
     let run = NSMutableAttributedString(string: text)
     if let mention, !mention.isEmpty {
@@ -849,6 +851,7 @@ enum CKCompositions {
         range: NSRange(location: 0, length: run.length)
       )
     }
+    TextFormattingAttributes.apply(formatting, to: run)
     guard
       let appended = try IMCoreRuntime.invoke(
         composition, "compositionByAppendingText:", [run]

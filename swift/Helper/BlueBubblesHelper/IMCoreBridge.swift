@@ -177,8 +177,13 @@ public final class IMCoreBridge: PrivateAPI {
       let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
       let reply = try replyPart.map(IMThreads.reply(for:))
 
+      // Styles and effects are attributes on the text itself; the initializer takes an
+      // attributed string and imagent stores whatever it carries. See
+      // `TextFormattingAttributes`.
+      let text = NSMutableAttributedString(string: request.text)
+      TextFormattingAttributes.apply(request.formatting, to: text)
       let message = try IMMessageBuilder.message(
-        text: NSAttributedString(string: request.text),
+        text: text,
         subject: request.subject.map { NSAttributedString(string: $0) },
         fileTransferGUIDs: [],
         effectID: request.effectId,
@@ -225,7 +230,7 @@ public final class IMCoreBridge: PrivateAPI {
           composition = try CKCompositions.appendingMedia(composition, path: path)
         } else if let text = part.text, !text.isEmpty {
           composition = try CKCompositions.appendingText(
-            composition, text: text, mention: part.mention
+            composition, text: text, mention: part.mention, formatting: part.formatting
           )
         }
       }

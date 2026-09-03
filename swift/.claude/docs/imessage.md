@@ -264,3 +264,28 @@ supported service list from the live `sdef`; never infer it from the OS version.
 See [`database.md`](database.md#change-detection) for the four preserved behaviours (dual
 lookback, query-by-`date`, the >24h clamp, watching the `-wal` sidecar). All four exist because
 getting them wrong loses messages.
+
+---
+
+## Text formatting: five attributes on the attributed body
+
+Since macOS 15 / iOS 18 a styled run is an attribute on the message's attributed text, and
+nothing else — no balloon, no payload, no flag on the row. Read from real rows on this Mac
+and from IMSharedUtilities on 26.5.2:
+
+| Attribute | Value |
+|---|---|
+| `__kIMTextBoldAttributeName` | `1` |
+| `__kIMTextItalicAttributeName` | `1` |
+| `__kIMTextUnderlineAttributeName` | `1` |
+| `__kIMTextStrikethroughAttributeName` | `1` |
+| `__kIMTextEffectAttributeName` | an `IMTextEffectType`: ripple 1, big 5, bloom 6, nod 8 (`shakeVertical`), shake 9 (`shakeHorizontal`), jitter 10, small 11, explode 12; stretch 2, squish 3, bounce 4 and somersault 7 exist and are not on the menu |
+
+The effect numbers were read by calling `IMTextEffectTypeFromName` on the framework's own
+`IMTextEffectName*` constants — the names are Apple's, and "shake"/"nod" are not the
+obvious ones. Both send paths carry them unchanged: the IMCore initializer takes the
+attributed string, and `compositionByAppendingText:` keeps its attributes. Verified by
+sending bold, italic+underline, strikethrough and explode on `/message/text`, and
+bold+shake on a multipart part, and reading the same runs back from chat.db after delivery.
+`TextFormattingAttributes` in `Helper/HelperShared` writes them; `TextStyle`/`TextEffect` in
+the contract name them.

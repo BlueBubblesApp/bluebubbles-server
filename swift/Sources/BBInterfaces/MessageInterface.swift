@@ -597,6 +597,8 @@ public struct MessageInterface: MessagesBackedInterface {
     public var replyToGUID: String?
     public var partIndex: Int
     public var scanForLinks: Bool
+    /// Inline styles and effects by UTF-16 range. Private API only, macOS 15 and later.
+    public var formatting: [FormattedRange]
     /// Forces AppleScript even when the Private API is available. The current server
     /// exposes this as `method`, and clients use it.
     public var forcedBackend: SendBackend?
@@ -609,6 +611,7 @@ public struct MessageInterface: MessagesBackedInterface {
       replyToGUID: String? = nil,
       partIndex: Int = 0,
       scanForLinks: Bool = false,
+      formatting: [FormattedRange] = [],
       forcedBackend: SendBackend? = nil
     ) {
       self.chatGUID = chatGUID
@@ -618,6 +621,7 @@ public struct MessageInterface: MessagesBackedInterface {
       self.replyToGUID = replyToGUID
       self.partIndex = partIndex
       self.scanForLinks = scanForLinks
+      self.formatting = formatting
       self.forcedBackend = forcedBackend
     }
   }
@@ -635,6 +639,7 @@ public struct MessageInterface: MessagesBackedInterface {
     } else {
       backend = await availableBackend()
     }
+    try Self.checkFormatting(request.formatting, text: request.text)
 
     switch backend {
     case .privateAPI:
@@ -650,7 +655,8 @@ public struct MessageInterface: MessagesBackedInterface {
             effectId: request.effectID,
             replyTo: request.replyToGUID.map { MessageGUID($0) },
             replyPartIndex: request.partIndex,
-            scanForLinks: request.scanForLinks
+            scanForLinks: request.scanForLinks,
+            formatting: request.formatting
           )
         )
       }
@@ -663,10 +669,12 @@ public struct MessageInterface: MessagesBackedInterface {
     case .appleScript:
       // Stated rather than dropped. A client that asked for a reply and got a plain
       // message would look like the server ignored it.
-      if request.subject != nil || request.effectID != nil || request.replyToGUID != nil {
+      if request.subject != nil || request.effectID != nil || request.replyToGUID != nil
+        || !request.formatting.isEmpty
+      {
         throw InterfaceError.invalidRequest(
-          "subjects, effects and replies need the Private API; this server is "
-            + "sending through AppleScript"
+          "subjects, effects, replies and text formatting need the Private API; this "
+            + "server is sending through AppleScript"
         )
       }
       // Stamped BEFORE the send. Messages back-dates rows by a second or so, and a window
@@ -784,6 +792,9 @@ public struct MessageInterface: MessagesBackedInterface {
       throw InterfaceError.invalidRequest("at least one part is required")
     }
     for part in parts {
+      try Self.checkFormatting(part.formatting, text: part.text ?? "")
+    }
+    for part in parts {
       guard let path = part.attachmentPath else { continue }
       guard FileManager.default.fileExists(atPath: path) else {
         throw InterfaceError.invalidRequest("no file at \(path)")
@@ -892,6 +903,25 @@ public struct MessageInterface: MessagesBackedInterface {
       messageGUID: sent.guid.rawValue,
       message: try await awaitSentMessage(guid: sent.guid.rawValue)
     )
+  }
+
+  /// The reference's two gates on `textFormatting`, then its range rules.
+  ///
+  /// macOS 15 is where the attributes appeared; the reference refuses below it with this
+  /// sentence, and so does this. Ranges are checked against the UTF-16 length, because
+  /// that is the unit the attributes are applied in.
+  static func checkFormatting(_ ranges: [FormattedRange], text: String) throws {
+    guard !ranges.isEmpty else { return }
+    if ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 15 {
+      throw InterfaceError.invalidRequest(
+        "Text formatting is only supported on macOS Sequoia (15) and newer"
+      )
+    }
+    do {
+      try FormattedRange.validate(ranges, utf16Length: text.utf16.count)
+    } catch let error as TextFormattingError {
+      throw InterfaceError.invalidRequest(error.description)
+    }
   }
 
   /// The row behind a GUID, or the reference's refusal.

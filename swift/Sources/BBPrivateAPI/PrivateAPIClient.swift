@@ -60,6 +60,7 @@ public actor PrivateAPIClient: PrivateAPI {
       "partIndex": .number(Double(request.replyPartIndex ?? 0)),
       // 0/1 rather than a boolean: the helper reads it as a number.
       "ddScan": .number(request.scanForLinks ? 1 : 0),
+      "textFormatting": Self.wireFormatting(request.formatting),
     ])
     let result = try await transport.request(
       action: .sendMessage, data: payload)
@@ -72,6 +73,7 @@ public actor PrivateAPIClient: PrivateAPI {
         "text": part.text.map(WireJSON.string),
         "attachment": part.attachmentPath.map(WireJSON.string),
         "mention": part.mention.map(WireJSON.string),
+        "textFormatting": Self.wireFormatting(part.formatting),
       ])
     }
     let payload = WireJSON.object(dropping: [
@@ -907,6 +909,21 @@ public actor PrivateAPIClient: PrivateAPI {
   ///
   /// The authoritative record still arrives through the chat.db change detector; this is
   /// what lets the two be correlated rather than producing a duplicate.
+  /// `textFormatting` as the helper reads it; absent (dropped) when there is none, so a
+  /// plain send's payload is byte-for-byte what it was.
+  private static func wireFormatting(_ ranges: [FormattedRange]) -> WireJSON? {
+    guard !ranges.isEmpty else { return nil }
+    return .array(
+      ranges.map { range in
+        WireJSON.object(dropping: [
+          "start": .number(Double(range.start)),
+          "length": .number(Double(range.length)),
+          "styles": .array(range.styles.map { .string($0.rawValue) }),
+          "effect": range.effect.map { .string($0.rawValue) },
+        ])
+      })
+  }
+
   private func sentMessage(from result: WireJSON?, chat: ChatIdentifier) throws -> SentMessage {
     guard
       let identifier = result?["identifier"]?.stringValue

@@ -74,7 +74,8 @@ public enum AttachmentStaging {
     try parts.map { part in
       guard let path = part.attachmentPath else { return part }
       return MessagePart(
-        text: part.text, attachmentPath: try stage(path), mention: part.mention
+        text: part.text, attachmentPath: try stage(path), mention: part.mention,
+        formatting: part.formatting
       )
     }
   }

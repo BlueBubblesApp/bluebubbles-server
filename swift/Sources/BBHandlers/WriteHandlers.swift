@@ -57,6 +57,8 @@ public enum WriteHandlers {
           replyToGUID: values["selectedMessageGuid"]?.stringValue,
           partIndex: values["partIndex"]?.intValue ?? 0,
           scanForLinks: values["scanForLinks"]?.boolValue ?? false,
+          // The reference's `textFormatting` — styles by range — with `effect` added.
+          formatting: try TextFormattingBody.parse(values["textFormatting"]),
           forcedBackend: forced
         )
       )
@@ -150,7 +152,8 @@ public enum WriteHandlers {
         return MessagePart(
           text: text,
           attachmentPath: path,
-          mention: part["mention"]?.stringValue
+          mention: part["mention"]?.stringValue,
+          formatting: try TextFormattingBody.parse(part["textFormatting"])
         )
       }
 

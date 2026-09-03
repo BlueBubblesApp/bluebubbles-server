@@ -657,6 +657,21 @@ Big Sur through Ventura are the evidence for the older releases.
 - [ ] On a macOS 14 or 15 machine, send one reply through `/message/text` with the Private
       API and confirm `thread_originator_guid` is set. Done = one row.
 
+## Text formatting: what the first pass left out
+
+`textFormatting` on `/message/text` and per part on `/message/multipart` sends the four
+styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Verified on
+26.5.2 from the sender's side.
+
+- [ ] Nobody has watched an effect play on a receiving device. The attribute and number
+      match what iOS-sent rows carry, so it should, but "should" is the word.
+- [ ] No recorded fixture carries `textFormatting`, so the inferred OpenAPI request schema
+      for the two routes does not mention it. Either record one or add a hand-written
+      body declaration the way `MultipartBodies` does for files.
+- [ ] The read side reports the raw attribute keys and the effect NUMBER. A v2 read could
+      add a decoded `formatting` array using `TextEffect(attributeValue:)`; v1 is frozen.
+- [ ] The Flutter client neither renders nor sends these yet.
+
 ## `POST /message/attachment/chunk` reads base64 JSON; the reference reads a multipart `chunk`
 
 Found while fixing `/message/attachment`, which had the same problem: the reference's chunk

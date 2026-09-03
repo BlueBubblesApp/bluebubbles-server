@@ -50,6 +50,22 @@ enum HelperDispatch {
       data[key]?.intValue ?? fallback
     }
     func flag(_ key: String) -> Bool { data[key]?.boolValue ?? false }
+    /// `textFormatting`: `[{start, length, styles: [String], effect: String?}]`. An entry
+    /// missing its range, or naming a style or effect this helper does not know, is
+    /// dropped here; the server validated the shape before sending, so a mismatch means
+    /// a version skew, and a message sent without one run's style is better than one not
+    /// sent at all.
+    func formatting(_ value: WireJSON?) -> [FormattedRange] {
+      (value?.arrayValue ?? []).compactMap { entry -> FormattedRange? in
+        guard let start = entry["start"]?.intValue, let length = entry["length"]?.intValue
+        else { return nil }
+        let styles = (entry["styles"]?.arrayValue ?? [])
+          .compactMap(\.stringValue).compactMap(TextStyle.init(rawValue:))
+        let effect = entry["effect"]?.stringValue.flatMap(TextEffect.init(rawValue:))
+        guard !styles.isEmpty || effect != nil else { return nil }
+        return FormattedRange(start: start, length: length, styles: styles, effect: effect)
+      }
+    }
 
     guard let action = MessagesHelperAction(rawValue: request.action) else {
       // A protocol mismatch, not a missing feature: this helper has never heard of the
@@ -72,7 +88,8 @@ enum HelperDispatch {
           effectId: optionalString("effectId"),
           replyTo: optionalString("selectedMessageGuid").map(MessageGUID.init(_:)),
           replyPartIndex: data["partIndex"]?.intValue,
-          scanForLinks: flag("ddScan")
+          scanForLinks: flag("ddScan"),
+          formatting: formatting(data["textFormatting"])
         )
       )
       return ["identifier": sent.guid.rawValue]
@@ -83,7 +100,8 @@ enum HelperDispatch {
         return MessagePart(
           text: fields["text"]?.stringValue,
           attachmentPath: fields["attachment"]?.stringValue,
-          mention: fields["mention"]?.stringValue
+          mention: fields["mention"]?.stringValue,
+          formatting: formatting(fields["textFormatting"])
         )
       }
       let sent = try await bridge.sendMultipart(
