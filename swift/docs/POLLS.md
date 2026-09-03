@@ -303,7 +303,9 @@ The vote payload came out 695 bytes — byte-for-byte the size of Apple's.
    type 2 with flags 5 (disassembled), and the row matches what Messages' own "Add Choice"
    wrote to the byte in shape.
 
-(`IMPolls.updateMessage`.) Attempt 1 left a stray four-option poll in the test chat.
+(`IMPolls.updateMessage`.) Confirmed on the Mac's transcript: the choice appears on the
+existing poll, alongside one added from Messages' own UI. Attempt 1 left a stray four-option
+poll in the test chat.
 
 `IMPollHelper` (IMCore) exists and reads polls back — `pollOptionsFromPluginPayload:completionHandler:`,
 `pollResponseFromChatItem:…`, `synchronousPollOptionCountFromChatItem:` — but its completion
