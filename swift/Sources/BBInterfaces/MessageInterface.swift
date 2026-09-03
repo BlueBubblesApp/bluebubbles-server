@@ -197,6 +197,15 @@ public struct MessageInterface: MessagesBackedInterface {
     return try await project(rows, query: query)
   }
 
+  /// What Send Later is still holding, soonest first, hydrated like any listing so a client
+  /// can show them in the transcript. `dateCreated` on each is the DELIVERY time.
+  public func pendingScheduledMessages(
+    chatGUID: String? = nil, query: Query = Query()
+  ) async throws -> [MessageProjection] {
+    let rows = try await repository.pendingScheduledMessages(chatGUID: chatGUID)
+    return try await project(rows, query: query)
+  }
+
   public func find(
     guid: String, query: Query = Query()
   ) async throws -> MessageProjection? {

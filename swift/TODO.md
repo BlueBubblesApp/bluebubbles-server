@@ -679,8 +679,10 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
       after two minutes. `docs/POLLS.md` § 8 has the remaining differences from Apple's rows.
 - [ ] Polls: an existing option's TEXT cannot be edited from here; adding one can
       (`POST /api/v2/message/poll/:guid/option`). Same type-2 re-send, `docs/POLLS.md` § 6.
-- [ ] Send Later has no LIST route. A client can find scheduled messages by querying and
-      filtering on the new `scheduleType`, but there is no "show me what is pending" call.
+- [ ] `GET /api/v2/message/send-later` lists rows with `schedule_state` 1 or 2 — the two
+      pending values observed. The states a DELIVERED scheduled message moves through were
+      not observed (the test cancelled it); if one shows up in the list after delivery, that
+      is the filter to widen.
 - [ ] Editing a scheduled message (`editScheduledMessageItem:scheduleType:deliveryTime:`) and
       "send now" (`dateCellRequestedScheduledMessageModification:scheduleType:deliveryTime:`
       with a nil time) are not built. Rescheduling today means cancel and re-send.
@@ -688,7 +690,7 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
       `scheduledFor`. The same composition trick should work on `sendMultipart`.
 - [ ] `_supportsSendLater` / `_supportsPolls` on IMChat are not consulted. A conversation that
       cannot schedule (SMS) will fail at ChatKit's `canSend` instead of being refused up front.
-- [ ] Nothing verifies a scheduled message actually ARRIVES at its time; the test cancelled it.
+- [ ] Nothing verifies a scheduled message actually ARRIVES at its time; every test cancelled it.
 
 ## Emoji reactions: what the first pass left out
 

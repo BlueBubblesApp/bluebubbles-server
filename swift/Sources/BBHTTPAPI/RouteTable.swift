@@ -623,6 +623,8 @@ public enum AdditiveRoutes {
     "Send Later", prefix: "message", apiVersion: RouteTable.latestVersion,
     routes: [
       .init(.post, "send-later", .messageSendLater, scope: .messagesWrite, requires: .privateAPI),
+      // Pending ones, from chat.db — no helper needed to read them.
+      .init(.get, "send-later", .messagePendingScheduled),
       .init(
         .delete, "send-later/:guid", .messageCancelScheduled, scope: .messagesWrite,
         requires: .privateAPI),

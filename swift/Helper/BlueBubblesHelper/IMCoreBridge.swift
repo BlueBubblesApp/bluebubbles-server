@@ -600,6 +600,17 @@ public final class IMCoreBridge: PrivateAPI {
     return try translating {
       let imChat = try IMChatRegistry.requireChat(guid: chat.rawValue)
       let item = (try? IMCoreRuntime.send(message, "_imMessageItem")) ?? message
+      // MEASURED on macOS 26: `deleteChatItems:` with the items off a freshly loaded
+      // message item returns without raising and deletes nothing — three app-message rows
+      // stayed in chat.db after three 200s. Those chat items are not the ones the chat's
+      // transcript holds, so the chat has nothing to match them against.
+      // `deleteIMMessageItems:` takes the MESSAGE ITEM, which is what was loaded, and is
+      // the model-layer delete.
+      let selector = "deleteIMMessageItems:"
+      if IMCoreRuntime.responds(imChat.object, to: NSSelectorFromString(selector)) {
+        try IMCoreRuntime.invoke(imChat.object, selector, [[item]])
+        return
+      }
       guard let items = try? IMCoreRuntime.send(item, "_newChatItems") else {
         throw PrivateAPIErrorShim.rejected("that message exposes no chat items")
       }

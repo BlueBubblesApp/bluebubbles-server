@@ -107,9 +107,12 @@ POST /api/v2/message/send-later
 `tempGuid`). Private API only, macOS 15 and newer. Answers with the message row, like every
 other send.
 
-`DELETE /api/v2/message/send-later/:guid` cancels one before it is delivered, taking `chatGuid`
-in the body. The row is DELETED from `chat.db`, so a client should drop it rather than expect a
-state change.
+`GET /api/v2/message/send-later` lists what is still pending, soonest first, as ordinary
+message rows (`?chatGuid=` scopes it; `?with=chat,attachment` as on `message/query`), with
+`count` in `metadata`. Read from `chat.db`, so it needs no helper. `DELETE
+/api/v2/message/send-later/:guid` cancels one before it is delivered, taking `chatGuid` in the
+body. The row is DELETED from `chat.db`, so a client should drop it rather than expect a state
+change — and it leaves the list on the next read.
 
 Two things a client must know when it reads a scheduled row back:
 

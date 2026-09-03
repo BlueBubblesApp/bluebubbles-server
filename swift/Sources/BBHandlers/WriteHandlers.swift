@@ -232,6 +232,22 @@ public enum WriteHandlers {
       )
     }
 
+    registry.register(.messagePendingScheduled) { request in
+      let interfaces = try await context.requireInterfaces()
+      // `chatGuid` scopes to one conversation; without it, every pending message. The
+      // `with` relations work as on `message/query`, and `dateCreated` is the delivery time.
+      let query = MessageInterface.Query(
+        withChats: request.wants("chat"),
+        withAttachments: request.wants("attachment"),
+        withHandle: true
+      )
+      let messages = try await interfaces.message.pendingScheduledMessages(
+        chatGUID: request.queryParameters["chatGuid"], query: query)
+      return .data(
+        .array(interfaces.message.serialize(messages, query: query)),
+        metadata: .object(["count": .int(messages.count)]))
+    }
+
     registry.register(.messageCancelScheduled) { request in
       let interfaces = try await context.requireInterfaces()
       let guid = try request.requirePathParameter("guid")

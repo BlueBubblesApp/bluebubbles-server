@@ -201,6 +201,32 @@ public struct MessageRepository: Sendable {
     }
   }
 
+  /// Messages Send Later is still holding: `schedule_type` set and `schedule_state` 1
+  /// (accepted) or 2 (scheduled). Measured on 26.5.2: a fresh scheduled message reads 1 in
+  /// the send's own response and 2 seconds later; a cancelled one is deleted outright, and
+  /// the states a delivered one moves through were not observed, so they are excluded by
+  /// listing the two known-pending values rather than by excluding known-done ones.
+  /// Soonest delivery first.
+  public func pendingScheduledMessages(
+    chatGUID: String? = nil, limit: Int = 500
+  ) async throws -> [IMessageRow] {
+    let columns = profile.select(Self.messageColumns, from: .message, alias: "m")
+    let predicate = messagePredicate(MessageQuery(chatGUID: chatGUID, limit: limit, offset: 0))
+    var clause = predicate.clause
+    let scheduled = "m.schedule_type != 0 AND m.schedule_state IN (1, 2)"
+    clause = clause.isEmpty ? " WHERE \(scheduled)" : clause + " AND \(scheduled)"
+    let statement =
+      "SELECT \(columns) FROM message m" + clause + " ORDER BY m.date ASC LIMIT ?"
+    var arguments = predicate.arguments
+    arguments.append(limit)
+    let statementArguments = StatementArguments(arguments)
+    let unit = dateUnit
+    return try await database.read { db in
+      try Row.fetchAll(db, sql: statement, arguments: statementArguments)
+        .map { IMessageRow(row: $0, dateUnit: unit) }
+    }
+  }
+
   /// Every message associated with one of `guids` — a poll's updates and votes, oldest
   /// first. Chat-independent: a poll's thread is addressed by GUID alone.
   public func messages(

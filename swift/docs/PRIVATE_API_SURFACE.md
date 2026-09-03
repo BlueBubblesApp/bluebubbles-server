@@ -359,6 +359,16 @@ iMessage app message from `com.apple.messages.Polls` whose `payload_data` archiv
 by `+[IMMessage customAcknowledgementMessageWithPayloadData:associatedMessageGUID:balloonBundleID:messageSummaryInfo:threadIdentifier:]`.
 macOS 26 only (`-[IMChat _supportsPolls]`).
 
+### Deleting a message locally — `deleteIMMessageItems:`, not `deleteChatItems:`
+
+Backs `chat.deleteMessage` (`DELETE /chat/:guid/:messageGuid`). Measured on 26.5.2: the helper
+had called `-[IMChat deleteChatItems:]` with the chat items off a freshly loaded message item,
+and three deletes answered 200 while all three rows stayed in `chat.db`. Those items are not
+the transcript's own, so the chat has nothing to match them against — the same "success that
+does nothing" the reference's `CKChatController deleteChatItem:` produces headless.
+`-[IMChat deleteIMMessageItems:]` takes the message ITEM itself and deletes the row; it is
+used first, with the chat-item form kept as the fallback for a release without it.
+
 ### Send Later — the date goes on the COMPOSITION
 
 Backs `message.sendLater` / `message.cancelScheduled`. Measured on macOS 26.5.2.

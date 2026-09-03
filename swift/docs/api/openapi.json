@@ -20169,6 +20169,95 @@
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
+      },
+      "get": {
+        "operationId": "getV2MessageSendLater",
+        "summary": "Pending scheduled",
+        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "tags": [
+          "send-later-v2"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pretty"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                },
+                "example": {
+                  "status": 200,
+                  "message": "Successfully fetched scheduled messages!"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 401,
+                  "message": "Authentication Error",
+                  "error": {
+                    "type": "Authentication Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource. Note the error type is `Database Error`, not `Not Found` — inherited from the previous server and part of the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 404,
+                  "message": "Database Error",
+                  "error": {
+                    "type": "Database Error",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The route exceeded its response timeout.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "status": 504,
+                  "message": "Gateway Timeout",
+                  "error": {
+                    "type": "Gateway Timeout",
+                    "message": "A description of what went wrong."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-handler-id": "message.pendingScheduled",
+        "x-api-version": 2,
+        "x-availability": "setting:additive_endpoints",
+        "x-required-scope": "messages:read",
+        "x-request-timeout-seconds": 60,
+        "x-response-timeout-seconds": 300
       }
     },
     "/api/v2/message/send-later/{guid}": {
