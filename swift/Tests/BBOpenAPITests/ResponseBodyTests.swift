@@ -52,7 +52,13 @@ struct ResponseBodyTests {
   func fieldsAreSound() {
     for (handler, body) in ResponseBodies.byHandler {
       #expect(body.summary.count > 10, "\(handler.rawValue) has no useful summary")
-      #expect(!body.properties.isEmpty, "\(handler.rawValue) declares an empty response")
+      switch body.kind {
+      case .empty, .mirrors:
+        // Nothing to describe: one has no payload, the other borrows a recorded schema.
+        #expect(body.properties.isEmpty, "\(handler.rawValue) declares fields it does not use")
+      case .object, .list:
+        #expect(!body.properties.isEmpty, "\(handler.rawValue) declares an empty response")
+      }
       #expect(
         Set(body.properties.map(\.name)).count == body.properties.count,
         "\(handler.rawValue) repeats a field")
@@ -65,22 +71,54 @@ struct ResponseBodyTests {
     }
   }
 
+  @Test("Every mirror points at a handler whose response is actually recorded")
+  func mirrorsResolve() {
+    // The failure this prevents is silent: a mirror that resolves to nothing emits a bare
+    // envelope, which is exactly the state this table exists to end. It would look like
+    // the route had simply never been declared.
+    for (handler, body) in ResponseBodies.byHandler {
+      guard case .mirrors(let target) = body.kind else { continue }
+      #expect(
+        OpenAPIDocument.recordedResponse(of: target) != nil,
+        "\(handler.rawValue) mirrors \(target.rawValue), which has no recorded response")
+      #expect(target != handler, "\(handler.rawValue) mirrors itself")
+    }
+  }
+
+  @Test("Every v2 route documents what it answers with")
+  func v2ResponsesAreDocumented() {
+    // The ratchet. A v2 route reaches the document with a described `data`, a recorded one,
+    // or a declaration that it answers with nothing — and a new route cannot ship without
+    // one of those, which is how all of these came to be undocumented in the first place.
+    for entry in RouteCatalog.routes where entry.path.hasPrefix("/api/v2/") {
+      let handler = entry.route.handlerID
+      let documented =
+        ResponseBodies.byHandler[handler] != nil
+        || NonJSONResponses.binary[handler] != nil
+        || FixtureSchemas.table[OpenAPIDocument.operationID(for: entry)]?.response != nil
+      let route = "\(entry.route.method.rawValue) \(entry.path)"
+      #expect(documented, "\(route) does not document what it answers with")
+    }
+  }
+
   @Test("Every example matches the shape it is an example of")
   func examplesMatchTheirShape() {
     // The example is what a client author copies, so an array route's example has to be an
     // array and an object route's an object — and the object's keys have to be fields this
     // response actually declares.
     for (handler, body) in ResponseBodies.byHandler {
+      // An empty or mirrored response has nothing of its own to exemplify.
+      guard let example = body.example, !body.properties.isEmpty else { continue }
       let object: OrderedJSON?
-      if body.isArray {
-        guard case .array(let elements) = body.example else {
+      if case .list = body.kind {
+        guard case .array(let elements) = example else {
           Issue.record("\(handler.rawValue) is an array response with a non-array example")
           continue
         }
         #expect(!elements.isEmpty, "\(handler.rawValue)'s example array is empty")
         object = elements.first
       } else {
-        object = body.example
+        object = example
       }
       guard case .object(let members)? = object else {
         Issue.record("\(handler.rawValue)'s example is not a JSON object")

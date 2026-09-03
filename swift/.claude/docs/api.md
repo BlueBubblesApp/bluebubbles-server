@@ -482,8 +482,12 @@ entry names a route that no longer exists.
 6. Add a `SuccessMessages` entry only if the route needs a non-default `message`.
 7. **Declare its response too**, if no fixture can cover it. `ResponseBodies.byHandler`
    supplies the `data` schema and an example where inference produced nothing — a fixture
-   always wins, and `ResponseBodyTests` fails the build if a route has both. A route that
-   answers with bytes goes in `NonJSONResponses.binary` instead.
+   always wins, and `ResponseBodyTests` fails the build if a route has both. Four shapes:
+   `.object`/`.list` for a payload only this route produces, `.empty` for `data: null`, and
+   `.mirrors(handler)` when it answers with the same row as a route whose schema IS recorded
+   (every v2 send mirrors `.messageSendText`; the pending-scheduled list mirrors
+   `.messageQuery`). A route answering with bytes goes in `NonJSONResponses.binary`. Every
+   v2 route must be in one of those or the build fails.
 8. **Declare its request body.** A route this server added has no fixture, so nothing is
    inferred and the spec would document no input at all. Add a `RequestBodies.byHandler`
    entry with a description per field and an `example` a client can copy — or, if it takes

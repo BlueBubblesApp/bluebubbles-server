@@ -162,13 +162,6 @@ envelope swap described below. What it still does not do:
       — exactly where the helper work lives. Needs a dedicated throwaway conversation and a
       driver that is explicit about what it will send. Note that the replay DENY-LISTS all of
       these (see below), so recording them buys `bb-parity` coverage, not CI coverage.
-- [ ] **Declare the remaining v2 responses.** `ResponseBodies` now exists and the four
-      sticker-library routes use it, with fields described and a real example each. The other
-      v2 routes still answer with a bare envelope in the spec: polls (`options[].id`,
-      `votes[]`), Send Later's pending list, and the app-message read (`game_pigeon.fields`).
-      Every shape has been seen on a live Mac during development, so this is transcription
-      rather than research — and there is no ratchet forcing it yet, which there should be:
-      the bodyless-style rule that a v2 route must appear in one table or the other.
 - [ ] **A sticker can be added to recents but not to the saved drawer.** The only write
       `_STKMessagesObjCStoreFacade` exposes is a donation to recents; creating a saved
       sticker is a Stickers-extension UI flow. Worth another look at whether `stickersd` has

@@ -361,8 +361,27 @@ and a declaration is testimony, so if a declared route is ever recorded the decl
 be deleted rather than left to disagree in silence — which `ResponseBodyTests` enforces,
 along with an example that is a real response and carries every required field.
 
-A route that answers with bytes rather than an envelope is declared in
-`NonJSONResponses.binary`, and a handler in both tables is a build failure.
+A declaration takes one of four shapes, and picking the right one matters:
+
+| Kind | For |
+| --- | --- |
+| `.object` / `.list` | a payload only this route produces — the poll read, the app-message read, the sticker library |
+| `.mirrors(handler)` | a route answering with the **same** `data` as one whose schema is recorded |
+| `.empty` | `data: null` |
+
+`.mirrors` is the one that does the most work. Seven v2 sends answer with the serialized
+message row that `POST /api/v1/message/text` answers with — the same serializer — so they
+name that handler instead of transcribing fifty fields seven times. The document resolves it
+against the recorded schema, so it is real evidence and it cannot drift. A mirror pointing at
+a handler with no recording is a build failure, because it would emit a bare envelope and
+look exactly like a route nobody had declared.
+
+`.empty` exists for the same reason `RequestBodies.bodyless` does: `data: null` and "nobody
+documented this" are indistinguishable in the emitted file otherwise.
+
+**Every v2 route must land in one of these**, in `NonJSONResponses.binary` for a route that
+answers with bytes, or have a recorded response — `ResponseBodyTests` fails the build
+otherwise. That ratchet is what stops the next route shipping the way these did.
 
 ### Why scopes are an extension
 

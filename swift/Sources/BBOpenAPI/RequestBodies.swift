@@ -518,7 +518,7 @@ public enum RequestBodies {
     ])
   }
 
-  private static func schema(for schema: Schema, _ description: String) -> OrderedJSON {
+  static func schema(for schema: Schema, _ description: String) -> OrderedJSON {
     switch schema {
     case .array(let element):
       return .obj([

@@ -551,7 +551,14 @@ public enum OpenAPIDocument {
       FixtureSchemas.table[operationID]?.response == nil
       ? ResponseBodies.byHandler[entry.route.handlerID] : nil
     let dataSchema =
-      FixtureSchemas.table[operationID]?.response ?? declared.map(ResponseBodies.schema(for:))
+      FixtureSchemas.table[operationID]?.response
+      ?? declared.flatMap { body in
+        // A MIRRORED declaration resolves against the schema recorded for the handler it
+        // names, so a route answering with the same serialized row as a v1 route documents
+        // that row exactly rather than a hand-copied approximation of it.
+        if case .mirrors(let handler) = body.kind { return recordedResponse(of: handler) }
+        return ResponseBodies.schema(for: body)
+      }
     let successSchema: OrderedJSON =
       dataSchema.map { schema in
         .obj([
@@ -896,6 +903,17 @@ public enum OpenAPIDocument {
   /// unique — `POST :guid/participant` and `POST :guid/participant/add` deliberately share
   /// `chat.addParticipant`, and `PUT /contact` and `PUT /contact/:id` share `contact.update`.
   /// The version stays in the identifier because v1 and v2 both serve `GET /server/alert`.
+  /// The recorded `data` schema of another handler, for a mirrored declaration.
+  ///
+  /// Nil when that handler has no recording — which `ResponseBodyTests` forbids, so a
+  /// mirror that resolves to nothing is a build failure rather than a silently empty
+  /// response in the document.
+  static func recordedResponse(of handler: HandlerID) -> OrderedJSON? {
+    guard let entry = RouteCatalog.routes.first(where: { $0.route.handlerID == handler })
+    else { return nil }
+    return FixtureSchemas.table[operationID(for: entry)]?.response
+  }
+
   public static func operationID(for entry: RouteCatalog.Entry) -> String {
     var words = [entry.route.method.rawValue.lowercased()]
     let templated = templatize(entry.path).path

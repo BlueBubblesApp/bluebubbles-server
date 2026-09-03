@@ -18549,11 +18549,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. The blocklist is empty."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": null
                 }
               }
             }
@@ -18649,11 +18661,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. That entry is no longer blocked."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": null
                 }
               }
             }
@@ -19003,11 +19027,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. That entry is no longer allowlisted."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": null
                 }
               }
             }
@@ -19330,11 +19366,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. The named alerts are marked read."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": null
                 }
               }
             }
@@ -19795,11 +19843,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. Read the conversation back to confirm the pin."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": null
                 }
               }
             }
@@ -19911,11 +19971,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. The conversation is no longer pinned."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": null
                 }
               }
             }
@@ -20074,7 +20146,395 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "associatedMessageGuid": {
+                          "type": "null"
+                        },
+                        "associatedMessageType": {
+                          "type": "null"
+                        },
+                        "attachments": {
+                          "items": {},
+                          "type": "array"
+                        },
+                        "attributedBody": {
+                          "items": {
+                            "properties": {
+                              "runs": {
+                                "items": {
+                                  "properties": {
+                                    "attributes": {
+                                      "properties": {
+                                        "__kIMMessagePartAttributeName": {
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "__kIMMessagePartAttributeName"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "range": {
+                                      "items": {
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "attributes",
+                                    "range"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "string": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "runs",
+                              "string"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "balloonBundleId": {
+                          "type": "null"
+                        },
+                        "cacheRoomnames": {
+                          "type": "null"
+                        },
+                        "chats": {
+                          "items": {
+                            "properties": {
+                              "chatIdentifier": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "type": "string"
+                              },
+                              "guid": {
+                                "type": "string"
+                              },
+                              "isArchived": {
+                                "type": "boolean"
+                              },
+                              "isFiltered": {
+                                "type": "boolean"
+                              },
+                              "lastAddressedHandle": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "properties": {
+                                "items": {
+                                  "properties": {
+                                    "LSMD": {
+                                      "type": "string"
+                                    },
+                                    "hasBeenAutoSpamReported": {
+                                      "type": "boolean"
+                                    },
+                                    "hasViewedPotentialSpamChat": {
+                                      "type": "boolean"
+                                    },
+                                    "lastSeenMessageGuid": {
+                                      "type": "string"
+                                    },
+                                    "markedAsKnownDate": {
+                                      "type": "string"
+                                    },
+                                    "numberOfTimesRespondedtoThread": {
+                                      "type": "integer"
+                                    },
+                                    "pv": {
+                                      "type": "integer"
+                                    },
+                                    "shouldForceToSMS": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "LSMD",
+                                    "hasBeenAutoSpamReported",
+                                    "hasViewedPotentialSpamChat",
+                                    "lastSeenMessageGuid",
+                                    "markedAsKnownDate",
+                                    "numberOfTimesRespondedtoThread",
+                                    "pv",
+                                    "shouldForceToSMS"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "style": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "chatIdentifier",
+                              "displayName",
+                              "groupId",
+                              "guid",
+                              "isArchived",
+                              "isFiltered",
+                              "lastAddressedHandle",
+                              "originalROWID",
+                              "properties",
+                              "style"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "country": {
+                          "type": "null"
+                        },
+                        "dateCreated": {
+                          "type": "integer"
+                        },
+                        "dateDelivered": {
+                          "type": "null"
+                        },
+                        "dateEdited": {
+                          "type": "null"
+                        },
+                        "datePlayed": {
+                          "type": "null"
+                        },
+                        "dateRead": {
+                          "type": "null"
+                        },
+                        "dateRetracted": {
+                          "type": "null"
+                        },
+                        "didNotifyRecipient": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "expressiveSendStyleId": {
+                          "type": "null"
+                        },
+                        "groupActionType": {
+                          "type": "integer"
+                        },
+                        "groupTitle": {
+                          "type": "null"
+                        },
+                        "guid": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "properties": {
+                            "address": {
+                              "type": "string"
+                            },
+                            "country": {
+                              "type": "string"
+                            },
+                            "originalROWID": {
+                              "type": "integer"
+                            },
+                            "service": {
+                              "type": "string"
+                            },
+                            "uncanonicalizedId": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "country",
+                            "originalROWID",
+                            "service",
+                            "uncanonicalizedId"
+                          ],
+                          "type": "object"
+                        },
+                        "handleId": {
+                          "type": "integer"
+                        },
+                        "hasDdResults": {
+                          "type": "boolean"
+                        },
+                        "hasPayloadData": {
+                          "type": "boolean"
+                        },
+                        "isArchived": {
+                          "type": "boolean"
+                        },
+                        "isAudioMessage": {
+                          "type": "boolean"
+                        },
+                        "isAutoReply": {
+                          "type": "boolean"
+                        },
+                        "isCorrupt": {
+                          "type": "boolean"
+                        },
+                        "isDelayed": {
+                          "type": "boolean"
+                        },
+                        "isDelivered": {
+                          "type": "boolean"
+                        },
+                        "isExpired": {
+                          "type": "boolean"
+                        },
+                        "isForward": {
+                          "type": "boolean"
+                        },
+                        "isFromMe": {
+                          "type": "boolean"
+                        },
+                        "isServiceMessage": {
+                          "type": "boolean"
+                        },
+                        "isSpam": {
+                          "type": "boolean"
+                        },
+                        "isSystemMessage": {
+                          "type": "boolean"
+                        },
+                        "itemType": {
+                          "type": "integer"
+                        },
+                        "messageSummaryInfo": {
+                          "items": {
+                            "properties": {
+                              "ust": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ust"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "originalROWID": {
+                          "type": "integer"
+                        },
+                        "otherHandle": {
+                          "type": "integer"
+                        },
+                        "partCount": {
+                          "type": "integer"
+                        },
+                        "payloadData": {
+                          "type": "null"
+                        },
+                        "replyToGuid": {
+                          "type": "string"
+                        },
+                        "shareDirection": {
+                          "type": "integer"
+                        },
+                        "shareStatus": {
+                          "type": "integer"
+                        },
+                        "subject": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "tempGuid": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "threadOriginatorGuid": {
+                          "type": "null"
+                        },
+                        "threadOriginatorPart": {
+                          "type": "null"
+                        },
+                        "timeExpressiveSendPlayed": {
+                          "type": "null"
+                        },
+                        "wasDeliveredQuietly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "associatedMessageGuid",
+                        "associatedMessageType",
+                        "attachments",
+                        "attributedBody",
+                        "balloonBundleId",
+                        "cacheRoomnames",
+                        "chats",
+                        "country",
+                        "dateCreated",
+                        "dateDelivered",
+                        "dateEdited",
+                        "datePlayed",
+                        "dateRead",
+                        "dateRetracted",
+                        "didNotifyRecipient",
+                        "error",
+                        "expressiveSendStyleId",
+                        "groupActionType",
+                        "groupTitle",
+                        "guid",
+                        "handle",
+                        "handleId",
+                        "hasDdResults",
+                        "hasPayloadData",
+                        "isArchived",
+                        "isAudioMessage",
+                        "isAutoReply",
+                        "isCorrupt",
+                        "isDelayed",
+                        "isDelivered",
+                        "isExpired",
+                        "isForward",
+                        "isFromMe",
+                        "isServiceMessage",
+                        "isSpam",
+                        "isSystemMessage",
+                        "itemType",
+                        "messageSummaryInfo",
+                        "originalROWID",
+                        "otherHandle",
+                        "partCount",
+                        "payloadData",
+                        "replyToGuid",
+                        "shareDirection",
+                        "shareStatus",
+                        "subject",
+                        "tempGuid",
+                        "text",
+                        "threadOriginatorGuid",
+                        "threadOriginatorPart",
+                        "timeExpressiveSendPlayed",
+                        "wasDeliveredQuietly"
+                      ],
+                      "type": "object"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -20594,7 +21054,6 @@
                       "description": "Every sticker on the requested shelves, newest first. `metadata` carries `saved` and `recent` totals whatever `?source=` asked for, so one request is enough to render both sections and page either.",
                       "items": {
                         "type": "object",
-                        "description": "Every sticker on the requested shelves, newest first. `metadata` carries `saved` and `recent` totals whatever `?source=` asked for, so one request is enough to render both sections and page either.",
                         "properties": {
                           "identifier": {
                             "type": "string",
@@ -21210,7 +21669,395 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "associatedMessageGuid": {
+                          "type": "null"
+                        },
+                        "associatedMessageType": {
+                          "type": "null"
+                        },
+                        "attachments": {
+                          "items": {},
+                          "type": "array"
+                        },
+                        "attributedBody": {
+                          "items": {
+                            "properties": {
+                              "runs": {
+                                "items": {
+                                  "properties": {
+                                    "attributes": {
+                                      "properties": {
+                                        "__kIMMessagePartAttributeName": {
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "__kIMMessagePartAttributeName"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "range": {
+                                      "items": {
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "attributes",
+                                    "range"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "string": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "runs",
+                              "string"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "balloonBundleId": {
+                          "type": "null"
+                        },
+                        "cacheRoomnames": {
+                          "type": "null"
+                        },
+                        "chats": {
+                          "items": {
+                            "properties": {
+                              "chatIdentifier": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "type": "string"
+                              },
+                              "guid": {
+                                "type": "string"
+                              },
+                              "isArchived": {
+                                "type": "boolean"
+                              },
+                              "isFiltered": {
+                                "type": "boolean"
+                              },
+                              "lastAddressedHandle": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "properties": {
+                                "items": {
+                                  "properties": {
+                                    "LSMD": {
+                                      "type": "string"
+                                    },
+                                    "hasBeenAutoSpamReported": {
+                                      "type": "boolean"
+                                    },
+                                    "hasViewedPotentialSpamChat": {
+                                      "type": "boolean"
+                                    },
+                                    "lastSeenMessageGuid": {
+                                      "type": "string"
+                                    },
+                                    "markedAsKnownDate": {
+                                      "type": "string"
+                                    },
+                                    "numberOfTimesRespondedtoThread": {
+                                      "type": "integer"
+                                    },
+                                    "pv": {
+                                      "type": "integer"
+                                    },
+                                    "shouldForceToSMS": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "LSMD",
+                                    "hasBeenAutoSpamReported",
+                                    "hasViewedPotentialSpamChat",
+                                    "lastSeenMessageGuid",
+                                    "markedAsKnownDate",
+                                    "numberOfTimesRespondedtoThread",
+                                    "pv",
+                                    "shouldForceToSMS"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "style": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "chatIdentifier",
+                              "displayName",
+                              "groupId",
+                              "guid",
+                              "isArchived",
+                              "isFiltered",
+                              "lastAddressedHandle",
+                              "originalROWID",
+                              "properties",
+                              "style"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "country": {
+                          "type": "null"
+                        },
+                        "dateCreated": {
+                          "type": "integer"
+                        },
+                        "dateDelivered": {
+                          "type": "null"
+                        },
+                        "dateEdited": {
+                          "type": "null"
+                        },
+                        "datePlayed": {
+                          "type": "null"
+                        },
+                        "dateRead": {
+                          "type": "null"
+                        },
+                        "dateRetracted": {
+                          "type": "null"
+                        },
+                        "didNotifyRecipient": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "expressiveSendStyleId": {
+                          "type": "null"
+                        },
+                        "groupActionType": {
+                          "type": "integer"
+                        },
+                        "groupTitle": {
+                          "type": "null"
+                        },
+                        "guid": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "properties": {
+                            "address": {
+                              "type": "string"
+                            },
+                            "country": {
+                              "type": "string"
+                            },
+                            "originalROWID": {
+                              "type": "integer"
+                            },
+                            "service": {
+                              "type": "string"
+                            },
+                            "uncanonicalizedId": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "country",
+                            "originalROWID",
+                            "service",
+                            "uncanonicalizedId"
+                          ],
+                          "type": "object"
+                        },
+                        "handleId": {
+                          "type": "integer"
+                        },
+                        "hasDdResults": {
+                          "type": "boolean"
+                        },
+                        "hasPayloadData": {
+                          "type": "boolean"
+                        },
+                        "isArchived": {
+                          "type": "boolean"
+                        },
+                        "isAudioMessage": {
+                          "type": "boolean"
+                        },
+                        "isAutoReply": {
+                          "type": "boolean"
+                        },
+                        "isCorrupt": {
+                          "type": "boolean"
+                        },
+                        "isDelayed": {
+                          "type": "boolean"
+                        },
+                        "isDelivered": {
+                          "type": "boolean"
+                        },
+                        "isExpired": {
+                          "type": "boolean"
+                        },
+                        "isForward": {
+                          "type": "boolean"
+                        },
+                        "isFromMe": {
+                          "type": "boolean"
+                        },
+                        "isServiceMessage": {
+                          "type": "boolean"
+                        },
+                        "isSpam": {
+                          "type": "boolean"
+                        },
+                        "isSystemMessage": {
+                          "type": "boolean"
+                        },
+                        "itemType": {
+                          "type": "integer"
+                        },
+                        "messageSummaryInfo": {
+                          "items": {
+                            "properties": {
+                              "ust": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ust"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "originalROWID": {
+                          "type": "integer"
+                        },
+                        "otherHandle": {
+                          "type": "integer"
+                        },
+                        "partCount": {
+                          "type": "integer"
+                        },
+                        "payloadData": {
+                          "type": "null"
+                        },
+                        "replyToGuid": {
+                          "type": "string"
+                        },
+                        "shareDirection": {
+                          "type": "integer"
+                        },
+                        "shareStatus": {
+                          "type": "integer"
+                        },
+                        "subject": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "tempGuid": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "threadOriginatorGuid": {
+                          "type": "null"
+                        },
+                        "threadOriginatorPart": {
+                          "type": "null"
+                        },
+                        "timeExpressiveSendPlayed": {
+                          "type": "null"
+                        },
+                        "wasDeliveredQuietly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "associatedMessageGuid",
+                        "associatedMessageType",
+                        "attachments",
+                        "attributedBody",
+                        "balloonBundleId",
+                        "cacheRoomnames",
+                        "chats",
+                        "country",
+                        "dateCreated",
+                        "dateDelivered",
+                        "dateEdited",
+                        "datePlayed",
+                        "dateRead",
+                        "dateRetracted",
+                        "didNotifyRecipient",
+                        "error",
+                        "expressiveSendStyleId",
+                        "groupActionType",
+                        "groupTitle",
+                        "guid",
+                        "handle",
+                        "handleId",
+                        "hasDdResults",
+                        "hasPayloadData",
+                        "isArchived",
+                        "isAudioMessage",
+                        "isAutoReply",
+                        "isCorrupt",
+                        "isDelayed",
+                        "isDelivered",
+                        "isExpired",
+                        "isForward",
+                        "isFromMe",
+                        "isServiceMessage",
+                        "isSpam",
+                        "isSystemMessage",
+                        "itemType",
+                        "messageSummaryInfo",
+                        "originalROWID",
+                        "otherHandle",
+                        "partCount",
+                        "payloadData",
+                        "replyToGuid",
+                        "shareDirection",
+                        "shareStatus",
+                        "subject",
+                        "tempGuid",
+                        "text",
+                        "threadOriginatorGuid",
+                        "threadOriginatorPart",
+                        "timeExpressiveSendPlayed",
+                        "wasDeliveredQuietly"
+                      ],
+                      "type": "object"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -21317,7 +22164,429 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "associatedMessageGuid": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "associatedMessageType": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "attachments": {
+                            "items": {
+                              "properties": {
+                                "guid": {
+                                  "type": "string"
+                                },
+                                "hasLivePhoto": {
+                                  "type": "boolean"
+                                },
+                                "hideAttachment": {
+                                  "type": "boolean"
+                                },
+                                "isOutgoing": {
+                                  "type": "boolean"
+                                },
+                                "isSticker": {
+                                  "type": "boolean"
+                                },
+                                "mimeType": {
+                                  "type": "string"
+                                },
+                                "originalGuid": {
+                                  "type": "string"
+                                },
+                                "originalROWID": {
+                                  "type": "integer"
+                                },
+                                "totalBytes": {
+                                  "type": "integer"
+                                },
+                                "transferName": {
+                                  "type": "string"
+                                },
+                                "transferState": {
+                                  "type": "integer"
+                                },
+                                "uti": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "guid",
+                                "hasLivePhoto",
+                                "hideAttachment",
+                                "isOutgoing",
+                                "isSticker",
+                                "mimeType",
+                                "originalGuid",
+                                "originalROWID",
+                                "totalBytes",
+                                "transferName",
+                                "transferState",
+                                "uti"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "attributedBody": {
+                            "type": "null"
+                          },
+                          "balloonBundleId": {
+                            "type": "null"
+                          },
+                          "cacheRoomnames": {
+                            "type": "string"
+                          },
+                          "chats": {
+                            "items": {
+                              "properties": {
+                                "chatIdentifier": {
+                                  "type": "string"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                },
+                                "groupId": {
+                                  "type": "string"
+                                },
+                                "guid": {
+                                  "type": "string"
+                                },
+                                "isArchived": {
+                                  "type": "boolean"
+                                },
+                                "isFiltered": {
+                                  "type": "boolean"
+                                },
+                                "lastAddressedHandle": {
+                                  "type": "string"
+                                },
+                                "originalROWID": {
+                                  "type": "integer"
+                                },
+                                "properties": {
+                                  "items": {
+                                    "properties": {
+                                      "GPUFC": {
+                                        "type": "integer"
+                                      },
+                                      "LSMD": {
+                                        "type": "string"
+                                      },
+                                      "com.apple.iChat.LastArchivedMessageID": {
+                                        "items": {
+                                          "type": [
+                                            "integer",
+                                            "string"
+                                          ]
+                                        },
+                                        "type": "array"
+                                      },
+                                      "gppv": {
+                                        "type": "integer"
+                                      },
+                                      "groupPhotoGuid": {
+                                        "type": "string"
+                                      },
+                                      "hasBeenAutoSpamReported": {
+                                        "type": "boolean"
+                                      },
+                                      "lastSeenMessageGuid": {
+                                        "type": "string"
+                                      },
+                                      "lastTUConversationCreatedDate": {
+                                        "type": "string"
+                                      },
+                                      "markedAsKnownDate": {
+                                        "type": "string"
+                                      },
+                                      "numberOfTimesRespondedtoThread": {
+                                        "type": "integer"
+                                      },
+                                      "put": {
+                                        "type": "number"
+                                      },
+                                      "pv": {
+                                        "type": "integer"
+                                      },
+                                      "shouldForceToSMS": {
+                                        "type": "boolean"
+                                      },
+                                      "supportsEncryption": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "GPUFC",
+                                      "LSMD",
+                                      "com.apple.iChat.LastArchivedMessageID",
+                                      "gppv",
+                                      "groupPhotoGuid",
+                                      "hasBeenAutoSpamReported",
+                                      "lastSeenMessageGuid",
+                                      "lastTUConversationCreatedDate",
+                                      "markedAsKnownDate",
+                                      "numberOfTimesRespondedtoThread",
+                                      "put",
+                                      "pv",
+                                      "shouldForceToSMS",
+                                      "supportsEncryption"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                "style": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "chatIdentifier",
+                                "displayName",
+                                "groupId",
+                                "guid",
+                                "isArchived",
+                                "isFiltered",
+                                "lastAddressedHandle",
+                                "originalROWID",
+                                "properties",
+                                "style"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "country": {
+                            "type": "null"
+                          },
+                          "dateCreated": {
+                            "type": "integer"
+                          },
+                          "dateDelivered": {
+                            "type": "null"
+                          },
+                          "dateEdited": {
+                            "type": "null"
+                          },
+                          "datePlayed": {
+                            "type": "null"
+                          },
+                          "dateRead": {
+                            "type": "null"
+                          },
+                          "dateRetracted": {
+                            "type": "null"
+                          },
+                          "didNotifyRecipient": {
+                            "type": "boolean"
+                          },
+                          "error": {
+                            "type": "integer"
+                          },
+                          "expressiveSendStyleId": {
+                            "type": "null"
+                          },
+                          "groupActionType": {
+                            "type": "integer"
+                          },
+                          "groupTitle": {
+                            "type": "null"
+                          },
+                          "guid": {
+                            "type": "string"
+                          },
+                          "handle": {
+                            "properties": {
+                              "address": {
+                                "type": "string"
+                              },
+                              "country": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "service": {
+                                "type": "string"
+                              },
+                              "uncanonicalizedId": {
+                                "type": "null"
+                              }
+                            },
+                            "required": [
+                              "address",
+                              "country",
+                              "originalROWID",
+                              "service",
+                              "uncanonicalizedId"
+                            ],
+                            "type": "object"
+                          },
+                          "handleId": {
+                            "type": "integer"
+                          },
+                          "hasDdResults": {
+                            "type": "boolean"
+                          },
+                          "hasPayloadData": {
+                            "type": "boolean"
+                          },
+                          "isArchived": {
+                            "type": "boolean"
+                          },
+                          "isAudioMessage": {
+                            "type": "boolean"
+                          },
+                          "isAutoReply": {
+                            "type": "boolean"
+                          },
+                          "isCorrupt": {
+                            "type": "boolean"
+                          },
+                          "isDelayed": {
+                            "type": "boolean"
+                          },
+                          "isDelivered": {
+                            "type": "boolean"
+                          },
+                          "isExpired": {
+                            "type": "boolean"
+                          },
+                          "isForward": {
+                            "type": "boolean"
+                          },
+                          "isFromMe": {
+                            "type": "boolean"
+                          },
+                          "isServiceMessage": {
+                            "type": "boolean"
+                          },
+                          "isSpam": {
+                            "type": "boolean"
+                          },
+                          "isSystemMessage": {
+                            "type": "boolean"
+                          },
+                          "itemType": {
+                            "type": "integer"
+                          },
+                          "messageSummaryInfo": {
+                            "type": "null"
+                          },
+                          "originalROWID": {
+                            "type": "integer"
+                          },
+                          "otherHandle": {
+                            "type": "integer"
+                          },
+                          "partCount": {
+                            "type": "integer"
+                          },
+                          "payloadData": {
+                            "type": "null"
+                          },
+                          "replyToGuid": {
+                            "type": "string"
+                          },
+                          "shareDirection": {
+                            "type": "integer"
+                          },
+                          "shareStatus": {
+                            "type": "integer"
+                          },
+                          "subject": {
+                            "type": "null"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "threadOriginatorGuid": {
+                            "type": "null"
+                          },
+                          "threadOriginatorPart": {
+                            "type": "null"
+                          },
+                          "timeExpressiveSendPlayed": {
+                            "type": "null"
+                          },
+                          "wasDeliveredQuietly": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "associatedMessageGuid",
+                          "associatedMessageType",
+                          "attachments",
+                          "attributedBody",
+                          "balloonBundleId",
+                          "cacheRoomnames",
+                          "chats",
+                          "country",
+                          "dateCreated",
+                          "dateDelivered",
+                          "dateEdited",
+                          "datePlayed",
+                          "dateRead",
+                          "dateRetracted",
+                          "didNotifyRecipient",
+                          "error",
+                          "expressiveSendStyleId",
+                          "groupActionType",
+                          "groupTitle",
+                          "guid",
+                          "handle",
+                          "handleId",
+                          "hasDdResults",
+                          "hasPayloadData",
+                          "isArchived",
+                          "isAudioMessage",
+                          "isAutoReply",
+                          "isCorrupt",
+                          "isDelayed",
+                          "isDelivered",
+                          "isExpired",
+                          "isForward",
+                          "isFromMe",
+                          "isServiceMessage",
+                          "isSpam",
+                          "isSystemMessage",
+                          "itemType",
+                          "messageSummaryInfo",
+                          "originalROWID",
+                          "otherHandle",
+                          "partCount",
+                          "payloadData",
+                          "replyToGuid",
+                          "shareDirection",
+                          "shareStatus",
+                          "subject",
+                          "text",
+                          "threadOriginatorGuid",
+                          "threadOriginatorPart",
+                          "timeExpressiveSendPlayed",
+                          "wasDeliveredQuietly"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -21441,11 +22710,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. The message is delivered and is no longer pending."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Message sent!"
+                  "message": "Message sent!",
+                  "data": null
                 }
               }
             }
@@ -21597,11 +22878,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. Read the message back if you need its new delivery time."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Scheduled message updated!"
+                  "message": "Scheduled message updated!",
+                  "data": null
                 }
               }
             }
@@ -21737,11 +23030,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. The pending message is deleted rather than marked cancelled, so there is no row left to answer with."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Scheduled message cancelled!"
+                  "message": "Scheduled message cancelled!",
+                  "data": null
                 }
               }
             }
@@ -21887,7 +23192,395 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "associatedMessageGuid": {
+                          "type": "null"
+                        },
+                        "associatedMessageType": {
+                          "type": "null"
+                        },
+                        "attachments": {
+                          "items": {},
+                          "type": "array"
+                        },
+                        "attributedBody": {
+                          "items": {
+                            "properties": {
+                              "runs": {
+                                "items": {
+                                  "properties": {
+                                    "attributes": {
+                                      "properties": {
+                                        "__kIMMessagePartAttributeName": {
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "__kIMMessagePartAttributeName"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "range": {
+                                      "items": {
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "attributes",
+                                    "range"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "string": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "runs",
+                              "string"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "balloonBundleId": {
+                          "type": "null"
+                        },
+                        "cacheRoomnames": {
+                          "type": "null"
+                        },
+                        "chats": {
+                          "items": {
+                            "properties": {
+                              "chatIdentifier": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "type": "string"
+                              },
+                              "guid": {
+                                "type": "string"
+                              },
+                              "isArchived": {
+                                "type": "boolean"
+                              },
+                              "isFiltered": {
+                                "type": "boolean"
+                              },
+                              "lastAddressedHandle": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "properties": {
+                                "items": {
+                                  "properties": {
+                                    "LSMD": {
+                                      "type": "string"
+                                    },
+                                    "hasBeenAutoSpamReported": {
+                                      "type": "boolean"
+                                    },
+                                    "hasViewedPotentialSpamChat": {
+                                      "type": "boolean"
+                                    },
+                                    "lastSeenMessageGuid": {
+                                      "type": "string"
+                                    },
+                                    "markedAsKnownDate": {
+                                      "type": "string"
+                                    },
+                                    "numberOfTimesRespondedtoThread": {
+                                      "type": "integer"
+                                    },
+                                    "pv": {
+                                      "type": "integer"
+                                    },
+                                    "shouldForceToSMS": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "LSMD",
+                                    "hasBeenAutoSpamReported",
+                                    "hasViewedPotentialSpamChat",
+                                    "lastSeenMessageGuid",
+                                    "markedAsKnownDate",
+                                    "numberOfTimesRespondedtoThread",
+                                    "pv",
+                                    "shouldForceToSMS"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "style": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "chatIdentifier",
+                              "displayName",
+                              "groupId",
+                              "guid",
+                              "isArchived",
+                              "isFiltered",
+                              "lastAddressedHandle",
+                              "originalROWID",
+                              "properties",
+                              "style"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "country": {
+                          "type": "null"
+                        },
+                        "dateCreated": {
+                          "type": "integer"
+                        },
+                        "dateDelivered": {
+                          "type": "null"
+                        },
+                        "dateEdited": {
+                          "type": "null"
+                        },
+                        "datePlayed": {
+                          "type": "null"
+                        },
+                        "dateRead": {
+                          "type": "null"
+                        },
+                        "dateRetracted": {
+                          "type": "null"
+                        },
+                        "didNotifyRecipient": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "expressiveSendStyleId": {
+                          "type": "null"
+                        },
+                        "groupActionType": {
+                          "type": "integer"
+                        },
+                        "groupTitle": {
+                          "type": "null"
+                        },
+                        "guid": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "properties": {
+                            "address": {
+                              "type": "string"
+                            },
+                            "country": {
+                              "type": "string"
+                            },
+                            "originalROWID": {
+                              "type": "integer"
+                            },
+                            "service": {
+                              "type": "string"
+                            },
+                            "uncanonicalizedId": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "country",
+                            "originalROWID",
+                            "service",
+                            "uncanonicalizedId"
+                          ],
+                          "type": "object"
+                        },
+                        "handleId": {
+                          "type": "integer"
+                        },
+                        "hasDdResults": {
+                          "type": "boolean"
+                        },
+                        "hasPayloadData": {
+                          "type": "boolean"
+                        },
+                        "isArchived": {
+                          "type": "boolean"
+                        },
+                        "isAudioMessage": {
+                          "type": "boolean"
+                        },
+                        "isAutoReply": {
+                          "type": "boolean"
+                        },
+                        "isCorrupt": {
+                          "type": "boolean"
+                        },
+                        "isDelayed": {
+                          "type": "boolean"
+                        },
+                        "isDelivered": {
+                          "type": "boolean"
+                        },
+                        "isExpired": {
+                          "type": "boolean"
+                        },
+                        "isForward": {
+                          "type": "boolean"
+                        },
+                        "isFromMe": {
+                          "type": "boolean"
+                        },
+                        "isServiceMessage": {
+                          "type": "boolean"
+                        },
+                        "isSpam": {
+                          "type": "boolean"
+                        },
+                        "isSystemMessage": {
+                          "type": "boolean"
+                        },
+                        "itemType": {
+                          "type": "integer"
+                        },
+                        "messageSummaryInfo": {
+                          "items": {
+                            "properties": {
+                              "ust": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ust"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "originalROWID": {
+                          "type": "integer"
+                        },
+                        "otherHandle": {
+                          "type": "integer"
+                        },
+                        "partCount": {
+                          "type": "integer"
+                        },
+                        "payloadData": {
+                          "type": "null"
+                        },
+                        "replyToGuid": {
+                          "type": "string"
+                        },
+                        "shareDirection": {
+                          "type": "integer"
+                        },
+                        "shareStatus": {
+                          "type": "integer"
+                        },
+                        "subject": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "tempGuid": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "threadOriginatorGuid": {
+                          "type": "null"
+                        },
+                        "threadOriginatorPart": {
+                          "type": "null"
+                        },
+                        "timeExpressiveSendPlayed": {
+                          "type": "null"
+                        },
+                        "wasDeliveredQuietly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "associatedMessageGuid",
+                        "associatedMessageType",
+                        "attachments",
+                        "attributedBody",
+                        "balloonBundleId",
+                        "cacheRoomnames",
+                        "chats",
+                        "country",
+                        "dateCreated",
+                        "dateDelivered",
+                        "dateEdited",
+                        "datePlayed",
+                        "dateRead",
+                        "dateRetracted",
+                        "didNotifyRecipient",
+                        "error",
+                        "expressiveSendStyleId",
+                        "groupActionType",
+                        "groupTitle",
+                        "guid",
+                        "handle",
+                        "handleId",
+                        "hasDdResults",
+                        "hasPayloadData",
+                        "isArchived",
+                        "isAudioMessage",
+                        "isAutoReply",
+                        "isCorrupt",
+                        "isDelayed",
+                        "isDelivered",
+                        "isExpired",
+                        "isForward",
+                        "isFromMe",
+                        "isServiceMessage",
+                        "isSpam",
+                        "isSystemMessage",
+                        "itemType",
+                        "messageSummaryInfo",
+                        "originalROWID",
+                        "otherHandle",
+                        "partCount",
+                        "payloadData",
+                        "replyToGuid",
+                        "shareDirection",
+                        "shareStatus",
+                        "subject",
+                        "tempGuid",
+                        "text",
+                        "threadOriginatorGuid",
+                        "threadOriginatorPart",
+                        "timeExpressiveSendPlayed",
+                        "wasDeliveredQuietly"
+                      ],
+                      "type": "object"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -22005,11 +23698,144 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "A poll assembled from its whole message thread: the options from the latest state, and one newest vote per participant. The server keeps no poll state — this is read from chat.db on every call.",
+                      "properties": {
+                        "guid": {
+                          "type": "string",
+                          "description": "The poll's ROOT message GUID."
+                        },
+                        "title": {
+                          "type": "string",
+                          "description": "Accepted when the poll was created, but Messages 26 neither shows a poll title nor keeps one — expect an empty string."
+                        },
+                        "creator_handle": {
+                          "type": "string",
+                          "description": "Who created the poll. Null for this account."
+                        },
+                        "session_id": {
+                          "type": "string",
+                          "description": "The poll's `MSSession` UUID."
+                        },
+                        "latest_state_guid": {
+                          "type": "string",
+                          "description": "What a NEW VOTE must be associated with: the newest update, or the root if there has been none. Send this, not `guid`, when casting a vote."
+                        },
+                        "options": {
+                          "type": "array",
+                          "description": "The choices, in order, from the poll's latest state.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "The option identifier a vote refers to."
+                              },
+                              "text": {
+                                "type": "string",
+                                "description": "What the option says."
+                              },
+                              "creator_handle": {
+                                "type": "string",
+                                "description": "Who added it. Null for this account."
+                              },
+                              "can_be_edited": {
+                                "type": "boolean",
+                                "description": "Whether the poll's creator allows this option's text to be changed."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "text",
+                              "can_be_edited"
+                            ]
+                          }
+                        },
+                        "votes": {
+                          "type": "array",
+                          "description": "One entry per participant, their newest vote only.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "guid": {
+                                "type": "string",
+                                "description": "The vote's own message GUID."
+                              },
+                              "handle": {
+                                "type": "string",
+                                "description": "Who voted. Null for this account."
+                              },
+                              "option_ids": {
+                                "type": "array",
+                                "description": "That participant's COMPLETE selection, not a delta. An empty array is a retracted vote.",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "date": {
+                                "type": "integer",
+                                "description": "When it was cast, epoch MILLISECONDS."
+                              }
+                            },
+                            "required": [
+                              "guid",
+                              "option_ids"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "guid",
+                        "title",
+                        "latest_state_guid",
+                        "options",
+                        "votes"
+                      ]
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Successfully fetched poll!"
+                  "message": "Successfully fetched poll!",
+                  "data": {
+                    "guid": "542FAC8D-24A5-4817-9DA7-76864FAB1BB0",
+                    "title": "",
+                    "creator_handle": null,
+                    "session_id": "6E2C1A2B-0F2E-4E77-9B6C-2E5A3D9F1A44",
+                    "latest_state_guid": "EAE71D60-F41C-4573-B931-F888009C6F37",
+                    "options": [
+                      {
+                        "id": "BB650E75-8A00-4578-BA3B-098E22C50B56",
+                        "text": "Red",
+                        "creator_handle": null,
+                        "can_be_edited": false
+                      },
+                      {
+                        "id": "9A8944AF-9941-494C-808A-11D9D76F27BC",
+                        "text": "Green",
+                        "creator_handle": null,
+                        "can_be_edited": false
+                      }
+                    ],
+                    "votes": [
+                      {
+                        "guid": "28A05594-5D75-4AB5-93EB-68B0F58A7A24",
+                        "handle": null,
+                        "option_ids": [
+                          "9A8944AF-9941-494C-808A-11D9D76F27BC"
+                        ],
+                        "date": 1788360567000
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -22140,7 +23966,395 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "associatedMessageGuid": {
+                          "type": "null"
+                        },
+                        "associatedMessageType": {
+                          "type": "null"
+                        },
+                        "attachments": {
+                          "items": {},
+                          "type": "array"
+                        },
+                        "attributedBody": {
+                          "items": {
+                            "properties": {
+                              "runs": {
+                                "items": {
+                                  "properties": {
+                                    "attributes": {
+                                      "properties": {
+                                        "__kIMMessagePartAttributeName": {
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "__kIMMessagePartAttributeName"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "range": {
+                                      "items": {
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "attributes",
+                                    "range"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "string": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "runs",
+                              "string"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "balloonBundleId": {
+                          "type": "null"
+                        },
+                        "cacheRoomnames": {
+                          "type": "null"
+                        },
+                        "chats": {
+                          "items": {
+                            "properties": {
+                              "chatIdentifier": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "type": "string"
+                              },
+                              "guid": {
+                                "type": "string"
+                              },
+                              "isArchived": {
+                                "type": "boolean"
+                              },
+                              "isFiltered": {
+                                "type": "boolean"
+                              },
+                              "lastAddressedHandle": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "properties": {
+                                "items": {
+                                  "properties": {
+                                    "LSMD": {
+                                      "type": "string"
+                                    },
+                                    "hasBeenAutoSpamReported": {
+                                      "type": "boolean"
+                                    },
+                                    "hasViewedPotentialSpamChat": {
+                                      "type": "boolean"
+                                    },
+                                    "lastSeenMessageGuid": {
+                                      "type": "string"
+                                    },
+                                    "markedAsKnownDate": {
+                                      "type": "string"
+                                    },
+                                    "numberOfTimesRespondedtoThread": {
+                                      "type": "integer"
+                                    },
+                                    "pv": {
+                                      "type": "integer"
+                                    },
+                                    "shouldForceToSMS": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "LSMD",
+                                    "hasBeenAutoSpamReported",
+                                    "hasViewedPotentialSpamChat",
+                                    "lastSeenMessageGuid",
+                                    "markedAsKnownDate",
+                                    "numberOfTimesRespondedtoThread",
+                                    "pv",
+                                    "shouldForceToSMS"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "style": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "chatIdentifier",
+                              "displayName",
+                              "groupId",
+                              "guid",
+                              "isArchived",
+                              "isFiltered",
+                              "lastAddressedHandle",
+                              "originalROWID",
+                              "properties",
+                              "style"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "country": {
+                          "type": "null"
+                        },
+                        "dateCreated": {
+                          "type": "integer"
+                        },
+                        "dateDelivered": {
+                          "type": "null"
+                        },
+                        "dateEdited": {
+                          "type": "null"
+                        },
+                        "datePlayed": {
+                          "type": "null"
+                        },
+                        "dateRead": {
+                          "type": "null"
+                        },
+                        "dateRetracted": {
+                          "type": "null"
+                        },
+                        "didNotifyRecipient": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "expressiveSendStyleId": {
+                          "type": "null"
+                        },
+                        "groupActionType": {
+                          "type": "integer"
+                        },
+                        "groupTitle": {
+                          "type": "null"
+                        },
+                        "guid": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "properties": {
+                            "address": {
+                              "type": "string"
+                            },
+                            "country": {
+                              "type": "string"
+                            },
+                            "originalROWID": {
+                              "type": "integer"
+                            },
+                            "service": {
+                              "type": "string"
+                            },
+                            "uncanonicalizedId": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "country",
+                            "originalROWID",
+                            "service",
+                            "uncanonicalizedId"
+                          ],
+                          "type": "object"
+                        },
+                        "handleId": {
+                          "type": "integer"
+                        },
+                        "hasDdResults": {
+                          "type": "boolean"
+                        },
+                        "hasPayloadData": {
+                          "type": "boolean"
+                        },
+                        "isArchived": {
+                          "type": "boolean"
+                        },
+                        "isAudioMessage": {
+                          "type": "boolean"
+                        },
+                        "isAutoReply": {
+                          "type": "boolean"
+                        },
+                        "isCorrupt": {
+                          "type": "boolean"
+                        },
+                        "isDelayed": {
+                          "type": "boolean"
+                        },
+                        "isDelivered": {
+                          "type": "boolean"
+                        },
+                        "isExpired": {
+                          "type": "boolean"
+                        },
+                        "isForward": {
+                          "type": "boolean"
+                        },
+                        "isFromMe": {
+                          "type": "boolean"
+                        },
+                        "isServiceMessage": {
+                          "type": "boolean"
+                        },
+                        "isSpam": {
+                          "type": "boolean"
+                        },
+                        "isSystemMessage": {
+                          "type": "boolean"
+                        },
+                        "itemType": {
+                          "type": "integer"
+                        },
+                        "messageSummaryInfo": {
+                          "items": {
+                            "properties": {
+                              "ust": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ust"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "originalROWID": {
+                          "type": "integer"
+                        },
+                        "otherHandle": {
+                          "type": "integer"
+                        },
+                        "partCount": {
+                          "type": "integer"
+                        },
+                        "payloadData": {
+                          "type": "null"
+                        },
+                        "replyToGuid": {
+                          "type": "string"
+                        },
+                        "shareDirection": {
+                          "type": "integer"
+                        },
+                        "shareStatus": {
+                          "type": "integer"
+                        },
+                        "subject": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "tempGuid": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "threadOriginatorGuid": {
+                          "type": "null"
+                        },
+                        "threadOriginatorPart": {
+                          "type": "null"
+                        },
+                        "timeExpressiveSendPlayed": {
+                          "type": "null"
+                        },
+                        "wasDeliveredQuietly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "associatedMessageGuid",
+                        "associatedMessageType",
+                        "attachments",
+                        "attributedBody",
+                        "balloonBundleId",
+                        "cacheRoomnames",
+                        "chats",
+                        "country",
+                        "dateCreated",
+                        "dateDelivered",
+                        "dateEdited",
+                        "datePlayed",
+                        "dateRead",
+                        "dateRetracted",
+                        "didNotifyRecipient",
+                        "error",
+                        "expressiveSendStyleId",
+                        "groupActionType",
+                        "groupTitle",
+                        "guid",
+                        "handle",
+                        "handleId",
+                        "hasDdResults",
+                        "hasPayloadData",
+                        "isArchived",
+                        "isAudioMessage",
+                        "isAutoReply",
+                        "isCorrupt",
+                        "isDelayed",
+                        "isDelivered",
+                        "isExpired",
+                        "isForward",
+                        "isFromMe",
+                        "isServiceMessage",
+                        "isSpam",
+                        "isSystemMessage",
+                        "itemType",
+                        "messageSummaryInfo",
+                        "originalROWID",
+                        "otherHandle",
+                        "partCount",
+                        "payloadData",
+                        "replyToGuid",
+                        "shareDirection",
+                        "shareStatus",
+                        "subject",
+                        "tempGuid",
+                        "text",
+                        "threadOriginatorGuid",
+                        "threadOriginatorPart",
+                        "timeExpressiveSendPlayed",
+                        "wasDeliveredQuietly"
+                      ],
+                      "type": "object"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -22288,7 +24502,395 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "associatedMessageGuid": {
+                          "type": "null"
+                        },
+                        "associatedMessageType": {
+                          "type": "null"
+                        },
+                        "attachments": {
+                          "items": {},
+                          "type": "array"
+                        },
+                        "attributedBody": {
+                          "items": {
+                            "properties": {
+                              "runs": {
+                                "items": {
+                                  "properties": {
+                                    "attributes": {
+                                      "properties": {
+                                        "__kIMMessagePartAttributeName": {
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "__kIMMessagePartAttributeName"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "range": {
+                                      "items": {
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "attributes",
+                                    "range"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "string": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "runs",
+                              "string"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "balloonBundleId": {
+                          "type": "null"
+                        },
+                        "cacheRoomnames": {
+                          "type": "null"
+                        },
+                        "chats": {
+                          "items": {
+                            "properties": {
+                              "chatIdentifier": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "type": "string"
+                              },
+                              "guid": {
+                                "type": "string"
+                              },
+                              "isArchived": {
+                                "type": "boolean"
+                              },
+                              "isFiltered": {
+                                "type": "boolean"
+                              },
+                              "lastAddressedHandle": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "properties": {
+                                "items": {
+                                  "properties": {
+                                    "LSMD": {
+                                      "type": "string"
+                                    },
+                                    "hasBeenAutoSpamReported": {
+                                      "type": "boolean"
+                                    },
+                                    "hasViewedPotentialSpamChat": {
+                                      "type": "boolean"
+                                    },
+                                    "lastSeenMessageGuid": {
+                                      "type": "string"
+                                    },
+                                    "markedAsKnownDate": {
+                                      "type": "string"
+                                    },
+                                    "numberOfTimesRespondedtoThread": {
+                                      "type": "integer"
+                                    },
+                                    "pv": {
+                                      "type": "integer"
+                                    },
+                                    "shouldForceToSMS": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "LSMD",
+                                    "hasBeenAutoSpamReported",
+                                    "hasViewedPotentialSpamChat",
+                                    "lastSeenMessageGuid",
+                                    "markedAsKnownDate",
+                                    "numberOfTimesRespondedtoThread",
+                                    "pv",
+                                    "shouldForceToSMS"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "style": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "chatIdentifier",
+                              "displayName",
+                              "groupId",
+                              "guid",
+                              "isArchived",
+                              "isFiltered",
+                              "lastAddressedHandle",
+                              "originalROWID",
+                              "properties",
+                              "style"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "country": {
+                          "type": "null"
+                        },
+                        "dateCreated": {
+                          "type": "integer"
+                        },
+                        "dateDelivered": {
+                          "type": "null"
+                        },
+                        "dateEdited": {
+                          "type": "null"
+                        },
+                        "datePlayed": {
+                          "type": "null"
+                        },
+                        "dateRead": {
+                          "type": "null"
+                        },
+                        "dateRetracted": {
+                          "type": "null"
+                        },
+                        "didNotifyRecipient": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "expressiveSendStyleId": {
+                          "type": "null"
+                        },
+                        "groupActionType": {
+                          "type": "integer"
+                        },
+                        "groupTitle": {
+                          "type": "null"
+                        },
+                        "guid": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "properties": {
+                            "address": {
+                              "type": "string"
+                            },
+                            "country": {
+                              "type": "string"
+                            },
+                            "originalROWID": {
+                              "type": "integer"
+                            },
+                            "service": {
+                              "type": "string"
+                            },
+                            "uncanonicalizedId": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "country",
+                            "originalROWID",
+                            "service",
+                            "uncanonicalizedId"
+                          ],
+                          "type": "object"
+                        },
+                        "handleId": {
+                          "type": "integer"
+                        },
+                        "hasDdResults": {
+                          "type": "boolean"
+                        },
+                        "hasPayloadData": {
+                          "type": "boolean"
+                        },
+                        "isArchived": {
+                          "type": "boolean"
+                        },
+                        "isAudioMessage": {
+                          "type": "boolean"
+                        },
+                        "isAutoReply": {
+                          "type": "boolean"
+                        },
+                        "isCorrupt": {
+                          "type": "boolean"
+                        },
+                        "isDelayed": {
+                          "type": "boolean"
+                        },
+                        "isDelivered": {
+                          "type": "boolean"
+                        },
+                        "isExpired": {
+                          "type": "boolean"
+                        },
+                        "isForward": {
+                          "type": "boolean"
+                        },
+                        "isFromMe": {
+                          "type": "boolean"
+                        },
+                        "isServiceMessage": {
+                          "type": "boolean"
+                        },
+                        "isSpam": {
+                          "type": "boolean"
+                        },
+                        "isSystemMessage": {
+                          "type": "boolean"
+                        },
+                        "itemType": {
+                          "type": "integer"
+                        },
+                        "messageSummaryInfo": {
+                          "items": {
+                            "properties": {
+                              "ust": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ust"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "originalROWID": {
+                          "type": "integer"
+                        },
+                        "otherHandle": {
+                          "type": "integer"
+                        },
+                        "partCount": {
+                          "type": "integer"
+                        },
+                        "payloadData": {
+                          "type": "null"
+                        },
+                        "replyToGuid": {
+                          "type": "string"
+                        },
+                        "shareDirection": {
+                          "type": "integer"
+                        },
+                        "shareStatus": {
+                          "type": "integer"
+                        },
+                        "subject": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "tempGuid": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "threadOriginatorGuid": {
+                          "type": "null"
+                        },
+                        "threadOriginatorPart": {
+                          "type": "null"
+                        },
+                        "timeExpressiveSendPlayed": {
+                          "type": "null"
+                        },
+                        "wasDeliveredQuietly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "associatedMessageGuid",
+                        "associatedMessageType",
+                        "attachments",
+                        "attributedBody",
+                        "balloonBundleId",
+                        "cacheRoomnames",
+                        "chats",
+                        "country",
+                        "dateCreated",
+                        "dateDelivered",
+                        "dateEdited",
+                        "datePlayed",
+                        "dateRead",
+                        "dateRetracted",
+                        "didNotifyRecipient",
+                        "error",
+                        "expressiveSendStyleId",
+                        "groupActionType",
+                        "groupTitle",
+                        "guid",
+                        "handle",
+                        "handleId",
+                        "hasDdResults",
+                        "hasPayloadData",
+                        "isArchived",
+                        "isAudioMessage",
+                        "isAutoReply",
+                        "isCorrupt",
+                        "isDelayed",
+                        "isDelivered",
+                        "isExpired",
+                        "isForward",
+                        "isFromMe",
+                        "isServiceMessage",
+                        "isSpam",
+                        "isSystemMessage",
+                        "itemType",
+                        "messageSummaryInfo",
+                        "originalROWID",
+                        "otherHandle",
+                        "partCount",
+                        "payloadData",
+                        "replyToGuid",
+                        "shareDirection",
+                        "shareStatus",
+                        "subject",
+                        "tempGuid",
+                        "text",
+                        "threadOriginatorGuid",
+                        "threadOriginatorPart",
+                        "timeExpressiveSendPlayed",
+                        "wasDeliveredQuietly"
+                      ],
+                      "type": "object"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -22406,11 +25008,151 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "An iMessage app balloon, decoded. `payload_json` and `payload_fields` appear when the payload is one of the two shapes the server can read, so a client never has to base64 or percent-decode anything; `url` is always the raw payload URL.",
+                      "properties": {
+                        "guid": {
+                          "type": "string",
+                          "description": "The message's GUID."
+                        },
+                        "balloon_bundle_id": {
+                          "type": "string",
+                          "description": "The app's full balloon bundle id, including the team-id segment."
+                        },
+                        "app_name": {
+                          "type": "string",
+                          "description": "The app's display name, as the sender's device wrote it."
+                        },
+                        "app_id": {
+                          "type": "integer",
+                          "description": "The app's App Store id."
+                        },
+                        "session_id": {
+                          "type": "string",
+                          "description": "The `MSSession` UUID. Send it back to continue the same conversation — a game reply MUST carry the session it answers."
+                        },
+                        "summary": {
+                          "type": "string",
+                          "description": "The message's fallback summary text."
+                        },
+                        "caption": {
+                          "type": "string",
+                          "description": "The line shown where the balloon cannot be drawn."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "The payload URL, verbatim."
+                        },
+                        "payload_json": {
+                          "description": "The payload decoded, when it is base64 JSON. Absent otherwise."
+                        },
+                        "payload_fields": {
+                          "type": "array",
+                          "description": "The payload decoded, when it is a query string. Absent otherwise.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "The field's name."
+                              },
+                              "value": {
+                                "type": "string",
+                                "description": "Its value."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "value"
+                            ]
+                          }
+                        },
+                        "game_pigeon": {
+                          "type": "object",
+                          "description": "Present only on a Game Pigeon message, with its scramble already undone. The server does not model games — the fields are handed over as they came.",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "description": "Game Pigeon's own payload version."
+                            },
+                            "game": {
+                              "type": "string",
+                              "description": "The game's short name, e.g. `pool`, `beer`."
+                            },
+                            "game_id": {
+                              "type": "string",
+                              "description": "The game's identifier within the session."
+                            },
+                            "fields": {
+                              "type": "array",
+                              "description": "The payload's fields, in the order they appeared. Repeated names are legal.",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "description": "The field's name."
+                                  },
+                                  "value": {
+                                    "type": "string",
+                                    "description": "Its value. An empty string is a real value."
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "value"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "fields"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "guid"
+                      ]
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Successfully fetched app message!"
+                  "message": "Successfully fetched app message!",
+                  "data": {
+                    "guid": "E404B184-D770-4732-BDFD-B9E437EE283E",
+                    "balloon_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:EWFNLB79LQ:com.gamerdelights.gamepigeon.ext",
+                    "app_name": "GamePigeon",
+                    "app_id": 1124197642,
+                    "session_id": "2B62987D-4F1C-4A2E-9C3D-6E5B1A7F0C22",
+                    "summary": "Let's play Cup Pong!",
+                    "caption": "Let's play Cup Pong!",
+                    "url": "data:?ver=45&data=el%3D1O%26%26yS6N2Rpa58E7Fr",
+                    "game_pigeon": {
+                      "version": 45,
+                      "game": "beer",
+                      "game_id": "frWzzfHEQ8COyfyp",
+                      "fields": [
+                        {
+                          "name": "game",
+                          "value": "beer"
+                        },
+                        {
+                          "name": "version",
+                          "value": "5"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -22587,7 +25329,395 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "associatedMessageGuid": {
+                          "type": "null"
+                        },
+                        "associatedMessageType": {
+                          "type": "null"
+                        },
+                        "attachments": {
+                          "items": {},
+                          "type": "array"
+                        },
+                        "attributedBody": {
+                          "items": {
+                            "properties": {
+                              "runs": {
+                                "items": {
+                                  "properties": {
+                                    "attributes": {
+                                      "properties": {
+                                        "__kIMMessagePartAttributeName": {
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "__kIMMessagePartAttributeName"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "range": {
+                                      "items": {
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "attributes",
+                                    "range"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "string": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "runs",
+                              "string"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "balloonBundleId": {
+                          "type": "null"
+                        },
+                        "cacheRoomnames": {
+                          "type": "null"
+                        },
+                        "chats": {
+                          "items": {
+                            "properties": {
+                              "chatIdentifier": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "type": "string"
+                              },
+                              "guid": {
+                                "type": "string"
+                              },
+                              "isArchived": {
+                                "type": "boolean"
+                              },
+                              "isFiltered": {
+                                "type": "boolean"
+                              },
+                              "lastAddressedHandle": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "properties": {
+                                "items": {
+                                  "properties": {
+                                    "LSMD": {
+                                      "type": "string"
+                                    },
+                                    "hasBeenAutoSpamReported": {
+                                      "type": "boolean"
+                                    },
+                                    "hasViewedPotentialSpamChat": {
+                                      "type": "boolean"
+                                    },
+                                    "lastSeenMessageGuid": {
+                                      "type": "string"
+                                    },
+                                    "markedAsKnownDate": {
+                                      "type": "string"
+                                    },
+                                    "numberOfTimesRespondedtoThread": {
+                                      "type": "integer"
+                                    },
+                                    "pv": {
+                                      "type": "integer"
+                                    },
+                                    "shouldForceToSMS": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "LSMD",
+                                    "hasBeenAutoSpamReported",
+                                    "hasViewedPotentialSpamChat",
+                                    "lastSeenMessageGuid",
+                                    "markedAsKnownDate",
+                                    "numberOfTimesRespondedtoThread",
+                                    "pv",
+                                    "shouldForceToSMS"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "style": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "chatIdentifier",
+                              "displayName",
+                              "groupId",
+                              "guid",
+                              "isArchived",
+                              "isFiltered",
+                              "lastAddressedHandle",
+                              "originalROWID",
+                              "properties",
+                              "style"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "country": {
+                          "type": "null"
+                        },
+                        "dateCreated": {
+                          "type": "integer"
+                        },
+                        "dateDelivered": {
+                          "type": "null"
+                        },
+                        "dateEdited": {
+                          "type": "null"
+                        },
+                        "datePlayed": {
+                          "type": "null"
+                        },
+                        "dateRead": {
+                          "type": "null"
+                        },
+                        "dateRetracted": {
+                          "type": "null"
+                        },
+                        "didNotifyRecipient": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "expressiveSendStyleId": {
+                          "type": "null"
+                        },
+                        "groupActionType": {
+                          "type": "integer"
+                        },
+                        "groupTitle": {
+                          "type": "null"
+                        },
+                        "guid": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "properties": {
+                            "address": {
+                              "type": "string"
+                            },
+                            "country": {
+                              "type": "string"
+                            },
+                            "originalROWID": {
+                              "type": "integer"
+                            },
+                            "service": {
+                              "type": "string"
+                            },
+                            "uncanonicalizedId": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "country",
+                            "originalROWID",
+                            "service",
+                            "uncanonicalizedId"
+                          ],
+                          "type": "object"
+                        },
+                        "handleId": {
+                          "type": "integer"
+                        },
+                        "hasDdResults": {
+                          "type": "boolean"
+                        },
+                        "hasPayloadData": {
+                          "type": "boolean"
+                        },
+                        "isArchived": {
+                          "type": "boolean"
+                        },
+                        "isAudioMessage": {
+                          "type": "boolean"
+                        },
+                        "isAutoReply": {
+                          "type": "boolean"
+                        },
+                        "isCorrupt": {
+                          "type": "boolean"
+                        },
+                        "isDelayed": {
+                          "type": "boolean"
+                        },
+                        "isDelivered": {
+                          "type": "boolean"
+                        },
+                        "isExpired": {
+                          "type": "boolean"
+                        },
+                        "isForward": {
+                          "type": "boolean"
+                        },
+                        "isFromMe": {
+                          "type": "boolean"
+                        },
+                        "isServiceMessage": {
+                          "type": "boolean"
+                        },
+                        "isSpam": {
+                          "type": "boolean"
+                        },
+                        "isSystemMessage": {
+                          "type": "boolean"
+                        },
+                        "itemType": {
+                          "type": "integer"
+                        },
+                        "messageSummaryInfo": {
+                          "items": {
+                            "properties": {
+                              "ust": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ust"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "originalROWID": {
+                          "type": "integer"
+                        },
+                        "otherHandle": {
+                          "type": "integer"
+                        },
+                        "partCount": {
+                          "type": "integer"
+                        },
+                        "payloadData": {
+                          "type": "null"
+                        },
+                        "replyToGuid": {
+                          "type": "string"
+                        },
+                        "shareDirection": {
+                          "type": "integer"
+                        },
+                        "shareStatus": {
+                          "type": "integer"
+                        },
+                        "subject": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "tempGuid": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "threadOriginatorGuid": {
+                          "type": "null"
+                        },
+                        "threadOriginatorPart": {
+                          "type": "null"
+                        },
+                        "timeExpressiveSendPlayed": {
+                          "type": "null"
+                        },
+                        "wasDeliveredQuietly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "associatedMessageGuid",
+                        "associatedMessageType",
+                        "attachments",
+                        "attributedBody",
+                        "balloonBundleId",
+                        "cacheRoomnames",
+                        "chats",
+                        "country",
+                        "dateCreated",
+                        "dateDelivered",
+                        "dateEdited",
+                        "datePlayed",
+                        "dateRead",
+                        "dateRetracted",
+                        "didNotifyRecipient",
+                        "error",
+                        "expressiveSendStyleId",
+                        "groupActionType",
+                        "groupTitle",
+                        "guid",
+                        "handle",
+                        "handleId",
+                        "hasDdResults",
+                        "hasPayloadData",
+                        "isArchived",
+                        "isAudioMessage",
+                        "isAutoReply",
+                        "isCorrupt",
+                        "isDelayed",
+                        "isDelivered",
+                        "isExpired",
+                        "isForward",
+                        "isFromMe",
+                        "isServiceMessage",
+                        "isSpam",
+                        "isSystemMessage",
+                        "itemType",
+                        "messageSummaryInfo",
+                        "originalROWID",
+                        "otherHandle",
+                        "partCount",
+                        "payloadData",
+                        "replyToGuid",
+                        "shareDirection",
+                        "shareStatus",
+                        "subject",
+                        "tempGuid",
+                        "text",
+                        "threadOriginatorGuid",
+                        "threadOriginatorPart",
+                        "timeExpressiveSendPlayed",
+                        "wasDeliveredQuietly"
+                      ],
+                      "type": "object"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -22774,7 +25904,395 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "associatedMessageGuid": {
+                          "type": "null"
+                        },
+                        "associatedMessageType": {
+                          "type": "null"
+                        },
+                        "attachments": {
+                          "items": {},
+                          "type": "array"
+                        },
+                        "attributedBody": {
+                          "items": {
+                            "properties": {
+                              "runs": {
+                                "items": {
+                                  "properties": {
+                                    "attributes": {
+                                      "properties": {
+                                        "__kIMMessagePartAttributeName": {
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "__kIMMessagePartAttributeName"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "range": {
+                                      "items": {
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
+                                    }
+                                  },
+                                  "required": [
+                                    "attributes",
+                                    "range"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "string": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "runs",
+                              "string"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "balloonBundleId": {
+                          "type": "null"
+                        },
+                        "cacheRoomnames": {
+                          "type": "null"
+                        },
+                        "chats": {
+                          "items": {
+                            "properties": {
+                              "chatIdentifier": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "type": "string"
+                              },
+                              "guid": {
+                                "type": "string"
+                              },
+                              "isArchived": {
+                                "type": "boolean"
+                              },
+                              "isFiltered": {
+                                "type": "boolean"
+                              },
+                              "lastAddressedHandle": {
+                                "type": "string"
+                              },
+                              "originalROWID": {
+                                "type": "integer"
+                              },
+                              "properties": {
+                                "items": {
+                                  "properties": {
+                                    "LSMD": {
+                                      "type": "string"
+                                    },
+                                    "hasBeenAutoSpamReported": {
+                                      "type": "boolean"
+                                    },
+                                    "hasViewedPotentialSpamChat": {
+                                      "type": "boolean"
+                                    },
+                                    "lastSeenMessageGuid": {
+                                      "type": "string"
+                                    },
+                                    "markedAsKnownDate": {
+                                      "type": "string"
+                                    },
+                                    "numberOfTimesRespondedtoThread": {
+                                      "type": "integer"
+                                    },
+                                    "pv": {
+                                      "type": "integer"
+                                    },
+                                    "shouldForceToSMS": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "LSMD",
+                                    "hasBeenAutoSpamReported",
+                                    "hasViewedPotentialSpamChat",
+                                    "lastSeenMessageGuid",
+                                    "markedAsKnownDate",
+                                    "numberOfTimesRespondedtoThread",
+                                    "pv",
+                                    "shouldForceToSMS"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "style": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "chatIdentifier",
+                              "displayName",
+                              "groupId",
+                              "guid",
+                              "isArchived",
+                              "isFiltered",
+                              "lastAddressedHandle",
+                              "originalROWID",
+                              "properties",
+                              "style"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "country": {
+                          "type": "null"
+                        },
+                        "dateCreated": {
+                          "type": "integer"
+                        },
+                        "dateDelivered": {
+                          "type": "null"
+                        },
+                        "dateEdited": {
+                          "type": "null"
+                        },
+                        "datePlayed": {
+                          "type": "null"
+                        },
+                        "dateRead": {
+                          "type": "null"
+                        },
+                        "dateRetracted": {
+                          "type": "null"
+                        },
+                        "didNotifyRecipient": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "integer"
+                        },
+                        "expressiveSendStyleId": {
+                          "type": "null"
+                        },
+                        "groupActionType": {
+                          "type": "integer"
+                        },
+                        "groupTitle": {
+                          "type": "null"
+                        },
+                        "guid": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "properties": {
+                            "address": {
+                              "type": "string"
+                            },
+                            "country": {
+                              "type": "string"
+                            },
+                            "originalROWID": {
+                              "type": "integer"
+                            },
+                            "service": {
+                              "type": "string"
+                            },
+                            "uncanonicalizedId": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "address",
+                            "country",
+                            "originalROWID",
+                            "service",
+                            "uncanonicalizedId"
+                          ],
+                          "type": "object"
+                        },
+                        "handleId": {
+                          "type": "integer"
+                        },
+                        "hasDdResults": {
+                          "type": "boolean"
+                        },
+                        "hasPayloadData": {
+                          "type": "boolean"
+                        },
+                        "isArchived": {
+                          "type": "boolean"
+                        },
+                        "isAudioMessage": {
+                          "type": "boolean"
+                        },
+                        "isAutoReply": {
+                          "type": "boolean"
+                        },
+                        "isCorrupt": {
+                          "type": "boolean"
+                        },
+                        "isDelayed": {
+                          "type": "boolean"
+                        },
+                        "isDelivered": {
+                          "type": "boolean"
+                        },
+                        "isExpired": {
+                          "type": "boolean"
+                        },
+                        "isForward": {
+                          "type": "boolean"
+                        },
+                        "isFromMe": {
+                          "type": "boolean"
+                        },
+                        "isServiceMessage": {
+                          "type": "boolean"
+                        },
+                        "isSpam": {
+                          "type": "boolean"
+                        },
+                        "isSystemMessage": {
+                          "type": "boolean"
+                        },
+                        "itemType": {
+                          "type": "integer"
+                        },
+                        "messageSummaryInfo": {
+                          "items": {
+                            "properties": {
+                              "ust": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "ust"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "originalROWID": {
+                          "type": "integer"
+                        },
+                        "otherHandle": {
+                          "type": "integer"
+                        },
+                        "partCount": {
+                          "type": "integer"
+                        },
+                        "payloadData": {
+                          "type": "null"
+                        },
+                        "replyToGuid": {
+                          "type": "string"
+                        },
+                        "shareDirection": {
+                          "type": "integer"
+                        },
+                        "shareStatus": {
+                          "type": "integer"
+                        },
+                        "subject": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "tempGuid": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "threadOriginatorGuid": {
+                          "type": "null"
+                        },
+                        "threadOriginatorPart": {
+                          "type": "null"
+                        },
+                        "timeExpressiveSendPlayed": {
+                          "type": "null"
+                        },
+                        "wasDeliveredQuietly": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "associatedMessageGuid",
+                        "associatedMessageType",
+                        "attachments",
+                        "attributedBody",
+                        "balloonBundleId",
+                        "cacheRoomnames",
+                        "chats",
+                        "country",
+                        "dateCreated",
+                        "dateDelivered",
+                        "dateEdited",
+                        "datePlayed",
+                        "dateRead",
+                        "dateRetracted",
+                        "didNotifyRecipient",
+                        "error",
+                        "expressiveSendStyleId",
+                        "groupActionType",
+                        "groupTitle",
+                        "guid",
+                        "handle",
+                        "handleId",
+                        "hasDdResults",
+                        "hasPayloadData",
+                        "isArchived",
+                        "isAudioMessage",
+                        "isAutoReply",
+                        "isCorrupt",
+                        "isDelayed",
+                        "isDelivered",
+                        "isExpired",
+                        "isForward",
+                        "isFromMe",
+                        "isServiceMessage",
+                        "isSpam",
+                        "isSystemMessage",
+                        "itemType",
+                        "messageSummaryInfo",
+                        "originalROWID",
+                        "otherHandle",
+                        "partCount",
+                        "payloadData",
+                        "replyToGuid",
+                        "shareDirection",
+                        "shareStatus",
+                        "subject",
+                        "tempGuid",
+                        "text",
+                        "threadOriginatorGuid",
+                        "threadOriginatorPart",
+                        "timeExpressiveSendPlayed",
+                        "wasDeliveredQuietly"
+                      ],
+                      "type": "object"
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
@@ -26243,11 +29761,96 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "The call that is now ringing, and a link anyone can join it with. The call is placed FIRST — if the link cannot be minted the call is still up, and the error carries the call so it can be ended deliberately.",
+                      "properties": {
+                        "link": {
+                          "type": "object",
+                          "description": "The join link minted for this call.",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "description": "The join link."
+                            },
+                            "group_uuid": {
+                              "type": "string",
+                              "description": "The conversation the link belongs to."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The link's name, when it has one."
+                            },
+                            "expiration": {
+                              "type": "integer",
+                              "description": "When the link expires, epoch MILLISECONDS."
+                            }
+                          },
+                          "required": [
+                            "url"
+                          ]
+                        },
+                        "call": {
+                          "type": "object",
+                          "description": "The live call.",
+                          "properties": {
+                            "call_uuid": {
+                              "type": "string",
+                              "description": "Pass this to leave the call."
+                            },
+                            "status": {
+                              "type": "string",
+                              "description": "e.g. `outgoing`, `connected`."
+                            },
+                            "is_video": {
+                              "type": "boolean",
+                              "description": "False when it rings as FaceTime Audio."
+                            },
+                            "address": {
+                              "type": "string",
+                              "description": "The callee, for a one-to-one call."
+                            },
+                            "group_uuid": {
+                              "type": "string",
+                              "description": "The conversation, once one has formed."
+                            }
+                          },
+                          "required": [
+                            "call_uuid",
+                            "status",
+                            "is_video"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "link",
+                        "call"
+                      ]
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": {
+                    "link": {
+                      "url": "https://facetime.apple.com/join#v=1&p=…",
+                      "group_uuid": "9E3C0B77-1A44-4D2E-8F51-7C2B9D6E0A13"
+                    },
+                    "call": {
+                      "call_uuid": "2B62987D-4F1C-4A2E-9C3D-6E5B1A7F0C22",
+                      "status": "outgoing",
+                      "is_video": true,
+                      "address": "+15551234567"
+                    }
+                  }
                 }
               }
             }
@@ -26385,11 +29988,40 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "Confirmation that the knocker was let in.",
+                      "properties": {
+                        "admitted": {
+                          "type": "boolean",
+                          "description": "Always true; a failure is an error response."
+                        },
+                        "address": {
+                          "type": "string",
+                          "description": "The handle that was admitted."
+                        }
+                      },
+                      "required": [
+                        "admitted",
+                        "address"
+                      ]
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": {
+                    "admitted": true,
+                    "address": "+15551234567"
+                  }
                 }
               }
             }
@@ -27475,11 +31107,53 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "The link for a call this Mac just ANSWERED on your behalf. Returned immediately; admitting joiners and dropping the Mac happen in the background, and the Mac only leaves once somebody has actually joined.",
+                      "properties": {
+                        "link": {
+                          "type": "string",
+                          "description": "The join link. Same value as `url`."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "The join link."
+                        },
+                        "group_uuid": {
+                          "type": "string",
+                          "description": "The conversation the link belongs to."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The link's name, when it has one."
+                        },
+                        "expiration": {
+                          "type": "integer",
+                          "description": "When the link expires, epoch MILLISECONDS."
+                        }
+                      },
+                      "required": [
+                        "link",
+                        "url"
+                      ]
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": {
+                    "link": "https://facetime.apple.com/join#v=1&p=…",
+                    "url": "https://facetime.apple.com/join#v=1&p=…",
+                    "group_uuid": "9E3C0B77-1A44-4D2E-8F51-7C2B9D6E0A13"
+                  }
                 }
               }
             }
@@ -28006,11 +31680,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ResponseEnvelope"
+                    }
+                  ],
+                  "description": "Describes payloads this API is known to produce, not a declared type. A field typed `null` may carry a value in cases this document does not cover, and an array with empty `items` has no described element type.",
+                  "properties": {
+                    "data": {
+                      "type": "null",
+                      "description": "Nothing. The device's token no longer authenticates."
+                    }
+                  }
                 },
                 "example": {
                   "status": 200,
-                  "message": "Success"
+                  "message": "Success",
+                  "data": null
                 }
               }
             }
