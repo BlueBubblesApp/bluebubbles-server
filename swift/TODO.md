@@ -699,8 +699,9 @@ styles and the eight menu effects (`.claude/docs/api.md` § Text formatting). Ve
       fallback) plus our `associatedMessageEmoji`. A v2 read could spell the type `emoji`;
       v1 stays as it is.
 - [ ] The Flutter client neither renders nor sends emoji reactions.
-- [ ] Sticker tapbacks (`IMStickerTapback`, 2007 / 3007) are the same sender with a
-      different tapback object and a sticker transfer; not built.
+- [ ] Sticker tapbacks are built (`tapback: true` on the sticker route). Ours carry the
+      placed-sticker geometry in `sticker_user_info` where Apple's carry almost none;
+      harmless so far, but if one renders oddly on another device that is the difference.
 
 ## `POST /message/attachment/chunk` reads base64 JSON; the reference reads a multipart `chunk`
 

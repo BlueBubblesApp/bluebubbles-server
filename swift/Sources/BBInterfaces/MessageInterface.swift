@@ -904,7 +904,9 @@ public struct MessageInterface: MessagesBackedInterface {
     filePath: String,
     targetGUID: String,
     partIndex: Int = 0,
-    placement: StickerPlacement = .centered
+    placement: StickerPlacement = .centered,
+    asTapback: Bool = false,
+    isRemoval: Bool = false
   ) async throws -> SendOutcome {
     let api = try requirePrivateAPI(for: "stickers")
     guard FileManager.default.fileExists(atPath: filePath) else {
@@ -921,7 +923,9 @@ public struct MessageInterface: MessagesBackedInterface {
           filePath: try AttachmentStaging.stage(filePath),
           target: MessageGUID(targetGUID),
           partIndex: partIndex,
-          placement: placement
+          placement: placement,
+          asTapback: asTapback,
+          isRemoval: isRemoval
         )
       )
     }

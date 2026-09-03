@@ -385,6 +385,35 @@ public final class IMCoreBridge: PrivateAPI {
       guid: request.target.rawValue, partIndex: request.partIndex
     )
     return try translating {
+      // A sticker TAPBACK is a tapback that renders a sticker: same media object and
+      // transfer, but the message comes from `IMStickerTapback` through `IMTapbackSender`
+      // rather than being built here. Messages positions it, so `placement` is unused.
+      if request.asTapback {
+        guard IMTapbacks.senderAvailable else {
+          throw PrivateAPIError.unavailableOnThisOS(
+            method: "sticker tapback", requires: "IMTapbackSender (macOS 15 or later)")
+        }
+        let chat = try IMChatRegistry.requireChat(guid: request.chat.rawValue)
+        let sticker = try IMStickers.sticker(path: request.filePath)
+        let userInfo = try IMStickers.userInfo(placement: request.placement)
+        let media = try IMStickers.mediaObject(sticker: sticker, userInfo: userInfo)
+        guard let transferGUID = try IMCoreRuntime.string(media, "transferGUID"),
+          !transferGUID.isEmpty
+        else {
+          throw PrivateAPIErrorShim.rejected("the sticker's media object has no transfer GUID")
+        }
+        let tapback = try IMTapbacks.stickerTapback(
+          transferGUID: transferGUID, isRemoved: request.isRemoval)
+        let sent = try IMTapbacks.send(tapback, chat: chat, part: part)
+        var guid = sent.flatMap { ((try? IMCoreRuntime.string($0, "guid")) ?? nil) }
+        if guid == nil { guid = try chat.lastSentMessageGUID() }
+        guard let guid else {
+          throw PrivateAPIErrorShim.rejected(
+            "Messages accepted the sticker tapback but reported no GUID")
+        }
+        return SentMessage(guid: MessageGUID(guid), chat: request.chat, sentAt: Date())
+      }
+
       let conversation = try requireConversation(request.chat)
 
       // The chat item's GUID is "p:<part>/<message guid>", and that prefix is what tells

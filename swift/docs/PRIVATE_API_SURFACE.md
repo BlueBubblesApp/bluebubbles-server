@@ -458,9 +458,8 @@ p:<part>/<target guid>`, `associated_message_range_{location,length}` = the pare
 range in the message text (so `length` is the part's character count, not 1),
 `message_summary_info = {amc: 0, ust: true}`, text `U+FFFC`. On the attachment row:
 `is_sticker = 1`, `sticker_user_info` (a bplist with the geometry below), `attribution_info`
-(`{bundle-id, name: "Stickers", accessl}`). An emoji sticker is type 1001. A sticker sent AS A
-TAPBACK (iOS 17's "react with a sticker") is a different thing again — `IMStickerTapback`,
-types 2007/3007 — and is not built.
+(`{bundle-id, name: "Stickers", accessl}`). An emoji sticker is type 1001. A sticker sent AS A TAPBACK
+("react with a sticker") is `IMStickerTapback`, types 2007 / 3007 — built, see below.
 
 **The chain Messages runs**, from `-[CKChatController(CKChatController_Stickers)
 sendSticker:withDragTarget:draggedSticker:]` down:
@@ -475,6 +474,15 @@ sendSticker:withDragTarget:draggedSticker:]` down:
 | message | `-[IMMessage initWithSender:time:text:messageSubject:fileTransferGUIDs:flags:error:guid:subject:associatedMessageGUID:associatedMessageType:associatedMessageRange:messageSummaryInfo:threadIdentifier:]` | sender nil, time now, text = `-[CKComposition superFormatText:]`, flags **5**, guid `[NSString stringGUID]`, type 1000, range = the part's, summary nil, thread = the part's |
 | link | `-[CKIMFileTransfer setIMMessage:]` on `[mediaObject transfer]` | |
 | send | `-[CKConversation sendMessage:newComposition:NO]` | NO, where a typed message passes YES |
+
+**Sticker tapbacks** (`tapback: true` on the route) are the same media object and transfer,
+handed to `-[IMStickerTapback initWithTransferGUID:isRemoved:]` — which sets 2007, or 3007 when
+removed (disassembled) — and sent through `IMTapbackSender` like every other tapback. Messages
+positions it, so the geometry is ignored. Measured: the row lands type 2007 with the part's own
+range, delivered. Apple's own carry a much smaller `sticker_user_info` (just `pid` and `spv`,
+with the plain extension bundle id rather than the balloon-prefixed one) and a summary of
+`{amc: 3, cmmAO: 0, cmmS: 0, ust: true}`; ours still carries the placed-sticker geometry, which
+did not stop it being accepted.
 
 Gate: `-[IMChat _supportsStickers]` (and `_supportsTapbacks`) — worth checking before
 building; SMS conversations say no.

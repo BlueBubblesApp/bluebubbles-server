@@ -1653,6 +1653,23 @@ enum IMTapbacks {
     return tapback
   }
 
+  /// A STICKER tapback: `IMStickerTapback`, which carries the sticker's transfer GUID
+  /// rather than an emoji or a type. Types 2007 / 3007 (`initWithTransferGUID:isRemoved:`,
+  /// disassembled). The transfer has to exist first — `IMStickers.mediaObject` creates and
+  /// registers it — and the same sender sends it as every other tapback.
+  static func stickerTapback(transferGUID: String, isRemoved: Bool) throws -> AnyObject {
+    let type: AnyClass = try IMCoreRuntime.requireClass("IMStickerTapback")
+    guard
+      let allocated = (type as AnyObject).perform(NSSelectorFromString("alloc"))?
+        .takeUnretainedValue(),
+      let tapback = try IMCoreRuntime.invoke(
+        allocated, "initWithTransferGUID:isRemoved:", [transferGUID, isRemoved])
+    else {
+      throw PrivateAPIErrorShim.rejected("IMStickerTapback would not initialise")
+    }
+    return tapback
+  }
+
   /// Sends, and returns the message `send` answered with — the tapback's own `IMMessage`.
   static func send(_ tapback: AnyObject, chat: IMChat, part: AnyObject) throws -> AnyObject? {
     let type: AnyClass = try IMCoreRuntime.requireClass("IMTapbackSender")

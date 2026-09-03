@@ -76,6 +76,15 @@ the read side the attributes come back as they are stored — `__kIMTextBoldAttr
 `TextEffect` in the contract. Measured 2 September 2026: `.claude/docs/imessage.md` § Text
 formatting.
 
+### Sticker tapbacks — `tapback: true` on `/api/v2/message/sticker`
+
+The sticker route's normal mode places a sticker on the bubble
+(`associatedMessageType` `"sticker"`, IMCore type 1000) wherever the placement fields say.
+`tapback: true` sends the same image as a sticker TAPBACK instead (type `"2007"`): Messages
+snaps it to the tapback position and it replaces this account's previous one rather than
+stacking, so the placement fields are ignored. `remove: true` alongside it takes one back
+(3007). Everything else about the request is unchanged.
+
 ### Emoji reactions on `/message/react`
 
 `reaction: "emoji"` or `"-emoji"` plus an `emoji` field (`"🔥"`). Additive on the existing

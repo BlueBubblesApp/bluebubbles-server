@@ -229,6 +229,8 @@ public actor PrivateAPIClient: PrivateAPI {
         "scale": .number(request.placement.scale),
         "rotation": .number(request.placement.rotation),
         "parentPreviewWidth": .number(request.placement.parentPreviewWidth),
+        "tapback": .bool(request.asTapback),
+        "remove": .bool(request.isRemoval),
       ]))
     return try sentMessage(from: result, chat: request.chat)
   }

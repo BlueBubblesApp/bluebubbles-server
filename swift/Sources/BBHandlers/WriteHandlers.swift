@@ -364,7 +364,12 @@ public enum WriteHandlers {
         filePath: body.path,
         targetGUID: target,
         partIndex: values.int("partIndex") ?? 0,
-        placement: placement
+        placement: placement,
+        // `tapback: true` sends it as a tapback (type 2007) instead of a placed sticker,
+        // which snaps it to the tapback spot and replaces this account's previous one.
+        // `remove: true` takes that back (3007).
+        asTapback: values.bool("tapback") ?? false,
+        isRemoval: values.bool("remove") ?? false
       )
       // The sticker's OWN message, as `react` answers with the tapback's. No error check,
       // matching the attachment route it takes its file from.

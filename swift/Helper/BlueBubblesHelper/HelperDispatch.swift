@@ -144,7 +144,9 @@ enum HelperDispatch {
           filePath: try string("filePath"),
           target: try message("selectedMessageGuid"),
           partIndex: integer("partIndex"),
-          placement: placement
+          placement: placement,
+          asTapback: flag("tapback"),
+          isRemoval: flag("remove")
         )
       )
       return ["identifier": sent.guid.rawValue]

@@ -370,16 +370,24 @@ public struct SendStickerRequest: Codable, Sendable {
   public let target: MessageGUID
   public let partIndex: Int
   public let placement: StickerPlacement
+  /// Send it as a TAPBACK rather than a placed sticker: `IMStickerTapback`, association
+  /// types 2007 / 3007, which snaps to the tapback position and replaces the sender's
+  /// previous one instead of stacking. `placement` is ignored — Messages positions it.
+  public let asTapback: Bool
+  /// Removes the sticker tapback this account previously sent. Only with `asTapback`.
+  public let isRemoval: Bool
 
   public init(
     chat: ChatIdentifier, filePath: String, target: MessageGUID, partIndex: Int = 0,
-    placement: StickerPlacement = .centered
+    placement: StickerPlacement = .centered, asTapback: Bool = false, isRemoval: Bool = false
   ) {
     self.chat = chat
     self.filePath = filePath
     self.target = target
     self.partIndex = partIndex
     self.placement = placement
+    self.asTapback = asTapback
+    self.isRemoval = isRemoval
   }
 }
 
