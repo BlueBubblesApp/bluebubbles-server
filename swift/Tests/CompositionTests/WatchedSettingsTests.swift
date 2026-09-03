@@ -196,7 +196,7 @@ struct WatchedSettingsTests {
   /// bookkeeping the user never sets.
   static let readPerUseOrUIOnly: Set<String> = [
     // Read per request or per operation — a change is picked up on the next one.
-    "log_level", "event_payload_codec", "auth_mode", "additive_endpoints",
+    "log_level", "event_payload_codec", "auth_mode",
     "update_feed_url", "check_for_updates", "landing_page_path",
     // Read at each cleanup sweep rather than held by a service, so a change applies to
     // the next sweep with no restart.

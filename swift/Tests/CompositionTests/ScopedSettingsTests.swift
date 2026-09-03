@@ -519,7 +519,7 @@ struct StructuralSettingsTests {
       SettingsPropagation.structuralKeys
         == Set(
           [
-            "auth_mode", "additive_endpoints", "event_payload_codec",
+            "auth_mode", "event_payload_codec",
             "facetime_incoming_handoff", "chat_db_readers",
           ] + Features.allKeys
         ))

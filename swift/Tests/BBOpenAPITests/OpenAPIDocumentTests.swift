@@ -178,8 +178,12 @@ struct RouteCatalogTests {
 
   @Test("The catalog carries the whole v1 table")
   func v1IsComplete() {
+    // Filtered by VERSION, not by availability. Availability used to separate the two —
+    // v1 was `always` and everything additive was behind `additive_endpoints` — but v2 is
+    // mounted for everyone now, so `always` covers both and only `apiVersion` still says
+    // which table a route belongs to.
     let catalogued = RouteCatalog.routes.filter {
-      $0.availability == .always && !$0.group.mountsAtRoot
+      $0.group.apiVersion == 1 && !$0.group.mountsAtRoot
     }
     #expect(catalogued.count == RouteTable.mountedRoutes().count)
   }

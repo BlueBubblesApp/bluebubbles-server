@@ -25,13 +25,30 @@ import Testing
 @Suite("Route registration")
 struct RouteRegistrationTests {
 
-  /// The shipping default: password auth, legacy codec. Nothing additive.
-  @Test("A default server registers no additive routes")
-  func defaultRegistersNothing() async {
+  /// The v2 groups EVERY server mounts, whatever its settings.
+  ///
+  /// Subtracted by `gated(_:)` below so that a test about a switch asserts about that switch.
+  /// Before v2 became unconditional these tests could say "nothing else is mounted"; now the
+  /// interesting claim is "nothing else *beyond the baseline* is mounted", and conflating the
+  /// two would make every flag test pass for the wrong reason.
+  static let alwaysMounted: Set<String> = [
+    "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers", "Send Later",
+    "Polls", "App Messages", "Webhook Editing", "Chat Controls", "Contact Card",
+  ]
+
+  /// Group names beyond the always-mounted baseline.
+  static func gated(_ groups: [RouteGroup]) -> Set<String> {
+    Set(groups.map(\.name)).subtracting(alwaysMounted)
+  }
+
+  /// The shipping default: password auth, legacy codec. v2 and nothing else.
+  @Test("A default server registers the v2 baseline and nothing gated")
+  func defaultRegistersNothingGated() async {
     let groups = await ServerComposition.routeGroups(
       authMode: .password, codecs: .legacyOnly()
     )
-    #expect(groups.isEmpty)
+    #expect(Self.gated(groups).isEmpty)
+    #expect(Set(groups.map(\.name)) == Self.alwaysMounted)
   }
 
   /// `GET /` and nothing under `/api/v1`. A landing page mounted at `/api/v1/` would be an
@@ -115,17 +132,16 @@ struct RouteRegistrationTests {
     let groups = await ServerComposition.routeGroups(
       authMode: .password, codecs: negotiator
     )
-    #expect(groups.isEmpty)
+    #expect(Self.gated(groups).isEmpty)
   }
 
   /// Both switches at once, which is the fully-enabled configuration.
   @Test("Both features on registers both groups")
   func bothEnabled() async {
-    let names =
+    let groups =
       await ServerComposition
       .routeGroups(authMode: .both, codecs: .full(preference: .sealedV2))
-      .map(\.name)
-    #expect(Set(names) == ["Auth", "Hydration"])
+    #expect(Self.gated(groups) == ["Auth", "Hydration"])
   }
 
   // MARK: - Find My
@@ -175,14 +191,14 @@ struct RouteRegistrationTests {
     let sharingOnly = await ServerComposition.routeGroups(
       authMode: .password, codecs: .legacyOnly(),
       features: [Features.findMyLocationSharing.id]
-    ).map(\.name)
-    #expect(sharingOnly.isEmpty)
+    )
+    #expect(Self.gated(sharingOnly).isEmpty)
 
     let both = await ServerComposition.routeGroups(
       authMode: .password, codecs: .legacyOnly(),
       features: [Features.findMy.id, Features.findMyLocationSharing.id]
     )
-    #expect(Set(both.map(\.name)) == ["Find My", "Find My Sharing"])
+    #expect(Self.gated(both) == ["Find My", "Find My Sharing"])
 
     // Sharing transmits this Mac's position to another person, so it is a write and
     // needs the helper.
@@ -199,7 +215,10 @@ struct RouteRegistrationTests {
     let groups = await ServerComposition.routeGroups(
       authMode: .password, codecs: .legacyOnly(),
       features: [Features.findMy.id, Features.findMyLocationSharing.id]
-    )
+    ).filter { $0.name.hasPrefix("Find My") }
+    // The rest of v2 is mounted alongside these now, and plenty of it takes a `:guid` —
+    // so this asserts over the Find My groups rather than over everything that came back.
+    #expect(groups.count == 2)
     for route in groups.flatMap(\.routes) {
       #expect(
         !route.path.contains(":"),
@@ -208,22 +227,20 @@ struct RouteRegistrationTests {
     }
   }
 
-  /// The additive-endpoints switch and the feature flags are separate concerns, and it
-  /// should not be necessary to expose the administration endpoints in order to get
-  /// FindMy.
-  @Test("Find My does not ride on the administration switch")
-  func findMyIsIndependentOfAdditiveEndpoints() async {
-    let adminOnly = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(),
-      additiveEndpoints: true, features: []
+  /// v2 being always-on must not drag a feature flag on with it, and a feature flag must
+  /// not need anything else turned on to work.
+  @Test("Find My rides on its own flag and nothing else")
+  func findMyIsIndependentOfTheRest() async {
+    let withoutFlag = await ServerComposition.routeGroups(
+      authMode: .password, codecs: .legacyOnly(), features: []
     ).map(\.name)
-    #expect(!adminOnly.contains("Find My"))
+    #expect(!withoutFlag.contains("Find My"))
 
-    let findMyOnly = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(),
-      additiveEndpoints: false, features: [Features.findMy.id]
+    let withFlag = await ServerComposition.routeGroups(
+      authMode: .password, codecs: .legacyOnly(), features: [Features.findMy.id]
     ).map(\.name)
-    #expect(findMyOnly == ["Find My"])
+    #expect(withFlag.contains("Find My"))
+    #expect(!withFlag.contains("Find My Sharing"))
   }
 
   // MARK: - FaceTime
@@ -332,39 +349,37 @@ struct RouteRegistrationTests {
   func faceTimeIncomingNeedsBothFlags() async {
     let incomingOnly = await ServerComposition.routeGroups(
       authMode: .password, codecs: .legacyOnly(), faceTimeIncoming: true
-    ).map(\.name)
-    #expect(incomingOnly.isEmpty)
+    )
+    #expect(Self.gated(incomingOnly).isEmpty)
 
     let both = await ServerComposition.routeGroups(
       authMode: .password, codecs: .legacyOnly(),
       faceTime: true, faceTimeIncoming: true
-    ).map(\.name)
-    #expect(Set(both.map(\.self)) == ["FaceTime Enhanced", "FaceTime Incoming"])
+    )
+    #expect(Self.gated(both) == ["FaceTime Enhanced", "FaceTime Incoming"])
   }
 
-  /// The administration endpoints are opt-in for the same reason the auth ones are: with
-  /// default settings the route table has to match the Node server's exactly, and a client
-  /// probing for capabilities can see an added path just as well as a missing one.
+  /// v2 is mounted for everyone, with no setting to turn it on and none to turn it off.
   ///
-  /// Turning this off does not strand a locked-out admin — `--clear-blocklist` recovers
-  /// from the command line without building the server at all.
-  @Test("Administration endpoints are off unless asked for")
-  func additiveEndpoints() async {
-    let off = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(), additiveEndpoints: false
-    )
-    #expect(off.isEmpty)
-
+  /// This is the assertion that used to say the opposite. The group list is pinned rather
+  /// than merely counted so that adding a v2 group is a deliberate edit here — and so that
+  /// `Security` appearing in it stays visible, since that group is empty outside `#if DEBUG`
+  /// and is the one piece of v2 that must never reach a shipped binary.
+  @Test("The whole v2 surface is mounted with default settings")
+  func v2IsNotOptIn() async {
     let on = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(), additiveEndpoints: true
+      authMode: .password, codecs: .legacyOnly()
     )
-    #expect(
-      Set(on.map(\.name))
-        == [
-          "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers", "Send Later",
-          "Polls", "App Messages", "Webhook Editing", "Chat Controls", "Contact Card",
-        ]
-    )
+    #expect(Set(on.map(\.name)) == Self.alwaysMounted)
+
+    // Compiled out of a release build by its own `#if DEBUG`, which is where that gate
+    // belongs: a runtime switch over who may talk to the server can be flipped by whoever
+    // holds an admin token, and a compile-time one cannot.
+    #if DEBUG
+      #expect(on.first { $0.name == "Security" }?.routes.isEmpty == false)
+    #else
+      #expect(on.first { $0.name == "Security" }?.routes.isEmpty == true)
+    #endif
 
     // Pinning is additive because the Node server has no route for it, not because it is
     // administrative — so the WRITES carry `chats:write` like every other chat write, and
@@ -396,7 +411,7 @@ struct RouteRegistrationTests {
   @Test("The chat background read needs no helper")
   func backgroundReadIsDatabaseOnly() async {
     let groups = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(), additiveEndpoints: true
+      authMode: .password, codecs: .legacyOnly()
     )
     let controls = groups.first { $0.name == "Chat Controls" }
     let background = controls?.routes.filter { $0.path.hasPrefix(":guid/background") } ?? []
@@ -439,7 +454,7 @@ struct RouteRegistrationTests {
   @Test("Mute routes are helper-only, scoped per method")
   func muteRoutesRequireTheHelper() async {
     let groups = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(), additiveEndpoints: true
+      authMode: .password, codecs: .legacyOnly()
     )
     let mute =
       groups.first { $0.name == "Chat Controls" }?
@@ -461,7 +476,7 @@ struct RouteRegistrationTests {
   @Test("Clearing history is a v2 route and cannot collide with message deletion")
   func clearHistoryIsIsolatedFromMessageDeletion() async {
     let groups = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(), additiveEndpoints: true
+      authMode: .password, codecs: .legacyOnly()
     )
     let controls = groups.first { $0.name == "Chat Controls" }
     let clear = controls?.routes.first { $0.path == ":guid/messages" }
@@ -485,7 +500,7 @@ struct RouteRegistrationTests {
   @Test("Filtering routes are scoped per method")
   func filteringRoutesAreScoped() async {
     let groups = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(), additiveEndpoints: true
+      authMode: .password, codecs: .legacyOnly()
     )
     let controls = groups.first { $0.name == "Chat Controls" }
     let filtering =
@@ -509,7 +524,7 @@ struct RouteRegistrationTests {
   @Test("Access-control administration is not in a release build")
   func securityRoutesAreDebugOnly() async {
     let groups = await ServerComposition.routeGroups(
-      authMode: .password, codecs: .legacyOnly(), additiveEndpoints: true
+      authMode: .password, codecs: .legacyOnly()
     )
     let security: RouteGroup? = groups.first { $0.name == "Security" }
 

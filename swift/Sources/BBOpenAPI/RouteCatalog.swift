@@ -2,14 +2,15 @@
 //  Every route this server can serve, in one list, with what it takes to reach each one.
 //
 //  `RouteTable.groups` is the v1 surface and nothing else; everything additive lives in
-//  `AdditiveRoutes` as separate properties that `ServerComposition.additiveGroups` turns on
-//  individually. A generated document has to describe BOTH, and has to say which switch each
-//  group is behind — "this endpoint exists" and "this endpoint exists if you turned on
-//  `additive_endpoints`" are different claims, and a client that cannot tell them apart will
-//  report a correctly-configured server as broken.
+//  `AdditiveRoutes` as separate properties that `ServerComposition.routeGroups` mounts. A
+//  generated document has to describe BOTH, and has to say which switch each group is behind
+//  — "this endpoint exists" and "this endpoint exists if you turned on the FindMy feature
+//  flag" are different claims, and a client that cannot tell them apart will report a
+//  correctly-configured server as broken. Most of v2 is now simply `always`; what is left
+//  behind a switch is FindMy, FaceTime, token auth and the non-legacy codec.
 //
 //  This catalog is therefore a second place that lists the additive groups, and that is a
-//  real cost: add a group to `additiveGroups` and forget it here, and it silently goes
+//  real cost: add a group to `routeGroups` and forget it here, and it silently goes
 //  undocumented. `CatalogCompletenessTests` is what stops that — it asserts every public
 //  `RouteGroup` on `AdditiveRoutes` appears below.
 //
@@ -32,10 +33,6 @@ public struct Availability: Sendable, Hashable {
   public static let always = Availability(
     id: "always",
     summary: "Always available."
-  )
-  public static let additiveEndpoints = Availability(
-    id: "setting:additive_endpoints",
-    summary: "Requires the `additive_endpoints` setting. Off by default."
   )
   public static let faceTimeSetting = Availability(
     id: "setting:facetime",
@@ -81,17 +78,17 @@ public enum RouteCatalog {
     RouteTable.groups.map { CatalogEntry(group: $0, availability: .always) }
       + [CatalogEntry(group: RouteTable.landing, availability: .always)]
       + [
-        CatalogEntry(group: AdditiveRoutes.security, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.alerts, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.contactAvatar, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.contactCard, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.chatPinning, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.stickers, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.sendLater, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.polls, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.appMessages, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.webhookEditing, availability: .additiveEndpoints),
-        CatalogEntry(group: AdditiveRoutes.chatControls, availability: .additiveEndpoints),
+        CatalogEntry(group: AdditiveRoutes.security, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.alerts, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.contactAvatar, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.contactCard, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.chatPinning, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.stickers, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.sendLater, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.polls, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.appMessages, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.webhookEditing, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.chatControls, availability: .always),
         CatalogEntry(group: AdditiveRoutes.findMy, availability: .findMy),
         CatalogEntry(group: AdditiveRoutes.findMySharing, availability: .findMySharing),
         CatalogEntry(group: AdditiveRoutes.faceTime, availability: .faceTimeSetting),

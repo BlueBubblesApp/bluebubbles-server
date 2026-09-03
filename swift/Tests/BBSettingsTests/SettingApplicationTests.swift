@@ -9,14 +9,14 @@ import Testing
 @Suite("Setting application")
 struct SettingApplicationTests {
 
-  /// The five composition-time settings, plus every feature flag. A change to this set is a
+  /// The four composition-time settings, plus every feature flag. A change to this set is a
   /// change to which edits raise the "restart to apply" notice, so it is pinned.
   @Test("Composition-time settings are exactly the ones the composition root reads once")
   func compositionSettings() {
     let composition = Set(Settings.all.filter { $0.application == .composition }.map(\.key))
     let expected =
       Set([
-        Settings.authMode.key, Settings.additiveEndpoints.key,
+        Settings.authMode.key,
         Settings.eventPayloadCodec.key, Settings.faceTimeIncomingHandoff.key,
         Settings.chatDatabaseReaders.key,
       ]).union(Features.allKeys)

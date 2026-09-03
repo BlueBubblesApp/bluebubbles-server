@@ -376,11 +376,18 @@ a `UserAlert` naming the source IP.
 |---|---|---|
 | Casing | Whatever Node emitted — 228 keys across four conventions | `snake_case` for our own fields |
 | Enforced by | The parity harness | `NamingConventionTests` |
-| Reachable by default | Yes | **No** |
+| Reachable by default | Yes | Yes |
 
-**Every v2 route sits behind a switch** — a setting, a feature flag, or `#if DEBUG`. A server
-with default settings serves none of them. The OpenAPI document records each one's switch as
-`x-availability`.
+**v2 is mounted for everyone.** There is no setting to turn it on and none to turn it off; the
+`additive_endpoints` toggle that used to gate it is gone. v1 being frozen is what protects an
+existing client, and v2 is a prefix no v1 client asks for.
+
+Four things are still gated, each for a reason of its own rather than because they are v2:
+FindMy and FaceTime (capabilities a user opts into), the token-auth and hydration groups (only
+meaningful under a non-default `auth_mode` or codec), and `server/security/*` plus the FaceTime
+diagnostics — those are `#if DEBUG`, compiled out of a shipped binary, because a runtime switch
+over who may talk to the server can be flipped by anyone holding an admin token. The OpenAPI
+document records each operation's switch as `x-availability`.
 
 Embedded iMessage entities inside a v2 response come out of the **same serializer v1 uses** and
 therefore keep v1's `camelCase`. That sharing is the point: there is one definition of what a

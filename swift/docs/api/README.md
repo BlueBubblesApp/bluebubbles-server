@@ -83,15 +83,21 @@ per-device credentials. The document reports a route's scope as `x-required-scop
 Routes mount under `/api/v1` or `/api/v2`. Which one a route uses is a property of its
 group, declared in the route table.
 
-**A v2 route is not automatically reachable.** Every one of them sits behind a switch — a
-setting, a feature flag, or a build configuration — and a server with default settings
-serves none of them. The document records the switch for each operation as
-`x-availability`:
+**Most of v2 is reachable on any server.** It used to be opt-in behind an
+`additive_endpoints` setting that defaulted to off, on the reasoning that a default
+configuration should serve a route table byte-identical to the Node server's. That has been
+dropped: v1 is frozen, which is what actually protects an existing client, and a capability
+nobody can reach without being told to flip a hidden setting may as well not exist.
+
+What is still gated is gated for a reason of its own — a capability that is not ready
+(FindMy), one the user opts into (FaceTime), one that only makes sense in a given
+configuration (token auth, the non-legacy codec), or one that must never ship at all
+(`server/security/*` and the FaceTime diagnostics, both `#if DEBUG`). The document records
+the switch for each operation as `x-availability`:
 
 | `x-availability` | Reachable when |
 | --- | --- |
 | `always` | Always. |
-| `setting:additive_endpoints` | The `additive_endpoints` setting is on. |
 | `setting:facetime` | FaceTime support is enabled. |
 | `setting:facetime_incoming` | FaceTime support *and* incoming-call hand-off are enabled. |
 | `feature:findMy` | The `findMy` feature flag is set. |

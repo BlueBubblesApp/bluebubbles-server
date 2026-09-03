@@ -124,77 +124,77 @@
     {
       "name": "security-v2",
       "summary": "Security",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "alerts-v2",
       "summary": "Alerts",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "contact-avatar-v2",
       "summary": "Contact Avatar",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "contact-card-v2",
       "summary": "Contact Card",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "chat-pinning-v2",
       "summary": "Chat Pinning",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "stickers-v2",
       "summary": "Stickers",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "send-later-v2",
       "summary": "Send Later",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "polls-v2",
       "summary": "Polls",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "app-messages-v2",
       "summary": "App Messages",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "webhook-editing-v2",
       "summary": "Webhook Editing",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
     {
       "name": "chat-controls-v2",
       "summary": "Chat Controls",
-      "description": "Requires the `additive_endpoints` setting. Off by default.",
+      "description": "Always available.",
       "parent": "v2",
       "kind": "nav"
     },
@@ -18427,7 +18427,7 @@
       "get": {
         "operationId": "getV2ServerSecurityBlocklist",
         "summary": "List blocked",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "security-v2"
         ],
@@ -18519,7 +18519,7 @@
         },
         "x-handler-id": "security.listBlocked",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -18527,7 +18527,7 @@
       "delete": {
         "operationId": "deleteV2ServerSecurityBlocklist",
         "summary": "Clear blocked",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "security-v2"
         ],
@@ -18608,7 +18608,7 @@
         },
         "x-handler-id": "security.clearBlocked",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -18618,7 +18618,7 @@
       "delete": {
         "operationId": "deleteV2ServerSecurityBlocklistById",
         "summary": "Unblock",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "security-v2"
         ],
@@ -18708,7 +18708,7 @@
         },
         "x-handler-id": "security.unblock",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -18718,7 +18718,7 @@
       "get": {
         "operationId": "getV2ServerSecurityAllowlist",
         "summary": "List allowed",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "security-v2"
         ],
@@ -18828,7 +18828,7 @@
         },
         "x-handler-id": "security.listAllowed",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -18836,7 +18836,7 @@
       "post": {
         "operationId": "postV2ServerSecurityAllowlist",
         "summary": "Allow",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "security-v2"
         ],
@@ -18962,7 +18962,7 @@
         },
         "x-handler-id": "security.allow",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -18972,7 +18972,7 @@
       "delete": {
         "operationId": "deleteV2ServerSecurityAllowlistById",
         "summary": "Disallow",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "security-v2"
         ],
@@ -19062,7 +19062,7 @@
         },
         "x-handler-id": "security.disallow",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19072,7 +19072,7 @@
       "get": {
         "operationId": "getV2ServerSecurityFailures",
         "summary": "Recent failures",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "security-v2"
         ],
@@ -19164,7 +19164,7 @@
         },
         "x-handler-id": "security.recentFailures",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19174,7 +19174,7 @@
       "get": {
         "operationId": "getV2ServerAlert",
         "summary": "Alerts v2",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "alerts-v2"
         ],
@@ -19276,7 +19276,7 @@
         },
         "x-handler-id": "server.alertsV2",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19286,7 +19286,7 @@
       "post": {
         "operationId": "postV2ServerAlertRead",
         "summary": "Mark alert read v2",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "alerts-v2"
         ],
@@ -19389,7 +19389,7 @@
         },
         "x-handler-id": "server.markAlertReadV2",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19399,7 +19399,7 @@
       "get": {
         "operationId": "getV2ContactByIdAvatar",
         "summary": "Avatar",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "contact-avatar-v2"
         ],
@@ -19486,7 +19486,7 @@
         },
         "x-handler-id": "contact.avatar",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19496,7 +19496,7 @@
       "get": {
         "operationId": "getV2IcloudContact",
         "summary": "Contact card v2",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "contact-card-v2"
         ],
@@ -19625,7 +19625,7 @@
         },
         "x-handler-id": "icloud.contactCardV2",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19635,7 +19635,7 @@
       "get": {
         "operationId": "getV2ChatPin",
         "summary": "Pinned",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-pinning-v2"
         ],
@@ -19754,7 +19754,7 @@
         },
         "x-handler-id": "chat.pinned",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19764,7 +19764,7 @@
       "post": {
         "operationId": "postV2ChatByGuidPin",
         "summary": "Pin",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-pinning-v2"
         ],
@@ -19872,7 +19872,7 @@
         },
         "x-handler-id": "chat.pin",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19880,7 +19880,7 @@
       "delete": {
         "operationId": "deleteV2ChatByGuidPin",
         "summary": "Unpin",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-pinning-v2"
         ],
@@ -19988,7 +19988,7 @@
         },
         "x-handler-id": "chat.unpin",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -19998,7 +19998,7 @@
       "post": {
         "operationId": "postV2MessageSticker",
         "summary": "Send sticker",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "stickers-v2"
         ],
@@ -20151,7 +20151,7 @@
         },
         "x-handler-id": "message.sendSticker",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -20161,7 +20161,7 @@
       "post": {
         "operationId": "postV2MessageSendLater",
         "summary": "Send later",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "send-later-v2"
         ],
@@ -20348,7 +20348,7 @@
         },
         "x-handler-id": "message.sendLater",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -20356,7 +20356,7 @@
       "get": {
         "operationId": "getV2MessageSendLater",
         "summary": "Pending scheduled",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "send-later-v2"
         ],
@@ -20437,7 +20437,7 @@
         },
         "x-handler-id": "message.pendingScheduled",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -20447,7 +20447,7 @@
       "post": {
         "operationId": "postV2MessageSendLaterByGuidSendNow",
         "summary": "Send scheduled now",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "send-later-v2"
         ],
@@ -20579,7 +20579,7 @@
         },
         "x-handler-id": "message.sendScheduledNow",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -20589,7 +20589,7 @@
       "put": {
         "operationId": "putV2MessageSendLaterByGuid",
         "summary": "Reschedule",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "send-later-v2"
         ],
@@ -20735,7 +20735,7 @@
         },
         "x-handler-id": "message.reschedule",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -20743,7 +20743,7 @@
       "delete": {
         "operationId": "deleteV2MessageSendLaterByGuid",
         "summary": "Cancel scheduled",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "send-later-v2"
         ],
@@ -20875,7 +20875,7 @@
         },
         "x-handler-id": "message.cancelScheduled",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -20885,7 +20885,7 @@
       "post": {
         "operationId": "postV2MessagePoll",
         "summary": "Create poll",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "polls-v2"
         ],
@@ -21025,7 +21025,7 @@
         },
         "x-handler-id": "message.createPoll",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -21035,7 +21035,7 @@
       "get": {
         "operationId": "getV2MessagePollByGuid",
         "summary": "Poll",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "polls-v2"
         ],
@@ -21125,7 +21125,7 @@
         },
         "x-handler-id": "message.poll",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -21135,7 +21135,7 @@
       "post": {
         "operationId": "postV2MessagePollByGuidVote",
         "summary": "Vote poll",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "polls-v2"
         ],
@@ -21278,7 +21278,7 @@
         },
         "x-handler-id": "message.votePoll",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -21288,7 +21288,7 @@
       "post": {
         "operationId": "postV2MessagePollByGuidOption",
         "summary": "Add poll option",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "polls-v2"
         ],
@@ -21426,7 +21426,7 @@
         },
         "x-handler-id": "message.addPollOption",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -21436,7 +21436,7 @@
       "get": {
         "operationId": "getV2MessageAppByGuid",
         "summary": "App payload",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "app-messages-v2"
         ],
@@ -21526,7 +21526,7 @@
         },
         "x-handler-id": "message.appPayload",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -21536,7 +21536,7 @@
       "post": {
         "operationId": "postV2MessageApp",
         "summary": "Send app",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "app-messages-v2"
         ],
@@ -21721,7 +21721,7 @@
         },
         "x-handler-id": "message.sendApp",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -21731,7 +21731,7 @@
       "post": {
         "operationId": "postV2MessageGamePigeon",
         "summary": "Send game pigeon",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "app-messages-v2"
         ],
@@ -21908,7 +21908,7 @@
         },
         "x-handler-id": "message.sendGamePigeon",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -21918,7 +21918,7 @@
       "put": {
         "operationId": "putV2WebhookById",
         "summary": "Update",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `server:admin` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "webhook-editing-v2"
         ],
@@ -22067,7 +22067,7 @@
         },
         "x-handler-id": "webhook.update",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "server:admin",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -22077,7 +22077,7 @@
       "get": {
         "operationId": "getV2ChatByGuidBackgroundInfo",
         "summary": "Background info",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `attachments:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `attachments:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -22189,7 +22189,7 @@
         },
         "x-handler-id": "chat.backgroundInfo",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "attachments:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -22199,7 +22199,7 @@
       "post": {
         "operationId": "postV2ChatByGuidBackgroundFetch",
         "summary": "Fetch background",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `attachments:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `attachments:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -22342,7 +22342,7 @@
         },
         "x-handler-id": "chat.fetchBackground",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "attachments:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -22352,7 +22352,7 @@
       "get": {
         "operationId": "getV2ChatByGuidBackground",
         "summary": "Background",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the `attachments:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the `attachments:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -22439,7 +22439,7 @@
         },
         "x-handler-id": "chat.background",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "attachments:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -22449,7 +22449,7 @@
       "get": {
         "operationId": "getV2ChatByGuidMute",
         "summary": "Mute state",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -22583,7 +22583,7 @@
         },
         "x-handler-id": "chat.muteState",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -22591,7 +22591,7 @@
       "post": {
         "operationId": "postV2ChatByGuidMute",
         "summary": "Mute",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -22737,7 +22737,7 @@
         },
         "x-handler-id": "chat.mute",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -22745,7 +22745,7 @@
       "delete": {
         "operationId": "deleteV2ChatByGuidMute",
         "summary": "Unmute",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -22900,7 +22900,7 @@
         },
         "x-handler-id": "chat.unmute",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -22910,7 +22910,7 @@
       "get": {
         "operationId": "getV2ChatByGuidFilter",
         "summary": "Filter state",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `messages:read` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -23056,7 +23056,7 @@
         },
         "x-handler-id": "chat.filterState",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "messages:read",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -23064,7 +23064,7 @@
       "post": {
         "operationId": "postV2ChatByGuidFilter",
         "summary": "Set filter",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -23229,7 +23229,7 @@
         },
         "x-handler-id": "chat.setFilter",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -23239,7 +23239,7 @@
       "post": {
         "operationId": "postV2ChatByGuidKnown",
         "summary": "Mark known",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -23406,7 +23406,7 @@
         },
         "x-handler-id": "chat.markKnown",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -23416,7 +23416,7 @@
       "post": {
         "operationId": "postV2ChatByGuidSpam",
         "summary": "Mark spam",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -23608,7 +23608,7 @@
         },
         "x-handler-id": "chat.markSpam",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -23618,7 +23618,7 @@
       "post": {
         "operationId": "postV2ChatByGuidJunk",
         "summary": "Report junk",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -23810,7 +23810,7 @@
         },
         "x-handler-id": "chat.reportJunk",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300
@@ -23820,7 +23820,7 @@
       "delete": {
         "operationId": "deleteV2ChatByGuidMessages",
         "summary": "Clear history",
-        "description": "Requires the `additive_endpoints` setting. Off by default.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
+        "description": "Always available.\n\nRequires the Private API helper to be connected. Without it this route answers **500** with an `iMessage Error` — not 503.\n\nRequires the `chats:write` scope. Under the default `auth_mode = password` the shared password grants every scope, so this is only enforced with per-device credentials.",
         "tags": [
           "chat-controls-v2"
         ],
@@ -23965,7 +23965,7 @@
         },
         "x-handler-id": "chat.clearHistory",
         "x-api-version": 2,
-        "x-availability": "setting:additive_endpoints",
+        "x-availability": "always",
         "x-required-scope": "chats:write",
         "x-request-timeout-seconds": 60,
         "x-response-timeout-seconds": 300

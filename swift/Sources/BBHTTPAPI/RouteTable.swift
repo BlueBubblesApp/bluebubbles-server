@@ -116,7 +116,7 @@ public struct RouteGroup: Sendable {
   /// New capability does not, however small and however additive it looks.
   ///
   /// **v2 is everything this server does that the Node server never did.** Its routes are
-  /// still individually gated — by `additive_endpoints`, by a feature flag, by `auth_mode` —
+  /// still individually gated — by a feature flag, by `auth_mode`, by `#if DEBUG` —
   /// so the version is not a switch that turns them all on. It is where a client goes
   /// looking for what is new, and it keeps that question separable from "is this server
   /// still compatible".

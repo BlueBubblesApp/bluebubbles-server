@@ -500,27 +500,6 @@ public enum Settings {
     )
   )
 
-  /// Mounts the additive administration endpoints and the streaming avatar route.
-  ///
-  /// Default OFF, and that default is load-bearing: with default settings the route table
-  /// must be byte-identical to the Node server's, which `RouteRegistrationTests` asserts.
-  /// Additive endpoints are additive precisely because a client can tell they are there.
-  ///
-  /// Turning it off does not strand an admin: `--clear-blocklist` on the command line is
-  /// the recovery path for a lockout, and it deliberately works without building the
-  /// server at all.
-  public static let additiveEndpoints = Setting<Bool>(
-    "additive_endpoints", default: false,
-    application: .composition,
-    presentation: .init(
-      label: "Administration endpoints",
-      help: "Adds /server/security/* for blocklist and allowlist administration, and "
-        + "GET /contact/:id/avatar. Off by default so the API matches the previous "
-        + "server's exactly.",
-      section: "Security", control: .toggle
-    )
-  )
-
   /// Where the update check reads from.
   ///
   /// Overridable so a beta channel can point at its own feed, and so the check can be
@@ -729,7 +708,6 @@ extension Settings {
       landingPagePath.erased,
       checkForUpdates.erased,
       authMode.erased,
-      additiveEndpoints.erased,
       updateFeedURL.erased,
       eventPayloadCodec.erased,
       logLevel.erased,

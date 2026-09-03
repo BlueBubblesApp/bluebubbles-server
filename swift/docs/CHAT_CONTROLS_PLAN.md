@@ -154,7 +154,7 @@ unchanged.
 All twelve routes below go into a single `AdditiveRoutes.chatControls` group in
 `Sources/BBHTTPAPI/RouteTable.swift` (next to `chatPinning`, line 527), mounted at
 `apiVersion: RouteTable.latestVersion` — i.e. `/api/v2/chat/…`. Registered from
-`ServerComposition.swift:476` inside the existing `if additiveEndpoints` block.
+`ServerComposition.swift` alongside the other unconditional v2 group appends.
 
 Rules this group has to respect, all of which have bitten before:
 
@@ -496,7 +496,6 @@ Setup, per CONTRIBUTING:
 swift build --arch arm64e --product BlueBubblesHelper
 swift run bluebubbles-server --headless \
     --set enable_private_api=true \
-    --set additive_endpoints=true \
     --set private_api_helper_path="$PWD/.build/arm64e-apple-macosx/debug/libBlueBubblesHelper.dylib"
 ```
 
@@ -536,7 +535,7 @@ Automated coverage, alongside:
 - `Tests/BBPrivateAPITests/HelperRoundTripTests.swift` — each new action recognised by the
   helper (the `findMyActionsAreKnown` pattern), and each rejected by name when a required field
   is missing.
-- `Tests/CompositionTests` — the new group appears only when `additiveEndpoints` is on.
+- `Tests/CompositionTests` — the new group joins the always-mounted v2 baseline.
 - Parity: `swift test --filter Parity` must stay green, which it will as long as §1.2's first
   rule is honoured.
 

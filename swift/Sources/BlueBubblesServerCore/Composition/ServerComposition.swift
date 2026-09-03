@@ -264,7 +264,6 @@ public struct ServerComposition {
     let additionalGroups = await routeGroups(
       authMode: authMode,
       codecs: codecs,
-      additiveEndpoints: await settings.get(Settings.additiveEndpoints),
       features: Set(
         await settings.featureStates().filter(\.value).keys.map(\.id)
       ),
@@ -482,50 +481,55 @@ public struct ServerComposition {
   static func routeGroups(
     authMode: AuthMode,
     codecs: CodecNegotiator,
-    additiveEndpoints: Bool = false,
     features: Set<String> = [],
     faceTime: Bool = false,
     faceTimeIncoming: Bool = false
   ) async -> [RouteGroup] {
     var groups: [RouteGroup] = []
 
-    // Opt-in, and off by default. With default settings the route table has to be
-    // identical to the Node server's — an added path is as much a difference as a
-    // missing one, and a client probing for capabilities can see it.
+    // ALWAYS MOUNTED. v2 is not opt-in.
     //
-    // Rate limiting without an unblock path would be a real problem, but it is not this
-    // one: `--clear-blocklist` recovers a lockout from the command line, and it works
-    // without building the server precisely so it survives whatever broke the API.
-    if additiveEndpoints {
-      groups.append(AdditiveRoutes.security)
-      // The richer alert shape. Additive because v1's is frozen at the reference's six
-      // keys — this is where the full alert shape becomes reachable.
-      groups.append(AdditiveRoutes.alerts)
-      // A second way to get an avatar the contact payload already carries.
-      groups.append(AdditiveRoutes.contactAvatar)
-      // Pinning: a helper capability the Node server never had a route for.
-      groups.append(AdditiveRoutes.chatPinning)
-      // Stickers: likewise, a send the Node helper never had an action for.
-      groups.append(AdditiveRoutes.stickers)
-      // Send Later: Apple's scheduling, distinct from this server's own timer.
-      groups.append(AdditiveRoutes.sendLater)
-      // Polls, macOS 26.
-      groups.append(AdditiveRoutes.polls)
-      // Any iMessage app's balloon, Game Pigeon included.
-      groups.append(AdditiveRoutes.appMessages)
-      // Editing a webhook, which the Node server only ever exposed to its own UI.
-      groups.append(AdditiveRoutes.webhookEditing)
-      // Conversation controls — wallpaper today, mute and filtering next.
-      groups.append(AdditiveRoutes.chatControls)
-      // The shared contact card, with the handle and shared-state v1 cannot carry.
-      groups.append(AdditiveRoutes.contactCard)
-    }
+    // It used to be, behind an `additive_endpoints` setting that defaulted to off, on the
+    // reasoning that with default settings this server's route table should be byte-identical
+    // to the Node server's — an added path being as much a difference as a missing one.
+    //
+    // That reasoning does not survive contact with a client. v1 is frozen and stays frozen,
+    // which is what actually protects an existing client; v2 is a separate prefix that no v1
+    // client asks for. A capability nobody can reach without first being told to flip a
+    // hidden setting may as well not exist, and every one of these is a feature a client
+    // wants: pinning, stickers, Send Later, polls, app balloons, wallpaper, the full alert
+    // and contact-card shapes.
+    //
+    // The two groups that genuinely should not ship are gated where the gate belongs, in
+    // `#if DEBUG` inside their own definitions rather than behind a runtime switch anyone
+    // holding an admin token could flip: `AdditiveRoutes.security` (which edits who may talk
+    // to this server) and the FaceTime debug diagnostics. Those stay compiled out.
+    groups.append(AdditiveRoutes.security)
+    // The richer alert shape. Additive because v1's is frozen at the reference's six
+    // keys — this is where the full alert shape becomes reachable.
+    groups.append(AdditiveRoutes.alerts)
+    // A second way to get an avatar the contact payload already carries.
+    groups.append(AdditiveRoutes.contactAvatar)
+    // Pinning: a helper capability the Node server never had a route for.
+    groups.append(AdditiveRoutes.chatPinning)
+    // Stickers: likewise, a send the Node helper never had an action for.
+    groups.append(AdditiveRoutes.stickers)
+    // Send Later: Apple's scheduling, distinct from this server's own timer.
+    groups.append(AdditiveRoutes.sendLater)
+    // Polls, macOS 26.
+    groups.append(AdditiveRoutes.polls)
+    // Any iMessage app's balloon, Game Pigeon included.
+    groups.append(AdditiveRoutes.appMessages)
+    // Editing a webhook, which the Node server only ever exposed to its own UI.
+    groups.append(AdditiveRoutes.webhookEditing)
+    // Conversation controls — wallpaper today, mute and filtering next.
+    groups.append(AdditiveRoutes.chatControls)
+    // The shared contact card, with the handle and shared-state v1 cannot carry.
+    groups.append(AdditiveRoutes.contactCard)
 
-    // Feature flags, each independently off by default. Separate from
-    // `additiveEndpoints` on purpose: that switch is about matching the previous
-    // server's route table, whereas these are about a capability not being ready to be
-    // reachable. Conflating them would mean turning on the admin endpoints in order to
-    // get FindMy, which is not a trade anyone should have to make.
+    // Feature flags, each independently off by default. Unlike v2 as a whole, these are
+    // about a capability not being ready to be reachable at all, rather than about which
+    // prefix it lives under.
     if features.contains(Features.findMy.id) {
       groups.append(AdditiveRoutes.findMy)
 
