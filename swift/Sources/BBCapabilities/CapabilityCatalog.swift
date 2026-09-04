@@ -60,9 +60,11 @@ extension PrivateAPICapability {
     title: "Mentions",
     summary: "Mention someone by name in a group so they are notified even on Do Not Disturb.",
     minimumMacOS: 14,
-    evidence: .notVisibleInHeaders(
-      reason: "Written as an attribute on the message body rather than through a method, so "
-        + "there is no class or selector to look for — the same shape as text formatting."),
+    // SENDING a mention is an attribute written onto the message body, which a header dump
+    // cannot see. But whether a conversation supports one at all is IMCore's own question
+    // and it answers it out loud, so that is what this checks — a release without mentions
+    // would not carry the method that asks.
+    evidence: .selectorExists("_supportsMentions", onClass: "IMChat"),
     category: .messages)
 
   public static let editMessage = Self(
@@ -215,10 +217,12 @@ extension PrivateAPICapability {
     title: "Text formatting",
     summary: "Bold, italics, underline and strikethrough inside a message.",
     minimumMacOS: 15,
-    evidence: .notVisibleInHeaders(
-      reason: "Carried as attribute names on the attributed body, which this Mac writes on "
-        + "any release — macOS 15 is where the RECEIVING Messages started rendering them, "
-        + "so there is no class or selector here to look for."),
+    // SENDING formatting is attribute names on the attributed body, which a header dump
+    // cannot see, and this Mac writes them on any release. What arrived in macOS 15 is
+    // Messages being able to APPLY a style, and its own key command for doing so is the
+    // marker: `CKChatController` is present on all three releases and only carries this
+    // selector from 15. Not a borrowed neighbour — it is the text-styling command itself.
+    evidence: .selectorExists("keyCommandApplyTextStyle:", onClass: "CKChatController"),
     category: .messages)
 
   public static let polls = Self(

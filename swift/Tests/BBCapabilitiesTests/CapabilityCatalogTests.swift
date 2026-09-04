@@ -180,6 +180,30 @@ struct CapabilityCatalogTests {
     }
   }
 
+  /// Every capability currently names something a header dump can check, and that is worth
+  /// holding onto rather than discovering later that half of them opted out.
+  ///
+  /// `notVisibleInHeaders` stays in the type because a capability genuinely may have no
+  /// marker — but two that looked that way turned out not to be. Mentions is written as an
+  /// attribute on the body, yet `-[IMChat _supportsMentions]` is IMCore asking the same
+  /// question out loud; text formatting is likewise attributes, yet `CKChatController` grew
+  /// `keyCommandApplyTextStyle:` in exactly the release the feature arrived. Both were
+  /// nearly given a borrowed neighbour's class instead, which would have made this whole
+  /// mechanism decorative.
+  ///
+  /// **If you add one, change this test and say why here.** That is the point of it.
+  @Test("Every capability names evidence a dump can check")
+  func everyCapabilityIsCheckable() {
+    for capability in PrivateAPICapability.all {
+      if case .notVisibleInHeaders(let reason) = capability.evidence {
+        Issue.record(
+          """
+          \(capability.id) opts out of the dump check ("\(reason)"). That may be right — but           look for a method that asks the same question first, the way `_supportsMentions`           and `keyCommandApplyTextStyle:` did, and update this test deliberately.
+          """)
+      }
+    }
+  }
+
   @Test("Identifiers are unique and wire-safe")
   func identifiersAreStable() {
     let ids = PrivateAPICapability.all.map(\.id)

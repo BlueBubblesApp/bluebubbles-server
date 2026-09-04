@@ -85,7 +85,7 @@ whole design — three separate checks, each closing a different way this could 
 
 | The catalog could... | Caught by |
 |---|---|
-| declare a wrong macOS minimum | `evidence` names the class or selector that decides it; a test re-derives the minimum from `docs/headers/` and fails if they disagree |
+| declare a wrong macOS minimum | `evidence` names the class or selector that decides it; a test re-derives the minimum from `docs/headers/` and fails if they disagree. **Every one of the 23 has some** — including the two that looked like they could not, where a method asking the same question turned out to exist |
 | **miss a feature entirely** | every capability names the `MessagesHelperAction`/`FaceTimeHelperAction` cases it covers, and a test walks *every* action, failing unless it is claimed or explicitly listed as not user-facing, with a reason |
 | leak API vocabulary onto the screen | a test rejects any title, summary or heading containing a selector, a function, a framework or an Apple type prefix |
 
