@@ -18,7 +18,10 @@ a one-to-one conversation. That is the whole list. Everything below works on mac
 |---|:-:|:-:|
 | Send text, send an attachment, start a 1:1 chat | ✅ | ✅ |
 | Read messages, chats and attachments · events to clients | ✅ | ✅ |
-| Improved message sending — subject lines, effects, replies, mentions | ⛔️ | ✅ |
+| Improved message sending — subject lines, and a more reliable send | ⛔️ | ✅ |
+| Bubble and screen effects | ⛔️ | ✅ |
+| Threaded replies | ⛔️ | ✅ |
+| Mentions | ⛔️ | ✅ |
 | Edit a sent message | ⛔️ | ✅ |
 | Unsend a message | ⛔️ | ✅ |
 | Typing indicators | ⛔️ | ✅ |
@@ -33,10 +36,11 @@ a one-to-one conversation. That is the whole list. Everything below works on mac
 | FaceTime from a client | ⛔️ | ✅ |
 | Find My | ⛔️ | ✅ |
 
-**Replying is not a separate row on purpose.** IMCore has no reply parameter: a reply is an
-ordinary message carrying the identifier of the thread it joins, so everything above — subject
-lines, effects, mentions — is available on a reply exactly as it is on a new message. Splitting
-them would imply a choice between them that does not exist.
+**These are separate rows and they compose.** Underneath, all four are fields on one send —
+IMCore has no reply parameter, only a thread identifier, and effects and mentions are likewise
+things a message carries rather than ways of sending one. So a reply can have an effect, a
+subject and a mention. They are listed apart because a user wants them one at a time, and each
+is decided by its own property on the message, which is what the catalog checks.
 
 ### What a newer macOS adds — on top of the above
 

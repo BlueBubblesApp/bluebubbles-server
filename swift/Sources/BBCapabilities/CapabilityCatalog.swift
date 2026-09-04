@@ -33,12 +33,37 @@ extension PrivateAPICapability {
     id: "rich-sending",
     title: "Improved message sending",
     summary:
-      "Subject lines, screen and bubble effects, replies to a specific message, and "
-      + "mentioning someone by name.",
+      "Send with a subject line, and more reliably than the scripting interface manages.",
     minimumMacOS: 14,
-    evidence: .selectorExists("sendMessage:", onClass: "IMChat"),
+    evidence: .selectorExists("subject", onClass: "IMMessage"),
     category: .messages,
     messagesActions: [.sendMessage, .sendMultipart, .sendAttachment, .sendAppMessage])
+
+  public static let messageEffects = Self(
+    id: "message-effects",
+    title: "Bubble and screen effects",
+    summary: "Send with slam, loud, gentle, invisible ink, confetti, fireworks and the rest.",
+    minimumMacOS: 14,
+    evidence: .selectorExists("expressiveSendStyleID", onClass: "IMMessage"),
+    category: .messages)
+
+  public static let replies = Self(
+    id: "replies",
+    title: "Threaded replies",
+    summary: "Reply to one specific message, so the conversation keeps the thread.",
+    minimumMacOS: 14,
+    evidence: .selectorExists("setThreadIdentifier:", onClass: "IMMessage"),
+    category: .messages)
+
+  public static let mentions = Self(
+    id: "mentions",
+    title: "Mentions",
+    summary: "Mention someone by name in a group so they are notified even on Do Not Disturb.",
+    minimumMacOS: 14,
+    evidence: .notVisibleInHeaders(
+      reason: "Written as an attribute on the message body rather than through a method, so "
+        + "there is no class or selector to look for — the same shape as text formatting."),
+    category: .messages)
 
   public static let editMessage = Self(
     id: "edit-message",
@@ -245,7 +270,7 @@ extension PrivateAPICapability {
   /// left out of it is caught rather than silently unlisted.
   public static let all: [PrivateAPICapability] = [
     // Every supported release.
-    richSending, editMessage, unsendMessage, typingIndicators, readState,
+    richSending, messageEffects, replies, mentions, editMessage, unsendMessage, typingIndicators, readState,
     tapbacks, stickers, groupManagement, pinning, muting, junkReporting, faceTime, findMy,
     // Gated on a newer macOS.
     emojiReactions, stickerReactions, sendLater, textFormatting, polls,
