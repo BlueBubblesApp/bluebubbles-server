@@ -38,9 +38,8 @@ struct FeatureAvailabilityView: View {
   /// with it — the SIP note and the connection status card are both shown or hidden on it.
   ///
   /// A binding rather than a second poll in the parent: two pollers is two answers to one
-  /// question, and they would disagree for whole seconds during startup. It also means the
-  /// debug picker below moves the whole page, which is the point of having the picker —
-  /// looking at one part of a state is not looking at the state.
+  /// question, and they would disagree for whole seconds during startup — the page would
+  /// show the features card for one state and the notes below it for another.
   @Binding var presence: PrivateAPIPresence
 
   /// The live answer, polled the same way the status card polls it.
@@ -49,15 +48,11 @@ struct FeatureAvailabilityView: View {
   /// during the second before the runtime answers.
   @State private var hasPolled = false
 
-  #if DEBUG
-    @State private var debugState: DebugState = .live
-  #endif
-
   var body: some View {
     SettingsSection(title, subtitle: subtitle, trailing: trailing) {
       CollapsibleFeatureList(entries: entries)
-        // A new state is a new list, so it opens collapsed rather than keeping however far
-        // the previous one had been scrolled open.
+        // The Private API coming up mid-session swaps one list for a different one, so the
+        // fold resets rather than carrying over how far the previous list had been opened.
         .id(listIdentity)
     }
     .onChange(of: effectivePresence, initial: true) { _, value in
@@ -93,20 +88,12 @@ struct FeatureAvailabilityView: View {
   /// Treated as connected until the first poll answers, so the page does not accuse the user
   /// of a broken setup for the second before it knows.
   private var effectivePresence: PrivateAPIPresence {
-    #if DEBUG
-      if case .forced(_, let presence) = debugState { return presence }
-    #endif
-    return hasPolled ? livePresence : .connected
+    hasPolled ? livePresence : .connected
   }
 
   private var isConnected: Bool { effectivePresence.showsAvailableFeatures }
 
-  private var macOSMajor: Int {
-    #if DEBUG
-      if case .forced(let major, _) = debugState { return major }
-    #endif
-    return PrivateAPICapability.currentMacOSMajor
-  }
+  private var macOSMajor: Int { PrivateAPICapability.currentMacOSMajor }
 
   private var upgrades: [(macOS: Int, capabilities: [PrivateAPICapability])] {
     PrivateAPICapability.all.upgradePaths(from: macOSMajor)
@@ -134,14 +121,10 @@ struct FeatureAvailabilityView: View {
   }
 
   private var trailing: AnyView? {
-    #if DEBUG
-      return AnyView(DebugStatePicker(state: $debugState))
-    #else
-      return AnyView(
-        Text(PrivateAPICapability.releaseName(macOSMajor))
-          .font(.subheadline.weight(.medium))
-          .foregroundStyle(.secondary))
-    #endif
+    AnyView(
+      Text(PrivateAPICapability.releaseName(macOSMajor))
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(.secondary))
   }
 }
 
@@ -294,65 +277,3 @@ private struct FeatureRow: View {
     }
   }
 }
-
-// MARK: - Debug
-
-#if DEBUG
-  /// Which state to draw, for looking at the other ones.
-  ///
-  /// DEBUG-only and view-local: it overrides nothing, persists nothing and writes no setting,
-  /// so cycling through states cannot leave the app in one of them. Compiled out of a release
-  /// build entirely — the shipping card shows the running macOS in this corner instead.
-  enum DebugState: Hashable {
-    case live
-    case forced(macOS: Int, presence: PrivateAPIPresence)
-
-    /// Every combination that draws differently: three releases by three presence states.
-    /// Built rather than typed out, so adding a supported release here is one number.
-    static let presets: [(label: String, state: DebugState)] = {
-      var presets: [(String, DebugState)] = [("Live", .live)]
-      for macOS in [26, 15, 14] {
-        for (suffix, presence) in [
-          ("connected", PrivateAPIPresence.connected),
-          ("not working", .enabledButNotWorking),
-          ("off", .notEnabled),
-        ] {
-          let name = PrivateAPICapability.releaseName(macOS)
-            .replacingOccurrences(of: "macOS ", with: "")
-          presets.append(("\(name) · \(suffix)", .forced(macOS: macOS, presence: presence)))
-        }
-      }
-      return presets
-    }()
-
-    var label: String {
-      Self.presets.first { $0.state == self }?.label ?? "Live"
-    }
-  }
-
-  private struct DebugStatePicker: View {
-    @Binding var state: DebugState
-
-    var body: some View {
-      Menu {
-        ForEach(DebugState.presets, id: \.state) { preset in
-          Button {
-            state = preset.state
-          } label: {
-            if state == preset.state {
-              Label(preset.label, systemImage: "checkmark")
-            } else {
-              Text(preset.label)
-            }
-          }
-        }
-      } label: {
-        Label(state.label, systemImage: "ladybug")
-          .font(.subheadline)
-      }
-      .menuStyle(.borderlessButton)
-      .fixedSize()
-      .help("Debug builds only: draw this card as another macOS or Private API state.")
-    }
-  }
-#endif
