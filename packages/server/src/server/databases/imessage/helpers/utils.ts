@@ -36,7 +36,7 @@ export const convertAudio = async (
     } = {}
 ): Promise<string> => {
     if (!attachment) return null;
-    const newPath = getConversionPath(attachment, "mp3");
+    const newPath = getConversionPath(attachment, "m4a");
     const mType = originalMimeType ?? attachment.getMimeType();
     let failed = false;
     let ext = null;
@@ -48,12 +48,12 @@ export const convertAudio = async (
     if (!fs.existsSync(newPath) && !dryRun) {
         try {
             if (isNotEmpty(ext)) {
-                Server().log(`Converting attachment, ${attachment.transferName}, to an MP3...`);
-                await FileSystem.convertCafToMp3(attachment.filePath, newPath);
+                Server().log(`Converting attachment, ${attachment.transferName}, to an M4A...`);
+                await FileSystem.convertCafToM4a(attachment.filePath, newPath);
             }
         } catch (ex: any) {
             failed = true;
-            Server().log(`Failed to convert CAF to MP3 for attachment, ${attachment.transferName}`, "debug");
+            Server().log(`Failed to convert CAF to M4A for attachment, ${attachment.transferName}`, "debug");
             Server().log(ex?.message ?? ex, "error");
         }
     } else {
@@ -62,9 +62,9 @@ export const convertAudio = async (
 
     if (!failed && ext && (fs.existsSync(newPath) || dryRun)) {
         // If conversion is successful, we need to modify the attachment a bit
-        attachment.mimeType = "audio/mp3";
+        attachment.mimeType = "audio/mp4";
         attachment.filePath = newPath;
-        attachment.transferName = basename(newPath).replace(`.${ext}`, ".mp3");
+        attachment.transferName = basename(newPath).replace(`.${ext}.m4a`, ".m4a");
 
         // Set the fPath to the newly converted path
         return newPath;
