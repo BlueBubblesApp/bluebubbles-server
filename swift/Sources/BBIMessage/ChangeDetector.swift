@@ -1,18 +1,30 @@
 //  ChangeDetector
 //  Watches chat.db and turns file activity into message change events.
 //
-//  The algorithm is sound and is kept; the plumbing is replaced. What changes:
-//    - fs.watch + MultiFileWatcher becomes DispatchSource file-system observation, which
-//      does not miss the -wal writes that carry most of the activity.
-//    - The Sema(1) process lock and the @DebounceSubsequentWithWait decorator become actor
-//      isolation and a debounced AsyncStream. The decorator keyed its lock by a GLOBAL
-//      string, so two instances of the same class shared one lock.
-//    - EventCache's linear array scan becomes a GUID-keyed bounded cache.
+//  Two signals, in a fixed order of trust:
+//
+//    1. PRIMARY — kqueue vnode notifications on chat.db and its -wal sidecar, through
+//       `DispatchSource`, on descriptors this process holds open. The kernel delivers them
+//       directly; nothing is coalesced by a daemon or delayed by a poll. A write to the WAL
+//       wakes the detector within the debounce, and that is where every message normally
+//       arrives from.
+//    2. BACKUP — every 30 seconds, `PRAGMA data_version`. SQLite bumps it on the reading
+//       connection whenever any other connection commits, and answering costs a read of the
+//       WAL index in shared memory: microseconds, no disk, no file-system event required.
+//       Unchanged means nothing was committed and NO query runs. Changed means the watcher
+//       missed something — a descriptor gone stale, a sidecar that did not exist at startup,
+//       events that stopped being delivered — and the query runs then.
+//
+//  The old server relied on FSEvents alone, and on some Macs those stop arriving once the
+//  disk has been idle for a while; users wrote "pokers" that touched chat.db to wake it up.
+//  The backup makes that unnecessary without polling the table: a Mac with nothing
+//  happening runs one shared-memory read every 30 seconds, not a query every second.
 //
 //  What is preserved exactly, because getting it wrong loses messages:
 //    - The DUAL LOOKBACK. A 30-minute fast window on every tick (Apple only permits edits
 //      within ~15 minutes and unsends within ~2), widening to a full 7 days every 5 minutes
-//      to catch read receipts and notification flags on older messages.
+//      to catch read receipts and notification flags on older messages. The wide pass is
+//      skipped when nothing has been committed since the last one — a receipt is a commit.
 //    - Querying by `date` and filtering the other timestamps in memory. `date` is the only
 //      one of them with an index in Apple's schema — and we cannot add one — so an OR across
 //      all of them full-scans `message`, which is the worst case on the old hardware this
@@ -27,6 +39,7 @@ import BBDiagnostics
 import Dispatch
 import Foundation
 import Logging
+import struct os.OSAllocatedUnfairLock
 
 // MARK: - File watching
 
@@ -35,70 +48,103 @@ import Logging
 /// The WAL is the one that matters: SQLite in WAL mode appends there and only checkpoints
 /// into the main file periodically, so a watcher looking only at `chat.db` sees activity in
 /// bursts minutes late. Watching both is what makes delivery feel immediate.
+///
+/// `-shm` is deliberately not watched. SQLite writes it through `mmap`, and stores into a
+/// mapping raise no vnode events, so a source on it never fires.
 public final class DatabaseFileWatcher: @unchecked Sendable {
 
   private let paths: [String]
-  private var sources: [any DispatchSourceFileSystemObject] = []
   private let queue = DispatchQueue(label: "bluebubbles.chatdb-watch")
   private let onChange: @Sendable () -> Void
   private let logger: Logger
+  /// Path -> its armed source. Guarded because arming happens from the owner and, after a
+  /// rename, from the watch queue.
+  private let sources = OSAllocatedUnfairLock<[String: any DispatchSourceFileSystemObject]>(
+    initialState: [:]
+  )
 
   public init(
     databasePath: String,
     onChange: @escaping @Sendable () -> Void,
     logger: Logger = Logger(label: "bluebubbles.chatdb-watch")
   ) {
-    self.paths = [databasePath, databasePath + "-wal", databasePath + "-shm"]
+    self.paths = [databasePath, databasePath + "-wal"]
     self.onChange = onChange
     self.logger = logger
   }
 
-  public func start() {
-    for path in paths {
-      // A missing sidecar is normal — the WAL only exists while there is uncommitted
-      // activity — so this is not an error, and the file is picked up on a later
-      // restart if it appears.
-      let descriptor = open(path, O_EVTONLY)
-      guard descriptor >= 0 else { continue }
+  /// The paths with a live source, in declaration order.
+  public var watchedPaths: [String] {
+    sources.withLockUnchecked { state in paths.filter { state[$0] != nil } }
+  }
 
-      let source = DispatchSource.makeFileSystemObjectSource(
-        fileDescriptor: descriptor,
-        // .delete and .rename matter because SQLite checkpointing REPLACES the WAL
-        // rather than truncating it, which invalidates our descriptor. Without
-        // watching for that, the watcher silently goes deaf after the first
-        // checkpoint.
-        eventMask: [.write, .extend, .delete, .rename, .link],
-        queue: queue
-      )
+  public func start() { armMissing() }
 
-      source.setEventHandler { [weak self] in
-        guard let self else { return }
-        let flags = source.data
-        if flags.contains(.delete) || flags.contains(.rename) {
-          // Re-open on the next tick. Do not attempt it inline: the replacement
-          // file may not exist yet mid-checkpoint.
-          self.logger.debug("chat.db sidecar was replaced; re-arming the watcher")
-          self.restart()
+  /// Arms every path that exists and is not yet watched.
+  ///
+  /// A missing sidecar at startup is normal — the WAL exists only while a writer holds it —
+  /// so `start()` skips it without error, and this is how it gets picked up later. The
+  /// detector calls it on every backup pass; a file that appears is watched within one.
+  public func armMissing() {
+    for path in paths where !isWatching(path) { arm(path) }
+  }
+
+  private func isWatching(_ path: String) -> Bool {
+    sources.withLockUnchecked { $0[path] != nil }
+  }
+
+  private func arm(_ path: String) {
+    let descriptor = open(path, O_EVTONLY)
+    guard descriptor >= 0 else { return }
+
+    let source = DispatchSource.makeFileSystemObjectSource(
+      fileDescriptor: descriptor,
+      // .delete and .rename matter because a descriptor follows the vnode, not the
+      // name: if the file is replaced, the source keeps watching the old, unlinked one
+      // and silently goes deaf. Re-arm by name instead.
+      eventMask: [.write, .extend, .delete, .rename, .link],
+      queue: queue
+    )
+
+    source.setEventHandler { [weak self] in
+      guard let self else { return }
+      let flags = source.data
+      if flags.contains(.delete) || flags.contains(.rename) {
+        self.logger.debug(
+          "chat.db file was replaced; re-arming the watcher",
+          metadata: ["path": .string(path)])
+        self.disarm(path)
+        // Not inline: the replacement may not exist yet. If it still does not after the
+        // delay, the next backup pass arms it.
+        self.queue.asyncAfter(deadline: .now() + .milliseconds(250)) { [weak self] in
+          self?.arm(path)
         }
-        self.onChange()
       }
-      source.setCancelHandler { close(descriptor) }
-      source.resume()
-      sources.append(source)
+      self.onChange()
     }
+    source.setCancelHandler { close(descriptor) }
+
+    let replaced = sources.withLockUnchecked { state -> (any DispatchSourceFileSystemObject)? in
+      let previous = state[path]
+      state[path] = source
+      return previous
+    }
+    replaced?.cancel()
+    source.resume()
+  }
+
+  private func disarm(_ path: String) {
+    let source = sources.withLockUnchecked { $0.removeValue(forKey: path) }
+    source?.cancel()
   }
 
   public func stop() {
-    for source in sources { source.cancel() }
-    sources.removeAll()
-  }
-
-  private func restart() {
-    queue.asyncAfter(deadline: .now() + .milliseconds(250)) { [weak self] in
-      guard let self else { return }
-      self.stop()
-      self.start()
+    let all = sources.withLockUnchecked { state -> [any DispatchSourceFileSystemObject] in
+      let values = Array(state.values)
+      state.removeAll()
+      return values
     }
+    for source in all { source.cancel() }
   }
 
   deinit { stop() }
@@ -107,8 +153,13 @@ public final class DatabaseFileWatcher: @unchecked Sendable {
 // MARK: - Change detection
 
 public struct ChangeDetectorConfiguration: Sendable {
-  /// Floor of 500ms. Below that, a busy conversation produces more polls than messages.
+  /// Floor between two ticks, and the debounce on file events. 500ms minimum: below that, a
+  /// busy conversation produces more queries than messages.
   public var pollInterval: Duration
+  /// How often the backup pass asks SQLite whether anything was committed. It is a
+  /// shared-memory read, not a query, so the cost of the interval is latency in the one
+  /// case the file watcher missed something — not CPU.
+  public var backupInterval: Duration
   /// The fast window, on every tick.
   public var fastLookback: Duration
   /// The wide window, periodically.
@@ -122,6 +173,7 @@ public struct ChangeDetectorConfiguration: Sendable {
 
   public init(
     pollInterval: Duration = .milliseconds(1000),
+    backupInterval: Duration = .seconds(30),
     fastLookback: Duration = .seconds(1800),
     reconcileLookback: Duration = .seconds(604_800),
     reconcileInterval: Duration = .seconds(300),
@@ -129,6 +181,7 @@ public struct ChangeDetectorConfiguration: Sendable {
     maximumCatchUp: Duration = .seconds(86_400)
   ) {
     self.pollInterval = max(pollInterval, .milliseconds(500))
+    self.backupInterval = backupInterval
     self.fastLookback = fastLookback
     self.reconcileLookback = reconcileLookback
     self.reconcileInterval = reconcileInterval
@@ -174,8 +227,23 @@ public actor ChangeDetector {
 
   private var cursor: Date
   private var lastReconcile: Date = .distantPast
+  /// `data_version` as read at the start of the last tick. Nil until the first tick, and
+  /// nil again if the read failed — either way the backup pass ticks rather than guesses.
+  private var lastChangeToken: Int?
+  /// `data_version` at the last wide pass. Equal to the current one means no commit since,
+  /// so there is nothing for a wide pass to find.
+  private var reconcileToken: Int?
   private var watcher: DatabaseFileWatcher?
   private var pollTask: Task<Void, Never>?
+  /// Set by the file watcher, cleared by the loop. Distinguishes a wake the watcher raised
+  /// (query unconditionally) from a backup wake (ask SQLite first), and survives the two
+  /// being coalesced into one.
+  private nonisolated let fileEventPending = OSAllocatedUnfairLock(initialState: false)
+
+  /// How many times the table was queried. For tests: the point of the backup pass is that
+  /// this does NOT grow while nothing is committed.
+  private(set) var tickCount = 0
+  private(set) var reconcileCount = 0
 
   struct MessageFingerprint: Sendable {
     let date: Int64?
@@ -207,11 +275,11 @@ public actor ChangeDetector {
   /// Bounded so that a consumer which stalls drops changes rather than backing up into the
   /// detector. Detection must never be the thing that waits.
   ///
-  /// `databasePath` arms a file watcher that nudges the loop the moment chat.db or its WAL
-  /// is written, so latency is the debounce rather than the poll interval. The interval
-  /// remains as a floor and a fallback — file watching can go deaf across a SQLite
-  /// checkpoint, and a detector that stops noticing messages is much worse than one that
-  /// notices them a second late.
+  /// `databasePath` arms the file watcher, which is the primary signal: a write to chat.db
+  /// or its WAL queries within the debounce. With or without it, the backup pass runs every
+  /// `backupInterval` and queries only when SQLite reports a commit the watcher did not
+  /// wake us for. One tick runs immediately, to seed the fingerprint cache so the first
+  /// real event does not pay for it.
   public func changes(watching databasePath: String? = nil) -> AsyncStream<[MessageChange]> {
     let (stream, continuation) = AsyncStream<[MessageChange]>.makeStream(
       bufferingPolicy: .bufferingNewest(32)
@@ -219,27 +287,41 @@ public actor ChangeDetector {
 
     // Coalesces a burst of file events into one wake. `bufferingNewest(1)` IS the
     // debounce: a hundred WAL writes while a tick is in flight collapse into one
-    // pending wake rather than a hundred queued polls.
+    // pending wake rather than a hundred queued polls. The flag remembers that at least
+    // one of the coalesced wakes came from the file, so a backup wake landing on top of
+    // a file wake cannot downgrade it into a maybe.
     let (wakes, wake) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    let pending = fileEventPending
 
     if let databasePath {
       let watcher = DatabaseFileWatcher(
         databasePath: databasePath,
-        onChange: { wake.yield(()) },
+        onChange: {
+          pending.withLock { $0 = true }
+          wake.yield(())
+        },
         logger: logger
       )
       watcher.start()
       self.watcher = watcher
+      if watcher.watchedPaths.isEmpty {
+        logger.warning(
+          "chat.db could not be watched; relying on the backup pass",
+          metadata: ["path": .string(databasePath)])
+      }
     }
 
-    let interval = configuration.pollInterval
+    let floor = configuration.pollInterval
+    let backup = configuration.backupInterval
+
+    // The seeding tick. Nothing has been read yet, so the backup check ticks.
+    wake.yield(())
 
     pollTask?.cancel()
     pollTask = Task { [weak self] in
-      // Ticks whether or not anything was written, so the fallback holds.
       let timer = Task {
         while !Task.isCancelled {
-          try? await Task.sleep(for: interval)
+          try? await Task.sleep(for: backup)
           wake.yield(())
         }
       }
@@ -251,14 +333,23 @@ public actor ChangeDetector {
       for await _ in wakes {
         if Task.isCancelled { break }
         guard let self else { break }
+        let fromFile = pending.withLock { flag -> Bool in
+          let was = flag
+          flag = false
+          return was
+        }
         do {
+          if !fromFile {
+            await self.rearmWatcher()
+            guard await self.hasCommittedSinceLastTick() else { continue }
+          }
           let changes = try await self.tick()
           if !changes.isEmpty { continuation.yield(changes) }
         } catch {
           await self.log(error)
         }
-        // Floor between ticks. Without it a chatty conversation polls continuously.
-        try? await Task.sleep(for: interval)
+        // Floor between ticks. Without it a chatty conversation queries continuously.
+        try? await Task.sleep(for: floor)
       }
       continuation.finish()
     }
@@ -271,18 +362,56 @@ public actor ChangeDetector {
     pollTask = nil
     watcher?.stop()
     watcher = nil
+    fileEventPending.withLock { $0 = false }
   }
 
   private func log(_ error: any Error) {
     logger.warning("Poll failed", metadata: ["error": .string(String(describing: error))])
   }
 
+  private func rearmWatcher() {
+    watcher?.armMissing()
+  }
+
+  /// The backup question: has any connection committed since the last tick read its token?
+  ///
+  /// Fails OPEN. If SQLite cannot answer, the tick runs — a wasted query every 30 seconds
+  /// is nothing, and a detector that stops looking is the worst outcome there is.
+  func hasCommittedSinceLastTick() async -> Bool {
+    guard let previous = lastChangeToken else { return true }
+    do {
+      return try await repository.changeToken() != previous
+    } catch {
+      logger.warning(
+        "Could not read chat.db's change token; querying instead",
+        metadata: ["error": .string(String(describing: error))])
+      return true
+    }
+  }
+
   /// One poll.
   func tick(now: Date = Date()) async throws -> [MessageChange] {
-    let dueForReconcile =
+    // Read BEFORE the query, so a commit that lands while the query runs is newer than
+    // this token and the next backup pass sees it. Reading after would file it as seen.
+    let token = await readChangeToken()
+    lastChangeToken = token
+    tickCount += 1
+
+    // Wide pass when the interval has elapsed AND something was committed since the last
+    // one. A receipt or edit on an old message is a commit like any other, so an unchanged
+    // token means the seven-day window would find exactly what it found last time. A
+    // failed token read (nil) does not gate: the pass runs on the interval alone.
+    let intervalElapsed =
       now.timeIntervalSince(lastReconcile)
       >= configuration.reconcileInterval.seconds
-    if dueForReconcile { lastReconcile = now }
+    let committedSinceReconcile =
+      token == nil || reconcileToken == nil || token != reconcileToken
+    let dueForReconcile = intervalElapsed && committedSinceReconcile
+    if dueForReconcile {
+      lastReconcile = now
+      reconcileToken = token
+      reconcileCount += 1
+    }
 
     let lookback =
       dueForReconcile
@@ -337,6 +466,17 @@ public actor ChangeDetector {
 
     cursor = now.addingTimeInterval(-configuration.overlap.seconds)
     return changes
+  }
+
+  private func readChangeToken() async -> Int? {
+    do {
+      return try await repository.changeToken()
+    } catch {
+      logger.warning(
+        "Could not read chat.db's change token",
+        metadata: ["error": .string(String(describing: error))])
+      return nil
+    }
   }
 
   /// Every message in the window, a page at a time.

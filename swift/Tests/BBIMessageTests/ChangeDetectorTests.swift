@@ -214,6 +214,111 @@ struct ChangeDetectorTests {
     )
   }
 
+  // MARK: - The backup pass
+
+  @Test("The backup check asks SQLite, and only a commit makes it query")
+  func backupChecksTheChangeTokenBeforeQuerying() async throws {
+    // The whole point of the backup pass: a quiet Mac must cost a shared-memory read
+    // every 30 seconds, not a query. `hasCommittedSinceLastTick` is that read.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let detector = detector(fixture)
+
+    // Nothing has been read yet, so the answer has to be "look".
+    #expect(await detector.hasCommittedSinceLastTick())
+
+    _ = try await detector.tick(now: Self.now)
+    #expect(await detector.hasCommittedSinceLastTick() == false)
+    #expect(await detector.hasCommittedSinceLastTick() == false, "stable across repeated asks")
+
+    try await fixture.insertMessage(guid: "COMMITTED", at: Self.now.addingTimeInterval(1))
+    #expect(await detector.hasCommittedSinceLastTick())
+
+    // And the tick that follows resets it.
+    _ = try await detector.tick(now: Self.now.addingTimeInterval(2))
+    #expect(await detector.hasCommittedSinceLastTick() == false)
+  }
+
+  @Test("A pooled database answers the change token on one fixed connection")
+  func pooledChangeTokenIsComparable() async throws {
+    // `data_version` is per connection. A pool hands `read` whichever reader is free, so
+    // two asks could land on two connections and differ with nothing committed — which
+    // would make the backup pass query every time. The pooled reader keeps one connection
+    // aside for exactly this question.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let pooled = try ReadOnlyDatabase(path: fixture.path, maximumReaders: 4)
+
+    let first = try await pooled.changeToken()
+    for _ in 0..<8 {
+      #expect(try await pooled.changeToken() == first)
+    }
+    try await fixture.insertMessage(guid: "POOLED", at: Self.now)
+    #expect(try await pooled.changeToken() != first)
+  }
+
+  @Test("The wide pass is skipped while nothing has been committed")
+  func reconcileIsSkippedWithoutCommits() async throws {
+    // The seven-day window is the expensive read. A receipt on an old message is a commit
+    // like any other, so an unchanged token means the window holds exactly what it held
+    // last time and the pass is pure cost.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let detector = detector(fixture)
+
+    _ = try await detector.tick(now: Self.now)
+    #expect(await detector.reconcileCount == 1, "the first tick seeds with a wide pass")
+
+    // Well past the reconcile interval, with no writes in between.
+    _ = try await detector.tick(now: Self.now.addingTimeInterval(400))
+    _ = try await detector.tick(now: Self.now.addingTimeInterval(800))
+    #expect(await detector.reconcileCount == 1)
+
+    // A commit, then the next tick past the interval widens again.
+    try await fixture.insertMessage(guid: "LATER", at: Self.now.addingTimeInterval(801))
+    _ = try await detector.tick(now: Self.now.addingTimeInterval(1200))
+    #expect(await detector.reconcileCount == 2)
+  }
+
+  @Test("Through the stream, the backup pass delivers a commit without a file watcher")
+  func streamBackupDeliversWithoutWatcher() async throws {
+    // No `watching:` path, so the timer is the only thing that can notice the write —
+    // the situation on a Mac whose file events have stopped arriving. Short intervals
+    // so the test is not a 30-second wait; the assertion on `tickCount` is what shows
+    // the timer checked several times and queried only once for the commit.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let detector = ChangeDetector(
+      repository: fixture.repository,
+      configuration: ChangeDetectorConfiguration(
+        pollInterval: .milliseconds(500), backupInterval: .milliseconds(100)
+      )
+    )
+    let stream = await detector.changes(watching: nil)
+
+    // Let the seeding tick and a few empty backup passes go by.
+    try await Task.sleep(for: .milliseconds(600))
+    try await fixture.insertMessage(guid: "VIA-BACKUP", at: Date())
+
+    // `for await` on the stream returns nil when the task is cancelled, so a timeout is
+    // a cancellation rather than a race between two iterators.
+    let waiter = Task { () -> [MessageChange]? in
+      for await batch in stream { return batch }
+      return nil
+    }
+    let timeout = Task {
+      try? await Task.sleep(for: .seconds(5))
+      waiter.cancel()
+    }
+    let delivered = await waiter.value
+    timeout.cancel()
+    await detector.stop()
+
+    #expect(delivered?.contains { $0.message.guid == "VIA-BACKUP" && $0.isNew } == true)
+    let ticks = await detector.tickCount
+    #expect(ticks <= 2, "queried \(ticks) times; backup passes without a commit must not query")
+  }
+
   @Test("The poll interval has a floor")
   func pollIntervalIsFloored() {
     // Below 500ms a busy conversation produces more polls than messages.

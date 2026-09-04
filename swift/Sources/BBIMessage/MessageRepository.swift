@@ -32,6 +32,12 @@ public struct MessageRepository: Sendable {
 
   private var dateUnit: AppleTimestamp.Unit { profile.dateUnit }
 
+  /// Whether anything was committed to chat.db, as a comparable token. See
+  /// `ReadOnlyDatabase.changeToken()`.
+  public func changeToken() async throws -> Int {
+    try await database.changeToken()
+  }
+
   // MARK: - Column sets
   //
   // Requested columns, filtered to what this schema actually has. Ordered roughly as the

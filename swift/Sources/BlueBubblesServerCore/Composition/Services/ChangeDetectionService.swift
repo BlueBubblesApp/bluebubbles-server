@@ -1,5 +1,9 @@
 //  ChangeDetectionService
 //  Watches chat.db and turns writes into events.
+//
+//  Two signals: a kqueue watcher on chat.db and its WAL is the primary, low-latency one; a
+//  `PRAGMA data_version` check every 30 seconds is the backup, and queries only when SQLite
+//  says something was committed that the watcher did not report. See `ChangeDetector`.
 
 import BBBuiltIns
 import BBEvents
@@ -71,11 +75,11 @@ actor ChangeDetectionService: ContextualService, PermissionDependentService,
       logger.debug("Change detection stopped")
     }
 
-    let pollInterval = await context.settings.get(Settings.dbPollInterval)
     context.logger.info(
       "Watching chat.db for changes",
       metadata: [
-        "pollMs": .stringConvertible(pollInterval)
+        "debounceMs": .stringConvertible(Int(configuration.pollInterval.seconds * 1000)),
+        "backupS": .stringConvertible(configuration.backupInterval.seconds),
       ])
   }
 

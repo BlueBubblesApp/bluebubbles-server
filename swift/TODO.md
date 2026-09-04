@@ -55,6 +55,21 @@ confidence in one, and none can be answered from here now.
       initializer — the fallback is correct but has coarser part ranges, which is what the
       sender path was introduced to improve. `probe.sh` / `trace.sh` on a 14 machine.
 
+## The change-detection backup is untested against the idle-FSEvents failure
+
+The Electron server watched `chat.db` through `fs.watch`, which on macOS is FSEvents, and on
+some Macs those stop arriving once the disk has been idle — users wrote "pokers" that touch
+`chat.db` to wake them. The Swift server watches through kqueue on open descriptors and backs
+that up with a `PRAGMA data_version` check every 30 seconds, which needs no file-system event
+at all, so on paper neither the failure nor the poker applies. Nobody has watched it on a Mac
+that actually exhibits the failure; the root cause was never pinned down, and "a different
+kernel mechanism" is an argument, not a measurement.
+
+- [ ] On a machine known to need a poker, run without one, leave it idle past the point
+      where the old server went quiet, and confirm a message arrives within 30 seconds.
+- [ ] If it does not, log `watchedPaths` and the change token around the gap: whether the
+      descriptors went stale or `data_version` itself stopped moving decides the fix.
+
 ## Verify the version ladders on real hardware
 
 All twelve selector ladders are written and none is runtime-tested below macOS 26. They are

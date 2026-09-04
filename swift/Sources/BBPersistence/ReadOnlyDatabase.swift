@@ -29,7 +29,11 @@ public struct ReadOnlyDatabase: Sendable {
   /// same one it has always been.
   private enum Reader {
     case single(DatabaseQueue)
-    case pooled(DatabasePool)
+    /// The pool, plus one connection reserved for `changeToken()`. SQLite's `data_version`
+    /// is only meaningful when the same connection asks twice, and a pool hands `read`
+    /// whichever reader is free — so a pooled database keeps this extra single connection
+    /// for that one question.
+    case pooled(DatabasePool, sentinel: DatabaseQueue)
   }
 
   private let reader: Reader
@@ -80,14 +84,36 @@ public struct ReadOnlyDatabase: Sendable {
     // thing it protects is the user's entire message history: raising a performance setting
     // must not be able to remove the read path. If a trigger is ever found, it belongs in the
     // benchmark as a test.
+    var single = configuration
+    single.maximumReaderCount = 1
     if maximumReaders > 1, let pool = try? DatabasePool(path: path, configuration: configuration) {
-      self.reader = .pooled(pool)
+      self.reader = .pooled(
+        pool, sentinel: try DatabaseQueue(path: path, configuration: single)
+      )
       self.readerCount = maximumReaders
     } else {
-      var single = configuration
-      single.maximumReaderCount = 1
       self.reader = .single(try DatabaseQueue(path: path, configuration: single))
       self.readerCount = 1
+    }
+  }
+
+  /// SQLite's commit counter for this file, as one connection sees it.
+  ///
+  /// `PRAGMA data_version` changes whenever ANOTHER connection commits — Messages.app, in
+  /// chat.db's case — and reads the WAL index out of shared memory, so it costs microseconds
+  /// and no disk I/O. Two equal answers mean nothing was committed in between; the value
+  /// itself is opaque and is only ever compared. The change detector uses it to know whether
+  /// a query is worth running without depending on file-system events being delivered.
+  ///
+  /// Always asked on the same connection: on a different one the numbers are not comparable.
+  public func changeToken() async throws -> Int {
+    let queue: DatabaseQueue
+    switch reader {
+    case .single(let single): queue = single
+    case .pooled(_, let sentinel): queue = sentinel
+    }
+    return try await queue.read { db in
+      try Int.fetchOne(db, sql: "PRAGMA data_version") ?? 0
     }
   }
 
@@ -100,7 +126,7 @@ public struct ReadOnlyDatabase: Sendable {
   public func read<T: Sendable>(_ block: @Sendable (Database) throws -> T) async throws -> T {
     switch reader {
     case .single(let queue): try await queue.read(block)
-    case .pooled(let pool): try await pool.read(block)
+    case .pooled(let pool, _): try await pool.read(block)
     }
   }
 

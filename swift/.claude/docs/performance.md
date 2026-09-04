@@ -48,6 +48,11 @@ raising one to make a test pass.
     are not ours.
 - **`DatabaseQueue` over `DatabasePool`** by default — one SQLite connection, not N. Pooling is an
   opt-in setting for powerful machines.
+- **Change detection never polls the table on a quiet Mac.** File events are the trigger; the
+  30-second backup asks `PRAGMA data_version` (a shared-memory read) and queries only when it
+  moved. The seven-day reconcile is gated the same way. A timer that queries unconditionally
+  is the thing that pinned CPU on old hardware, and it must not come back.
+  See [`database.md`](database.md#change-detection).
 - **Autorelease pool discipline** in every long enumeration (contacts, attachment scans, message
   batches). The classic Foundation footgun; shows up as sawtooth growth.
 - **Value types and `Sendable` structs** for domain models, so serialization does not allocate a

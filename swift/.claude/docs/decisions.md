@@ -199,6 +199,16 @@ validation errors and the "set on the command line, not editable here" state. `r
 hand-written only because Swift cannot enumerate a type's static members;
 `RenderableSettingsTests` keeps it honest.
 
+**Change detection is event-driven, with a cheap backup — not a poll with a watcher bolted on.**
+kqueue on `chat.db` and its WAL is the primary signal. Every 30 seconds `PRAGMA data_version`
+says whether anything was committed, and only then does the table get queried. The obvious
+alternative — a one-second timer that always queries, with file events for latency — is what
+the first cut did, and it is the scheduled polling that locks CPU on the old hardware this
+targets. The backup exists because FSEvents have been seen to stop on idle Macs, and it
+answers that without touching the file or the table. Do not shorten the backup interval to
+make it the primary; fix the watcher instead.
+See [`database.md`](database.md#change-detection).
+
 **Handlers are thin; interfaces hold the logic.** The same methods serve HTTP, the legacy socket
 commands, and the SwiftUI app. Logic in a handler is logic the app cannot call, and the only way
 to reach it then is a hand-written IPC channel on both sides — one per operation, indefinitely.

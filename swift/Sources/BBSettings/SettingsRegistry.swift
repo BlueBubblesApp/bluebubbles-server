@@ -326,7 +326,11 @@ public enum Settings {
       }
     },
     presentation: .init(
-      label: "Poll Interval (ms)", section: "Advanced", control: .number(range: 500...30000))
+      label: "Poll Interval (ms)",
+      help: "The shortest gap between two reads of the message database after a change is "
+        + "noticed. Changes are detected by watching the file, not by polling; this only "
+        + "spaces out reads during a burst.",
+      section: "Advanced", control: .number(range: 500...30000))
   )
 
   public static let autoCaffeinate = Setting<Bool>(

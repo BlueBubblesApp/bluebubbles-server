@@ -73,18 +73,47 @@ moving a `serialize` call between layers cannot change the bytes.
 
 ### Change detection
 
-`Sources/BBIMessage/ChangeDetector.swift` turns file activity into message events. Four of its
-behaviours are load-bearing — changing any of them loses messages:
+`Sources/BBIMessage/ChangeDetector.swift` turns file activity into message events. It has two
+signals, and their order of trust is fixed:
+
+1. **Primary: kqueue vnode events** on `chat.db` and `chat.db-wal`, through `DispatchSource`,
+   on descriptors the process holds open. The kernel delivers them directly — no fseventsd, no
+   coalescing daemon — and a WAL write queries within the debounce (`db_poll_interval`,
+   default 1s, floor 500ms). This is where every message normally arrives from.
+2. **Backup: `PRAGMA data_version` every 30 seconds.** SQLite bumps it on the reading
+   connection whenever any other connection commits, and answering reads the WAL index out of
+   shared memory: microseconds, no disk, no file-system event required. Unchanged means
+   nothing was committed and **no query runs**. Changed means the watcher missed something,
+   and the query runs then. The same pass re-arms a sidecar that did not exist at startup.
+
+The Electron server had only FSEvents, and on some Macs those stop arriving once the disk has
+been idle; users wrote "pokers" that touched `chat.db` to wake it. The backup pass makes that
+unnecessary without polling the table: a quiet Mac costs one shared-memory read every 30
+seconds, not a query a second. **Do not turn the backup into the primary** by shortening its
+interval — it is the safety net, and its cost is only latency in the one case the watcher failed.
+
+`data_version` is only comparable on the SAME connection. `ReadOnlyDatabase.changeToken()`
+guarantees that: a single-connection reader answers directly, and a pooled one keeps a sentinel
+connection aside for the question, because a pool hands `read` whichever reader is free.
+
+Four further behaviours are load-bearing — changing any of them loses messages:
 
 - **The dual lookback** — a 30-minute fast window every tick (Apple only permits edits within
   ~15 minutes and unsends within ~2), widening to a full 7 days every 5 minutes to catch read
-  receipts and notification flags on older messages.
+  receipts and notification flags on older messages. The wide pass is **skipped when nothing
+  has been committed since the last one** — a receipt is a commit — so it never runs on a
+  quiet Mac.
 - **Query by `date`, filter the other timestamps in memory.** `date` is the only one of them
   with an index in Apple's schema and we cannot add one, so an `OR` across all of them
   full-scans `message`.
 - **The >24h clamp**, so a machine that slept for a week does not replay a week as new messages.
 - **Watching the `-wal` sidecar**, not just the database file. SQLite in WAL mode appends there
-  and checkpoints later; watching only `chat.db` misses most activity.
+  and checkpoints later; watching only `chat.db` misses most activity. `-shm` is not watched:
+  SQLite writes it through `mmap`, which raises no vnode events.
+
+`Tests/BBIMessageTests/DatabaseFileWatcherTests.swift` covers the watcher against real files
+(late sidecar, replaced file); `ChangeDetectorTests` covers the backup pass and the gated
+reconcile.
 
 Develop against fixtures, never your own messages:
 

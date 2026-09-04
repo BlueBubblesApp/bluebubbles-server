@@ -261,9 +261,10 @@ supported service list from the live `sdef`; never infer it from the OS version.
 
 ## Change detection
 
-See [`database.md`](database.md#change-detection) for the four preserved behaviours (dual
-lookback, query-by-`date`, the >24h clamp, watching the `-wal` sidecar). All four exist because
-getting them wrong loses messages.
+See [`database.md`](database.md#change-detection). Two signals — kqueue on `chat.db` and its
+WAL as the primary, `PRAGMA data_version` every 30 seconds as the backup that queries only after
+a commit — and four preserved behaviours (dual lookback, query-by-`date`, the >24h clamp,
+watching the `-wal` sidecar). All of them exist because getting them wrong loses messages.
 
 ---
 
