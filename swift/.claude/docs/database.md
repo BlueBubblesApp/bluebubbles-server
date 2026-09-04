@@ -73,41 +73,42 @@ moving a `serialize` call between layers cannot change the bytes.
 
 ### Change detection
 
-`Sources/BBIMessage/ChangeDetector.swift` turns file activity into message events. It has two
-signals, and their order of trust is fixed:
+`Sources/BBIMessage/ChangeDetector.swift` turns chat.db activity into message events. It never
+polls the table on a quiet Mac. Two signals, in a fixed order of trust:
 
 1. **Primary: kqueue vnode events** on `chat.db` and `chat.db-wal`, through `DispatchSource`,
    on descriptors the process holds open. The kernel delivers them directly — no fseventsd, no
-   coalescing daemon — and a WAL write queries within the debounce (a fixed 500ms floor
-   between ticks, not a setting). This is where every message normally arrives from.
-2. **Backup: `PRAGMA data_version` every `db_poll_interval`** — default and minimum 30
-   seconds. The key is the Electron server's poll period, kept for migration; a legacy value
-   below 30s is raised, a higher one is kept, and the service clamps whatever it reads so an
-   install that stored a sub-30s value under the old meaning cannot come up polling. SQLite bumps `data_version` on the reading
+   coalescing daemon. A WAL write queries within the debounce, a fixed 500ms floor between
+   ticks that is not a setting. This is where every message normally arrives from.
+2. **Backup: `PRAGMA data_version`, every `db_poll_interval`.** SQLite bumps it on the reading
    connection whenever any other connection commits, and answering reads the WAL index out of
    shared memory: microseconds, no disk, no file-system event required. Unchanged means
    nothing was committed and **no query runs**. Changed means the watcher missed something,
    and the query runs then. The same pass re-arms a sidecar that did not exist at startup.
 
+`db_poll_interval` is the Electron server's poll-period key, kept for migration, and it now means
+the backup period: default and minimum 30 seconds. A legacy value below that is raised and a
+higher one is kept, and `ChangeDetectionService` clamps whatever it reads, so an install that
+stored a sub-30s value under the old meaning cannot come up polling. **Do not shorten it into a
+poll**: the backup is the safety net, and its interval costs only latency in the one case the
+watcher failed.
+
 The Electron server had only FSEvents, and on some Macs those stop arriving once the disk has
-been idle; users wrote "pokers" that touched `chat.db` to wake it. The backup pass makes that
-unnecessary without polling the table: a quiet Mac costs one shared-memory read every 30
-seconds, not a query a second. **Do not turn the backup into the primary** by shortening its
-interval — it is the safety net, and its cost is only latency in the one case the watcher failed.
+been idle; users wrote "pokers" that touched `chat.db` to wake it. Neither applies here: the
+backup needs no file-system event at all, and a quiet Mac costs one shared-memory read every 30
+seconds. `data_version` is only comparable on the SAME connection, which
+`ReadOnlyDatabase.changeToken()` guarantees — a pooled reader keeps a sentinel connection aside
+for the question, because a pool hands `read` whichever reader is free.
 
-`data_version` is only comparable on the SAME connection. `ReadOnlyDatabase.changeToken()`
-guarantees that: a single-connection reader answers directly, and a pooled one keeps a sentinel
-connection aside for the question, because a pool hands `read` whichever reader is free.
-
-Two refinements on top of the two signals, both in the stream loop:
+Two refinements in the stream loop:
 
 - **A file wake that finds no commit is re-checked once**, after the floor plus 250ms. kqueue
   reports the WAL write before SQLite publishes the commit to readers, so an early wake can
-  query and see nothing; without the re-check that message waits for the backup pass.
+  query and see nothing; without the re-check that message would wait for the backup pass.
 - **A deaf watcher heals itself.** Three consecutive backup passes that find a commit no file
-  event announced means the descriptors are stale or events stopped arriving; the watcher is
-  torn down, re-armed, and a warning is logged naming the watched paths. That log line is what
-  to look for on a Mac that used to need a poker.
+  event announced means the descriptors are stale or events stopped arriving. The watcher is
+  torn down and re-armed, and a warning names the watched paths. That log line is what to look
+  for on a Mac that used to need a poker.
 
 **What a tick reads.** `MessageRepository.messageFingerprints` — ROWID, GUID and the eight
 fields that can move — never the full row. The 70-column row with its attributed-body and
@@ -115,17 +116,25 @@ payload blobs is hydrated by `messages(rowIDs:)` only for the rows whose fingerp
 Pages are keyset-resumed on `(date, ROWID)`, not `OFFSET`: OFFSET re-walks the skipped rows on
 every page and shifts when Messages inserts mid-walk. `ChangeDetectorTests` asks SQLite for the
 plan of both page shapes and fails if either leaves `message_idx_date` or sorts. The fingerprint
-cache holds 25,000 entries — more than the 20,000-row page budget — because a cache smaller than
-the window forgets fingerprints every wide pass, and a forgotten fingerprint is an update that
-can no longer be detected.
+cache holds 25,000 entries, more than the 20,000-row page budget, because a cache smaller than
+the window forgets fingerprints on every wide pass, and a forgotten fingerprint is an update
+that can no longer be detected. `BoundedCache` evicts in O(1) for the same reason.
 
 **What counts as new.** A GUID the cache has not seen, dated after the cursor OR within the
-fast window of now. The second clause is the late arrival: a row carries the time the message
-was sent, and after a network outage the backlog lands dated inside the gap — under the cursor
-rule alone none of it raised an event. Anything older than both is history (iCloud backfill, a
-re-synced device) and is cached silently. **The first tick announces nothing**: on startup or
-restart the cache is empty and everything in the window is unseen, and re-announcing the last
-half hour on every restart was the bug users noticed. A client that missed something syncs.
+30-minute fast window of now. The second clause is the late arrival: a row carries the time the
+message was sent, and after a network outage the backlog lands dated inside the gap, all of it
+older than the cursor — under the cursor rule alone none of it raised an event. Anything older
+than both is history (iCloud backfill, a re-synced device) and is cached silently; a late
+arrival older than 30 minutes is therefore treated as history too, and that constant is the
+line. **The first tick announces nothing.** On startup or restart the cache is empty and
+everything in the window is unseen; re-announcing the last half hour on every restart was the
+bug users noticed. A client that missed something syncs.
+
+**What counts as updated.** A stored fingerprint whose delivered, read, played, edited,
+retracted or error field moved, or whose `did_notify_recipient` went false to true. The event
+carries the row as hydrated, which can be newer than the fingerprint that was compared; the
+next tick then reports that later move as an update. Nothing is lost, and a tick that throws
+records nothing — not the change token, not the wide pass — so the next pass retries.
 
 Four further behaviours are load-bearing — changing any of them loses messages:
 
@@ -143,8 +152,9 @@ Four further behaviours are load-bearing — changing any of them loses messages
   SQLite writes it through `mmap`, which raises no vnode events.
 
 `Tests/BBIMessageTests/DatabaseFileWatcherTests.swift` covers the watcher against real files
-(late sidecar, replaced file); `ChangeDetectorTests` covers the backup pass and the gated
-reconcile.
+(late sidecar, replaced file). `ChangeDetectorTests` covers the backup pass, the gated
+reconcile, the query plan, keyset paging across a mid-walk insert, the silent first tick, late
+arrivals, backfill, and the primary path end to end through a real vnode event.
 
 Develop against fixtures, never your own messages:
 

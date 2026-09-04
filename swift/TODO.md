@@ -60,15 +60,43 @@ confidence in one, and none can be answered from here now.
 The Electron server watched `chat.db` through `fs.watch`, which on macOS is FSEvents, and on
 some Macs those stop arriving once the disk has been idle — users wrote "pokers" that touch
 `chat.db` to wake them. The Swift server watches through kqueue on open descriptors and backs
-that up with a `PRAGMA data_version` check every 30 seconds, which needs no file-system event
-at all, so on paper neither the failure nor the poker applies. Nobody has watched it on a Mac
-that actually exhibits the failure; the root cause was never pinned down, and "a different
-kernel mechanism" is an argument, not a measurement.
+that up with a `PRAGMA data_version` check every `db_poll_interval` (30 seconds at least),
+which needs no file-system event at all, so on paper neither the failure nor the poker applies.
+If the watcher does go deaf, three backup passes in a row that find unannounced commits tear it
+down and re-arm it, logging "chat.db commits are arriving without file events". Nobody has
+watched any of this on a Mac that actually exhibits the failure; the root cause was never
+pinned down, and "a different kernel mechanism" is an argument, not a measurement.
 
 - [ ] On a machine known to need a poker, run without one, leave it idle past the point
       where the old server went quiet, and confirm a message arrives within 30 seconds.
-- [ ] If it does not, log `watchedPaths` and the change token around the gap: whether the
-      descriptors went stale or `data_version` itself stopped moving decides the fix.
+- [ ] Watch the log for the re-arm warning. If it appears, the descriptors went stale and
+      the self-heal is doing its job; if messages are late and it never appears,
+      `data_version` itself stopped moving, which is a different fix.
+
+## A message delayed by more than thirty minutes is announced as history, not news
+
+A row carries the time the message was SENT. The detector announces an unseen row as new when
+it postdates the cursor or is dated within the 30-minute fast window; anything older is cached
+silently, which is what keeps an iCloud backfill from becoming thousands of notifications. The
+same line means a message that arrives more than thirty minutes after it was sent — a long
+outage, a sender offline for an hour — raises no `new-message` event. The Electron server
+never announced late arrivals at all, so this is strictly better, but the constant is a guess
+at where "late" ends and "history" begins, and nobody has measured real outage backlogs.
+
+- [ ] If users report delayed messages arriving silently, widen `fastLookback`'s role in the
+      new-message rule (it is one `min` in `ChangeDetector.tick`) or key it on a ROWID
+      high-water mark instead, and add the case to `ChangeDetectorTests.lateArrivalIsNew`.
+
+## `CallHistoryRepositoryTests` works around a `#require` crash
+
+`try #require(try await CallHistoryRepository(path:))` segfaults in `initializeWithCopy` inside
+the macro expansion — reproducibly, only in a full parallel run, taking the whole test process
+and two hundred unfinished tests with it. Awaiting the value into a local and requiring that
+is fine. Every site in the file is written that way with a comment on the first; the pattern
+elsewhere in the suite does not crash, and why this struct does was not investigated.
+
+- [ ] On the next toolchain, put one site back to the direct form and run the full suite. If
+      it passes, restore the others.
 
 ## Verify the version ladders on real hardware
 
