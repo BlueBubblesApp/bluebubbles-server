@@ -528,13 +528,13 @@ export class FileSystem {
         return output;
     }
 
-    static async convertCafToMp3(originalPath: string, outputPath: string): Promise<void> {
+    static async convertCafToM4a(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
         const output = await FileSystem.execShellCommand(
             `/usr/bin/afconvert -f m4af -d aac "${oldPath}" "${outputPath}"`
         );
         if (isNotEmpty(output) && output.includes("Error:")) {
-            throw Error(`Failed to convert audio to MP3: ${output}`);
+            throw Error(`Failed to convert audio to M4A: ${output}`);
         }
     }
 
