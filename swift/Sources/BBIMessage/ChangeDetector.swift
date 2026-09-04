@@ -227,6 +227,11 @@ public actor ChangeDetector {
   private var seen: BoundedCache<String, MessageFingerprint>
 
   private var cursor: Date
+  /// Whether the first tick has run. That tick caches everything in its window and
+  /// announces nothing: on startup or restart, what is already in chat.db is history, not
+  /// news. A client that missed it syncs on its own; re-announcing the last half hour on
+  /// every restart is the more visible failure, and the one users report.
+  private var hasBaseline = false
   private var lastReconcile: Date = .distantPast
   /// `data_version` as read at the start of the last tick. Nil until the first tick, and
   /// nil again if the read failed — either way the backup pass ticks rather than guesses.
@@ -550,7 +555,16 @@ public actor ChangeDetector {
       let changedFields: Set<MessageField>
     }
     var pending: [Pending] = []
-    let newFloor = clampedCursor.addingTimeInterval(-configuration.overlap.seconds)
+    // New if it postdates the cursor — the ordinary case — OR is dated within the fast
+    // window. The second is the late arrival: the network was down or the sender was
+    // offline, and the row carries the time the message was sent, not the time it reached
+    // this Mac. Under the cursor rule alone, ten minutes of outage was ten minutes of
+    // messages that never raised an event. Older than both is history — iCloud backfill,
+    // a re-synced device — and is cached silently rather than announced.
+    let newFloor = min(
+      clampedCursor.addingTimeInterval(-configuration.overlap.seconds),
+      now.addingTimeInterval(-configuration.fastLookback.seconds)
+    )
 
     for candidate in candidates {
       let fingerprint = MessageFingerprint(candidate)
@@ -575,6 +589,12 @@ public actor ChangeDetector {
     }
 
     cursor = now.addingTimeInterval(-configuration.overlap.seconds)
+
+    // The baseline. Everything above went into the cache; none of it is announced.
+    if !hasBaseline {
+      hasBaseline = true
+      return []
+    }
     guard !pending.isEmpty else { return [] }
 
     // Hydrate only what changed. The stored fingerprint is the one that was compared, so
@@ -660,7 +680,8 @@ public actor ChangeDetector {
     return fields
   }
 
-  /// Seeds the cache so a restart does not re-announce everything already delivered.
+  /// Seeds the cache with rows outside the first tick's window. The first tick is itself
+  /// silent, so this is only needed for rows it would not examine.
   public func prime(with messages: [IMessageRow]) {
     for message in messages {
       seen[message.guid] = MessageFingerprint(message)

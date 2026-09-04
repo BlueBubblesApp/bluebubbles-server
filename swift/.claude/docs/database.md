@@ -119,6 +119,14 @@ cache holds 25,000 entries — more than the 20,000-row page budget — because 
 the window forgets fingerprints every wide pass, and a forgotten fingerprint is an update that
 can no longer be detected.
 
+**What counts as new.** A GUID the cache has not seen, dated after the cursor OR within the
+fast window of now. The second clause is the late arrival: a row carries the time the message
+was sent, and after a network outage the backlog lands dated inside the gap — under the cursor
+rule alone none of it raised an event. Anything older than both is history (iCloud backfill, a
+re-synced device) and is cached silently. **The first tick announces nothing**: on startup or
+restart the cache is empty and everything in the window is unseen, and re-announcing the last
+half hour on every restart was the bug users noticed. A client that missed something syncs.
+
 Four further behaviours are load-bearing — changing any of them loses messages:
 
 - **The dual lookback** — a 30-minute fast window every tick (Apple only permits edits within

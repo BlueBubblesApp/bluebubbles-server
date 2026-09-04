@@ -139,6 +139,10 @@ struct ChangeDetectorTests {
     // Just over one page, all inside the fast window so a single tick must see them all.
     let count = ChangeDetector.pageSize + 25
     let start = Self.now.addingTimeInterval(-600)
+    // A detector whose cursor predates the bulk, baselined before it lands, so every one
+    // of them is new to the tick under test.
+    let detector = detector(fixture, startingFrom: start.addingTimeInterval(-1))
+    _ = try await detector.tick(now: start.addingTimeInterval(-1))
     for index in 0..<count {
       try await fixture.insertMessage(
         guid: "BULK-\(index)",
@@ -146,8 +150,6 @@ struct ChangeDetectorTests {
       )
     }
 
-    // A detector whose cursor predates the bulk, so every one of them is new.
-    let detector = detector(fixture, startingFrom: start.addingTimeInterval(-1))
     let changes = try await detector.tick(now: Self.now)
 
     #expect(
@@ -190,6 +192,74 @@ struct ChangeDetectorTests {
     #expect(ChangeDetector.difference(from: notified, to: notNotified).isEmpty)
   }
 
+  // MARK: - Startup and late arrivals
+
+  @Test("The first tick announces nothing, whatever the window holds")
+  func firstTickIsSilent() async throws {
+    // On restart the cache is empty and everything in the window is unseen. All of it is
+    // history; announcing the last half hour again on every restart is the bug users
+    // notice.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    // Cursor an hour back, so the window is full of rows that postdate it.
+    let detector = detector(fixture, startingFrom: Self.now.addingTimeInterval(-3600))
+    for index in 0..<5 {
+      try await fixture.insertMessage(
+        guid: "BEFORE-START-\(index)", at: Self.now.addingTimeInterval(Double(-60 * index))
+      )
+    }
+
+    #expect(try await detector.tick(now: Self.now).isEmpty)
+
+    // And the cache was populated, not skipped: a receipt on one of them is an update.
+    try await fixture.markRead(guid: "BEFORE-START-2", at: Self.now)
+    let changes = try await detector.tick(now: Self.now.addingTimeInterval(2))
+    #expect(changes.map(\.message.guid) == ["BEFORE-START-2"])
+    #expect(changes.first?.isNew == false)
+  }
+
+  @Test("A message that arrives late is still announced as new")
+  func lateArrivalIsNew() async throws {
+    // The row carries the time it was SENT. When the network was down for ten minutes the
+    // messages arrive together, each dated somewhere in that gap and all of them older
+    // than the cursor. They are new to every client and must be announced.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let detector = detector(fixture)
+    _ = try await detector.tick(now: Self.now)
+
+    // Ticks kept running through the outage; nothing arrived.
+    _ = try await detector.tick(now: Self.now.addingTimeInterval(300))
+    _ = try await detector.tick(now: Self.now.addingTimeInterval(600))
+
+    // Then the backlog lands, dated inside the gap.
+    try await fixture.insertMessage(guid: "LATE-1", at: Self.now.addingTimeInterval(120))
+    try await fixture.insertMessage(guid: "LATE-2", at: Self.now.addingTimeInterval(480))
+    let changes = try await detector.tick(now: Self.now.addingTimeInterval(601))
+
+    #expect(changes.filter(\.isNew).map(\.message.guid).sorted() == ["LATE-1", "LATE-2"])
+  }
+
+  @Test("Backfilled history older than the fast window is cached, not announced")
+  func backfillIsSilent() async throws {
+    // iCloud syncing a device's history inserts rows with fresh ROWIDs and old dates.
+    // Thousands of those must not become thousands of notifications.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let detector = detector(fixture)
+    _ = try await detector.tick(now: Self.now)
+
+    try await fixture.insertMessage(guid: "BACKFILL", at: Self.now.addingTimeInterval(-7200))
+    // A reconcile tick, so the two-hour-old row is inside the window.
+    let changes = try await detector.tick(now: Self.now.addingTimeInterval(400))
+    #expect(!changes.contains { $0.message.guid == "BACKFILL" })
+
+    // Cached, though: a later receipt on it is an update.
+    try await fixture.markRead(guid: "BACKFILL", at: Self.now.addingTimeInterval(401))
+    let later = try await detector.tick(now: Self.now.addingTimeInterval(800))
+    #expect(later.contains { $0.message.guid == "BACKFILL" && $0.changedFields == [.read] })
+  }
+
   // MARK: - Clamping
 
   @Test("Waking after a long sleep does not replay the whole gap as new")
@@ -202,6 +272,7 @@ struct ChangeDetectorTests {
 
     let weekAgo = Self.now.addingTimeInterval(-604_800)
     let detector = detector(fixture, startingFrom: weekAgo)
+    _ = try await detector.tick(now: weekAgo)
 
     // Three days old: inside the week-long gap, outside the 24-hour catch-up clamp.
     try await fixture.insertMessage(
