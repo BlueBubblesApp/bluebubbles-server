@@ -203,18 +203,6 @@ public enum ResponseBodies {
     required: true)
 
   public static let byHandler: [HandlerID: Body] = [
-    .stickerList: Body(
-      summary:
-        "Every sticker on the requested shelves, newest first. `metadata` carries `saved` "
-        + "and `recent` totals whatever `?source=` asked for, so one request is enough to "
-        + "render both sections and page either.",
-      kind: .list(stickerProperties),
-      example: .array([stickerExample])),
-
-    .stickerDetail: Body(
-      summary: "One sticker, with every representation it has.",
-      kind: .object(stickerProperties),
-      example: stickerExample),
 
     .stickerSave: Body(
       summary:
@@ -283,12 +271,6 @@ public enum ResponseBodies {
     .messageSendGamePigeon: .mirroring(
       .messageSendText, "The Game Pigeon message's row."),
 
-    .messagePendingScheduled: .mirroring(
-      .messageQuery,
-      "Every message Apple is still holding, as ordinary message rows. `dateCreated` is the "
-        + "DELIVERY time rather than when it was composed, and the `?with=` relations work "
-        + "as they do on message query."),
-
     // MARK: Routes that report nothing
     //
     // Declared rather than left bare, because `data: null` and "nobody documented this"
@@ -310,156 +292,6 @@ public enum ResponseBodies {
     .securityDisallow: .empty("Nothing. That entry is no longer allowlisted."),
 
     // MARK: Reads this server added
-
-    .messagePoll: Body(
-      summary:
-        "A poll assembled from its whole message thread: the options from the latest state, "
-        + "and one newest vote per participant. The server keeps no poll state — this is "
-        + "read from chat.db on every call.",
-      kind: .object([
-        Property("guid", .string, "The poll's ROOT message GUID.", required: true),
-        Property(
-          "title", .string,
-          "Accepted when the poll was created, but Messages 26 neither shows a poll title "
-            + "nor keeps one — expect an empty string.", required: true),
-        Property("creator_handle", .string, "Who created the poll. Null for this account."),
-        Property("session_id", .string, "The poll's `MSSession` UUID."),
-        Property(
-          "latest_state_guid", .string,
-          "What a NEW VOTE must be associated with: the newest update, or the root if there "
-            + "has been none. Send this, not `guid`, when casting a vote.", required: true),
-        Property(
-          "options",
-          .array(
-            of: .object(properties: [
-              Property("id", .string, "The option identifier a vote refers to.", required: true),
-              Property("text", .string, "What the option says.", required: true),
-              Property("creator_handle", .string, "Who added it. Null for this account."),
-              Property(
-                "can_be_edited", .boolean,
-                "Whether the poll's creator allows this option's text to be changed.",
-                required: true),
-            ])),
-          "The choices, in order, from the poll's latest state.", required: true),
-        Property(
-          "votes",
-          .array(
-            of: .object(properties: [
-              Property("guid", .string, "The vote's own message GUID.", required: true),
-              Property("handle", .string, "Who voted. Null for this account."),
-              Property(
-                "option_ids", .array(of: .string),
-                "That participant's COMPLETE selection, not a delta. An empty array is a "
-                  + "retracted vote.", required: true),
-              Property("date", .integer, "When it was cast, epoch MILLISECONDS."),
-            ])),
-          "One entry per participant, their newest vote only.", required: true),
-      ]),
-      example: .obj([
-        ("guid", .string("542FAC8D-24A5-4817-9DA7-76864FAB1BB0")),
-        ("title", .string("")),
-        ("creator_handle", .null),
-        ("session_id", .string("6E2C1A2B-0F2E-4E77-9B6C-2E5A3D9F1A44")),
-        ("latest_state_guid", .string("EAE71D60-F41C-4573-B931-F888009C6F37")),
-        (
-          "options",
-          .array([
-            .obj([
-              ("id", .string("BB650E75-8A00-4578-BA3B-098E22C50B56")),
-              ("text", .string("Red")), ("creator_handle", .null),
-              ("can_be_edited", .bool(false)),
-            ]),
-            .obj([
-              ("id", .string("9A8944AF-9941-494C-808A-11D9D76F27BC")),
-              ("text", .string("Green")), ("creator_handle", .null),
-              ("can_be_edited", .bool(false)),
-            ]),
-          ])
-        ),
-        (
-          "votes",
-          .array([
-            .obj([
-              ("guid", .string("28A05594-5D75-4AB5-93EB-68B0F58A7A24")),
-              ("handle", .null),
-              ("option_ids", .array([.string("9A8944AF-9941-494C-808A-11D9D76F27BC")])),
-              ("date", .int(1_788_360_567_000)),
-            ])
-          ])
-        ),
-      ])),
-
-    .messageAppPayload: Body(
-      summary:
-        "An iMessage app balloon, decoded. `payload_json` and `payload_fields` appear when "
-        + "the payload is one of the two shapes the server can read, so a client never has "
-        + "to base64 or percent-decode anything; `url` is always the raw payload URL.",
-      kind: .object([
-        Property("guid", .string, "The message's GUID.", required: true),
-        Property(
-          "balloon_bundle_id", .string,
-          "The app's full balloon bundle id, including the team-id segment."),
-        Property("app_name", .string, "The app's display name, as the sender's device wrote it."),
-        Property("app_id", .integer, "The app's App Store id."),
-        Property(
-          "session_id", .string,
-          "The `MSSession` UUID. Send it back to continue the same conversation — a game "
-            + "reply MUST carry the session it answers."),
-        Property("summary", .string, "The message's fallback summary text."),
-        Property("caption", .string, "The line shown where the balloon cannot be drawn."),
-        Property("url", .string, "The payload URL, verbatim."),
-        Property(
-          "payload_json", .anything,
-          "The payload decoded, when it is base64 JSON. Absent otherwise."),
-        Property(
-          "payload_fields",
-          .array(
-            of: .object(properties: [
-              Property("name", .string, "The field's name.", required: true),
-              Property("value", .string, "Its value.", required: true),
-            ])),
-          "The payload decoded, when it is a query string. Absent otherwise."),
-        Property(
-          "game_pigeon",
-          .object(properties: [
-            Property("version", .integer, "Game Pigeon's own payload version.", required: true),
-            Property("game", .string, "The game's short name, e.g. `pool`, `beer`."),
-            Property("game_id", .string, "The game's identifier within the session."),
-            payloadFields,
-          ]),
-          "Present only on a Game Pigeon message, with its scramble already undone. The "
-            + "server does not model games — the fields are handed over as they came."),
-      ]),
-      example: .obj([
-        ("guid", .string("E404B184-D770-4732-BDFD-B9E437EE283E")),
-        (
-          "balloon_bundle_id",
-          .string(
-            "com.apple.messages.MSMessageExtensionBalloonPlugin:EWFNLB79LQ"
-              + ":com.gamerdelights.gamepigeon.ext")
-        ),
-        ("app_name", .string("GamePigeon")),
-        ("app_id", .int(1_124_197_642)),
-        ("session_id", .string("2B62987D-4F1C-4A2E-9C3D-6E5B1A7F0C22")),
-        ("summary", .string("Let's play Cup Pong!")),
-        ("caption", .string("Let's play Cup Pong!")),
-        ("url", .string("data:?ver=45&data=el%3D1O%26%26yS6N2Rpa58E7Fr")),
-        (
-          "game_pigeon",
-          .obj([
-            ("version", .int(45)),
-            ("game", .string("beer")),
-            ("game_id", .string("frWzzfHEQ8COyfyp")),
-            (
-              "fields",
-              .array([
-                .obj([("name", .string("game")), ("value", .string("beer"))]),
-                .obj([("name", .string("version")), ("value", .string("5"))]),
-              ])
-            ),
-          ])
-        ),
-      ])),
 
     // MARK: FaceTime
 

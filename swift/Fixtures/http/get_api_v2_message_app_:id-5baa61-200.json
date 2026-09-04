@@ -1,0 +1,96 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/message/app/E5E8C9E7-8728-4A63-A9AF-5E982EB2988E?password=__REDACTED__",
+    "headers": {
+      "host": "127.0.0.1:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Successfully fetched app message!",
+        "status": 200,
+        "data": {
+          "app_id": 1124197642,
+          "game_pigeon": {
+            "game_id": "iconTest00000001",
+            "fields": [
+              {
+                "name": "sender",
+                "value": "D4412D71-BD4D-2665-7189-4BA14A27D31FD9rXdA"
+              },
+              {
+                "name": "version",
+                "value": "5"
+              },
+              {
+                "value": "5",
+                "name": "tver"
+              },
+              {
+                "value": "26.5.2",
+                "name": "ios"
+              },
+              {
+                "value": "pool",
+                "name": "game"
+              },
+              {
+                "value": "iconTest00000001",
+                "name": "id"
+              },
+              {
+                "name": "player",
+                "value": "2"
+              },
+              {
+                "name": "player2",
+                "value": "D4412D71-BD4D-2665-7189-4BA14A27D31FD9rXdA"
+              },
+              {
+                "name": "game_name",
+                "value": "8 Ball"
+              },
+              {
+                "name": "seed",
+                "value": "12345"
+              },
+              {
+                "name": "mode",
+                "value": "n"
+              },
+              {
+                "name": "num",
+                "value": "1"
+              }
+            ],
+            "version": 49,
+            "game": "pool"
+          },
+          "caption": "icon test — does this balloon show an icon?",
+          "url": "data:?ver=49&data=2e12geucy-2p1241et%26Ao9d%26-%26%3D7e0403%261mDB2mDd4rm054%3D7i-6%3FrA342evBoD4037omnDda11n-X5sirDDT9dA4764e0Ae-py%3Da%26se%26%3D%3Dl%26p%3D.vB7rD-50at182ra-l6Dd56na0_o512is1rFXaDo%3D%261isl8B1.224ge%3D8B07lA%3Do-%25n9en54%26F1A%26sD6%3DneDr9d12D%3D2em4l%3De%26",
+          "guid": "E5E8C9E7-8728-4A63-A9AF-5E982EB2988E",
+          "app_name": "GamePigeon",
+          "summary": "icon test — does this balloon show an icon?",
+          "session_id": "580C2DA3-38F1-46A6-A9C6-D6121B60533D",
+          "balloon_bundle_id": "com.apple.messages.MSMessageExtensionBalloonPlugin:EWFNLB79LQ:com.gamerdelights.gamepigeon.ext"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-09-04T15:12:39.972Z"
+}

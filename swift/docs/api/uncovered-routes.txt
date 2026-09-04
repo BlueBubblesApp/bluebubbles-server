@@ -8,21 +8,25 @@
 # failing check pass):
 #   swift run bb-openapi coverage --write-allowlist
 #
-# 17 of 166 routes.
-POST /api/v2/message/sticker  # needs a live Private API send to record; the conformance recorder runs against the Node server, which has no sticker route
-POST /api/v2/message/send-later  # needs a live Private API send to record; the conformance recorder runs against the Node server, which has no Send Later route
-GET /api/v2/message/send-later  # same
-PUT /api/v2/message/send-later/:guid  # same
-POST /api/v2/message/send-later/:guid/send-now  # same
-DELETE /api/v2/message/send-later/:guid  # same
-GET /api/v2/message/poll/:guid  # needs a poll thread in the fixture chat.db; the recorder's Node server has no poll route
-POST /api/v2/message/poll  # same
-POST /api/v2/message/poll/:guid/vote  # same
-POST /api/v2/message/poll/:guid/option  # same
-GET /api/v2/message/app/:guid  # needs an app-message row in the fixture chat.db; the recorder's Node server has no app-message route
-POST /api/v2/message/app  # same
-POST /api/v2/message/game-pigeon  # same
-GET /api/v2/sticker  # reads this Mac's own stickers.stickerdb, which no fixture can carry — the recorder's Node server has no sticker library route either
-GET /api/v2/sticker/:id  # same
-GET /api/v2/sticker/:id/image  # same, and it answers with image bytes rather than an envelope
-POST /api/v2/sticker  # needs a live helper to donate into the real sticker store
+# Regenerating SORTS the file and does not know which entry a "# same" referred to,
+# so write each reason out in full.
+#
+# Every route left here WRITES. The v2 reads were recorded against this server on
+# 2026-09-04 — a v2 route has no counterpart on the Node server, so the recorder
+# proxies this one, which is how the other 62 v2 fixtures in the corpus were made.
+# "The recorder runs against Node" was the reason given here before, and it was
+# wrong: it is true of v1 and of nothing else.
+#
+# 11 of 166 routes.
+
+DELETE /api/v2/message/send-later/:guid  # needs a scheduled message to cancel, which means scheduling one first
+POST /api/v2/message/app  # sends an iMessage app balloon to a real conversation
+POST /api/v2/message/game-pigeon  # sends a Game Pigeon invite to a real conversation
+POST /api/v2/message/poll  # sends a poll to a real conversation
+POST /api/v2/message/poll/:guid/option  # adds a choice to a poll someone can see
+POST /api/v2/message/poll/:guid/vote  # casts a vote someone can see
+POST /api/v2/message/send-later  # schedules a real message; recording it leaves one queued
+POST /api/v2/message/send-later/:guid/send-now  # releases a scheduled message immediately, so it sends
+POST /api/v2/message/sticker  # places a sticker on someone's message
+POST /api/v2/sticker  # needs a live helper to donate into this Mac's real sticker store
+PUT /api/v2/message/send-later/:guid  # needs a scheduled message to edit

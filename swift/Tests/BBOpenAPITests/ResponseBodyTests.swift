@@ -137,13 +137,19 @@ struct ResponseBodyTests {
     }
   }
 
-  @Test("Declared responses reach the emitted document")
+  @Test("Response bodies reach the emitted document")
   func responsesAreEmitted() throws {
     let document = try OpenAPIDocument.generate().serialized()
     // The field a client cannot work without, and the one most easily lost.
     #expect(document.contains("\"external_uri\""))
     #expect(document.contains("Emoji and Memoji"))
-    // The example, with a real identifier from a live Mac in it.
-    #expect(document.contains("7608FF1D-006B-4E00-B15A-DDB5001BCBF6"))
+    // And an example, so a client sees a real shape rather than a bare schema.
+    //
+    // NOT a specific identifier any more. This asserted one hand-written into
+    // `ResponseBodies`, and the sticker routes have since been RECORDED — at which point
+    // the declaration became inert (a fixture wins; see `declarationsFillOnlyGaps`) and had
+    // to be deleted, taking its example with it. Pinning the replacement's identifier would
+    // just be the same trap with a fresher value: it changes on every re-record.
+    #expect(document.contains("\"example\""))
   }
 }

@@ -2070,6 +2070,153 @@
         ]
       }
     },
+    "getV2MessageAppByGuid": {
+      "response": {
+        "type": "object",
+        "properties": {
+          "app_id": {
+            "type": "integer"
+          },
+          "app_name": {
+            "type": "string"
+          },
+          "balloon_bundle_id": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "game_pigeon": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ]
+                }
+              },
+              "game": {
+                "type": "string"
+              },
+              "game_id": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "fields",
+              "game",
+              "game_id",
+              "version"
+            ]
+          },
+          "guid": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id",
+          "app_name",
+          "balloon_bundle_id",
+          "caption",
+          "game_pigeon",
+          "guid",
+          "session_id",
+          "summary",
+          "url"
+        ]
+      }
+    },
+    "getV2MessagePollByGuid": {
+      "response": {
+        "type": "object",
+        "properties": {
+          "creator_handle": {
+            "type": "string"
+          },
+          "guid": {
+            "type": "string"
+          },
+          "latest_state_guid": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "can_be_edited": {
+                  "type": "boolean"
+                },
+                "creator_handle": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "can_be_edited",
+                "creator_handle",
+                "id",
+                "text"
+              ]
+            }
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "votes": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "creator_handle",
+          "guid",
+          "latest_state_guid",
+          "options",
+          "session_id",
+          "title",
+          "votes"
+        ]
+      }
+    },
+    "getV2MessageSendLater": {
+      "response": {
+        "type": "array",
+        "items": {}
+      }
+    },
     "getV2ServerAlert": {
       "response": {
         "type": "array",
@@ -2110,6 +2257,240 @@
       "response": {
         "type": "array",
         "items": {}
+      }
+    },
+    "getV2Sticker": {
+      "response": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "accessibility_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "attribution_bundle_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "attribution_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "byte_count": {
+              "type": "integer"
+            },
+            "created_at": {
+              "type": "integer"
+            },
+            "effect": {
+              "type": "integer"
+            },
+            "external_uri": {
+              "type": "string"
+            },
+            "identifier": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "last_used_at": {
+              "type": "integer"
+            },
+            "library_index": {
+              "type": "integer"
+            },
+            "name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "representations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "byte_count": {
+                    "type": "integer"
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "identifier": {
+                    "type": "string"
+                  },
+                  "is_preferred": {
+                    "type": "boolean"
+                  },
+                  "mime_type": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "uti": {
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "byte_count",
+                  "height",
+                  "identifier",
+                  "is_preferred",
+                  "mime_type",
+                  "role",
+                  "uti",
+                  "width"
+                ]
+              }
+            },
+            "search_text": {
+              "type": "null"
+            },
+            "shelf": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accessibility_name",
+            "attribution_bundle_id",
+            "attribution_name",
+            "byte_count",
+            "created_at",
+            "effect",
+            "external_uri",
+            "identifier",
+            "kind",
+            "last_used_at",
+            "library_index",
+            "name",
+            "representations",
+            "search_text",
+            "shelf"
+          ]
+        }
+      }
+    },
+    "getV2StickerById": {
+      "response": {
+        "type": "object",
+        "properties": {
+          "accessibility_name": {
+            "type": "string"
+          },
+          "attribution_bundle_id": {
+            "type": "string"
+          },
+          "attribution_name": {
+            "type": "string"
+          },
+          "byte_count": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "effect": {
+            "type": "integer"
+          },
+          "external_uri": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": "integer"
+          },
+          "library_index": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "null"
+          },
+          "representations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "byte_count": {
+                  "type": "integer"
+                },
+                "height": {
+                  "type": "integer"
+                },
+                "identifier": {
+                  "type": "string"
+                },
+                "is_preferred": {
+                  "type": "boolean"
+                },
+                "mime_type": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "uti": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "byte_count",
+                "height",
+                "identifier",
+                "is_preferred",
+                "mime_type",
+                "role",
+                "uti",
+                "width"
+              ]
+            }
+          },
+          "search_text": {
+            "type": "null"
+          },
+          "shelf": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessibility_name",
+          "attribution_bundle_id",
+          "attribution_name",
+          "byte_count",
+          "created_at",
+          "effect",
+          "external_uri",
+          "identifier",
+          "kind",
+          "last_used_at",
+          "library_index",
+          "name",
+          "representations",
+          "search_text",
+          "shelf"
+        ]
       }
     },
     "postV1AttachmentUpload": {
