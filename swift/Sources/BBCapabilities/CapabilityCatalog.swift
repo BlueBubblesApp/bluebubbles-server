@@ -33,19 +33,12 @@ extension PrivateAPICapability {
     id: "rich-sending",
     title: "Improved message sending",
     summary:
-      "Send with a subject line, a screen or bubble effect, and links that preview properly.",
+      "Subject lines, screen and bubble effects, replies to a specific message, and "
+      + "mentioning someone by name.",
     minimumMacOS: 14,
     evidence: .selectorExists("sendMessage:", onClass: "IMChat"),
     category: .messages,
     messagesActions: [.sendMessage, .sendMultipart, .sendAttachment, .sendAppMessage])
-
-  public static let replies = Self(
-    id: "replies",
-    title: "Threaded replies and mentions",
-    summary: "Reply to a specific message, and mention someone by name in a group.",
-    minimumMacOS: 14,
-    evidence: .selectorExists("sendMessage:", onClass: "IMChat"),
-    category: .messages)
 
   public static let editMessage = Self(
     id: "edit-message",
@@ -252,7 +245,7 @@ extension PrivateAPICapability {
   /// left out of it is caught rather than silently unlisted.
   public static let all: [PrivateAPICapability] = [
     // Every supported release.
-    richSending, replies, editMessage, unsendMessage, typingIndicators, readState,
+    richSending, editMessage, unsendMessage, typingIndicators, readState,
     tapbacks, stickers, groupManagement, pinning, muting, junkReporting, faceTime, findMy,
     // Gated on a newer macOS.
     emojiReactions, stickerReactions, sendLater, textFormatting, polls,

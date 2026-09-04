@@ -118,7 +118,6 @@ struct ActionCoverageTests {
   @Test("Capabilities without actions are the ones that legitimately have none")
   func capabilitiesWithoutActions() {
     let expected: Set<String> = [
-      "replies",  // carried on a send, not a command of its own
       "text-formatting",  // attributes on the body of an ordinary send
       "emoji-reactions",  // a variant of send-reaction, which `tapbacks` claims
       "sticker-reactions",  // a variant of send-sticker, which `stickers` claims

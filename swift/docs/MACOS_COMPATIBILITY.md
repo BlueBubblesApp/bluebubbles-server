@@ -18,8 +18,7 @@ a one-to-one conversation. That is the whole list. Everything below works on mac
 |---|:-:|:-:|
 | Send text, send an attachment, start a 1:1 chat | ✅ | ✅ |
 | Read messages, chats and attachments · events to clients | ✅ | ✅ |
-| Improved message sending — subject lines, screen and bubble effects | ⛔️ | ✅ |
-| Threaded replies and mentions | ⛔️ | ✅ |
+| Improved message sending — subject lines, effects, replies, mentions | ⛔️ | ✅ |
 | Edit a sent message | ⛔️ | ✅ |
 | Unsend a message | ⛔️ | ✅ |
 | Typing indicators | ⛔️ | ✅ |
@@ -33,6 +32,11 @@ a one-to-one conversation. That is the whole list. Everything below works on mac
 | Spam and junk | ⛔️ | ✅ |
 | FaceTime from a client | ⛔️ | ✅ |
 | Find My | ⛔️ | ✅ |
+
+**Replying is not a separate row on purpose.** IMCore has no reply parameter: a reply is an
+ordinary message carrying the identifier of the thread it joins, so everything above — subject
+lines, effects, mentions — is available on a reply exactly as it is on a new message. Splitting
+them would imply a choice between them that does not exist.
 
 ### What a newer macOS adds — on top of the above
 
