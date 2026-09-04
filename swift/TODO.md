@@ -496,15 +496,17 @@ half and it is in place. Neither runtime check § Verification asks for exists:
       Also assert the connection reports `SQLITE_OPEN_READONLY` and that `immutable` is NOT set.
 - [ ] **The compile-failure test** proving a write does not build.
 
-## `explainQueryPlan` is public, written, and called by nothing
+## Only one `chat.db` query has its plan asserted
 
 § Verification asks CI to run `EXPLAIN QUERY PLAN` over every `chat.db` query and fail any that
-full-scans `message`. `ReadOnlyDatabase.explainQueryPlan` exists for this and has no caller;
-the only query-plan assertion in the suite is over the contacts index, which is our own table.
+full-scans `message`. `ReadOnlyDatabase.explainQueryPlan` now has one caller: the change
+detector's fingerprint query is asserted on both page shapes against the fixture, which carries
+Apple's `message_idx_date` for the purpose. Every other repository query is still unasserted.
 We cannot add indexes to `chat.db`, so a query that misses the ones Apple ships is a defect —
 and it is the kind that only hurts on the old hardware § 10 is written for.
 
-- [ ] Enumerate the repository's SQL and assert each plan against a fixture database.
+- [ ] Enumerate the rest of the repository's SQL and assert each plan the same way. The
+      fixture will need whichever of Apple's indexes each query is meant to use.
 
 ## The schema-profile matrix is not exercised
 

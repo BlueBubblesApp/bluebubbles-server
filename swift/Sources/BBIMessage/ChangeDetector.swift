@@ -238,12 +238,26 @@ public actor ChangeDetector {
   /// Set by the file watcher, cleared by the loop. Distinguishes a wake the watcher raised
   /// (query unconditionally) from a backup wake (ask SQLite first), and survives the two
   /// being coalesced into one.
-  private nonisolated let fileEventPending = OSAllocatedUnfairLock(initialState: false)
+  private nonisolated let wakeFlags = OSAllocatedUnfairLock(initialState: WakeFlags())
+  /// Whether the last tick's token differed from the one before it — that is, whether the
+  /// wake that caused it found a commit. A file wake that found none is re-checked once.
+  private var lastTickSawCommit = true
 
   /// How many times the table was queried. For tests: the point of the backup pass is that
   /// this does NOT grow while nothing is committed.
   private(set) var tickCount = 0
   private(set) var reconcileCount = 0
+  /// How many times the watcher was torn down and re-armed for going deaf.
+  private(set) var watcherResets = 0
+
+  struct WakeFlags: Sendable {
+    /// The file watcher raised this wake: query unconditionally.
+    var fromFile = false
+    /// This wake is the one re-check after a file wake that found no commit. It asks
+    /// SQLite first like a backup wake, but a commit it finds is not evidence of a deaf
+    /// watcher — it is the race the re-check exists for.
+    var recheck = false
+  }
 
   struct MessageFingerprint: Sendable {
     let date: Int64?
@@ -254,13 +268,57 @@ public actor ChangeDetector {
     let dateRetracted: Int64?
     let didNotifyRecipient: Bool?
     let error: Int
+
+    init(
+      date: Int64?, dateRead: Int64?, dateDelivered: Int64?, datePlayed: Int64?,
+      dateEdited: Int64?, dateRetracted: Int64?, didNotifyRecipient: Bool?, error: Int
+    ) {
+      self.date = date
+      self.dateRead = dateRead
+      self.dateDelivered = dateDelivered
+      self.datePlayed = datePlayed
+      self.dateEdited = dateEdited
+      self.dateRetracted = dateRetracted
+      self.didNotifyRecipient = didNotifyRecipient
+      self.error = error
+    }
+
+    init(_ row: MessageFingerprintRow) {
+      date = row.date?.rawValue
+      dateRead = row.dateRead?.rawValue
+      dateDelivered = row.dateDelivered?.rawValue
+      datePlayed = row.datePlayed?.rawValue
+      dateEdited = row.dateEdited?.rawValue
+      dateRetracted = row.dateRetracted?.rawValue
+      didNotifyRecipient = row.didNotifyRecipient
+      error = row.error
+    }
+
+    init(_ message: IMessageRow) {
+      date = message.date?.rawValue
+      dateRead = message.dateRead?.rawValue
+      dateDelivered = message.dateDelivered?.rawValue
+      datePlayed = message.datePlayed?.rawValue
+      dateEdited = message.dateEdited?.rawValue
+      dateRetracted = message.dateRetracted?.rawValue
+      didNotifyRecipient = message.didNotifyRecipient
+      error = message.error
+    }
   }
+
+  /// Backup passes in a row that found a commit no file event announced. At this many the
+  /// watcher is deaf — a stale descriptor, events that stopped being delivered — and is
+  /// torn down and re-armed rather than left to the backup pass forever.
+  static let deafWatcherThreshold = 3
 
   public init(
     repository: MessageRepository,
     configuration: ChangeDetectorConfiguration = ChangeDetectorConfiguration(),
     startingFrom: Date = Date(),
-    cacheCapacity: Int = 5_000,
+    // At least the reconcile window. A cache smaller than the window evicts and
+    // re-learns the same rows on every wide pass, and every fingerprint it forgets is an
+    // update it can no longer detect. 20,000 rows of fingerprints is a few megabytes.
+    cacheCapacity: Int = 25_000,
     logger: Logger = Logger(label: "bluebubbles.change-detector")
   ) {
     self.repository = repository
@@ -291,13 +349,13 @@ public actor ChangeDetector {
     // one of the coalesced wakes came from the file, so a backup wake landing on top of
     // a file wake cannot downgrade it into a maybe.
     let (wakes, wake) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    let pending = fileEventPending
+    let flags = wakeFlags
 
     if let databasePath {
       let watcher = DatabaseFileWatcher(
         databasePath: databasePath,
         onChange: {
-          pending.withLock { $0 = true }
+          flags.withLock { $0.fromFile = true }
           wake.yield(())
         },
         logger: logger
@@ -330,21 +388,45 @@ public actor ChangeDetector {
         wake.finish()
       }
 
+      // Consecutive backup passes that found a commit the watcher never announced.
+      var unannouncedCommits = 0
+
       for await _ in wakes {
         if Task.isCancelled { break }
         guard let self else { break }
-        let fromFile = pending.withLock { flag -> Bool in
-          let was = flag
-          flag = false
-          return was
+        let wakeFlags = flags.withLock { state -> WakeFlags in
+          let taken = state
+          state = WakeFlags()
+          return taken
         }
         do {
-          if !fromFile {
+          if wakeFlags.fromFile {
+            unannouncedCommits = 0
+          } else {
             await self.rearmWatcher()
             guard await self.hasCommittedSinceLastTick() else { continue }
+            if !wakeFlags.recheck {
+              unannouncedCommits += 1
+              if unannouncedCommits >= Self.deafWatcherThreshold, await self.resetWatcher() {
+                unannouncedCommits = 0
+              }
+            }
           }
           let changes = try await self.tick()
           if !changes.isEmpty { continuation.yield(changes) }
+
+          // kqueue reports the WAL write before SQLite publishes the commit to readers,
+          // so a file wake can arrive a moment early and the query sees nothing. One
+          // re-check after the floor catches that, instead of leaving it to the backup
+          // pass thirty seconds later. Bounded: a re-check that finds nothing does not
+          // schedule another.
+          if wakeFlags.fromFile, await !self.lastTickSawCommit {
+            Task {
+              try? await Task.sleep(for: floor + .milliseconds(250))
+              flags.withLock { $0.recheck = true }
+              wake.yield(())
+            }
+          }
         } catch {
           await self.log(error)
         }
@@ -362,7 +444,7 @@ public actor ChangeDetector {
     pollTask = nil
     watcher?.stop()
     watcher = nil
-    fileEventPending.withLock { $0 = false }
+    wakeFlags.withLock { $0 = WakeFlags() }
   }
 
   private func log(_ error: any Error) {
@@ -371,6 +453,20 @@ public actor ChangeDetector {
 
   private func rearmWatcher() {
     watcher?.armMissing()
+  }
+
+  /// Tears the watcher down and arms it again. Returns false when there is nothing to
+  /// reset: a stream started without a path is backup-only by design, and a watcher with
+  /// no armed source already warned at startup and is re-tried by every backup pass.
+  private func resetWatcher() -> Bool {
+    guard let watcher, !watcher.watchedPaths.isEmpty else { return false }
+    logger.warning(
+      "chat.db commits are arriving without file events; re-arming the watcher",
+      metadata: ["watched": .string(watcher.watchedPaths.joined(separator: ", "))])
+    watcher.stop()
+    watcher.start()
+    watcherResets += 1
+    return true
   }
 
   /// The backup question: has any connection committed since the last tick read its token?
@@ -394,6 +490,8 @@ public actor ChangeDetector {
     // Read BEFORE the query, so a commit that lands while the query runs is newer than
     // this token and the next backup pass sees it. Reading after would file it as seen.
     let token = await readChangeToken()
+    // Unknown on either side counts as seen: a failed read must not schedule re-checks.
+    lastTickSawCommit = token == nil || lastChangeToken == nil || token != lastChangeToken
     lastChangeToken = token
     tickCount += 1
 
@@ -426,46 +524,57 @@ public actor ChangeDetector {
     )
     let queryFloor = clampedCursor.addingTimeInterval(-lookback.seconds)
 
-    // Queried by `date` alone — the only indexed timestamp — and filtered below. An OR
-    // across date_read/date_delivered/date_edited full-scans `message`.
-    //
-    // PAGED, and that matters more than it looks. `MessageQuery` caps `limit` at 1000,
-    // a single ascending page would mean the 7-day reconcile pass on an install with more
-    // than 1000 messages a week only ever examines the OLDEST 1000 in the window, forever.
-    // Read receipts, delivered flags and edits on anything newer would never be detected,
-    // and the symptom is "read receipts stop working after half an hour" on exactly the
-    // busiest accounts. The fast pass hides it, because its 30-minute window rarely holds
-    // 1000 messages.
+    // Fingerprints only — ROWID, GUID and the eight fields that can move — queried by
+    // `date` alone (the only indexed timestamp) and keyset-paged. The full row, with its
+    // attributed-body and payload blobs, is fetched afterwards for just the rows that
+    // changed. Decoding every row in the window to compare eight numbers was most of what
+    // a tick cost, and on the reconcile pass that was up to 20,000 rows.
     let candidates = try await fetchWindow(after: queryFloor)
 
-    var changes: [MessageChange] = []
-    for message in candidates {
-      let fingerprint = fingerprint(of: message)
-      guard let previous = seen[message.guid] else {
-        seen[message.guid] = fingerprint
+    struct Pending {
+      let rowID: Int64
+      let isNew: Bool
+      let changedFields: Set<MessageField>
+    }
+    var pending: [Pending] = []
+    let newFloor = clampedCursor.addingTimeInterval(-configuration.overlap.seconds)
+
+    for candidate in candidates {
+      let fingerprint = MessageFingerprint(candidate)
+      guard let previous = seen[candidate.guid] else {
+        seen[candidate.guid] = fingerprint
         // Only NEW if it actually falls inside the window. The lookback deliberately
         // reaches back past the cursor to catch updates, so most of what it returns
         // is old and already delivered.
-        let messageDate = message.date?.date ?? .distantPast
-        if messageDate >= clampedCursor.addingTimeInterval(-configuration.overlap.seconds) {
-          changes.append(
-            MessageChange(message: message, isNew: true, changedFields: [])
-          )
+        let messageDate = candidate.date?.date ?? .distantPast
+        if messageDate >= newFloor {
+          pending.append(Pending(rowID: candidate.rowID, isNew: true, changedFields: []))
         }
         continue
       }
 
       let changed = Self.difference(from: previous, to: fingerprint)
       if !changed.isEmpty {
-        seen[message.guid] = fingerprint
-        changes.append(
-          MessageChange(message: message, isNew: false, changedFields: changed)
-        )
+        seen[candidate.guid] = fingerprint
+        pending.append(
+          Pending(rowID: candidate.rowID, isNew: false, changedFields: changed))
       }
     }
 
     cursor = now.addingTimeInterval(-configuration.overlap.seconds)
-    return changes
+    guard !pending.isEmpty else { return [] }
+
+    // Hydrate only what changed. The stored fingerprint is the one that was compared, so
+    // a row that moved again between the two queries is announced with its newer state
+    // now and once more, as an update, on the next tick — never missed. A row that
+    // vanished in between is dropped here; it was real when fingerprinted and is gone.
+    let rows = try await repository.messages(rowIDs: pending.map(\.rowID))
+    let byRowID = Dictionary(rows.map { ($0.rowID, $0) }, uniquingKeysWith: { first, _ in first })
+    return pending.compactMap { item in
+      byRowID[item.rowID].map {
+        MessageChange(message: $0, isNew: item.isNew, changedFields: item.changedFields)
+      }
+    }
   }
 
   private func readChangeToken() async -> Int? {
@@ -479,30 +588,26 @@ public actor ChangeDetector {
     }
   }
 
-  /// Every message in the window, a page at a time.
+  /// Every message fingerprint in the window, a page at a time.
   ///
   /// Bounded by `maximumWindowPages` rather than run to exhaustion: the reconcile window
   /// is seven days, and on first run against a large archive that is an unbounded read on
   /// the main path. Hitting the bound is logged, because it means the window is not being
   /// fully examined and that is worth knowing rather than guessing at.
-  private func fetchWindow(after floor: Date) async throws -> [IMessageRow] {
-    var collected: [IMessageRow] = []
-    var offset = 0
+  private func fetchWindow(after floor: Date) async throws -> [MessageFingerprintRow] {
+    var collected: [MessageFingerprintRow] = []
+    var resume: MessageRepository.FingerprintCursor?
 
     for page in 0..<Self.maximumWindowPages {
-      let batch = try await repository.messages(
-        MessageRepository.MessageQuery(
-          after: floor,
-          limit: Self.pageSize,
-          offset: offset,
-          ascending: true,
-          includeAttachments: false
-        )
+      let batch = try await repository.messageFingerprints(
+        after: floor, resumingFrom: resume, limit: Self.pageSize
       )
       collected.append(contentsOf: batch)
       // A short page is the last page.
       if batch.count < Self.pageSize { return collected }
-      offset += batch.count
+      // The query excludes NULL dates, so the last row always has one.
+      guard let last = batch.last, let lastDate = last.date else { return collected }
+      resume = .init(date: lastDate.rawValue, rowID: last.rowID)
 
       if page == Self.maximumWindowPages - 1 {
         logger.warning(
@@ -519,22 +624,9 @@ public actor ChangeDetector {
   /// The repository's own ceiling. Asking for more is silently clamped, so matching it
   /// keeps the "a short page is the last page" test honest.
   static let pageSize = 1000
-  /// 20 pages — 20,000 messages — per tick. Enough for any real seven-day window, and a
-  /// hard stop against a first run over a decade of history.
+  /// 20 pages — 20,000 fingerprints — per tick. Enough for any real seven-day window, and
+  /// a hard stop against a first run over a decade of history.
   static let maximumWindowPages = 20
-
-  private func fingerprint(of message: IMessageRow) -> MessageFingerprint {
-    MessageFingerprint(
-      date: message.date?.rawValue,
-      dateRead: message.dateRead?.rawValue,
-      dateDelivered: message.dateDelivered?.rawValue,
-      datePlayed: message.datePlayed?.rawValue,
-      dateEdited: message.dateEdited?.rawValue,
-      dateRetracted: message.dateRetracted?.rawValue,
-      didNotifyRecipient: message.didNotifyRecipient,
-      error: message.error
-    )
-  }
 
   static func difference(
     from previous: MessageFingerprint,
@@ -558,7 +650,7 @@ public actor ChangeDetector {
   /// Seeds the cache so a restart does not re-announce everything already delivered.
   public func prime(with messages: [IMessageRow]) {
     for message in messages {
-      seen[message.guid] = fingerprint(of: message)
+      seen[message.guid] = MessageFingerprint(message)
     }
   }
 

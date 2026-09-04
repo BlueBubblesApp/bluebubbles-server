@@ -145,7 +145,7 @@ struct SchemaProfileReadTests {
 
     // Change detection reads on a different path from the listing, and is what runs
     // continuously in production.
-    _ = try await repository.messagesChanged(since: Date(timeIntervalSince1970: 0))
+    _ = try await repository.messageFingerprints(after: Date(timeIntervalSince1970: 0))
     _ = try await repository.updatedMessageCount(after: Date(timeIntervalSince1970: 0))
     _ = try await repository.iMessageAccount()
   }

@@ -297,40 +297,98 @@ public struct MessageRepository: Sendable {
     }
   }
 
-  /// Messages changed since `date`, by any of the timestamps that can move after insert.
-  ///
-  /// Rows are UPDATED after they are written — delivery, read receipts, edits — so a
-  /// poller watching only for new ROWIDs misses all of that.
-  public func messagesChanged(since date: Date, limit: Int = 1000) async throws -> [IMessageRow] {
-    let columns = profile.select(Self.messageColumns, from: .message, alias: "m")
-    let threshold = AppleTimestamp.from(date, unit: dateUnit).rawValue
+  // MARK: - Change detection
 
-    var clauses = ["m.date > ?", "m.date_read > ?", "m.date_delivered > ?"]
-    var arguments: [(any DatabaseValueConvertible)?] = [threshold, threshold, threshold]
+  /// The columns the change detector compares. Everything a message can change after it
+  /// is written, and nothing else — no text, no blobs, no joins.
+  static let fingerprintColumns: [String] = [
+    "ROWID", "guid", "date", "date_read", "date_delivered", "date_played", "date_edited",
+    "date_retracted", "did_notify_recipient", "error",
+  ]
 
-    if profile.supportsEditedMessages {
-      clauses.append("m.date_edited > ?")
-      arguments.append(threshold)
-      clauses.append("m.date_retracted > ?")
-      arguments.append(threshold)
+  /// Where a fingerprint page stopped: the `(date, ROWID)` of its last row.
+  public struct FingerprintCursor: Sendable, Hashable {
+    public let date: Int64
+    public let rowID: Int64
+
+    public init(date: Int64, rowID: Int64) {
+      self.date = date
+      self.rowID = rowID
     }
+  }
 
-    let sql = """
-      SELECT \(columns) FROM message m
-      WHERE \(clauses.joined(separator: " OR "))
-      ORDER BY m.date ASC
-      LIMIT ?
-      """
-    arguments.append(limit)
-
-    let statement = sql
+  /// Fingerprints of every message dated after `floor`, oldest first, one page at a time.
+  ///
+  /// Keyset-paged on `(date, ROWID)` rather than `OFFSET`: SQLite re-walks the skipped rows
+  /// for every OFFSET page, so a 20-page window cost far more than 20 pages — and a row
+  /// Messages inserted between two pages shifted every offset after it, duplicating or
+  /// skipping a row. Resuming from the last row seen is stable and walks the index once.
+  ///
+  /// Narrow on purpose. The detector compares eight numbers per row; decoding the whole
+  /// 70-column row with its attributed-body and payload blobs to get at them was most of
+  /// what a tick cost. `messages(rowIDs:)` hydrates the few rows that actually changed.
+  public func messageFingerprints(
+    after floor: Date,
+    resumingFrom cursor: FingerprintCursor? = nil,
+    limit: Int = 1000
+  ) async throws -> [MessageFingerprintRow] {
+    let (sql, arguments) = fingerprintQuery(after: floor, resumingFrom: cursor, limit: limit)
     let statementArguments = StatementArguments(arguments)
     let unit = dateUnit
     return try await database.read { db in
-      try Row.fetchAll(db, sql: statement, arguments: statementArguments)
-        .map { IMessageRow(row: $0, dateUnit: unit) }
+      try Row.fetchAll(db, sql: sql, arguments: statementArguments)
+        .map { MessageFingerprintRow(row: $0, dateUnit: unit) }
     }
   }
+
+  /// The statement behind `messageFingerprints`, exposed so a test can ask SQLite for its
+  /// plan: both page shapes must walk `message_idx_date` and neither may sort.
+  func fingerprintQuery(
+    after floor: Date,
+    resumingFrom cursor: FingerprintCursor?,
+    limit: Int
+  ) -> (sql: String, arguments: [(any DatabaseValueConvertible)?]) {
+    let columns = profile.select(Self.fingerprintColumns, from: .message, alias: "m")
+    var sql = "SELECT \(columns) FROM message m WHERE "
+    var arguments: [(any DatabaseValueConvertible)?] = []
+    if let cursor {
+      // One range scan from the cursor's date; only rows sharing that exact date are
+      // re-examined, and the ROWID test drops the ones already seen.
+      sql += "m.date >= ? AND (m.date > ? OR m.ROWID > ?)"
+      arguments = [cursor.date, cursor.date, cursor.rowID]
+    } else {
+      sql += "m.date > ?"
+      arguments = [AppleTimestamp.from(floor, unit: dateUnit).rawValue]
+    }
+    // ROWID is the index's implicit trailing key, so this order comes straight off
+    // `message_idx_date` with no temp b-tree.
+    sql += " ORDER BY m.date ASC, m.ROWID ASC LIMIT ?"
+    arguments.append(min(max(1, limit), 1000))
+    return (sql, arguments)
+  }
+
+  /// Full rows for the given ROWIDs, oldest first. Chunked so a large changed set cannot
+  /// exceed SQLite's bound-parameter limit.
+  public func messages(rowIDs: [Int64]) async throws -> [IMessageRow] {
+    guard !rowIDs.isEmpty else { return [] }
+    let columns = profile.select(Self.messageColumns, from: .message, alias: "m")
+    let unit = dateUnit
+    var collected: [IMessageRow] = []
+    for start in stride(from: 0, to: rowIDs.count, by: Self.hydrationChunk) {
+      let chunk = Array(rowIDs[start..<min(start + Self.hydrationChunk, rowIDs.count)])
+      let placeholders = Array(repeating: "?", count: chunk.count).joined(separator: ", ")
+      let sql =
+        "SELECT \(columns) FROM message m WHERE m.ROWID IN (\(placeholders)) ORDER BY m.date ASC"
+      let statementArguments = StatementArguments(chunk)
+      collected += try await database.read { db in
+        try Row.fetchAll(db, sql: sql, arguments: statementArguments)
+          .map { IMessageRow(row: $0, dateUnit: unit) }
+      }
+    }
+    return collected
+  }
+
+  static let hydrationChunk = 500
 
   // MARK: - Chats
 

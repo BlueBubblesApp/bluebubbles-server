@@ -96,6 +96,26 @@ interval — it is the safety net, and its cost is only latency in the one case 
 guarantees that: a single-connection reader answers directly, and a pooled one keeps a sentinel
 connection aside for the question, because a pool hands `read` whichever reader is free.
 
+Two refinements on top of the two signals, both in the stream loop:
+
+- **A file wake that finds no commit is re-checked once**, after the floor plus 250ms. kqueue
+  reports the WAL write before SQLite publishes the commit to readers, so an early wake can
+  query and see nothing; without the re-check that message waits for the backup pass.
+- **A deaf watcher heals itself.** Three consecutive backup passes that find a commit no file
+  event announced means the descriptors are stale or events stopped arriving; the watcher is
+  torn down, re-armed, and a warning is logged naming the watched paths. That log line is what
+  to look for on a Mac that used to need a poker.
+
+**What a tick reads.** `MessageRepository.messageFingerprints` — ROWID, GUID and the eight
+fields that can move — never the full row. The 70-column row with its attributed-body and
+payload blobs is hydrated by `messages(rowIDs:)` only for the rows whose fingerprint changed.
+Pages are keyset-resumed on `(date, ROWID)`, not `OFFSET`: OFFSET re-walks the skipped rows on
+every page and shifts when Messages inserts mid-walk. `ChangeDetectorTests` asks SQLite for the
+plan of both page shapes and fails if either leaves `message_idx_date` or sorts. The fingerprint
+cache holds 25,000 entries — more than the 20,000-row page budget — because a cache smaller than
+the window forgets fingerprints every wide pass, and a forgotten fingerprint is an update that
+can no longer be detected.
+
 Four further behaviours are load-bearing — changing any of them loses messages:
 
 - **The dual lookback** — a 30-minute fast window every tick (Apple only permits edits within

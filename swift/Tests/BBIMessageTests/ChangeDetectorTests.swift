@@ -12,6 +12,7 @@
 import BBIMessage
 import BBPersistence
 import Foundation
+import GRDB
 import Testing
 
 @testable import BBIMessage
@@ -317,6 +318,134 @@ struct ChangeDetectorTests {
     #expect(delivered?.contains { $0.message.guid == "VIA-BACKUP" && $0.isNew } == true)
     let ticks = await detector.tickCount
     #expect(ticks <= 2, "queried \(ticks) times; backup passes without a commit must not query")
+  }
+
+  @Test("The fingerprint query walks the date index on both page shapes")
+  func fingerprintQueryUsesTheDateIndex() async throws {
+    // The whole reason detection queries by `date`: it is the one timestamp Apple indexes.
+    // Both the first page and a resumed page must be a range scan on that index, and the
+    // (date, ROWID) order must come off the index rather than a sort.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let repository = fixture.repository
+
+    let shapes: [MessageRepository.FingerprintCursor?] = [
+      nil, MessageRepository.FingerprintCursor(date: 1, rowID: 1),
+    ]
+    for cursor in shapes {
+      let (sql, arguments) = repository.fingerprintQuery(
+        after: Self.now, resumingFrom: cursor, limit: 10
+      )
+      let plan = try await fixture.database.explainQueryPlan(
+        sql: sql, arguments: StatementArguments(arguments)
+      )
+      #expect(plan.contains { $0.contains("USING INDEX message_idx_date") }, "\(plan)")
+      #expect(!plan.contains { $0.hasPrefix("SCAN") }, "\(plan)")
+      #expect(!plan.contains { $0.contains("TEMP B-TREE") }, "\(plan)")
+    }
+  }
+
+  @Test("Keyset paging is stable when a row lands between pages")
+  func keysetPagingSurvivesAnInsertBetweenPages() async throws {
+    // OFFSET paging shifted every later page when Messages inserted a row mid-walk, so a
+    // row was duplicated or skipped. Resuming from the last (date, ROWID) seen is not
+    // affected by what lands ahead of it.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let repository = fixture.repository
+    let start = Self.now.addingTimeInterval(-600)
+    for index in 0..<6 {
+      try await fixture.insertMessage(
+        guid: "PAGE-\(index)", at: start.addingTimeInterval(Double(index))
+      )
+    }
+
+    let first = try await repository.messageFingerprints(
+      after: start.addingTimeInterval(-1), limit: 3
+    )
+    #expect(first.map(\.guid) == ["PAGE-0", "PAGE-1", "PAGE-2"])
+
+    // A row older than everything on the next page, inserted after the first page.
+    try await fixture.insertMessage(guid: "PAGE-EARLY", at: start.addingTimeInterval(-0.5))
+
+    let last = try #require(first.last)
+    let cursor = MessageRepository.FingerprintCursor(
+      date: try #require(last.date?.rawValue), rowID: last.rowID
+    )
+    let second = try await repository.messageFingerprints(
+      after: start.addingTimeInterval(-1), resumingFrom: cursor, limit: 3
+    )
+    #expect(second.map(\.guid) == ["PAGE-3", "PAGE-4", "PAGE-5"], "no duplicate, no skip")
+  }
+
+  @Test("A watcher that never fires while commits keep arriving is re-armed")
+  func deafWatcherIsReset() async throws {
+    // Watching a file that is not the database is the cheapest deaf watcher there is:
+    // it is armed, it is healthy, and it will never see a write. Three backup passes that
+    // each find a commit it did not announce must tear it down and re-arm it.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let decoy = FileManager.default.temporaryDirectory
+      .appendingPathComponent("bb-decoy-\(UUID().uuidString)").path
+    FileManager.default.createFile(atPath: decoy, contents: Data("x".utf8))
+    defer { try? FileManager.default.removeItem(atPath: decoy) }
+
+    let detector = ChangeDetector(
+      repository: fixture.repository,
+      configuration: ChangeDetectorConfiguration(
+        pollInterval: .milliseconds(500), backupInterval: .milliseconds(150)
+      )
+    )
+    let stream = await detector.changes(watching: decoy)
+    let drain = Task { for await _ in stream {} }
+    defer { drain.cancel() }
+
+    // One commit per backup interval, well past the threshold, with time for the
+    // floor sleep between ticks.
+    for index in 0..<ChangeDetector.deafWatcherThreshold + 1 {
+      try await Task.sleep(for: .milliseconds(800))
+      try await fixture.insertMessage(guid: "UNANNOUNCED-\(index)", at: Date())
+    }
+    try await Task.sleep(for: .milliseconds(800))
+    await detector.stop()
+
+    #expect(await detector.watcherResets >= 1)
+  }
+
+  @Test("Through a real watcher, a commit is delivered without waiting for the backup")
+  func streamPrimaryPathDelivers() async throws {
+    // The primary path end to end: a write to the fixture file raises a vnode event, the
+    // detector ticks, and the change arrives long before a 30-second backup would run.
+    let fixture = try await ChatDatabaseFixture()
+    defer { fixture.tearDown() }
+    let detector = ChangeDetector(
+      repository: fixture.repository,
+      configuration: ChangeDetectorConfiguration(
+        pollInterval: .milliseconds(500), backupInterval: .seconds(30)
+      )
+    )
+    let stream = await detector.changes(watching: fixture.path)
+    // Let the seeding tick finish and its floor elapse.
+    try await Task.sleep(for: .milliseconds(700))
+
+    let started = ContinuousClock.now
+    try await fixture.insertMessage(guid: "VIA-KQUEUE", at: Date())
+
+    let waiter = Task { () -> [MessageChange]? in
+      for await batch in stream { return batch }
+      return nil
+    }
+    let timeout = Task {
+      try? await Task.sleep(for: .seconds(5))
+      waiter.cancel()
+    }
+    let delivered = await waiter.value
+    timeout.cancel()
+    let elapsed = ContinuousClock.now - started
+    await detector.stop()
+
+    #expect(delivered?.contains { $0.message.guid == "VIA-KQUEUE" && $0.isNew } == true)
+    #expect(elapsed < .seconds(3), "took \(elapsed); that is the backup pass, not the watcher")
   }
 
   @Test("The poll interval has a floor")

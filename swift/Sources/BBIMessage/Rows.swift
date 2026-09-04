@@ -12,6 +12,36 @@ import BBCore
 import Foundation
 import GRDB
 
+/// What the change detector compares: a message's identity and the fields that can move
+/// after it is written. See `MessageRepository.messageFingerprints`.
+public struct MessageFingerprintRow: Sendable, Hashable {
+  public let rowID: Int64
+  public let guid: String
+  /// Converted exactly as `IMessageRow` converts them — a zero column is "not set" and
+  /// reads as nil — so a fingerprint taken from either row shape compares equal.
+  public let date: AppleTimestamp?
+  public let dateRead: AppleTimestamp?
+  public let dateDelivered: AppleTimestamp?
+  public let datePlayed: AppleTimestamp?
+  public let dateEdited: AppleTimestamp?
+  public let dateRetracted: AppleTimestamp?
+  public let didNotifyRecipient: Bool?
+  public let error: Int
+
+  init(row: Row, dateUnit: AppleTimestamp.Unit) {
+    rowID = row["ROWID"]
+    guid = row["guid"]
+    date = AppleTimestamp.column(row.optional("date"), unit: dateUnit)
+    dateRead = AppleTimestamp.column(row.optional("date_read"), unit: dateUnit)
+    dateDelivered = AppleTimestamp.column(row.optional("date_delivered"), unit: dateUnit)
+    datePlayed = AppleTimestamp.column(row.optional("date_played"), unit: dateUnit)
+    dateEdited = AppleTimestamp.column(row.optional("date_edited"), unit: dateUnit)
+    dateRetracted = AppleTimestamp.column(row.optional("date_retracted"), unit: dateUnit)
+    didNotifyRecipient = row.boolIfPresent("did_notify_recipient")
+    error = row.optional("error") ?? 0
+  }
+}
+
 /// Safe column access: a column absent from this schema reads as nil rather than trapping.
 extension Row {
   fileprivate func optional<T: DatabaseValueConvertible>(_ column: String) -> T? {

@@ -203,6 +203,7 @@ struct ChatDatabaseFixture {
             date_retracted INTEGER,
             part_count INTEGER
         );
+        CREATE INDEX message_idx_date ON message(date);
         CREATE TABLE attachment (
             ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
             guid TEXT NOT NULL UNIQUE,

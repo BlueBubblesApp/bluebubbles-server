@@ -51,8 +51,12 @@ raising one to make a test pass.
 - **Change detection never polls the table on a quiet Mac.** File events are the trigger; the
   30-second backup asks `PRAGMA data_version` (a shared-memory read) and queries only when it
   moved. The seven-day reconcile is gated the same way. A timer that queries unconditionally
-  is the thing that pinned CPU on old hardware, and it must not come back.
-  See [`database.md`](database.md#change-detection).
+  is the thing that pinned CPU on old hardware, and it must not come back. When it does query,
+  it reads fingerprints (ten narrow columns, keyset-paged on the date index) and hydrates full
+  rows only for what changed. See [`database.md`](database.md#change-detection).
+- **`BoundedCache` evicts in O(1).** Insertion order is a queue with a head index and
+  tombstones, not an array searched and shifted per removal. The detector evicts thousands of
+  fingerprints per reconcile pass; the linear version made that quadratic.
 - **Autorelease pool discipline** in every long enumeration (contacts, attachment scans, message
   batches). The classic Foundation footgun; shows up as sawtooth growth.
 - **Value types and `Sendable` structs** for domain models, so serialization does not allocate a

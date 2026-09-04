@@ -91,6 +91,58 @@ struct BoundedCacheTests {
     #expect(cache["same"] == 99)
   }
 
+  @Test("A removed key does not hold a slot against eviction")
+  func removedKeyDoesNotBlockEviction() {
+    // `remove` leaves a tombstone in the order queue. Eviction has to step over it and
+    // evict the oldest LIVE entry, not stop at the ghost.
+    var cache = BoundedCache<String, Int>(capacity: 2)
+    cache.insert(1, for: "a")
+    cache.insert(2, for: "b")
+    cache.remove("a")
+    cache.insert(3, for: "c")
+    cache.insert(4, for: "d")
+    #expect(cache.count == 2)
+    #expect(cache["b"] == nil, "b was the oldest live entry")
+    #expect(cache["c"] == 3)
+    #expect(cache["d"] == 4)
+  }
+
+  @Test("A key removed and re-inserted is young again")
+  func reinsertedKeyIsYoung() {
+    var cache = BoundedCache<String, Int>(capacity: 2)
+    cache.insert(1, for: "a")
+    cache.insert(2, for: "b")
+    cache.remove("a")
+    cache.insert(3, for: "a")
+    cache.insert(4, for: "c")
+    #expect(cache["b"] == nil, "b is now the oldest")
+    #expect(cache["a"] == 3)
+  }
+
+  @Test("Overwriting keeps a key's original place in the order")
+  func overwriteKeepsPosition() {
+    var cache = BoundedCache<String, Int>(capacity: 2)
+    cache.insert(1, for: "a")
+    cache.insert(2, for: "b")
+    cache.insert(10, for: "a")
+    cache.insert(3, for: "c")
+    #expect(cache["a"] == nil, "refreshing a value is not re-inserting it")
+    #expect(cache["b"] == 2)
+  }
+
+  @Test("Churn well past capacity stays bounded and correct")
+  func churnStaysBounded() {
+    // The change detector's shape: a window larger than the cache, re-fingerprinted
+    // every pass. The old linear eviction made this quadratic.
+    var cache = BoundedCache<Int, Int>(capacity: 1_000)
+    for pass in 0..<5 {
+      for index in 0..<20_000 { cache.insert(pass, for: index) }
+      for index in stride(from: 0, to: 20_000, by: 7) { cache.remove(index) }
+    }
+    #expect(cache.count <= 1_000)
+    #expect(cache[19_998] == 4, "19,998 is not a multiple of 7 and was in the last pass")
+  }
+
   @Test("Removal clears both storage and ordering")
   func removalIsComplete() {
     var cache = BoundedCache<String, Int>(capacity: 3)

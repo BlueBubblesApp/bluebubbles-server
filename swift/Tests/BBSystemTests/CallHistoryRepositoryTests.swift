@@ -109,7 +109,11 @@ struct CallHistoryRepositoryTests {
     try Self.makeStore(at: path)
     defer { try? FileManager.default.removeItem(atPath: path) }
 
-    let repository = try #require(try await CallHistoryRepository(path: path))
+    // Bound outside the macro. `#require(try await …)` on this struct segfaults in
+    // `initializeWithCopy` inside the expansion, reproducibly, in every full run; the
+    // same value awaited into a local and then required is fine. Same below.
+    let opened = try await CallHistoryRepository(path: path)
+    let repository = try #require(opened)
     let calls = try await repository.recents()
 
     // The carrier call is excluded by default.
@@ -137,7 +141,8 @@ struct CallHistoryRepositoryTests {
     try Self.makeStore(at: path)
     defer { try? FileManager.default.removeItem(atPath: path) }
 
-    let repository = try #require(try await CallHistoryRepository(path: path))
+    let opened = try await CallHistoryRepository(path: path)
+    let repository = try #require(opened)
     let newest = try #require(try await repository.recents().first)
     #expect(abs(newest.date.timeIntervalSince1970 - 1_756_515_965.0) < 1)
   }
@@ -152,7 +157,8 @@ struct CallHistoryRepositoryTests {
       try Self.makeStore(at: path, callEntity: callEntity, handleEntity: handleEntity)
       defer { try? FileManager.default.removeItem(atPath: path) }
 
-      let repository = try #require(try await CallHistoryRepository(path: path))
+      let opened = try await CallHistoryRepository(path: path)
+      let repository = try #require(opened)
       let newest = try #require(try await repository.recents().first)
       #expect(newest.participants.sorted() == ["+15550000003", "person@example.com"])
     }
@@ -166,7 +172,8 @@ struct CallHistoryRepositoryTests {
     try Self.makeStore(at: path)
     defer { try? FileManager.default.removeItem(atPath: path) }
 
-    let repository = try #require(try await CallHistoryRepository(path: path))
+    let opened = try await CallHistoryRepository(path: path)
+    let repository = try #require(opened)
     let older = try #require(try await repository.recents().last)
     #expect(older.participants == ["+15550000001"])
   }
@@ -177,7 +184,8 @@ struct CallHistoryRepositoryTests {
     try Self.makeStore(at: path)
     defer { try? FileManager.default.removeItem(atPath: path) }
 
-    let repository = try #require(try await CallHistoryRepository(path: path))
+    let opened = try await CallHistoryRepository(path: path)
+    let repository = try #require(opened)
     let calls = try await repository.recents(faceTimeOnly: false)
     #expect(calls.count == 3)
     #expect(calls.contains { $0.service == "com.apple.Telephony" })
@@ -189,7 +197,8 @@ struct CallHistoryRepositoryTests {
     try Self.makeStore(at: path)
     defer { try? FileManager.default.removeItem(atPath: path) }
 
-    let repository = try #require(try await CallHistoryRepository(path: path))
+    let opened = try await CallHistoryRepository(path: path)
+    let repository = try #require(opened)
     let first = try await repository.recents(limit: 1, offset: 0)
     let second = try await repository.recents(limit: 1, offset: 1)
     #expect(first.first?.id == "UID-NEWER")
@@ -204,7 +213,8 @@ struct CallHistoryRepositoryTests {
     try Self.makeStore(at: path, includeServiceColumn: false)
     defer { try? FileManager.default.removeItem(atPath: path) }
 
-    let repository = try #require(try await CallHistoryRepository(path: path))
+    let opened = try await CallHistoryRepository(path: path)
+    let repository = try #require(opened)
     // Without ZSERVICE_PROVIDER there is nothing to filter on, so everything comes back
     // rather than nothing.
     let calls = try await repository.recents()

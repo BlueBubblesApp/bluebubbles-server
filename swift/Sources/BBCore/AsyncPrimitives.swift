@@ -166,11 +166,19 @@ public struct BoundedCache<Key: Hashable, Value>: Sendable where Key: Sendable, 
   private struct Entry {
     let value: Value
     let insertedAt: ContinuousClock.Instant
+    /// The `order` slot that owns this entry. A slot whose sequence no longer matches the
+    /// stored entry is a tombstone left behind by `remove`, and eviction skips it.
+    let sequence: UInt64
   }
 
   private var storage: [Key: Entry] = [:]
-  /// Insertion order, for eviction. Cheaper than sorting by timestamp on every insert.
-  private var order: [Key] = []
+  /// Insertion order, as a queue. `head` advances instead of shifting the array, and a
+  /// removed key leaves its slot behind rather than being searched for. Both used to be
+  /// O(n), and the change detector evicts thousands of entries in one reconcile pass —
+  /// which made every eviction past capacity a full scan of the order array.
+  private var order: [(sequence: UInt64, key: Key)] = []
+  private var head = 0
+  private var nextSequence: UInt64 = 0
 
   public let capacity: Int
   public let ttl: Duration?
@@ -201,21 +209,29 @@ public struct BoundedCache<Key: Hashable, Value>: Sendable where Key: Sendable, 
   }
 
   public mutating func insert(_ value: Value, for key: Key) {
-    if storage[key] == nil {
-      order.append(key)
+    let sequence: UInt64
+    if let existing = storage[key] {
+      // Keeps its place: this is insertion order, not access order.
+      sequence = existing.sequence
+    } else {
+      sequence = nextSequence
+      nextSequence += 1
+      order.append((sequence: sequence, key: key))
     }
-    storage[key] = Entry(value: value, insertedAt: ContinuousClock.now)
+    storage[key] = Entry(value: value, insertedAt: ContinuousClock.now, sequence: sequence)
     evictIfNeeded()
+    compactIfNeeded()
   }
 
+  /// O(1). The order slot becomes a tombstone that eviction steps over.
   public mutating func remove(_ key: Key) {
-    guard storage.removeValue(forKey: key) != nil else { return }
-    if let index = order.firstIndex(of: key) { order.remove(at: index) }
+    storage.removeValue(forKey: key)
   }
 
   public mutating func removeAll() {
     storage.removeAll()
     order.removeAll()
+    head = 0
   }
 
   /// Drops entries past their TTL. Cheap enough to call on a timer.
@@ -223,13 +239,27 @@ public struct BoundedCache<Key: Hashable, Value>: Sendable where Key: Sendable, 
     guard let ttl else { return }
     let now = ContinuousClock.now
     let expired = storage.filter { now - $0.value.insertedAt > ttl }.map(\.key)
-    for key in expired { remove(key) }
+    for key in expired { storage.removeValue(forKey: key) }
+    compactIfNeeded()
   }
 
   private mutating func evictIfNeeded() {
-    while storage.count > capacity, let oldest = order.first {
-      remove(oldest)
+    while storage.count > capacity, head < order.count {
+      let slot = order[head]
+      head += 1
+      if let entry = storage[slot.key], entry.sequence == slot.sequence {
+        storage.removeValue(forKey: slot.key)
+      }
     }
+  }
+
+  /// Rebuilds `order` from the live entries once consumed slots and tombstones outnumber
+  /// them, so it cannot grow without bound under churn. Amortised O(1) per insert.
+  private mutating func compactIfNeeded() {
+    let dead = order.count - storage.count
+    guard dead > max(64, storage.count) else { return }
+    order = order[head...].filter { slot in storage[slot.key]?.sequence == slot.sequence }
+    head = 0
   }
 }
 
