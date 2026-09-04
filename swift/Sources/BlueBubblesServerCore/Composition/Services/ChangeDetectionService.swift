@@ -37,8 +37,10 @@ actor ChangeDetectionService: ContextualService, PermissionDependentService,
     }
 
     var configuration = ChangeDetectorConfiguration()
-    configuration.pollInterval = .milliseconds(
-      await context.settings.get(Settings.dbPollInterval)
+    // Clamped here as well as validated on write: an install that stored a sub-30s value
+    // under the old meaning of the key must not come up polling.
+    configuration.backupInterval = .milliseconds(
+      max(30_000, await context.settings.get(Settings.dbPollInterval))
     )
 
     let detector = ChangeDetector(repository: repository, configuration: configuration)
@@ -83,8 +85,8 @@ actor ChangeDetectionService: ContextualService, PermissionDependentService,
       ])
   }
 
-  /// Rebuilt rather than reconfigured: the interval is baked into the detector when it is
-  /// constructed and cannot be changed on a running one.
+  /// Rebuilt rather than reconfigured: the backup interval is baked into the detector when
+  /// it is constructed and cannot be changed on a running one.
   func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
 
   func stop() async {

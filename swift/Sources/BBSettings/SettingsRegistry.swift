@@ -318,19 +318,26 @@ public enum Settings {
   )
 
   /// Also a real Int. Under the current coercion a value of 0 or 1 comes back as a Bool.
+  ///
+  /// The key is the Electron server's, where it was the poll period. It is now the period
+  /// of the BACKUP check — `PRAGMA data_version` asked whether the file watcher missed a
+  /// commit — and changes are detected by the watcher the moment the file is written. The
+  /// minimum is 30 seconds because anything shorter is polling again; a legacy value below
+  /// it is raised on migration, and `ChangeDetectionService` clamps whatever it reads.
   public static let dbPollInterval = Setting<Int>(
-    "db_poll_interval", default: 1000,
+    "db_poll_interval", default: 30_000,
     validate: { value in
-      guard value >= 500 else {
-        throw SettingsError.validationFailed(key: "db_poll_interval", reason: "minimum is 500ms")
+      guard value >= 30_000 else {
+        throw SettingsError.validationFailed(
+          key: "db_poll_interval", reason: "minimum is 30 seconds (30000ms)")
       }
     },
     presentation: .init(
-      label: "Poll Interval (ms)",
-      help: "The shortest gap between two reads of the message database after a change is "
-        + "noticed. Changes are detected by watching the file, not by polling; this only "
-        + "spaces out reads during a burst.",
-      section: "Advanced", control: .number(range: 500...30000))
+      label: "Backup Check Interval (ms)",
+      help: "How often the server double-checks the message database for a change the file "
+        + "watcher missed. Changes are normally noticed the instant the file is written; "
+        + "this only bounds how late a missed one can be. Minimum 30 seconds.",
+      section: "Advanced", control: .number(range: 30_000...600_000))
   )
 
   public static let autoCaffeinate = Setting<Bool>(
@@ -738,7 +745,8 @@ extension Settings {
 
   /// The label the settings screen uses for a key, or the key itself.
   ///
-  /// Exists so a permissions list can say "Poll Interval (ms)" instead of `db_poll_interval`.
+  /// Exists so a permissions list can say "Backup Check Interval (ms)" instead of
+  /// `db_poll_interval`.
   /// A storage key is a column name; asking a user to judge whether a plugin should read
   /// `db_poll_interval` is asking them to decode it first.
   ///

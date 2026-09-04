@@ -154,7 +154,10 @@ public struct LegacyConfigMigration: Sendable {
     // Ints. Under the old rules a value of 0 or 1 came back as a Bool, so any caller
     // doing arithmetic on it got a surprise.
     case "socket_port": try batch.set(Settings.socketPort, to: Int(raw) ?? 1234)
-    case "db_poll_interval": try batch.set(Settings.dbPollInterval, to: max(500, Int(raw) ?? 1000))
+    // The Electron poll period becomes the backup-check period, which has a 30-second
+    // floor. A user who set it HIGHER keeps their value; everyone else is raised to it.
+    case "db_poll_interval":
+      try batch.set(Settings.dbPollInterval, to: max(30_000, Int(raw) ?? 30_000))
     case "last_fcm_restart": try batch.set(Settings.lastFcmRestart, to: Int(raw) ?? 0)
 
     // The headline case: stored as the STRING "0.0" specifically so the old coercion

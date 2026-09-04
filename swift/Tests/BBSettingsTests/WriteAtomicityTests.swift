@@ -115,7 +115,7 @@ struct WriteAtomicityTests {
 
     let change = try await store.write { batch in
       try batch.set(Settings.socketPort, to: 4321)
-      try batch.set(Settings.dbPollInterval, to: 2000)
+      try batch.set(Settings.dbPollInterval, to: 60_000)
       try batch.set(Settings.autoCaffeinate, to: true)
     }
 

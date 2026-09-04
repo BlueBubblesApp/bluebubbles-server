@@ -37,8 +37,8 @@ struct SettingsStoreTests {
   @Test("An Int setting of 1 stays an Int")
   func intOneIsNotBoolean() async throws {
     let (store, _) = try await makeStore()
-    try await store.set(Settings.dbPollInterval, to: 1000)
-    #expect(await store.get(Settings.dbPollInterval) == 1000)
+    try await store.set(Settings.dbPollInterval, to: 45_000)
+    #expect(await store.get(Settings.dbPollInterval) == 45_000)
 
     try await store.set(Settings.lastFcmRestart, to: 1)
     let value = await store.get(Settings.lastFcmRestart)
@@ -142,7 +142,7 @@ struct SettingsStoreTests {
     await #expect(throws: (any Error).self) {
       try await store.write { batch in
         try batch.set(Settings.socketPort, to: 4321)
-        try batch.set(Settings.dbPollInterval, to: 10)  // below the 500ms minimum
+        try batch.set(Settings.dbPollInterval, to: 10)  // below the 30-second minimum
       }
     }
     #expect(await store.get(Settings.socketPort) == 1234)

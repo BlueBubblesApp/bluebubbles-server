@@ -78,9 +78,12 @@ signals, and their order of trust is fixed:
 
 1. **Primary: kqueue vnode events** on `chat.db` and `chat.db-wal`, through `DispatchSource`,
    on descriptors the process holds open. The kernel delivers them directly — no fseventsd, no
-   coalescing daemon — and a WAL write queries within the debounce (`db_poll_interval`,
-   default 1s, floor 500ms). This is where every message normally arrives from.
-2. **Backup: `PRAGMA data_version` every 30 seconds.** SQLite bumps it on the reading
+   coalescing daemon — and a WAL write queries within the debounce (a fixed 500ms floor
+   between ticks, not a setting). This is where every message normally arrives from.
+2. **Backup: `PRAGMA data_version` every `db_poll_interval`** — default and minimum 30
+   seconds. The key is the Electron server's poll period, kept for migration; a legacy value
+   below 30s is raised, a higher one is kept, and the service clamps whatever it reads so an
+   install that stored a sub-30s value under the old meaning cannot come up polling. SQLite bumps `data_version` on the reading
    connection whenever any other connection commits, and answering reads the WAL index out of
    shared memory: microseconds, no disk, no file-system event required. Unchanged means
    nothing was committed and **no query runs**. Changed means the watcher missed something,

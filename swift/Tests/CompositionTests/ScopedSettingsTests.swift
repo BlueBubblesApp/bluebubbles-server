@@ -410,7 +410,7 @@ struct EntitlementWordingTests {
     let entitlement = Entitlement.readSettings(keys: ["db_poll_interval"])
     #expect(
       entitlement.userFacingDescription(namingSettings: Settings.label(forKey:))
-        == "Read these server settings: Poll Interval (ms)"
+        == "Read these server settings: Backup Check Interval (ms)"
     )
   }
 

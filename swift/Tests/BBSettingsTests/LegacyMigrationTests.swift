@@ -69,6 +69,23 @@ struct LegacyMigrationTests {
     #expect(await store.get(Settings.autoCaffeinate) == true)
   }
 
+  @Test("A legacy poll interval is raised to the backup floor, never lowered")
+  func pollIntervalIsRaisedToTheFloor() async throws {
+    // The Electron key was a poll period, typically 1000. It now sets the backup check,
+    // which must not run more often than every 30 seconds — but a user who chose a longer
+    // period keeps it.
+    for (legacy, expected) in [("1000", 30_000), ("500", 30_000), ("120000", 120_000)] {
+      let url = try makeLegacyDatabase(["db_poll_interval": legacy])
+      defer { try? FileManager.default.removeItem(at: url) }
+      let secrets = InMemorySecretStore()
+      let store = try await makeStore(secrets)
+
+      _ = try await LegacyConfigMigration().run(from: url, into: store, secrets: secrets)
+
+      #expect(await store.get(Settings.dbPollInterval) == expected, "legacy \(legacy)")
+    }
+  }
+
   @Test("A migrated password is visible to the store, not just to authentication")
   func migratedPasswordIsResolvable() async throws {
     // The migration puts secrets straight into the Keychain and writes no marker row.

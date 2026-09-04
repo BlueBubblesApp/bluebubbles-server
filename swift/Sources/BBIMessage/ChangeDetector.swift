@@ -153,8 +153,9 @@ public final class DatabaseFileWatcher: @unchecked Sendable {
 // MARK: - Change detection
 
 public struct ChangeDetectorConfiguration: Sendable {
-  /// Floor between two ticks, and the debounce on file events. 500ms minimum: below that, a
-  /// busy conversation produces more queries than messages.
+  /// Floor between two ticks, and the debounce on file events. Fixed at 500ms rather than
+  /// a setting: below that a busy conversation produces more queries than messages, and
+  /// above it the floor is latency added to every message during a burst.
   public var pollInterval: Duration
   /// How often the backup pass asks SQLite whether anything was committed. It is a
   /// shared-memory read, not a query, so the cost of the interval is latency in the one
@@ -172,7 +173,7 @@ public struct ChangeDetectorConfiguration: Sendable {
   public var maximumCatchUp: Duration
 
   public init(
-    pollInterval: Duration = .milliseconds(1000),
+    pollInterval: Duration = .milliseconds(500),
     backupInterval: Duration = .seconds(30),
     fastLookback: Duration = .seconds(1800),
     reconcileLookback: Duration = .seconds(604_800),
@@ -505,11 +506,6 @@ public actor ChangeDetector {
     let committedSinceReconcile =
       token == nil || reconcileToken == nil || token != reconcileToken
     let dueForReconcile = intervalElapsed && committedSinceReconcile
-    if dueForReconcile {
-      lastReconcile = now
-      reconcileToken = token
-      reconcileCount += 1
-    }
 
     let lookback =
       dueForReconcile
@@ -529,7 +525,24 @@ public actor ChangeDetector {
     // attributed-body and payload blobs, is fetched afterwards for just the rows that
     // changed. Decoding every row in the window to compare eight numbers was most of what
     // a tick cost, and on the reconcile pass that was up to 20,000 rows.
-    let candidates = try await fetchWindow(after: queryFloor)
+    let candidates: [MessageFingerprintRow]
+    do {
+      candidates = try await fetchWindow(after: queryFloor)
+    } catch {
+      // Nothing was examined, so nothing was seen: forget the token so the next backup
+      // pass retries instead of waiting for a further commit, and leave the wide pass
+      // due. A tick that fails must cost nothing but the retry.
+      lastChangeToken = nil
+      throw error
+    }
+    // Bookkeeping only once the window was actually read. Marking the wide pass done
+    // before its query ran meant a transient failure — a busy lock during a checkpoint —
+    // silently deferred it by a full interval.
+    if dueForReconcile {
+      lastReconcile = now
+      reconcileToken = token
+      reconcileCount += 1
+    }
 
     struct Pending {
       let rowID: Int64
