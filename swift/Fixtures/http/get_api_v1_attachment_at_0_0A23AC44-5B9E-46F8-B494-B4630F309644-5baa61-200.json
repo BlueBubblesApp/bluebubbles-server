@@ -1,0 +1,51 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/attachment/at_0_0A23AC44-5B9E-46F8-B494-B4630F309644?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "originalROWID": 11931,
+          "guid": "at_0_0A23AC44-5B9E-46F8-B494-B4630F309644",
+          "uti": "public.png",
+          "mimeType": "image/png",
+          "transferName": "REDACTED",
+          "totalBytes": 433659,
+          "transferState": 5,
+          "isOutgoing": false,
+          "hideAttachment": false,
+          "isSticker": false,
+          "originalGuid": "D763B9F7-74DB-42FD-A4E2-E63E21ED4A7A",
+          "hasLivePhoto": false,
+          "height": 697,
+          "width": 600,
+          "metadata": {
+            "size": 433659,
+            "height": 697,
+            "width": 600
+          }
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:10.037Z"
+}

@@ -1,0 +1,49 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/server/info?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "computer_id": "person@example.com",
+          "os_version": "26.5.2",
+          "server_version": "25.9.8",
+          "private_api": true,
+          "proxy_service": "lan-url",
+          "helper_connected": true,
+          "detected_icloud": "person@example.com",
+          "detected_imessage": "person@example.com",
+          "macos_time_sync": 0.142827,
+          "local_ipv4s": [
+            "+15555550100"
+          ],
+          "local_ipv6s": [
+            "fe80::1",
+            "fe80::1",
+            "fe80::1"
+          ]
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:05.861Z"
+}

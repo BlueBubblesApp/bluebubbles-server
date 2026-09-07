@@ -47,7 +47,7 @@ module.exports = {
             "NSSystemAdministrationUsageDescription": "BlueBubbles needs access to manage your system",
         },
         "gatekeeperAssess": false,
-        "minimumSystemVersion": "10.11.0",
+        "minimumSystemVersion": "10.14.0",
         "signIgnore": [
             "ngrok$",
             "zrok$",

@@ -1,0 +1,51 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/icloud/findmy/status?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "data": {
+          "backend": "none",
+          "sharing_disabled": true,
+          "active_device": null,
+          "provisioned": false,
+          "restricted": false,
+          "features": {
+            "findmy_location_sharing": {
+              "reason": "Lets clients start and stop sharing a location with a conversation. The location shared is THIS MAC's, not the location of the device that asked — so a phone asking to share its location would instead share the Mac's. Leave off unless that is what you want.",
+              "summary": "Find My location sharing",
+              "enabled": true
+            },
+            "findmy_enhanced": {
+              "summary": "Enhanced Find My",
+              "enabled": true,
+              "reason": "Adds Find My status, per-person location refresh, and location-share requests. Off by default because it adds endpoints the previous server did not have, which a client can detect."
+            }
+          },
+          "available": false
+        },
+        "message": "Success",
+        "status": 200
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:11:12.689Z"
+}

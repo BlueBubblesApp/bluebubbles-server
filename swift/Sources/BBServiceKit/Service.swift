@@ -1,0 +1,176 @@
+//  Service
+//  The lifecycle contract every service implements: declared dependencies, one start, one
+//  stop, and a restart policy the registry applies.
+//
+//  See `.claude/docs/architecture.md` — Service registry.
+
+import BBCore
+import BBSettings
+
+/// What a service reports about itself. Surfaced in the UI and on `GET /api/v1/server/info`.
+public enum ServiceHealth: Sendable, Equatable {
+  case stopped
+  case starting
+  case running
+  /// Running, but not fully functional — e.g. a proxy that is connected but rate limited.
+  case degraded(reason: String)
+  case failed(reason: String)
+  /// Deliberately not running: `canRun` returned false, or a required permission is absent.
+  case inactive(reason: String)
+}
+
+/// How a service wants a settings change handled. Returned from `apply(_:)` so the decision
+/// lives with the service rather than in one central if-chain.
+public enum ReloadAction: Sendable, Equatable {
+  /// Change was irrelevant to this service.
+  case none
+  /// Service absorbed the change in place.
+  case reconfigure
+  /// Service must be restarted. The registry restarts its dependents too.
+  case restart
+}
+
+/// Restart policy applied by the registry when a service throws. Per service, so one failing
+/// tunnel is retried on its own rather than taking the application down with it.
+public enum RestartPolicy: Sendable, Equatable {
+  case never
+  case backoff(base: Duration, max: Duration, attempts: Int)
+}
+
+/// A service is an actor.
+///
+/// It was `AnyObject & Sendable`, which left every service to arrange its own isolation.
+/// They arranged it by pushing each piece of mutable state into a private single-purpose
+/// actor — one to hold a `Task`, one to hold the Private API runtime — so a service that
+/// owned a pump was two objects and every read of its own state was a hop. The alternative
+/// on offer was `@unchecked Sendable` over a bare `var`, which is what those boxes were
+/// written to avoid.
+///
+/// Requiring `Actor` here makes the service its own isolation domain, so a plain `private
+/// var` is both safe and checked. The registry already awaited every call into a service, so
+/// nothing above changed shape.
+public protocol Service: Actor {
+
+  /// What this service is, declared as data.
+  ///
+  /// The single source of truth for its identity, dependencies, category, description and
+  /// entitlements — `id` and `dependencies` are DERIVED from it below rather than declared
+  /// separately, because two places to state the same fact is two places to disagree. It is
+  /// also what makes a built-in service and a third-party plugin the same kind of thing:
+  /// both are described by this type and validated by the same rules.
+  static var manifest: ServiceManifest { get }
+
+  static var restartPolicy: RestartPolicy { get }
+
+  /// What this service is constructed from.
+  ///
+  /// An associated type rather than an existential, and that is the whole point: the
+  /// registry is generic over one host and only accepts services built from it, so
+  /// "this service needs the application context" is checked by the compiler.
+  ///
+  /// Deliberately not `init(context: any ServiceContext)`. A protocol with a single member
+  /// that every implementation opens by force-casting to `AppContext` buys nothing and turns
+  /// a mismatched host from a compile error into a crash. BBServiceKit still knows nothing
+  /// about what a host IS; it just refuses to mix two of them.
+  associatedtype Host: Sendable
+
+  init(host: Host)
+
+  func start() async throws
+  func stop() async
+
+  var health: ServiceHealth { get async }
+}
+
+extension Service {
+  /// The registry's key. The manifest identifier IS the key — there is no second type to
+  /// convert through, so the two cannot drift.
+  public static var id: ServiceIdentifier { manifest.id }
+
+  /// Services that must be running first. The registry topologically sorts these, so start
+  /// order is derived rather than hand-maintained — and stop order is exactly its reverse.
+  public static var dependencies: [ServiceIdentifier] { manifest.dependencies }
+
+  /// The macOS permissions without which this service cannot run, derived from the manifest
+  /// like `id` and `dependencies` are.
+  ///
+  /// `.recommended` and `.feature` are deliberately excluded: the registry refuses to start a
+  /// service whose REQUIRED permission is missing, and a service that merely works better
+  /// with Contacts must still start without them.
+  public static var requiredPermissions: [PermissionID] {
+    manifest.permissions.filter(\.requirement.isRequired).map(\.id)
+  }
+
+  public static var restartPolicy: RestartPolicy {
+    .backoff(base: .seconds(1), max: .seconds(60), attempts: 5)
+  }
+}
+
+/// Opt-in: a service that reacts to settings changes.
+///
+/// The registry routes a change only to services whose `watchedSettings` intersect it, which
+/// is what removes the manual `proxiesRestarted` latch from the old `handleConfigUpdate`.
+///
+/// `watchedSettings` defaults to what the manifest declares — see
+/// `ServiceManifest.watchedSettingKeys` — and that default is the rule. A service that must
+/// hear about a key it cannot declare (a secret, which no entitlement may name; or a password
+/// change it does not read but must kick clients for) ADDS to the default with
+/// `manifestWatchedSettings.union(...)`. It never replaces it: a hand-written list is how a
+/// service comes to read a setting it does not watch.
+public protocol ConfigurableService: Service {
+  static var watchedSettings: Set<String> { get }
+  func apply(_ change: SettingsChange) async throws -> ReloadAction
+}
+
+extension ConfigurableService {
+  /// What the manifest says this service reads and owns.
+  public static var manifestWatchedSettings: Set<String> { manifest.watchedSettingKeys }
+
+  public static var watchedSettings: Set<String> { manifestWatchedSettings }
+}
+
+/// Opt-in: a service that is not always applicable.
+///
+/// A gated service that declines reports `.inactive`, which is a normal state rather than a
+/// failure — no Private API, no tunnel configured.
+public protocol GatedService: Service {
+  func canRun() async -> Bool
+}
+
+/// Identifier for a macOS permission.
+///
+/// Defined here rather than in BBSystem so ServiceKit can express the dependency without
+/// importing the AppKit-bound layer. Deliberately open rather than an enum: the layer that
+/// KNOWS about a permission is the one that can probe it, so BBSystem adds
+/// `.systemIntegrityProtection` in an extension, and a third-party manifest arriving as JSON
+/// can name one this binary has never heard of without failing to parse.
+public struct PermissionID: Hashable, Sendable, RawRepresentable, CustomStringConvertible,
+  Codable
+{
+  public let rawValue: String
+  public init(rawValue: String) { self.rawValue = rawValue }
+  public init(_ rawValue: String) { self.rawValue = rawValue }
+  public var description: String { rawValue }
+
+  public static let fullDiskAccess = PermissionID("full-disk-access")
+  public static let automationMessages = PermissionID("automation-messages")
+  public static let contacts = PermissionID("contacts")
+  public static let notifications = PermissionID("notifications")
+}
+
+/// How much a permission matters to whoever declares it.
+///
+/// Lives here rather than in BBSystem for the same reason `PermissionID` does: a manifest is
+/// pure data and must be expressible without the layer that probes the system. BBSystem's
+/// app-wide `Permission` catalogue uses this same type.
+public enum PermissionRequirement: Sendable, Equatable, Hashable, Codable {
+  case required
+  case recommended
+  /// Required only for a named feature, which is what the user is told.
+  case feature(String)
+
+  public var isRequired: Bool {
+    if case .required = self { return true }
+    return false
+  }
+}

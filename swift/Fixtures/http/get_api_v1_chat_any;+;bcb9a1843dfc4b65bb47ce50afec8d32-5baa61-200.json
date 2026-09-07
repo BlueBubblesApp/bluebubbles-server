@@ -1,0 +1,54 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/chat/any;+;bcb9a1843dfc4b65bb47ce50afec8d32?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "originalROWID": 481,
+          "guid": "any;+;bcb9a1843dfc4b65bb47ce50afec8d32",
+          "style": 43,
+          "chatIdentifier": "REDACTED",
+          "isArchived": false,
+          "displayName": "REDACTED",
+          "participants": [],
+          "isFiltered": false,
+          "groupId": "9DB6C8D7-1BA3-400F-B5D7-25AE57832A97",
+          "properties": [
+            {
+              "pv": 3,
+              "put": 1787943599.351112,
+              "numberOfTimesRespondedtoThread": 1,
+              "shouldForceToSMS": false,
+              "lastSeenMessageGuid": "REDACTED",
+              "hasBeenAutoSpamReported": true,
+              "markedAsKnownDate": "+15555550100T18:55:12.667Z",
+              "LSMD": "+15555550100T18:55:12.659Z"
+            }
+          ],
+          "lastAddressedHandle": "REDACTED"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:08.774Z"
+}

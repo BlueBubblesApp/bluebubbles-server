@@ -1,0 +1,31 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/server/logs?count=25&password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": "[+15555550100:58:34.631][debug] Raw Error: BadRequest: [400] You've made a bad request! Please check your request params & body\n[+15555550100:58:34.631][debug] API Error: [400] You've made a bad request! Please check your request params & body -> The limit must be a number.\n[+15555550100:58:34.631][debug] BadRequest: [400] You've made a bad request! Please check your request params & body\n    at ValidateInput (/Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11317:11)\n    at _callee4$ (/Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11478:68)\n    at tryCatch (/Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11383:1062)\n    at Generator.<anonymous> (/Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11383:3008)\n    at Generator.next (/Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11383:1699)\n    at asyncGeneratorStep (/Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11384:70)\n    at _next (/Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11385:163)\n    at /Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11385:299\n    at new Promise (<anonymous>)\n    at /Users/user/Development/BlueBubbles/bluebubbles-server/packages/server/dist/main.js:11385:90\n[+15555550100:58:34.631][debug] Request to /api/v1/message/query took 1 ms\n[+15555550100:58:34.641][debug] Request to / (URL Params: {})\n[+15555550100:58:34.642][debug] Request to / took 1 ms\n[+15555550100:58:34.729][debug] Request to /api/v1/message/count/updated (URL Params: {\"after\":\"+15555550100\"})\n[+15555550100:58:34.859][debug] Request to /api/v1/message/count/updated took 130 ms\n[+15555550100:59:05.641][debug] Request to /api/v1/ping (URL Params: {})\n[+15555550100:59:05.642][debug] Request to /api/v1/ping took 1 ms\n[+15555550100:59:05.667][debug] Request to /api/v1/server/info (URL Params: {})\n[+15555550100:59:05.857][debug] Request to /api/v1/server/info took 190 ms\n[+15555550100:59:05.888][debug] Request to /api/v1/server/alert (URL Params: {})\n[+15555550100:59:05.890][debug] Request to /api/v1/server/alert took 2 ms\n[+15555550100:59:05.911][debug] Request to /api/v1/server/logs (URL Params: {\"count\":\"25\"})\n"
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:05.927Z"
+}

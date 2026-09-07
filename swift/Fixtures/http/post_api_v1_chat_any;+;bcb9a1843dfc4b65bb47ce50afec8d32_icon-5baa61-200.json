@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/chat/any;+;bcb9a1843dfc4b65bb47ce50afec8d32/icon?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "multipart/form-data; boundary=------------------------sMNsv5xyOfe0Nrd3d0e6fK"
+    },
+    "body": {
+      "kind": "text",
+      "value": "--------------------------sMNsv5xyOfe0Nrd3d0e6fK\r\nContent-Disposition: form-data; name=\"icon\"; filename=\"fixture.png\"\r\nContent-Type: image/png\r\n\r\n�PNG\r\n\u001a\n\u0000\u0000\u0000\rIHDR\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0010\b\u0002\u0000\u0000\u0000��h6\u0000\u0000\u0000HIDATx����\u0014�\u0000\u0000��!�\u0010B\b!�\u0010B\b!�\u0010B\u001f\u0003\b!�\u0010B�a�\u000e0\u001el\u0019m�l�mYlYm�l�m9l9m�l�mylym�L�\u0017,\u0010�φ\u0014\u0000\u0000\u0000\u0000IEND�B`�\r\n--------------------------sMNsv5xyOfe0Nrd3d0e6fK--\r\n"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Success",
+        "status": 200
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T19:35:23.630Z"
+}

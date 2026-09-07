@@ -7,6 +7,16 @@ import { IMessageCache, IMessagePoller } from "../pollers";
 import { MessageRepository } from "..";
 import { waitMs } from "@server/helpers/utils";
 import { DebounceSubsequentWithWait } from "@server/lib/decorators/DebounceDecorator";
+import { Server } from "@server";
+
+const DEFAULT_POLL_DEBOUNCE_MS = 500;
+
+const getPollDebounceMs = (): number => {
+    const configured = Server()?.repo?.getConfig("db_poll_interval") as number;
+    return typeof configured === "number" && configured >= DEFAULT_POLL_DEBOUNCE_MS
+        ? configured
+        : DEFAULT_POLL_DEBOUNCE_MS;
+};
 
 export class IMessageListener extends Loggable {
     tag = "IMessageListener";
@@ -81,7 +91,7 @@ export class IMessageListener extends Loggable {
         this.watcher.start();
     }
 
-    @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', 500)
+    @DebounceSubsequentWithWait('IMessageListener.handleChangeEvent', getPollDebounceMs)
     async handleChangeEvent(event: FileChangeEvent) {
         await this.processLock.acquire();
         try {
@@ -104,6 +114,7 @@ export class IMessageListener extends Loggable {
             this.lastCheck = now;
     
             this.cache.trimCaches();
+            Server().messageManager.prune();
             if (this.processLock.nrWaiting() > 0) {
                 await waitMs(100);
             }

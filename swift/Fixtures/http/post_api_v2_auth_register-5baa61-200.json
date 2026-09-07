@@ -1,0 +1,40 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/auth/register?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "device_name": "Fixture Device",
+        "platform": "macos"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "data": {
+          "client_secret": "__REDACTED__",
+          "client_id": "bb_368f1830e50a4cc4ab6b499722ee321c"
+        },
+        "message": "Success"
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T19:20:54.347Z"
+}

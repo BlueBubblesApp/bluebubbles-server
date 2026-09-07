@@ -1,0 +1,545 @@
+# The API
+
+`/api/v1` is a contract with shipped clients we do not control. `/api/v2` is ours, and every
+route on it is default-off. Prose reference: [`docs/api/README.md`](../../docs/api/README.md).
+Machine-readable: `docs/api/openapi.json` (**generated — never hand-edit**).
+
+---
+
+## The envelope
+
+Every JSON response, success or failure, has the same outer shape:
+
+```json
+{ "status": 200, "message": "Ping received!", "data": { }, "metadata": { } }
+```
+
+- `status` mirrors the HTTP status code.
+- `message` is **not** uniform. About forty routes carry their own string; the rest fall through
+  to `"Success"`. They live in `Sources/BBHTTPAPI/SuccessMessages.swift`.
+- **`data` and `metadata` are omitted when absent, never emitted as null.** Null and absent are
+  different to a strict parser and clients depend on the distinction.
+
+Failures add an `error` object and keep the outer shape. `error.type` comes from a fixed
+vocabulary: `Server Error`, `Database Error`, `iMessage Error`, `Socket Error`,
+`Validation Error`, `Authentication Error`, `Gateway Timeout`.
+
+### On an error, `message` is a SENTENCE and `error.message` is the detail
+
+```json
+{
+  "status": 404,
+  "message": "The requested resource was not found",
+  "error": { "type": "Database Error", "message": "Chat does not exist!" }
+}
+```
+
+Not the other way round, and this server had it the other way round on **every error response
+on every route** until the recorded corpus was replayed against it: `message` carried the short
+`"Not Found"` / `"Bad Request"` / `"Server Error"`, which the reference uses as the DEFAULT for
+`error.message`. The sentences per status live on the error types in
+`Sources/BBHTTPAPI/HTTPErrors.swift`; the details the reference sends per route are transcribed
+in `Sources/BBSerialization/ReferenceMessages.swift`.
+
+Three consequences worth knowing before writing a handler:
+
+- An exception that reaches the renderer **without** being an `HTTPError` gets
+  `"An unhandled error has occurred!"`, not `ServerError`'s own sentence. That difference is how
+  a client tells "this route decided to fail" from "this server fell over" — see
+  `ServerError.unhandled`.
+- A required field that is absent answers `"The <field> field is required."` — validatorjs's
+  own wording, which is what the reference generates from a `required` rule.
+- The Private API gate puts its long sentence in `message` and which half failed in
+  `error.message`, and sends **no `data`**.
+
+Two pairings look like bugs and are **not**:
+
+- **A 404 reports `Database Error`, not `Not Found`.**
+- **A failed send returns HTTP 500 with the serialized message in `data`.** Clients read that
+  payload; it is the most depended-on error response in the API. See below — a send answers
+  with the message either way, and the status is decided by the row's `error` column.
+
+### Text formatting on `/message/text` and `/message/multipart`
+
+Both take `textFormatting`: an array of `{start, length, styles, effect}` — on the text
+route over `message`, on the multipart route inside each part over that part's `text`.
+`start` and `length` are UTF-16 code units (what JavaScript and Dart indices are; an emoji is
+two). `styles` is any of `bold`, `italic`, `underline`, `strikethrough`; `effect` is one of
+`big`, `small`, `shake`, `nod`, `explode`, `ripple`, `bloom`, `jitter`. A range needs at
+least one of the two. Private API only, macOS 15 and later; the refusals are the reference's
+sentences (`textFormatting[0] range exceeds message length`, and so on).
+
+The shape and the style names are the reference's `textFormatting` (`TextFormattingUtils.ts`),
+which it validated and never forwarded to its helper; `effect` is this server's addition. On
+the read side the attributes come back as they are stored — `__kIMTextBoldAttributeName: 1`,
+`__kIMTextEffectAttributeName: 12` — in `attributedBody` runs; the number-to-name table is
+`TextEffect` in the contract. Measured 2 September 2026: `.claude/docs/imessage.md` § Text
+formatting.
+
+### Sticker tapbacks — `tapback: true` on `/api/v2/message/sticker`
+
+The sticker route's normal mode places a sticker on the bubble
+(`associatedMessageType` `"sticker"`, IMCore type 1000) wherever the placement fields say.
+`tapback: true` sends the same image as a sticker TAPBACK instead (type `"2007"`): Messages
+snaps it to the tapback position and it replaces this account's previous one rather than
+stacking, so the placement fields are ignored. `remove: true` alongside it takes one back
+(3007). Everything else about the request is unchanged.
+
+### Emoji reactions on `/message/react`
+
+`reaction: "emoji"` or `"-emoji"` plus an `emoji` field (`"🔥"`). Additive on the existing
+route rather than a new one: a reaction is a reaction, the client already has this call, and
+the reference validator's `in:` list of six names is the only thing that changes — an
+unknown name was a 400 there and `emoji` is a new name here. IMCore types 2006 / 3006.
+**macOS 15 and later only**: below it the route answers 400 with "Emoji reactions are only
+supported on macOS Sequoia (15) and newer", before the helper is asked.
+
+On the read side the row's type is still the reference's numeric string (`"2006"`) — v1 is
+frozen — and the emoji itself is `associatedMessageEmoji`, a field of ours declared in
+`acceptedDifferences`, present only on rows that have one. Sending a second reaction to the
+same message replaces the first, and removing one deletes its row, which is Messages'
+own behaviour and what the tests below observed.
+
+### Send Later — `POST /api/v2/message/send-later`
+
+Full reference, including the client notes: [`docs/SEND_LATER.md`](../../docs/SEND_LATER.md).
+
+Apple's own scheduling, not this server's. `/message/schedule` (v1) is a SERVER timer: it holds
+the message and sends it when this Mac is awake and the server is running. Send Later hands the
+message to iMessage already scheduled, and it goes out whether or not this Mac is on.
+
+```json
+POST /api/v2/message/send-later
+{ "chatGuid": "…", "message": "…", "scheduledFor": 1788403440000 }
+```
+
+`scheduledFor` is epoch MILLISECONDS and must be in the future; the rest of the body is
+`/message/text`'s (`subject`, `effectId`, `selectedMessageGuid`, `partIndex`, `textFormatting`,
+`tempGuid`). Private API only, macOS 15 and newer. Answers with the message row, like every
+other send.
+
+`PUT /api/v2/message/send-later/:guid` changes a pending message's `message` text, its
+`scheduledFor`, or both in one call (at least one required), and
+`POST /api/v2/message/send-later/:guid/send-now` releases one immediately; both take
+`chatGuid` in the body and answer with no data. After a send-now the row reads
+`scheduleType 0`, `scheduleState 0`, delivered — it becomes an ordinary message and leaves
+the pending list.
+
+`GET /api/v2/message/send-later` lists what is still pending, soonest first, as ordinary
+message rows (`?chatGuid=` scopes it; `?with=chat,attachment` as on `message/query`), with
+`count` in `metadata`. Read from `chat.db`, so it needs no helper. `DELETE
+/api/v2/message/send-later/:guid` cancels one before it is delivered, taking `chatGuid` in the
+body. The row is DELETED from `chat.db`, so a client should drop it rather than expect a state
+change — and it leaves the list on the next read.
+
+Two things a client must know when it reads a scheduled row back:
+
+- `dateCreated` is the DELIVERY time, not the time it was composed — `date` holds the scheduled
+  instant. Sorting a transcript by it puts the message in the future, which is where Messages
+  itself shows it.
+- `scheduleType` and `scheduleState` are ours, present only on scheduled rows (`acceptedDifferences`).
+  Type 2 is Send Later; state 1 is "accepted" and 2 is "scheduled and waiting". A row with
+  neither key is an ordinary message. Without them a pending message looks identical to a sent
+  one — `isSent` is 1 the moment Messages accepts it.
+
+### The sticker library — `/api/v2/sticker`
+
+`docs/STICKER_LIBRARY.md` is the reference. Four routes over
+`~/Library/Group Containers/com.apple.stickersd.group/Stickers/stickers.stickerdb`, a Core
+Data store whose `ZMANAGEDREPRESENTATION.ZDATA` holds the image bytes INLINE — so the three
+reads open a read-only SQLite handle and need no helper at all, only the Full Disk Access
+chat.db already needs. `GET sticker` lists the library (`?source=saved|recent|all`, default
+all, with both shelf totals in `metadata` either way), `GET sticker/:id` is one of them, and
+`GET sticker/:id/image` serves bytes with the representation's own Content-Type
+(`?role=still|keyboard`, falling back to preferred rather than 404ing).
+
+`ZTYPE` is the shelf: 0 is `recent`, 1 is `saved`. Read off a live store and then confirmed
+by donating — the `POST` produced a type-0 row. `ZEXTERNALURI` is the origin
+(`sticker:///emoji/…`, `/memoji/…`, `/user/…`) and is reported parsed as `kind`.
+
+`POST sticker` is the only write and needs the helper, because the store's container is
+entitled to the app group and the server is not. It donates to RECENTS — the one write
+`_STKMessagesObjCStoreFacade` exposes — so it cannot add to the saved drawer, and the
+response says `"shelf": "recent"` rather than implying otherwise. Two traps are recorded in
+the doc: the store mints its own row identifier and puts the given one in the external URI
+(so the route resolves the row by URI, not by the identifier it passed), and
+`STKStickerRepresentation.init` is an unimplemented Swift initializer that TRAPS — the
+donation wants `_STKStickerUIStickerRepresentation` and its
+`-initWithData:type:size:role:`.
+
+### iMessage app balloons — `/api/v2/message/app`, and Game Pigeon
+
+`docs/GAME_PIGEON.md` is the reference. `GET app/:guid` decodes any iMessage APP balloon (bundle id,
+app name, session, caption, raw payload URL) and adds a `game_pigeon` block when the message
+is one. Apple's built-in balloon providers — rich links, handwriting, Digital Touch — are not
+apps and are refused with a sentence naming the alternative route. `POST app` sends any app's balloon, taking the payload as `json` (encoded as the
+`data:,<base64>` shape Polls uses), `fields` (a `data:?a=1` query string), or a raw `url` for
+anything else — so a client never base64s or percent-encodes by hand. `GET app/:guid` fills in
+`payload_json` or `payload_fields` symmetrically. `POST game-pigeon` takes fields and does Game
+Pigeon's own scramble for you.
+
+`POST app` REFUSES the Polls bundle id with a 400 naming `POST /api/v2/message/poll`, and
+refuses it even for a well-formed poll payload: the generic encoder writes
+`MSMessageTemplateLayout` and a poll needs `MSMessageLiveLayout`, so anything sent from that
+route arrives as "Sent a poll" with no options. Two such balloons reached a real conversation
+during development before this existed. When the payload is malformed too, the error names
+the missing fields alongside the layout reason.
+
+**A Game Pigeon invite needs a COMPLETE field set.** A short one is delivered and renders,
+and then tells the recipient to update GamePigeon — measured: a 15-field Cup Pong invite was
+opened and played, a 3-field 8 Ball invite sent minutes later produced the update message.
+Every genuine payload carries `sender version tver ios game id player player2 seed mode num
+build avatar2` plus the game's own.
+
+`POST game-pigeon` handles the fields a client cannot know. `sender` and `player<N>` (where N
+is the payload's own `player`) are FORCED — one correct value each and the client cannot know
+it, so accepting one could only let it be wrong, and echoing a received payload is the obvious
+way to do that. `version` (5), `tver` (5) and `ios` are FILLED when absent, keeping a caller's
+own value and position, so a reply can echo the `version` it is answering — moves disagree
+(Cup Pong sent 0, 8 Ball sent 5), so there is no rule to infer. The OTHER player's slot is
+never touched; a client reads it off the message it is answering.
+
+The sender is DERIVED from the Mac's `IOPlatformUUID`, not stored — stable per machine,
+distinct between machines, and no state to keep. `player<N> == sender` held on every genuine
+payload measured (three games, seven years, both directions, 12/12). The rest is still the client's: capture a real invite with
+`GET app/:guid` and vary it. `docs/GAME_PIGEON.md` § 4.
+
+`sendAppMessage` attaches the balloon artwork (`ai`) by reading it from the most recent
+message that app sent this Mac — there is nowhere else to get it, since a Mac generally has
+no third-party iMessage extension installed. Without it the SENDER's own transcript draws a
+bare balloon while the recipient, who has the app, sees its icon. Best effort: no prior
+message from that app means no icon, never a failed send.
+
+**A move cannot be composed server-side, and that is measured rather than assumed.** A move's
+`replay` carries `balls:` — 31 ball states, position and velocity — which is the
+AUTHORITATIVE post-shot outcome computed by the sender; the `d`/`p` shot parameters only
+drive the animation. A move sent with someone else's ball state played an animation and then
+showed a wrong table, and 8 Ball has no score field at all (the score is derived from which
+balls are pocketed). So composing a move means simulating the game. Clients that want to play
+must model it themselves; the server carries the payload, threads the session and fills in
+identity. Reading moves is unaffected.
+
+The server does not model games: fields go out and come back as an ordered name/value list,
+so every Game Pigeon game travels the same way and the client decides what a field means. The
+envelope is built server-side rather than through ChatKit, because ChatKit refuses to compose
+for an extension the Mac does not have installed — which is every third-party iMessage app,
+since they are iOS-only.
+
+### Polls — `/api/v2/message/poll`
+
+`docs/POLLS.md` is the reference. Three routes, macOS 26 only: `GET poll/:guid` assembles a
+poll from its message thread (options from the latest state, one newest vote per participant),
+`POST poll` creates one (`chatGuid`, `options`, and a `title` that Messages 26 neither shows
+nor keeps — write-only until a later release uses it), `POST poll/:guid/vote` casts the
+voter's complete selection (`chatGuid`, `optionIds`), `POST poll/:guid/option` adds a choice
+(`chatGuid`, `text`). The server keeps no poll state; each route reads the thread from
+chat.db when called. A poll or vote row is recognised by its
+`balloonBundleId`; the read side needed no new fields.
+
+### Eight routes answer with the MESSAGE, not with an identifier
+
+`POST /message/text`, `/attachment`, `/attachment/chunk`, `/multipart`, `/react`,
+`/:guid/edit`, `/:guid/unsend` and `/:guid/notify` all return the serialised row, under `.full`
+(blob columns parsed, participants not loaded), plus `tempGuid` on the two routes that echo it.
+Not `{guid, chatGuid}` and not `data: null` — a client reads back the text, date, handle and
+chats of what it just did. `SendShapeTests` diffs all eight against their recorded fixtures.
+
+Messages writes asynchronously, so `MessageInterface` waits, and **what it waits for differs by
+kind**:
+
+| | Waits for | Ceiling |
+|---|---|---|
+| text / attachment / multipart / chunk / react | the row to APPEAR, by GUID | 60 s |
+| edit / unsend | `dateEdited` to move past what it was | 30 s |
+| notify | `didNotifyRecipient` to become true | 30 s |
+
+An AppleScript send has no GUID, so it matches on chat plus text inside a ten-second window —
+comparing `universalText()`, **not** the `text` column, which Messages leaves NULL on a send and
+never fills in. Backoff throughout is the reference's: 250 ms × 1.5.
+
+The wait is for the row **and its `chat_message_join`**. Messages writes the row first and joins
+it to the chat a moment later, so stopping at "the row exists" answers `chats: []` — which is
+where a client places the message it just sent. Both of these were found by sending real
+messages; neither is reproducible against a fixture database, where `text` is populated and the
+joins are already written.
+
+A mutation waits for the column to CHANGE rather than for the row to exist, and that distinction
+is load-bearing: the row is already there, so a wait for existence returns instantly with the
+pre-edit text — which a client then displays as the result. An unsend watches `dateEdited`, not
+`dateRetracted`, because Messages records an unsend as an edit that empties the part.
+
+**A timeout answers 200 with the identifiers rather than failing** — the operation already
+happened, and a 500 would invite the client to repeat it.
+
+Only `text` and `multipart` turn a non-zero `error` on the row into a 500 carrying that message.
+`attachment`, `chunk`, `react` and the rest answer 200 and let the client read `error` itself.
+It reads like something that should be uniform; it is transcribed, not tidied.
+
+`react` answers with the tapback's OWN message. A tapback is an ordinary message carrying an
+association, so Messages assigns it a GUID — which is why `PrivateAPI.react` returns a
+`SentMessage` rather than nothing.
+
+The four message-action routes refuse an unknown GUID with **400 "Selected message does not
+exist!"**, and a message in no chat with 400 "Associated chat not found!". Both are 400s in the
+reference, not 404s.
+
+There is no `backend` key. It named which send path ran, from this server's first commit, and
+nothing ever read it — no client was told it existed, and the case it would cover does not
+arise: a request for a subject, effect or reply that only AppleScript can serve is refused
+rather than quietly downgraded. `SendOutcome.backend` still records it for the log.
+
+### Anything Messages refuses is an `iMessage Error`
+
+Not just sends. Every interface operation carried out by Messages rather than by this server —
+sending, chat administration, availability lookups, an iCloud attachment download — reports a
+backend failure as `InterfaceError.messagesFailed`, which projects to a 500 `iMessage Error`.
+Neither backend produces anything usable on its own: AppleScript throws `MessageSendError` and
+the helper throws `PrivateAPIError`, and without translation both arrived as a generic 500
+`Server Error`, so a client could not tell "Messages refused this" from "the server is broken".
+
+The translation lives on `MessagesBackedInterface` (`Sources/BBInterfaces/`), which
+`MessageInterface`, `ChatInterface`, `HandleInterface` and `AttachmentInterface` all conform to.
+**Route every call that reaches Messages through `throughMessages { … }`** — see
+[the module guide](../../Sources/BBInterfaces/CLAUDE.md).
+
+Two things pass through it untranslated, and both matter:
+
+- **An error already in the domain vocabulary.** An `.invalidRequest` for a malformed request
+  stays a 400; wrapping it would blame the server for the caller's mistake and invite a client
+  to retry something that can never succeed.
+- **`requirePrivateAPI`'s refusal** (`.helperUnavailable`), whose projection carries the fixed
+  helper-unavailable sentence in the envelope's `message` and no `data` at all. It used to send
+  `data.feature`; that was an added key, and the feature name lives in the log instead.
+  `.capabilityUnavailable` still carries `data.feature`, because the reference has no Shortcut
+  path and so never produces that response.
+
+`AttachmentInterface` is the one deliberate exception to the second point: with no helper it
+answers a purged attachment with a **404 explaining it was offloaded to iCloud**, because the
+caller's problem is a missing file rather than a missing feature. Do not collapse that into the
+shared helper for consistency.
+
+### What happens to an error that is not an `HTTPError`
+
+`ErrorRenderer` matches `HTTPError` first, and anything else becomes a 500 `Server Error`. What
+it takes from a `BBError` on the way is the **message**: `body` is used verbatim, because the
+protocol already requires it to be a sentence a person can act on, and `String(describing:)` on
+an enum renders the case name — `scriptFailed(number: -1728, …)` — straight to the client.
+
+**The status is deliberately not derived from `severity`.** Severity says how bad something is,
+not whose fault it is, and guessing would silently move responses clients have read as 500s
+since before the current envelope existed. An error that needs a different status conforms to
+`HTTPError` too.
+
+`code`, `domain`, `severity` and the redaction-aware `context` go to the **log**, not the wire —
+the `error` object is `{type, message}` and an added key fails the parity diff in the same way a
+missing one does.
+
+---
+
+## The route table
+
+`Sources/BBHTTPAPI/RouteTable.swift` declares the whole surface once. The parity harness diffs it
+against the reference route table **in both directions** — an added route fails exactly like a
+missing one.
+
+```swift
+.init(.get, "info", "server.info")
+.init(.post, "update/install", "server.installUpdate",
+      scope: .serverAdmin, responseTimeout: .seconds(1800))
+.init(.get, "account", "icloud.accountInfo", requires: .privateAPI)
+```
+
+Three properties are load-bearing and look like mistakes:
+
+1. **Order matters.** Routes register in declaration order and first match wins, so a `:guid`
+   catch-all placed before a literal sibling swallows it. `PUT /contact/:id` must precede
+   `GET /contact/external/:externalId`, and every group's `:guid` routes come last.
+   **Reordering this file for tidiness breaks routing.**
+2. **Duplicate handlers are intentional.** `POST :guid/participant` and
+   `POST :guid/participant/add` both add a participant; `PUT /contact` and `PUT /contact/:id`
+   are both update. Different client versions call different ones.
+3. **Per-route timeouts differ by orders of magnitude.** Attachment download 30 min,
+   force-download 60 min, update install 30 min, the `mac` group 30 s. One default breaks large
+   transfers on slow tunnels.
+
+### `groups` vs `alwaysMounted` vs `AdditiveRoutes`
+
+- `RouteTable.groups` — the versioned API surface. **This is what the parity test diffs.**
+- `RouteTable.alwaysMounted` — `groups` plus the landing page.
+- `AdditiveRoutes` (`RouteTable.swift:493`) — routes that are not in the reference table. Mounted
+  explicitly by `ServerComposition.additiveGroups`.
+
+**A route absent from the reference table fails the parity test if you put it in `groups`. The fix
+is to move it to `AdditiveRoutes`, never to edit the fixture.** Regenerate the fixture only when
+the reference table itself changes:
+
+```bash
+python3 Tools/route-table/extract.py
+```
+
+### `RouteRequirements`
+
+| Flag | Meaning |
+|---|---|
+| `.privateAPI` | Needs the helper connected. Fails **500 with the helper-unavailable message** — not 503, which would be more correct but is not what clients see |
+| `.unauthenticated` | Only the UI index route |
+| `.optionalAuthentication` | Authenticates *if* a credential is offered and proceeds either way |
+
+`.optionalAuthentication` exists for enrollment, which an unenrolled caller must be able to
+reach and which accepts either the server password or a one-time code. Marking it
+`.unauthenticated` made the password half unreachable — the router only populates `principal`
+when it authenticates, so `auth.register` saw `nil` every time and demanded a code that nothing
+issues, which made the entire token-auth surface unreachable. **A failed credential is not an
+error on this path.**
+
+---
+
+## Middleware order
+
+```
+Metrics -> Error -> Log -> Auth -> [PrivateAPI] -> validator -> handler
+```
+
+**Error sits outside Auth on purpose:** an auth rejection has to come back as the JSON envelope,
+not as a framework-generated 401 body, because clients parse the envelope.
+
+Access control **wraps** auth rather than replacing it — a blocked client is rejected before the
+password comparison runs, so a brute-force attempt costs nothing after the block lands.
+
+`APIRequestContext` (`Sources/BBHTTPAPI/Middleware.swift`) is transport-agnostic so the socket
+handshake reuses the auth and access-control stages without pulling in Hummingbird types.
+
+Bodies are **collected, not streamed** — every route that takes a body takes a small JSON one,
+and the size ceiling is enforced first. The two routes that move real volume (attachment upload
+and download) stream and do not go through here.
+
+---
+
+## Authentication
+
+One shared secret, accepted five ways — query first, then the header:
+
+`?password=`, `?guid=`, `?token=`, `Authorization: Bearer <secret>`,
+`Authorization: Basic <base64 of anything:secret>`.
+
+The credential is trimmed of surrounding whitespace before comparison, because clients have
+shipped trailing newlines. Comparison is constant-time against a `SecureString`.
+
+Each route declares a scope (`messages:read`, `messages:write`, `chats:write`,
+`attachments:read`, `server:admin`). **Under the default `auth_mode = password` the shared
+password grants every scope, so scopes are inert** — they become meaningful only with per-device
+credentials, which are default-off. Do not "fix" a scope by changing the default.
+
+Rate limiting counts **authentication failures only**, never successful requests. A client that
+polls hard with correct credentials is completely unaffected — some do. Sustained failures raise
+a `UserAlert` naming the source IP.
+
+---
+
+## v1 vs v2
+
+| | v1 | v2 |
+|---|---|---|
+| Casing | Whatever Node emitted — 228 keys across four conventions | `snake_case` for our own fields |
+| Enforced by | The parity harness | `NamingConventionTests` |
+| Reachable by default | Yes | Yes |
+
+**v2 is mounted for everyone.** There is no setting to turn it on and none to turn it off; the
+`additive_endpoints` toggle that used to gate it is gone. v1 being frozen is what protects an
+existing client, and v2 is a prefix no v1 client asks for.
+
+Four things are still gated, each for a reason of its own rather than because they are v2:
+FindMy and FaceTime (capabilities a user opts into), the token-auth and hydration groups (only
+meaningful under a non-default `auth_mode` or codec), and `server/security/*` plus the FaceTime
+diagnostics — those are `#if DEBUG`, compiled out of a shipped binary, because a runtime switch
+over who may talk to the server can be flipped by anyone holding an admin token. The OpenAPI
+document records each operation's switch as `x-availability`.
+
+Embedded iMessage entities inside a v2 response come out of the **same serializer v1 uses** and
+therefore keep v1's `camelCase`. That sharing is the point: there is one definition of what a
+message looks like.
+
+`auth/*` is `snake_case` by RFC 6749 (`access_token`, `expires_in`, `client_id`) — those are not
+ours to restyle.
+
+**A bug fix belongs in v1. A naming preference does not.**
+
+---
+
+## Sockets
+
+`Sources/BBSocketIO/` is a native Engine.IO / Socket.IO server, not a wrapper. Socket.IO event
+names are `kebab-case` and **frozen**.
+
+`SocketSink` is the only route many desktop (Linux/Windows) clients have, so it is never
+optional.
+
+Sequence numbers and replay exist but are **strictly opt-in**: a client sends `replay=1` in the
+handshake to receive `seq` and gain `?since=<seq>` reconnection; overflow yields a
+`resync-required` marker. **For every client that does not ask, broadcast payloads are
+byte-identical to what they receive without it** — the ring is maintained server-side and simply
+never consulted.
+
+---
+
+## Generated artifacts — CI checks all three
+
+```bash
+swift run bb-openapi infer-schemas --check   # schemas match the recorded corpus
+swift run bb-openapi emit --check            # openapi.json is current
+swift run bb-openapi coverage --check        # fixture ratchet
+```
+
+Drop `--check` to regenerate. Order matters: schemas are inferred from the corpus and the
+document is built from the schemas, so infer first.
+
+**All three run in DEBUG.** `AdditiveRoutes.security` and the FaceTime diagnostics are
+`#if DEBUG`, so a release build legitimately emits ten fewer routes and checking one against a
+debug-generated document fails for reasons unrelated to your change.
+
+`docs/api/uncovered-routes.txt` is a **ratchet**: the list may only shrink. Coverage fails when
+a route without a fixture is not on it, when a listed route has since been covered, or when an
+entry names a route that no longer exists.
+
+---
+
+## Adding a route — the checklist
+
+1. Add it to `RouteTable.groups` **only if Node has it**; otherwise `AdditiveRoutes`.
+2. Give it a scope, a `responseTimeout` if it is not the group default, and `requires:` flags.
+3. Put it in the right position — after literal siblings, before nothing that a `:guid` would
+   swallow.
+4. Register the handler in `Sources/BBHandlers/`
+   (`registry.register("server.info") { ... }`). Keep it thin.
+5. Put the logic in `Sources/BBInterfaces/`. If it touches chat GUIDs, read
+   [`imessage.md`](imessage.md) first.
+6. Add a `SuccessMessages` entry only if the route needs a non-default `message`.
+7. **Declare its response too**, if no fixture can cover it. `ResponseBodies.byHandler`
+   supplies the `data` schema and an example where inference produced nothing — a fixture
+   always wins, and `ResponseBodyTests` fails the build if a route has both. Five shapes:
+   `.object`/`.list` for a payload only this route produces, `.empty` for `data: null`,
+   `.mirrors(handler)` when it answers with the same row as a route whose schema IS recorded
+   (every v2 send mirrors `.messageSendText`; the pending-scheduled list mirrors
+   `.messageQuery`), and `.oneOf([Variant])` when the route DEGRADES — answers with less
+   because a permission is missing or a store is unreadable. A route answering with bytes
+   goes in `NonJSONResponses.binary`. Every v2 route must be in one of those or the build
+   fails.
+
+   **A declaration is testimony, and until a test executes the handler nothing
+   cross-examines it.** Every other check over this table compares the declaration to
+   itself — that fields have descriptions, that the example uses only declared keys, that a
+   mirror resolves — so a hand-written schema can be wrong in a way no test sees. One was:
+   `sticker.save` answers two ways and the table described one, so the emitted document
+   declared three fields required on a response carrying none of them and omitted `saved`
+   entirely. If you hand-write a schema, build the response in a NAMED serializer rather
+   than an object literal inside the handler, and assert its key set against the
+   declaration. `StickerResponseShapeTests` is the pattern.
+8. **Declare its request body.** A route this server added has no fixture, so nothing is
+   inferred and the spec would document no input at all. Add a `RequestBodies.byHandler`
+   entry with a description per field and an `example` a client can copy — or, if it takes
+   no body, a `RequestBodies.bodyless` entry saying why. `RequestBodyTests` fails the build
+   for a v2 write route that is in neither. A declaration for a route that *does* have a
+   fixture must be a superset of the inferred schema; a file upload goes in
+   `MultipartBodies` instead, which wins over both.
+9. Regenerate the OpenAPI document and update the coverage list.
+10. `swift test --filter CompatibilityTests` and `--filter BBOpenAPITests`.

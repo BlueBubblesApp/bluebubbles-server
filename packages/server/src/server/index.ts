@@ -71,6 +71,7 @@ import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
 import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
+import { ZrokManager } from "./managers/zrokManager";
 
 const findProcess = require("find-process");
 
@@ -339,8 +340,16 @@ class BlueBubblesServer extends EventEmitter {
                 continue;
             }
 
+            const shouldLog =
+                !normalizedKey.includes("token") &&
+                !normalizedKey.includes("key") &&
+                !normalizedKey.includes("password") &&
+                !normalizedKey.includes("secret");
+            if (shouldLog) {
+                this.logger.info(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`);
+            }
+
             // Set the value
-            this.logger.info(`[ENV] Setting config value ${normalizedKey} to ${value} (persist=${persist})`);
             this.repo.setConfig(normalizedKey, value, persist);
         }
     }
@@ -468,11 +477,7 @@ class BlueBubblesServer extends EventEmitter {
 
         try {
             this.logger.info("Initializing proxy services...");
-            this.proxyServices = [
-                new NgrokService(),
-                new CloudflareService(),
-                new ZrokService()
-            ];
+            this.proxyServices = [new NgrokService(), new CloudflareService(), new ZrokService()];
         } catch (ex: any) {
             this.logger.error(`Failed to initialize proxy services! ${ex?.message ?? String(ex)}}`);
         }
@@ -776,8 +781,10 @@ class BlueBubblesServer extends EventEmitter {
         // Set the dock icon according to the config
         this.setDockIcon();
 
+        // Don't relaunch if the auto start method is set to launch agent. This will cause a loop.
         const noGpu = Server().repo.getConfig("disable_gpu") ?? false;
-        if (noGpu && !this.args["disable-gpu"]) {
+        const isLaunchAgent = Server().repo.getConfig("auto_start_method") === AutoStartMethods.LaunchAgent;
+        if (noGpu && !this.args["disable-gpu"] && !isLaunchAgent) {
             this.relaunch();
         }
 
@@ -962,11 +969,20 @@ class BlueBubblesServer extends EventEmitter {
         if (!this.repo || !this.repo.db) return;
 
         const hideDockIcon = this.repo.getConfig("hide_dock_icon") as boolean;
+        // Use app.setActivationPolicy() instead of app.dock.hide()/show().
+        // setActivationPolicy is the runtime equivalent of LSUIElement in
+        // Info.plist and reliably hides the app from the Dock + app
+        // switcher across window-creation cycles. app.dock.hide() alone is
+        // brittle: creating a BrowserWindow after the call re-promotes the
+        // app to the Dock, and on macOS 26 (Tahoe) app.dock.hide() does not
+        // take effect at all — neither from startup config-load nor from
+        // the in-app UI toggle. The previous `app.show()` after dock.hide()
+        // was also counterproductive: app.show() focuses the app, which
+        // re-activates the Dock icon as a side effect.
         if (hideDockIcon) {
-            app.dock.hide();
-            app.show();
+            app.setActivationPolicy("accessory");
         } else {
-            app.dock.show();
+            app.setActivationPolicy("regular");
         }
     }
 
@@ -1010,6 +1026,16 @@ class BlueBubblesServer extends EventEmitter {
 
         // If the zrok proxy config has changed, we need to restart the zrok service
         if (prevConfig.zrok_reserved_name !== nextConfig.zrok_reserved_name && !proxiesRestarted) {
+            // If we previously had a reserved name and it changes from a non-empty value to an empty value,
+            // we need to release the previous reserved token
+            if (
+                isNotEmpty(prevConfig.zrok_reserved_name as string) &&
+                isEmpty(nextConfig.zrok_reserved_name as string)
+            ) {
+                this.logger.debug("Releasing previous Zrok reserved token due to the reserved name being cleared");
+                await ZrokManager.safeRelease(prevConfig.zrok_reserved_token as string, { clearToken: true });
+            }
+
             await this.restartProxyServices();
             proxiesRestarted = true;
         }
@@ -1271,10 +1297,7 @@ class BlueBubblesServer extends EventEmitter {
 
         const cache = new IMessageCache();
         this.iMessageListener = new IMessageListener({
-            filePaths: [
-                this.iMessageRepo.dbPath,
-                this.iMessageRepo.dbPathWal
-            ],
+            filePaths: [this.iMessageRepo.dbPath, this.iMessageRepo.dbPathWal],
             cache,
             repo: this.iMessageRepo
         });
@@ -1298,13 +1321,13 @@ class BlueBubblesServer extends EventEmitter {
          * need to be fully sent before forwarding to any clients. If we emit a notification
          * before the message is sent, it will cause a duplicate.
          */
-        this.iMessageListener.on("new-entry", (item) => this.handleNewMessage(item));
+        this.iMessageListener.on("new-entry", item => this.handleNewMessage(item));
 
         /**
          * Message listener checking for updated messages. This means either the message's
          * delivered date or read date have changed since the last time we checked the database.
          */
-        this.iMessageListener.on("updated-entry", (item) => this.handleUpdatedMessage(item));
+        this.iMessageListener.on("updated-entry", item => this.handleUpdatedMessage(item));
 
         /**
          * Message listener for messages that have errored out
@@ -1499,7 +1522,10 @@ class BlueBubblesServer extends EventEmitter {
     private async handleNewMessage(item: Message) {
         const newMessage = await insertChatParticipants(item);
         this.logger.info(
-            `New Message from ${newMessage.isFromMe ? 'You' : obfuscatedHandle(newMessage.handle?.id)}, ${newMessage.contentString()}`);
+            `New Message from ${
+                newMessage.isFromMe ? "You" : obfuscatedHandle(newMessage.handle?.id)
+            }, ${newMessage.contentString()}`
+        );
 
         // Manually send the message to the socket so we can serialize it with
         // all the extra data

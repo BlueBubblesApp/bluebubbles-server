@@ -31,7 +31,7 @@ export class ZrokService extends Proxy {
     async connect(): Promise<string> {
         if (this.connectPromise) {
             this.log.debug("Already connecting to Zrok. Waiting for connection to complete.");
-            await this.connectPromise;
+            return this.connectPromise;
         }
 
         const token = Server().repo.getConfig("zrok_token") as string;
@@ -52,32 +52,34 @@ export class ZrokService extends Proxy {
     }
 
     async _connect(): Promise<string> {
-        // Create the connection
+        // Create the connection (and its listeners) only once. Re-attaching
+        // listeners on every _connect() call would leak them onto the same
+        // manager instance whenever connect() is invoked again.
         if (!this.manager) {
             this.manager = new ZrokManager();
+
+            // When we get a new URL, set the URL and update
+            this.manager.on("new-url", async url => {
+                this.url = url;
+
+                // 5 second delay to allow DNS records to update
+                setTimeout(() => {
+                    this.applyAddress(this.url);
+                }, 5000);
+            });
+
+            // When we get a new URL, set the URL and update
+            this.manager.on("needs-restart", async _ => {
+                try {
+                    await waitMs(5000);
+                    await this.restart();
+                } catch (ex) {
+                    // Don't do anything
+                } finally {
+                    this.manager.isRestarting = false;
+                }
+            });
         }
-
-        // When we get a new URL, set the URL and update
-        this.manager.on("new-url", async url => {
-            this.url = url;
-
-            // 5 second delay to allow DNS records to update
-            setTimeout(() => {
-                this.applyAddress(this.url);
-            }, 5000);
-        });
-
-        // When we get a new URL, set the URL and update
-        this.manager.on("needs-restart", async _ => {
-            try {
-                await waitMs(5000);
-                await this.restart();
-            } catch (ex) {
-                // Don't do anything
-            } finally {
-                this.manager.isRestarting = false;
-            }
-        });
 
         this.url = await this.manager.start();
         return this.url;

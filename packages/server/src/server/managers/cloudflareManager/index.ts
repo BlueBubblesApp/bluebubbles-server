@@ -9,7 +9,13 @@ export class CloudflareManager extends Loggable {
     tag = "CloudflareManager";
 
     daemonPath = path.join(
-        FileSystem.resources, "macos", "daemons", "cloudflare", (process.arch === "arm64") ? "arm64" : "x86", "cloudflared");
+        FileSystem.resources,
+        "macos",
+        "daemons",
+        "cloudflare",
+        process.arch === "arm64" ? "arm64" : "x86",
+        "cloudflared"
+    );
 
     // Use a default (empty) config file so we don't interfere with the default CF install (if any)
     cfgPath = path.join(FileSystem.resources, "macos", "daemons", "cloudflare", "cloudflared-config.yml");
@@ -28,7 +34,10 @@ export class CloudflareManager extends Loggable {
 
     async start(): Promise<string> {
         if (this.isRateLimited) {
-            throw new Error("Cloudflare is rate limiting your requests. Waiting 1 hour... If you do not wawnt to wait 1 hour, fully restart the server.");
+            throw new Error(
+                "Cloudflare is rate limiting your requests. Waiting 1 hour... " +
+                    "If you do not want to wait 1 hour, fully restart the server."
+            );
         }
 
         try {
@@ -43,6 +52,7 @@ export class CloudflareManager extends Loggable {
     }
 
     private async connectHandler(): Promise<string> {
+        // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
             try {
                 const port = Server().repo.getConfig("socket_port") as string;
@@ -54,17 +64,12 @@ export class CloudflareManager extends Loggable {
                 this.log.debug("Starting Cloudflare Tunnel...");
                 this.proc = new ProcessSpawner({
                     command: this.daemonPath,
-                    args: [
-                        'tunnel',
-                        '--url', `localhost:${port}`,
-                        '--config', this.cfgPath,
-                        '--pidfile', this.pidPath
-                    ],
+                    args: ["tunnel", "--url", `localhost:${port}`, "--config", this.cfgPath, "--pidfile", this.pidPath],
                     verbose: true,
                     logTag: "CloudflareDaemon",
-                    onOutput: (data) => this.handleData(data),
+                    onOutput: data => this.handleData(data),
                     restartOnNonZeroExit: true,
-                    restartOnNonZeroExitCondition: (_) => !this.isRateLimited,
+                    restartOnNonZeroExitCondition: _ => !this.isRateLimited,
                     waitForExit: false,
                     storeOutput: false
                 });
@@ -118,23 +123,29 @@ export class CloudflareManager extends Loggable {
     }
 
     private detectError(data: string): string | null {
-        if (data.includes('no such host')) {
-            return 'Unable to resolve api.trycloudflare.com! Ensure that your Mac has internet access and that any networking tools you use are not blocking the hostname.';
+        if (data.includes("no such host")) {
+            return (
+                "Unable to resolve api.trycloudflare.com! Ensure that your Mac has internet access " +
+                "and that any networking tools you use are not blocking the hostname."
+            );
         } else if (data.includes("context deadline exceeded")) {
-            return "Failed to connect to Cloudflare's servers! Connection timed out. Please check your internet connection and try again.";
+            return (
+                "Failed to connect to Cloudflare's servers! Connection timed out. " +
+                "Please check your internet connection and try again."
+            );
         } else if (data.includes("connect: bad file descriptor")) {
             return "Failed to connect to Cloudflare's servers! Please make sure your Mac is up to date";
-        } else if (data.includes('failed to request quick Tunnel: ')) {
-            return data.split('failed to request quick Tunnel: ')[1];
-        } else if (data.includes('failed to unmarshal quick Tunnel')) {
+        } else if (data.includes("failed to request quick Tunnel: ")) {
+            return data.split("failed to request quick Tunnel: ")[1];
+        } else if (data.includes("failed to unmarshal quick Tunnel")) {
             this.isRateLimited = true;
             this.stop();
             waitMs(1000 * 60 * 60).then(() => {
                 this.isRateLimited = false;
                 this.start();
             });
-    
-            return 'Cloudflare is rate limiting your requests. Waiting 1 hour...';
+
+            return "Cloudflare is rate limiting your requests. Waiting 1 hour...";
         }
 
         return null;

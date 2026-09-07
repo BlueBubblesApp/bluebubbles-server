@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/attachment/24B4EE+15555550100B6-47672BD45BD9/download/force?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "image/png",
+      "content-disposition": "attachment; filename=\"fixture.png\""
+    },
+    "body": {
+      "kind": "binary",
+      "byteLength": 129,
+      "sha256": "04ac33f9404daa2bfb2e1f52c43596b8ec2af3b1e92975789b561ed133a5e716"
+    }
+  },
+  "recordedAt": "2026-08-31T15:46:19.871Z"
+}
