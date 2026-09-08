@@ -440,7 +440,11 @@ public struct ManagedToolDescriptor: Sendable, Codable, Equatable, Identifiable 
       && !id.contains("..")
       && !executableName.isEmpty
       && !executableName.contains("/")
-      && companionExecutables.allSatisfy { !$0.isEmpty && !$0.contains("/") }
+      // A name beside the executable, never a path: `..` would resolve to the parent
+      // directory, and a directory with the execute bit answers `isExecutableFile`.
+      && companionExecutables.allSatisfy {
+        !$0.isEmpty && !$0.contains("/") && $0 != "." && $0 != ".."
+      }
   }
 }
 

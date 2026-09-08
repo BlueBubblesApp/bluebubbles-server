@@ -214,7 +214,7 @@ public actor ProxyCoordinator {
     await provider.observe(
       ProxyObserver(
         addressChanged: { [weak self, onAddressChanged, logger] address in
-          logger.info("The tunnel came back with a new address")
+          logger.info("The tunnel published an address on its own")
           await self?.clearPending()
           await onAddressChanged(address)
         },

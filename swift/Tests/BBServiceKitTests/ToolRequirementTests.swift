@@ -210,7 +210,7 @@ struct ToolRequirementTests {
   func companionsAreNames() {
     let descriptor = ManagedToolDescriptor(
       id: "daemon", displayName: "daemon", summary: "", executableName: "daemond",
-      companionExecutables: ["../elsewhere/daemon"],
+      companionExecutables: [".."],
       source: .rollingURL,
       builds: [
         ToolBuild(architecture: .arm64, download: .url("https://x.test/d"), archive: .zip)
@@ -218,6 +218,17 @@ struct ToolRequirementTests {
       signature: .trustOnFirstUse
     )
     #expect(!descriptor.isWellFormed)
+
+    for bad in [".", "bin/daemon", ""] {
+      let variant = ManagedToolDescriptor(
+        id: "daemon", displayName: "daemon", summary: "", executableName: "daemond",
+        companionExecutables: [bad],
+        source: .rollingURL,
+        builds: descriptor.builds,
+        signature: .trustOnFirstUse
+      )
+      #expect(!variant.isWellFormed, "'\(bad)' should not be a companion name")
+    }
   }
 
   @Test("A tool id that is not safe as a directory name is refused")

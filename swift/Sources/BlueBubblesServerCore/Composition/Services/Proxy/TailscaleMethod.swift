@@ -28,8 +28,9 @@ enum TailscaleMethod: ProxyMethod {
       await host.complain(
         title: "Tailscale is missing its command-line tool",
         body: "The `tailscale` program should be next to `tailscaled` at \(daemonPath), "
-          + "and is not. Reinstall Tailscale from the Tailscale page, or point this server "
-          + "at an install that has both.",
+          + "and is not. A managed install always has both, so reinstall Tailscale from "
+          + "the Tailscale page; if you pointed this server at a binary of your own, point "
+          + "it at one that ships the command-line tool too.",
         key: "cli-missing"
       )
       return nil

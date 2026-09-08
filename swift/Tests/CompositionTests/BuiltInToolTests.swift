@@ -128,10 +128,11 @@ struct BuiltInToolTests {
     }
   }
 
-  @Test("Tailscale is the daemon, with the CLI found beside it")
+  @Test("Tailscale is the daemon, with the CLI declared as its companion")
   func tailscaleInstallsTheDaemon() {
-    // `TailscaleMethod` resolves `tailscale` next to whatever the tool manager hands it, so
-    // the descriptor has to name the daemon — the thing that is RUN — and not the CLI.
+    // The descriptor names the daemon — the thing that is RUN — and declares the CLI as a
+    // companion, which is how the tool manager hands `TailscaleMethod` both from one
+    // install.
     #expect(BuiltInTools.tailscale.executableName == "tailscaled")
     #expect(BuiltInTools.tailscale.companionExecutables == ["tailscale"])
     #expect(BuiltInTools.tailscale.signature == .unsigned)

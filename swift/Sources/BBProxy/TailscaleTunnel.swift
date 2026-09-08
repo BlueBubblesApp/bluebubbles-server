@@ -385,10 +385,12 @@ public struct TailscaleCLI: Sendable {
     )
 
     let afterwards = try await status()
-    if !key.isEmpty, !afterwards.isRunning, !afterwards.needsMachineAuth {
-      // A key that was refused leaves the node exactly where it was, with no link to
-      // offer instead. `up` said why on the way out — THIS command's output, not the
-      // status document read a moment later.
+    // A REFUSED key: the command failed with the key present and the node is still signed
+    // out. Not a slow one — a control server that takes longer than the timeout leaves the
+    // node `Starting` with the command killed, and that is a node to keep polling, not a
+    // key to stop using. `up` said why on the way out — THIS command's output, not the
+    // status document read a moment later.
+    if !key.isEmpty, !result.succeeded, !result.timedOut, afterwards.needsLogin {
       throw TailscaleError.invalidAuthKey(output: Self.lastLine(of: result.output))
     }
     return afterwards
@@ -644,6 +646,13 @@ public actor TailscaleTunnel: ProxyProviding {
   /// the browser link rather than presenting the same key every poll.
   private var authKeyWasRejected = false
   private var isDisconnecting = false
+  /// Whether `connect()` is between starting the daemon and returning, and whether the
+  /// daemon died in that window. The same pair `BinaryTunnel` keeps: an exit during the
+  /// inline phase is recorded rather than acted on, because acting on it would start a
+  /// restart loop behind a `connect()` that then stops the daemon the loop just brought
+  /// back and throws without cancelling it.
+  private var isConnecting = false
+  private var exitedDuringConnect = false
 
   /// How often to ask the daemon whether the pending step has been taken.
   static let waitingPollInterval: Duration = .seconds(5)
@@ -685,6 +694,9 @@ public actor TailscaleTunnel: ProxyProviding {
     }
 
     isDisconnecting = false
+    isConnecting = true
+    exitedDuringConnect = false
+    defer { isConnecting = false }
     lastAttention = nil
     hasAppliedPreferences = false
     authKeyWasRejected = false
@@ -713,11 +725,20 @@ public actor TailscaleTunnel: ProxyProviding {
         switch try await establish() {
         case .ready(let url):
           address = url
-          startBackground { tunnel in await tunnel.monitorLoop() }
+          // It may ALREADY be dead — printed its address and exited a moment later. The
+          // exit was recorded rather than acted on while this ran; acted on here, once
+          // the address is settled, the way `BinaryTunnel` does.
+          if consumeExitDuringConnect() {
+            startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: true) }
+          } else {
+            startBackground { tunnel in await tunnel.monitorLoop() }
+          }
           return url
         case .waiting(let attention):
-          startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: false) }
-          throw ProxyError.pending(reason: attention.summary)
+          startBackground { tunnel in
+            await tunnel.waitLoop(restartingDaemon: await tunnel.consumeExitDuringConnect())
+          }
+          throw ProxyError.pending(reason: attention.notice.summary)
         }
       } catch let error as TailscaleError {
         await daemon.stop()
@@ -725,10 +746,22 @@ public actor TailscaleTunnel: ProxyProviding {
       }
     }
 
-    startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: false) }
+    startBackground { tunnel in
+      await tunnel.waitLoop(restartingDaemon: await tunnel.consumeExitDuringConnect())
+    }
+    // `Starting` is a signed-in node still coming up — what a normal restart shows for a
+    // few seconds — and is reported as that rather than as a sign-in that is not needed.
     throw ProxyError.pending(
-      reason: status.isRunning ? "applying the Tailscale configuration" : "signing in to Tailscale"
+      reason: status.needsLogin || status.backendState == "NoState"
+        ? "signing in to Tailscale"
+        : "waiting for Tailscale to finish starting"
     )
+  }
+
+  /// Reads and clears the "it died while connect was running" flag.
+  private func consumeExitDuringConnect() -> Bool {
+    defer { exitedDuringConnect = false }
+    return exitedDuringConnect
   }
 
   public func disconnect() async {
@@ -961,6 +994,12 @@ public actor TailscaleTunnel: ProxyProviding {
       metadata: ["code": .stringConvertible(code)])
     address = nil
     hasAppliedPreferences = false
+    // `connect()` is mid-flight and owns the daemon until it returns. Recorded; it picks
+    // this up once its own inline work is settled, or fails on the dead socket and stops.
+    guard !isConnecting else {
+      exitedDuringConnect = true
+      return
+    }
     startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: true) }
   }
 }
