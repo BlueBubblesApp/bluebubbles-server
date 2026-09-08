@@ -787,14 +787,13 @@ public enum Tunnels {
   /// Tailscale, as this server's own userspace node. See `TailscaleTunnel`.
   ///
   /// Two executables rather than one: the daemon this runs, and the CLI it drives the
-  /// daemon with. Both come from the same install — the CLI sits beside `tailscaled` in
-  /// every distribution of it — and the method resolves the second from the first.
+  /// daemon with. Both come from the same install — the CLI is declared as the daemon's
+  /// companion, and the tool manager hands over both.
   public static func tailscale(
     daemonExecutablePath: String,
     cliExecutablePath: String,
     port: Int,
     options: TailscaleOptions,
-    onAttention: @escaping @Sendable (TailscaleAttention) async -> Void,
     logger: Logger = Logger(label: "bluebubbles.proxy.tailscale")
   ) -> TailscaleTunnel {
     TailscaleTunnel(
@@ -802,7 +801,6 @@ public enum Tunnels {
       cliExecutablePath: cliExecutablePath,
       port: port,
       options: options,
-      onAttention: onAttention,
       logger: logger
     )
   }

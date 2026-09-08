@@ -164,6 +164,21 @@ public actor ToolManager {
     return resolve(descriptor: descriptor, state: states[toolID] ?? store.load(toolID)).path
   }
 
+  /// A companion executable, beside whichever executable a service would be handed.
+  ///
+  /// Resolved from the same install as `executablePath(for:)` — managed, the user's own,
+  /// or bundled — so the daemon and the tool that drives it can never come from two
+  /// different versions. Nil when the tool is not installed, when the descriptor declares
+  /// no such companion, or when the install lacks it.
+  public func companionExecutablePath(for toolID: String, named name: String) -> String? {
+    guard let descriptor = descriptors[toolID],
+      descriptor.companionExecutables.contains(name),
+      let executable = executablePath(for: toolID)
+    else { return nil }
+    let candidate = (executable as NSString).deletingLastPathComponent + "/" + name
+    return FileManager.default.isExecutableFile(atPath: candidate) ? candidate : nil
+  }
+
   /// Preference order: what the user chose, then what we manage, then what shipped.
   ///
   /// The user's own choice wins over a managed install because pointing at a binary is an

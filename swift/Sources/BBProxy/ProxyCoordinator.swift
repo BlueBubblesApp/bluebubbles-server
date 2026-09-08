@@ -25,15 +25,44 @@ public enum ProxyError: BBError, Equatable {
   case notConfigured(String)
   case tunnelFailed(reason: String)
   case addressUnavailable
-  /// The provider is up but cannot publish until a person does something — sign in,
-  /// approve a device, enable a feature — and has already said what through its own
-  /// channel. It keeps working in the background and reports the address through
-  /// `ProxyObserver.addressChanged` when the step is taken.
+  /// The provider is up and still working — signing in, waiting on a person, applying a
+  /// configuration — and will report the address through `ProxyObserver.addressChanged`
+  /// when it has one. Anything a person has to do is reported through
+  /// `ProxyObserver.attentionRequired` as it comes up.
   ///
   /// Not a failure. `ProxyCoordinator.start` returns normally on it, which is what keeps
   /// the registry from restarting the service — and with it the daemon, and with THAT the
-  /// link the person was just sent. `reason` is the health report's one line.
-  case awaitingUser(reason: String)
+  /// link the person was just sent. It also keeps a slow first start from holding every
+  /// service behind it in the registry's start order. `reason` is the health report's one
+  /// line until something more specific arrives.
+  case pending(reason: String)
+}
+
+/// A step only a person can take, described for the notification that asks them to.
+///
+/// Generic on purpose: a provider says what it needs and where, and the SERVICE turns that
+/// into an alert the same way for every connection method. That is what lets a third-party
+/// tunnel with a browser sign-in be expressible at all — before this, "waiting on a person"
+/// was a closure threaded through one factory, and a plugin had no way to say it.
+public struct ProxyAttention: Sendable, Equatable {
+  public let title: String
+  public let body: String
+  /// Where to go to take the step, when there is somewhere.
+  public let link: URL?
+  /// Distinguishes one step from another for deduplication. A step whose link changes —
+  /// a fresh sign-in link after a daemon restart — is a different key, so the old text
+  /// is not what the person keeps seeing.
+  public let key: String
+  /// One line for a health report.
+  public let summary: String
+
+  public init(title: String, body: String, link: URL?, key: String, summary: String) {
+    self.title = title
+    self.body = body
+    self.link = link
+    self.key = key
+    self.summary = summary
+  }
 }
 
 /// How a provider reports things that happen AFTER `connect()` has returned.
@@ -49,13 +78,17 @@ public struct ProxyObserver: Sendable {
   /// The provider has stopped trying. Carries an explanation written for a person, because
   /// this is what ends up in front of one.
   public let failed: @Sendable (String) async -> Void
+  /// The provider cannot go on until a person does something. See `ProxyAttention`.
+  public let attentionRequired: @Sendable (ProxyAttention) async -> Void
 
   public init(
     addressChanged: @escaping @Sendable (String) async -> Void = { _ in },
-    failed: @escaping @Sendable (String) async -> Void = { _ in }
+    failed: @escaping @Sendable (String) async -> Void = { _ in },
+    attentionRequired: @escaping @Sendable (ProxyAttention) async -> Void = { _ in }
   ) {
     self.addressChanged = addressChanged
     self.failed = failed
+    self.attentionRequired = attentionRequired
   }
 }
 
@@ -137,6 +170,9 @@ public actor ProxyCoordinator {
   /// already sees — this is the failure that happens hours later, with nobody waiting on a
   /// call to return.
   private let onFailure: @Sendable (String) async -> Void
+  /// Raised when a provider needs a person. The service turns it into an alert; this only
+  /// remembers the summary for the health report.
+  private let onAttention: @Sendable (ProxyAttention) async -> Void
   /// Supplied by the HTTP layer, so idleness is measured against real client activity
   /// rather than guessed.
   private let lastConnectionAt: @Sendable () async -> Date?
@@ -152,13 +188,15 @@ public actor ProxyCoordinator {
     logger: Logger = Logger(label: "bluebubbles.proxy"),
     lastConnectionAt: @escaping @Sendable () async -> Date? = { nil },
     onAddressChanged: @escaping @Sendable (String) async -> Void = { _ in },
-    onFailure: @escaping @Sendable (String) async -> Void = { _ in }
+    onFailure: @escaping @Sendable (String) async -> Void = { _ in },
+    onAttention: @escaping @Sendable (ProxyAttention) async -> Void = { _ in }
   ) {
     self.policy = policy
     self.logger = logger
     self.lastConnectionAt = lastConnectionAt
     self.onAddressChanged = onAddressChanged
     self.onFailure = onFailure
+    self.onAttention = onAttention
   }
 
   public var address: String? {
@@ -180,19 +218,26 @@ public actor ProxyCoordinator {
           await self?.clearPending()
           await onAddressChanged(address)
         },
-        failed: { [onFailure] reason in await onFailure(reason) }
+        failed: { [onFailure] reason in await onFailure(reason) },
+        attentionRequired: { [weak self, onAttention, logger] attention in
+          logger.info(
+            "The tunnel needs something from the user",
+            metadata: ["step": .string(attention.summary)])
+          await self?.setPending(attention.summary)
+          await onAttention(attention)
+        }
       )
     )
 
     let address: String
     do {
       address = try await provider.connect()
-    } catch ProxyError.awaitingUser(let reason) {
-      // Up, and waiting on a person. The provider publishes through the observer above
-      // once they have acted; until then the health report carries the reason.
+    } catch ProxyError.pending(let reason) {
+      // Up, and still working. The provider publishes through the observer above when it
+      // has an address; until then the health report carries the reason.
       pendingReason = reason
       logger.info(
-        "Tunnel is waiting on the user",
+        "Tunnel is still coming up",
         metadata: [
           "kind": .string(provider.identifier.shortName),
           "reason": .string(reason),
@@ -223,6 +268,10 @@ public actor ProxyCoordinator {
     pendingReason = nil
   }
 
+  private func setPending(_ reason: String) {
+    pendingReason = reason
+  }
+
   private func startRefreshTimer() {
     refreshTask = Task { [weak self] in
       guard let self else { return }
@@ -249,7 +298,7 @@ public actor ProxyCoordinator {
     do {
       let address = try await provider.connect()
       await onAddressChanged(address)
-    } catch ProxyError.awaitingUser(let reason) {
+    } catch ProxyError.pending(let reason) {
       pendingReason = reason
     } catch {
       logger.error(
@@ -280,7 +329,7 @@ extension ProxyError {
     case .notConfigured: "proxy.not_configured"
     case .tunnelFailed: "proxy.tunnel_failed"
     case .addressUnavailable: "proxy.address_unavailable"
-    case .awaitingUser: "proxy.awaiting_user"
+    case .pending: "proxy.pending"
     }
   }
 
@@ -289,8 +338,9 @@ extension ProxyError {
   /// User-facing: a tunnel that will not come up is the difference between the server being
   /// reachable and not, and there is nothing else that would tell them.
   public var isUserFacing: Bool {
-    // The provider has already told the person what to do, through its own channel.
-    if case .awaitingUser = self { return false }
+    // Not a failure: the provider is still working, and anything a person has to do
+    // arrives through `ProxyObserver.attentionRequired` with its own notification.
+    if case .pending = self { return false }
     return true
   }
 
@@ -298,7 +348,7 @@ extension ProxyError {
     switch self {
     case .notConfigured: "This connection method is not configured"
     case .tunnelFailed, .addressUnavailable: "Could not open the tunnel"
-    case .awaitingUser: "The connection is waiting for you"
+    case .pending: "The connection is still coming up"
     }
   }
 
@@ -308,7 +358,7 @@ extension ProxyError {
     case .tunnelFailed(let reason): reason
     case .addressUnavailable:
       "The tunnel started but never reported an address, so clients have nowhere to connect."
-    case .awaitingUser(let reason): reason
+    case .pending(let reason): reason
     }
   }
 }

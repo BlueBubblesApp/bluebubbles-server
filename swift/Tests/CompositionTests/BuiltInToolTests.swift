@@ -133,6 +133,7 @@ struct BuiltInToolTests {
     // `TailscaleMethod` resolves `tailscale` next to whatever the tool manager hands it, so
     // the descriptor has to name the daemon — the thing that is RUN — and not the CLI.
     #expect(BuiltInTools.tailscale.executableName == "tailscaled")
+    #expect(BuiltInTools.tailscale.companionExecutables == ["tailscale"])
     #expect(BuiltInTools.tailscale.signature == .unsigned)
     #expect(BuiltInTools.tailscale.recommended != nil)
   }

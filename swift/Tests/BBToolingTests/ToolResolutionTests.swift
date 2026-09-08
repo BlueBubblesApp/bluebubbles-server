@@ -243,6 +243,39 @@ struct ToolResolutionOrderTests {
     #expect(await manager.executablePath(for: "tool") == managed.path)
   }
 
+  @Test("A companion is resolved beside the executable, from the same install")
+  func companionsComeFromTheSameInstall() async throws {
+    let root = try ToolFixtures.temporaryDirectory()
+    let install = try ToolFixtures.temporaryDirectory()
+    let daemon = try ToolFixtures.fakeExecutable(named: "faked", version: "1.0", in: install)
+    _ = try ToolFixtures.fakeExecutable(named: "fake", version: "1.0", in: install)
+
+    let descriptor = ManagedToolDescriptor(
+      id: "faked",
+      displayName: "faked",
+      summary: "",
+      executableName: "faked",
+      companionExecutables: ["fake"],
+      source: .rollingURL,
+      builds: ToolArchitecture.allCases.map {
+        ToolBuild(architecture: $0, download: .url("https://example.test/faked"), archive: .zip)
+      },
+      signature: .trustOnFirstUse
+    )
+    let manager = ToolManager(store: ToolStore(root: root), transport: StubTransport())
+    await manager.register(descriptor)
+
+    // Nothing installed: no companion either, rather than a guess at a path.
+    #expect(await manager.companionExecutablePath(for: "faked", named: "fake") == nil)
+
+    try await manager.adoptExternalBinary(at: daemon.path, for: "faked")
+    #expect(
+      await manager.companionExecutablePath(for: "faked", named: "fake")
+        == install.appendingPathComponent("fake").path)
+    // Only a DECLARED companion: the manager does not hand out arbitrary neighbours.
+    #expect(await manager.companionExecutablePath(for: "faked", named: "sh") == nil)
+  }
+
   @Test("With nothing installed, the bundled copy is used and reported as such")
   func bundledFallback() async throws {
     let directory = try ToolFixtures.temporaryDirectory()

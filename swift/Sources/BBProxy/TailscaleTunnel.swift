@@ -9,13 +9,14 @@
 //  somebody who is not at this Mac, and the daemon has to stay up while they are, because
 //  restarting it invalidates the very link they were sent.
 //
-//  So this provider has a state the others do not: WAITING. `connect()` brings the daemon up
-//  and, if a person has to do something first, says what through `onAttention`, throws
-//  `ProxyError.awaitingUser`, and keeps going in the background — polling the daemon until
-//  the step is done, then finishing the setup and publishing the address through the
-//  observer like a tunnel that came back. `ProxyCoordinator` treats that error as "not yet"
-//  rather than "failed", which is what keeps the registry from restarting the service into a
-//  fresh daemon with a fresh, different sign-in link every few minutes.
+//  So `connect()` does as little as it can inline: it starts the daemon, and if the node is
+//  already signed in it applies the serve configuration and returns the address. Anything
+//  slower — signing in, waiting on a person, a feature the tailnet has yet to grant — throws
+//  `ProxyError.pending` and carries on in the background, reporting each step through
+//  `ProxyObserver.attentionRequired` and the address through `addressChanged` when it has
+//  one. `ProxyCoordinator` treats `pending` as "not yet" rather than "failed", which keeps
+//  the registry from restarting the service into a fresh daemon with a fresh, different
+//  sign-in link, and keeps a slow first start from holding every service behind it.
 //
 //  Two choices about HOW the daemon runs are the whole reason this works without root:
 //    - `--tun=userspace-networking`. On macOS `tailscaled` refuses to start as a normal user
@@ -48,7 +49,7 @@ public enum TailscaleError: BBError, Equatable {
   /// The node is signed in but has no MagicDNS name, so there is no address to publish.
   case noMagicDNSName
   /// Funnel only serves a few ports, and this is not one of them.
-  case funnelPortNotAllowed(port: Int, output: String)
+  case funnelPortNotAllowed(port: Int)
   /// Serve or Funnel refused the configuration for a reason other than a missing feature.
   case serveRefused(output: String)
 
@@ -71,8 +72,9 @@ public enum TailscaleError: BBError, Equatable {
     case .noMagicDNSName:
       "this Mac has no MagicDNS name on the tailnet, so there is no address to publish; "
         + "MagicDNS must be enabled in the tailnet's DNS settings"
-    case .funnelPortNotAllowed(let port, let output):
-      output.isEmpty ? "Funnel does not allow port \(port)" : output
+    case .funnelPortNotAllowed(let port):
+      "Funnel does not serve port \(port); it allows "
+        + TailscaleOptions.funnelPorts.map(String.init).joined(separator: ", ")
     case .serveRefused(let output):
       output.isEmpty ? "Tailscale refused the serve configuration" : output
     }
@@ -112,14 +114,14 @@ public struct TailscaleOptions: Sendable, Equatable {
   public var originUsesTLS: Bool
   /// Where `tailscaled` keeps its node key, preferences and certificates.
   public var stateDirectory: String
-  /// The control socket both the daemon and the CLI use. Short on purpose: a Unix socket
-  /// path is capped at 104 bytes on macOS, and a path under Application Support with a long
-  /// user name would not fit.
+  /// The control socket both the daemon and the CLI use. See `socketPath(preferring:)`.
   public var socketPath: String
 
   public static let defaultHostname = "bluebubbles"
   /// The ports Funnel will serve on. `ipn.CheckFunnelPort` in Tailscale refuses others.
   public static let funnelPorts = [443, 8443, 10000]
+  /// `sun_path` on macOS: 104 bytes including the terminator.
+  public static let maximumSocketPathLength = 103
 
   public init(
     hostname: String = TailscaleOptions.defaultHostname,
@@ -143,6 +145,28 @@ public struct TailscaleOptions: Sendable, Equatable {
     self.originUsesTLS = originUsesTLS
     self.stateDirectory = stateDirectory
     self.socketPath = socketPath
+  }
+
+  /// Whether Funnel would refuse this port. Checked before anything is spawned, because
+  /// the select on the settings page is not the only way a value gets into a setting.
+  public var isFunnelPortAllowed: Bool {
+    exposure != .funnel || Self.funnelPorts.contains(httpsPort)
+  }
+
+  /// Where the daemon's socket goes: beside its state when the path fits, and in the
+  /// per-user temporary directory when it does not.
+  ///
+  /// A Unix socket path is capped at 104 bytes on macOS, and Application Support plus a
+  /// long user name can exceed it. The temporary directory is the fallback rather than
+  /// the rule because macOS purges what sits unused there for a few days — harmless for a
+  /// socket the daemon recreates on every start, but not somewhere to keep anything on
+  /// purpose. Two instances sharing one path is not a concern either way: they would also
+  /// share the state directory, and the single-instance lock keeps a second server from
+  /// starting at all.
+  public static func socketPath(preferring directory: String, fallback: String) -> String {
+    let preferred = directory + "/tailscaled.sock"
+    if preferred.utf8.count <= maximumSocketPathLength { return preferred }
+    return fallback + (fallback.hasSuffix("/") ? "" : "/") + "bluebubbles-tailscaled.sock"
   }
 
   /// A machine name Tailscale will accept: lowercase letters, digits and hyphens, at most
@@ -289,6 +313,15 @@ public struct TailscaleStatus: Sendable, Equatable {
 /// The `tailscale` CLI, pointed at this server's own daemon.
 public struct TailscaleCLI: Sendable {
 
+  /// What one command said and whether it succeeded, for the callers that tolerate a
+  /// failure and then need to look at it.
+  public struct CommandResult: Sendable, Equatable {
+    public let output: String
+    public let succeeded: Bool
+    /// Killed by the backstop timeout, with its output lost.
+    public let timedOut: Bool
+  }
+
   /// The `tailscale` executable — the CLI, not the daemon.
   public let executablePath: String
   public let socketPath: String
@@ -304,11 +337,9 @@ public struct TailscaleCLI: Sendable {
   public func status() async throws -> TailscaleStatus {
     // `status` exits non-zero while the node is not running, and that is the answer being
     // asked for — so its exit code is ignored and only its document is read.
-    let output = try await run(
-      ["status", "--json"], describedAs: "status", tolerateFailure: true
-    )
-    guard let status = TailscaleStatus.parse(output) else {
-      throw TailscaleError.commandFailed(command: "status", output: output)
+    let result = try await run(["status", "--json"], describedAs: "status", tolerateFailure: true)
+    guard let status = TailscaleStatus.parse(result.output) else {
+      throw TailscaleError.commandFailed(command: "status", output: result.output)
     }
     return status
   }
@@ -325,12 +356,15 @@ public struct TailscaleCLI: Sendable {
 
   /// `tailscale up`, and the node's state afterwards.
   ///
-  /// Without a key, `up` prints the sign-in link and waits for someone to use it; the
+  /// Idempotent on a signed-in node, where it only applies the preferences. Without a key
+  /// on a signed-out one, it prints the sign-in link and waits for someone to use it; the
   /// timeout ends the wait, and the link stays valid in the daemon — `status` reports it —
-  /// which is where the caller reads it from. With a key, `up` returns once the node is
+  /// which is where the caller reads it from. With a key, it returns once the node is
   /// running or the key is refused.
-  public func up(options: TailscaleOptions) async throws -> TailscaleStatus {
-    let key = options.authKey.trimmingCharacters(in: .whitespacesAndNewlines)
+  ///
+  /// - Parameter authKey: used only when the node is not already signed in.
+  public func up(options: TailscaleOptions, authKey: String?) async throws -> TailscaleStatus {
+    let key = authKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     let timeout: Duration = key.isEmpty ? .seconds(15) : .seconds(90)
 
     var keyFile: String?
@@ -341,25 +375,21 @@ public struct TailscaleCLI: Sendable {
       if let keyFile { try? FileManager.default.removeItem(atPath: keyFile) }
     }
 
-    do {
-      _ = try await run(
-        options.upArguments(authKeyFile: keyFile, timeout: timeout),
-        describedAs: "up",
-        // Its own `--timeout` ends it; this is the backstop for a CLI that ignores it.
-        timeout: timeout + .seconds(15),
-        tolerateFailure: true
-      )
-    } catch let error as TailscaleError {
-      guard case .timedOut = error else { throw error }
-      // Killed by the backstop. The daemon has still been asked to come up, so the state
-      // read below is what matters.
-    }
+    let result = try await run(
+      options.upArguments(authKeyFile: keyFile, timeout: timeout),
+      describedAs: "up",
+      // Its own `--timeout` ends it; this is the backstop for a CLI that ignores it.
+      timeout: timeout + .seconds(15),
+      tolerateFailure: true,
+      tolerateTimeout: true
+    )
 
     let afterwards = try await status()
     if !key.isEmpty, !afterwards.isRunning, !afterwards.needsMachineAuth {
       // A key that was refused leaves the node exactly where it was, with no link to
-      // offer instead. `up` said why on the way out.
-      throw TailscaleError.invalidAuthKey(output: lastOutput)
+      // offer instead. `up` said why on the way out — THIS command's output, not the
+      // status document read a moment later.
+      throw TailscaleError.invalidAuthKey(output: Self.lastLine(of: result.output))
     }
     return afterwards
   }
@@ -381,8 +411,8 @@ public struct TailscaleCLI: Sendable {
   /// The serve command is not trusted to say whether it applied anything. When HTTPS
   /// certificates or Funnel are not enabled for the tailnet it prints the enabling link and
   /// then either exits SUCCESSFULLY without applying, or blocks until somebody enables the
-  /// feature — which is why it runs under a timeout and why the node's capabilities are
-  /// read back afterwards to decide.
+  /// feature — which is why the capabilities are read first and the command runs under a
+  /// timeout.
   public func configureServe(
     options: TailscaleOptions, forwardingTo port: Int
   ) async throws -> ServeOutcome {
@@ -395,25 +425,22 @@ public struct TailscaleCLI: Sendable {
     // person than the generic page used when it says nothing.
     let before = try await status()
     if Self.missingFeature(for: options, in: before) {
-      let output = try await run(
+      let attempt = try await run(
         arguments, describedAs: command, timeout: .seconds(10),
         tolerateFailure: true, tolerateTimeout: true
       )
       let after = try await status()
       if Self.missingFeature(for: options, in: after) {
-        return .featureMissing(after, link: Self.firstLink(in: output))
+        return .featureMissing(after, link: Self.firstLink(in: attempt.output))
       }
     }
 
     _ = try? await run(["serve", "reset"], describedAs: "serve reset", tolerateFailure: true)
-    let output = try await run(
+    let result = try await run(
       arguments, describedAs: command, timeout: .seconds(30), tolerateFailure: true
     )
-    if output.lowercased().contains("not allowed for funnel") {
-      throw TailscaleError.funnelPortNotAllowed(port: options.httpsPort, output: output)
-    }
-    guard lastExitSucceeded else {
-      throw TailscaleError.serveRefused(output: output)
+    guard result.succeeded else {
+      throw TailscaleError.serveRefused(output: result.output)
     }
     return .applied
   }
@@ -433,36 +460,14 @@ public struct TailscaleCLI: Sendable {
     return nil
   }
 
-  // MARK: Internals
-
-  /// The exit status and output of the most recent command, for the callers that need to
-  /// look at a failure after tolerating it. Boxed because this is a value type.
-  private let lastRun = LastRun()
-
-  private var lastOutput: String { lastRun.output }
-  private var lastExitSucceeded: Bool { lastRun.succeeded }
-
-  private final class LastRun: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storedOutput = ""
-    private var storedSuccess = true
-    var output: String {
-      lock.lock()
-      defer { lock.unlock() }
-      return storedOutput
-    }
-    var succeeded: Bool {
-      lock.lock()
-      defer { lock.unlock() }
-      return storedSuccess
-    }
-    func record(output: String, succeeded: Bool) {
-      lock.lock()
-      storedOutput = output
-      storedSuccess = succeeded
-      lock.unlock()
-    }
+  /// The last non-empty line, which is where a CLI puts its reason for failing.
+  static func lastLine(of output: String) -> String {
+    output.split(separator: "\n").last.map {
+      $0.trimmingCharacters(in: .whitespaces)
+    } ?? ""
   }
+
+  // MARK: Internals
 
   /// Writes the auth key where only this user can read it, for `--auth-key=file:`.
   private func writeAuthKey(_ key: String, in directory: String) throws -> String {
@@ -481,14 +486,14 @@ public struct TailscaleCLI: Sendable {
     return path
   }
 
-  /// Runs one command against this daemon's socket and returns its merged output.
+  /// Runs one command against this daemon's socket.
   private func run(
     _ arguments: [String],
     describedAs command: String,
     timeout: Duration = .seconds(30),
     tolerateFailure: Bool = false,
     tolerateTimeout: Bool = false
-  ) async throws -> String {
+  ) async throws -> CommandResult {
     guard FileManager.default.isExecutableFile(atPath: executablePath) else {
       throw TailscaleError.executableMissing(path: executablePath)
     }
@@ -503,8 +508,7 @@ public struct TailscaleCLI: Sendable {
       switch failure {
       case .timedOut:
         if tolerateTimeout {
-          lastRun.record(output: "", succeeded: false)
-          return ""
+          return CommandResult(output: "", succeeded: false, timedOut: true)
         }
         throw TailscaleError.timedOut(command: command)
       case .launchFailed(_, let reason):
@@ -512,7 +516,6 @@ public struct TailscaleCLI: Sendable {
       }
     }
     let output = result.trimmedText
-    lastRun.record(output: output, succeeded: result.succeeded)
     logger.trace(
       "tailscale command finished",
       metadata: [
@@ -522,7 +525,7 @@ public struct TailscaleCLI: Sendable {
     guard result.succeeded || tolerateFailure else {
       throw TailscaleError.commandFailed(command: command, output: output)
     }
-    return output
+    return CommandResult(output: output, succeeded: result.succeeded, timedOut: false)
   }
 }
 
@@ -534,19 +537,79 @@ public enum TailscaleAttention: Sendable, Equatable {
   case signInRequired(URL)
   /// The tailnet approves new devices by hand, and this one is queued.
   case deviceApprovalRequired
+  /// The auth key on the settings page was refused, so the browser link is on offer.
+  case authKeyRejected(detail: String)
   /// HTTPS certificates are switched off for the tailnet. The link is the page that
   /// switches them on, when Tailscale printed one.
   case httpsNotEnabled(link: URL?)
   /// Funnel is not granted to this node. Same shape.
   case funnelNotEnabled(link: URL?)
 
-  /// One line for a health report.
-  public var summary: String {
+  /// The Tailscale admin pages, for the steps where Tailscale printed no link of its own —
+  /// Tailscale's own short links, from the messages its CLI prints for the same conditions.
+  private enum Pages {
+    static let machines = URL(string: "https://login.tailscale.com/admin/machines")
+    static let keys = URL(string: "https://login.tailscale.com/admin/settings/keys")
+    static let https = URL(string: "https://tailscale.com/s/https")
+    static let funnel = URL(string: "https://tailscale.com/s/no-funnel")
+  }
+
+  /// The notification asking for it.
+  public var notice: ProxyAttention {
     switch self {
-    case .signInRequired: "waiting for you to sign in to Tailscale"
-    case .deviceApprovalRequired: "waiting for this Mac to be approved on your tailnet"
-    case .httpsNotEnabled: "waiting for HTTPS certificates to be enabled on your tailnet"
-    case .funnelNotEnabled: "waiting for Funnel to be enabled for this Mac"
+    case .signInRequired(let url):
+      ProxyAttention(
+        title: "Sign in to Tailscale to finish connecting",
+        body: "Open the link and sign this Mac in to your Tailscale account. The connection "
+          + "starts on its own once you have. To skip this step in future, paste an auth "
+          + "key from the Tailscale admin console on the Tailscale page.",
+        link: url,
+        // A sign-in link belongs to one daemon; a daemon that came back after a crash has
+        // a different one, and a person should see the current one.
+        key: "sign-in.\(url.lastPathComponent)",
+        summary: "waiting for you to sign in to Tailscale"
+      )
+    case .deviceApprovalRequired:
+      ProxyAttention(
+        title: "Approve this Mac in the Tailscale admin console",
+        body: "Your tailnet approves new devices by hand, and this one is waiting. Approve "
+          + "it under Machines in the admin console and the connection starts on its own.",
+        link: Pages.machines,
+        key: "device-approval",
+        summary: "waiting for this Mac to be approved on your tailnet"
+      )
+    case .authKeyRejected(let detail):
+      ProxyAttention(
+        title: "Tailscale rejected the auth key",
+        body: "The auth key on the Tailscale page was refused"
+          + (detail.isEmpty ? ". " : ": \(detail). ")
+          + "Generate a new one in the admin console and paste it on the Tailscale page, "
+          + "or sign in through the link in the next notification instead.",
+        link: Pages.keys,
+        key: "auth-key-rejected",
+        summary: "the Tailscale auth key was rejected"
+      )
+    case .httpsNotEnabled(let link):
+      ProxyAttention(
+        title: "Enable HTTPS certificates for your tailnet",
+        body: "Tailscale serves this server over HTTPS, which needs certificates enabled "
+          + "once for your whole tailnet. Open the link, turn on HTTPS Certificates, and "
+          + "the connection starts on its own.",
+        link: link ?? Pages.https,
+        key: "https.\(link?.lastPathComponent ?? "")",
+        summary: "waiting for HTTPS certificates to be enabled on your tailnet"
+      )
+    case .funnelNotEnabled(let link):
+      ProxyAttention(
+        title: "Enable Tailscale Funnel for this Mac",
+        body: "Publishing to the internet needs Funnel enabled for this Mac in your "
+          + "tailnet's access policy. Open the link and allow it, and the connection starts "
+          + "on its own — or choose \"Only devices on my tailnet\" on the Tailscale page "
+          + "instead.",
+        link: link ?? Pages.funnel,
+        key: "funnel.\(link?.lastPathComponent ?? "")",
+        summary: "waiting for Funnel to be enabled for this Mac"
+      )
     }
   }
 }
@@ -562,16 +625,24 @@ public actor TailscaleTunnel: ProxyProviding {
   private let cli: TailscaleCLI
   private let options: TailscaleOptions
   private let port: Int
-  private let onAttention: @Sendable (TailscaleAttention) async -> Void
   private let logger: Logger
   private let restartDelay: Duration
 
   private var address: String?
   private var observer: ProxyObserver?
-  /// The background work: waiting on a person, or watching a running node. One at a time.
+  /// The background work: bringing the node up, waiting on a person, or watching a running
+  /// node. One at a time, identified by generation — see `startBackground`.
   private var background: Task<Void, Never>?
+  private var backgroundGeneration = 0
   /// What the person was last told, so they are told once rather than every poll.
   private var lastAttention: TailscaleAttention?
+  /// Whether the preferences in `options` have been applied to a signed-in node. Once per
+  /// provider: a settings change makes a new provider, so a change is applied exactly once
+  /// rather than on every poll.
+  private var hasAppliedPreferences = false
+  /// Whether the configured auth key has been refused. Once it has, sign-in falls back to
+  /// the browser link rather than presenting the same key every poll.
+  private var authKeyWasRejected = false
   private var isDisconnecting = false
 
   /// How often to ask the daemon whether the pending step has been taken.
@@ -584,7 +655,6 @@ public actor TailscaleTunnel: ProxyProviding {
     cliExecutablePath: String,
     port: Int,
     options: TailscaleOptions,
-    onAttention: @escaping @Sendable (TailscaleAttention) async -> Void,
     logger: Logger = Logger(label: "bluebubbles.proxy.tailscale")
   ) {
     let configuration = DaemonConfiguration(
@@ -598,7 +668,6 @@ public actor TailscaleTunnel: ProxyProviding {
     )
     self.options = options
     self.port = port
-    self.onAttention = onAttention
     self.logger = logger
     self.restartDelay = configuration.restartDelay
   }
@@ -610,42 +679,61 @@ public actor TailscaleTunnel: ProxyProviding {
   }
 
   public func connect() async throws -> String {
+    guard options.isFunnelPortAllowed else {
+      throw ProxyError.tunnelFailed(
+        reason: TailscaleError.funnelPortNotAllowed(port: options.httpsPort).message)
+    }
+
     isDisconnecting = false
     lastAttention = nil
+    hasAppliedPreferences = false
+    authKeyWasRejected = false
     await daemon.onTermination { [weak self] code in
       await self?.handleUnexpectedExit(code: code)
     }
 
     do {
       try await daemon.start()
+      try await cli.waitUntilResponsive(timeout: .seconds(30))
     } catch let error as DaemonError {
       throw ProxyError.tunnelFailed(reason: BinaryTunnel.describe(error))
-    }
-
-    do {
-      try await cli.waitUntilResponsive(timeout: .seconds(30))
-      switch try await establish() {
-      case .ready(let url):
-        address = url
-        startMonitoring()
-        return url
-      case .waiting(let attention):
-        // The daemon stays up: the link a person was just sent belongs to THIS daemon.
-        startWaiting(restartingDaemon: false)
-        throw ProxyError.awaitingUser(reason: attention.summary)
-      }
     } catch let error as TailscaleError {
-      // A real failure. The daemon is stopped here rather than left for the next attempt
-      // to find holding the socket.
       await daemon.stop()
       throw ProxyError.tunnelFailed(reason: error.message)
     }
+
+    // Inline only what is quick: a node that is already signed in gets its serve
+    // configuration applied and its address returned. Signing in, or anything a person
+    // has to do, moves to the background — the registry starts services one after
+    // another, and a first start that waits a minute for a browser holds every service
+    // behind it.
+    let status = try await quickStatus()
+    if status.isRunning, !Self.needsPerson(status) {
+      do {
+        switch try await establish() {
+        case .ready(let url):
+          address = url
+          startBackground { tunnel in await tunnel.monitorLoop() }
+          return url
+        case .waiting(let attention):
+          startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: false) }
+          throw ProxyError.pending(reason: attention.summary)
+        }
+      } catch let error as TailscaleError {
+        await daemon.stop()
+        throw ProxyError.tunnelFailed(reason: error.message)
+      }
+    }
+
+    startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: false) }
+    throw ProxyError.pending(
+      reason: status.isRunning ? "applying the Tailscale configuration" : "signing in to Tailscale"
+    )
   }
 
   public func disconnect() async {
     isDisconnecting = true
-    background?.cancel()
-    background = nil
+    cancelBackground()
     await daemon.stop()
     address = nil
     lastAttention = nil
@@ -658,29 +746,62 @@ public actor TailscaleTunnel: ProxyProviding {
     case waiting(TailscaleAttention)
   }
 
+  /// The daemon's state, or a failure converted for `connect()`.
+  private func quickStatus() async throws -> TailscaleStatus {
+    do {
+      return try await cli.status()
+    } catch let error as TailscaleError {
+      await daemon.stop()
+      throw ProxyError.tunnelFailed(reason: error.message)
+    }
+  }
+
+  /// Whether a status is one only a person can move on from.
+  private static func needsPerson(_ status: TailscaleStatus) -> Bool {
+    status.needsMachineAuth || (status.needsLogin && status.authURL != nil)
+  }
+
   /// One pass at getting from "daemon running" to "address published", stopping at the
   /// first step that needs a person.
   private func establish() async throws -> Outcome {
     var status = try await cli.status()
 
+    if status.needsMachineAuth {
+      return .waiting(await report(.deviceApprovalRequired))
+    }
+
+    // `up` is run when the node is not signed in and has no link to offer yet, and once on
+    // a signed-in node to apply the preferences — the machine name and control server —
+    // so a change to them takes effect after the restart that follows a settings change.
+    // NOT on every poll of a node that already has its link: that would present the same
+    // link, or the same refused key, every five seconds.
+    let signedOut = !status.isRunning
+    let needsUp = signedOut ? status.authURL == nil : !hasAppliedPreferences
+    if needsUp {
+      let key: String? = signedOut && !authKeyWasRejected ? options.authKey : nil
+      do {
+        status = try await cli.up(options: options, authKey: key)
+      } catch TailscaleError.invalidAuthKey(let output) {
+        // Reported once, then the browser link is offered instead. The key stays as it
+        // is on the settings page; a new provider is made when it changes.
+        authKeyWasRejected = true
+        _ = await report(.authKeyRejected(detail: output))
+        status = try await cli.up(options: options, authKey: nil)
+      }
+      if status.isRunning { hasAppliedPreferences = true }
+    }
+
+    if status.needsMachineAuth {
+      return .waiting(await report(.deviceApprovalRequired))
+    }
     if !status.isRunning {
-      if status.needsMachineAuth {
-        return .waiting(await report(.deviceApprovalRequired))
+      guard let link = status.authURL else {
+        throw TailscaleError.commandFailed(
+          command: "up",
+          output: "the node is \(status.backendState) and Tailscale offered no sign-in link"
+        )
       }
-      status = try await cli.up(options: options)
-      if status.needsMachineAuth {
-        return .waiting(await report(.deviceApprovalRequired))
-      }
-      if !status.isRunning {
-        guard let link = status.authURL else {
-          throw TailscaleError.commandFailed(
-            command: "up",
-            output: "the node is \(status.backendState) and Tailscale offered no sign-in link"
-          )
-        }
-        return .waiting(await report(.signInRequired(link)))
-      }
-      logger.info("Signed in to Tailscale")
+      return .waiting(await report(.signInRequired(link)))
     }
 
     switch try await cli.configureServe(options: options, forwardingTo: port) {
@@ -702,56 +823,44 @@ public actor TailscaleTunnel: ProxyProviding {
   private func report(_ attention: TailscaleAttention) async -> TailscaleAttention {
     if lastAttention != attention {
       lastAttention = attention
-      logger.info(
-        "Tailscale needs something from you",
-        metadata: ["step": .string(attention.summary)])
-      await onAttention(attention)
+      await observer?.attentionRequired(attention.notice)
     }
     return attention
   }
 
   // MARK: - Background work
 
-  /// Polls until the pending step is taken and the address can be published.
+  /// Starts the one background task, replacing whatever was running.
   ///
-  /// - Parameter restartingDaemon: whether the daemon died and has to be brought back first.
-  private func startWaiting(restartingDaemon: Bool) {
-    guard background == nil else { return }
+  /// Generations rather than a bare handle, because a cancelled task's clean-up runs
+  /// LATER, on its own schedule: a `defer { background = nil }` in a task that was just
+  /// replaced would clear the replacement's handle, leaving it running untracked where
+  /// `disconnect()` could not reach it and a second crash would start a third loop beside
+  /// it. A task only clears the handle if the generation is still its own.
+  private func startBackground(_ work: @escaping @Sendable (TailscaleTunnel) async -> Void) {
+    cancelBackground()
+    backgroundGeneration += 1
+    let generation = backgroundGeneration
     background = Task { [weak self] in
-      await self?.waitLoop(restartingDaemon: restartingDaemon)
+      guard let self else { return }
+      await work(self)
+      await self.finishBackground(generation: generation)
     }
   }
 
-  private func waitLoop(restartingDaemon: Bool) async {
-    defer { background = nil }
+  private func cancelBackground() {
+    background?.cancel()
+    background = nil
+  }
 
+  private func finishBackground(generation: Int) {
+    if generation == backgroundGeneration { background = nil }
+  }
+
+  /// Brings the daemon back if it died, then polls until the address can be published.
+  private func waitLoop(restartingDaemon: Bool) async {
     if restartingDaemon {
-      // The same budget `BinaryTunnel` spends: a daemon that dies once a day is retried
-      // forever, one that cannot start at all gives up after ten tries.
-      while true {
-        guard await daemon.shouldRestart() else {
-          let reason =
-            "The Tailscale daemon exited repeatedly and will not be restarted again. "
-            + "Check the server log for what it printed on the way out."
-          logger.error("Giving up on the tunnel", metadata: ["kind": .string("tailscale")])
-          await observer?.failed(reason)
-          return
-        }
-        try? await Task.sleep(for: restartDelay)
-        if Task.isCancelled || isDisconnecting { return }
-        do {
-          try await daemon.start()
-          try await cli.waitUntilResponsive(timeout: .seconds(30))
-          break
-        } catch {
-          // A daemon that launched and then died reaches `handleUnexpectedExit`, which
-          // cancels this task and starts another; one that would not launch at all is
-          // retried here, against the same budget.
-          logger.warning(
-            "The Tailscale daemon did not come back yet",
-            metadata: ["reason": .string(String(describing: error))])
-        }
-      }
+      guard await restartDaemon() else { return }
     }
 
     var consecutiveFailures = 0
@@ -762,7 +871,7 @@ public actor TailscaleTunnel: ProxyProviding {
           address = url
           logger.info("Tailscale is publishing this server")
           await observer?.addressChanged(url)
-          startMonitoringLater()
+          if !Task.isCancelled { await monitorLoop() }
           return
         case .waiting:
           consecutiveFailures = 0
@@ -780,21 +889,44 @@ public actor TailscaleTunnel: ProxyProviding {
     }
   }
 
-  /// Hands over from the waiting loop to the monitor without the two overlapping: the loop
-  /// clears `background` on exit, so the monitor is started from a fresh task.
-  private func startMonitoringLater() {
-    Task { [weak self] in await self?.startMonitoring() }
+  /// Restarts a dead daemon within the budget. False when the budget is spent, or the
+  /// task was cancelled meanwhile.
+  ///
+  /// The same budget `BinaryTunnel` spends: a daemon that dies once a day is retried
+  /// forever, one that cannot start at all gives up after ten tries. A daemon that starts
+  /// and never answers on its socket is STOPPED before the next try, so each slot spent is
+  /// a real restart rather than `start()` returning early on a process that still exists.
+  private func restartDaemon() async -> Bool {
+    while !Task.isCancelled, !isDisconnecting {
+      guard await daemon.shouldRestart() else {
+        let reason =
+          "The Tailscale daemon exited repeatedly, or kept starting without answering, and "
+          + "will not be restarted again. Check the server log for what it printed."
+        logger.error("Giving up on the tunnel", metadata: ["kind": .string("tailscale")])
+        await observer?.failed(reason)
+        return false
+      }
+      try? await Task.sleep(for: restartDelay)
+      if Task.isCancelled || isDisconnecting { return false }
+      do {
+        try await daemon.start()
+        try await cli.waitUntilResponsive(timeout: .seconds(30))
+        return true
+      } catch {
+        // A daemon that launched and then died reaches `handleUnexpectedExit`, which
+        // replaces this task; one that would not launch, or launched and never answered,
+        // is retried here against the same budget.
+        logger.warning(
+          "The Tailscale daemon did not come back yet",
+          metadata: ["reason": .string(String(describing: error))])
+        await daemon.stop()
+      }
+    }
+    return false
   }
 
   /// Watches a running node for the two things that silently take it down: a node key that
   /// expired (the state drops to `NeedsLogin`), and a rename on the tailnet.
-  private func startMonitoring() {
-    guard background == nil else { return }
-    background = Task { [weak self] in
-      await self?.monitorLoop()
-    }
-  }
-
   private func monitorLoop() async {
     while !Task.isCancelled, !isDisconnecting {
       try? await Task.sleep(for: Self.monitorInterval)
@@ -806,8 +938,8 @@ public actor TailscaleTunnel: ProxyProviding {
           "The Tailscale node is no longer running",
           metadata: ["state": .string(status.backendState)])
         address = nil
-        background = nil
-        startWaiting(restartingDaemon: false)
+        hasAppliedPreferences = false
+        startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: false) }
         return
       }
       if let dnsName = status.dnsName {
@@ -828,9 +960,8 @@ public actor TailscaleTunnel: ProxyProviding {
       "The Tailscale daemon exited on its own",
       metadata: ["code": .stringConvertible(code)])
     address = nil
-    background?.cancel()
-    background = nil
-    startWaiting(restartingDaemon: true)
+    hasAppliedPreferences = false
+    startBackground { tunnel in await tunnel.waitLoop(restartingDaemon: true) }
   }
 }
 
@@ -851,15 +982,9 @@ extension TailscaleError {
 
   public var domain: String { "Proxy" }
 
-  /// The ones with an obvious remedy interrupt; the rest are reported through the proxy's
-  /// own failure path and would be a second notice for one event.
-  public var isUserFacing: Bool {
-    switch self {
-    case .invalidAuthKey, .noMagicDNSName, .funnelPortNotAllowed: true
-    default: false
-    }
-  }
-
+  /// Every case is folded into `ProxyError.tunnelFailed` by the provider, whose message
+  /// is what a person reads; these are what a diagnostic report carries for one caught
+  /// on its own.
   public var title: String {
     switch self {
     case .invalidAuthKey: "Tailscale rejected the auth key"

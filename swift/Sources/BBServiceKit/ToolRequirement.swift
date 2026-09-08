@@ -336,6 +336,15 @@ public struct ManagedToolDescriptor: Sendable, Codable, Equatable, Identifiable 
   public let summary: String
   /// The name the executable is installed under, and the name looked for inside an archive.
   public let executableName: String
+  /// Other executables the same install ships beside the main one, by name.
+  ///
+  /// Tailscale is a daemon AND a command-line tool, and the second is how the first is
+  /// signed in and told what to serve; neither works alone. Declared so the host makes
+  /// both runnable on install and can hand a service the companion's path from the same
+  /// install it resolved the executable from — whether that install is managed, one the
+  /// user pointed at, or bundled. A service that went looking beside the executable by
+  /// hand would be reimplementing that resolution, differently.
+  public let companionExecutables: [String]
   /// Where a user goes to read about it, or to download it by hand for an offline install.
   public let homepage: URL?
   public let source: ToolSource
@@ -357,6 +366,7 @@ public struct ManagedToolDescriptor: Sendable, Codable, Equatable, Identifiable 
     displayName: String,
     summary: String,
     executableName: String,
+    companionExecutables: [String] = [],
     homepage: URL? = nil,
     source: ToolSource,
     builds: [ToolBuild],
@@ -369,6 +379,7 @@ public struct ManagedToolDescriptor: Sendable, Codable, Equatable, Identifiable 
     self.displayName = displayName
     self.summary = summary
     self.executableName = executableName
+    self.companionExecutables = companionExecutables
     self.homepage = homepage
     self.source = source
     self.builds = builds
@@ -429,6 +440,7 @@ public struct ManagedToolDescriptor: Sendable, Codable, Equatable, Identifiable 
       && !id.contains("..")
       && !executableName.isEmpty
       && !executableName.contains("/")
+      && companionExecutables.allSatisfy { !$0.isEmpty && !$0.contains("/") }
   }
 }
 

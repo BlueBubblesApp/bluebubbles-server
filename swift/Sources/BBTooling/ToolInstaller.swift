@@ -182,6 +182,17 @@ public struct ToolInstaller: Sendable {
       )
     }
     try Unpacking.makeRunnable(installedExecutable)
+    // The companions the descriptor declares, beside it. A tarball can carry a mode we
+    // cannot rely on for these just as for the main one, and a companion that is not
+    // executable fails later, in a service, as a command that would not launch.
+    let installedDirectory = installedExecutable.deletingLastPathComponent()
+    for companion in descriptor.companionExecutables {
+      let path = installedDirectory.appendingPathComponent(companion)
+      guard FileManager.default.fileExists(atPath: path.path) else {
+        throw ToolError.executableNotFoundInArchive(tool: descriptor.id, expected: companion)
+      }
+      try Unpacking.makeRunnable(path)
+    }
 
     try activate(destination, layout: layout, toolID: descriptor.id)
 

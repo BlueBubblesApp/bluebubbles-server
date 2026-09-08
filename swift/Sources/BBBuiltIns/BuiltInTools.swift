@@ -208,7 +208,7 @@ public enum BuiltInTools {
   /// documentation sends anyone wanting the daemon on a Mac — and Homebrew's builders
   /// publish the result to a registry that this server can read without `brew`. The bottle
   /// is a gzipped tarball with `tailscale/<version>/bin/tailscaled` and `bin/tailscale`
-  /// beside it; the connection method needs both and finds the second next to the first.
+  /// beside it; the connection method needs both, and declares the second as a companion.
   ///
   /// **Unsigned, and verified by digest instead.** Homebrew's builders sign ad hoc, which
   /// carries no team and proves nothing about who built it. What stands in is that a bottle
@@ -230,6 +230,9 @@ public enum BuiltInTools {
     displayName: "Tailscale",
     summary: "The open-source Tailscale daemon, which joins this Mac to your tailnet.",
     executableName: "tailscaled",
+    // The CLI, which the connection method drives the daemon with. Both are made runnable
+    // on install and the method asks the tool manager for this one by name.
+    companionExecutables: ["tailscale"],
     homepage: URL(string: "https://formulae.brew.sh/formula/tailscale"),
     source: .homebrewBottle(formula: "tailscale"),
     builds: [

@@ -206,6 +206,20 @@ struct ToolRequirementTests {
       })
   }
 
+  @Test("A companion executable is a name beside the executable, never a path")
+  func companionsAreNames() {
+    let descriptor = ManagedToolDescriptor(
+      id: "daemon", displayName: "daemon", summary: "", executableName: "daemond",
+      companionExecutables: ["../elsewhere/daemon"],
+      source: .rollingURL,
+      builds: [
+        ToolBuild(architecture: .arm64, download: .url("https://x.test/d"), archive: .zip)
+      ],
+      signature: .trustOnFirstUse
+    )
+    #expect(!descriptor.isWellFormed)
+  }
+
   @Test("A tool id that is not safe as a directory name is refused")
   func malformedToolIdentifiers() {
     // The id becomes a path component under Application Support.

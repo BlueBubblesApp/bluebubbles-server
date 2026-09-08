@@ -102,6 +102,13 @@ struct ProxyHost: Sendable {
     return await tools.executablePath(for: tool.id)
   }
 
+  /// One of the declared program's companion executables — the CLI that ships beside a
+  /// daemon — resolved by the same tool manager, from the same install.
+  func companionExecutable(named name: String) async -> String? {
+    guard let tool = manifest.tools.first else { return nil }
+    return await tools.companionExecutablePath(for: tool.id, named: name)
+  }
+
   /// The port to forward to — a CORE setting, so it goes through the scope and every
   /// connection method has to declare `.readSettings(keys: ["socket_port"])` for it. They all
   /// do; the declaration is what makes that visible on their permissions list.
@@ -211,6 +218,27 @@ actor ProxyService<Method: ProxyMethod>: Service, ConfigurableService,
             actions: [.openSettings(.settings)],
             dedupeKey: "proxy.gave-up.\(identifier)",
             // Whether the tunnel is down is re-established the moment it tries again.
+            isDurable: false
+          )
+        )
+      },
+      onAttention: { attention in
+        // A step only a person can take — a sign-in link, a feature to switch on. The
+        // same alert for every connection method, built from what the provider said;
+        // the link, where there is one, is the action.
+        var actions: [AlertAction] = []
+        if let link = attention.link { actions.append(.openURL(link)) }
+        actions.append(.openSettings(.settings))
+        await alerts.raise(
+          UserAlert(
+            severity: .warning,
+            title: attention.title,
+            body: attention.body,
+            source: "Connection",
+            actions: actions,
+            dedupeKey: "proxy.attention.\(identifier).\(attention.key)",
+            // Re-raised by the provider whenever the step is still pending after a
+            // restart, so the fresh notice replaces this one.
             isDurable: false
           )
         )

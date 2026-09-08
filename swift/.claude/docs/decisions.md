@@ -237,13 +237,18 @@ third-party services are meant to be the same kind of thing. Four rules the code
 - **Keep the offline path.** A user configuring a tunnel frequently has no working connection —
   that is often why.
 
-**A connection method may wait on a person without failing.** Tailscale has to be signed in,
-and serving over HTTPS or Funnel needs a feature the tailnet's owner switches on once; each can
-be pending on somebody who is not at the Mac. The provider throws `ProxyError.awaitingUser`,
-which `ProxyCoordinator` treats as "not yet" rather than "failed", and keeps polling in the
-background with the daemon UP — because restarting it would invalidate the very sign-in link
-the person was just sent. The registry's restart policy is for tunnels that broke, not for
-tunnels that are waiting, and the health report carries the reason so the UI can say which.
+**A connection method may still be coming up when `start()` returns, and may wait on a person
+without failing.** Tailscale has to be signed in, and serving over HTTPS or Funnel needs a
+feature the tailnet's owner switches on once; each can be pending on somebody who is not at
+the Mac. The provider throws `ProxyError.pending`, which `ProxyCoordinator` treats as "not
+yet" rather than "failed", and carries on in the background with the daemon UP — because
+restarting it would invalidate the very sign-in link the person was just sent, and because the
+registry starts services one after another, so a `connect()` that waits a minute for a browser
+holds every service behind it. What the person has to do reaches the service through
+`ProxyObserver.attentionRequired`, a generic event carrying a title, a body, a link and a key,
+which `ProxyService` turns into one alert the same way for every connection method — so a
+third-party tunnel with a browser sign-in can say it too. The registry's restart policy is for
+tunnels that broke, not for tunnels that are waiting, and the health report carries the reason.
 
 **The settings screen is generated.** Declaring a `Setting` with a `presentation:` and adding it
 to `Settings.renderable` is the whole job. `SettingRow` renders every control type, including
