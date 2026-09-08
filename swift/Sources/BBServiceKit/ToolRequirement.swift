@@ -2,7 +2,7 @@
 //  The external program a service needs, declared the same way everything else about a
 //  service is: as data.
 //
-//  Three of the connection methods are a wrapper around someone else's binary, and the Node
+//  Four of the connection methods are a wrapper around someone else's binary, and the Node
 //  server solved that by committing 200 MB of vendored executables to the repository —
 //  `appResources/macos/daemons/<provider>/<arch>/`, two architectures each, cloudflared alone
 //  38 MB, updated by hand when someone remembered. Every one of those bytes ships in the app,
@@ -54,15 +54,31 @@ public enum ToolArchitecture: String, Sendable, Codable, CaseIterable, CustomStr
 
 /// How the host discovers what the current version IS.
 ///
-/// Two shapes, because the three tunnels genuinely have two: cloudflared and zrok publish
-/// GitHub releases with version tags and per-architecture assets, while ngrok publishes one
-/// URL per architecture that always serves the current build and never says what it is. A
-/// single "download strategy" that pretended those were the same would have to invent a
-/// version for ngrok, and the invented one would be wrong the moment ngrok shipped.
+/// Three shapes, because the four tunnels genuinely have three: cloudflared and zrok publish
+/// GitHub releases with version tags and per-architecture assets; ngrok publishes one URL
+/// per architecture that always serves the current build and never says what it is; and
+/// Tailscale publishes no standalone macOS daemon at all, so the build comes from the bottle
+/// Homebrew compiles for it. A single "download strategy" that pretended those were the
+/// same would have to invent a version for ngrok, and the invented one would be wrong the
+/// moment ngrok shipped.
 public enum ToolSource: Sendable, Codable, Equatable {
 
   /// A GitHub repository's releases. The tag is the version; assets are matched by name.
   case gitHubReleases(owner: String, repository: String, allowPrereleases: Bool = false)
+
+  /// A formula's bottles in Homebrew's registry on GitHub Container Registry.
+  ///
+  /// For a vendor that publishes source and a Homebrew formula but no macOS binary of its
+  /// own — Tailscale's open-source daemon is the case in hand. The registry lists every
+  /// version as a tag, and each version's index names one bottle per macOS release and
+  /// architecture together with its SHA-256, so a version is addressable and the download is
+  /// checksummed by the registry that serves it. What a bottle does NOT carry is a Developer
+  /// ID signature: Homebrew's builders sign ad hoc, so `signature` is `.unsigned` and the
+  /// digest is what stands in for it — the registry's own, and the plugin's pin on top.
+  ///
+  /// The formula name is Homebrew's (`tailscale`, `python@3.12`); the registry path is
+  /// derived from it by the host.
+  case homebrewBottle(formula: String)
 
   /// One URL per architecture that always serves the vendor's current build.
   ///
@@ -86,8 +102,27 @@ public enum ToolSource: Sendable, Codable, Equatable {
     switch self {
     case .gitHubReleases:
       ["api.github.com", "github.com", "objects.githubusercontent.com"]
+    case .homebrewBottle:
+      // The index and the tag list come from `ghcr.io`; the bottle itself REDIRECTS to
+      // GitHub's package store, for the same reason `objects.githubusercontent.com` is
+      // listed above.
+      ["ghcr.io", "pkg-containers.githubusercontent.com"]
     case .rollingURL:
       []
+    }
+  }
+
+  /// Whether the source itself publishes a digest for every download it serves.
+  ///
+  /// A GitHub release may or may not ship a checksums asset, which is why `checksums` is
+  /// declared separately. A Homebrew bottle always has one: its SHA-256 is in the index and
+  /// is the address the bytes are fetched by. That is what lets an unsigned bottle pass
+  /// `ManifestValidator` without a `checksums` declaration — there is nothing extra to
+  /// declare, because the source cannot serve a build without naming its digest.
+  public var publishesDigests: Bool {
+    switch self {
+    case .homebrewBottle: true
+    case .gitHubReleases, .rollingURL: false
     }
   }
 }
@@ -127,10 +162,17 @@ public enum ToolDownload: Sendable, Codable, Equatable {
   case releaseAsset(namePattern: String)
   /// A fixed URL.
   case url(String)
+  /// The bottle Homebrew built for this build's architecture.
+  ///
+  /// Which macOS it was built on is the host's choice, not the manifest's: the oldest one
+  /// the version's index still carries, because a bottle built on an older macOS runs on
+  /// every newer one and the reverse is not promised. Only meaningful under
+  /// `ToolSource.homebrewBottle`, and the resolver says so if it meets it anywhere else.
+  case homebrewBottle
 
   public var host: String? {
     switch self {
-    case .releaseAsset: nil
+    case .releaseAsset, .homebrewBottle: nil
     case .url(let string): URL(string: string)?.host
     }
   }
@@ -360,7 +402,7 @@ public struct ManagedToolDescriptor: Sendable, Codable, Equatable, Identifiable 
   /// that does until someone compares versions by hand.
   public var supportsVersionSelection: Bool {
     switch source {
-    case .gitHubReleases: true
+    case .gitHubReleases, .homebrewBottle: true
     case .rollingURL: false
     }
   }

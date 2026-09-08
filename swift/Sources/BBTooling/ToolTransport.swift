@@ -38,8 +38,12 @@ public struct ToolHTTPResponse: Sendable, Equatable {
 }
 
 public protocol ToolTransport: Sendable {
-  /// A small document — a release list, a checksums file.
-  func fetch(_ url: URL) async throws -> (Data, ToolHTTPResponse)
+  /// A small document — a release list, a checksums file, a registry index.
+  ///
+  /// `headers` is what a registry needs and GitHub does not: GitHub Container Registry
+  /// answers nothing without an `Authorization` header, and returns an OCI index only when
+  /// asked for one by `Accept`. Everything else passes `[:]` through the extension below.
+  func fetch(_ url: URL, headers: [String: String]) async throws -> (Data, ToolHTTPResponse)
   /// What is currently at a URL, without transferring it.
   func head(_ url: URL) async throws -> ToolHTTPResponse
   /// Streams to `destination`, reporting completed fraction where the server said how big
@@ -47,8 +51,23 @@ public protocol ToolTransport: Sendable {
   func download(
     _ url: URL,
     to destination: URL,
+    headers: [String: String],
     progress: @escaping @Sendable (Double) -> Void
   ) async throws -> ToolHTTPResponse
+}
+
+extension ToolTransport {
+  public func fetch(_ url: URL) async throws -> (Data, ToolHTTPResponse) {
+    try await fetch(url, headers: [:])
+  }
+
+  public func download(
+    _ url: URL,
+    to destination: URL,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws -> ToolHTTPResponse {
+    try await download(url, to: destination, headers: [:], progress: progress)
+  }
 }
 
 public struct URLSessionToolTransport: ToolTransport {
@@ -62,8 +81,11 @@ public struct URLSessionToolTransport: ToolTransport {
     self.userAgent = userAgent
   }
 
-  public func fetch(_ url: URL) async throws -> (Data, ToolHTTPResponse) {
-    let (data, response) = try await session.data(for: request(url, method: "GET"))
+  public func fetch(_ url: URL, headers: [String: String]) async throws -> (
+    Data, ToolHTTPResponse
+  ) {
+    let (data, response) = try await session.data(
+      for: request(url, method: "GET", headers: headers))
     return (data, Self.describe(response))
   }
 
@@ -77,6 +99,7 @@ public struct URLSessionToolTransport: ToolTransport {
   public func download(
     _ url: URL,
     to destination: URL,
+    headers: [String: String],
     progress: @escaping @Sendable (Double) -> Void
   ) async throws -> ToolHTTPResponse {
     // A download task with a delegate, rather than `URLSession.bytes` or
@@ -86,16 +109,21 @@ public struct URLSessionToolTransport: ToolTransport {
     // The delegate gives byte counts as they arrive and writes through the system's own
     // file handling.
     try await DownloadCoordinator.run(
-      request: request(url, method: "GET"),
+      request: request(url, method: "GET", headers: headers),
       destination: destination,
       progress: progress
     )
   }
 
-  private func request(_ url: URL, method: String) -> URLRequest {
+  private func request(
+    _ url: URL, method: String, headers: [String: String] = [:]
+  ) -> URLRequest {
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+    for (name, value) in headers {
+      request.setValue(value, forHTTPHeaderField: name)
+    }
     // An update check that returns a cached answer for hours is not a check.
     request.cachePolicy = .reloadIgnoringLocalCacheData
     request.timeoutInterval = 30
@@ -170,6 +198,29 @@ private final class DownloadCoordinator: NSObject, URLSessionDownloadDelegate, @
     continuation = nil
     lock.unlock()
     pending?.resume(with: result)
+  }
+
+  /// Follows a redirect, dropping the credential when it leaves the host it was meant for.
+  ///
+  /// A registry answers a blob request with a redirect to its storage — GitHub Container
+  /// Registry sends a pre-signed URL on `pkg-containers.githubusercontent.com` — and
+  /// `URLSession` forwards the original headers to it, `Authorization` included. The
+  /// storage host then has a credential it was never meant to see and, for a pre-signed
+  /// URL, one that makes it refuse the request outright. `curl` strips the header on a
+  /// cross-host redirect for exactly this reason; this does the same.
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    willPerformHTTPRedirection response: HTTPURLResponse,
+    newRequest request: URLRequest,
+    completionHandler: @escaping (URLRequest?) -> Void
+  ) {
+    var next = request
+    let original = task.originalRequest?.url?.host?.lowercased()
+    if let original, next.url?.host?.lowercased() != original {
+      next.setValue(nil, forHTTPHeaderField: "Authorization")
+    }
+    completionHandler(next)
   }
 
   func urlSession(

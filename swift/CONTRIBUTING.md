@@ -534,9 +534,13 @@ none of which belong in a run-to-completion helper.
 
 ### External programs are declared, never fetched by hand
 
-Three connection methods run someone else's binary — ngrok, cloudflared, zrok — and none of
-them contains any downloading code. Each declares a `ManagedToolDescriptor` in its manifest
-(`BuiltInTools`) and asks `AppContext.tools` for a path; `BBTooling` does the rest.
+Four connection methods run someone else's binary — ngrok, cloudflared, zrok, Tailscale — and
+none of them contains any downloading code. Each declares a `ManagedToolDescriptor` in its
+manifest (`BuiltInTools`) and asks `AppContext.tools` for a path; `BBTooling` does the rest.
+Three sources are expressible — a GitHub release, a rolling URL, and a Homebrew bottle — and
+the third exists because Tailscale publishes no standalone macOS daemon: `BBTooling` reads
+Homebrew's registry on `ghcr.io` directly, without `brew`, and the bottle's digest is both its
+address and its checksum.
 
 That split is not tidiness either. A downloader compiled into a service is a capability plugins
 could never have, and the whole point of the manifest model is that a built-in service and a

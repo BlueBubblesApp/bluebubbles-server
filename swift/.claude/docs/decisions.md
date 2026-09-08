@@ -219,8 +219,11 @@ and whether the blocking wait lands on a cooperative-pool thread. `BBCore/Subpro
 `BBProxy/DaemonProcess` is the exception and stays one — supervising a tunnel needs streaming
 output, readiness signals, its own process group and a termination handler.
 
-**External binaries are declared, never fetched by hand.** ngrok, cloudflared and zrok contain no
-downloading code; each declares a `ManagedToolDescriptor` and asks `AppContext.tools` for a path.
+**External binaries are declared, never fetched by hand.** ngrok, cloudflared, zrok and Tailscale
+contain no downloading code; each declares a `ManagedToolDescriptor` and asks `AppContext.tools`
+for a path. Tailscale's comes from Homebrew's bottle registry, because Tailscale ships no
+standalone macOS daemon — a third `ToolSource`, read without `brew`, whose digest is the
+download's own address and so stands in for the signature Homebrew's builders do not apply.
 A downloader compiled into a service is a capability a plugin could never have, and built-ins and
 third-party services are meant to be the same kind of thing. Four rules the code enforces:
 
@@ -233,6 +236,14 @@ third-party services are meant to be the same kind of thing. Four rules the code
   signs, pin the team after first install. The `current` symlink moves last.
 - **Keep the offline path.** A user configuring a tunnel frequently has no working connection —
   that is often why.
+
+**A connection method may wait on a person without failing.** Tailscale has to be signed in,
+and serving over HTTPS or Funnel needs a feature the tailnet's owner switches on once; each can
+be pending on somebody who is not at the Mac. The provider throws `ProxyError.awaitingUser`,
+which `ProxyCoordinator` treats as "not yet" rather than "failed", and keeps polling in the
+background with the daemon UP — because restarting it would invalidate the very sign-in link
+the person was just sent. The registry's restart policy is for tunnels that broke, not for
+tunnels that are waiting, and the health report carries the reason so the UI can say which.
 
 **The settings screen is generated.** Declaring a `Setting` with a `presentation:` and adding it
 to `Settings.renderable` is the whole job. `SettingRow` renders every control type, including

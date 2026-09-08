@@ -37,7 +37,7 @@ both directions** — an added key fails the same as a missing one.
 | `Sources/BBSocketIO` | Native Engine.IO / Socket.IO server |
 | `Sources/BBEvents` | Event bus, delivery sinks, extension seam, payload codecs |
 | `Sources/BBPushKit` | FCM and Firebase provisioning — entirely optional |
-| `Sources/BBProxy` | ngrok / Cloudflare / zrok / dynamic-DNS / LAN |
+| `Sources/BBProxy` | ngrok / Cloudflare / zrok / Tailscale / dynamic-DNS / LAN |
 | `Sources/BBAppleScript` | OSAKit send and start-chat, for installs without the Private API |
 | `Sources/BBSystem` | NSWorkspace, permissions, Keychain, SMAppService, media |
 | `Helper/BBPrivateAPIContract` | Typed contract shared by the server and the injected helper |

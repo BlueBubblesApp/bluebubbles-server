@@ -15,7 +15,7 @@
 //  stored property so there is no `Self` to bind to the wrong type. The dispatch assertion is
 //  therefore gone — it is now a property of the type system rather than something to test.
 //
-//  What remains is what the type system does NOT check: that the five manifests are distinct,
+//  What remains is what the type system does NOT check: that the six manifests are distinct,
 //  and that each declares the entitlement its code relies on.
 
 import BBServiceKit
@@ -35,6 +35,7 @@ struct ProxyManifestDispatchTests {
     ("ngrok", NgrokMethod.self),
     ("Cloudflare", CloudflareMethod.self),
     ("zrok", ZrokMethod.self),
+    ("Tailscale", TailscaleMethod.self),
   ]
 
   @Test("Every connection method declares a manifest in the right category")
@@ -69,15 +70,15 @@ struct ProxyManifestDispatchTests {
   }
 
   /// The registry keys on `Service.id`, which comes from the manifest. Each specialisation of
-  /// the generic is a distinct type, so this is what confirms the five register separately
+  /// the generic is a distinct type, so this is what confirms the six register separately
   /// rather than collapsing onto one.
   @Test("Each specialisation carries its own service id")
   func specialisationsAreDistinctServices() {
     let ids = [
       ProxyService<LANMethod>.id, ProxyService<DynamicDNSMethod>.id,
       ProxyService<NgrokMethod>.id, ProxyService<CloudflareMethod>.id,
-      ProxyService<ZrokMethod>.id,
+      ProxyService<ZrokMethod>.id, ProxyService<TailscaleMethod>.id,
     ]
-    #expect(Set(ids).count == 5)
+    #expect(Set(ids).count == 6)
   }
 }

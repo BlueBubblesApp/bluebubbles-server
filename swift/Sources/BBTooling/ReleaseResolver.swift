@@ -1,12 +1,15 @@
 //  ReleaseResolver
 //  Turning "what is the current version" into a URL to fetch.
 //
-//  The two source shapes are not a generalisation for its own sake — they are what the three
+//  The three source shapes are not a generalisation for its own sake — they are what the four
 //  tunnels actually do, and the difference is visible to the user:
 //
 //    - **GitHub releases** (cloudflared, zrok) publish a version tag and per-architecture
 //      assets. The version is known BEFORE downloading, so "2024.8.2 is available, you have
 //      2024.6.1" is a sentence that can be shown, and an update can be declined.
+//    - **A Homebrew bottle** (Tailscale) is the same claim from a different registry: one
+//      tag per version, one bottle per macOS release and architecture, and a digest that is
+//      also the download's address. See `HomebrewBottles`.
 //    - **A rolling URL** (ngrok) always serves the current build and never says what it is.
 //      The best available answer to "is there something newer" is that the bytes at the URL
 //      changed, which is what `ETag`/`Last-Modified` say. The version is learned afterwards,
@@ -32,6 +35,15 @@ public struct ResolvedRelease: Sendable, Equatable {
   public let channel: ToolChannel
   /// SHA-256 the plugin pinned for this build, when it pinned one.
   public let pinnedDigest: String?
+  /// SHA-256 the SOURCE published for this build, when the source publishes one per build.
+  ///
+  /// A Homebrew bottle's, read from the version's index. Checked by the installer like a
+  /// checksums file would be, and — like a checksums file — it is what lets an unsigned
+  /// download be adopted. Nil for the sources that publish digests elsewhere or not at all.
+  public let publishedDigest: String?
+  /// Headers the download itself needs. A registry that refuses anonymous requests puts its
+  /// token here; everything else leaves it empty.
+  public let requestHeaders: [String: String]
   /// Set when the recommended version was asked for and could not be found.
   ///
   /// The install continues on the latest rather than failing: a recommendation is advice
@@ -52,6 +64,8 @@ public struct ResolvedRelease: Sendable, Equatable {
     isVersionKnownInAdvance: Bool,
     channel: ToolChannel = .latest,
     pinnedDigest: String? = nil,
+    publishedDigest: String? = nil,
+    requestHeaders: [String: String] = [:],
     recommendationUnavailable: String? = nil,
     build: ToolBuild,
     downloadURL: URL,
@@ -64,6 +78,8 @@ public struct ResolvedRelease: Sendable, Equatable {
     self.isVersionKnownInAdvance = isVersionKnownInAdvance
     self.channel = channel
     self.pinnedDigest = pinnedDigest
+    self.publishedDigest = publishedDigest
+    self.requestHeaders = requestHeaders
     self.recommendationUnavailable = recommendationUnavailable
     self.build = build
     self.downloadURL = downloadURL
@@ -121,6 +137,14 @@ public struct ReleaseResolver: Sendable {
         descriptor, build: build,
         owner: owner, repository: repository, allowPrereleases: allowPrereleases
       )
+    case .homebrewBottle(let formula):
+      let registry = HomebrewRegistry(formula: formula, transport: transport)
+      if channel == .recommended, let recommended = descriptor.recommended {
+        return try await resolvePinnedBottle(
+          descriptor, build: build, recommended: recommended, registry: registry
+        )
+      }
+      return try await resolveBottle(descriptor, build: build, registry: registry, version: nil)
     case .rollingURL:
       return try await resolveRolling(descriptor, build: build)
     }
@@ -232,7 +256,8 @@ public struct ReleaseResolver: Sendable {
     guard case .releaseAsset(let pattern) = build.download else {
       throw ToolError.releaseLookupFailed(
         tool: descriptor.id,
-        reason: "this build names a fixed URL, which a GitHub release cannot supply"
+        reason: "this build names a fixed URL or a Homebrew bottle, which a GitHub release "
+          + "cannot supply"
       )
     }
     guard let asset = release.asset(matching: pattern),
@@ -266,6 +291,110 @@ public struct ReleaseResolver: Sendable {
     case nil:
       nil
     }
+  }
+
+  // MARK: - Homebrew
+
+  /// The recommended bottle, falling back to the newest the way `resolvePinned` does and for
+  /// the same reason: a stale pin is not a reason to have no tunnel, and the fallback is
+  /// reported rather than hidden.
+  private func resolvePinnedBottle(
+    _ descriptor: ManagedToolDescriptor,
+    build: ToolBuild,
+    recommended: RecommendedBuild,
+    registry: HomebrewRegistry
+  ) async throws -> ResolvedRelease {
+    if let pinned = try? await resolveBottle(
+      descriptor, build: build, registry: registry, version: recommended.version
+    ) {
+      return ResolvedRelease(
+        version: pinned.version,
+        isVersionKnownInAdvance: true,
+        channel: .recommended,
+        pinnedDigest: recommended.digest(for: build.architecture),
+        publishedDigest: pinned.publishedDigest,
+        requestHeaders: pinned.requestHeaders,
+        build: build,
+        downloadURL: pinned.downloadURL,
+        releaseNotesURL: pinned.releaseNotesURL,
+        publishedAt: pinned.publishedAt
+      )
+    }
+
+    let latest = try await resolveBottle(
+      descriptor, build: build, registry: registry, version: nil
+    )
+    return ResolvedRelease(
+      version: latest.version,
+      isVersionKnownInAdvance: true,
+      channel: .latest,
+      // Not carried over: the pin describes a version that is not the one being installed.
+      pinnedDigest: nil,
+      publishedDigest: latest.publishedDigest,
+      requestHeaders: latest.requestHeaders,
+      recommendationUnavailable: "\(descriptor.displayName) \(recommended.version) is "
+        + "recommended but is no longer published; \(latest.version) was installed "
+        + "instead.",
+      build: build,
+      downloadURL: latest.downloadURL,
+      releaseNotesURL: latest.releaseNotesURL,
+      publishedAt: latest.publishedAt
+    )
+  }
+
+  /// One version's bottle for this build, or the newest version's when `version` is nil.
+  private func resolveBottle(
+    _ descriptor: ManagedToolDescriptor,
+    build: ToolBuild,
+    registry: HomebrewRegistry,
+    version: String?
+  ) async throws -> ResolvedRelease {
+    guard case .homebrewBottle = build.download else {
+      throw ToolError.releaseLookupFailed(
+        tool: descriptor.id,
+        reason: "this build names a release asset or a URL, which a Homebrew formula "
+          + "cannot supply"
+      )
+    }
+
+    let wanted: String
+    if let version {
+      wanted = version
+    } else {
+      guard let newest = try await registry.versions(toolID: descriptor.id).last else {
+        throw ToolError.releaseLookupFailed(
+          tool: descriptor.id, reason: "the Homebrew registry lists no versions"
+        )
+      }
+      wanted = newest.text
+    }
+
+    guard let index = try await registry.index(version: wanted, toolID: descriptor.id) else {
+      throw ToolError.releaseLookupFailed(
+        tool: descriptor.id, reason: "the Homebrew registry has no \(wanted)"
+      )
+    }
+    guard let bottle = index.bottle(for: build.architecture),
+      let downloadURL = registry.downloadURL(for: bottle)
+    else {
+      throw ToolError.assetNotFound(
+        tool: descriptor.id,
+        pattern: "a macOS \(build.architecture.displayName) bottle",
+        available: index.bottles.map(\.referenceName)
+      )
+    }
+
+    return ResolvedRelease(
+      version: index.version,
+      isVersionKnownInAdvance: true,
+      channel: .latest,
+      publishedDigest: bottle.digest,
+      requestHeaders: HomebrewRegistry.headers(),
+      build: build,
+      downloadURL: downloadURL,
+      releaseNotesURL: registry.formulaPage,
+      publishedAt: index.createdAt
+    )
   }
 
   // MARK: - Rolling

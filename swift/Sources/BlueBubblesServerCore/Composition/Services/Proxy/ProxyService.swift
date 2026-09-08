@@ -2,14 +2,14 @@
 //  One service per connection method, in an exclusive category.
 //
 //  This replaces a single `ProxyTunnelService` that switched on a `proxy_service` enum. The
-//  enum could not say the things the model needs it to say: that these five are the same KIND
-//  of thing, that only one may run at a time, that three of them run a program and two do not,
+//  enum could not say the things the model needs it to say: that these six are the same KIND
+//  of thing, that only one may run at a time, that four of them run a program and two do not,
 //  or that each has its own configuration. Most importantly it could not be EXTENDED — a
 //  third-party tunnel cannot add a case to an enum compiled into this binary, so as long as
 //  the choice was an enum, "plugins" could never include a connection method.
 //
-//  As five services in an exclusive category, all of that falls out: the registry starts them
-//  all, four decline through `canRun`, and the validator reports it if two are somehow enabled
+//  As six services in an exclusive category, all of that falls out: the registry starts them
+//  all, five decline through `canRun`, and the validator reports it if two are somehow enabled
 //  at once. Selection is "which service in this category is enabled", which is a question a
 //  plugin can answer about itself.
 //
@@ -220,7 +220,7 @@ actor ProxyService<Method: ProxyMethod>: Service, ConfigurableService,
 
   /// Only the selected connection method runs.
   ///
-  /// The exclusive category expressed at runtime: all five are registered, and four decline
+  /// The exclusive category expressed at runtime: all six are registered, and five decline
   /// here. That is `GatedService`'s existing meaning, so nothing new was needed for it.
   func canRun() async -> Bool {
     await scoped.valueOrDefault(Settings.connectionMethod) == Self.manifest.id.rawValue
@@ -285,8 +285,14 @@ actor ProxyService<Method: ProxyMethod>: Service, ConfigurableService,
 
   func apply(_ change: SettingsChange) async throws -> ReloadAction { .restart }
 
+  /// Running once an address is published. Before that, the reason: a tunnel that has come
+  /// up and is waiting on a person — Tailscale's sign-in link, say — reports what it is
+  /// waiting for rather than a bare "not connected" that reads as a failure.
   var health: ServiceHealth {
-    get async { await coordinator.address == nil ? .inactive(reason: "not connected") : .running }
+    get async {
+      if await coordinator.address != nil { return .running }
+      return .inactive(reason: await coordinator.pendingReason ?? "not connected")
+    }
   }
 
 }

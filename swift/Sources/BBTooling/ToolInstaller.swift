@@ -68,7 +68,9 @@ public struct ToolInstaller: Sendable {
     progress(.downloading(fraction: 0))
     let response: ToolHTTPResponse
     do {
-      response = try await transport.download(release.downloadURL, to: archiveFile) { fraction in
+      response = try await transport.download(
+        release.downloadURL, to: archiveFile, headers: release.requestHeaders
+      ) { fraction in
         progress(.downloading(fraction: fraction))
       }
     } catch {
@@ -103,11 +105,22 @@ public struct ToolInstaller: Sendable {
       }
     }
 
+    // The source's own digest next, where the source publishes one per build. A Homebrew
+    // bottle is fetched BY this value, so a mismatch here is a registry serving something
+    // other than what it was asked for.
+    if let published = release.publishedDigest {
+      guard published.caseInsensitiveCompare(digest) == .orderedSame else {
+        throw ToolError.checksumMismatch(
+          tool: descriptor.id, expected: published, actual: digest
+        )
+      }
+    }
+
     if let checksumsURL = release.checksumsURL {
       try await verifyChecksum(
         descriptor, digest: digest, assetName: downloadName, checksumsURL: checksumsURL
       )
-    } else if descriptor.signature == .unsigned {
+    } else if descriptor.signature == .unsigned, release.publishedDigest == nil {
       // Belt and braces against a manifest that got past validation — an unsigned tool
       // with no checksums is bytes from the internet that nothing has checked.
       throw ToolError.checksumMissing(tool: descriptor.id, asset: downloadName)

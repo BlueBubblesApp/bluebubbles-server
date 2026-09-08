@@ -364,7 +364,9 @@ public enum ManifestValidator {
           ))
       }
 
-      if tool.signature == .unsigned && tool.checksums == nil {
+      // A source that names a digest for every build it serves counts as checksums: a
+      // Homebrew bottle is fetched BY its SHA-256, so there is nothing separate to declare.
+      if tool.signature == .unsigned && tool.checksums == nil && !tool.source.publishesDigests {
         problems.append(.unverifiableTool(service: manifest.id, tool: tool.id))
       }
 

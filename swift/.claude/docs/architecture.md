@@ -41,7 +41,7 @@ and knows nothing about the whole.
 | `BBSocketIO` | Native Engine.IO / Socket.IO implementation |
 | `BBEvents` | Event bus, sinks, payload codecs, webhook delivery |
 | `BBPushKit` | FCM and Firebase provisioning — entirely optional |
-| `BBProxy` | ngrok / Cloudflare / zrok / dynamic DNS / LAN |
+| `BBProxy` | ngrok / Cloudflare / zrok / Tailscale / dynamic DNS / LAN |
 | `BBAppleScript` | OSAKit send path for installs without the Private API |
 | `BBPrivateAPI` | Client and transport for the injected helper |
 | `BBSystem` | NSWorkspace, permissions, Keychain, SMAppService, media, certificates |
@@ -153,7 +153,7 @@ Access says so in `permissions:`, and the registry reads it from there.
 Built-in service ids (`Sources/BBBuiltIns/BuiltInManifests.swift`, `BuiltInManifests.ID`):
 `http`, `socket`, `permissions`, `changeDetection`, `contacts`, `privateAPI`,
 `scheduledMessages`, `sleepPrevention`, `launchAtLogin`, `toolUpdates`, `push`, `webhooks`,
-and the five `proxy*` connection methods.
+and the six `proxy*` connection methods.
 
 A service's registry key IS its manifest identifier: `Service.id` returns `manifest.id`, the
 registry keys on `ServiceIdentifier`, and there is no second identifier type. A dependency is

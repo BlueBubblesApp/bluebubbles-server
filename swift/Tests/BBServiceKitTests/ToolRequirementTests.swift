@@ -163,6 +163,49 @@ struct ToolRequirementTests {
     #expect(checked.isEmpty)
   }
 
+  @Test("A Homebrew bottle is checksummed by its registry, so an unsigned one passes")
+  func bottlesCarryTheirOwnDigests() {
+    // The bottle is fetched by its SHA-256 and the installer hashes what arrived, which is
+    // the same guarantee a checksums file gives. Declaring one would be declaring nothing.
+    let bottle = tool(
+      signature: .unsigned,
+      builds: [
+        ToolBuild(architecture: .arm64, download: .homebrewBottle, archive: .tarGzip),
+        ToolBuild(architecture: .x86_64, download: .homebrewBottle, archive: .tarGzip),
+      ],
+      source: .homebrewBottle(formula: "faketool")
+    )
+    #expect(bottle.source.publishesDigests)
+    #expect(bottle.supportsVersionSelection)
+    // The registry, and the store its blob downloads redirect to — both on the list the
+    // user reads.
+    #expect(bottle.networkHosts == ["ghcr.io", "pkg-containers.githubusercontent.com"])
+
+    let problems = ManifestValidator.validate(
+      manifest(
+        tools: [bottle],
+        entitlements: [
+          .spawnProcess,
+          .network(hosts: ["ghcr.io", "pkg-containers.githubusercontent.com"]),
+        ]),
+      secretKeys: Self.secrets
+    )
+    #expect(problems.isEmpty, "\(problems)")
+
+    // Declaring only the registry describes the check and not the download.
+    let undeclared = ManifestValidator.validate(
+      manifest(tools: [bottle], entitlements: [.spawnProcess, .network(hosts: ["ghcr.io"])]),
+      secretKeys: Self.secrets
+    )
+    #expect(
+      undeclared.contains {
+        if case .toolHostNotDeclared(_, _, let host) = $0 {
+          return host == "pkg-containers.githubusercontent.com"
+        }
+        return false
+      })
+  }
+
   @Test("A tool id that is not safe as a directory name is refused")
   func malformedToolIdentifiers() {
     // The id becomes a path component under Application Support.

@@ -67,12 +67,13 @@ struct BuiltInManifestTests {
 
   // MARK: - Categories
 
-  @Test("All five connection methods are one exclusive category")
+  @Test("All six connection methods are one exclusive category")
   func proxiesShareACategory() {
     // The generalisation of `proxy_service`. Expressing it as a category means a
     // third-party tunnel can join the set, which an enum could never allow.
     let proxies = BuiltInManifests.all.filter { $0.category == .reverseProxy }
-    #expect(proxies.count == 5, "expected LAN, dynamic DNS, ngrok, Cloudflare and zrok")
+    #expect(
+      proxies.count == 6, "expected LAN, dynamic DNS, ngrok, Cloudflare, zrok and Tailscale")
     #expect(proxies.allSatisfy { $0.category.isExclusive })
   }
 
@@ -108,6 +109,7 @@ struct BuiltInManifestTests {
       BuiltInManifests.ID.proxyNgrok,
       BuiltInManifests.ID.proxyCloudflare,
       BuiltInManifests.ID.proxyZrok,
+      BuiltInManifests.ID.proxyTailscale,
     ] {
       let manifest = BuiltInManifests.all.first { $0.id == id }
       #expect(

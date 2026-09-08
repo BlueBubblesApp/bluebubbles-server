@@ -1,22 +1,22 @@
 //  BuiltInTools
-//  The three tunnel binaries, described the way a plugin would have to describe one.
+//  The four tunnel binaries, described the way a plugin would have to describe one.
 //
-//  Everything vendor-specific about downloading, verifying and updating ngrok, cloudflared and
-//  zrok is in this file and nowhere else. That is the test of whether the model in
-//  `ToolRequirement` is real: if managing these three needed anything beyond what a manifest
+//  Everything vendor-specific about downloading, verifying and updating ngrok, cloudflared,
+//  zrok and Tailscale is in this file and nowhere else. That is the test of whether the model
+//  in `ToolRequirement` is real: if managing these four needed anything beyond what a manifest
 //  can express, a third-party connection method could never manage its own binary, and we
 //  would be back to built-in services having a capability plugins do not.
 //
 //  They differ in every way they could:
 //
-//  | | ngrok | cloudflared | zrok |
-//  |---|---|---|---|
-//  | Published as | one rolling URL per architecture | GitHub releases | GitHub releases |
-//  | Version known before download | no | yes | yes |
-//  | Packaged as | zip | tar.gz | tar.gz |
-//  | Signed by | ngrok, Inc. | Cloudflare Inc. | NetFoundry Inc |
-//  | Checksums published | no | in the release notes only | `checksums.sha256.txt` |
-//  | Recommended version | not expressible | 2026.8.2 | 1.1.11 |
+//  | | ngrok | cloudflared | zrok | tailscale |
+//  |---|---|---|---|---|
+//  | Published as | one rolling URL per arch | GitHub releases | GitHub releases | Homebrew bottles |
+//  | Version known before download | no | yes | yes | yes |
+//  | Packaged as | zip | tar.gz | tar.gz | tar.gz |
+//  | Signed by | ngrok, Inc. | Cloudflare Inc. | NetFoundry Inc | nobody (ad hoc) |
+//  | Checksums published | no | release notes only | `checksums.sha256.txt` | registry index |
+//  | Recommended version | not expressible | 2026.8.2 | 1.1.11 | 1.102.3 |
 //
 //  **The recommended version is what installs by default**, and it is declared HERE, next to
 //  the service that runs the program, because that service is the only thing that knows what it
@@ -196,5 +196,56 @@ public enum BuiltInTools {
     versionProbe: VersionProbe(arguments: ["version"])
   )
 
-  public static let all: [ManagedToolDescriptor] = [ngrok, cloudflared, zrok]
+  // MARK: - Tailscale
+
+  /// The open-source Tailscale daemon and CLI, from the bottles Homebrew builds for them.
+  ///
+  /// Tailscale ships macOS in two forms and neither is this: the App Store and standalone
+  /// applications run their daemon inside a network system extension that needs an
+  /// administrator to approve and a person to sign in through the menu bar, and there is no
+  /// `tailscaled` tarball for darwin on `pkgs.tailscale.com` and no binary on a GitHub
+  /// release. What there is, is a Homebrew formula — which is where Tailscale's own
+  /// documentation sends anyone wanting the daemon on a Mac — and Homebrew's builders
+  /// publish the result to a registry that this server can read without `brew`. The bottle
+  /// is a gzipped tarball with `tailscale/<version>/bin/tailscaled` and `bin/tailscale`
+  /// beside it; the connection method needs both and finds the second next to the first.
+  ///
+  /// **Unsigned, and verified by digest instead.** Homebrew's builders sign ad hoc, which
+  /// carries no team and proves nothing about who built it. What stands in is that a bottle
+  /// is fetched BY its SHA-256 — the registry's index names it, the download is addressed by
+  /// it, and the installer hashes what arrived — plus the pin below, which travelled inside
+  /// this signed application. A registry serving something else fails closed twice over.
+  ///
+  /// The digests are the index's `sh.brew.bottle.digest` for 1.102.3's `arm64_sonoma` and
+  /// `sonoma` bottles, which are the ones the resolver picks (the oldest macOS each
+  /// architecture is built for, since macOS 14 is the floor). They are the values the OCI
+  /// layer is addressed by — `ghcr.io/v2/homebrew/core/tailscale/blobs/sha256:<digest>` —
+  /// read off the registry rather than off a completed download; a transcription error
+  /// refuses every install rather than admitting one.
+  ///
+  /// `tailscaled --version` prints the version on its first line, which is what the probe
+  /// reads; the CLI prints the same.
+  public static let tailscale = ManagedToolDescriptor(
+    id: "tailscale",
+    displayName: "Tailscale",
+    summary: "The open-source Tailscale daemon, which joins this Mac to your tailnet.",
+    executableName: "tailscaled",
+    homepage: URL(string: "https://formulae.brew.sh/formula/tailscale"),
+    source: .homebrewBottle(formula: "tailscale"),
+    builds: [
+      ToolBuild(architecture: .arm64, download: .homebrewBottle, archive: .tarGzip),
+      ToolBuild(architecture: .x86_64, download: .homebrewBottle, archive: .tarGzip),
+    ],
+    signature: .unsigned,
+    recommended: RecommendedBuild(
+      version: "1.102.3",
+      digests: [
+        "arm64": "46c67806a1fadef72641f73e214419fbe9589aa96952a7d99d42f0b4393ae23b",
+        "x86_64": "30d20988a55dd0afb46fb6e4fa2f64d0885ba6f07d2506872435c40881037aad",
+      ]
+    ),
+    versionProbe: VersionProbe(arguments: ["--version"])
+  )
+
+  public static let all: [ManagedToolDescriptor] = [ngrok, cloudflared, zrok, tailscale]
 }

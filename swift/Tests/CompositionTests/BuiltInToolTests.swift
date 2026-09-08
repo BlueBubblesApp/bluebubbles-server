@@ -102,6 +102,41 @@ struct BuiltInToolTests {
     }
   }
 
+  @Test("A program from a Homebrew bottle asks for bottles, and only bottles")
+  func bottleSourcesUseBottleDownloads() {
+    // The resolver refuses a bottle source whose build names a release asset, and a GitHub
+    // source whose build names a bottle. Both compile; both fail on the first install.
+    for tool in BuiltInTools.all {
+      let isBottleSource: Bool
+      if case .homebrewBottle = tool.source {
+        isBottleSource = true
+      } else {
+        isBottleSource = false
+      }
+      for build in tool.builds {
+        let isBottleDownload: Bool
+        if case .homebrewBottle = build.download {
+          isBottleDownload = true
+        } else {
+          isBottleDownload = false
+        }
+        #expect(
+          isBottleSource == isBottleDownload,
+          "\(tool.id)'s \(build.architecture) build does not match its source"
+        )
+      }
+    }
+  }
+
+  @Test("Tailscale is the daemon, with the CLI found beside it")
+  func tailscaleInstallsTheDaemon() {
+    // `TailscaleMethod` resolves `tailscale` next to whatever the tool manager hands it, so
+    // the descriptor has to name the daemon — the thing that is RUN — and not the CLI.
+    #expect(BuiltInTools.tailscale.executableName == "tailscaled")
+    #expect(BuiltInTools.tailscale.signature == .unsigned)
+    #expect(BuiltInTools.tailscale.recommended != nil)
+  }
+
   @Test("Every declared program belongs to a service that asked to run one")
   func toolsAreReachableFromAManifest() {
     // A descriptor nothing declares is a descriptor nothing installs. The registry is

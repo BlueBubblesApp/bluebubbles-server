@@ -627,6 +627,15 @@ Not plan-claimed, just never written. Each is code a user reaches today.
       nine tests; the other two tunnels are touched only in passing by `DaemonTests`. zrok's
       reserved-versus-public share selection and ngrok's environment-carried token deserve the
       same treatment cloudflared got.
+- [ ] **Tailscale, end to end on a real Mac.** `TailscaleTests` covers the arguments, the
+      status parsing and the coordinator's waiting state, and `HomebrewBottleTests` the
+      registry and install path against a stubbed registry. What has NOT been run is the
+      daemon itself: a first install from `ghcr.io`, the browser sign-in through the
+      notification's link, an auth-key sign-in, `serve` and `funnel` against a tailnet with
+      and without HTTPS certificates enabled, and a Funnel request from a phone with no
+      Tailscale app. The digests pinned in `BuiltInTools.tailscale` are the registry's
+      layer digests for 1.102.3, read from the index rather than off a completed download,
+      so the first real install is also the first check that they match.
 - [ ] **`FileBodySequence`.** Its stated contract is "peak memory is the chunk size and not the
       file size" and no test says so. Neither does anything cover the mid-stream vanish path,
       which is reachable whenever an attachment is purged to iCloud between the route's

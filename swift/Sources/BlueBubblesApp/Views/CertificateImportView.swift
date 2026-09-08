@@ -58,7 +58,7 @@ struct CertificateImportView: View {
     SettingsSection(
       "TLS Certificate",
       subtitle: "Let this server terminate HTTPS itself, instead of a tunnel or reverse "
-        + "proxy doing it. Leave this alone if you use Cloudflare, ngrok or zrok."
+        + "proxy doing it. Leave this alone if you use Cloudflare, ngrok, zrok or Tailscale."
     ) {
       VStack(alignment: .leading, spacing: 14) {
         dropZone

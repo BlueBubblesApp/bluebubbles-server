@@ -412,7 +412,7 @@ public struct ServerComposition {
     await registry.register(PushDeliveryService.self) { $0 }
     await registry.register(WebhookDeliveryService.self) { $0 }
     await registry.register(ScheduledMessageService.self) { $0 }
-    // Five connection methods, one exclusive category: all register, and `canRun` lets
+    // Six connection methods, one exclusive category: all register, and `canRun` lets
     // exactly the selected one through. This is what makes a third-party tunnel possible
     // — it joins a category rather than adding a case to an enum.
     await registry.register(ProxyService<LANMethod>.self) { $0 }
@@ -420,6 +420,7 @@ public struct ServerComposition {
     await registry.register(ProxyService<NgrokMethod>.self) { $0 }
     await registry.register(ProxyService<CloudflareMethod>.self) { $0 }
     await registry.register(ProxyService<ZrokMethod>.self) { $0 }
+    await registry.register(ProxyService<TailscaleMethod>.self) { $0 }
     await registry.register(SleepPreventionService.self) { $0 }
     await registry.register(LaunchAtLoginService.self) { $0 }
     await registry.register(ToolUpdateService.self) { $0 }
@@ -637,8 +638,9 @@ public struct ServerComposition {
 
   /// Who is allowed to set `X-Forwarded-For`, from `trusted_proxies`.
   ///
-  /// Loopback is always included and cannot be configured away: the bundled ngrok,
-  /// cloudflared and zrok processes all connect over it, and dropping it would make every
+  /// Loopback is always included and cannot be configured away: the managed ngrok,
+  /// cloudflared, zrok and tailscaled processes all connect over it, and dropping it would
+  /// make every
   /// tunnelled client unattributable.
   static func proxyTrust(from settings: SettingsStore) async -> ProxyTrustPolicy {
     var trust = ProxyTrustPolicy()

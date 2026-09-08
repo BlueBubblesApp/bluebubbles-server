@@ -233,6 +233,7 @@ private struct ConnectionMethodPicker: View {
     case BuiltInManifests.ID.proxyCloudflare: "cloud"
     case BuiltInManifests.ID.proxyNgrok: "point.3.connected.trianglepath.dotted"
     case BuiltInManifests.ID.proxyZrok: "bolt.horizontal"
+    case BuiltInManifests.ID.proxyTailscale: "lock.shield"
     default: "network"
     }
   }

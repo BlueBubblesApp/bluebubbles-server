@@ -62,6 +62,10 @@ struct WatchedSettingsTests {
     ),
     ("ProxyService<ZrokMethod>", ZrokMethod.manifest, ProxyService<ZrokMethod>.watchedSettings),
     (
+      "ProxyService<TailscaleMethod>", TailscaleMethod.manifest,
+      ProxyService<TailscaleMethod>.watchedSettings
+    ),
+    (
       "SleepPreventionService", SleepPreventionService.manifest,
       SleepPreventionService.watchedSettings
     ),

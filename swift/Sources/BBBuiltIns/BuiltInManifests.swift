@@ -44,6 +44,7 @@ public enum BuiltInManifests {
     public static let proxyNgrok = ServiceIdentifier("app.bluebubbles.proxy.ngrok")
     public static let proxyCloudflare = ServiceIdentifier("app.bluebubbles.proxy.cloudflare")
     public static let proxyZrok = ServiceIdentifier("app.bluebubbles.proxy.zrok")
+    public static let proxyTailscale = ServiceIdentifier("app.bluebubbles.proxy.tailscale")
   }
 
   /// Services that stay running whatever `disabled_services` says.
@@ -56,7 +57,7 @@ public enum BuiltInManifests {
   /// also the one switch that can leave a headless install unreachable. It is recoverable
   /// from the CLI — `bluebubbles-server --set disabled_services=` — and the app's own UI
   /// keeps working either way, because it talks to the interfaces in-process rather than
-  /// over HTTP. The five reverse proxies declare a dependency on it, so switching it off
+  /// over HTTP. The six reverse proxies declare a dependency on it, so switching it off
   /// takes them down with it rather than leaving an address that resolves to nothing.
   ///
   /// Enforced HERE rather than only in the app's Integrations screen, which is what makes
@@ -66,7 +67,7 @@ public enum BuiltInManifests {
 
   // MARK: - Reverse proxies
   //
-  // The category is exclusive, so declaring all five and enabling one replaces the
+  // The category is exclusive, so declaring all six and enabling one replaces the
   // `proxy_service` enum with something the validator can check — and something a plugin
   // can join, which the enum could never be.
 
@@ -496,6 +497,137 @@ public enum BuiltInManifests {
     tools: [BuiltInTools.cloudflared]
   )
 
+  /// Tailscale, as this server's own node on the user's tailnet.
+  ///
+  /// The one connection method whose setup can be PENDING ON A PERSON at three separate
+  /// points — signing in, enabling HTTPS certificates, enabling Funnel — so the form leads
+  /// with the two ways to sign in and the service reports each of the three through a
+  /// notification carrying the link, rather than failing. Also the only one that offers a
+  /// private address: tailnet-only is the default because it needs nothing enabled on the
+  /// tailnet beyond certificates, and because a person who chose Tailscale usually has it
+  /// on their phone already.
+  public static let tailscale = ServiceManifest(
+    id: ID.proxyTailscale,
+    name: "Tailscale",
+    summary: "Reach this server over your tailnet, or publish it with Funnel.",
+    details: """
+      This Mac joins your Tailscale network as its own device and serves this server at a \
+      `.ts.net` address with a real certificate. By default only devices signed in to your \
+      tailnet can reach it; Tailscale Funnel can open it to the internet instead. Needs a \
+      free Tailscale account, and the Tailscale app on each phone or computer that connects \
+      unless Funnel is on.
+      """,
+    category: .reverseProxy,
+    dependencies: [ID.http],
+    entitlements: [
+      .spawnProcess,
+      .network(hosts: [
+        // Signing in, the coordination server, and the relays that carry traffic when a
+        // direct path cannot be found.
+        "login.tailscale.com", "controlplane.tailscale.com", "*.tailscale.com",
+        // Where the certificate for the address is issued.
+        "acme-v02.api.letsencrypt.org",
+        // Where the daemon is downloaded from: Homebrew's registry, and the store it
+        // redirects to. See the note on ngrok below.
+        "ghcr.io", "pkg-containers.githubusercontent.com",
+      ]),
+      // Reads the port to forward to, and whether this server terminates TLS — which
+      // decides the scheme serve proxies to. NOT the password.
+      .readSettings(keys: ["connection_method", "socket_port", "use_custom_certificate"]),
+      .writeSettings(keys: ["server_address"]),
+    ],
+    settings: [
+      .header("Account"),
+      .paragraph(
+        "Create a free account at **tailscale.com**. This Mac joins your tailnet as a "
+          + "device of its own — separate from any Tailscale app you already run here — and "
+          + "signs in one of two ways: paste an auth key below, or leave it empty and open "
+          + "the sign-in link this server shows in Notifications the first time it starts."
+      ),
+      .field(
+        FieldDescriptor(
+          key: "auth_key",
+          label: "Auth Key",
+          help: "Optional. Generate one under Settings › Keys in the Tailscale admin "
+            + "console. A reusable, pre-approved key lets this Mac sign in again on its "
+            + "own if its key ever expires. Used only to sign in, and kept in the Keychain.",
+          kind: .text(placeholder: "tskey-auth-…"),
+          isSecret: true
+        )),
+      .field(
+        FieldDescriptor(
+          key: "hostname",
+          label: "Machine Name",
+          help: "The name this Mac takes on your tailnet, which becomes the first part of "
+            + "the address clients use. Letters, digits and hyphens.",
+          kind: .text(placeholder: "bluebubbles")
+        )),
+
+      .divider,
+      .header("Reach"),
+      .field(
+        FieldDescriptor(
+          key: "exposure",
+          label: "Who Can Connect",
+          help: "Tailnet only: every phone or computer running the BlueBubbles client "
+            + "also runs the Tailscale app, signed in to the same tailnet — nothing is "
+            + "exposed to the internet. Funnel: anyone with the address, through "
+            + "Tailscale's relays; it has to be enabled once for your tailnet, and this "
+            + "server shows the link if it is not.",
+          kind: .select(options: [
+            FieldOption(value: "tailnet", label: "Only devices on my tailnet"),
+            FieldOption(value: "funnel", label: "Anyone, through Tailscale Funnel"),
+          ])
+        )),
+      .field(
+        FieldDescriptor(
+          key: "https_port",
+          label: "Port",
+          help: "The port on the tailnet address. 443 keeps the address short; the other "
+            + "two are the only others Funnel permits.",
+          kind: .select(options: [
+            FieldOption(value: "443", label: "443"),
+            FieldOption(value: "8443", label: "8443"),
+            FieldOption(value: "10000", label: "10000"),
+          ])
+        )),
+      .note(
+        "Tailscale issues a certificate for the address, so HTTPS certificates must be "
+          + "enabled for your tailnet. This server shows the link if they are not."
+      ),
+
+      // Folded away by default: a self-hosted control server and the log switch are for
+      // people who know they want them.
+      .collapsedHeader("Advanced"),
+      .field(
+        FieldDescriptor(
+          key: "control_url",
+          label: "Control Server",
+          help: "For a Headscale or other self-hosted control server. Leave empty for "
+            + "Tailscale's own. Funnel is not available on a self-hosted control server.",
+          kind: .url
+        )),
+      .field(
+        FieldDescriptor(
+          key: "send_logs",
+          label: "Send Diagnostic Logs to Tailscale",
+          help: "Off runs the daemon with `--no-logs-no-support`, so nothing about this Mac "
+            + "is uploaded to Tailscale's log service. Turn on only if Tailscale support "
+            + "asks for it.",
+          kind: .toggle()
+        )),
+      .field(
+        FieldDescriptor(
+          key: "verbose_logging",
+          label: "Verbose Tunnel Logging",
+          help: "Logs everything the Tailscale daemon prints, which is a great deal. Worth "
+            + "turning on before asking for help with a node that will not connect.",
+          kind: .toggle()
+        )),
+    ],
+    tools: [BuiltInTools.tailscale]
+  )
+
   /// Computed, because its options are THIS machine's network interfaces.
   ///
   /// A `static let` cannot know them: a Mac with a VPN, a virtual machine, or both Wi-Fi and
@@ -824,6 +956,6 @@ public enum BuiltInManifests {
     http, socket, permissions, changeDetection, contacts, privateAPI,
     scheduledMessages, sleepPrevention, launchAtLogin, toolUpdates,
     push, webhooks,
-    lan, dynamicDNS, ngrok, cloudflare, zrok,
+    lan, dynamicDNS, ngrok, cloudflare, zrok, tailscale,
   ]
 }

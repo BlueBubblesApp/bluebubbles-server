@@ -143,8 +143,9 @@ public enum Settings {
 
   /// Whether this server terminates TLS itself.
   ///
-  /// Off by default, and that is right for most installs: ngrok, cloudflared and zrok all
-  /// terminate TLS at their edge, and a second layer inside the tunnel buys nothing.
+  /// Off by default, and that is right for most installs: ngrok, cloudflared, zrok and
+  /// Tailscale all terminate TLS before this server, and a second layer inside the tunnel
+  /// buys nothing.
   ///
   /// It matters for the deployment that has no tunnel — dynamic DNS, or a port forwarded
   /// straight to this Mac — where the alternative is message content in plaintext across
@@ -688,8 +689,9 @@ public enum Settings {
 
   /// Comma-separated addresses or CIDR blocks whose `X-Forwarded-For` header is believed.
   ///
-  /// Empty by default, which trusts loopback only — correct for the bundled tunnels, since
-  /// ngrok, cloudflared and zrok all run on this machine and connect over 127.0.0.1.
+  /// Empty by default, which trusts loopback only — correct for the managed tunnels, since
+  /// ngrok, cloudflared, zrok and tailscaled all run on this machine and connect over
+  /// 127.0.0.1.
   ///
   /// It matters for the deployment that is NOT bundled: an nginx or Caddy in front of the
   /// server on another host. There every request arrives from one address, so without this

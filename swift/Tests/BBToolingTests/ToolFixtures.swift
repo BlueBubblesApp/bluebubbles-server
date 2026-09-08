@@ -19,9 +19,34 @@ struct StubTransport: ToolTransport, @unchecked Sendable {
   /// URL string → headers a HEAD (or a download) reports.
   var headers: [String: [String: String]] = [:]
   var statusCodes: [String: Int] = [:]
+  /// URL string → the request headers a fetch or download must carry to be answered, the
+  /// way a registry that refuses anonymous requests would insist. Unlisted URLs accept
+  /// anything.
+  var requiredRequestHeaders: [String: [String: String]] = [:]
+  /// Every request header sent, by URL, for asserting what went over the wire.
+  let sentHeaders = SentHeaders()
 
-  func fetch(_ url: URL) async throws -> (Data, ToolHTTPResponse) {
-    (bodies[url.absoluteString] ?? Data(), response(for: url))
+  final class SentHeaders: @unchecked Sendable {
+    private let lock = NSLock()
+    private var byURL: [String: [String: String]] = [:]
+    func record(_ headers: [String: String], for url: URL) {
+      lock.lock()
+      byURL[url.absoluteString] = headers
+      lock.unlock()
+    }
+    subscript(url: String) -> [String: String]? {
+      lock.lock()
+      defer { lock.unlock() }
+      return byURL[url]
+    }
+  }
+
+  func fetch(_ url: URL, headers: [String: String]) async throws -> (Data, ToolHTTPResponse) {
+    sentHeaders.record(headers, for: url)
+    guard accepts(headers, for: url) else {
+      return (Data(), ToolHTTPResponse(statusCode: 401))
+    }
+    return (bodies[url.absoluteString] ?? Data(), response(for: url))
   }
 
   func head(_ url: URL) async throws -> ToolHTTPResponse {
@@ -31,8 +56,13 @@ struct StubTransport: ToolTransport, @unchecked Sendable {
   func download(
     _ url: URL,
     to destination: URL,
+    headers: [String: String],
     progress: @escaping @Sendable (Double) -> Void
   ) async throws -> ToolHTTPResponse {
+    sentHeaders.record(headers, for: url)
+    guard accepts(headers, for: url) else {
+      return ToolHTTPResponse(statusCode: 401)
+    }
     progress(0)
     guard let body = bodies[url.absoluteString] else {
       return ToolHTTPResponse(statusCode: 404)
@@ -40,6 +70,11 @@ struct StubTransport: ToolTransport, @unchecked Sendable {
     try body.write(to: destination)
     progress(1)
     return response(for: url)
+  }
+
+  private func accepts(_ headers: [String: String], for url: URL) -> Bool {
+    guard let required = requiredRequestHeaders[url.absoluteString] else { return true }
+    return required.allSatisfy { name, value in headers[name] == value }
   }
 
   private func response(for url: URL) -> ToolHTTPResponse {

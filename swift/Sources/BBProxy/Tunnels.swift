@@ -1,8 +1,10 @@
 //  Tunnels
-//  The five proxy options.
+//  The six proxy options.
 //
-//  Three drive a bundled binary through DaemonProcess; two do not tunnel at all and exist so
-//  the rest of the server does not have to special-case "no tunnel".
+//  Three drive a managed binary through DaemonProcess and scrape its URL; a fourth,
+//  Tailscale, drives one through DaemonProcess and a CLI and lives in its own file because
+//  it has a waiting state the others do not; two do not tunnel at all and exist so the rest
+//  of the server does not have to special-case "no tunnel".
 //
 //  See `.claude/docs/performance.md`.
 
@@ -778,6 +780,29 @@ public enum Tunnels {
         return String(line[range.lowerBound...].prefix { !$0.isWhitespace })
           .trimmingCharacters(in: CharacterSet(charactersIn: "\"' "))
       },
+      logger: logger
+    )
+  }
+
+  /// Tailscale, as this server's own userspace node. See `TailscaleTunnel`.
+  ///
+  /// Two executables rather than one: the daemon this runs, and the CLI it drives the
+  /// daemon with. Both come from the same install — the CLI sits beside `tailscaled` in
+  /// every distribution of it — and the method resolves the second from the first.
+  public static func tailscale(
+    daemonExecutablePath: String,
+    cliExecutablePath: String,
+    port: Int,
+    options: TailscaleOptions,
+    onAttention: @escaping @Sendable (TailscaleAttention) async -> Void,
+    logger: Logger = Logger(label: "bluebubbles.proxy.tailscale")
+  ) -> TailscaleTunnel {
+    TailscaleTunnel(
+      daemonExecutablePath: daemonExecutablePath,
+      cliExecutablePath: cliExecutablePath,
+      port: port,
+      options: options,
+      onAttention: onAttention,
       logger: logger
     )
   }

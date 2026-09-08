@@ -1,7 +1,7 @@
 //  ProxyCoordinator
 //  The tunnels, behind one protocol.
 //
-//  Five options, and today they share almost nothing: ngrok goes through an npm binding,
+//  Six options, and today they share almost nothing: ngrok goes through an npm binding,
 //  cloudflared and zrok are spawned directly with their own ad-hoc output scraping, LAN and
 //  dynamic-DNS are not really services at all. The lifecycle differences are not deliberate —
 //  they are what happens when four things are written at four different times.
@@ -25,6 +25,15 @@ public enum ProxyError: BBError, Equatable {
   case notConfigured(String)
   case tunnelFailed(reason: String)
   case addressUnavailable
+  /// The provider is up but cannot publish until a person does something — sign in,
+  /// approve a device, enable a feature — and has already said what through its own
+  /// channel. It keeps working in the background and reports the address through
+  /// `ProxyObserver.addressChanged` when the step is taken.
+  ///
+  /// Not a failure. `ProxyCoordinator.start` returns normally on it, which is what keeps
+  /// the registry from restarting the service — and with it the daemon, and with THAT the
+  /// link the person was just sent. `reason` is the health report's one line.
+  case awaitingUser(reason: String)
 }
 
 /// How a provider reports things that happen AFTER `connect()` has returned.
@@ -134,6 +143,9 @@ public actor ProxyCoordinator {
 
   private var provider: (any ProxyProviding)?
   private var refreshTask: Task<Void, Never>?
+  /// Why there is no address yet, when the provider is waiting on a person. Nil once it
+  /// has published one, and whenever nothing is waiting.
+  public private(set) var pendingReason: String?
 
   public init(
     policy: RefreshPolicy = .default,
@@ -156,21 +168,37 @@ public actor ProxyCoordinator {
   public func start(_ provider: any ProxyProviding) async throws {
     await stop()
     self.provider = provider
+    pendingReason = nil
 
     // Installed BEFORE connecting, not after. A tunnel can die in the window between
     // `connect()` returning and an observer being attached, and an exit in that window is
     // exactly the one nobody would ever hear about.
     await provider.observe(
       ProxyObserver(
-        addressChanged: { [onAddressChanged, logger] address in
+        addressChanged: { [weak self, onAddressChanged, logger] address in
           logger.info("The tunnel came back with a new address")
+          await self?.clearPending()
           await onAddressChanged(address)
         },
         failed: { [onFailure] reason in await onFailure(reason) }
       )
     )
 
-    let address = try await provider.connect()
+    let address: String
+    do {
+      address = try await provider.connect()
+    } catch ProxyError.awaitingUser(let reason) {
+      // Up, and waiting on a person. The provider publishes through the observer above
+      // once they have acted; until then the health report carries the reason.
+      pendingReason = reason
+      logger.info(
+        "Tunnel is waiting on the user",
+        metadata: [
+          "kind": .string(provider.identifier.shortName),
+          "reason": .string(reason),
+        ])
+      return
+    }
     logger.info(
       "Tunnel established",
       metadata: [
@@ -188,6 +216,11 @@ public actor ProxyCoordinator {
     refreshTask = nil
     await provider?.disconnect()
     provider = nil
+    pendingReason = nil
+  }
+
+  private func clearPending() {
+    pendingReason = nil
   }
 
   private func startRefreshTimer() {
@@ -216,6 +249,8 @@ public actor ProxyCoordinator {
     do {
       let address = try await provider.connect()
       await onAddressChanged(address)
+    } catch ProxyError.awaitingUser(let reason) {
+      pendingReason = reason
     } catch {
       logger.error(
         "Could not re-establish the tunnel",
@@ -245,6 +280,7 @@ extension ProxyError {
     case .notConfigured: "proxy.not_configured"
     case .tunnelFailed: "proxy.tunnel_failed"
     case .addressUnavailable: "proxy.address_unavailable"
+    case .awaitingUser: "proxy.awaiting_user"
     }
   }
 
@@ -252,12 +288,17 @@ extension ProxyError {
 
   /// User-facing: a tunnel that will not come up is the difference between the server being
   /// reachable and not, and there is nothing else that would tell them.
-  public var isUserFacing: Bool { true }
+  public var isUserFacing: Bool {
+    // The provider has already told the person what to do, through its own channel.
+    if case .awaitingUser = self { return false }
+    return true
+  }
 
   public var title: String {
     switch self {
     case .notConfigured: "This connection method is not configured"
     case .tunnelFailed, .addressUnavailable: "Could not open the tunnel"
+    case .awaitingUser: "The connection is waiting for you"
     }
   }
 
@@ -267,6 +308,7 @@ extension ProxyError {
     case .tunnelFailed(let reason): reason
     case .addressUnavailable:
       "The tunnel started but never reported an address, so clients have nowhere to connect."
+    case .awaitingUser(let reason): reason
     }
   }
 }
