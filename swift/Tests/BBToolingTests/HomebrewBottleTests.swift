@@ -236,7 +236,8 @@ struct HomebrewBottleTests {
     #expect(
       HomebrewRegistry.nextPage(after: response, from: current)?.absoluteString
         == "https://ghcr.io/v2/homebrew/core/faketool/tags/list?last=1.90.3&n=0")
-    #expect(HomebrewRegistry.nextPage(after: ToolHTTPResponse(statusCode: 200), from: current) == nil)
+    let silent = ToolHTTPResponse(statusCode: 200)
+    #expect(HomebrewRegistry.nextPage(after: silent, from: current) == nil)
   }
 
   @Test("A versioned formula name maps to the registry's nested path")
