@@ -57,6 +57,10 @@ export const clearDevices = async () => {
     return await ipcRenderer.invoke('purge-devices');
 };
 
+export const deleteDevice = async (name: string, identifier: string) => {
+    return await ipcRenderer.invoke('delete-device', { name, identifier });
+};
+
 export const clearEventCache = async () => {
     return await ipcRenderer.invoke('purge-event-cache');
 };

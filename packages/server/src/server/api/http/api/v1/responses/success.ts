@@ -45,6 +45,16 @@ export class HTTPResponse {
         this.ctx.body = this.response;
     }
 
+    setHeader(key: string, value: string) {
+        this.ctx.set(key, value);
+    }
+
+    setHeaders(headers: Record<string, string>) {
+        Object.entries(headers).forEach(([key, value]) => {
+            this.ctx.set(key, value);
+        });
+    }
+
     toString() {
         if (this.type === "json") {
             const res = this.response as ResponseParams;
@@ -76,6 +86,12 @@ export class FileStream extends HTTPResponse {
     constructor(ctx: RouterContext, path: string, mimeType = "application/octet-stream") {
         const src = fs.createReadStream(path);
         ctx.response.set("Content-Type", mimeType as string);
+
+        // Set the content-length header so that clients can show download progress
+        const stats = fs.statSync(path);
+        ctx.response.set("Content-Length", stats.size.toString());
+        ctx.response.set("Content-Disposition", `attachment; filename="${path.split("/").pop()}"`);
+
         super(ctx, 200, src, "file");
     }
 }

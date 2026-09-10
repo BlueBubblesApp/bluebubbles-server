@@ -1,0 +1,310 @@
+#!/bin/bash
+#
+# Builds BlueBubbles.app as a universal binary.
+#
+# The app bundle exists even though the server is usable headless, and that is not
+# ceremony: several macOS APIs the server depends on refuse to work outside a bundle.
+# UNUserNotificationCenter.current() TERMINATES the process when Bundle.main has no
+# identifier (not an exception, an abort) which is how the first real boot of this server
+# died. TCC also keys permission grants on the bundle identifier, so Full Disk Access,
+# Automation and Contacts are grantable only to a bundle.
+#
+# Phase 10's SwiftUI app becomes the CFBundleExecutable and this script stops changing.
+#
+# Usage:
+#   Packaging/build-app.sh [--output DIR] [--configuration release]
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+ROOT="$PWD"
+
+OUTPUT="$ROOT/.build/package"
+CONFIGURATION="release"
+SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output) OUTPUT="$2"; shift 2 ;;
+        --configuration) CONFIGURATION="$2"; shift 2 ;;
+        *) echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+VERSION="$(tr -d '[:space:]' < Packaging/VERSION)"
+# A monotonic build number from the commit count. Sparkle compares CFBundleVersion, and it
+# must never go backwards: a date would, across a rebuild of an older tag.
+BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+
+APP="$OUTPUT/BlueBubbles.app"
+echo "==> BlueBubbles $VERSION (build $BUILD), $CONFIGURATION"
+
+# --- Universal binary ---------------------------------------------------------------------
+#
+# Both slices in one invocation. SwiftPM produces the lipo'd binary itself, which is more
+# reliable than building twice and merging by hand: the two builds can otherwise disagree
+# about a conditionally-compiled symbol and fail at link time rather than here.
+echo "==> Building arm64 + x86_64"
+# The SwiftUI app is what the bundle runs. The `bluebubbles-server` CLI is built too and
+# placed alongside it, because a genuinely headless install should not need a WindowServer
+# connection at all; see BlueBubblesApp.swift on why both exist.
+# Both products in one invocation, and note that `swift build` accepts only ONE `--product`:
+# passing two silently builds just one of them, which showed up here as lipo failing on a
+# binary that was never produced. Building everything is also what the release needs anyway,
+# since the helper dylib goes into the bundle too.
+swift build \
+    --configuration "$CONFIGURATION" \
+    --arch arm64 --arch x86_64
+
+BIN_PATH="$(swift build --configuration "$CONFIGURATION" --arch arm64 --arch x86_64 --show-bin-path)"
+BINARY="$BIN_PATH/BlueBubblesApp"
+
+# Asserted rather than assumed. A single-architecture build looks completely normal until an
+# Intel user downloads it and it will not launch at all.
+ARCHS="$(lipo -archs "$BINARY")"
+echo "==> Architectures: $ARCHS"
+for required in arm64 x86_64; do
+    case " $ARCHS " in
+        *" $required "*) ;;
+        *) echo "error: the binary is missing the $required slice (got: $ARCHS)" >&2; exit 1 ;;
+    esac
+done
+
+# --- Bundle -------------------------------------------------------------------------------
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+
+cp "$BINARY" "$APP/Contents/MacOS/BlueBubbles"
+chmod +x "$APP/Contents/MacOS/BlueBubbles"
+
+# The headless CLI, inside the bundle so it is covered by the same notarization ticket.
+#
+# **It gets its OWN nested bundle rather than sitting in `Contents/MacOS`, and that is not
+# tidiness.** `keychain-access-groups` is a restricted entitlement, authorised only by an
+# embedded provisioning profile, and a profile can only live inside a bundle. A bare Mach-O
+# in `Contents/MacOS` does NOT inherit the containing bundle's profile: signed with the
+# entitlement it is killed at launch (SIGKILL, nothing catchable), and signed without it every
+# keychain call returns `errSecMissingEntitlement`. Both were measured.
+#
+# Wrapping it in a bundle costs nothing it cares about. A `.app` is a directory layout, not a
+# GUI contract: this binary never creates an NSApplication, so it still runs over SSH and in
+# CI with no WindowServer connection, which is the whole reason the CLI exists as its own
+# product (see `Package.swift`).
+#
+# Its bundle identifier may differ from the app's: the profile grants the keychain group as a
+# TEAM wildcard, so both binaries reach the same items without a second profile.
+if [ -f "$BIN_PATH/bluebubbles-server" ]; then
+    CLI_APP="$APP/Contents/Helpers/bluebubbles-server.app"
+    mkdir -p "$CLI_APP/Contents/MacOS"
+    cp "$BIN_PATH/bluebubbles-server" "$CLI_APP/Contents/MacOS/bluebubbles-server"
+    chmod +x "$CLI_APP/Contents/MacOS/bluebubbles-server"
+    cat > "$CLI_APP/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.BlueBubbles.BlueBubbles-Server.cli</string>
+    <key>CFBundleExecutable</key>
+    <string>bluebubbles-server</string>
+    <key>CFBundleName</key>
+    <string>BlueBubbles Server</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$VERSION</string>
+    <key>CFBundleVersion</key>
+    <string>$VERSION</string>
+    <!--
+        Never shown, and never launched by LaunchServices; this is invoked by path. The key
+        is here because a bundle without it can be treated as a UI-capable application, and a
+        headless tool should not be able to appear in the Dock even by accident.
+    -->
+    <key>LSBackgroundOnly</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+fi
+
+# --- The launcher -----------------------------------------------------------------------------
+#
+# A login item at `Contents/Library/LoginItems/`, which is the ONLY place
+# `SMAppService.loginItem(identifier:)` looks. Registered by `LaunchAtLogin`, it starts the app
+# at login and restarts it if it stops unexpectedly: the supervision the app cannot do for
+# itself, because a process cannot restart itself once it is dead.
+#
+# `CFBundleIdentifier` here and `LauncherContract.launcherBundleIdentifier` must be the same
+# string. macOS matches the registration on it exactly and reports `.notFound` for a mismatch,
+# which reads identically to "not registered yet"; a typo here is a login item that silently
+# never installs.
+LAUNCHER="$BIN_PATH/BlueBubblesLauncher"
+if [ -f "$LAUNCHER" ]; then
+    LAUNCHER_APP="$APP/Contents/Library/LoginItems/BlueBubblesLauncher.app"
+    mkdir -p "$LAUNCHER_APP/Contents/MacOS"
+    cp "$LAUNCHER" "$LAUNCHER_APP/Contents/MacOS/BlueBubblesLauncher"
+    chmod +x "$LAUNCHER_APP/Contents/MacOS/BlueBubblesLauncher"
+    cat > "$LAUNCHER_APP/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.BlueBubbles.BlueBubbles-Server.Launcher</string>
+    <key>CFBundleExecutable</key>
+    <string>BlueBubblesLauncher</string>
+    <!--
+        What System Settings > Login Items shows. Background Task Management names a
+        bundle-based item from ITS bundle, which is the whole reason this is a bundle and not
+        the launch agent that used to be offered here: an agent is named from the signing
+        certificate's Organization field, which for an individual Apple Developer enrolment is
+        the developer's legal name.
+    -->
+    <key>CFBundleName</key>
+    <string>BlueBubbles</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$VERSION</string>
+    <key>CFBundleVersion</key>
+    <string>$VERSION</string>
+    <!-- No Dock icon and no menu bar. It is not something a user interacts with. -->
+    <key>LSUIElement</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+    echo "==> Bundled the launcher"
+else
+    echo "error: no launcher built at $LAUNCHER; the app would have no login item." >&2
+    exit 1
+fi
+
+# --- The injected helpers -------------------------------------------------------------------
+#
+# A SECOND build, with DIFFERENT architectures from everything above, and that is the point
+# rather than an oversight to tidy away.
+#
+# **A helper is loaded into somebody else's process, so it must carry the slices THAT process
+# runs, not the ones this app runs.** On Apple Silicon, Messages.app and FaceTime.app run
+# `arm64e`, and dyld will not load an `arm64` dylib into an `arm64e` process. It does not
+# report an error either: the insert is skipped, the app starts perfectly, and the Private API
+# is simply absent. That is the whole failure mode: nothing crashes and nothing is logged.
+#
+# Measured, on this Mac:
+#     lipo -archs /System/Applications/Messages.app/Contents/MacOS/Messages   # x86_64 arm64e
+#     lipo -archs /System/Applications/FaceTime.app/Contents/MacOS/FaceTime   # x86_64 arm64e
+#
+# The app and the CLI stay `arm64 + x86_64`; only the two dylibs are built `arm64e + x86_64`.
+#
+# One `--product` per invocation, for the reason given at the top of this script: `swift build`
+# honours only the last one and silently drops the rest.
+HELPER_ARCH_ARGS=(--arch arm64e --arch x86_64)
+echo "==> Building the injected helpers for arm64e + x86_64"
+for product in BlueBubblesHelper BlueBubblesFaceTimeHelper; do
+    swift build --configuration "$CONFIGURATION" "${HELPER_ARCH_ARGS[@]}" --product "$product"
+done
+HELPER_BIN="$(swift build --configuration "$CONFIGURATION" "${HELPER_ARCH_ARGS[@]}" --show-bin-path)"
+
+# The helpers travel inside the bundle so their paths are stable and inside the signed,
+# notarized container. A helper sitting loose in a temp directory is one a user can replace.
+#
+# BOTH of them. Only the Messages helper used to be copied, so `Contents/Frameworks/` never
+# held `libBlueBubblesFaceTimeHelper.dylib` at all, and `PrivateAPIGatedService` looks for it
+# there by name, so every FaceTime route was unavailable in a shipped build.
+mkdir -p "$APP/Contents/Frameworks"
+for helper in libBlueBubblesHelper libBlueBubblesFaceTimeHelper; do
+    built="$HELPER_BIN/$helper.dylib"
+    if [ ! -f "$built" ]; then
+        echo "error: $built was not produced. The Private API would be silently absent." >&2
+        exit 1
+    fi
+    # Asserted, not assumed, and this is the assertion that matters most in the file. A
+    # wrong-architecture helper produces an app that installs, launches, serves and reports
+    # itself healthy, with reactions and typing indicators quietly missing.
+    HELPER_ARCHS="$(lipo -archs "$built")"
+    for required in arm64e x86_64; do
+        case " $HELPER_ARCHS " in
+            *" $required "*) ;;
+            *)
+                echo "error: $helper.dylib is missing the $required slice (got: $HELPER_ARCHS)." >&2
+                echo "error: dyld declines a mismatched insert WITHOUT an error, so this" >&2
+                echo "error: would ship as a Private API that is simply never there." >&2
+                exit 1
+                ;;
+        esac
+    done
+    cp "$built" "$APP/Contents/Frameworks/"
+    echo "==> Bundled $helper.dylib ($HELPER_ARCHS)"
+done
+
+# --- SwiftPM resource bundles ---------------------------------------------------------------
+#
+# Dependencies that ship resources build a `*.bundle` alongside the binary, and they find it
+# through `Bundle.main.resourceURL` at RUNTIME. Copying the executable alone produces an app
+# that starts, serves requests, and then dies the first time one of them is needed:
+# PhoneNumberKit calls `fatalError("unable to find bundle")`, which is not catchable.
+#
+# That is exactly what happened here: the server came up, bound its port, logged "Server
+# started", and then aborted on the first address it tried to format.
+# Test bundles are EXCLUDED. `swift build` produces one per test target that has resources,
+# and they sit in the same directory as the real ones, so a naive copy ships the conformance
+# fixtures and the recorded protocol vectors inside the released app. Small, but it is test
+# data in a user-facing artifact, and the recording tooling writes captures from a live
+# server into exactly that directory.
+BUNDLE_COUNT=0
+for resource in "$BIN_PATH"/*.bundle; do
+    [ -e "$resource" ] || continue
+    case "$(basename "$resource")" in
+        *Tests.bundle)
+            echo "==> Skipping test bundle $(basename "$resource")"
+            continue
+            ;;
+    esac
+    cp -R "$resource" "$APP/Contents/Resources/"
+    BUNDLE_COUNT=$((BUNDLE_COUNT + 1))
+done
+echo "==> Copied $BUNDLE_COUNT resource bundle(s)"
+
+# Asserted, not assumed. A dependency that gains resources later would otherwise reintroduce
+# the same crash silently, and it only shows up at runtime on a specific code path.
+if [ "$BUNDLE_COUNT" -eq 0 ]; then
+    echo "error: no resource bundles were copied. PhoneNumberKit ships one and the app" >&2
+    echo "error: aborts without it; check whether the build actually produced them." >&2
+    exit 1
+fi
+
+sed -e "s|__VERSION__|$VERSION|g" \
+    -e "s|__BUILD__|$BUILD|g" \
+    -e "s|__SPARKLE_PUBLIC_KEY__|$SPARKLE_PUBLIC_KEY|g" \
+    Packaging/Info.plist > "$APP/Contents/Info.plist"
+
+if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
+    echo "==> note: SPARKLE_PUBLIC_KEY is unset; this build cannot verify auto-updates"
+fi
+
+ICON_SOURCE="$ROOT/../icons/macos/dock-icon.png"
+if [ -f "$ICON_SOURCE" ]; then
+    ICONSET="$OUTPUT/AppIcon.iconset"
+    rm -rf "$ICONSET"; mkdir -p "$ICONSET"
+    # Every size Finder, the Dock and Spotlight ask for. A bundle missing one falls back to
+    # a scaled version of another, which looks visibly wrong at small sizes.
+    for size in 16 32 128 256 512; do
+        sips -z $size $size "$ICON_SOURCE" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null 2>&1
+        sips -z $((size * 2)) $((size * 2)) "$ICON_SOURCE" \
+            --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null 2>&1
+    done
+    iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null || \
+        echo "==> note: icon conversion failed; the bundle will use the generic icon"
+    rm -rf "$ICONSET"
+fi
+
+# Proves the plist is well-formed and carries the version we intended. A malformed Info.plist
+# produces an app that will not launch, with no useful message.
+BUNDLED_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+if [ "$BUNDLED_VERSION" != "$VERSION" ]; then
+    echo "error: the bundle reports $BUNDLED_VERSION but Packaging/VERSION says $VERSION" >&2
+    exit 1
+fi
+
+echo "==> Built $APP"

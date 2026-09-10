@@ -1,0 +1,497 @@
+# Testing strategy
+
+*What* is asserted and why. How to run any of it is in
+[`../.claude/docs/workflow.md`](../.claude/docs/workflow.md).
+
+The organising idea: **the failure mode that keeps recurring is code that is written,
+unit-tested, reported healthy, and reachable from nothing.** Unit tests cannot catch it by
+construction: the missing thing is the call site, and a test is itself a call site. A module with
+passing tests and no production caller looks exactly like a module that works.
+
+So a component is not done when its tests pass. **It is done when the composition root calls it
+and a test asserts that call exists.** `Tests/CompositionTests/EventDeliveryWiringTests.swift` is
+the pattern: it asserts *wiring* rather than behaviour, because behaviour was never the part that
+was broken.
+
+---
+
+## The parity harness: the backbone
+
+`Tests/CompatibilityTests/FixtureReplayTests` mounts the **shipping** router in-process:
+`ServerComposition.buildHandlers`, over the synthetic `chat.db` from `Tools/chatdb-fixtures`,
+replays every recorded v1 fixture against it, and structurally diffs the answers. Runs in CI.
+
+**Two things it must be read with:**
+
+- **It compares SHAPE, not values.** The fixtures were recorded against a real Mac holding real
+  conversations; the replay runs against three synthetic chats. No count, GUID, address or body
+  text can agree. So `DiffMode.shape` keeps keys, types, and the literal strings that ARE the
+  contract (`status`, `message`, `error.type`) and drops the rest. Value-level parity needs two
+  servers over one database, which is `bb-parity` below.
+- **The baseline is a ratchet, not a suppression list.**
+  `Tests/CompatibilityTests/Fixtures/replay-baseline.json` lists the fixtures that cannot match
+  here and why: HARNESS (no helper, no network, no log sink), DATA (the recorded row is not in
+  the synthetic database), OPEN (a real divergence, with an entry in `TODO.md`), and DECIDED (a
+  divergence we examined and chose to keep (contact ids are the standing example). A fixture
+  that starts matching must be **removed** from it or the suite fails, and one that stops
+  matching and is not listed fails too.
+
+  **Only OPEN is work.** The split exists because a settled won't-fix left sitting under OPEN
+  makes the ratchet overstate what is left to do, and the next person re-litigates a decision
+  instead of reading it. A DECIDED entry is added only once the reasoning is written in
+  `TODO.md`, and it states the decision inline so the baseline can be read on its own.
+
+**Nothing that acts on the machine is ever replayed.** `FixtureReplay.destructiveRoutes` refuses
+`mac/lock`, `mac/imessage/restart`, both restarts, the update install, and every non-GET route
+under `message/`, `chat/`, `facetime/`, `handle/` and `icloud/`, bar the four query routes, which
+read. This is not tidiness: the first run of the harness locked the developer's Mac and restarted
+Messages, on a machine being used over a remote session. `ReplayDenyListTests` asserts it.
+
+### The event pipeline, end to end
+
+`Tools/event-probe/probe.mjs` attaches to a RUNNING server on all three delivery channels at
+once: the socket, a webhook it registers against itself, and ntfy (point `ntfy_server` at the
+probe), triggers real activity, and prints what each channel received.
+
+It exists because neither half of the pipeline was ever tested against a payload the change
+detector produced. `SocketEndToEndTests` drives the transport with hand-built events and the
+webhook suite drives delivery with hand-built events, so both were green while every emitted
+event carried `chats: []`.
+
+```bash
+node Tools/event-probe/probe.mjs --password "$PW" --seconds 40 \
+    --send 'any;-;someone@example.com' --react
+```
+
+No dependencies: the socket is Engine.IO v4 over long-polling, the same path
+`SocketEndToEndTests` uses. `--send` and `--react` reach a real conversation: pass them
+deliberately, and only to an address cleared for testing.
+
+**What it cannot show on every Mac.** Typing indicators and FindMy locations are INBOUND
+events, observed through the helper. When the server logs "The helper attached to no
+inbound-event source on this macOS", neither is ever emitted and neither channel can be
+checked; see `docs/OBSERVATION_LADDER.md`.
+
+### What a fixture database cannot tell you
+
+**A fixture database has its rows already complete. A live one does not, and the difference is
+where the bugs are.** Every one of these passed a full green suite and was found by sending a
+real message:
+
+| Assumption | What Messages actually does |
+|---|---|
+| A sent message's `text` column holds its text | **NULL** on an AppleScript send, and never filled in; the words are in `attributedBody`. Match `universalText()`. |
+| A message row arrives with its chat | The `chat_message_join` row lands **after**. A wait for "the row exists" answers `chats: []`. |
+| An unsend moves `dateRetracted` | It moves **`dateEdited`**; `dateRetracted` stays null. Watching the obvious column times out every time. |
+| A helper call that compiles, works | `notifyAnyways` took only a message GUID and could never resolve the chat. Every call failed; nothing tested it. |
+
+So: **anything that depends on the timing or completeness of what Messages writes is unverified
+until it has run against a real send.** `FailingPrivateAPI` proves the translation of a refusal
+and nothing about IMCore's behaviour.
+
+Running one, on a Mac with the Private API set up:
+
+```bash
+swift build --arch arm64e --product BlueBubblesHelper     # Messages runs arm64e; a plain arm64 dylib maps nowhere
+.build/arm64-apple-macosx/debug/bluebubbles-server --headless     --set socket_port=1234 --set password=… --set enable_private_api=true     --set private_api_helper_path="$PWD/.build/arm64e-apple-macosx/debug/libBlueBubblesHelper.dylib"
+```
+
+`server/info` reports `helper_connected`. **Send only to an address you have been told you may
+send to** (these reach real people) and never commit one.
+
+**A fixture is only a contract if the REFERENCE recorded it.** Fifteen v1 routes have no fixture
+except one this server produced, which cannot fail and proves nothing;
+`CorpusProvenanceTests` pins that set so it cannot grow. The source is inferred from the CORS
+header, because the recorder does not stamp it.
+
+**The diff is strict in both directions: an added key fails exactly like a missing one.** That is
+what mechanically enforces the compatibility contract: every opt-in field (`?fields=extended` on
+alerts, `replay=1` on the socket, negotiated codecs) is proven *absent* from the default response
+rather than merely intended to be. Broadcast socket frames are asserted byte-identical for a
+client that requests nothing.
+
+It asserts status codes, `error.type` strings, **key presence/absence** (not just values),
+epoch-ms date encoding, and the macOS-version-gated field sets across all three schema profiles.
+
+### The corpus is committed, and scrubbed
+
+`Fixtures/http/`. Recording runs against a real Mac with real conversations, and this repository
+is public, so the scrub is what makes the corpus committable.
+
+**It replaces personal values while keeping everything the diff asserts**: keys, types, array
+lengths, and the literal values that *are* the contract. `"message": "Successfully fetched
+messages!"` survives verbatim; message text becomes `REDACTED`; every address becomes
+`person@example.com`. Addresses are stripped from **paths and filenames** too, since a chat GUID
+is an address.
+
+`--no-scrub` exists for a local run and its output must never be committed; a test fails if it is.
+
+**If you record against a live server, re-audit before pushing.** The scrubber is a filter, not a
+guarantee, and it has been wrong before: multipart bodies once bypassed scrubbing entirely,
+link-local IPv6 addresses embed the interface MAC, and stack traces carried absolute
+`/Users/<name>` paths.
+
+### Live differential runs
+
+`bb-parity` diffs two running servers against identical traffic:
+
+```bash
+BB_REFERENCE_PASSWORD=… BB_CANDIDATE_PASSWORD=… swift run bb-parity \
+    --reference http://localhost:1234 --candidate http://localhost:1235 --chat-guid '…'
+```
+
+Three properties make the output trustworthy rather than merely reassuring:
+
+- **The corpus is read-only, and a test asserts it.** This runs against a real Mac with real
+  conversations. A corpus that sent anything would send it *twice* (once per server) to a real
+  person.
+- **It shares `ResponseDiff` with the fixture harness.** Two copies of a comparison this specific
+  would drift, and the drift would be silent: a live run reporting "no differences" because its
+  copy had stopped checking something.
+- **It was validated in both directions.** Two identically configured servers report clean;
+  running one with a non-legacy codec is caught as two added keys on `server/info`, and the tool
+  exits non-zero.
+
+Requests are issued **sequentially, not concurrently**: both servers read the same live
+`chat.db`, and a message arriving between two parallel requests shows up as a real but meaningless
+difference in counts.
+
+---
+
+## Default-off enforcement
+
+The tests that keep "available but unused" from quietly drifting into "used":
+
+- With default settings the **full route table matches the reference**: the auth endpoints **404,
+  not 401**.
+- **No signing key, device table, or enrollment state is created** on a fresh install.
+- An `Authorization: Bearer` header is **ignored rather than evaluated** under
+  `auth_mode = password`.
+- A default server emits `legacy-v1` to every target **regardless of what any client advertises**,
+  and advertises no new `server/info` fields.
+
+---
+
+## `chat.db` is never written
+
+The strongest guarantee is structural: the read-only handle exposes no write API, so **a write
+does not compile**, asserted by a compile-failure test rather than a runtime one.
+
+Backed by a runtime assertion: open a fixture database, snapshot its bytes and mtime, run the full
+read surface (every repository method, every poller pass, a complete serialization cycle), and
+assert the file, its `-wal` and its `-shm` are **byte-identical afterwards**. Assert the
+connection reports `SQLITE_OPEN_READONLY`, and that `immutable` is **not** set.
+
+### Schema drift
+
+Assert every query names its columns explicitly and that **no `SELECT *` reaches `chat.db`**. Run
+the full read surface against all three profiles and assert that columns absent from a profile
+produce **absent fields rather than nulls or crashes**, including the case that bites hardest, a
+table present in Sonoma and gone in Sequoia (`message_processing_task`).
+
+### Query plans
+
+Run `EXPLAIN QUERY PLAN` over every `chat.db` query in CI and **fail any that full-scans
+`message`**. We cannot add indexes, so a query that misses the ones Apple ships is a defect, and
+it is the kind that only hurts on the old hardware the memory budget is written for.
+
+### Timestamps
+
+Round-trip every date column through `AppleTimestamp` at both unit scales, asserting the High
+Sierra boundary. Separately assert Notification Center's Cocoa *seconds* are not decoded with the
+nanosecond scale: the two live in one codebase and the failure is a plausible-looking wrong date
+rather than an error.
+
+---
+
+## The deployment matrix
+
+Integration tests run against **four** configurations, not one: socket-only (no push, no
+webhooks); webhook/ntfy-only; full push; and each of those **with and without the Private API**.
+
+**A test that only passes in the fully-configured case is a failing test.**
+
+Specifically assert that a socket-only install starts with **zero warnings**, completes setup with
+no Firebase step, and reports its active delivery routes accurately.
+
+**Non-SIP send path** is a first-class suite, not a fallback afterthought: send text, send an
+attachment, and start both a 1:1 and a group chat with the helper absent, asserting the returned
+`Message` matches the Private-API path's shape. Assert the capability matrix in
+`GET /api/v1/server/info` reports honestly in both modes.
+
+---
+
+## What the audit pass added
+
+Five suites, each written against a specific way the code could go wrong again:
+
+- `SocketTransportTests`: the Private API event stream fans out. Two subscribers taken before
+  a helper registration both receive it. Against the previous single-shared-`AsyncStream` this
+  fails, with one subscriber never served.
+- `DeviceRegistrationTests`: the push registration WRITE runs. Nothing had ever executed it,
+  which is how it kept inserting into a column a frozen migration had renamed. One test pins
+  the migrated column name directly.
+- `OptionalAuthenticationTests`: drives the real listener and asserts a blocked caller is
+  refused on the one route whose credential check is optional, and never reaches the handler.
+- `HelperVocabularyTests`: what the compiler cannot check about the helper command enums:
+  the two stay disjoint, raw values stay kebab-case and unique, and the client keeps sending
+  cases rather than strings. Exhaustiveness is the build's job and is deliberately not
+  restated here.
+- `PrivateAPIPumpOrderTests`: structural, and says so: the event pump must be attached before
+  the runtime starts, and no service may replace a running task without cancelling it. The
+  behaviour needs a real injection to reproduce, so the order is asserted in the source in the
+  same shape as `NamingConventionTests`.
+
+## Per-subsystem assertions
+
+**Messages-backed interfaces.** Every operation carried out by Messages reports a backend refusal
+as `IMessageError` (HTTP 500, `error.type = "iMessage Error"`) rather than as a generic
+`Server Error`, and a `BadRequest` the interface raised itself still arrives as a 400.
+`ChatFailureTests` asserts this by walking **all twenty-four** chat operations rather than
+sampling: the risk with a rule applied call site by call site is not that the rule is wrong, it is
+that one call site was missed, and only an exhaustive walk finds it. Verified non-vacuous by
+unwrapping one operation and confirming the walk fails.
+
+`FailingPrivateAPI` (`Tests/BBTestSupport/`) is the fake that makes this reachable. It conforms
+to the whole of `PrivateAPI` and throws from every member, which is affordable because each one is
+`async throws`: **every stub body is `throw error` and no return value has to be constructed**.
+Reach for it for the exhaustive walks above rather than writing a narrower stub; a selective one
+cannot catch the missed call site. `InterfaceFixtures` supplies the empty database these interfaces
+need to exist but never read.
+
+**When the helper answers.** A double that throws can only ask "was this wrapped". Everything on
+the other side (did the interface send down what the caller asked for, does it return what came
+back) needs one that succeeds, and for a long time none existed: a conformance was an
+all-or-nothing 76-member obligation, so the failing double was the only one anybody could justify
+writing.
+
+`PrivateAPI` is now a composition of sixteen ROLES (`PrivateAPIConnection`, `MessageSending`,
+`ChatMuting`, `HandleAvailability`, `FaceTimeControl`, …), and each interface declares the roles it
+calls as its `MessagesBackedInterface.Helper`. `HandleInterface`'s slice is three methods and
+`AttachmentInterface`'s is one, so a succeeding stub for either is a dozen lines:
+`Tests/BBTestSupport/SucceedingHelpers.swift`, driving `HelperSuccessPathTests`. Two rules there: a stub **records what
+it was asked**, because half the value is asserting what went down rather than what came back; and
+an unarranged member **throws** rather than returning a default, so a test that wanders onto an
+unexpected path fails there instead of passing on a zero value.
+
+Prefer the narrowest role that covers the operation. A real `any PrivateAPI` still satisfies every
+one of them, so nothing at the composition root changes.
+
+**Where a suite lives.** `BBInterfacesTests` stands up ONE interface against a repository and a
+helper double and asserts what it does, in the interfaces layer's own vocabulary. It builds no
+`AppContext` and links no transport, which is the property that makes it worth having: a failure
+there points at the interface. `CompositionTests` is for what genuinely spans layers: the wiring
+assertions, and the suites that check an `InterfaceError` reaches a client as the right envelope,
+which needs BBInterfaces, BBHandlers and BBHTTPAPI at once.
+
+Fakes both need live in `BBTestSupport`, a plain library target under `Tests/`. It belongs to no
+product, so nothing ships it, and everything in it is public API with no `@testable`, which is
+what lets it be a library at all. Two copies of a fake is how two copies drift, and a drifted fake
+is worse than none: both suites go on passing.
+
+**A test that races a write against a poll holds the task and awaits it.** Two of these
+existed and both wrote `Task.detached { try? await ... }`, which discards the error. When the
+write failed the poll simply ran to its limit, so the failure arrived sixty seconds later
+reading "answered before the join": a true sentence about an entirely different cause, and
+one that sends you reading the hydration logic rather than the test's own write. Hold the
+`Task`, `await` its value before the assertions, and let a failed write fail as itself. Pass
+an explicit policy too where the API takes one: `SendHydrationTests.waitsForTheChatJoin` was
+the only test in its file taking the sixty-second default, which is what made its flake
+expensive as well as misleading.
+
+**Diagnostics separation.** `log.error(…)` alone creates **no** `UserAlert`; `alerts.raise(…)`
+creates exactly one; repeated raises with the same `dedupeKey` coalesce and increment
+`occurrenceCount`; `GET /api/v1/server/alert` returns the legacy field shape (asserted by **set
+equality** on the key set); a Copy Diagnostic Report bundle contains **no value sourced from a
+setting marked `isSecret`**.
+
+**Payload codecs.** `legacy-v1` output byte-identical to captured fixtures. `sealed-v2` verified by
+**decrypting what it produced with a real keypair**: a codec round-tripped only through its own
+encoder proves nothing, since the same bug on both sides cancels out, plus tamper tests on the
+ciphertext, the header and the sender hint, and a wrong-key test. Per-device negotiation verified
+by registering one legacy device and one `sealed-v2` device and asserting **one event produces two
+different payloads in one send**.
+
+**Socket conformance.** Replay the captured handshake and frame transcript for both transports and
+both EIO3 and EIO4, asserting frame-level equality. Verified against the canonical
+`socket.io-client@4`, including the polling→websocket upgrade and the silent close on a bad
+password.
+
+> A cautionary case worth keeping in mind: the packet codec and server existed with golden-vector
+> tests and **nothing was mounted**: `/socket.io/` 404'd and no client could connect, while every
+> unit test in the module passed.
+
+**Settings.** Every key round-trips to its declared type, with explicit cases for a numeric setting
+whose value is `0` or `1`, a password of `"1"`, and a delay stored as `"0.0"`. Secrets land in the
+Keychain and plaintext rows are gone. `RenderableSettingsTests` fails when a setting declares a
+presentation and is missing from `Settings.renderable`; `SettingApplicationTests` pins which
+settings need a restart to apply and that every legacy row stays hidden.
+
+**Service lifecycle.** Start/stop ordering under a synthetic dependency graph, restart-with-
+dependents on a `socket_port` change, gated services declining to start, and supervised
+restart-with-backoff on a service that throws, with an alert raised on policy exhaustion.
+
+**Contacts.** Benchmark lookup against a synthetic 5,000-contact address book and assert it is an
+**indexed lookup, not a scan**. Assert the bulk ingest never requests image data, that an
+incremental re-index touches only changed identifiers, and that two contacts sharing a full name do
+not collide.
+
+**Memory.** Assert the budget table in CI on a fixture dataset, plus a 24-hour soak driving the
+poller, socket and send paths that asserts a **flat** memory curve. Assert that downloading a large
+attachment does not grow the heap proportionally to file size.
+
+**Access control.** The highest-value test is the tunnel footgun: simulate requests arriving
+through a trusted proxy and **assert the tunnel egress address is never blocked**, with failures
+attributed to the forwarded client. Assert that with no resolvable client address the system falls
+back to global throttling instead of blocking the proxy. Assert blocks expire on their TTL, survive
+a restart, escalate on repeat offences, that loopback and allowlisted CIDRs are never blocked, that
+unblocking takes effect immediately, and that `--clear-blocklist` recovers a fully locked-out
+server.
+
+**Permissions.** Assert Full Disk Access detection is the authoritative `chat.db` open. Assert
+`AEDeterminePermissionToAutomateTarget` is called with `askUserIfNeeded: false` so status checks
+never surface a prompt. Assert every deep link opens the correct pane, that the walkthrough refuses
+to advance past an unmet required permission without a recorded acknowledgement, that revoking a
+permission at runtime raises an alert, and that the registry refuses to start a service whose
+required permission is missing.
+
+**Security regression suite.** Each finding of the 2023 report is a permanent test so it cannot
+silently return: no plaintext credential on disk after provisioning; Keychain items carrying an
+ACL bound to the app's code signature; the published ruleset denying `write` on `/server/config`
+while `/server/commands` **remains writable**; the restart limiter capping at one per hour with
+replayed and stale commands ignored; auto-remediation rewriting permissive rules **and a simulated
+client still able to read config and write `nextRestart` afterward**; lockout triggering under
+sustained failures with a `UserAlert` naming the source IP.
+
+---
+
+## What CI cannot cover
+
+Private API, permissions and AppleScript need a real Mac. **A green PR is meaningful but not
+sufficient before a release.**
+
+Two categories are only reachable by *running* the thing:
+
+- **Wiring.** Static sweeps find code with no caller; they cannot tell you whether a wired call
+  site is *correct*. Live exercises are what found duplicated sends, a silent `sendAttachment`, a
+  `setDisplayName` timeout, a contacts wipe, and a misleading AppleScript error, none of which any
+  static analysis would have shown.
+- **Host-environment behaviour.** `NSAppleScript` re-entrancy under a nested run loop, and TLS
+  hostname selection: a SAN dNSName is an ASN.1 IA5String and the macOS default computer name is
+  `<Name>’s MacBook Pro` with a **U+2019 apostrophe**, so certificate generation throws on a stock
+  Mac and HTTPS silently degrades.
+
+**Manual end-to-end on a real Mac** with Full Disk Access and SIP disabled: send text and
+attachment via both backends; create a group; rename it; add and remove participants; send and
+remove a tapback; edit and unsend; receive a message and confirm it arrives over socket, push and
+webhook simultaneously with the correct per-sink payload shape; toggle each proxy service; change
+the password mid-session and confirm connected clients are kicked; pair a device and confirm it
+keeps working after the password changes.
+
+**Opt-in live tests** sit between the two. `TailscaleLiveInstallTests` downloads the
+recommended Tailscale bottle from `ghcr.io` into a temporary directory, checks it against the
+digest pinned in `BuiltInTools.tailscale`, and runs both `tailscaled` and its `tailscale`
+companion. It is the only check that the pinned digests are the registry's, and it is skipped
+unless `BB_LIVE_TOOL_INSTALL=1` is set, because it needs the internet and a 20 MB download:
+
+```bash
+BB_LIVE_TOOL_INSTALL=1 swift test --filter TailscaleLiveInstall
+```
+
+Run it after bumping a Tailscale pin, on each architecture the pin covers. What it does not
+reach is the daemon signed in (the browser link, `serve` and `funnel`) which needs a tailnet
+and a person, and is on the manual list above.
+
+**CI itself** is verified too: a PR from a **fork** builds and tests green with no secrets
+available; the release workflow refuses a tag that is not an ancestor of the default branch, and
+refuses a tag whose version disagrees with the app target.
+
+---
+
+## What the recorded fixtures are not yet doing
+
+`Fixtures/http/` holds 179 recorded request/response pairs from the reference server, and they
+are the most precise statement of the contract this project has. **Nothing replays them against
+the Swift server in CI.** They are used for coverage measurement (`FixtureCoverage`), for schema
+inference, and for the test-data scrub, but a recorded response and the response this server
+actually produces are never diffed automatically. `SideBySideRunner` does compare responses, and
+correctly cannot run here: it needs both servers live.
+
+That gap is not theoretical. Two `POST /api/v1/backup/*` defects sat in shipped code and were
+found by reading a fixture, not by a failing test: the response carried a `data` key the
+reference does not send, and the success message fell back to `"Success"` because its
+`SuccessMessages` key was misspelled. Both are single-line diffs against a fixture that was
+already committed.
+
+**A fixture-replay harness is the highest-value test still missing.** Until it exists, when you
+touch a route that has a fixture, open the fixture.
+
+---
+
+## Success-message keys must name real routes
+
+`SuccessMessageTests` checks the message STRINGS. `SuccessMessageKeyTests` checks the KEYS, and
+they are different failures: a key matching no route is not a wrong string, it is a string
+nothing looks up, so the route silently answers `"Success"`: the exact bug the table was added
+to fix, returning as a typo. Four keys had drifted (`backup.saveTheme`, `backup.saveSettings`,
+`chat.setIcon`, `chat.removeIcon`; the routes are spelled `create…`, `setGroupIcon`,
+`removeGroupIcon`).
+
+The check runs against `RouteCatalog.routes`, not `RouteTable.groups`, because two of the four
+belonged to additive routes a v1-only check would not have seen.
+
+---
+
+## Do not grep for whether a handler is implemented
+
+Handlers are not all registered from a string literal. Several are registered from a loop:
+
+```swift
+for (name, pinned): (HandlerID, Bool) in [("chat.pin", true), ("chat.unpin", false)] {
+```
+
+so `grep 'registry.register("chat.pin")'` finds nothing and reports a working route as missing.
+Backups are registered the same way, through `HandlerID(id)` built from a variable. **The
+authoritative answer is `HandlerRegistry.missing(for:)`**: the same question the router asks at
+mount time, and the count is logged at start-up as `"Endpoints not yet implemented"`. Exactly
+one route is unimplemented today: `icloud.contactCard`.
+
+---
+
+## Tests that bind a port use port 0
+
+Eight suites start a real listener. **Every one of them passes port 0 and reads
+`HTTPListener.port` back**: never a random high port, and never a retry loop around one.
+
+```swift
+try await listener.start(router: router, host: "127.0.0.1", port: 0)
+defer { Task { await listener.stop() } }
+try await body(try await listener.boundPortOrFail())
+```
+
+Guessing a port is a birthday problem against the rest of the run, and it produced real
+intermittent failures: `PeerAddressTests` and `SignalOwnershipTests` reporting "Port N is
+already in use" perhaps once in a few hundred runs, which is often enough to be seen and rare
+enough to be re-run and ignored. Three suites had grown retry loops, which lower the odds
+without removing them; one of those loops fell through **without calling its assertion body**
+when every attempt failed, so a fully-collided run passed green having tested nothing.
+
+The kernel does not hand out a port it has already given away, so there is nothing left to
+collide and nothing to retry. `HTTPListener.port` reports the assigned port rather than the
+requested one, which is what makes this work, and is the truthful answer anyway.
+
+The one test that needs a *specific* port, `SignalOwnershipTests.stopWorksWithoutSignals`,
+binds 0, reads the assigned port, stops, and rebinds that exact port to prove it was released.
+That is stronger than the guess it replaced: a guessed port that was never free would have
+failed the first bind and never reached the claim under test.
+
+---
+
+## Test data: never real addresses
+
+`Tests/CompatibilityTests/TestDataPolicyTests.swift` fails the build on real-looking phone numbers,
+emails and message content. This is enforced, not requested.
+
+Fixtures come from generators. `python3 Tools/chatdb-fixtures/generate.py` produces deterministic,
+byte-identical databases so they never appear as diff noise. `Tools/send-probe` takes the chat GUID
+on the command line specifically so no real address is ever committed.

@@ -11,28 +11,47 @@ export class MessagePoller extends IMessagePoller {
 
     unsentIds: number[] = [];
 
+    // Apple only allows edits within ~15 minutes and unsends within ~2 minutes of sending,
+    // so a much smaller lookback than a full week is enough to catch those on every tick.
+    static readonly FAST_LOOKBACK_MS = 1000 * 60 * 30;
+
+    // Periodically we still widen the lookback to a full week so we don't permanently miss
+    // things that can legitimately change well outside the fast window (e.g. a read receipt
+    // or notification flag on an older message).
+    static readonly RECONCILE_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 7;
+
+    static readonly RECONCILE_INTERVAL_MS = 1000 * 60 * 5;
+
+    lastReconcileAt = 0;
+
     async poll(after: Date): Promise<IMessagePollResult[]> {
         let results: IMessagePollResult[] = [];
 
-        // Lookback 1 week only using date created because date created
-        // has a SQLite index on it, while the other dates don't.
-        // Because of this, searching is much faster. We can do the filtering
-        // after the query.
-        // The incremental sync should pick up on anything changed outside of this range.
-        const oneWeekMs = 1000 * 60 * 60 * 24 * 7;
-        const afterLookback = new Date(after.getTime() - oneWeekMs);
+        // Lookback using date created because date created has a SQLite index on it, while
+        // the other dates don't. Because of this, searching is much faster. We can do the
+        // filtering after the query.
+        const now = Date.now();
+        const dueForReconcile = now - this.lastReconcileAt >= MessagePoller.RECONCILE_INTERVAL_MS;
+        const lookbackMs = dueForReconcile ? MessagePoller.RECONCILE_LOOKBACK_MS : MessagePoller.FAST_LOOKBACK_MS;
+        if (dueForReconcile) this.lastReconcileAt = now;
+
+        const afterLookback = new Date(after.getTime() - lookbackMs);
 
         // let start = new Date();
+        // Skip the attachment join here -- the filtering below never looks at attachments,
+        // and joining them over this lookback window is the most expensive part of this
+        // query. We only fetch attachments for the small set of rows that actually changed.
         const [search, __] = await this.repo.getMessages({
             after: afterLookback,
             withChats: true,
+            withAttachments: false,
             orderBy: "message.dateCreated"
         });
 
         // Filter out messages that aren't within our actual range.
         // Do this here instead of in SQLite to save on performance
         const afterTime = after.getTime();
-        const entries = search.filter(e => (
+        let entries = search.filter(e => (
             (e.dateCreated?.getTime() ?? 0) >= afterTime ||
             // Date delivered only matters if it's from you
             (e.isFromMe && (e.dateDelivered?.getTime() ?? 0)) >= afterTime ||
@@ -51,6 +70,25 @@ export class MessagePoller extends IMessagePoller {
             // If didNotifyRecipient changed (from false to true)
             (e.didNotifyRecipient ?? false)
         ));
+
+        // Hydrate the (small) set of changed entries with their attachments, since downstream
+        // consumers (sockets, webhooks) need the full message payload.
+        if (entries.length > 0) {
+            const [hydrated] = await this.repo.getMessages({
+                withChats: true,
+                withAttachments: true,
+                limit: entries.length,
+                where: [
+                    {
+                        statement: `message.ROWID in (${entries.map(e => e.ROWID).join(", ")})`,
+                        args: null
+                    }
+                ]
+            });
+
+            const hydratedByRowId = new Map(hydrated.map(e => [e.ROWID, e]));
+            entries = entries.map(e => hydratedByRowId.get(e.ROWID) ?? e);
+        }
 
         // Handle group changes
         const groupChangeEntries = entries.filter(e => isEmpty(e.text) && [1, 2, 3].includes(e.itemType));
