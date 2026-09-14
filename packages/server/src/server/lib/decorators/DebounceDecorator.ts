@@ -14,7 +14,7 @@ const timeouts = new Map<string, Promise<any>>();
  */
 export const DebounceSubsequentWithWait = <T extends (...args: any[]) => any>(
     name: string,
-    timeoutMs: number
+    timeoutMs: number | (() => number)
 ): MethodDecorator => {
     return (_target: any, _propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
         const originalMethod = descriptor.value;
@@ -27,7 +27,10 @@ export const DebounceSubsequentWithWait = <T extends (...args: any[]) => any>(
             // This will call the original function after the timeout.
             const promiseWrapper = async () => {
                 try {
-                    await waitMs(timeoutMs);
+                    // Resolved lazily (rather than once at decoration time) so config-driven
+                    // values (e.g. the user's poll interval setting) can change at runtime.
+                    const resolvedTimeoutMs = typeof timeoutMs === "function" ? timeoutMs() : timeoutMs;
+                    await waitMs(resolvedTimeoutMs);
                     const result = await originalMethod.apply(this, args);
                     timeouts.delete(name);
                     return result;

@@ -1,0 +1,42 @@
+name: Swift - PR
+
+# The gate for the Swift server. Deliberately fast and secret-free: the Xcode app target is
+# built unsigned, so pull requests from forks run the full build and test suite with no
+# secrets available.
+#
+# The gate itself is `swift-gate.yml`, shared with the release workflow so that the build
+# that ships is held to the same five checks as the pull request that proposed it.
+#
+# `push` as well as `pull_request`: a merge queue, a direct commit to a long-lived branch and
+# an administrator override all reach these branches without a pull request run, so without
+# it the branch state itself was never checked, only the proposals.
+#
+# The existing Node workflow (main.yml) is untouched and runs independently.
+
+on:
+  pull_request:
+    # master is the repository default branch; development is where day-to-day PRs
+    # actually land. Gating both means the check runs wherever the work arrives.
+    branches: [master, development]
+    paths:
+      - 'swift/**'
+      - '.github/workflows/swift-pr.yml'
+      - '.github/workflows/swift-gate.yml'
+  push:
+    branches: [master, development]
+    paths:
+      - 'swift/**'
+      - '.github/workflows/swift-pr.yml'
+      - '.github/workflows/swift-gate.yml'
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes the previous run rather than queueing behind it.
+  group: swift-pr-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Gate
+    uses: ./.github/workflows/swift-gate.yml

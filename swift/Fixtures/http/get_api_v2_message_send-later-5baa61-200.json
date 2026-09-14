@@ -1,0 +1,35 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/message/send-later?password=__REDACTED__",
+    "headers": {
+      "host": "127.0.0.1:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Successfully fetched scheduled messages!",
+        "data": [],
+        "status": 200,
+        "metadata": {
+          "count": 0
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-09-04T15:12:39.934Z"
+}

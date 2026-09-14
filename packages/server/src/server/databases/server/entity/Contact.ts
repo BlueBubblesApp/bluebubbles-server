@@ -1,5 +1,14 @@
 import { Base64Transformer } from "@server/databases/transformers/Base64Transformer";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, Unique } from "typeorm";
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
+    OneToMany,
+    Unique,
+    Index
+} from "typeorm";
 import { ContactAddress } from "./ContactAddress";
 
 @Entity({ name: "contact" })
@@ -7,6 +16,10 @@ import { ContactAddress } from "./ContactAddress";
 export class Contact {
     @PrimaryGeneratedColumn({ name: "id" })
     id: number;
+
+    @Column("text", { name: "external_id", nullable: true })
+    @Index()
+    externalId: string;
 
     @Column("text", { name: "first_name", nullable: false, default: "" })
     firstName: string;

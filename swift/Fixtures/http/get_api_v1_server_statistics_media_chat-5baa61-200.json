@@ -1,0 +1,1670 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/server/statistics/media/chat?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": [
+          {
+            "chatGuid": "any;+;0babff0e486647dca0de91aec22758ad",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 13,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;291301a8af684985ba453791c0a5d9f9",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;0123456789abcdef0123456789abcdef",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;5738c4ea264b438baaeb6a76b69e99db",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;6f19839d8f8d49cdbdb42e714d8e6b57",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;87bfd6cd533c453d8e0d69f40056c525",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;cecaa870fade4c49b8674ceda687b394",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1286,
+              "videos": 130,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 79,
+              "videos": 5,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 7,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 7,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 149,
+              "videos": 14,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 12,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 26,
+              "videos": 5,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 8,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 6,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 18,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 805,
+              "videos": 39,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 25,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 6,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 10,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1593,
+              "videos": 112,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 13,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 164,
+              "videos": 11,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 6,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 12,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 14,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 10,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 103,
+              "videos": 18,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 19,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 22,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 49,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 27,
+              "videos": 4,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 15,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 62,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 63,
+              "videos": 4,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 131,
+              "videos": 13,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 17,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 6,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 28,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 18,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 313,
+              "videos": 47,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 15,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 11,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 39,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 12,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 20,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 48,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 20,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 6,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 16,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 60,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 24,
+              "videos": 5,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 31,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 30,
+              "videos": 10,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 32,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 8,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 115,
+              "videos": 7,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 53,
+              "videos": 4,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 6,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 349,
+              "videos": 35,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 25,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 181,
+              "videos": 6,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 25,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 7,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 10,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 10,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 25,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 11,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 53,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 77,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 25,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 58,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 81,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 41,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 33,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 12,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 18,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 49,
+              "videos": 8,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 5,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 4,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": null,
+            "totals": {
+              "images": 155,
+              "videos": 12,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 3,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 125,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 390,
+              "videos": 23,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": null,
+            "totals": {
+              "images": 8,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 2,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": null,
+            "totals": {
+              "images": 3,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 20,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;xxxxxxxxxx",
+            "groupName": null,
+            "totals": {
+              "images": 1,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 26,
+              "videos": 0,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 0,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;+;chat1234567890",
+            "groupName": null,
+            "totals": {
+              "images": 0,
+              "videos": 1,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 0,
+              "videos": 3,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;+15555550100",
+            "groupName": "REDACTED",
+            "totals": {
+              "images": 0,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": null,
+            "totals": {
+              "images": 0,
+              "videos": 2,
+              "locations": 0
+            }
+          },
+          {
+            "chatGuid": "any;-;person@example.com",
+            "groupName": null,
+            "totals": {
+              "images": 0,
+              "videos": 1,
+              "locations": 0
+            }
+          }
+        ]
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:06.125Z"
+}

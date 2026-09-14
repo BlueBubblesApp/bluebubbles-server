@@ -22,7 +22,7 @@ export const FaceTimeCallingField = ({ helpText }: ExperimentalFaceTimeFeaturesF
                 {helpText ?? (
                     <Text>
                         When enabled, the server will detect incoming FaceTime calls and forward
-                        a notification to your device. If you choose to answer the the call
+                        a notification to your device. If you choose to answer the call
                         from the notification, the server will attempt to generate a link
                         for you to join with.
                     </Text>

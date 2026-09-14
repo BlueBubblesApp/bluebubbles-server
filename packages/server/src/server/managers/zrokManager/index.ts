@@ -12,7 +12,14 @@ export class ZrokManager extends Loggable {
     tag = "ZrokManager";
 
     static get daemonPath() {
-        return path.join(FileSystem.resources, "macos", "daemons", "zrok", (process.arch === "arm64") ? "arm64" : "x86", "zrok");
+        return path.join(
+            FileSystem.resources,
+            "macos",
+            "daemons",
+            "zrok",
+            process.arch === "arm64" ? "arm64" : "x86",
+            "zrok"
+        );
     }
 
     proc: ChildProcess;
@@ -48,6 +55,7 @@ export class ZrokManager extends Loggable {
         const reservedTunnel = (Server().repo.getConfig("zrok_reserve_tunnel") as boolean) ?? false;
         const tunnelToken = await ZrokManager.reserve(null);
 
+        // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
             // Didn't use zx here because I couldn't figure out how to pipe the stdout
             // properly, without taking over the terminal outputs.
@@ -170,7 +178,7 @@ export class ZrokManager extends Loggable {
     static async reserve(name?: string): Promise<string> {
         const reservedTunnel = (Server().repo.getConfig("zrok_reserve_tunnel") as boolean) ?? false;
         const reservedToken = Server().repo.getConfig("zrok_reserved_token") as string;
-        const reservedName = name ?? Server().repo.getConfig("zrok_reserved_name") as string;
+        const reservedName = name ?? (Server().repo.getConfig("zrok_reserved_name") as string);
         const logger = getLogger("ZrokManager");
 
         logger.info(`Looking for existing reserved Zrok share...`);
@@ -192,7 +200,10 @@ export class ZrokManager extends Loggable {
 
             // If there is an existing token, release it
             if (isNotEmpty(existingToken)) {
-                logger.info(`Releasing existing Zrok share (${existingToken}) because we no longer want to use a reserved tunnel.`);
+                logger.info(
+                    `Releasing existing Zrok share (${existingToken}) because we no ` +
+                        `longer want to use a reserved tunnel.`
+                );
                 await this.safeRelease(existingToken);
             }
 
@@ -200,18 +211,18 @@ export class ZrokManager extends Loggable {
         }
 
         if (isNotEmpty(existingToken)) {
-            logger.debug('Handling existing token...');
+            logger.debug("Handling existing token...");
 
             // If the token is different, release the existing tunnel
             if (existingToken !== reservedToken) {
                 logger.info(`Releasing existing Zrok share (${existingToken}) because the reserve token has changed.`);
                 await ZrokManager.safeRelease(existingToken, { clearToken: true });
-            // If the tokens match, but the name doesn't match the token (which will be the name),
-            // then release the existing tunnel
+                // If the tokens match, but the name doesn't match the token (which will be the name),
+                // then release the existing tunnel
             } else if (existingToken === reservedToken && isNotEmpty(reservedName) && reservedName !== existingToken) {
                 logger.info(`Releasing existing Zrok share (${existingToken}) because the reserved name has changed.`);
                 await ZrokManager.safeRelease(existingToken, { clearToken: true });
-            // If we have an existing token and the name hasn't changed, return the existing token
+                // If we have an existing token and the name hasn't changed, return the existing token
             } else if (existingIsReserved) {
                 logger.info(`Using existing Zrok token: ${existingToken}`);
                 return existingToken;
@@ -228,7 +239,12 @@ export class ZrokManager extends Loggable {
             }
 
             logger.info(`Reserving new tunnel with flags: ${flags.join(" ")}`);
-            const output = await ProcessSpawner.executeCommand(this.daemonPath, ["reserve", "public", ...flags], {}, "ZrokManager");
+            const output = await ProcessSpawner.executeCommand(
+                this.daemonPath,
+                ["reserve", "public", ...flags],
+                {},
+                "ZrokManager"
+            );
             const urlMatches = output.match(ZrokManager.proxyUrlRegex);
             if (isEmpty(urlMatches)) {
                 logger.info(`Failed to reserve Zrok tunnel! Unable to find URL in output. Output: ${output}`);
@@ -264,8 +280,7 @@ export class ZrokManager extends Loggable {
 
     static async disable(): Promise<string> {
         const logger = getLogger("ZrokManager");
-        
-        
+
         try {
             logger.debug("Disabling Zrok tunnel...");
             return await ProcessSpawner.executeCommand(this.daemonPath, ["disable"], {}, "ZrokManager");
@@ -326,7 +341,7 @@ export class ZrokManager extends Loggable {
             const result = await ProcessSpawner.executeCommand(this.daemonPath, ["release", token], {}, "ZrokManager");
 
             // Clear the token from the config
-            if (clearToken) await Server().repo.setConfig("zrok_reserved_token", "");   
+            if (clearToken) await Server().repo.setConfig("zrok_reserved_token", "");
             if (clearName) await Server().repo.setConfig("zrok_reserved_name", "");
             return result;
         } catch (ex: any | ProcessSpawnerError) {

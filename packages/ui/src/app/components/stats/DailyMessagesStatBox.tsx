@@ -13,16 +13,19 @@ export const DailyMessagesStatBox = (
         delay?: number
     }
 ): JSX.Element => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const hoursSinceDayStart = Math.floor((now.getTime() - startOfDay.getTime()) / 3_600_000);
     return (
         <UpdatableStatBox
-            title='Daily Messages'
+            title='Messages Today'
             statName="daily_messages"
             ipcEvent="get-message-count"
             color="yellow"
             autoUpdate={autoUpdate}
             updateInterval={updateInterval}
             delay={delay}
-            pastDays={1}
+            pastHours={hoursSinceDayStart}
         />
     );
 };

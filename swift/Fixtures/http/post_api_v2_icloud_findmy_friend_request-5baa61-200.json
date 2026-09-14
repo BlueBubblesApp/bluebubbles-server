@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/icloud/findmy/friend/request?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "address": "REDACTED"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "requested": true,
+          "address": "REDACTED"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:31:08.771Z"
+}

@@ -5,6 +5,15 @@ export class TransactionManager {
 
     add(promise: TransactionPromise) {
         this.promises.push(promise);
+
+        // Once the transaction settles (resolved, rejected, or timed out),
+        // remove it so completed transactions don't accumulate forever.
+        promise.promise.finally(() => this.remove(promise.transactionId)).catch(() => {});
+    }
+
+    remove(transactionId: string) {
+        const idx = this.promises.findIndex(p => p.transactionId === transactionId);
+        if (idx !== -1) this.promises.splice(idx, 1);
     }
 
     findIndex(transactionId: string, includeResolved = false): number {

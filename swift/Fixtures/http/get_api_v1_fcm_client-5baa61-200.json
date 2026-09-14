@@ -1,0 +1,65 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/fcm/client?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "project_info": {
+            "project_number": "+15555550100",
+            "project_id": "bluebubbles-ijd37cn8nbgrxnypm7",
+            "storage_bucket": "bluebubbles-ijd37cn8nbgrxnypm7.firebasestorage.app"
+          },
+          "configuration_version": "1",
+          "client": [
+            {
+              "client_info": {
+                "android_client_info": {
+                  "package_name": "com.bluebubbles.messaging"
+                },
+                "mobilesdk_app_id": "1:+15555550100:android:35b48b+15555550100afc"
+              },
+              "oauth_client": [
+                {
+                  "client_type": 3,
+                  "client_id": "+15555550100"
+                }
+              ],
+              "services": {
+                "appinvite_service": {
+                  "other_platform_oauth_client": []
+                }
+              },
+              "api_key": [
+                {
+                  "current_key": "AIzaSyAn0V7r-oknDFKJ4HnMw_hM2qFdq-21M-M"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T20:38:23.001Z"
+}

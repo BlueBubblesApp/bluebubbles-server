@@ -1,0 +1,31 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/chat/any;-;person@example.com/share/contact/status?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Successfully got contact sharing status!",
+        "data": false
+      }
+    }
+  },
+  "recordedAt": "2026-08-30T15:59:08.800Z"
+}

@@ -1,0 +1,35 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/attachment/upload?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "multipart/form-data; boundary=------------------------rRhi2sUnWkTYOF7IHkEZYv"
+    },
+    "body": {
+      "kind": "text",
+      "value": "--------------------------rRhi2sUnWkTYOF7IHkEZYv\r\nContent-Disposition: form-data; name=\"attachment\"; filename=\"fixture.png\"\r\nContent-Type: image/png\r\n\r\n�PNG\r\n\u001a\n\u0000\u0000\u0000\rIHDR\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0010\b\u0002\u0000\u0000\u0000��h6\u0000\u0000\u0000HIDATx����\u0014�\u0000\u0000��!�\u0010B\b!�\u0010B\b!�\u0010B\u001f\u0003\b!�\u0010B�a�\u000e0\u001el\u0019m�l�mYlYm�l�m9l9m�l�mylym�L�\u0017,\u0010�φ\u0014\u0000\u0000\u0000\u0000IEND�B`�\r\n--------------------------rRhi2sUnWkTYOF7IHkEZYv--\r\n"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": {
+          "path": "b7dee877-b+15555550100d2-069b31b90f8d/fixture.png"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:39:04.466Z"
+}

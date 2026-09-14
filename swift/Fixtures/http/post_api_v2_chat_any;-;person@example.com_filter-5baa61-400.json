@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v2/chat/any;-;person@example.com/filter?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "category": "known"
+      }
+    }
+  },
+  "response": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "error": {
+          "type": "Validation Error",
+          "message": "`category` is required"
+        },
+        "status": 400,
+        "message": "Bad Request"
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T18:31:08.357Z"
+}

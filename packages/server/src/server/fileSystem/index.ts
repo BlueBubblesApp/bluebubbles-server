@@ -320,7 +320,10 @@ export class FileSystem {
      * @param guid Unique identifier for the attachment
      */
     static buildAttachmentChunks(guid: string, name: string): string {
-        let chunks = new Uint8Array(0);
+        // Use the concatUint8Arrays helper so that the type will be the same as
+        // when we concat the actual attachment chunks. If we just create a new Uint8Array(0),
+        // we will get a type-error because the type will be a Uint8Array<ArrayBufferLike>.
+        let chunks = concatUint8Arrays(new Uint8Array(0), new Uint8Array(0));
 
         // Get the files in ascending order
         const files = fs.readdirSync(path.join(FileSystem.attachmentsDir, guid));
@@ -538,7 +541,7 @@ export class FileSystem {
     static async convertMp3ToCaf(originalPath: string, outputPath: string): Promise<void> {
         const oldPath = FileSystem.getRealPath(originalPath);
         const output = await FileSystem.execShellCommand(
-            `/usr/bin/afconvert -f caff -d LEI16@44100 -c 1 "${oldPath}" "${outputPath}"`
+            `/usr/bin/afconvert -f caff -d opus@24000 -c 1 "${oldPath}" "${outputPath}"`
         );
         if (isNotEmpty(output) && output.includes("Error:")) {
             throw Error(`Failed to convert audio to CAF: ${output}`);
@@ -746,8 +749,14 @@ export class FileSystem {
     </dict>
 </plist>`;
 
+        // As of macOS Tahoe, the directory ~/Library/LaunchAgents does not exist unless otherwise created
+        const launchAgentsPath = path.join(userHomeDir(), "Library", "LaunchAgents");
+        if (!fs.existsSync(launchAgentsPath)) {
+            fs.mkdirSync(launchAgentsPath);
+        }
+
         const plistName = "com.bluebubbles.server";
-        const filePath = path.join(userHomeDir(), "Library", "LaunchAgents", `${plistName}.plist`);
+        const filePath = path.join(launchAgentsPath, `${plistName}.plist`);
         if (!fs.existsSync(filePath)) {
             fs.writeFileSync(filePath, plist);
         }

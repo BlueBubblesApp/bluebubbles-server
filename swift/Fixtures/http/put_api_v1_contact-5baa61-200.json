@@ -1,0 +1,62 @@
+{
+  "request": {
+    "method": "PUT",
+    "path": "/api/v1/contact?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": [
+        {
+          "id": 553,
+          "firstName": "REDACTED",
+          "lastName": "REDACTED",
+          "displayName": "REDACTED"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Success",
+        "data": [
+          {
+            "phoneNumbers": [
+              {
+                "address": "REDACTED",
+                "id": 696
+              }
+            ],
+            "emails": [
+              {
+                "address": "REDACTED",
+                "id": 697
+              }
+            ],
+            "firstName": "REDACTED",
+            "lastName": "REDACTED",
+            "displayName": "REDACTED",
+            "avatar": "REDACTED",
+            "sourceType": "db",
+            "id": 553,
+            "externalId": null
+          }
+        ]
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:36:45.100Z"
+}

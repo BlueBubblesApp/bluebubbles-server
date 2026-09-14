@@ -4,9 +4,11 @@ import type { File } from "formidable";
 import path from "path";
 import fs from "fs";
 import { Server } from "@server";
-import { isEmpty } from "@server/helpers/utils";
+import { isEmpty, isTruthyBool } from "@server/helpers/utils";
 import { FileSystem } from "@server/fileSystem";
 import { MessageInterface } from "@server/api/interfaces/messageInterface";
+import { isMinSequoia } from "@server/env";
+import { hasTextFormatting, validateTextFormatting } from "@server/utils/TextFormattingUtils";
 
 import { ValidateInput } from "./index";
 import { BadRequest } from "../responses/errors";
@@ -75,14 +77,13 @@ export class MessageValidator {
         subject: "string",
         selectedMessageGuid: "string",
         partIndex: "numeric|min:0",
-        ddScan: "boolean"
+        ddScan: "boolean",
+        textFormatting: "array"
     };
 
     static async validateText(ctx: RouterContext, next: Next) {
-        const { tempGuid, method, effectId, subject, selectedMessageGuid, message, ddScan } = ValidateInput(
-            ctx.request.body,
-            MessageValidator.sendTextRules
-        );
+        const { tempGuid, method, effectId, subject, selectedMessageGuid, message, ddScan, textFormatting } =
+            ValidateInput(ctx.request.body, MessageValidator.sendTextRules);
         let saniMethod = method;
 
         // Default the method to AppleScript
@@ -90,7 +91,14 @@ export class MessageValidator {
 
         // If we have an effectId, subject, reply, or attributedBody
         // let's imply we want to use the Private API
-        if (effectId || subject || selectedMessageGuid || ddScan || ctx.request.body.attributedBody) {
+        if (
+            effectId ||
+            subject ||
+            selectedMessageGuid ||
+            ddScan ||
+            ctx.request.body.attributedBody ||
+            hasTextFormatting(textFormatting)
+        ) {
             saniMethod = "private-api";
         }
 
@@ -105,6 +113,22 @@ export class MessageValidator {
 
         if (saniMethod === "private-api" && isEmpty(message) && isEmpty(subject)) {
             throw new BadRequest({ error: `A 'message' or 'subject' is required when sending via the Private API` });
+        }
+
+        if (hasTextFormatting(textFormatting)) {
+            if (ctx.request.body.attributedBody) {
+                throw new BadRequest({ error: "Use either textFormatting or attributedBody, not both" });
+            }
+
+            if (!isMinSequoia) {
+                throw new BadRequest({ error: "Text formatting is only supported on macOS Sequoia (15) and newer" });
+            }
+
+            try {
+                validateTextFormatting(textFormatting, message);
+            } catch (ex: any) {
+                throw new BadRequest({ error: ex?.message ?? "Invalid textFormatting payload" });
+            }
         }
 
         // Inject the method (we have to force it to thing it's anything)
@@ -217,10 +241,7 @@ export class MessageValidator {
     };
 
     static async validateMultipart(ctx: RouterContext, next: Next) {
-        const { parts, tempGuid } = ValidateInput(
-            ctx.request.body,
-            MessageValidator.multipartRules
-        );
+        const { parts, tempGuid } = ValidateInput(ctx.request.body, MessageValidator.multipartRules);
 
         // Validate the parts. We have a few rules for this:
         // 1. Each part must be a dictionary
@@ -235,8 +256,7 @@ export class MessageValidator {
             if (typeof part.partIndex !== "number") throw new BadRequest({ error: "Each partIndex must be a number" });
             if (!part.text && !part.attachment)
                 throw new BadRequest({ error: "Each part must have either a text or attachment" });
-            if (part.attachment && !part.name)
-                throw new BadRequest({ error: "Each attachment must have a name" });
+            if (part.attachment && !part.name) throw new BadRequest({ error: "Each attachment must have a name" });
             if (part.attachment) {
                 const aPath = path.join(FileSystem.getAttachmentDirectory("private-api"), part.attachment);
                 if (!fs.existsSync(aPath)) {
@@ -250,6 +270,61 @@ export class MessageValidator {
         // Make sure the message isn't already in the queue
         if (Server().httpService.sendCache.find(tempGuid)) {
             throw new BadRequest({ error: "Message is already queued to be sent!" });
+        }
+
+        await next();
+    }
+
+    static attachmentChunkRules = {
+        chatGuid: "required|string",
+        attachmentGuid: "required|string",
+        name: "required|string",
+        chunkIndex: "required|numeric|min:0",
+        totalChunks: "required|numeric|min:1",
+        isComplete: "boolean",
+        method: "string|in:apple-script,private-api",
+        isAudioMessage: "boolean",
+        effectId: "string",
+        subject: "string",
+        selectedMessageGuid: "string",
+        partIndex: "numeric|min:0"
+    };
+
+    static async validateAttachmentChunk(ctx: RouterContext, next: Next) {
+        const { files } = ctx.request;
+        // eslint-disable-next-line prefer-const
+        let { chunkIndex, totalChunks, method, isAudioMessage, effectId, subject, selectedMessageGuid } = ValidateInput(
+            ctx.request?.body,
+            MessageValidator.attachmentChunkRules
+        );
+
+        // Convert the string values (form data) to their appropriate types.
+        // Do it for both the request body and the parsed values. This is so whatever is
+        // after this middleware can use the parsed values directly.
+        chunkIndex = parseInt(chunkIndex, 10);
+        totalChunks = parseInt(totalChunks, 10);
+        isAudioMessage = isTruthyBool(isAudioMessage) ? true : false;
+
+        let saniMethod = method ?? "apple-script";
+        if (effectId || subject || selectedMessageGuid || ctx.request.body.attributedBody) {
+            saniMethod = "private-api";
+        }
+
+        // Inject the new/converted fields (we have to force it to thing it's anything)
+        ctx.request.body.method = saniMethod;
+        ctx.request.body.isAudioMessage = isAudioMessage;
+        ctx.request.body.chunkIndex = chunkIndex;
+        ctx.request.body.totalChunks = totalChunks;
+
+        // Make sure the chunk file is provided
+        const chunk = files?.chunk as File;
+        if (!chunk || chunk.size === 0) {
+            throw new BadRequest({ error: "Chunk not provided or was empty!" });
+        }
+
+        // Validate that chunkIndex is less than totalChunks
+        if (chunkIndex >= totalChunks) {
+            throw new BadRequest({ error: "Chunk index cannot be greater than or equal to total chunks!" });
         }
 
         await next();

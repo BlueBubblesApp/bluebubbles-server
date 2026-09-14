@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/06C883C7-A97A-48A0-8F0A-4AA02B6B2581/members?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 404,
+    "headers": {
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "recordedAt": "2026-08-31T19:16:58.295Z"
+}

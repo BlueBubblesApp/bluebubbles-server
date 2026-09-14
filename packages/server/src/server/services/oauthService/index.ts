@@ -24,7 +24,7 @@ export class OauthService extends Loggable {
 
     running = false;
 
-    status: ProgressStatus = ProgressStatus.NOT_STARTED
+    status: ProgressStatus = ProgressStatus.NOT_STARTED;
 
     koaApp: KoaApp;
 
@@ -54,9 +54,7 @@ export class OauthService extends Loggable {
         "https://www.googleapis.com/auth/iam"
     ];
 
-    private contactScopes = [
-        "https://www.googleapis.com/auth/contacts.readonly"
-    ]
+    private contactScopes = ["https://www.googleapis.com/auth/contacts.readonly"];
 
     get callbackUrl(): string {
         return `http://localhost:${this.port}/oauth/callback`;
@@ -194,10 +192,12 @@ export class OauthService extends Loggable {
         } catch (ex: any) {
             this.log.error(`Failed to create project: ${ex?.message}`);
             if (ex?.response?.data?.error) {
-                this.log.debug(`(${ex.response.data.error.code}) ${ex.response.data.error.message}`);
+                this.log.info(
+                    `Error: (${ex.response.data.error.code}) ${ex.response.data?.error?.message ?? "Unknown error"}`
+                );
             }
 
-            this.log.debug(`Use the Google Login button and try again. If the issue persists, please contact support.`);
+            this.log.info(`Use the Google Login button and try again. If the issue persists, please contact support.`);
             this.setStatus(ProgressStatus.FAILED);
         } finally {
             // Shutdown the service
@@ -220,7 +220,7 @@ export class OauthService extends Loggable {
                 try {
                     const avatar = await this.loadContactAvatar(contact);
 
-                    await ContactInterface.createContact({
+                    await ContactInterface.createOrUpdateContact({
                         firstName: contact.names[0].givenName,
                         lastName: contact.names[0].familyName,
                         displayName: contact.names[0].displayName,
@@ -249,7 +249,7 @@ export class OauthService extends Loggable {
             }
 
             // Mark the service as completed
-            this.log.info('Successfully synced your Google Contacts to the BlueBubbles Server!');
+            this.log.info("Successfully synced your Google Contacts to the BlueBubbles Server!");
             this.setStatus(ProgressStatus.COMPLETED);
 
             // Shutdown the service
@@ -387,7 +387,8 @@ export class OauthService extends Loggable {
             getUrl,
             null,
             "projects",
-            12, 10000,  // Wait at least 2 minutes
+            12,
+            10000, // Wait at least 2 minutes
             `Project "${this.projectName}" was not found! Please restart the setup process.`
         );
         return (projectData.projects ?? []).find((p: any) => p.projectId === projectId);
@@ -451,11 +452,7 @@ export class OauthService extends Loggable {
                 await this.addFirebaseManual();
             } else {
                 this.log.debug(`Failed to add Firebase to project: Data: ${getObjectAsString(ex.response?.data)}`);
-                throw new Error(
-                    `Failed to add Firebase to project: ${getObjectAsString(
-                        ex.response?.data?.error?.message ?? ex.message
-                    )}}`
-                );
+                throw ex;
             }
         }
     }
@@ -473,13 +470,31 @@ export class OauthService extends Loggable {
         this.log.info(`Resuming setup...`);
     }
 
+    async enableBillingManual(url: string) {
+        this.log.info(
+            `You must enable billing for your Google Cloud Project before creating the Firestore database! ` +
+                `You will need to verify your identity and add a payment method. ` +
+                `Luckily, Cloud Messaging (FCM) is free to use, and BlueBubbles' database usage is negligible.` +
+                `As such, you will not be charged for using this service. ` +
+                `We recommend using a service like privacy.com to create a virtual card for this purpose. ` +
+                `In 15 seconds, a window will open where you can enable billing. ` +
+                `Once billing is enabled, you can close the window and setup will continue. ` +
+                `You can downgrade your billing plan after setup, if you wish, but it shouldn't be required.`
+        );
+
+        await waitMs(15000);
+        await this.openWindow(url);
+        this.log.info(`Resuming setup in 3 minutes. Please wait patiently while we wait for billing to propagate...`);
+        await waitMs(180000);
+    }
+
     /**
      * Creates the default database for the Google Cloud Project
      *
      * @param projectId The project ID
      * @throws An HTTP error if the error code is not 409
      */
-    async createDatabase(projectId: string) {
+    async createDatabase(projectId: string, attempt: number = 1) {
         const dbName = "(default)";
 
         try {
@@ -497,7 +512,25 @@ export class OauthService extends Loggable {
         } catch (ex: any) {
             if (ex.response?.data?.error?.code === 409) {
                 this.log.info(`Firestore already exists!`);
+            } else if (
+                ex.response?.data?.error?.code === 403 &&
+                (ex.response?.data?.error?.message ?? "").includes("requires billing")
+            ) {
+                if (attempt == 1) {
+                    await this.enableBillingManual(
+                        `https://console.developers.google.com/billing/enable?project=${projectId}`
+                    );
+
+                    // Try again after enabling billing
+                    await this.createDatabase(projectId, 2);
+                } else {
+                    throw new Error(`Failed to create Firestore database: ${this.getErrorMessage(ex)}`);
+                }
             } else {
+                if (ex.response?.data?.error) {
+                    this.log.debug(`Failed to create Firestore database: ${this.getErrorMessage(ex)}`);
+                }
+
                 throw ex;
             }
         }
@@ -514,12 +547,12 @@ export class OauthService extends Loggable {
             const url = `https://firebase.googleapis.com/v1beta1/projects/${projectId}/androidApps`;
             const data = { displayName: this.projectName, packageName: this.packageName };
             const createRes = await this.tryUntilNoError("POST", url, data, 3, 10000);
-            if (!createRes?.data?.name) {
+            const operationName = createRes?.name;
+            if (!operationName) {
                 throw new Error(`Failed to provision Android App: ${getObjectAsString(createRes)}`);
             }
 
             // Wait for the app to be created
-            const operationName = createRes.data.name;
             const operationUrl = `https://firebase.googleapis.com/v1beta1/${operationName}`;
             const operationResult = await this.waitForData("GET", operationUrl, null, "done", 60, 5000);
             if (operationResult.error) {
@@ -665,8 +698,9 @@ export class OauthService extends Loggable {
             attempts += 1;
             if (attempts > maxAttempts) {
                 this.log.debug(`Received data from failed request: ${getObjectAsString(res.data)}`);
-                throw new Error(errorOverride ??
-                    `Failed to get data from: ${url}. Please gather server logs and contact the developers!`
+                throw new Error(
+                    errorOverride ??
+                        `Failed to get data from: ${url}. Please gather server logs and contact the developers!`
                 );
             }
 
@@ -682,7 +716,13 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @param key The key to check for in the response data (optional)
      */
-    async tryUntilNoError(method: "GET" | "POST", url: string, data: Record<string, any> = null, maxAttempts = 30, waitTime = 2000) {
+    async tryUntilNoError(
+        method: "GET" | "POST",
+        url: string,
+        data: Record<string, any> = null,
+        maxAttempts = 30,
+        waitTime = 2000
+    ) {
         let attempts = 0;
 
         // eslint-disable-next-line no-constant-condition
@@ -691,8 +731,6 @@ export class OauthService extends Loggable {
                 const res = await this.sendRequest(method, url, data);
                 return res.data;
             } catch (ex: any) {
-                // For duplicates, just throw the error so it can be handled properly.
-                if (ex.response?.data?.error?.code === 409) throw ex;
                 attempts += 1;
                 if (attempts > maxAttempts) throw ex;
                 await waitMs(waitTime);
@@ -738,7 +776,7 @@ export class OauthService extends Loggable {
 
         // Paginate through all the data
         let pageToken = null;
-        let contacts = [];
+        const contacts = [];
         do {
             const res: AxiosResponse<any, any> = await this.sendRequest("GET", getUrl, null, { ...params, pageToken });
             contacts.push(...res.data.connections);
@@ -783,7 +821,12 @@ export class OauthService extends Loggable {
      * @param data The data to send (optional)
      * @returns The response object
      */
-    async sendRequest(method: "GET" | "POST" | "DELETE", url: string, data: Record<string, any> = null, params: Record<string, any> = null) {
+    async sendRequest(
+        method: "GET" | "POST" | "DELETE",
+        url: string,
+        data: Record<string, any> = null,
+        params: Record<string, any> = null
+    ) {
         if (!this.authToken) throw new Error("Missing auth token");
 
         const headers: Record<string, string> = {
@@ -851,6 +894,16 @@ export class OauthService extends Loggable {
                 resolve(null);
             }
         });
+    }
+
+    private getErrorMessage(ex: any): string {
+        if (ex?.response?.data?.error?.code && ex?.response?.data?.error?.message) {
+            return `[${ex.response.data.error.code}] ${ex.response.data.error.message}`;
+        } else if (ex?.message) {
+            return ex.message;
+        }
+
+        return "An unknown error occurred";
     }
 
     /**
