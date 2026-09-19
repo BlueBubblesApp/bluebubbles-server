@@ -1,0 +1,13 @@
+# Written by Tools/private-api/vm-share.sh. Do not edit.
+#
+# dump-headers-vm.sh checks hosts_sha256 against the hosts.conf beside it and
+# refuses to run if they disagree, then copies this file into the dump so the
+# checked-in headers record which class list produced them.
+
+release         Sequoia
+macos_major     15
+commit          2378e4db+dirty
+built           2026-09-16T15:01:23Z
+built_on        macOS 26.5.2 (25F84), arm64
+hosts_sha256    86166706c1eb9ab4062b6bc0c5eda33562211d6fc8d0a1bde33d88b32a32a515
+hosts_classes   143

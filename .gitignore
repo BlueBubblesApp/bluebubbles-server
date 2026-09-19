@@ -1,11 +1,46 @@
-node_modules/
-dist/
-release/
+.build/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# The recorded corpus lives in Fixtures/ and IS committed. It was local-only while the
+# scrubber let real content through: multipart request bodies bypassed scrubbing entirely, so
+# form fields carrying an address were written verbatim, and link-local IPv6 addresses (which
+# embed the interface MAC) and absolute /Users/<name> paths in stack traces were never
+# touched. All three are scrubbed now, and the corpus was re-scrubbed and audited before
+# being committed. See docs/api/README.md.
+#
+# If you record against a live server, RE-AUDIT before pushing; the scrubber is a filter, not
+# a guarantee, and it has been wrong before.
+
+# The chat.db fixtures are COMMITTED, not ignored. They named a directory that has
+# never existed (`Tests/ChatDBFixtures`), so this rule matched nothing and the prose
+# built on it was wrong in both directions. The generator is deterministic and its
+# self-test proves byte-identical regeneration, so committing them keeps `swift test`
+# free of a Python dependency. See .claude/docs/workflow.md.
+
+# Bytecode from the Python checkers and generators under Tools/. Every one of them is run
+# as `python3 Tools/<tool>/<script>.py`, so a local run of what CI checks leaves these
+# behind next to the scripts.
+__pycache__/
+
+# Repository-wide noise, inherited from the layout before the Swift server became the
+# root: editor state, Finder droppings, stray logs, and the local .env that carries the
+# live-send test addresses (see CONTRIBUTING.md § "Test data: never real addresses").
 .vscode
 .DS_Store
 **/*.log
 .env
-.build
-.swiftpm
-.yarn
-.yarnrc*
+
+# Reference implementations, installed locally to generate protocol vectors.
+Tools/protocol-vectors/node_modules/
+Tools/protocol-vectors/package-lock.json
+
+# Local state from `wrangler dev` under Tools/licence-worker: a miniflare cache and its
+# KV store, written on every local run. Machine-local and not reproducible, and it was
+# swept into the index once by a `git add -A` during the repository restructure.
+.wrangler/
+
+# The observation probe is a separate package with its own build directory.
+Tools/observation-probe/.build/

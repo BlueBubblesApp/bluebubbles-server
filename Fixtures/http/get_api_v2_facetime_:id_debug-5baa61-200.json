@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/facetime/06C883C7-A97A-48A0-8F0A-4AA02B6B2581/debug?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "message": "Success",
+        "status": 200,
+        "data": {
+          "activatedConversationLinks": "(\n    \"<TUConversationLink 0xcb59111f0 pseudonym=pseud:50l7VKR0EfGcuWZn8F4SVw publicKey={length = 32, bytes = 0x2178db74 e5db5d6c e44dc73f 5f8b3ce9 ... d6f+15555550100d8c2 } URL=https://facetime.apple.com/join#v=1&p=50l7VKR0EfGcuWZn8F4SVw&k=IXjbdOXbXWzkTcc_X4s86ZYSpnr66h8-1vNGkUcE2MI linkName=(null) isLocallyCreated=1 linkLifetimeScope=0 canCreateConversations=YES deletionDate=(null) deleteReason=0 self.groupUUID=8C6B+15555550100D5-9D65-B82865C42252 self.originatorHandle=<TUHandle 0xcb8eb3b40 type=EmailAddress, value=u:qfsuJ8kP9+4GMamt, normalizedValue=u:qfsuJ8kP9+4GMamt, siriDisplayName=(null)> self.invitedMemberHandles={(\\n)}>\",\n    \"<TUConversationLink 0xcb5911110 pseudonym=pseud:Dgk4cKR1EfGA5RaGMEVExg publicKey={length = 32, bytes = 0x00b4f862 d36eb844 e1197a3e 7c5d8865 ... f45f6af+15555550100 } URL=https://facetime.apple.com/join#v=1&p=Dgk4cKR1EfGA5RaGMEVExg&k=ALT4YtNuuEThGXo-fF2IZaIkCksFF0S49F9q8JOTd1E linkName=(null) isLocallyCreated=1 linkLifetimeScope=0 canCreateConversations=YES deletionDate=(null) deleteReason=0 self.groupUUID=6F8F57E2-2CC0-4B2F-8D31-5C2BC97E2353 self.originatorHandle=<TUHandle 0xcb8eb3b80 type=EmailAddress, value=u:qfsuJ8kP9+4GMamt, normalizedValue=u:qfsuJ8kP9+4GMamt, siriDisplayName=(null)> self.invitedMemberHandles={(\\n)}>\",\n    \"<TUConversationLink 0xcb5910380 pseudonym=pseud:mpNj26R3EfGQdEoFgHK6PQ publicKey={length = 32, bytes = 0x321df6a4 73fb83f+15555550100e 8070809c ... 491b8b52 2e3ba2a6 } URL=https://facetime.apple.com/join#v=1&p=mpNj26R3EfGQdEoFgHK6PQ&k=Mh32pHP7g_KYgzmOgHCAnFp0uryzMk29SRuLUi47oqY linkName=(null) isLocallyCreated=1 linkLifetimeScope=0 canCreateConversations=YES deletionDate=(null) deleteReason=0 self.groupUUID=+15555550100F39-4C21-9C00-EDFEDFDB72C4 self.originatorHandle=<TUHandle 0xcb8eb3880 type=EmailAddress, value=u:qfsuJ8kP9+4GMamt, normalizedValue=u:qfsuJ8kP9+4GMamt, siriDisplayName=(null)> self.invitedMemberHandles={(\\n    <TUHandle 0xcb8eb37c0 type=EmailAddress, value=u:5YerpMMsnqLUxCli, normalizedValue=u:5YerpMMsnqLUxCli, siriDisplayName=(null)>\\n)}>\",\n    \"<TUConversationLink 0xcb5910e00 pseudonym=pseud:kvf+k6R5EfGC+BaDqh1Ing publicKey={length = 32, bytes = 0xbb24f561 47c19218 7ddd0e68 e+15555550100a0804 5f31cc5c } URL=https://facetime.apple.com/join#v=1&p=kvf+k6R5EfGC+BaDqh1Ing&k=uyT1YUfBkhh93Q5o5jCTZWW9fHiO0hRMcwoIBF8xzFw linkName=(null) isLocallyCreated=1 linkLifetimeScope=0 canCreateConversations=YES deletionDate=(null) deleteReason=0 self.groupUUID=9C97AE+15555550100A58-8BB9-1E987EA00F18 self.originatorHandle=<TUHandle 0xcb8eb3740 type=EmailAddress, value=u:qfsuJ8kP9+4GMamt, normalizedValue=u:qfsuJ8kP9+4GMamt, siriDisplayName=(null)> self.invitedMemberHandles={(\\n)}>\",\n    \"<TUConversationLink 0xcb5910f50 pseudonym=pseud:k1X85qR5EfG7XjbtHBDbvg publicKey={length = 32, bytes = 0x53ee94f3 2cb353b4 8c656818 0fd2d+15555550100c2a85f 62647584 } URL=https://facetime.apple.com/join#v=1&p=k1X85qR5EfG7XjbtHBDbvg&k=U-6U8yyzU7SMZWgYD9LRSDE029vbkVW7csKoX2JkdYQ linkName=(null) isLocallyCreated=1 linkLifetimeScope=0 canCreateConversations=YES deletionDate=(null) deleteReason=0 self.groupUUID=06C883C7-A97A-48A0-8F0A-4AA02B6B2581 self.originatorHandle=<TUHandle 0xcb8eb38c0 type=EmailAddress, value=u:qfsuJ8kP9+4GMamt, normalizedValue=u:qfsuJ8kP9+4GMamt, siriDisplayName=(null)> self.invitedMemberHandles={(\\n)}>\"\n)",
+          "conversation": "NOT FOUND for 06C883C7-A97A-48A0-8F0A-4AA02B6B2581",
+          "getActiveLinks(createdOnly:false)": "nil",
+          "conversationsByGroupUUID": "{\n}",
+          "incomingPendingConversationsByGroupUUID": "{\n}"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T19:16:58.525Z"
+}

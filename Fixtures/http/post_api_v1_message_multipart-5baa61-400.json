@@ -1,0 +1,44 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/message/multipart?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "chatGuid": "any;-;person@example.com",
+        "tempGuid": "fixture-C30A3284-C42A-48DB-A6C1-74BA8DF0605C",
+        "parts": [
+          {
+            "text": "REDACTED"
+          }
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 400,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 400,
+        "message": "You've made a bad request! Please check your request params & body",
+        "error": {
+          "type": "Validation Error",
+          "message": "Each part must have a partIndex"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:44:34.398Z"
+}

@@ -1,0 +1,135 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/chat/new?password=__REDACTED__",
+    "headers": {
+      "host": "localhost:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*",
+      "content-type": "application/json"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "addresses": [
+          "person@example.com",
+          "person@example.com"
+        ],
+        "message": "Fixture group chat",
+        "method": "private-api",
+        "service": "iMessage",
+        "tempGuid": "fixture-group-1"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,HEAD,PUT,POST,DELETE",
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": {
+      "kind": "json",
+      "value": {
+        "status": 200,
+        "message": "Successfully created chat!",
+        "data": {
+          "originalROWID": 480,
+          "guid": "any;+;49d0b618798a414c9a74291223a99b6e",
+          "style": 43,
+          "chatIdentifier": "REDACTED",
+          "isArchived": false,
+          "displayName": "REDACTED",
+          "participants": [
+            {
+              "originalROWID": 2,
+              "address": "REDACTED",
+              "service": "iMessage",
+              "uncanonicalizedId": null,
+              "country": "US"
+            },
+            {
+              "originalROWID": 4,
+              "address": "REDACTED",
+              "service": "iMessage",
+              "uncanonicalizedId": null,
+              "country": "US"
+            }
+          ],
+          "messages": [
+            {
+              "originalROWID": 418348,
+              "guid": "047BA227-386E-43C7-ABC8-6D59BE3FC11D",
+              "text": "REDACTED",
+              "attributedBody": null,
+              "handle": null,
+              "handleId": 0,
+              "otherHandle": 0,
+              "attachments": [],
+              "subject": null,
+              "error": 0,
+              "dateCreated": 1788191190482,
+              "dateRead": null,
+              "dateDelivered": null,
+              "isDelivered": false,
+              "isFromMe": true,
+              "hasDdResults": false,
+              "isArchived": false,
+              "itemType": 0,
+              "groupTitle": null,
+              "groupActionType": 0,
+              "balloonBundleId": null,
+              "associatedMessageGuid": null,
+              "associatedMessageType": null,
+              "expressiveSendStyleId": null,
+              "threadOriginatorGuid": null,
+              "hasPayloadData": false,
+              "country": null,
+              "isDelayed": false,
+              "isAutoReply": false,
+              "isSystemMessage": false,
+              "isServiceMessage": false,
+              "isForward": false,
+              "threadOriginatorPart": null,
+              "isCorrupt": false,
+              "datePlayed": null,
+              "cacheRoomnames": "49d0b618798a414c9a74291223a99b6e",
+              "isSpam": false,
+              "isExpired": false,
+              "timeExpressiveSendPlayed": null,
+              "isAudioMessage": false,
+              "replyToGuid": "5B43CB10-5EEF-4289-B9CD-23F252DEA4ED",
+              "shareStatus": 0,
+              "shareDirection": 0,
+              "wasDeliveredQuietly": false,
+              "didNotifyRecipient": false,
+              "messageSummaryInfo": null,
+              "payloadData": null,
+              "dateEdited": null,
+              "dateRetracted": null,
+              "partCount": 1,
+              "tempGuid": "fixture-group-1"
+            }
+          ],
+          "isFiltered": false,
+          "groupId": "0F4B116C-4092-44A6-B5B7-CA5390D8507E",
+          "properties": [
+            {
+              "pv": 1,
+              "numberOfTimesRespondedtoThread": 2,
+              "shouldForceToSMS": false,
+              "lastSeenMessageGuid": "REDACTED",
+              "hasBeenAutoSpamReported": true,
+              "groupPhotoGuid": "2885FE0B-263F-4F+15555550100A530F34B57",
+              "markedAsKnownDate": "+15555550100T18:46:03.537Z",
+              "LSMD": "+15555550100T15:46:30.482Z"
+            }
+          ],
+          "lastAddressedHandle": "REDACTED"
+        }
+      }
+    }
+  },
+  "recordedAt": "2026-08-31T15:46:30.861Z"
+}

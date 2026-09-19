@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v2/sticker/E5319610-D541-4467-ADB1-FAD35A1654CB/image?password=__REDACTED__",
+    "headers": {
+      "host": "127.0.0.1:1235",
+      "user-agent": "curl/8.7.1",
+      "accept": "*/*"
+    },
+    "body": {
+      "kind": "empty"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/png",
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "server": "BlueBubbles"
+    },
+    "body": {
+      "kind": "binary",
+      "byteLength": 528,
+      "sha256": "d858b170ac283788a6b1738bb31eb349e82024e757dbebd9b3984cea5b85a0aa"
+    }
+  },
+  "recordedAt": "2026-09-04T15:12:39.963Z"
+}
