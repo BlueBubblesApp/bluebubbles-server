@@ -64,11 +64,11 @@ export class ContactInterface {
             // Load the avatar based on the selected extra fields
             let avatar = null;
             if (extraProps.includes("avatar")) {
-                avatar = contact?.avatar ?? contact?.contactImage ?? contact.contactImageThumbnail;
+                avatar = contact?.avatar ?? contact?.contactImage ?? contact.contactThumbnailImage;
             } else if (extraProps.includes("contactImage")) {
-                avatar = contact?.contactImage ?? contact.contactImageThumbnail;
-            } else if (extraProps.includes("contactImageThumbnail")) {
-                avatar = contact?.contactImageThumbnail;
+                avatar = contact?.contactImage ?? contact.contactThumbnailImage;
+            } else if (extraProps.includes("contactThumbnailImage")) {
+                avatar = contact?.contactThumbnailImage;
             }
 
             let displayName = contact?.displayName;
