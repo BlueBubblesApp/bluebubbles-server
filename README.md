@@ -4,40 +4,11 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 
 ## Pre-requisites
 
--   NodeJS **20.11.x** (the version pinned in `devEngines`): https://nodejs.org/en/
+-   NodeJS **20.11.x** (the version named in `devEngines`): https://nodejs.org/en/
 -   Python with `distutils` available for `node-gyp` (Python 3.11 or older, or a newer Python with `setuptools` installed)
 -   Git: https://git-scm.com/
 
 **Warning**: Yarn may not work for this project. You may run into build errors.
-
-### Native module build errors
-
-The native dependencies (`node-mac-permissions`, `node-mac-contacts`, `better-sqlite3`) are compiled during `npm install`, and two toolchain mismatches commonly break that step:
-
--   **`ModuleNotFoundError: No module named 'distutils'`**: the bundled `node-gyp` (v9) needs `distutils`, which Python 3.12 removed. Point npm at a Python that has it, for example a virtualenv with `setuptools`:
-
-    ```bash
-    python3 -m venv .gyp-venv && .gyp-venv/bin/pip install setuptools
-    export npm_config_python="$PWD/.gyp-venv/bin/python"
-    ```
-
--   **`no matching function for call to 'napi_add_finalizer'`** while compiling `node-mac-contacts`: you are on a newer Node 20 release than 20.11 (Homebrew's `node@20`, for example, is 20.20). Its headers changed the finalizer signature that `node-mac-contacts`' bundled `node-addon-api` expects. Use Node 20.11.x, e.g. with nvm:
-
-    ```bash
-    nvm install 20.11 && nvm use 20.11
-    ```
-
-### Building a local app (macOS)
-
-`npm run build` packages the app with electron-builder. Without an Apple Developer ID, skip signing and sign the result ad-hoc:
-
-```bash
-CSC_IDENTITY_AUTO_DISCOVERY=false npm run build
-ditto dist/mac-arm64/BlueBubbles.app /Applications/BlueBubbles.app
-codesign --force --deep -s - /Applications/BlueBubbles.app
-```
-
-On first launch, grant BlueBubbles **Full Disk Access** (otherwise it fails with `SqliteError: unable to open database file`) and allow it to control **Messages** under Automation (otherwise sends fail with AppleEvent error `-1712`).
 
 ## Development
 
@@ -49,6 +20,35 @@ On first launch, grant BlueBubbles **Full Disk Access** (otherwise it fails with
     - `npm install`
 4. Run the dev server (this will start both the renderer and server)
     - `npm run start`
+
+### Native module build errors
+
+`node-mac-permissions` and `node-mac-contacts` are compiled from source during `npm install` (`better-sqlite3` normally downloads a prebuilt binary). Two toolchain mismatches commonly break that step:
+
+-   **`ModuleNotFoundError: No module named 'distutils'`**: `@electron/rebuild` (run by the server package's `postinstall`) uses `node-gyp` 9, which needs `distutils`, removed in Python 3.12. Point npm at a Python that has it, for example a virtualenv with `setuptools`:
+
+    ```bash
+    python3 -m venv .gyp-venv && .gyp-venv/bin/pip install setuptools
+    export npm_config_python="$PWD/.gyp-venv/bin/python"
+    ```
+
+-   **`no matching function for call to 'napi_add_finalizer'`** while compiling `node-mac-contacts`: you are on Node 20.12 or newer (Homebrew's `node@20`, for example, is 20.20). Those headers declare `napi_add_finalizer` with a finalizer type that the `node-addon-api` 3 nested under `node-mac-contacts` predates. Use Node 20.11.x, e.g. with nvm:
+
+    ```bash
+    nvm install 20.11 && nvm use 20.11
+    ```
+
+### Building a local app (macOS)
+
+`npm run build` packages the app with electron-builder. Without an Apple Developer ID, skip signing and sign the result ad-hoc (the app is in `dist/mac-arm64/` on Apple Silicon, `dist/mac/` on Intel):
+
+```bash
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run build
+ditto dist/mac-arm64/BlueBubbles.app /Applications/BlueBubbles.app
+codesign --force --deep -s - /Applications/BlueBubbles.app
+```
+
+On first launch, grant BlueBubbles **Full Disk Access** (otherwise it cannot open `~/Library/Messages/chat.db`) and allow it to control **Messages** under Automation when prompted (a denied prompt gives AppleEvent error `-1743`; an unanswered one surfaces as `-1712` timeouts on send). These grants are tied to the ad-hoc signature, so after a rebuild remove and re-add BlueBubbles in those lists.
 
 ### macOS Warning
 
