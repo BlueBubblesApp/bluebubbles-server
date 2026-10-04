@@ -143,6 +143,7 @@ Ten rules override anything you would otherwise infer from the code.
 | Routes, envelopes, auth, v1 vs v2, OpenAPI, sockets | [`.claude/docs/api.md`](.claude/docs/api.md) |
 | Chat GUIDs, attributedBody/typedstream, the send backends, AppleScript | [`.claude/docs/imessage.md`](.claude/docs/imessage.md) |
 | Group chat creation without the Private API; the Shortcuts boundary | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) |
+| Server backup and restore: the archive format, its protection and validation, the sections, the restore flow; what is planned | [`docs/BACKUP_RESTORE_PLAN.md`](docs/BACKUP_RESTORE_PLAN.md) |
 | Injection, the sandbox/container, helper transport, selectors, swizzling | [`.claude/docs/private-api.md`](.claude/docs/private-api.md) |
 | Memory budgets, child processes, async traps | [`.claude/docs/performance.md`](.claude/docs/performance.md) |
 | Event routing, sinks, payload codecs, socket delivery | [`docs/EVENTS.md`](docs/EVENTS.md) |
