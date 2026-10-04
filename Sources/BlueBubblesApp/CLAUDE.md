@@ -279,6 +279,13 @@ stream (Webhooks); a page with its own read writes `.task(id: model.phase.isRunn
   borrow the colour of one reporting a problem, and `.informational` is the default because
   a page of coloured symbols teaches people to ignore the coloured one that matters. Use
   `NoticeBody` where the caller owns the container, as `FeatureDisabledNotice` does.
+- **Choosing a conversation is `ConversationPicker`, in `.single` or `.multiple` mode.** The
+  page says which, because it is a property of what the choice is for: a scheduled message
+  and an export go to one conversation, a webhook filter covers several. The picker reads
+  `ConversationDirectory` (the list with contact names, formatted numbers and emails already
+  resolved) and the page holds only the chosen GUIDs, so the same chat reads the same on every
+  page. `ConversationPicking` decides what a click, an arrow and Return do in each mode.
+  `ConversationPickerPolicyTests` refuses a page that reads the list itself.
 - **Shared views live in `Views/Components/`.** `Tag`, `StatCard`, `StatusDot`, `GlassCard`,
   `CopyableValue`, `SheetScaffold`, `FloatingBar`, `NoticeCard`, `LoadingNotice`, the two
   notices and the settings layout.
@@ -416,7 +423,7 @@ over built-in ids. `IntegrationCatalogTests` refuses a second lookup.
 `UpdaterPolicy`, `InstallWindow`, `WhatsNew`, `ScheduledMessageRow`, `ServiceFormLayout`,
 `LogFiltering` (with `LogLevelFilter`), `LogDocumentUpdate`, `FirebaseDetail`,
 `NotificationDeliveryRouting`, `BlockedClientSummary`,
-`ChatPickerNavigation`, `SettingRowState`, `WebhookDeliverySummary`, `DeviceRowSummary`, `HTTPListenerSummary`,
+`ConversationPicking`, `SettingRowState`, `WebhookDeliverySummary`, `DeviceRowSummary`, `HTTPListenerSummary`,
 `APIDocsRelayPolicy`, `APIDocsPagePrefill` and
 `PermissionGuidance` are enums and structs, not statics on a `View`. `SendLaterGuidance` is the sentence set the
 Scheduled Messages page shows about Apple's Send Later, keyed on the macOS major and
@@ -431,7 +438,7 @@ that deserves a test cannot live on the view that uses it. If you find yourself 
 that `critical` belongs under Error and that a line with no level appears only under All were
 asserted by nothing. The third is a rule that MUTATES `@State` rather than answering:
 `moveSelection` wrote the new selection in place, so it could not be asked what it would do —
-`ChatPickerNavigation.selection(movedBy:in:from:)` returns it and the view does the writing.
+`ConversationPicking.cursor(movedBy:in:from:)` returns it and the view does the writing.
 
 A rule that reads the clock is the same problem in a fourth costume. `BlockedClientSummary`
 and `ScheduledMessageRow.when` both take `now` as a parameter, which is what makes their
@@ -456,7 +463,7 @@ to feel constrained by this, the answer is a plain note value the view renders, 
 `PushSelfHealTests`, `SendLaterGuidanceTests`, `UpdaterPolicyTests`, `InstallWindowTests`,
 `WhatsNewTests`, `ScheduledMessageRowTests`, `ServiceFormLayoutTests`, `LogFilteringTests`,
 `LogDocumentUpdateTests`, `NotificationDeliveryRoutingTests`, `BlockedClientSummaryTests`,
-`ChatPickerNavigationTests`, `SettingRowStateTests`,
+`ConversationPickingTests`, `ConversationPickerPolicyTests`, `SettingRowStateTests`,
 `WebhookDeliverySummaryTests`, `DeviceRowSummaryTests`, `HTTPListenerSummaryTests`,
 `APIDocsRelayPolicyTests`, `PermissionGuidanceTests`. `AppBehaviourPolicy` is asserted from `CompositionTests/ScopedSettingsTests`
 and the setting-dependency declarations from `BBSettingsTests/SettingDependencyTests`.

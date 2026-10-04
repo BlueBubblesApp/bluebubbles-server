@@ -152,6 +152,14 @@ This is what keeps the SwiftUI app off the HTTP API and out of a parallel IPC ch
 Logic written into a handler is logic the app cannot call, and the only way to reach it then is
 to add a hand-written channel on both sides: one per operation, forever.
 
+**A conversation list for a person is `ConversationDirectory`, and only that.** It lists chats
+newest first with every participant already named: a contact name when the address book has
+the address and the Contacts integration is on, a name the caller supplied otherwise, else the
+formatted number or the email, with the address always kept beside the name. The app's
+`ConversationPicker` reads it for every page that chooses a conversation, and the transcript
+export names its chat and senders through it, so one chat reads the same everywhere. It is
+three batched queries and one contact lookup for the whole list (`ChatPageCostTests`).
+
 **Interfaces return typed values, never wire JSON.** `interfaces.message.query(...)` returns
 `[MessageProjection]`, `send…` returns `SendOutcome`, `countByService` returns `ChatCounts`,
 `webhooks()` returns `[Webhook]`. Each has exactly one projection onto the wire: a `serialize`

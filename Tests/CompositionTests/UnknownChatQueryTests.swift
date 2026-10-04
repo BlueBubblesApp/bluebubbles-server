@@ -73,10 +73,13 @@ struct UnknownChatQueryTests {
           handle: HandleInterface(repository: repository),
           attachment: AttachmentInterface(repository: repository),
           contact: ContactInterface(index: ContactIndex(database: appDatabase)),
+          conversations: ConversationDirectory(
+            repository: repository, contacts: ContactIndex(database: appDatabase)),
           transcript: TranscriptInterface(
             repository: repository, serializer: serializer,
             attachments: AttachmentInterface(repository: repository),
-            contacts: ContactIndex(database: appDatabase))
+            conversations: ConversationDirectory(
+              repository: repository, contacts: ContactIndex(database: appDatabase)))
         )
       )
     )

@@ -33,8 +33,10 @@ public enum TranscriptHandlers {
     registry.register(.transcriptExport) { request in
       let interfaces = try await context.requireInterfaces()
       let exportRequest = try Self.exportRequest(try request.values())
-      let candidate = try await interfaces.transcript.chat(guid: exportRequest.chatGUID)
-      let filename = TranscriptInterface.filename(for: candidate.chat, request: exportRequest)
+      let conversation = try await interfaces.conversations.conversation(
+        guid: exportRequest.chatGUID, names: exportRequest.participantNames)
+      let filename = TranscriptInterface.filename(
+        for: TranscriptInterface.chat(from: conversation), request: exportRequest)
       let folder = try context.transcriptExports.reserve()
       let result = try await interfaces.transcript.export(
         exportRequest, to: folder.appendingPathComponent(filename))

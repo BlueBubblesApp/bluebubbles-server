@@ -87,8 +87,8 @@ public enum Transcript {
 
     /// The conversation's title: its display name, else its participants, named in order.
     ///
-    /// Same rule the app's conversation picker applies (`ScheduleComposer.label`), so the
-    /// title a person chose a chat by is the title on the file they get.
+    /// Same rule as `ConversationDirectory.Conversation.title`, which is what the app's
+    /// picker shows, so the title a person chose a chat by is the title on the file they get.
     public var title: String {
       if let displayName, !displayName.isEmpty { return displayName }
       guard !participants.isEmpty else { return guid }

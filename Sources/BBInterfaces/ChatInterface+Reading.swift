@@ -17,30 +17,6 @@ import Logging
 
 extension ChatInterface {
 
-  public func summaries(
-    limit: Int = 500, sortByLastMessage: Bool = true
-  ) async throws -> [ChatSummary] {
-    let rows = try await repository.chats(
-      includeArchived: true, limit: limit, offset: 0, sortByLastMessage: sortByLastMessage
-    )
-    // One query for every chat's participants, not one per chat. `limit` defaults to 500 and
-    // the app's schedule composer calls this on open, so the per-row form froze the single
-    // database queue for the whole page.
-    let participants = try await repository.participants(forChatRowIDs: rows.map(\.rowID))
-    var summaries: [ChatSummary] = []
-    summaries.reserveCapacity(rows.count)
-    for row in rows {
-      summaries.append(
-        ChatSummary(
-          guid: row.guid,
-          displayName: row.displayName,
-          participants: (participants[row.rowID] ?? []).map(\.id)
-        )
-      )
-    }
-    return summaries
-  }
-
   /// A chat together with what was loaded alongside it. See
   /// `MessageInterface.MessageProjection` for why this layer returns rows rather than JSON.
   public struct ChatProjection: Sendable {

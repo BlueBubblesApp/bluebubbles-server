@@ -65,7 +65,7 @@ public struct ChatInterface: MessagesBackedInterface {
     self.osMajorVersion = osMajorVersion
   }
 
-  // MARK: - The query, and what a picker needs
+  // MARK: - The query
 
   public struct Query: Sendable {
     /// Filter to one chat, matched across every service-prefix spelling.
@@ -149,28 +149,6 @@ public struct ChatInterface: MessagesBackedInterface {
         withLastMessage: wantsLastMessage,
         sortByLastMessage: sort == "lastmessage" || (wantsLastMessage && sort == nil)
       )
-    }
-  }
-
-  /// Just enough of a chat to offer it in a picker.
-  ///
-  /// Three fields against a whole `ChatRow`, and no last-message load. `query` already
-  /// returns `ChatProjection` values and serializes nothing unless asked, so this exists for
-  /// the narrowness alone.
-  ///
-  /// A caller that wants more should use `query` directly rather than growing this type;
-  /// growing it is how this layer ends up with a second, parallel set of chat types.
-  public struct ChatSummary: Sendable, Identifiable {
-    public let guid: String
-    public let displayName: String?
-    /// The addresses the chat is with.
-    public let participants: [String]
-    public var id: String { guid }
-
-    public init(guid: String, displayName: String?, participants: [String]) {
-      self.guid = guid
-      self.displayName = displayName
-      self.participants = participants
     }
   }
 }

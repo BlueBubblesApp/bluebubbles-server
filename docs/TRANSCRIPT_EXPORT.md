@@ -103,11 +103,11 @@ JSON `date_iso` strings carry the offset so they stay unambiguous.
 The API takes a chat GUID and nothing else identifies the conversation: a client has the GUID
 in hand and its own contacts to show the person a name. There is deliberately no search route.
 
-The app's Export page is where a person without a GUID finds a conversation, the same way the
-Scheduled page's composer does: the search matches, case-insensitively, the group's name, each
+The app's Export page is where a person without a GUID finds a conversation, with the same
+`ConversationPicker` the Scheduled page's composer uses, in single mode. It reads
+`ConversationDirectory`, and the search matches, case-insensitively, the group's name, each
 participant's contact name and address, and the GUID; a mostly-numeric query also matches the
-digits of a phone number (`TranscriptInterface.searchChats`, `TranscriptChatFilter`). The list
-is newest first, with arrow keys.
+digits of a phone number. The list is newest first, with arrow keys.
 
 ---
 
@@ -161,10 +161,11 @@ two cannot drift.
 | Piece | Where |
 |---|---|
 | The model, the sentences, the three writers, the ZIP writer | `Sources/BBTranscript/` |
-| Finding a chat, filling the model from `chat.db` and the contact index | `Sources/BBInterfaces/TranscriptInterface.swift` |
+| Filling the model from `chat.db` | `Sources/BBInterfaces/TranscriptInterface.swift` |
+| Naming the chat and its people, and the list the picker shows | `Sources/BBInterfaces/ConversationDirectory.swift` |
 | The route and its request body | `Sources/BBHandlers/TranscriptHandlers.swift`, `AdditiveRoutes.transcripts` |
 | Where an API export waits to be downloaded | `Sources/BBMedia/TranscriptExportStore.swift` |
-| The app page, its decisions, and the run it hands off | `Views/TranscriptExportView.swift`, `TranscriptExportOptions.swift`, `Models/TranscriptExportModel.swift` |
+| The app page, its decisions, and the run it hands off | `Views/TranscriptExportView.swift`, `TranscriptExportOptions.swift`, `Models/TranscriptExportModel.swift`, and the shared `Views/Components/ConversationPicker.swift` |
 | The decoders the export needed from `chat.db` | `AppMessagePayload.layout`, `RichLinkPayload`, `MessageEditHistory` in `Sources/BBIMessage/` |
 
 Tests: `Tests/BBTranscriptTests` (every sentence, every format, the archive verified with

@@ -1,26 +1,20 @@
 //  TranscriptInterface
-//  Exporting a conversation as a file: finding the chat, then streaming it out.
+//  Exporting a conversation as a file, streamed out a page at a time.
 //
-//  Two operations. `searchChats` is how a person at the Mac, who does not know a chat GUID,
-//  finds a conversation: by the group's name, by a participant's contact name, or by an
-//  address. It serves the app's Export page and no route: a client has the GUID and its own
-//  contacts. `export` writes the transcript, and it is built around one constraint: the
-//  conversation is read a page at a time and written as it is read, so a chat of any
-//  length costs one page of rows plus whatever attachment is being copied at that moment.
-//  Nothing here holds the conversation.
+//  Built around one constraint: the conversation is read a page at a time and written as
+//  it is read, so a chat of any length costs one page of rows plus whatever attachment is
+//  being copied at that moment. Nothing here holds the conversation.
 //
 //  The rendering lives in `BBTranscript` and none of it is repeated here: this file decides
 //  what a row IS (a reaction, a group event, a balloon, words) from the columns, fills the
 //  model, and hands it to a writer. The sentence a reaction reads as is the writer's
 //  business, which is what keeps the three formats saying the same thing.
 //
-//  Names come from three places, in order: a name the caller supplied with the request (a
-//  client with the phone's address book knows people this Mac does not), this server's
-//  contact index when the Contacts integration is on, and the formatted address. Every
-//  participant carries its address either way, so a consumer can re-resolve the names
-//  afterwards. See `docs/TRANSCRIPT_EXPORT.md`.
+//  Who is who comes from `ConversationDirectory`, the same list every picker in the app
+//  reads: a name the caller supplied with the request first, then this server's contacts,
+//  then the formatted address. Every participant carries its address either way, so a
+//  consumer can re-resolve the names afterwards. See `docs/TRANSCRIPT_EXPORT.md`.
 
-import BBContacts
 import BBCore
 import BBIMessage
 import BBMedia
@@ -31,33 +25,6 @@ import Foundation
 import Logging
 
 public struct TranscriptInterface: Sendable {
-
-  /// A conversation as the picker offers it.
-  public struct ChatCandidate: Sendable, Equatable, Identifiable {
-    public let chat: Transcript.Chat
-    public let lastMessageDate: Date?
-    public let isArchived: Bool
-    public var id: String { chat.guid }
-
-    public init(chat: Transcript.Chat, lastMessageDate: Date?, isArchived: Bool) {
-      self.chat = chat
-      self.lastMessageDate = lastMessageDate
-      self.isArchived = isArchived
-    }
-
-    /// What a search matches against: the title, every participant's name and address,
-    /// and the GUID itself.
-    public var searchText: String {
-      var pieces = [chat.title, chat.guid]
-      if let name = chat.displayName { pieces.append(name) }
-      for participant in chat.participants {
-        pieces.append(participant.address)
-        pieces.append(participant.displayName)
-        if let name = participant.name { pieces.append(name) }
-      }
-      return pieces.joined(separator: " ")
-    }
-  }
 
   /// Everything an export can be asked for. The defaults are what the app's page starts
   /// with and what the API applies when a field is absent.
@@ -132,23 +99,21 @@ public struct TranscriptInterface: Sendable {
   private let repository: MessageRepository
   private let serializer: MessageSerializer
   private let attachments: AttachmentInterface
-  private let contacts: ContactIndex
-  private let contactsEnabled: @Sendable () async -> Bool
+  private let conversations: ConversationDirectory
   private let conversion: AttachmentConversion?
   private let generator: String
   private let logger: Logger
 
   /// - Parameters:
-  ///   - contactsEnabled: whether the Contacts integration is on, asked per export, because
-  ///     the interface is cached for the life of the server and the switch is not.
+  ///   - conversations: the directory every picker reads, which is what names the chat and
+  ///     its participants here too.
   ///   - conversion: the converter the attachment routes use, or nil to always copy
   ///     originals.
   public init(
     repository: MessageRepository,
     serializer: MessageSerializer,
     attachments: AttachmentInterface,
-    contacts: ContactIndex,
-    contactsEnabled: @escaping @Sendable () async -> Bool = { true },
+    conversations: ConversationDirectory,
     conversion: AttachmentConversion? = nil,
     generator: String = TranscriptInterface.defaultGenerator,
     logger: Logger = Logger(label: "bluebubbles.interface.transcript")
@@ -156,8 +121,7 @@ public struct TranscriptInterface: Sendable {
     self.repository = repository
     self.serializer = serializer
     self.attachments = attachments
-    self.contacts = contacts
-    self.contactsEnabled = contactsEnabled
+    self.conversations = conversations
     self.conversion = conversion
     self.generator = generator
     self.logger = logger
@@ -170,125 +134,25 @@ public struct TranscriptInterface: Sendable {
     return "BlueBubbles Server \(version)"
   }
 
-  // MARK: - Finding a conversation
+  // MARK: - The conversation, in the transcript's own terms
 
-  /// Conversations matching `query`, newest first, with names resolved.
-  ///
-  /// An empty query lists the most recent conversations. A query matches case-insensitively
-  /// against the title, each participant's name and address, and the GUID; a query that
-  /// is mostly digits also matches the digits of a phone number, so "555 0101" finds
-  /// `+15555550101`.
-  public func searchChats(
-    matching query: String, limit: Int = 50, includeArchived: Bool = true
-  ) async throws -> [ChatCandidate] {
-    let rows = try await repository.chats(
-      includeArchived: includeArchived, limit: 1000, offset: 0, sortByLastMessage: true)
-    let participants = try await repository.participants(forChatRowIDs: rows.map(\.rowID))
-    let lastMessages = try await repository.lastMessages(forChatRowIDs: rows.map(\.rowID))
-    let addresses = Set(participants.values.flatMap { $0.map(\.id) })
-    let names = await contactNames(for: Array(addresses), overrides: [:])
-
-    var candidates: [ChatCandidate] = []
-    for row in rows {
-      let chat = Self.chat(row, participants: participants[row.rowID] ?? [], names: names)
-      candidates.append(
-        ChatCandidate(
-          chat: chat, lastMessageDate: lastMessages[row.rowID]?.date?.date,
-          isArchived: row.isArchived))
-    }
-    let matches = Self.filter(candidates, query: query)
-    return Array(matches.prefix(max(1, limit)))
-  }
-
-  /// One conversation by GUID, with names resolved, which is how the export route names
-  /// its file before writing it.
-  public func chat(guid: String) async throws -> ChatCandidate {
-    guard let row = try await repository.chat(guid: guid) else {
-      throw InterfaceError.notFound("that conversation does not exist on this server")
-    }
-    let participants = try await repository.participants(forChatRowIDs: [row.rowID])
-    let handles = participants[row.rowID] ?? []
-    let names = await contactNames(for: handles.map(\.id), overrides: [:])
-    let last = try await repository.lastMessages(forChatRowIDs: [row.rowID])
-    return ChatCandidate(
-      chat: Self.chat(row, participants: handles, names: names),
-      lastMessageDate: last[row.rowID]?.date?.date, isArchived: row.isArchived)
-  }
-
-  /// The match rule, off the query path so a test can state it.
-  static func filter(_ candidates: [ChatCandidate], query: String) -> [ChatCandidate] {
-    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return candidates }
-    let folded = ContactSearchText.fold(trimmed)
-    let digits = trimmed.filter(\.isNumber)
-    let matchesDigits = digits.count >= 3 && digits.count * 2 >= trimmed.count
-    return candidates.filter { candidate in
-      if ContactSearchText.fold(candidate.searchText).contains(folded) { return true }
-      guard matchesDigits else { return false }
-      return candidate.chat.participants.contains { participant in
-        participant.address.filter(\.isNumber).contains(digits)
-      }
-    }
-  }
-
-  static func chat(_ row: ChatRow, participants: [HandleRow], names: NameResolution)
+  /// The directory's row as the transcript carries it. Same fields, the transcript's own
+  /// types: `BBTranscript` is a leaf and cannot name the directory.
+  public static func chat(from conversation: ConversationDirectory.Conversation)
     -> Transcript.Chat
   {
     Transcript.Chat(
-      guid: row.guid,
-      displayName: row.displayName.flatMap { $0.isEmpty ? nil : $0 },
-      isGroup: row.isGroup,
-      service: row.serviceName,
-      participants: participants.map { names.participant(for: $0) })
+      guid: conversation.guid, displayName: conversation.displayName,
+      isGroup: conversation.isGroup, service: conversation.service,
+      participants: conversation.participants.map(participant(from:)))
   }
 
-  // MARK: - Names
-
-  /// Names by address, with where each came from.
-  struct NameResolution: Sendable {
-    var names: [String: (name: String, source: Transcript.NameSource)] = [:]
-
-    func participant(for handle: HandleRow) -> Transcript.Participant {
-      participant(address: handle.id, service: handle.service)
-    }
-
-    func participant(address: String, service: String?) -> Transcript.Participant {
-      let known = names[address]
-      return Transcript.Participant(
-        address: address, service: service, name: known?.name,
-        nameSource: known?.source ?? .none)
-    }
-  }
-
-  /// The caller's names first, then the contact index for the rest.
-  ///
-  /// The index is asked only when the Contacts integration is on: with it off the index
-  /// may still hold rows from before, and a person who switched it off did not switch it
-  /// off for everything but exports.
-  private func contactNames(
-    for addresses: [String], overrides: [String: String]
-  ) async -> NameResolution {
-    var resolution = NameResolution()
-    for (address, name) in overrides where !name.isEmpty {
-      resolution.names[address] = (name, .client)
-    }
-    let unresolved = addresses.filter { resolution.names[$0] == nil }
-    guard !unresolved.isEmpty, await contactsEnabled() else { return resolution }
-    do {
-      let records = try await contacts.findContacts(addresses: unresolved)
-      for (address, record) in records {
-        if let name = ContactInterface.displayName(for: record), !name.isEmpty {
-          resolution.names[address] = (name, .contacts)
-        }
-      }
-    } catch {
-      // A transcript with addresses in place of names is still a transcript; the failure is
-      // logged here and the export goes on. The address is never in the log line.
-      logger.warning(
-        "Contact lookup failed during a transcript export; addresses will be shown",
-        metadata: ["reason": .string(String(describing: error))])
-    }
-    return resolution
+  static func participant(from participant: ConversationDirectory.Participant)
+    -> Transcript.Participant
+  {
+    Transcript.Participant(
+      address: participant.address, service: participant.service, name: participant.name,
+      nameSource: Transcript.NameSource(rawValue: participant.nameSource.rawValue) ?? .none)
   }
 
   // MARK: - Exporting
@@ -303,13 +167,13 @@ public struct TranscriptInterface: Sendable {
     _ request: ExportRequest, to destination: URL, progress: Progress? = nil
   ) async throws -> ExportResult {
     try Self.validate(request)
-    guard let row = try await repository.chat(guid: request.chatGUID) else {
-      throw InterfaceError.notFound("that conversation does not exist on this server")
-    }
-    let handles = try await repository.participants(forChatRowIDs: [row.rowID])[row.rowID] ?? []
-    var names = await contactNames(
-      for: handles.map(\.id), overrides: request.participantNames)
-    let chat = Self.chat(row, participants: handles, names: names)
+    let conversation = try await conversations.conversation(
+      guid: request.chatGUID, names: request.participantNames)
+    let chat = Self.chat(from: conversation)
+    // Senders by address, grown as the pages are read: a sender who has since left the
+    // group is not among the participants and is named on first sight, once.
+    var people = Dictionary(
+      uniqueKeysWithValues: chat.participants.map { ($0.address, $0) })
     let header = Transcript.Header(
       chat: chat, format: request.format, attachmentMode: request.attachmentMode,
       after: request.after, before: request.before, timeZone: request.timeZone,
@@ -325,7 +189,6 @@ public struct TranscriptInterface: Sendable {
     var summary = Transcript.Summary()
     var summaries = BoundedCache<String, String>(capacity: Self.summaryCacheCapacity)
     var otherHandles: [Int64: HandleRow] = [:]
-    var lookedUp = Set(handles.map(\.id))
     var offset = 0
     var previousPage = Set<String>()
     while true {
@@ -339,18 +202,14 @@ public struct TranscriptInterface: Sendable {
       let currentPage = Set(page.map(\.row.guid))
       for projection in page where !previousPage.contains(projection.row.guid) {
         let row = projection.row
-        // A sender who has since left the group is not among the participants; name them
-        // on first sight, once.
-        if !row.isFromMe, let handle = projection.relations.handle,
-          !lookedUp.contains(handle.id)
-        {
-          lookedUp.insert(handle.id)
-          let resolved = await contactNames(
-            for: [handle.id], overrides: request.participantNames)
-          if let known = resolved.names[handle.id] { names.names[handle.id] = known }
+        if !row.isFromMe, let handle = projection.relations.handle, people[handle.id] == nil {
+          people[handle.id] = Self.participant(
+            from: await conversations.participant(
+              address: handle.id, service: handle.service, names: request.participantNames))
         }
         var message = try await transcriptMessage(
-          projection, names: names, summaries: &summaries, otherHandles: &otherHandles)
+          projection, people: &people, request: request, summaries: &summaries,
+          otherHandles: &otherHandles)
         if request.attachmentMode == .files {
           message.attachments = await copyAttachments(
             message.attachments, rows: projection.relations.attachments, into: layout,
@@ -404,13 +263,14 @@ public struct TranscriptInterface: Sendable {
   /// Decides what the row is and fills the model from it.
   private func transcriptMessage(
     _ projection: MessageInterface.MessageProjection,
-    names: NameResolution,
+    people: inout [String: Transcript.Participant],
+    request: ExportRequest,
     summaries: inout BoundedCache<String, String>,
     otherHandles: inout [Int64: HandleRow]
   ) async throws -> Transcript.Message {
     let row = projection.row
     let sender: Transcript.Participant? =
-      row.isFromMe ? nil : projection.relations.handle.map { names.participant(for: $0) }
+      row.isFromMe ? nil : projection.relations.handle.flatMap { people[$0.id] }
     let history = MessageEditHistory.decode(row.messageSummaryInfo)
     var message = Transcript.Message(
       guid: row.guid, date: row.date?.date, dateDelivered: row.dateDelivered?.date,
@@ -446,7 +306,14 @@ public struct TranscriptInterface: Sendable {
         {
           otherHandles[otherID] = handle
         }
-        other = otherHandles[otherID].map { names.participant(for: $0) }
+        if let handle = otherHandles[otherID] {
+          if people[handle.id] == nil {
+            people[handle.id] = Self.participant(
+              from: await conversations.participant(
+                address: handle.id, service: handle.service, names: request.participantNames))
+          }
+          other = people[handle.id]
+        }
       }
       message.kind = .groupEvent(
         Transcript.GroupEvent(

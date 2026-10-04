@@ -410,6 +410,11 @@ public actor AppContext {
     if let cachedInterfaces { return cachedInterfaces }
     guard let messages, let serializer else { return nil }
 
+    let conversations = ConversationDirectory(
+      repository: messages, contacts: contacts,
+      contactsEnabled: { [settings] in
+        await ServiceEnablement.isEnabled(BuiltInManifests.ID.contacts, settings: settings)
+      })
     let built = ServerInterfaces(
       message: MessageInterface(
         repository: messages, serializer: serializer, privateAPI: published.privateAPI
@@ -430,15 +435,13 @@ public actor AppContext {
           await ServiceEnablement.isEnabled(BuiltInManifests.ID.contacts, settings: settings)
         }
       ),
-      // The same closure, for the same reason: an export asks whether Contacts is on at
-      // the moment it runs.
+      // The same closure, for the same reason: a picker asks whether Contacts is on at the
+      // moment it reads.
+      conversations: conversations,
       transcript: TranscriptInterface(
         repository: messages, serializer: serializer,
         attachments: AttachmentInterface(repository: messages, privateAPI: published.privateAPI),
-        contacts: contacts,
-        contactsEnabled: { [settings] in
-          await ServiceEnablement.isEnabled(BuiltInManifests.ID.contacts, settings: settings)
-        },
+        conversations: conversations,
         conversion: attachmentConversion
       )
     )

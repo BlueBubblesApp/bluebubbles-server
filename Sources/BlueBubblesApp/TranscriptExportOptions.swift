@@ -1,50 +1,15 @@
 //  TranscriptExportOptions
 //  The decisions behind the export page, off the view so they can be tested.
 //
-//  Which conversations a search admits, what a run is called, which window a form
-//  describes, and what the save panel is told the file is: each is a rule rather than a
-//  mechanic, and a rule on a `View` type cannot be reached from a test process. See
-//  `Sources/BlueBubblesApp/CLAUDE.md` § Policy lives off the view.
+//  Which window a form describes, what it refuses, and what the save panel is told the file
+//  is: each is a rule rather than a mechanic, and a rule on a `View` type cannot be reached
+//  from a test process. Choosing the conversation is `ConversationPicking`'s, shared with
+//  every other picker. See `Sources/BlueBubblesApp/CLAUDE.md` § Policy lives off the view.
 
 import BBInterfaces
 import BBTranscript
 import Foundation
 import UniformTypeIdentifiers
-
-/// Searching the conversation list on the export page.
-enum TranscriptChatFilter {
-
-  /// The rows a query admits: a case-insensitive match on the title, every participant's
-  /// name and address, or the GUID; a mostly-numeric query also matches a phone number's
-  /// digits, so "555 0101" finds `+15555550101`. A whitespace-only query is no query.
-  static func filter(
-    _ candidates: [TranscriptInterface.ChatCandidate], query: String
-  ) -> [TranscriptInterface.ChatCandidate] {
-    let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return candidates }
-    let digits = trimmed.filter(\.isNumber)
-    let matchesDigits = digits.count >= 3 && digits.count * 2 >= trimmed.count
-    return candidates.filter { candidate in
-      if candidate.searchText.localizedCaseInsensitiveContains(trimmed) { return true }
-      guard matchesDigits else { return false }
-      return candidate.chat.participants.contains {
-        $0.address.filter(\.isNumber).contains(digits)
-      }
-    }
-  }
-
-  /// Where an arrow key moves the selection: down enters at the top, up at the bottom, and
-  /// the ends clamp rather than wrap. Nil when there is nothing to move to.
-  static func selection(
-    movedBy offset: Int, in candidates: [TranscriptInterface.ChatCandidate], from selected: String
-  ) -> String? {
-    guard !candidates.isEmpty else { return nil }
-    guard let current = candidates.firstIndex(where: { $0.id == selected }) else {
-      return (offset > 0 ? candidates.first : candidates.last)?.id
-    }
-    return candidates[min(max(current + offset, 0), candidates.count - 1)].id
-  }
-}
 
 /// The form's choices, as one value the page edits and the model is handed.
 struct TranscriptExportForm: Equatable {

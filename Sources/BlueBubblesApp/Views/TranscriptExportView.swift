@@ -6,11 +6,12 @@
 //  shape, press Export and choose where it goes. The same `TranscriptInterface` the API
 //  route calls, with the same options, so the two cannot drift.
 //
-//  The conversation list is a `ScreenModel` read that re-runs when the server starts; the
-//  run itself lives on `AppModel.transcriptExport`, which is what lets a person leave this
-//  page while a long export copies its attachments and come back to find it still going.
-//  Everything this page decides (the search rule, the window, the file type) is in
-//  `TranscriptExportOptions.swift`, where a test can reach it.
+//  The conversation is chosen with `ConversationPicker` in single mode, the same picker and
+//  the same rows the scheduled-message composer shows. The run itself lives on
+//  `AppModel.transcriptExport`, which is what lets a person leave this page while a long
+//  export copies its attachments and come back to find it still going. Everything this page
+//  decides (the window, the file type) is in `TranscriptExportOptions.swift`, where a test
+//  can reach it.
 
 import AppKit
 import BBCore
@@ -22,41 +23,13 @@ import SwiftUI
 struct TranscriptExportView: View {
 
   @Bindable var model: AppModel
-  @State private var conversations: ScreenModel<[TranscriptInterface.ChatCandidate]>
-  @State private var search = ""
-  @State private var selectedGUID = ""
+  /// The chosen conversation, as the picker holds it: zero or one GUID.
+  @State private var chosen: Set<String> = []
   @State private var form = TranscriptExportForm()
-  @FocusState private var searchIsFocused: Bool
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// Why the last press of Export did not reach the save panel, when it did not.
+  @State private var preparationError: String?
 
-  /// How many conversations the picker holds. The newest first, so anything a person is
-  /// likely to export is near the top; the search finds the rest.
-  static let pickerLimit = 500
-
-  init(model: AppModel) {
-    self.model = model
-    _conversations = State(initialValue: ScreenModel { try await Self.read(model) })
-  }
-
-  @MainActor
-  private static func read(_ model: AppModel) async throws
-    -> [TranscriptInterface.ChatCandidate]?
-  {
-    guard let interfaces = await model.messaging.interfaces() else { return nil }
-    return try await interfaces.transcript.searchChats(matching: "", limit: pickerLimit)
-  }
-
-  private var candidates: [TranscriptInterface.ChatCandidate] {
-    conversations.state.value ?? []
-  }
-
-  private var filtered: [TranscriptInterface.ChatCandidate] {
-    TranscriptChatFilter.filter(candidates, query: search)
-  }
-
-  private var selected: TranscriptInterface.ChatCandidate? {
-    candidates.first { $0.id == selectedGUID }
-  }
+  private var chosenGUID: String? { chosen.first }
 
   private var export: TranscriptExportModel { model.transcriptExport }
 
@@ -70,7 +43,6 @@ struct TranscriptExportView: View {
         page
       }
     }
-    .reloads(conversations, following: model)
   }
 
   private var page: some View {
@@ -98,143 +70,8 @@ struct TranscriptExportView: View {
       "Conversation",
       subtitle: "Search by a group's name, a contact's name, or a number."
     ) {
-      searchField
-      resultsList
-      selectionSummary
+      ConversationPicker(model: model, selection: $chosen, mode: .single, visibleRows: 8)
     }
-  }
-
-  private var searchField: some View {
-    HStack(spacing: 6) {
-      Image(systemName: "magnifyingglass")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .accessibilityHidden(true)
-
-      TextField("Search conversations", text: $search)
-        .textFieldStyle(.plain)
-        .focused($searchIsFocused)
-        .onSubmit {
-          if selectedGUID.isEmpty, let first = filtered.first { selectedGUID = first.id }
-        }
-        .onKeyPress(.downArrow) { moveSelection(by: 1) }
-        .onKeyPress(.upArrow) { moveSelection(by: -1) }
-
-      if !search.isEmpty {
-        Button {
-          search = ""
-          searchIsFocused = true
-        } label: {
-          Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Clear search")
-      }
-    }
-    .padding(.horizontal, 8)
-    .padding(.vertical, 6)
-    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
-  }
-
-  private var resultsList: some View {
-    let rows = filtered
-    return ScrollViewReader { proxy in
-      ScrollView {
-        if rows.isEmpty {
-          emptyResults
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-        } else {
-          LazyVStack(spacing: 0) {
-            ForEach(rows) { candidate in
-              ConversationChoiceRow(
-                candidate: candidate, isSelected: candidate.id == selectedGUID
-              ) { selectedGUID = candidate.id }
-              .id(candidate.id)
-            }
-          }
-          .padding(2)
-        }
-      }
-      .frame(height: resultsHeight(rows))
-      .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
-      .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary, lineWidth: 1))
-      .onChange(of: selectedGUID) { _, guid in
-        guard !guid.isEmpty else { return }
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
-          proxy.scrollTo(guid, anchor: .center)
-        }
-      }
-    }
-  }
-
-  private static let rowHeight: CGFloat = 30
-
-  /// Sized to the results, up to eight rows, so one hit is not a box of empty space.
-  private func resultsHeight(_ rows: [TranscriptInterface.ChatCandidate]) -> CGFloat {
-    let count = max(rows.count, 1)
-    return min(CGFloat(count) * Self.rowHeight, CGFloat(8) * Self.rowHeight) + 4
-  }
-
-  @ViewBuilder
-  private var emptyResults: some View {
-    // Told apart by the read's own state, not by whether the value is empty: a read in
-    // flight has no value yet and is not "nothing was found".
-    switch conversations.state {
-    case .failed(let failure):
-      Label(failure, systemImage: "exclamationmark.triangle")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    case .idle:
-      Label("Waiting for the message database.", systemImage: "clock")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    case .loading:
-      HStack(spacing: 8) {
-        ProgressView().controlSize(.small)
-        Text("Loading conversations…")
-      }
-      .font(.callout)
-      .foregroundStyle(.secondary)
-    case .loaded(let loaded) where loaded.isEmpty:
-      Label("No conversations were found on this Mac.", systemImage: "info.circle")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    case .loaded:
-      Label("No conversation matches “\(search)”.", systemImage: "magnifyingglass")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    }
-  }
-
-  /// What is chosen, kept on screen even when the search has filtered it out.
-  @ViewBuilder
-  private var selectionSummary: some View {
-    if let selected {
-      HStack(spacing: 6) {
-        Image(systemName: "checkmark.circle.fill")
-          .foregroundStyle(.tint)
-          .accessibilityHidden(true)
-        Text(selected.chat.title)
-        Text(selected.chat.participants.count.counted("participant"))
-          .foregroundStyle(.secondary)
-        Spacer(minLength: 8)
-        Button("Clear") { selectedGUID = "" }
-          .buttonStyle(.link)
-      }
-      .font(.callout)
-      .lineLimit(1)
-      .accessibilityElement(children: .combine)
-    }
-  }
-
-  private func moveSelection(by offset: Int) -> KeyPress.Result {
-    guard
-      let moved = TranscriptChatFilter.selection(
-        movedBy: offset, in: filtered, from: selectedGUID)
-    else { return .ignored }
-    selectedGUID = moved
-    return .handled
   }
 
   // MARK: - Window
@@ -348,11 +185,14 @@ struct TranscriptExportView: View {
     if let problem = form.problem {
       SettingsFootnote(text: problem, kind: .advice, tone: .warning)
     }
+    if let preparationError {
+      ScreenErrorLine(message: preparationError)
+    }
     HStack(spacing: 10) {
-      Button("Export…") { chooseDestinationAndRun() }
+      Button("Export…") { Task { await chooseDestinationAndRun() } }
         .buttonStyle(.borderedProminent)
-        .disabled(selected == nil || form.problem != nil)
-      if selected == nil {
+        .disabled(chosenGUID == nil || form.problem != nil)
+      if chosenGUID == nil {
         Text("Choose a conversation first.")
           .font(.callout)
           .foregroundStyle(.secondary)
@@ -408,9 +248,23 @@ struct TranscriptExportView: View {
     ].joined(separator: ", ")
   }
 
-  private func chooseDestinationAndRun() {
-    guard let selected else { return }
-    let request = form.request(chatGUID: selected.id)
+  /// Names the file from the conversation, asks where it goes, and hands the run off.
+  ///
+  /// The conversation is read back from the directory by GUID rather than taken from the
+  /// picker's row: the picker holds only what was chosen, and the directory is the one place
+  /// that knows what the chat is called, which is what the file is named after.
+  private func chooseDestinationAndRun() async {
+    guard let guid = chosenGUID else { return }
+    preparationError = nil
+    guard let interfaces = await model.messaging.interfaces() else { return }
+    let request = form.request(chatGUID: guid)
+    let conversation: ConversationDirectory.Conversation
+    do {
+      conversation = try await interfaces.conversations.conversation(guid: guid)
+    } catch {
+      preparationError = DiagnosticText.sentence(for: error)
+      return
+    }
     let panel = NSSavePanel()
     panel.title = "Export Conversation"
     panel.message = "Choose where to save the transcript."
@@ -418,72 +272,8 @@ struct TranscriptExportView: View {
     panel.isExtensionHidden = false
     panel.allowedContentTypes = [form.contentType]
     panel.nameFieldStringValue = TranscriptInterface.filename(
-      for: selected.chat, request: request)
+      for: TranscriptInterface.chat(from: conversation), request: request)
     guard panel.runModal() == .OK, let destination = panel.url else { return }
-    Task {
-      guard let interfaces = await model.messaging.interfaces() else { return }
-      export.start(request, to: destination, using: interfaces)
-    }
-  }
-}
-
-/// One conversation in the picker. Its own view for the hover state, so a row's hover is a
-/// row-local fact rather than page state every keystroke invalidates.
-private struct ConversationChoiceRow: View {
-
-  let candidate: TranscriptInterface.ChatCandidate
-  let isSelected: Bool
-  let select: () -> Void
-
-  @State private var isHovering = false
-
-  var body: some View {
-    Button(action: select) {
-      HStack(spacing: 8) {
-        Image(systemName: "checkmark")
-          .font(.caption.weight(.bold))
-          .foregroundStyle(.tint)
-          .opacity(isSelected ? 1 : 0)
-          .frame(width: 12)
-          .accessibilityHidden(true)
-        Text(candidate.chat.title)
-          .lineLimit(1)
-        if let detail {
-          Text(detail)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .layoutPriority(-1)
-        }
-        Spacer(minLength: 0)
-        if candidate.isArchived {
-          Tag("archived")
-        }
-      }
-      .padding(.horizontal, 8)
-      .frame(height: 30)
-      .contentShape(Rectangle())
-      .background(background, in: RoundedRectangle(cornerRadius: 6))
-    }
-    .buttonStyle(.plain)
-    .onHover { isHovering = $0 }
-  }
-
-  /// The address beside a one-to-one chat whose title is a name, so a person who knows the
-  /// number and not the name can still tell which row this is.
-  private var detail: String? {
-    let participants = candidate.chat.participants
-    if participants.count == 1, participants[0].name != nil {
-      return participants[0].address
-    }
-    if candidate.chat.isGroup, candidate.chat.displayName != nil {
-      return participants.count.counted("participant")
-    }
-    return nil
-  }
-
-  private var background: AnyShapeStyle {
-    if isSelected { return AnyShapeStyle(.tint.opacity(0.18)) }
-    if isHovering { return AnyShapeStyle(.quaternary.opacity(0.5)) }
-    return AnyShapeStyle(.clear)
+    export.start(request, to: destination, using: interfaces)
   }
 }

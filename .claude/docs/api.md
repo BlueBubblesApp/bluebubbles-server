@@ -288,8 +288,8 @@ JSON about it. `after`/`before` are inclusive and take epoch milliseconds or ISO
 come from the request's `participants` map first, then this server's contacts, then the
 formatted address, and every row keeps the address beside the name so a client with its own
 address book can re-resolve them. Finding a conversation by a person's name is the app's
-Export page (`TranscriptInterface.searchChats`), deliberately not a route: a client holds
-the GUID and the contacts already.
+Export page (`ConversationPicker` over `ConversationDirectory`), deliberately not a route: a
+client holds the GUID and the contacts already.
 
 The conversation is streamed a page at a time, so memory is one page of rows however long the
 chat is; a reaction is therefore its own row, naming its target, rather than nested under it.

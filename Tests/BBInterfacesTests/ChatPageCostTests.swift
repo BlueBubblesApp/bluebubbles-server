@@ -33,6 +33,7 @@
 //  Each test also asserts the participants still ARRIVE, because a loader that returned
 //  nothing would satisfy every count assertion here triumphantly.
 
+import BBContacts
 import BBIMessage
 import BBPersistence
 import BBSerialization
@@ -57,6 +58,9 @@ struct ChatPageCostTests {
 
   private struct Harness {
     let interface: ChatInterface
+    /// Contacts off, so the count is the chat.db read alone: the contact index is a
+    /// different database and its one batched lookup is not what this file measures.
+    let directory: ConversationDirectory
     let counter: StatementCounter
   }
 
@@ -82,11 +86,17 @@ struct ChatPageCostTests {
     let database = try ReadOnlyDatabase(
       path: path.path, observingStatements: { _ in counter.record() })
     let profile = try await SchemaProfile.detect(in: database, osMajorVersion: 14)
+    let repository = MessageRepository(database: database, profile: profile)
+    let appDatabase = AppDatabase(queue: try DatabaseQueue())
+    try appDatabase.migrate(contributors: [ContactsSchema.self])
     return Harness(
       interface: ChatInterface(
-        repository: MessageRepository(database: database, profile: profile),
+        repository: repository,
         serializer: MessageSerializer(profile: profile)
       ),
+      directory: ConversationDirectory(
+        repository: repository, contacts: ContactIndex(database: appDatabase),
+        contactsEnabled: { false }),
       counter: counter
     )
   }
@@ -171,25 +181,24 @@ struct ChatPageCostTests {
       "a batch that returns no participants is not a fix")
   }
 
-  @Test("Summaries cost the same for a small page as for a large one")
-  func summariesAreNotNPlusOne() async throws {
-    // The same loop in the other reader. It backs the app's schedule composer, which calls it
-    // on open with a default limit of 500, so the per-row form froze the queue for the page.
+  @Test("The conversation directory costs the same for a small list as for a large one")
+  func directoryIsNotNPlusOne() async throws {
+    // The list every picker in the app reads, on open, 500 at a time: participants, last
+    // messages and names for the whole list in a constant number of statements.
     let harness = try await harness()
-    let all = try await harness.interface.summaries()
+    let directory = harness.directory
+    let all = try await directory.list()
     #expect(all.count >= Self.seededChats)
     #expect(all.contains { !$0.participants.isEmpty })
 
-    let few = try await cost(harness) { _ = try await harness.interface.summaries(limit: 5) }
-    let many = try await cost(harness) {
-      _ = try await harness.interface.summaries(limit: all.count)
-    }
+    let few = try await cost(harness) { _ = try await directory.list(limit: 5) }
+    let many = try await cost(harness) { _ = try await directory.list(limit: all.count) }
 
     let extra = all.count - 5
     let growth = many - few
     let report = "5 chats cost \(few) statements and \(all.count) cost \(many)"
     #expect(growth < extra, "\(report): \(growth) more for \(extra) more chats is per-chat")
-    #expect(many < all.count, "\(report): a page should not cost a statement per chat")
+    #expect(many < all.count, "\(report): a list should not cost a statement per chat")
   }
 
   @Test("Not asking for participants does not load them")

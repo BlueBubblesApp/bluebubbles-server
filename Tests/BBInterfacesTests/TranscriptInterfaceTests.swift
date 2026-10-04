@@ -36,6 +36,7 @@ struct TranscriptInterfaceTests {
   private struct Harness {
     let path: String
     let writer: DatabaseQueue
+    let directory: ConversationDirectory
     let interface: TranscriptInterface
     let folder: URL
     let photo: URL
@@ -68,11 +69,15 @@ struct TranscriptInterfaceTests {
         phoneNumbers: [Self.alice])
     ])
 
+    let directory = ConversationDirectory(
+      repository: repository, contacts: contacts, contactsEnabled: { contactsEnabled })
     let interface = TranscriptInterface(
       repository: repository, serializer: MessageSerializer(profile: profile),
-      attachments: AttachmentInterface(repository: repository), contacts: contacts,
-      contactsEnabled: { contactsEnabled }, generator: "BlueBubbles Server test")
-    return Harness(path: path, writer: writer, interface: interface, folder: folder, photo: photo)
+      attachments: AttachmentInterface(repository: repository), conversations: directory,
+      generator: "BlueBubbles Server test")
+    return Harness(
+      path: path, writer: writer, directory: directory, interface: interface, folder: folder,
+      photo: photo)
   }
 
   /// A group of alice and bob with seven rows, in order: words, a reply, a tapback on the
@@ -155,26 +160,17 @@ struct TranscriptInterfaceTests {
     return try #require(object as? [String: Any])
   }
 
-  // MARK: - Finding the conversation
+  // MARK: - The conversation
 
-  @Test("A conversation is found by a contact's name, a number's digits, and its own name")
-  func search() async throws {
+  @Test("The transcript's chat is the directory's row, names and all")
+  func chatComesFromTheDirectory() async throws {
     let harness = try await harness()
     defer { harness.tearDown() }
-    let byName = try await harness.interface.searchChats(matching: "alice")
-    #expect(byName.contains { $0.id == Self.chatGUID })
-    #expect(byName.contains { $0.chat.guid.hasSuffix(Self.alice) })
-    let byDigits = try await harness.interface.searchChats(matching: "555 0143")
-    #expect(byDigits.contains { $0.id == Self.chatGUID })
-    let byTitle = try await harness.interface.searchChats(matching: "weekend")
-    #expect(byTitle.count == 1)
-    #expect(byTitle.first?.chat.title == "Weekend Plans")
-    let none = try await harness.interface.searchChats(matching: "nobody by this name")
-    #expect(none.isEmpty)
-    let all = try await harness.interface.searchChats(matching: "")
-    #expect(all.first?.id == Self.chatGUID, "newest conversation first")
-    let found = try await harness.interface.chat(guid: Self.chatGUID)
-    #expect(found.chat.participants.map(\.displayName) == ["Alice Example", Self.bob])
+    let conversation = try await harness.directory.conversation(guid: Self.chatGUID)
+    let chat = TranscriptInterface.chat(from: conversation)
+    #expect(chat.title == "Export Test")
+    #expect(chat.participants.map(\.displayName) == ["Alice Example", Self.bob])
+    #expect(chat.participants.map(\.nameSource) == [.contacts, .none])
   }
 
   @Test("An unknown conversation is a not-found")
@@ -182,7 +178,9 @@ struct TranscriptInterfaceTests {
     let harness = try await harness()
     defer { harness.tearDown() }
     await #expect(throws: InterfaceError.self) {
-      _ = try await harness.interface.chat(guid: "iMessage;+;chat-no-such")
+      _ = try await harness.interface.export(
+        TranscriptInterface.ExportRequest(chatGUID: "iMessage;+;chat-no-such"),
+        to: harness.folder.appendingPathComponent("never.json"))
     }
   }
 
@@ -308,9 +306,9 @@ struct TranscriptInterfaceTests {
   func contactsOff() async throws {
     let harness = try await harness(contactsEnabled: false)
     defer { harness.tearDown() }
-    let found = try await harness.interface.chat(guid: Self.chatGUID)
-    #expect(found.chat.participants.map(\.nameSource) == [.none, .none])
-    #expect(found.chat.participants[0].displayName == "+1 (202) 555-0143")
+    let found = try await harness.directory.conversation(guid: Self.chatGUID)
+    #expect(found.participants.map(\.nameSource) == [.none, .none])
+    #expect(found.participants[0].displayName == "+1 (202) 555-0143")
   }
 
   @Test("A window whose start is after its end is refused before anything is read")
