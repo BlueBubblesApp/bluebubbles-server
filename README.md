@@ -4,10 +4,40 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 
 ## Pre-requisites
 
--   NodeJS: https://nodejs.org/en/
+-   NodeJS **20.11.x** (the version pinned in `devEngines`): https://nodejs.org/en/
+-   Python with `distutils` available for `node-gyp` (Python 3.11 or older, or a newer Python with `setuptools` installed)
 -   Git: https://git-scm.com/
 
 **Warning**: Yarn may not work for this project. You may run into build errors.
+
+### Native module build errors
+
+The native dependencies (`node-mac-permissions`, `node-mac-contacts`, `better-sqlite3`) are compiled during `npm install`, and two toolchain mismatches commonly break that step:
+
+-   **`ModuleNotFoundError: No module named 'distutils'`**: the bundled `node-gyp` (v9) needs `distutils`, which Python 3.12 removed. Point npm at a Python that has it, for example a virtualenv with `setuptools`:
+
+    ```bash
+    python3 -m venv .gyp-venv && .gyp-venv/bin/pip install setuptools
+    export npm_config_python="$PWD/.gyp-venv/bin/python"
+    ```
+
+-   **`no matching function for call to 'napi_add_finalizer'`** while compiling `node-mac-contacts`: you are on a newer Node 20 release than 20.11 (Homebrew's `node@20`, for example, is 20.20). Its headers changed the finalizer signature that `node-mac-contacts`' bundled `node-addon-api` expects. Use Node 20.11.x, e.g. with nvm:
+
+    ```bash
+    nvm install 20.11 && nvm use 20.11
+    ```
+
+### Building a local app (macOS)
+
+`npm run build` packages the app with electron-builder. Without an Apple Developer ID, skip signing and sign the result ad-hoc:
+
+```bash
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run build
+ditto dist/mac-arm64/BlueBubbles.app /Applications/BlueBubbles.app
+codesign --force --deep -s - /Applications/BlueBubbles.app
+```
+
+On first launch, grant BlueBubbles **Full Disk Access** (otherwise it fails with `SqliteError: unable to open database file`) and allow it to control **Messages** under Automation (otherwise sends fail with AppleEvent error `-1712`).
 
 ## Development
 
