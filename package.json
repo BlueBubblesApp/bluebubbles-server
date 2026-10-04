@@ -28,5 +28,10 @@
     },
     "devDependencies": {
         "concurrently": "^7.0.0"
+    },
+    "overrides": {
+        "node-mac-contacts": {
+            "node-addon-api": "^8.0.0"
+        }
     }
 }
