@@ -20,6 +20,18 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 4. Run the dev server (this will start both the renderer and server)
     - `npm run start`
 
+### Building a local app (macOS)
+
+`npm run build` packages the app with electron-builder. Without an Apple Developer ID, skip signing and sign the result ad-hoc (the app is in `dist/mac-arm64/` on Apple Silicon, `dist/mac/` on Intel):
+
+```bash
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run build
+ditto dist/mac-arm64/BlueBubbles.app /Applications/BlueBubbles.app
+codesign --force --deep -s - /Applications/BlueBubbles.app
+```
+
+On first launch, grant BlueBubbles **Full Disk Access** (otherwise it cannot open `~/Library/Messages/chat.db`) and allow it to control **Messages** under Automation when prompted (a denied prompt gives AppleEvent error `-1743`; an unanswered one surfaces as `-1712` timeouts on send). These grants are tied to the ad-hoc signature, so after a rebuild remove and re-add BlueBubbles in those lists.
+
 ### macOS Warning
 
 If you are using macOS 10.x and are having issues building/running the server, please downgrade the `node-mac-permissions` dependency to `v2.2.0`. The reason it's on a newer version is to fix a production crashing issue on Big Sur+. Please downgrade it manually for testing on macOS v10.x.
