@@ -37,6 +37,7 @@ and knows nothing about the whole.
 | `BBContacts` | Streaming contact ingest, persistent address index |
 | `BBSerialization` | Wire types and serializers: the single definition of "what a message looks like" |
 | `BBAuth` | Authentication schemes, access control, enrollment, device registry |
+| `BBAudit` | The audit log: the event envelope and kind catalogue, the `audit_event` table, the recorder every emitter holds, retention, CSV export, the syslog forwarder. Below `BBInterfaces`, so an interface can record what it changed |
 | `BBHTTPAPI` | `RouteTable`, middleware chain, Hummingbird server, multipart |
 | `BBSocketIO` | Native Engine.IO / Socket.IO implementation |
 | `BBEvents` | Event bus, sinks, payload codecs, webhook delivery |
@@ -552,6 +553,48 @@ Six interfaces conform, and one that reaches Messages without conforming is the 
 for.
 
 ---
+
+## The audit log is a third system
+
+Logging says what the code did, alerting says what a person must do, and the audit log says
+what HAPPENED: who caused it, to what, with what outcome, in a shape that leaves the machine.
+It is neither of the other two. A log line is free text for a developer and is never
+forwarded; an alert is a summons and clears when acted on; an audit record is a durable,
+structured fact with a documented schema (`docs/AUDIT_LOG.md`), kept for a retention period,
+exported as CSV and forwarded as RFC 5424 syslog with the record as its JSON body.
+
+Four parts, in four places:
+
+- **The recorder** (`AuditRecorder`, in `BBAudit`) exists for the life of the server and is
+  held by every emitter from construction: the HTTP dispatcher, the authentication stage, the
+  settings store, the access controller, the interfaces. Disarmed, `record` drops the event;
+  armed, it buffers, writes a batch in one transaction and hands the batch to the exporters.
+  That is what makes "turn the audit log on" a service starting rather than every emitter
+  restarting.
+- **Who did it** rides a task-local (`AuditContext`, in `BBCore`), set at the boundary that
+  knows and read where the record is built: the HTTP dispatcher sets the client and a
+  per-request id before the handler runs, the registry sets the service around `start` and
+  `stop`, `ScopedSettings` sets the service around its own writes, the composition root sets
+  `startup` and `shutdown`. What nothing set is the operator: the app and the command line.
+  The direction is deliberate; attributing a person's change to the server is the worse lie.
+- **The emitters that may not import `BBAudit`** (the auth layer, the settings store, the
+  HTTP layer) declare a protocol in their own vocabulary (`AuthenticationAuditing`,
+  `AccessControlAuditing`, `SettingsWriteObserving`, the request-completed callback) and
+  `Composition/AuditWiring.swift` holds the bridges that translate each into an `AuditEvent`.
+  A handler records nothing: the dispatcher records its request and the interface records
+  what changed, so a handler able to write records would be a second author of the same
+  history.
+- **The service** (`AuditLogService`) is the switch. It arms the recorder with the table and,
+  when configured, a `SyslogForwarder`; runs the retention sweep; turns the registry's health
+  snapshots into `service.started` / `stopped` / `failed` records for every other service;
+  and disarms on stop. It ships in `disabledByDefault`, and the app shows the Audit Log page
+  only while it is on.
+
+Two rules a record is held to, because it is the artefact most likely to leave this Mac: no
+message content and no address other than a client's (routes are templates, never resolved
+paths), and no secret value (`AuditValue.redacted` in its place). `AuditEventKind` declares
+every kind and every metadata key, and `AuditDocumentationTests` fails the build if
+`docs/AUDIT_LOG.md` does not describe one.
 
 ## Two ways to run, and they are not interchangeable
 

@@ -12,6 +12,7 @@
 //  fields inside `data`, and three chats with seven messages between them is what makes
 //  those fields exist to compare.
 
+import BBAudit
 import BBAuth
 import BBContacts
 import BBDiagnostics
@@ -89,6 +90,7 @@ struct ReplayServer {
         alerts: AlertCenter(),
         permissions: PermissionsService(),
         accessControl: AccessControlService(),
+        auditLog: AuditRecorder(),
         contacts: ContactIndex(database: appDatabase)
       ),
       transport: ServerComposition.Transport(

@@ -120,6 +120,10 @@ public actor EngineIOServer {
   /// nil controller means no counting and no blocking, which is only ever right in a test;
   /// `SocketAccessControlWiringTests` asserts the composition root supplies one.
   private let accessControl: AccessControlService?
+  /// Told about every refused handshake and CONNECT, so a wrong password over the socket
+  /// leaves the same audit record a wrong password over HTTP does. Optional for the reason
+  /// `accessControl` is.
+  private let auditor: (any AuthenticationAuditing)?
   /// Injected so a test can pin the sid rather than matching on a UUID.
   private let makeSessionID: @Sendable () -> String
   private var reaper: Task<Void, Never>?
@@ -136,6 +140,7 @@ public actor EngineIOServer {
     configuration: Configuration = Configuration(),
     chain: @escaping @Sendable () async -> AuthenticationChain,
     accessControl: AccessControlService? = nil,
+    auditor: (any AuthenticationAuditing)? = nil,
     isAccepting: @escaping @Sendable () async -> Bool = { true },
     logger: Logger = Logger(label: "bluebubbles.socket.engine"),
     makeSessionID: @escaping @Sendable () -> String = { UUID().uuidString }
@@ -144,6 +149,7 @@ public actor EngineIOServer {
     self.configuration = configuration
     self.chain = chain
     self.accessControl = accessControl
+    self.auditor = auditor
     self.isAccepting = isAccepting
     self.logger = logger
     self.makeSessionID = makeSessionID
@@ -157,6 +163,15 @@ public actor EngineIOServer {
   /// chain. It is what a person reads in the failure list to tell a socket attempt from an
   /// API one, so the two have to agree.
   static let authPath = "/socket.io/"
+
+  /// The audit record for a refusal on this transport, against the resolved identity.
+  private func audit(_ kind: AuthenticationAuditEvent.Kind, identity: ClientIdentity) {
+    guard let auditor else { return }
+    let address: String? = if case .address(let resolved) = identity { resolved } else { nil }
+    auditor.record(
+      AuthenticationAuditEvent(
+        kind: kind, transport: .socket, clientAddress: address, route: Self.authPath))
+  }
 
   nonisolated var pingInterval: Duration { configuration.pingInterval }
 
@@ -232,6 +247,7 @@ public actor EngineIOServer {
       logger.info(
         "Refused a socket handshake: the client is blocked",
         metadata: ["client": .string(clientAddress ?? "unknown")])
+      audit(.blocked, identity: identity)
       packets.append(EngineIOPacket(type: .close).encode())
       return .established(sid: sid, packets: packets)
     }
@@ -295,6 +311,7 @@ public actor EngineIOServer {
       await accessControl?.recordFailure(
         identity, path: Self.authPath, reason: "socket handshake credential rejected"
       )
+      audit(.credentialRejected(reason: "socket_handshake_rejected"), identity: identity)
       // Closed rather than refused, and with no error packet. See above.
       packets.append(EngineIOPacket(type: .close).encode())
       await session.close(.rejected)
@@ -382,6 +399,7 @@ public actor EngineIOServer {
           logger.info(
             "Rejected a socket CONNECT: the client is blocked",
             metadata: ["sid": .string(session.id.rawValue)])
+          audit(.blocked, identity: identity)
           await close(sid: session.id.rawValue, reason: .rejected)
           return EngineIOPacket(type: .close).encode()
         }
@@ -397,6 +415,7 @@ public actor EngineIOServer {
           await accessControl?.recordFailure(
             identity, path: Self.authPath, reason: "socket CONNECT credential rejected"
           )
+          audit(.credentialRejected(reason: "socket_connect_rejected"), identity: identity)
           await close(sid: session.id.rawValue, reason: .rejected)
           return EngineIOPacket(type: .close).encode()
         }
@@ -502,9 +521,11 @@ public actor EngineIOServer {
   /// authenticating. Without it the cheapest way to exhaust that pool was also the only one
   /// the lockout could not see, since holding a slot open involves no rejected credential.
   private func recordAuthGraceExpiry(for session: EngineIOSession) async {
+    let identity = await session.clientIdentity
+    audit(.credentialMissing, identity: identity)
     guard let accessControl else { return }
     await accessControl.recordFailure(
-      await session.clientIdentity,
+      identity,
       path: Self.authPath,
       reason: "socket handshake expired without a credential"
     )

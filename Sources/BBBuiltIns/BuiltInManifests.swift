@@ -37,6 +37,7 @@ public enum BuiltInManifests {
     public static let launchAtLogin = ServiceIdentifier("app.bluebubbles.core.launch-at-login")
     public static let toolUpdates = ServiceIdentifier("app.bluebubbles.core.tool-updates")
     public static let networkPath = ServiceIdentifier("app.bluebubbles.core.network-path")
+    public static let auditLog = ServiceIdentifier("app.bluebubbles.core.audit-log")
 
     public static let push = ServiceIdentifier("app.bluebubbles.sink.push")
     public static let webhooks = ServiceIdentifier("app.bluebubbles.sink.webhooks")
@@ -86,7 +87,12 @@ public enum BuiltInManifests {
   /// Seeded ONCE, into `disabled_services`, rather than being consulted on every read: the
   /// list means "what the user switched off", and a default folded into every read could
   /// never be switched back on. See `ServiceEnablement.seed(skipping:)`.
-  public static let disabledByDefault: Set<ServiceIdentifier> = [ID.ntfy]
+  ///
+  /// The audit log is off for a different reason: it is a compliance feature that writes a
+  /// row for every action and auth failure, and a home install gains nothing from the table
+  /// growing. An operator who needs it turns it on, and the switch is itself the first thing
+  /// it records.
+  public static let disabledByDefault: Set<ServiceIdentifier> = [ID.ntfy, ID.auditLog]
 
   // MARK: - Reverse proxies
   //
@@ -1119,5 +1125,6 @@ public enum BuiltInManifests {
     scheduledMessages, sleepPrevention, launchAtLogin, toolUpdates,
     push, webhooks, ntfy,
     lan, dynamicDNS, ngrok, cloudflare, zrok, tailscale,
+    auditLog,
   ]
 }

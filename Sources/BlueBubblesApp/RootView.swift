@@ -25,6 +25,10 @@ enum Destination: CaseIterable, Identifiable, Hashable {
   /// should have been reading is meaningless until Firebase is set up.
   case firebase
   case logs
+  /// The server's account of itself. The one row that comes and goes: shown only while the
+  /// audit log is switched on, by `SidebarDestinations`, because a row for a feature that
+  /// ships off would otherwise be an empty table on every install.
+  case auditLog
   /// Not a docs link: it reads live state, because every question it answers is about THIS
   /// machine.
   case guides
@@ -41,6 +45,7 @@ enum Destination: CaseIterable, Identifiable, Hashable {
     case .integrations: "Integrations"
     case .firebase: "Firebase"
     case .logs: "Logs"
+    case .auditLog: "Audit Log"
     case .guides: "Guides"
     case .settings: "Settings"
     }
@@ -55,6 +60,7 @@ enum Destination: CaseIterable, Identifiable, Hashable {
     case .integrations: "puzzlepiece.extension"
     case .firebase: "bell.badge"
     case .logs: "doc.plaintext"
+    case .auditLog: "list.bullet.rectangle.portrait"
     case .guides: "book"
     case .settings: "gearshape"
     }
@@ -92,10 +98,17 @@ struct RootView: View {
         // row highlighted, because that is the list's own visual selection, and the setter
         // was never called. Spelling the identity out means a change to the `Identifiable`
         // conformance cannot quietly break the sidebar again.
-        ForEach(Destination.allCases, id: \.self) { destination in
+        // The VISIBLE rows, not every case: the Audit Log row is there only while the
+        // feature is on. `SidebarDestinations` is the rule.
+        ForEach(model.visibleDestinations, id: \.self) { destination in
           Label(destination.title, systemImage: destination.symbol)
             .badge(badge(for: destination) ?? 0)
         }
+      }
+      // A page whose row has just left cannot stay selected: the detail column would show a
+      // page the sidebar no longer names. Home is where it goes; see `SidebarDestinations`.
+      .onChange(of: model.visibleDestinations) { _, visible in
+        model.selection = SidebarDestinations.resolvedSelection(model.selection, visible: visible)
       }
       .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
       // Pinned rather than a first row in the list, for the same reason the status strip
@@ -238,6 +251,7 @@ struct RootView: View {
     case .integrations: IntegrationsView(model: model)
     case .firebase: FirebaseView(model: model)
     case .logs: LogsView(model: model)
+    case .auditLog: AuditLogView(model: model)
     case .guides: GuidesView(model: model)
     case .settings: SettingsView(model: model)
     }

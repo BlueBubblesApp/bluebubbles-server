@@ -74,6 +74,10 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
         // Self-signed certificate generation for the HTTPS listener.
         .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
+        // Already in the graph under HummingbirdTLS. Declared because BBAudit imports NIOSSL
+        // directly: the syslog forwarder is a TLS CLIENT with a client certificate, which the
+        // listener's server-side configuration has no spelling for.
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.27.0"),
         // For the raw-bytes IP address in a certificate's SAN extension.
         .package(url: "https://github.com/apple/swift-asn1.git", from: "1.0.0"),
         // Firebase has no Swift Admin SDK, so FCM and the Google APIs are spoken over REST.
@@ -469,6 +473,26 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
 
+        // The audit log: the record, its table, retention, the CSV export and the syslog
+        // forwarder. Below the domain layer, because the interfaces EMIT records and the
+        // module that defines a record cannot depend on the module that writes one. Depends
+        // on nothing above persistence for the same reason: a record about a settings change
+        // must not have to link the message schema to say what changed.
+        .target(
+            name: "BBAudit",
+            dependencies: [
+                "BBCore", "BBPersistence",
+                .product(name: "GRDB", package: "GRDB.swift"),
+                .product(name: "Logging", package: "swift-log"),
+                // The syslog forwarder: a TCP or UDP client with optional TLS, over the same
+                // library the Private API transport uses.
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+            ],
+            swiftSettings: swiftSettings
+        ),
+
         .target(
             name: "BBInterfaces",
             dependencies: [
@@ -480,6 +504,8 @@ let package = Package(
                 "BBPrivateAPI", "BBPrivateAPIContract", "BBAppleScript", "BBShortcuts",
                 "BBSystem", "BBSettings", "BBPushKit", "BBEvents", "BBDiagnostics", "BBMedia",
                 "BBAppStore",
+                // The admin and schedule interfaces record what they change.
+                "BBAudit",
                 // `UpdateInstalling` names `AppcastItem`; the app conforms, a handler consumes.
                 "BBUpdates",
                 // `Capabilities.swift` names the FaceTime coordinator. The auth, tooling and
@@ -524,6 +550,7 @@ let package = Package(
             name: "BlueBubblesServerCore",
             dependencies: [
                 "BBAppStore",
+                "BBAudit",
                 "BBMedia",
                 "BBInterfaces", "BBHandlers", "BBBuiltIns", "BBFaceTime",
                 "BBTooling",
@@ -793,11 +820,21 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
 
+        // The audit log on its own: the record, the table, retention, the CSV and the
+        // syslog framing. None of it needs a server.
+        .testTarget(
+            name: "BBAuditTests",
+            dependencies: ["BBAudit", "BBCore", "BBPersistence"],
+            swiftSettings: swiftSettings
+        ),
+
         .testTarget(
             name: "CompositionTests",
             dependencies: [
                 "BBMedia",
                 "BBAppStore",
+                // `AuditWiringTests` drives the recorder and reads the table.
+                "BBAudit",
                 "BBTestSupport",
                 "BlueBubblesApp",
                 // The three targets the composition root is now split across. Reaching all of
@@ -853,6 +890,8 @@ let package = Package(
             name: "BlueBubblesApp",
             dependencies: [
                 "BBAppStore",
+                // The Audit Log page reads the table and exports it.
+                "BBAudit",
                 "BlueBubblesServerCore", "BBBuiltIns", "BBFaceTime", "BBInterfaces", "BBSettings",
                 "BBSystem", "BBAuth", "BBPrivateAPICatalog",
                 "BBServiceKit", "BBDiagnostics", "BBUpdates", "BBSerialization",
@@ -1080,6 +1119,8 @@ let package = Package(
                 "BlueBubblesServerCore", "BBHandlers", "BBInterfaces", "BBAuth", "BBEvents",
                 "BBSettings", "BBSerialization", "BBPersistence", "BBIMessage", "BBContacts",
                 "BBSocketIO", "BBTooling", "BBSystem", "BBServiceKit", "BBDiagnostics",
+                // The replay builds the shared services by hand, recorder included.
+                "BBAudit",
                 // The replay publishes a stub Private API so the helper-backed routes are
                 // diffed rather than refused: BBTestSupport for `FailingPrivateAPI` and the
                 // contract for the payloads its closures return.
@@ -1170,6 +1211,8 @@ let package = Package(
                 "BBMedia",
                 "BBAppStore",
                 "BlueBubblesApp", "BlueBubblesServerCore", "BBBuiltIns", "BBHandlers", "BBInterfaces",
+                // `AuditRowSummaryTests` builds records for the Audit Log page to describe.
+                "BBAudit",
                 // `APIDocsRelayPolicyTests` diffs the reference window's forbidden-header
                 // list against `CORSHeaderPolicy.forbidden`, which is the point of it.
                 "BBHTTPAPI",

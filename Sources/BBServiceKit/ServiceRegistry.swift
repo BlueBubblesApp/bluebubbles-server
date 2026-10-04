@@ -368,7 +368,12 @@ public actor ServiceRegistry<Host: Sendable> {
     await publishHealth()
     let started = ContinuousClock.now
     do {
-      try await instance.start()
+      // As the service, so a setting it writes while starting is recorded against it rather
+      // than against the person who happened to press Start. A task the service spawns here
+      // inherits the same actor. See `AuditContext`.
+      try await AuditContext.acting(as: .system(component: id.rawValue)) {
+        try await instance.start()
+      }
       // Returned cleanly, so the service is up. `Service.start()` brings a service up
       // and returns; anything long-running is the service's own task to hold.
       logger.info(
@@ -444,7 +449,9 @@ public actor ServiceRegistry<Host: Sendable> {
         await self?.markStart(id, inFlight: true)
         let outcome: Result<Void, any Error>
         do {
-          try await instance.start()
+          try await AuditContext.acting(as: .system(component: id.rawValue)) {
+            try await instance.start()
+          }
           outcome = .success(())
         } catch {
           outcome = .failure(error)
@@ -563,7 +570,7 @@ public actor ServiceRegistry<Host: Sendable> {
     supervisors[id]?.cancel()
     supervisors[id] = nil
     if let instance = instances[id] {
-      await instance.stop()
+      await AuditContext.acting(as: .system(component: id.rawValue)) { await instance.stop() }
       logger.debug("Service stopped", metadata: ["service": .string(id.rawValue)])
     }
     instances[id] = nil

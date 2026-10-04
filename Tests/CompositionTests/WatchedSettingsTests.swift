@@ -77,6 +77,7 @@ struct WatchedSettingsTests {
       "ChangeDetectionService", ChangeDetectionService.manifest,
       ChangeDetectionService.watchedSettings
     ),
+    ("AuditLogService", AuditLogService.manifest, AuditLogService.watchedSettings),
   ]
 
   /// THE rule. A service's watch list defaults to what its manifest declares it reads and

@@ -5,6 +5,7 @@
 //  HTTP controllers call, in the same process. See `.claude/docs/architecture.md`.
 
 import BBAuth
+import BBBuiltIns
 import BBContacts
 import BBCore
 import BBDiagnostics
@@ -295,6 +296,12 @@ final class AppModel {
   var pushDevicesVersion = 0
   var pushDevicesTask: Task<Void, Never>?
 
+  /// Bumped on every change to the audit table, in the same shape as the two counters
+  /// above, and for the same reason: almost nothing that writes an audit record is the page
+  /// that shows it. See `AuditObservation.swift`.
+  var auditEventsVersion = 0
+  var auditEventsTask: Task<Void, Never>?
+
   /// Who is blocked, exempt, or failing, followed from the access-control service for the
   /// life of the server; see `AccessControlObservation.swift`. Nil when there is no server.
   var accessControl: AccessControlSnapshot?
@@ -476,6 +483,7 @@ final class AppModel {
       followTools(context.tools)
       followWebhooks(context.webhooks)
       followPushDevices(context.devices)
+      followAuditLog(context.auditEvents)
       followAccessControl(context.accessControl)
       followPublishedAddress(context.settings)
       if let sink = built.logSink { followLog(sink) }
@@ -663,6 +671,17 @@ final class AppModel {
   }
 
   // MARK: - Navigation
+
+  /// The sidebar's rows. Every page but the Audit Log is always there; that one is shown
+  /// while its feature is on and hidden while it is off or unknown (no server running).
+  /// `SidebarDestinations` is the rule; this supplies the one fact it needs.
+  var visibleDestinations: [Destination] {
+    let enabled: Bool? =
+      integrations.isAttached
+      ? IntegrationCatalog.manifest(BuiltInManifests.ID.auditLog).map(integrations.isEnabled)
+      : nil
+    return SidebarDestinations.visible(auditLogEnabled: enabled)
+  }
 
   /// Opens a service's own page.
   func open(_ id: ServiceIdentifier) {

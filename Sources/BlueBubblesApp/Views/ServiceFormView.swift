@@ -203,6 +203,11 @@ struct ServiceFormView: View {
           .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
           .focused($editing, equals: field.key)
         ForEach(footnotes(for: field)) { note in note }
+        // A secret paragraph (PEM text) is never read back into the editor: `load` records
+        // that one is stored and nothing more. Without this line a stored certificate
+        // looks like an empty field, and a person re-pastes it or, worse, assumes it is
+        // gone. The single-line secret fields say the same through their prompt.
+        if let note = storedSecretNote(field) { note }
       }
 
     case .multiSelect(let options):
@@ -367,6 +372,25 @@ struct ServiceFormView: View {
         )
         .accessibilityLabel(revealed.contains(field.key) ? "Hide" : "Reveal")
       }
+    }
+  }
+
+  /// The line under a secret field the form cannot show a prompt in: a paragraph. Nil when
+  /// nothing is stored, or when the person is typing a replacement.
+  private func storedSecretNote(_ field: FieldDescriptor) -> SettingsFootnote? {
+    guard field.isSecret, isBlank(field) else { return nil }
+    switch storedState(field) {
+    case .stored:
+      return SettingsFootnote(
+        text: "Stored in the Keychain. Text entered here replaces it.",
+        kind: .secret, symbol: "key", tone: .neutral)
+    case .unreadable:
+      return SettingsFootnote(
+        text: "The Keychain would not answer. The value may still be there; do not replace "
+          + "it until the Keychain is reachable.",
+        kind: .secret, symbol: "exclamationmark.triangle", tone: .error)
+    case .absent:
+      return nil
     }
   }
 

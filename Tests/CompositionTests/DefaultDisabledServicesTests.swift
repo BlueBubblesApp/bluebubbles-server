@@ -2,7 +2,8 @@
 //  Which built-ins ship switched off, and the upgrade that must not switch anything off.
 //
 //  Being compiled in is not a reason to be running: ntfy publishes to a third-party service
-//  most installs do not use. But a default is for somebody who has not decided, and an
+//  most installs do not use, and the audit log writes a row per request into `app.db` for a
+//  record most installs never read. But a default is for somebody who has not decided, and an
 //  install that had ntfy publishing before it was an integration HAS decided. Seeding that
 //  one off during an upgrade stops a working setup silently — notifications simply stop —
 //  which is the outcome every case here exists to rule out.
@@ -33,29 +34,34 @@ struct DefaultDisabledServicesTests {
 
   // MARK: - The rule
 
-  @Test("ntfy is the built-in that ships switched off")
-  func ntfyShipsOff() {
-    #expect(BuiltInManifests.disabledByDefault == [BuiltInManifests.ID.ntfy])
-    // And it is genuinely a built-in, not something excluded from the shipped set: a
+  @Test("ntfy and the audit log are the built-ins that ship switched off")
+  func ntfyAndAuditLogShipOff() {
+    #expect(
+      BuiltInManifests.disabledByDefault == [BuiltInManifests.ID.ntfy, BuiltInManifests.ID.auditLog]
+    )
+    // And both are genuinely built-ins, not something excluded from the shipped set: a
     // manifest that is not in `all` would never be started whatever this list said.
     #expect(BuiltInManifests.all.contains { $0.id == BuiltInManifests.ID.ntfy })
+    #expect(BuiltInManifests.all.contains { $0.id == BuiltInManifests.ID.auditLog })
   }
 
   /// The webhook sink is the contrast that makes "disabled by default" a decision rather
   /// than a habit: it is the other half of what ntfy used to be, and it stays on.
   @Test("Nothing else is switched off by default")
-  func onlyNtfy() {
+  func onlyThoseTwo() {
     #expect(!BuiltInManifests.disabledByDefault.contains(BuiltInManifests.ID.webhooks))
     #expect(!BuiltInManifests.disabledByDefault.contains(BuiltInManifests.ID.push))
   }
 
   // MARK: - Seeding
 
-  @Test("A fresh install starts with ntfy switched off")
+  @Test("A fresh install starts with ntfy and the audit log switched off")
   func freshInstallIsSeeded() async throws {
     let store = try await makeStore()
     await ServerComposition.seedDisabledServices(settings: store, logger: logger)
-    #expect(await stored(store) == [BuiltInManifests.ID.ntfy.rawValue])
+    #expect(
+      await stored(store)
+        == [BuiltInManifests.ID.ntfy.rawValue, BuiltInManifests.ID.auditLog.rawValue])
   }
 
   /// The upgrade case. An install publishing to a topic under the old core setting keeps
@@ -67,7 +73,9 @@ struct DefaultDisabledServicesTests {
 
     await ServerComposition.seedDisabledServices(settings: store, logger: logger)
 
-    #expect(await stored(store).isEmpty)
+    // The audit log has no "in use" signal (it writes nothing until it is on), so it is
+    // seeded off regardless; only ntfy is spared.
+    #expect(await stored(store) == [BuiltInManifests.ID.auditLog.rawValue])
   }
 
   /// And the same install after the adoption has run, where the topic lives in the
@@ -84,7 +92,7 @@ struct DefaultDisabledServicesTests {
 
     await ServerComposition.seedDisabledServices(settings: store, logger: logger)
 
-    #expect(await stored(store).isEmpty)
+    #expect(await stored(store) == [BuiltInManifests.ID.auditLog.rawValue])
   }
 
   /// An empty list is a real answer — somebody switched everything on — so re-seeding over
@@ -118,13 +126,14 @@ struct DefaultDisabledServicesTests {
 
   // MARK: - What the registry does with it
 
-  @Test("A seeded install does not start ntfy, and does start the other sinks")
+  @Test("A seeded install does not start ntfy or the audit log, and does start the other sinks")
   func seededInstallDoesNotEnableNtfy() async throws {
     let store = try await makeStore()
     await ServerComposition.seedDisabledServices(settings: store, logger: logger)
 
     let enabled = await ServerComposition.enabledServices(settings: store)
     #expect(!enabled.contains(BuiltInManifests.ID.ntfy))
+    #expect(!enabled.contains(BuiltInManifests.ID.auditLog))
     #expect(enabled.contains(BuiltInManifests.ID.webhooks))
     #expect(enabled.contains(BuiltInManifests.ID.push))
   }

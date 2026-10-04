@@ -318,6 +318,9 @@ public actor AccessControlService {
   private let clock: any BBClock
   private let alerts: (any AlertRaising)?
   private let persistence: (any AccessControlPersistence)?
+  /// Told about every block, unblock and allowlist edit. Optional for the reason `alerts` is:
+  /// a test builds this with nothing behind it, and production wires the audit log.
+  private let auditor: (any AccessControlAuditing)?
   private let logger = Logger(label: "bluebubbles.access-control")
 
   private var blocked: [String: BlockedClient] = [:]
@@ -368,13 +371,15 @@ public actor AccessControlService {
     trust: ProxyTrustPolicy = ProxyTrustPolicy(),
     clock: any BBClock = SystemClock(),
     alerts: (any AlertRaising)? = nil,
-    persistence: (any AccessControlPersistence)? = nil
+    persistence: (any AccessControlPersistence)? = nil,
+    auditor: (any AccessControlAuditing)? = nil
   ) {
     self.policy = policy
     self.trust = trust
     self.clock = clock
     self.alerts = alerts
     self.persistence = persistence
+    self.auditor = auditor
   }
 
   /// Reads the durable state back in. Called once, at startup, before anything is served.
@@ -739,6 +744,7 @@ public actor AccessControlService {
     logger.warning(
       "Throttling failed logins from an unidentified source",
       metadata: ["failures": .stringConvertible(failureCount)])
+    auditor?.record(.loginsThrottled(failureCount: failureCount))
     guard let alerts else { return }
     await alerts.raise(
       UserAlert(
@@ -793,6 +799,10 @@ public actor AccessControlService {
     // full-table rewrite on the set being bounded.
     capBlocked()
     persist(blocked: true)
+    auditor?.record(
+      .clientBlocked(
+        address: address, reason: reason, failureCount: failureCount, offenceCount: offences,
+        expiresAt: expiry))
 
     // What the alert says, for the log. The client is an IP and is named: it is what the
     // person unblocks.
@@ -918,6 +928,10 @@ public actor AccessControlService {
     let normalized = ProxyTrustPolicy.normalize(address)
     if blocked.removeValue(forKey: normalized) != nil {
       logger.info("Unblocked a client", metadata: ["client": .string(normalized)])
+      // Only a block that existed: `allow` calls this for every literal address it
+      // allowlists, and "unblocked" a client that was never blocked would be a record of
+      // nothing.
+      auditor?.record(.clientUnblocked(address: normalized))
     }
     failureTimes.removeValue(forKey: normalized)
     persist(blocked: true)
@@ -936,6 +950,7 @@ public actor AccessControlService {
   public func clearAllBlocks() {
     logger.info(
       "Cleared every block", metadata: ["blocked": .stringConvertible(blocked.count)])
+    auditor?.record(.blocksCleared(count: blocked.count))
     blocked.removeAll()
     failureTimes.removeAll()
     unresolvedFailureTimes.removeAll()
@@ -973,6 +988,7 @@ public actor AccessControlService {
     let stored = AllowedClient(cidr: entry, note: note, createdAt: clock.now)
     allowlist.append(stored)
     logger.info("Allowlisted a client", metadata: ["client": .string(entry)])
+    auditor?.record(.clientAllowlisted(cidr: entry, note: note))
     // Allowlisting implies unblocking, which is what "Unblock and allowlist" needs.
     if !entry.contains("/") { unblock(address: entry) }
     persist(allowlist: true)
@@ -983,6 +999,7 @@ public actor AccessControlService {
   public func disallow(id: UUID) {
     if let entry = allowlist.first(where: { $0.id == id }) {
       logger.info("Removed a client from the allowlist", metadata: ["client": .string(entry.cidr)])
+      auditor?.record(.allowlistEntryRemoved(cidr: entry.cidr))
     }
     allowlist.removeAll { $0.id == id }
     persist(allowlist: true)
@@ -995,6 +1012,7 @@ public actor AccessControlService {
     logger.info(
       "Blocked a client permanently",
       metadata: ["client": .string(normalized), "reason": .string(reason)])
+    auditor?.record(.clientBlockedPermanently(address: normalized, reason: reason))
     let now = clock.now
     let existing = blocked[normalized]
     blocked[normalized] = BlockedClient(

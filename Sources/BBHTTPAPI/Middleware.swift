@@ -142,16 +142,33 @@ public struct AuthenticationStage: Sendable {
 
   private let chain: AuthenticationChain
   private let accessControl: AccessControlService
+  /// Told about every refusal. Optional because the stage is built in tests with nothing
+  /// behind it; production wires the audit log.
+  private let auditor: (any AuthenticationAuditing)?
   private let logger: Logger
 
   public init(
     chain: AuthenticationChain,
     accessControl: AccessControlService,
+    auditor: (any AuthenticationAuditing)? = nil,
     logger: Logger = Logger(label: "bluebubbles.http.auth")
   ) {
     self.chain = chain
     self.accessControl = accessControl
+    self.auditor = auditor
     self.logger = logger
+  }
+
+  /// The audit record for a refusal on this request. The address is the RESOLVED identity,
+  /// so a client behind a trusted proxy is named rather than the proxy; the route is the
+  /// template, for the reason `auditPath` gives.
+  private func audit(_ kind: AuthenticationAuditEvent.Kind, _ context: APIRequestContext) {
+    guard let auditor else { return }
+    let address: String? =
+      if case .address(let resolved) = context.identity { resolved } else { context.peerAddress }
+    auditor.record(
+      AuthenticationAuditEvent(
+        kind: kind, transport: .http, clientAddress: address, route: context.auditPath))
   }
 
   // There is deliberately no `authenticate(_:)` convenience combining the two calls below.
@@ -195,6 +212,7 @@ public struct AuthenticationStage: Sendable {
       logger.debug(
         "Rejected a request from a blocked client",
         metadata: ["client": .string(context.peerAddress ?? "-")])
+      audit(.blocked, context)
       throw Unauthorized()
     }
   }
@@ -224,6 +242,7 @@ public struct AuthenticationStage: Sendable {
       logger.debug(
         "Request without a credential",
         metadata: ["client": .string(context.peerAddress ?? "-")])
+      audit(.credentialMissing, context)
       throw Unauthorized("Missing server password!")
 
     case .failed(let failure):
@@ -245,6 +264,11 @@ public struct AuthenticationStage: Sendable {
           identity, path: context.auditPath, reason: String(describing: failure),
           peerAddress: context.peerAddress
         )
+        // The audit log hears about the client's failures, never the server's: a
+        // misconfigured password is reported to the operator by the alert, and counting
+        // it against a client who did nothing wrong would be a false accusation in a
+        // record that outlives the alert.
+        audit(.credentialRejected(reason: failure.code), context)
       }
       if case .serverMisconfigured(let reason) = failure {
         // The server's fault, so it reports as one, and does not count against the
@@ -261,6 +285,7 @@ public struct AuthenticationStage: Sendable {
   public func authorize(_ context: APIRequestContext, scope: Scope) throws {
     guard let principal = context.principal else { throw Unauthorized() }
     guard principal.hasScope(scope) else {
+      audit(.scopeRefused(scope: scope.rawValue), context)
       throw Forbidden("This credential is not permitted to \(scope.rawValue)")
     }
   }

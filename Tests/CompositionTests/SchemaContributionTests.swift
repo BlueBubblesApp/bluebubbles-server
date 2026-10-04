@@ -65,6 +65,8 @@ struct SchemaContributionTests {
     "createAccessControl",
     "addBlockOffenceCount",
     "createPairedClients",
+    // BBAudit
+    "audit.createAuditEvent",
     // The frozen tail, appended by AppDatabase itself: it renames columns across
     // BBInterfaces and BBAuth in one released migration and belongs to neither.
     "normaliseTimestampColumnNames",
@@ -179,8 +181,9 @@ struct SchemaContributionTests {
         db, sql: "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
     }
     for expected in [
-      "alert", "allowed_client", "auth_failure", "backup", "blocked_client", "contact",
-      "contact_address", "device", "paired_client", "scheduled_message", "setting", "webhook",
+      "alert", "allowed_client", "audit_event", "auth_failure", "backup", "blocked_client",
+      "contact", "contact_address", "device", "paired_client", "scheduled_message", "setting",
+      "webhook",
     ] {
       #expect(tables.contains(expected), "missing table: \(expected)")
     }

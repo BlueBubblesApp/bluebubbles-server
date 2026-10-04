@@ -18,6 +18,7 @@ to the topic document that matches your task.
 | Build, run, test, CI | [`.claude/docs/workflow.md`](.claude/docs/workflow.md) |
 | Events, sinks, payload codecs | [`docs/EVENTS.md`](docs/EVENTS.md) |
 | Auth, access control, permissions | [`docs/AUTH.md`](docs/AUTH.md) |
+| The audit log: event kinds, metadata, CSV, syslog | [`docs/AUDIT_LOG.md`](docs/AUDIT_LOG.md) |
 | What the tests assert and why | [`docs/TESTING.md`](docs/TESTING.md) |
 | Naming: DB columns, settings keys, wire keys, spelling | [`docs/NAMING.md`](docs/NAMING.md) |
 | Writing any documentation, and what a document may claim | [`docs/WRITING.md`](docs/WRITING.md) |

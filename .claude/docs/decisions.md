@@ -1102,3 +1102,32 @@ own change with its own blast radius.
 `isMatch`, or stop raising `.notCompared` at all, and those six "start matching" and fail as
 stale entries. `hasBodyDifferences`, which excluded `.notCompared` for a caller that no longer
 exists, is deleted rather than corrected.
+
+## The audit log ships off, and what nothing attributed belongs to the operator
+
+Two decisions in the audit log look like oversights and are not.
+
+**It ships switched off.** Every state-changing request becomes a row in `app.db`, and with
+read-only requests included a polling client is a row a second. A default that grows the
+server's own database for a record most installs never read is the wrong default; a site
+that wants the record switches it on, and `audit.recording_started` marks the point from
+which the record is complete. It is in `BuiltInManifests.disabledByDefault` beside ntfy, and
+the app shows the Audit Log page only while it is on, so a row for an empty table is not the
+first thing every install sees.
+
+**A record nothing attributed is the operator's.** `AuditContext` is a task-local set at the
+boundaries that know who is acting: the HTTP dispatcher (a client), the registry around
+`start` and `stop` (a service), `ScopedSettings` around a service's own writes, the
+composition root around assembly and shutdown. The code left over is the app's views and the
+command line, which the person at the Mac drove. Defaulting the other way, to "the server",
+would attribute a person's change to the machine, and in an audit log that is the worse lie:
+an auditor asking "who turned this off" would be told nobody did.
+
+**What a record may carry** follows from where it goes. It is the one artefact built to leave
+the Mac, so it holds no message content, no address other than a client's (a route is always
+its template), and no secret value. The settings bridge records that a secret changed with
+`••••` on both sides; the webhook bridge runs the URL through `Redaction.url`. The syslog body
+is the whole JSON document rather than a key-value rendering, because a receiver already has
+tooling for a JSON body and a second format would be a second thing to keep in step; and
+`MSGID` is the category rather than the kind because the field is capped at 32 characters and
+several kinds are longer.

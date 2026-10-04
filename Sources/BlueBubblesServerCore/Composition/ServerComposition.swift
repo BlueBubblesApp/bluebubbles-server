@@ -19,6 +19,7 @@
 //  See `.claude/docs/architecture.md`.
 
 import BBAppStore
+import BBAudit
 import BBAuth
 import BBBuiltIns
 import BBContacts
@@ -153,6 +154,16 @@ public struct ServerComposition {
   public static func build(
     storage: Storage, options: Options = Options()
   ) async throws -> RunningServer {
+    // Everything assembly writes (seeded defaults, adopted certificates, migrated service
+    // settings) is the SERVER's doing, and the audit log attributes it so. See `AuditContext`.
+    try await AuditContext.acting(as: .system(component: "startup")) {
+      try await assemble(storage: storage, options: options)
+    }
+  }
+
+  private static func assemble(
+    storage: Storage, options: Options
+  ) async throws -> RunningServer {
     let logger = storage.logger
     let settings = storage.settings
 
@@ -164,7 +175,8 @@ public struct ServerComposition {
 
     let readPath = await openReadPath(settings: settings, logger: logger)
     let shared = await makeSharedServices(storage: storage)
-    let transport = await makeTransport(storage: storage, accessControl: shared.accessControl)
+    let transport = await makeTransport(
+      storage: storage, accessControl: shared.accessControl, auditLog: shared.auditLog)
 
     // Decided before the context is built, because the HTTP service mounts them and is
     // constructed by the registry with nothing but a context to read from.
@@ -497,6 +509,9 @@ public struct ServerComposition {
     let permissions: PermissionsService
     let accessControl: AccessControlService
     let contacts: ContactIndex
+    /// Built here, before the access controller and the transport, because both record
+    /// into it from their construction. Inert until `AuditLogService` arms it.
+    let auditLog: AuditRecorder
   }
 
   /// Builds the alert centre, the permission monitor, access control and the contact index.
@@ -511,6 +526,13 @@ public struct ServerComposition {
     // with live-condition alerts restored already-read so a problem that cleared while the
     // server was down does not greet the user as current.
     await alerts.attach(store: AlertRepository(database: appDatabase))
+
+    // The audit recorder, and the two observers that feed it from objects built in this
+    // function. The settings store is told here rather than in `prepareStorage`, which has
+    // no recorder yet; a write made before this line (the log level, say) is start-up
+    // bookkeeping the audit log would drop as disarmed anyway.
+    let auditLog = AuditRecorder()
+    await settings.attachAuditObserver(AuditSettingsBridge(recorder: auditLog))
 
     // The settings store is built before this point, so a Keychain failure during
     // start-up (the likeliest moment for one, and the one that decides whether the
@@ -553,7 +575,8 @@ public struct ServerComposition {
       policy: await accessPolicy(from: settings),
       trust: await proxyTrust(from: settings),
       alerts: alerts,
-      persistence: AccessControlStore(database: appDatabase)
+      persistence: AccessControlStore(database: appDatabase),
+      auditor: AuditAccessControlBridge(recorder: auditLog)
     )
     // Read back BEFORE anything is served, so a client blocked before the restart does
     // not get one free window, and an administrator's allowlist is in force from the
@@ -565,7 +588,8 @@ public struct ServerComposition {
       alerts: alerts,
       permissions: permissions,
       accessControl: accessControl,
-      contacts: ContactIndex(database: appDatabase)
+      contacts: ContactIndex(database: appDatabase),
+      auditLog: auditLog
     )
   }
 
@@ -585,7 +609,8 @@ public struct ServerComposition {
 
   static func makeTransport(
     storage: Storage,
-    accessControl: AccessControlService
+    accessControl: AccessControlService,
+    auditLog: AuditRecorder
   ) async -> Transport {
     let settings = storage.settings
 
@@ -630,6 +655,9 @@ public struct ServerComposition {
       // argument is here, because its absence is silent: handshakes keep working and
       // nothing is ever counted.
       accessControl: accessControl,
+      // The same recorder the HTTP stage records into, so a wrong password over the socket
+      // leaves the same audit record a wrong password over HTTP does.
+      auditor: AuditAuthenticationBridge(recorder: auditLog),
       // A closure for the same reason the chain is one, and additionally because the
       // engine outlives every start and stop of the socket service. Reading the setting
       // per handshake is also what makes the answer right at BOOT: a socket switched off
@@ -729,6 +757,7 @@ public struct ServerComposition {
     await register(LaunchAtLoginService.self) { $0 }
     await register(ToolUpdateService.self) { $0 }
     await register(NetworkPathService.self) { $0 }
+    await register(AuditLogService.self) { $0 }
   }
 
   // MARK: - Settings propagation
@@ -1005,7 +1034,9 @@ public struct RunningServer: Sendable {
     // and the tunnel an orphan holds are free by the time the replacement asks.
     DaemonLedger.shared.reapOrphans(logger: logger)
 
-    try await registry.startAll()
+    try await AuditContext.acting(as: .system(component: "startup")) {
+      try await registry.startAll()
+    }
     logger.info("Server started")
   }
 
@@ -1020,7 +1051,9 @@ public struct RunningServer: Sendable {
     // survives the restart. Same argument as the line above, about durable state rather
     // than deliverable state.
     await context.accessControl.flushPersistedState()
-    await registry.stopAll()
+    await AuditContext.acting(as: .system(component: "shutdown")) {
+      await registry.stopAll()
+    }
     logger.info("Server stopped")
   }
 }

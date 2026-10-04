@@ -37,6 +37,7 @@
 //
 //  See `.claude/docs/architecture.md` and `docs/EVENTS.md`.
 
+import BBCore
 import BBSettings
 import Foundation
 import Logging
@@ -82,7 +83,18 @@ public struct ScopedSettings: Sendable {
 
   public func setOwn(_ value: String, field: String) async throws {
     let isSecret = manifest.fields.first { $0.key == field }?.isSecret ?? false
-    try await store.set(value, forKey: manifest.storageKey(for: field), isSecret: isSecret)
+    try await actingAsService {
+      try await store.set(value, forKey: manifest.storageKey(for: field), isSecret: isSecret)
+    }
+  }
+
+  /// A write through this scope is the SERVICE's doing, and the audit log is told so.
+  ///
+  /// Without this a service's own writes (a tunnel publishing its address, ntfy adopting
+  /// its settings) would be attributed to whoever the task-local happened to name, which
+  /// outside a request is the person at the window. See `AuditContext`.
+  private func actingAsService<T>(_ body: () async throws -> T) async rethrows -> T {
+    try await AuditContext.acting(as: .system(component: manifest.id.rawValue), body)
   }
 
   // MARK: - Someone else's settings
@@ -122,7 +134,7 @@ public struct ScopedSettings: Sendable {
 
   public func set<Value: SettingValue>(_ setting: Setting<Value>, to value: Value) async throws {
     try scope.checkWrite(setting.key)
-    try await store.set(setting, to: value)
+    try await actingAsService { try await store.set(setting, to: value) }
   }
 
   /// The write counterpart to `valueOrDefault`, for a closure with no error channel.

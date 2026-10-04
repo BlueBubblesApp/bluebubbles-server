@@ -147,6 +147,7 @@ Ten rules override anything you would otherwise infer from the code.
 | Memory budgets, child processes, async traps | [`.claude/docs/performance.md`](.claude/docs/performance.md) |
 | Event routing, sinks, payload codecs, socket delivery | [`docs/EVENTS.md`](docs/EVENTS.md) |
 | Auth modes, enrollment, access control, permissions | [`docs/AUTH.md`](docs/AUTH.md) |
+| The audit log: what is recorded, the record's shape, every event kind, CSV, syslog | [`docs/AUDIT_LOG.md`](docs/AUDIT_LOG.md) |
 | What the test suites assert and why | [`docs/TESTING.md`](docs/TESTING.md) |
 | Why something is the way it is; what is deliberately deferred | [`.claude/docs/decisions.md`](.claude/docs/decisions.md) |
 | Building, running, testing, and what CI will fail you on | [`.claude/docs/workflow.md`](.claude/docs/workflow.md) |
@@ -196,6 +197,7 @@ improvising the order:**
 | An event | `Sources/BBEvents/ServerEvent.swift` plus its per-sink projection |
 | A user-visible alert | Raise it explicitly through `BBDiagnostics`. Logging must never produce one |
 | A Private API call | `Helper/BBPrivateAPIContract` first: a case on `MessagesHelperAction` or `FaceTimeHelperAction`, any new payload field as a case on `WireKey` (never a string literal on either side; a test fails the build on one), then the contract method **on the ROLE protocol it belongs to** (`MessageSending`, `ChatMuting`, `FaceTimeControl`, …; `PrivateAPI` composes the sixteen roles and declares nothing itself) then `Helper/BlueBubblesHelper`. Each dispatch is exhaustive over its enum, so the helper side will not compile until you handle it. Go through `IMCoreRuntime`, never IMCore directly |
+| An audit event kind | A case on `AuditEventKind` (`Sources/BBAudit/AuditEventKind.swift`) spelled `<category>.<name>`, its `metadataFields` (every key the emitter writes, with a type and a sentence), and its entry in `docs/AUDIT_LOG.md`, which `AuditDocumentationTests` fails the build without. Emit it where the fact is KNOWN: an interface records what it changed, a service what it did, never a handler. Build the `AuditEvent` with no `actor:`, so the task-local `AuditContext` names who (a client inside a request, a service inside its start, the operator otherwise), unless the record is the server's own decision taken inside somebody else's request, as an automatic block is. A record carries no message content, no address other than a client's, and a secret only as `AuditValue.redacted`; a route is always the template. If nothing in the server has to import `BBAudit` to know the fact (the auth layer, the settings store), declare a protocol beside the fact and translate in `AuditWiring.swift` |
 | An external binary a service runs | A `ManagedToolDescriptor` on its manifest (`Sources/BBBuiltIns/BuiltInTools.swift`). Do not write a downloader. **Declare `compatible:`**, the range of versions your code actually drives, or a copy the user already has is never used and a duplicate is downloaded beside it. It is not `recommended` (the one build we fetch) and is strictly wider; its ceiling is EXCLUSIVE, which is what keeps a published major that dropped a subcommand — zrok 2 — from being adopted off disk. Measure both bounds by running a build; a floor fails closed, refusing a copy that works |
 
 ---
@@ -395,6 +397,7 @@ code, and the `CLAUDE.md` for the module, are part of the change; see the non-ne
 | [`docs/EVENTS.md`](docs/EVENTS.md) | ~16 KB | Event routing, sinks, payload codecs, socket delivery |
 | [`docs/AUTH.md`](docs/AUTH.md) | ~21 KB | Auth modes, enrollment, access control, permissions |
 | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) | ~13 KB | Why AppleScript cannot create group chats, and what Shortcuts can and cannot do |
+| [`docs/AUDIT_LOG.md`](docs/AUDIT_LOG.md) | ~25 KB | The audit log: every event kind and its metadata, the envelope, CSV columns, the syslog layout, SIEM and Postgres notes |
 
 **Source file headers are the primary documentation.** Most files open with 10–25 lines
 explaining the design and the failure it prevents. Read the header before changing the file.

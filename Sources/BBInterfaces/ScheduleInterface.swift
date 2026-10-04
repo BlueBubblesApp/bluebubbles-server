@@ -9,6 +9,7 @@
 //  layer's own job: deciding whether what a client sent is acceptable.
 
 import BBAppStore
+import BBAudit
 import BBPersistence
 import BBSerialization
 import Foundation
@@ -17,14 +18,36 @@ import Logging
 public struct ScheduleInterface: Sendable {
 
   private let store: ScheduledMessageRepository
+  /// Where a change to the queue is recorded. Nil in tests; see `AdminInterface.audit`.
+  private let audit: (any AuditRecording)?
   private let logger: Logger
 
   public init(
     database: AppDatabase,
+    audit: (any AuditRecording)? = nil,
     logger: Logger = Logger(label: "bluebubbles.interface.schedule")
   ) {
     self.store = ScheduledMessageRepository(database: database)
+    self.audit = audit
     self.logger = logger
+  }
+
+  /// The audit record for a message queued or re-queued. The payload is never in it: the
+  /// chat and the text are message content, and the id is enough to find the row.
+  private func auditQueued(
+    _ kind: AuditEventKind, _ record: ScheduledMessage, _ summary: String
+  ) {
+    audit?.record(
+      AuditEvent(
+        kind: kind,
+        subject: .scheduledMessage(record.id ?? 0),
+        summary: summary,
+        metadata: [
+          "type": .string(record.type),
+          "scheduled_for": .string(AuditTimestamp.string(from: record.scheduledFor)),
+          "recurring": .bool(record.schedule != nil),
+        ]
+      ))
   }
 
   /// Spelled here as well so callers that already speak in terms of this interface do not
@@ -82,6 +105,8 @@ public struct ScheduleInterface: Sendable {
         "scheduledFor": .string("\(scheduledFor)"),
         "recurring": .stringConvertible(inserted.schedule != nil),
       ])
+    auditQueued(
+      .scheduledMessageCreated, inserted, "Scheduled message \(inserted.id ?? 0) was queued.")
     return inserted
   }
 
@@ -125,6 +150,7 @@ public struct ScheduleInterface: Sendable {
         "scheduledFor": .string("\(updated.scheduledFor)"),
         "recurring": .stringConvertible(updated.schedule != nil),
       ])
+    auditQueued(.scheduledMessageUpdated, updated, "Scheduled message \(id) was changed.")
     return updated
   }
 
@@ -228,6 +254,10 @@ public struct ScheduleInterface: Sendable {
       throw InterfaceError.notFound("no scheduled message with id \(id)")
     }
     logger.info("Scheduled message deleted", metadata: ["id": .stringConvertible(id)])
+    audit?.record(
+      AuditEvent(
+        kind: .scheduledMessageDeleted, subject: .scheduledMessage(id),
+        summary: "Scheduled message \(id) was removed."))
   }
 
   /// Clears the history: everything sent, cancelled or failed. Returns how many went.
@@ -238,6 +268,13 @@ public struct ScheduleInterface: Sendable {
     let removed = try await store.deleteFinished()
     logger.info(
       "Cleared finished scheduled messages", metadata: ["removed": .stringConvertible(removed)])
+    if removed > 0 {
+      audit?.record(
+        AuditEvent(
+          kind: .scheduledMessageDeleted,
+          summary: "\(removed) finished scheduled messages were cleared.",
+          metadata: ["count": .int(removed)]))
+    }
     return removed
   }
 }

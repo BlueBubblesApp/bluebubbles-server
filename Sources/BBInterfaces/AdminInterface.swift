@@ -6,6 +6,7 @@
 //  of these calls, and in the reference each one is a hand-written IPC channel.
 
 import BBAppStore
+import BBAudit
 import BBCore
 import BBDiagnostics
 import BBIMessage
@@ -22,6 +23,9 @@ public struct AdminInterface: Sendable {
   private let alerts: AlertCenter
   private let settings: SettingsStore
   private let messages: MessageRepository?
+  /// Where a webhook change is recorded. Nil in tests; the composition root wires the audit
+  /// recorder, which decides for itself whether anything is kept.
+  private let audit: (any AuditRecording)?
   private let logger: Logger
 
   public init(
@@ -29,12 +33,14 @@ public struct AdminInterface: Sendable {
     alerts: AlertCenter,
     settings: SettingsStore,
     messages: MessageRepository?,
+    audit: (any AuditRecording)? = nil,
     logger: Logger = Logger(label: "bluebubbles.interface.server")
   ) {
     self.database = database
     self.alerts = alerts
     self.settings = settings
     self.messages = messages
+    self.audit = audit
     self.logger = logger
   }
 
@@ -223,6 +229,7 @@ public struct AdminInterface: Sendable {
       "Webhook created", id: webhook.id, url: url, events: events,
       followRedirects: webhook.followRedirects
     )
+    auditWebhook(.webhookCreated, webhook, "Webhook \(webhook.id ?? 0) was registered.")
     return webhook
   }
 
@@ -237,7 +244,25 @@ public struct AdminInterface: Sendable {
       "Webhook updated", id: id, url: webhook.url, events: webhook.subscribedEvents,
       followRedirects: webhook.followRedirects
     )
+    auditWebhook(.webhookUpdated, webhook, "Webhook \(id) was changed.")
     return webhook
+  }
+
+  /// The audit record for a webhook that was made or changed. The URL goes through the same
+  /// redaction the log line uses: a client registering a webhook routinely puts the server
+  /// password in its query, and an audit log leaves this Mac.
+  private func auditWebhook(_ kind: AuditEventKind, _ webhook: Webhook, _ summary: String) {
+    audit?.record(
+      AuditEvent(
+        kind: kind,
+        subject: .webhook(webhook.id ?? 0),
+        summary: summary,
+        metadata: [
+          "url": .string(Redaction.url(webhook.url)),
+          "events": .array(webhook.subscribedEvents.map(AuditValue.string)),
+          "follow_redirects": .bool(webhook.followRedirects),
+        ]
+      ))
   }
 
   /// The URL is redacted: it routinely carries the server password in its query.
@@ -261,6 +286,9 @@ public struct AdminInterface: Sendable {
   public func deleteWebhook(id: Int64) async throws {
     try await webhookStore.delete(id: id)
     logger.info("Webhook deleted", metadata: ["id": .stringConvertible(id)])
+    audit?.record(
+      AuditEvent(
+        kind: .webhookDeleted, subject: .webhook(id), summary: "Webhook \(id) was removed."))
   }
 
   private static func validate(url: String) throws {

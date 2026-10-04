@@ -95,12 +95,12 @@ struct BlueBubblesApp: App {
       CommandGroup(after: .help) {
         APIDocsMenuItem()
       }
-      // ⌘1 to ⌘9 walk the sidebar in its own order. Settings is excluded BY NAME rather
-      // than by falling off the end of nine digits: it already has ⌘, above, and when the
-      // Devices row moved under Firebase the count dropped to nine, so a `prefix(9)` would
-      // have quietly handed Settings a second shortcut.
+      // ⌘1 to ⌘9 walk the sidebar in its own order, over the rows it is SHOWING: the Audit
+      // Log row comes and goes with its feature, and a shortcut to a hidden page would open
+      // a page the sidebar does not name. Settings is excluded by name, not by falling off
+      // the end of nine digits; `SidebarDestinations.shortcutPages` says why.
       CommandMenu("Go") {
-        let pages = Destination.allCases.filter { $0 != .settings }.prefix(9)
+        let pages = SidebarDestinations.shortcutPages(visible: model.visibleDestinations)
         ForEach(Array(pages.enumerated()), id: \.element) {
           index, page in
           NavigationMenuItem(

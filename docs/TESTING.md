@@ -296,6 +296,25 @@ relevant tests fail — because a regression test for a silent failure is exactl
 can pass without exercising anything.
 
 
+**The audit log: the record, the wiring and the document.** `BBAuditTests` holds the module:
+`AuditRepositoryTests` pins newest-first paging with the total from the same read, the
+oldest-first keyset walk the export uses, filters that escape `LIKE` wildcards and the
+retention sweep; `AuditRecorderTests` pins that a disarmed recorder drops and an armed one
+stores and forwards in storage order; `SyslogMessageTests` pins the RFC 5424 header field by
+field, the category as `MSGID` (and that a kind would not fit), octet counting by byte and
+the refusal of unreadable PEM; `AuditCSVTests` pins RFC 4180 quoting and the formula
+defence. `AuditDocumentationTests` reads `docs/AUDIT_LOG.md` and fails on any kind, metadata
+field, category, outcome, severity, source, actor kind, subject kind or CSV column the code
+has and the page does not, because the page is what a SIEM rule is written against.
+`CompositionTests/AuditWiringTests` is the wiring half: each bridge translates its emitter's
+value into the right kind with the right actor, the settings store reports a write with the
+task-local actor in scope, and `AuditLogService` started against the fixture context arms the
+container's recorder and leaves `recording_started` and `recording_stopped` as the run's first
+and last rows. `AccessControlAuditingTests` and `AuthenticationAuditingTests` pin that the
+emitters hand over every refusal and change, against the route template and never the path.
+The app's `SidebarDestinationsTests` pins that the Audit Log row is shown only when the
+feature is known to be on and that a selection whose row leaves falls back to Home.
+
 **The contact index: behaviour AND cost.** `ContactSearchTests` covers paging, SQL search and
 ordering; `ContactEnablementTests` covers which contacts are served; `ContactPageCostTests`
 covers what a page costs. The split is deliberate, because two of these fail in ways a

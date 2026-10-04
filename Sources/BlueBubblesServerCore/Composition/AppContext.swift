@@ -29,6 +29,7 @@
 //  See `.claude/docs/architecture.md`.
 
 import BBAppStore
+import BBAudit
 import BBAuth
 import BBBuiltIns
 import BBContacts
@@ -147,6 +148,11 @@ public actor AppContext {
   /// without being told to.
   public nonisolated let tools: ToolManager
   public nonisolated let alerts: AlertCenter
+  /// Where every audit event is handed in. Built with the shared services, before the
+  /// transport, because the socket engine and the access controller hold it from their
+  /// construction; armed by `AuditLogService` when the audit log is switched on, and
+  /// dropping everything until then. See `AuditRecorder`.
+  public nonisolated let auditLog: AuditRecorder
   public nonisolated let logger: Logger
 
   /// What is built on first use and then held: the call log, the sticker store, the
@@ -263,6 +269,7 @@ public actor AppContext {
     self.permissions = shared.permissions
     self.accessControl = shared.accessControl
     self.alerts = shared.alerts
+    self.auditLog = shared.auditLog
     self.events = transport.events
     self.updateAnnouncer = UpdateAnnouncer(events: transport.events)
     self.codecs = transport.codecs
@@ -288,6 +295,16 @@ public actor AppContext {
   /// A service's report that its health moved, forwarded to the registry's health stream.
   func serviceHealthDidChange() async {
     await registry?.noteHealthChanged()
+  }
+
+  /// The registry's view of every service, for the audit log's lifecycle records.
+  func serviceHealthSnapshot() async -> [ServiceIdentifier: ServiceHealth] {
+    await registry?.health() ?? [:]
+  }
+
+  /// Nil only once the registry has gone, which is after the server stopped.
+  func serviceHealthChanges() async -> AsyncStream<[ServiceIdentifier: ServiceHealth]>? {
+    await registry?.healthChanges()
   }
 
   func finishWiring(registry: ServiceRegistry<AppContext>, handlers: HandlerRegistry) {
@@ -443,7 +460,8 @@ public actor AppContext {
   /// A value type over the same storage, so building one per call costs nothing.
   public nonisolated var admin: AdminInterface {
     AdminInterface(
-      database: appDatabase, alerts: alerts, settings: settings, messages: messages
+      database: appDatabase, alerts: alerts, settings: settings, messages: messages,
+      audit: auditLog
     )
   }
 
@@ -451,7 +469,13 @@ public actor AppContext {
   /// touches only the app database, and `AdminHandlers` and `ScheduleHandlers` were each
   /// rebuilding their own interface to get around the chat.db gate.
   public nonisolated var schedule: ScheduleInterface {
-    ScheduleInterface(database: appDatabase)
+    ScheduleInterface(database: appDatabase, audit: auditLog)
+  }
+
+  /// The audit log's table. Storage lives in `AuditRepository`; the Audit Log page reads it
+  /// through this and nothing writes it but the recorder.
+  public nonisolated var auditEvents: AuditRepository {
+    AuditRepository(database: appDatabase)
   }
 
   /// Firebase setup.

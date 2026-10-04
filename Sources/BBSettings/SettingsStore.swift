@@ -76,6 +76,10 @@ public actor SettingsStore {
   private var alerts: (any AlertRaising)?
   private var pendingAlerts: [SettingsError] = []
 
+  /// Told about every write that moved a value, and every removal, with the actor of the
+  /// work in flight. Attached by the composition root; nil in tests and before wiring.
+  private var auditObserver: (any SettingsWriteObserving)?
+
   /// Keys whose last Keychain read failed. Two jobs: it stops a per-request read from
   /// spawning a raise every time, and it lets a caller tell "this secret is empty" from
   /// "this secret could not be read", which otherwise look identical from the outside.
@@ -130,6 +134,15 @@ public actor SettingsStore {
   }
 
   // MARK: - Alerts
+
+  /// Hands the store the audit log, which hears about every change from then on.
+  ///
+  /// A separate attachment from `attachAlerts` because the two are built at different
+  /// moments and answer different questions: an alert says something went wrong, an audit
+  /// record says something happened.
+  public func attachAuditObserver(_ observer: (any SettingsWriteObserving)?) {
+    auditObserver = observer
+  }
 
   /// Hands the store somewhere to report to, and drains anything that failed before it existed.
   public func attachAlerts(_ alerts: any AlertRaising) async {
@@ -305,6 +318,7 @@ public actor SettingsStore {
     // row is gone, so nothing will ever try again.
     try secrets.delete(key)
     broadcast(SettingsChange(changedKeys: [key]))
+    auditObserver?.settingsDidChange(SettingsWriteRecord(changes: [], removedKeys: [key]))
   }
 
   /// Writes a dynamically-keyed value.
@@ -509,6 +523,26 @@ public actor SettingsStore {
         in: rows, from: previous, secretsThatMoved: secretsThatMoved))
     guard !change.changedKeys.isEmpty else { return change }
     broadcast(change)
+    // Told SYNCHRONOUSLY, here, so the record carries the task-local actor of whoever
+    // called `write`: a request, a service, or the person at the window. A store that told
+    // an observer from the change stream would have lost that by the time it arrived.
+    // Only the keys that moved, which is the same answer the broadcast gives, and a
+    // secret's values are never handed over: the record says that the key changed.
+    if let auditObserver {
+      let moved = rows.filter { change.changedKeys.contains($0.key) }
+      auditObserver.settingsDidChange(
+        SettingsWriteRecord(
+          changes: moved.map { row in
+            SettingsWriteRecord.Change(
+              key: row.key,
+              isSecret: row.isSecret,
+              previousJSON: row.isSecret ? nil : previous[row.key]?.json,
+              currentJSON: row.isSecret ? nil : row.json
+            )
+          },
+          removedKeys: []
+        ))
+    }
     return change
   }
 
@@ -638,6 +672,45 @@ public actor SettingsStore {
   private func decodeLoose<Value: SettingValue>(_ raw: String, as type: Value.Type) -> Value? {
     Value.parse(loose: raw)
   }
+}
+
+/// What one `write` or `remove` did, for an audit log.
+///
+/// Values travel as the JSON the row holds (`"abc"`, `1234`, `true`) rather than as decoded
+/// Swift values, so the store does not have to know every type a dynamic key can take. Nil
+/// means unset, and a secret has nil for both: the record is that the key changed.
+public struct SettingsWriteRecord: Sendable, Equatable {
+
+  public struct Change: Sendable, Equatable {
+    public let key: String
+    public let isSecret: Bool
+    public let previousJSON: Data?
+    public let currentJSON: Data?
+
+    public init(key: String, isSecret: Bool, previousJSON: Data?, currentJSON: Data?) {
+      self.key = key
+      self.isSecret = isSecret
+      self.previousJSON = previousJSON
+      self.currentJSON = currentJSON
+    }
+  }
+
+  /// Keys whose stored value moved, with what it was and what it is.
+  public let changes: [Change]
+  /// Keys that were deleted outright.
+  public let removedKeys: [String]
+
+  public init(changes: [Change], removedKeys: [String]) {
+    self.changes = changes
+    self.removedKeys = removedKeys
+  }
+}
+
+/// Somewhere a settings change is reported. Synchronous and non-throwing on purpose: it is
+/// called inside the store's write lane, with the caller's task-local actor still in scope,
+/// and must hand the record on without waiting.
+public protocol SettingsWriteObserving: Sendable {
+  func settingsDidChange(_ record: SettingsWriteRecord)
 }
 
 /// Accumulates writes so a batch is applied and announced atomically.

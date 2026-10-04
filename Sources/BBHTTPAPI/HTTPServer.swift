@@ -101,6 +101,39 @@ public struct HandlerRegistry: Sendable {
   }
 }
 
+/// What one finished request looked like from the outside, for the audit log.
+///
+/// Built by `dispatch` on the way out, success or failure, so a refused request is recorded
+/// with its 401 beside the ones that succeeded. No body, no query, no resolved path: the
+/// route template is the one spelling that cannot carry a person's address.
+public struct RequestAuditRecord: Sendable, Equatable {
+  public let requestID: String
+  public let method: HTTPMethod
+  public let routeTemplate: String
+  public let handlerID: HandlerID
+  public let status: Int
+  public let duration: Duration
+  /// The identity access control resolved, or the peer when it resolved nothing.
+  public let clientAddress: String?
+  /// Whether a credential was accepted. False for a refused request and for the two routes
+  /// that need none.
+  public let isAuthenticated: Bool
+
+  public init(
+    requestID: String, method: HTTPMethod, routeTemplate: String, handlerID: HandlerID,
+    status: Int, duration: Duration, clientAddress: String?, isAuthenticated: Bool
+  ) {
+    self.requestID = requestID
+    self.method = method
+    self.routeTemplate = routeTemplate
+    self.handlerID = handlerID
+    self.status = status
+    self.duration = duration
+    self.clientAddress = clientAddress
+    self.isAuthenticated = isAuthenticated
+  }
+}
+
 public enum HTTPMountError: BBError, CustomStringConvertible {
   case unregisteredHandlers([HandlerID])
   case unrecognizedMethod(method: String, path: String)
@@ -174,6 +207,10 @@ public struct HTTPAPIBuilder: Sendable {
   /// Deliberately after authentication: an unauthenticated probe, including a port scanner,
   /// is not a client and must not hold either behaviour open.
   private let onClientActivity: @Sendable () async -> Void
+  /// Called once per request, on the way out, with what the audit log needs to know: the
+  /// route, the method, the status and who asked. Synchronous and never awaited: it runs in
+  /// the request's `defer`, and the audit recorder hands the record on without waiting.
+  private let onRequestCompleted: @Sendable (RequestAuditRecord) -> Void
   private let logger: Logger
 
   public init(
@@ -182,6 +219,7 @@ public struct HTTPAPIBuilder: Sendable {
     privateAPI: PrivateAPIStage,
     metrics: RequestMetrics = RequestMetrics(),
     onClientActivity: @escaping @Sendable () async -> Void = {},
+    onRequestCompleted: @escaping @Sendable (RequestAuditRecord) -> Void = { _ in },
     logger: Logger = Logger(label: "bluebubbles.http")
   ) {
     self.configuration = configuration
@@ -189,6 +227,7 @@ public struct HTTPAPIBuilder: Sendable {
     self.privateAPI = privateAPI
     self.metrics = metrics
     self.onClientActivity = onClientActivity
+    self.onRequestCompleted = onRequestCompleted
     self.logger = logger
   }
 
@@ -284,6 +323,14 @@ public struct HTTPAPIBuilder: Sendable {
     let started = ContinuousClock.now
     var failed = true
     var status = 500
+    // One identifier per request, so the audit log can join this request's transport record
+    // to the domain records written while it was handled. Minted here, before anything can
+    // throw, so a refused request has one too.
+    let requestID = UUID().uuidString.lowercased()
+    // Who asked, as far as the stages below establish it. Updated as they run, and read in
+    // the `defer`, which cannot see `context` because it is declared after it.
+    var resolvedClient = peerAddress
+    var authenticated = false
     defer {
       let elapsed = ContinuousClock.now - started
       // Read `failed` here, not inside the Task. The defer body runs after the last
@@ -291,6 +338,12 @@ public struct HTTPAPIBuilder: Sendable {
       // hand a mutable reference to a concurrently-running task.
       let didFail = failed
       Task { await metrics.record(routeTemplate: template, duration: elapsed, failed: didFail) }
+      onRequestCompleted(
+        RequestAuditRecord(
+          requestID: requestID, method: route.method, routeTemplate: template,
+          handlerID: route.handlerID, status: status, duration: elapsed,
+          clientAddress: resolvedClient, isAuthenticated: authenticated
+        ))
       // The access line. The route TEMPLATE, never the resolved path or the query: a
       // handle route's path is a phone number and the query is where `?password=` lives.
       logger.debug(
@@ -338,21 +391,33 @@ public struct HTTPAPIBuilder: Sendable {
       //
       // It also resolves `context.identity`, which every route wants for the same reason.
       // Cheap: an address lookup and a map read, no credential work.
-      try await authentication.admit(&context)
+      // The auth stages run under this request's audit context too, so a refusal they
+      // record joins the transport record by request id. The actor is the PEER at this
+      // point; the resolved identity is not known until `admit` has run.
+      let preliminary = AuditContext(
+        actor: .client(address: peerAddress), source: .http, requestID: requestID,
+        route: template)
+      try await AuditContext.with(preliminary) {
+        try await authentication.admit(&context)
+        // The identity access control resolved, which honours a trusted proxy's forwarding
+        // header: the client, not the tunnel in front of it.
+        if case .address(let resolved) = context.identity { resolvedClient = resolved }
 
-      if requirements.contains(.optionalAuthentication) {
-        // The CREDENTIAL is best effort. A caller with a valid password gets a principal
-        // and the handler can act on it; one enrolling with a one-time code has no password
-        // to send and must still reach the handler. Swallowing that failure is the whole
-        // point: the handler decides, because only it knows which of the two doors this
-        // caller is using.
-        try? await authentication.verifyCredential(&context)
-        if context.principal != nil { await onClientActivity() }
-      } else if !requirements.contains(.unauthenticated) {
-        try await authentication.verifyCredential(&context)
-        try authentication.authorize(context, scope: route.scope)
-        await onClientActivity()
+        if requirements.contains(.optionalAuthentication) {
+          // The CREDENTIAL is best effort. A caller with a valid password gets a principal
+          // and the handler can act on it; one enrolling with a one-time code has no password
+          // to send and must still reach the handler. Swallowing that failure is the whole
+          // point: the handler decides, because only it knows which of the two doors this
+          // caller is using.
+          try? await authentication.verifyCredential(&context)
+          if context.principal != nil { await onClientActivity() }
+        } else if !requirements.contains(.unauthenticated) {
+          try await authentication.verifyCredential(&context)
+          try authentication.authorize(context, scope: route.scope)
+          await onClientActivity()
+        }
       }
+      authenticated = context.principal != nil
       if requirements.contains(.privateAPI) {
         try await privateAPI.check()
       }
@@ -432,9 +497,15 @@ public struct HTTPAPIBuilder: Sendable {
       // Bound before the closure: `context` is a `var` because the auth stage mutates it
       // in place, and a concurrently-running task may not capture a mutable binding. The
       // value is Sendable and no longer changes past this point.
-      let authenticated = context
+      let request = context
+      // The handler runs AS THIS CLIENT: anything it writes (a setting, a webhook, a
+      // scheduled message) is recorded against the caller and joined to this request.
+      // See `AuditContext`.
+      let auditContext = AuditContext(
+        actor: .client(address: resolvedClient), source: .http, requestID: requestID,
+        route: template)
       let result = try await withTimeout(Self.responseTimeout(for: route, in: group)) {
-        try await handler(authenticated)
+        try await AuditContext.with(auditContext) { try await handler(request) }
       }
       failed = false
       let response = try Self.response(

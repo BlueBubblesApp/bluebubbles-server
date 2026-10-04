@@ -55,6 +55,8 @@ extension AppContext: SocketRuntimeProviding {}
 extension AppContext: ClientActivityProviding {}
 extension AppContext: SecretStoreProviding {}
 extension AppContext: DeviceDirectoryProviding {}
+extension AppContext: AuditRecorderProviding {}
+extension AppContext: ServiceHealthObserving {}
 
 // The publishing direction: what a service hands the container while it runs.
 extension AppContext: ContactsIngestorPublishing {}

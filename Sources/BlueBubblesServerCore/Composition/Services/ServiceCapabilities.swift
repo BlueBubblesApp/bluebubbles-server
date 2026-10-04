@@ -18,6 +18,7 @@
 //
 //  See `.claude/docs/architecture.md`.
 
+import BBAudit
 import BBAuth
 import BBContacts
 import BBPrivateAPI
@@ -59,6 +60,25 @@ protocol NetworkPathProviding: Sendable {
 protocol SocketRuntimeProviding: Sendable {
   var socketServer: SocketServer { get }
   var engineIO: EngineIOServer { get }
+}
+
+/// The audit recorder, for a service that records what it did.
+///
+/// Service-only on purpose. A handler records nothing directly: the request it is handling
+/// is recorded by the dispatcher, and what it changes is recorded by the interface that
+/// changed it, so a handler able to write its own audit records would be a second author of
+/// the same history.
+protocol AuditRecorderProviding: Sendable {
+  var auditLog: AuditRecorder { get }
+}
+
+/// The registry's view of every service, as a stream, for a service that records
+/// transitions it did not perform itself.
+///
+/// Nil when the registry has gone, which is only ever after the server has stopped.
+protocol ServiceHealthObserving: Sendable {
+  func serviceHealthSnapshot() async -> [ServiceIdentifier: ServiceHealth]
+  func serviceHealthChanges() async -> AsyncStream<[ServiceIdentifier: ServiceHealth]>?
 }
 
 // MARK: - Reporting a change in health

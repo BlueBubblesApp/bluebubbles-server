@@ -25,6 +25,11 @@ final class IntegrationsModel {
   private var store: SettingsStore?
   private var changesTask: Task<Void, Never>?
 
+  /// Whether there is a store to answer from. False before the server starts and after it
+  /// stops, when `isEnabled` would answer from an empty disabled set, which reads as every
+  /// service being on. The sidebar asks this before it believes an answer.
+  var isAttached: Bool { store != nil }
+
   /// The two keys this model is a view of.
   private static let watchedKeys: Set<String> = [
     Settings.connectionMethod.key, Settings.disabledServicesKey,

@@ -13,6 +13,7 @@
 //
 //  See `Sources/BlueBubblesServerCore/Composition/AppContext.swift`.
 
+import BBAudit
 import BBAuth
 import BBContacts
 import BBDiagnostics
@@ -64,6 +65,7 @@ enum AppContextFixture {
         alerts: AlertCenter(),
         permissions: PermissionsService(),
         accessControl: AccessControlService(),
+        auditLog: AuditRecorder(),
         contacts: ContactIndex(database: database)
       ),
       transport: ServerComposition.Transport(

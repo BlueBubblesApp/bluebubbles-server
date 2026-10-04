@@ -14,6 +14,7 @@
 //  See `.claude/docs/database.md`.
 
 import BBAppStore
+import BBAudit
 import BBAuth
 import BBContacts
 import BBInterfaces
@@ -34,5 +35,8 @@ public enum AppSchema {
     ContactsSchema.self,
     InterfacesSchema.self,
     AccessControlSchema.self,
+    // Appended: the first contributor added after the list existed, and the order above
+    // is what every install already built.
+    AuditSchema.self,
   ]
 }

@@ -199,6 +199,8 @@ extension AppModel {
     webhookRegistrationsTask = nil
     pushDevicesTask?.cancel()
     pushDevicesTask = nil
+    auditEventsTask?.cancel()
+    auditEventsTask = nil
     accessControlTask?.cancel()
     accessControlTask = nil
     addressTask?.cancel()

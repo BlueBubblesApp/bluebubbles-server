@@ -8,6 +8,7 @@
 //  `HTTPServiceHost` names the job instead. It is also what lets this service be constructed
 //  in a test from eleven values rather than from a whole server.
 
+import BBAudit
 import BBAuth
 import BBBuiltIns
 import BBDiagnostics
@@ -44,6 +45,10 @@ struct HTTPServiceHost: Sendable {
   /// asks the host for the specific job instead of being handed the Keychain. This one can
   /// read and write TLS material and nothing else.
   let certificates: CertificateKeychainStore
+  /// The audit log, as the two things the listener feeds it: refusals from the auth stage
+  /// and a record per finished request. Narrow on purpose, like `certificates`: the service
+  /// records; it never reads the table.
+  let audit: AuditRequestBridge
   /// Resolved per start: nothing is registered when the container is constructed.
   let handlers: @Sendable () async -> HandlerRegistry
   /// Resolved per request, never captured; see the call site.
@@ -68,6 +73,7 @@ extension HTTPServiceHost {
       additionalRouteGroups: context.additionalRouteGroups,
       clientActivity: context.clientActivity,
       certificates: CertificateKeychainStore(secrets: context.secrets, logger: context.logger),
+      audit: AuditRequestBridge(recorder: context.auditLog),
       handlers: { [weak context] in await context?.httpHandlers ?? HandlerRegistry() },
       isHelperConnected: { [weak context] in await context?.isHelperConnected ?? false }
     )
@@ -149,6 +155,7 @@ actor HTTPService: Service, ConfigurableService {
 
     let isHelperConnected = host.isHelperConnected
     let clientActivity = host.clientActivity
+    let audit = host.audit
     // Its own label, not the host's root logger: the access line and every HTTP error
     // are what a reader filters by subsystem for.
     // Read once, here, which is why a change to it restarts this service rather than taking
@@ -159,7 +166,8 @@ actor HTTPService: Service, ConfigurableService {
     let builder = HTTPAPIBuilder(
       configuration: HTTPAPIConfiguration(allowedOrigin: allowedOrigin),
       authentication: AuthenticationStage(
-        chain: chain, accessControl: host.accessControl
+        chain: chain, accessControl: host.accessControl,
+        auditor: AuditAuthenticationBridge(recorder: audit.recorder)
       ),
       privateAPI: PrivateAPIStage(isConnected: {
         // Resolved at call time, not captured: the Private API may connect, drop and
@@ -175,6 +183,9 @@ actor HTTPService: Service, ConfigurableService {
       }),
       onClientActivity: {
         clientActivity.note()
+      },
+      onRequestCompleted: { record in
+        audit.requestCompleted(record)
       },
       logger: Logger(label: "bluebubbles.http")
     )

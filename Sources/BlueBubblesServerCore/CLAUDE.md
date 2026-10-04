@@ -22,7 +22,11 @@ Full context: [`../../.claude/docs/architecture.md`](../../.claude/docs/architec
   their last caller.
 - `Composition/Services/Proxy/`: `ProxyService<Method>` plus one file per connection method.
 - Everything else in `Composition/` is wiring: the context, the composition, the lifecycle
-  and settings propagation.
+  and settings propagation. `AuditWiring.swift` is the audit log's share of it: the bridges
+  that turn what the auth layer, the access controller, the settings store and the HTTP
+  dispatcher report into `AuditEvent`s, because none of those modules may import `BBAudit`.
+  A service that records what it did takes `AuditRecorderProviding` in its `Host`; a handler
+  never records (the dispatcher and the interface already do).
 - **What a service declares is not here.** The manifests, the tool descriptors, enablement and
   `ServiceSettingsBridge` live in [`../BBBuiltIns`](../BBBuiltIns), a data module the app and
   the tests can link without the wiring. This root READS them. `ScopedSettings` is NOT there:

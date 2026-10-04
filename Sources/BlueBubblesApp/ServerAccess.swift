@@ -26,6 +26,7 @@
 //  See `.claude/docs/architecture.md`.
 
 import BBAppStore
+import BBAudit
 import BBAuth
 import BBContacts
 import BBFaceTime
@@ -57,6 +58,14 @@ struct SecurityAccess {
   var certificates: CertificateKeychainStore? {
     context.map { CertificateKeychainStore(secrets: $0.secrets, logger: $0.logger) }
   }
+
+  /// The audit table, as the repository rather than the recorder: the page reads and
+  /// exports, and a read that throws is what `ScreenModel` needs to say it failed.
+  var auditEvents: AuditRepository? { context?.auditEvents }
+
+  /// Where the page hands in the one record it writes, the export. As the protocol rather
+  /// than the actor, so a view cannot arm or disarm it.
+  var auditRecorder: (any AuditRecording)? { context?.auditLog }
 }
 
 /// iMessage itself: reading it, sending through it, and whether the Private API is attached.

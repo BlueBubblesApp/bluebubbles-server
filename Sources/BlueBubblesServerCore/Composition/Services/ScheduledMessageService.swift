@@ -13,6 +13,7 @@
 //  See `.claude/docs/architecture.md`.
 
 import BBAppStore
+import BBAudit
 import BBBuiltIns
 import BBCore
 import BBEvents
@@ -74,11 +75,12 @@ actor ScheduledMessageService: Service {
 
   /// What this service touches, rather than the container that holds it.
   typealias Host = any InterfaceProviding & LoggerProviding & EventPublishing
-    & AppDatabaseProviding
+    & AppDatabaseProviding & AuditRecorderProviding
 
   private let host: Host
   private let appDatabase: AppDatabase
   private let events: EventBus
+  private let audit: AuditRecorder
   private let logger: Logger
   private var pump: Task<Void, Never>?
 
@@ -91,6 +93,7 @@ actor ScheduledMessageService: Service {
     self.host = host
     self.appDatabase = host.appDatabase
     self.events = host.events
+    self.audit = host.auditLog
     self.logger = Logger(label: "bluebubbles.scheduled")
   }
 
@@ -220,6 +223,27 @@ actor ScheduledMessageService: Service {
           "error": .string(String(describing: error)),
         ])
     }
+
+    // The send is an action the server took on the user's behalf, so the audit log gets it
+    // whichever way it went. The payload stays out, as it does everywhere else.
+    audit.record(
+      AuditEvent(
+        kind: outcome == .sent ? .scheduledMessageSent : .scheduledMessageFailed,
+        outcome: outcome == .sent ? .success : .failure,
+        subject: .scheduledMessage(id),
+        summary: outcome == .sent
+          ? "Scheduled message \(id) was sent."
+          : "Scheduled message \(id) could not be sent.",
+        metadata: outcome == .sent
+          ? [
+            "type": .string(record.type),
+            "next_occurrence": next.map { .string(AuditTimestamp.string(from: $0)) } ?? .null,
+          ]
+          : [
+            "type": .string(record.type),
+            "reason": .string(failure ?? ""),
+          ]
+      ))
 
     // Clients surface these, and the event names are frozen.
     await events.emit(
