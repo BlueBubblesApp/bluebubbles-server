@@ -593,19 +593,52 @@ rendering.
   page lists it under its own heading with a "Restore this" button that is the same restore
   flow.
 
-### 8.6 Onboarding
+### 8.6 Onboarding: the restore step is page two
 
-A `restore` case in `OnboardingStep.ID` (`Onboarding/OnboardingFlow.swift:164-167`), placed
-after `welcome`, `isSkippable: true`, view in `Views/Onboarding/OnboardingSteps.swift`. The
-catch the UI survey turned up: onboarding is presented only once the phase is `.running`
-(`RootView.swift:188-198`), and a restore has to run BEFORE `build`. So the step does not
-restore in place; it behaves like the migration sheet: choosing an archive stops the
-just-started server, runs the restore on `Storage` through `MigrationModel`'s shape, and
-restarts. After a successful restore the flow continues at `permissions`, because macOS
-grants are per Mac and nothing in an archive can supply them; the `connection`, `firebase`,
-`webhooks` and `api` steps are skipped when the sections that feed them were applied, and
-shown otherwise. The onboarding flags in `UserDefaults` are not touched by the restore; the
-flow reaches `finish` the ordinary way.
+The restore step is the SECOND page of onboarding, immediately after `welcome` and before
+anything else asks the user for a decision. A person moving to a new Mac must be offered
+their archive before they have typed a password, chosen a connection method or imported
+Firebase credentials by hand, because every one of those steps becomes wasted work the
+moment a restore runs. The step is a `restore` case in `OnboardingStep.ID`
+(`Onboarding/OnboardingFlow.swift:164-167`) with `isSkippable: true`, a catalogue entry
+whose `isIncluded` is always true, and a view case in `Views/Onboarding/OnboardingSteps.swift`.
+
+The page asks one question: "Are you moving this server from another Mac?" It offers
+"Choose a backup…", a drop target for a `.bbbackup`, and "Start fresh", which is the skip.
+Choosing an archive opens the same restore sheet the Backup page uses (§9.1): password,
+preview, confirm. The welcome page carries one sentence saying a backup can be restored on
+the next page, so nobody reads the welcome text and reaches for their old settings first.
+
+The catch the UI survey turned up: onboarding is presented only once the phase is `.running`
+(`RootView.swift:188-198`), and a restore has to run BEFORE `build` (§8.1). So the step does
+not restore in place. Confirming the sheet stops the just-started server, keeps `Storage`,
+runs the restore on it through the shape `MigrationModel` already has, and starts again. The
+first start of a fresh install has nothing worth keeping, so the stop is invisible to the
+user beyond a progress indicator on the sheet. The sheet cannot be dismissed while this runs.
+
+After a successful restore the flow continues at `permissions`, because macOS grants are per
+Mac and nothing in an archive can supply them. Each later step's `isIncluded` consults what
+the restore applied, through the `restored_from` marker (§8.4) rather than onboarding state:
+
+| Step | Shown after a restore when |
+|---|---|
+| `permissions` | Always |
+| `connection` | `settings` or `secrets` was not applied, or the server password is still unset |
+| `firebase` | `pushCredentials` was not applied |
+| `webhooks` | `webhooks` was not applied and the goal asks for it |
+| `api` | As before; it only explains |
+| `privateAPI` | Always; it depends on this Mac's SIP state and helper, which no archive carries |
+| `groupShortcut` | As before |
+| `finish` | Always, and it names the archive id and the sections that were applied |
+
+Every step shown after a restore is prefilled from the restored values, so a user who
+reaches `connection` sees their tunnel already chosen rather than a blank form. The
+onboarding flags in `UserDefaults` are not touched by the restore; the flow reaches `finish`
+the ordinary way.
+
+A restore chosen later, from the Backup page on a running server, does not re-run
+onboarding. The two entry points share the sheet and the engine and differ only in what
+happens afterwards.
 
 ### 8.7 Moving house: what is a move and what is a clone
 
