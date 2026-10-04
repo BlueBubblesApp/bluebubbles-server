@@ -224,6 +224,50 @@ struct WebhookDeliveryTests {
     #expect(state?.outcome == .failed("HTTP 404"))
     #expect(state?.consecutiveFailures == 1)
   }
+
+  // MARK: - The chat filter
+
+  /// The filter has to reach the sink's own choice of targets: a scope that stops at the
+  /// target struct is one that delivers every conversation anyway.
+  @Test("A chat event goes only to the endpoints following that conversation")
+  func sinkAppliesChatScope() async throws {
+    let transport = RecordingTransport()
+    let chosen = "iMessage;-;+12025550143"
+    let targets = [
+      WebhookTarget(id: 1, url: "https://example.com/all", events: ["*"]),
+      WebhookTarget(
+        id: 2, url: "https://example.com/chosen", events: ["*"], chatScope: .only([chosen])),
+      WebhookTarget(
+        id: 3, url: "https://example.com/other", events: ["*"],
+        chatScope: .only(["iMessage;-;someone@example.com"])),
+    ]
+    let sink = WebhookSink(targets: { targets }, transport: transport)
+    let message = ServerEvent(
+      name: .newMessage,
+      fullPayload: .object(["chats": .array([.object(["guid": .string(chosen)])])]))
+
+    #expect(await sink.accepts(message))
+    try await sink.deliver(message)
+    let delivered = Set(await transport.posts.map(\.url))
+    #expect(delivered == ["https://example.com/all", "https://example.com/chosen"])
+
+    // And an event that is not about a conversation reaches all three.
+    let before = await transport.posts.count
+    try await sink.deliver(ServerEvent(name: .serverUpdate, fullPayload: .string("1.2.3")))
+    #expect(await transport.posts.count == before + 3)
+  }
+
+  @Test("A sink whose every endpoint follows other conversations does not accept the event")
+  func sinkDeclinesUnfollowedChat() async {
+    let narrowed = WebhookTarget(
+      id: 1, url: "https://example.com/hook", events: ["*"],
+      chatScope: .only(["iMessage;-;someone@example.com"]))
+    let sink = WebhookSink(targets: { [narrowed] }, transport: RecordingTransport())
+    let typing = ServerEvent(
+      name: .typingIndicator,
+      fullPayload: .object(["guid": .string("any;-;+12025550143"), "display": .bool(true)]))
+    #expect(await sink.accepts(typing) == false)
+  }
 }
 
 @Suite("ntfy subscriptions")

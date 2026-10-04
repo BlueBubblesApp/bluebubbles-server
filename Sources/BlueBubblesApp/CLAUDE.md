@@ -412,8 +412,8 @@ over built-in ids. `IntegrationCatalogTests` refuses a second lookup.
 ## Policy lives off the view
 
 `IntegrationCatalog`, `ConnectionMethodChoices`, `NetworkAddressChoices`,
-`AlertActionRouting`, `WebhookEventCatalog`, `OnboardingFlow`, `SendLaterGuidance`,
-`UpdaterPolicy`, `InstallWindow`, `WhatsNew`, `ScheduledMessageRow`, `ServiceFormLayout`,
+`AlertActionRouting`, `WebhookEventCatalog`, `WebhookChatSelection`, `OnboardingFlow`,
+`SendLaterGuidance`, `UpdaterPolicy`, `InstallWindow`, `WhatsNew`, `ScheduledMessageRow`, `ServiceFormLayout`,
 `LogFiltering` (with `LogLevelFilter`), `LogDocumentUpdate`, `FirebaseDetail`,
 `NotificationDeliveryRouting`, `BlockedClientSummary`,
 `ChatPickerNavigation`, `SettingRowState`, `WebhookDeliverySummary`, `DeviceRowSummary`, `HTTPListenerSummary`,
@@ -457,6 +457,6 @@ to feel constrained by this, the answer is a plain note value the view renders, 
 `WhatsNewTests`, `ScheduledMessageRowTests`, `ServiceFormLayoutTests`, `LogFilteringTests`,
 `LogDocumentUpdateTests`, `NotificationDeliveryRoutingTests`, `BlockedClientSummaryTests`,
 `ChatPickerNavigationTests`, `SettingRowStateTests`,
-`WebhookDeliverySummaryTests`, `DeviceRowSummaryTests`, `HTTPListenerSummaryTests`,
-`APIDocsRelayPolicyTests`, `PermissionGuidanceTests`. `AppBehaviourPolicy` is asserted from `CompositionTests/ScopedSettingsTests`
+`WebhookDeliverySummaryTests`, `WebhookChatSelectionTests`, `DeviceRowSummaryTests`,
+`HTTPListenerSummaryTests`, `APIDocsRelayPolicyTests`, `PermissionGuidanceTests`. `AppBehaviourPolicy` is asserted from `CompositionTests/ScopedSettingsTests`
 and the setting-dependency declarations from `BBSettingsTests/SettingDependencyTests`.

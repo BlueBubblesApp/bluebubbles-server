@@ -149,5 +149,14 @@ public enum InterfacesSchema: SchemaContributor {
         table.add(column: "follow_redirects", .boolean).notNull().defaults(to: true)
       }
     }
+
+    // The conversations a webhook's chat events are narrowed to: a JSON array of chat GUIDs,
+    // or NULL for every conversation. Nullable with no default, so every row that predates
+    // the column reads as unfiltered, which is what it has been receiving.
+    migrator.registerMigration("interfaces.addWebhookChatFilter") { db in
+      try db.alter(table: "webhook") { table in
+        table.add(column: "chat_guids", .text)
+      }
+    }
   }
 }

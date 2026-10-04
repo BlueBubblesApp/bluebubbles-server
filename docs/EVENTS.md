@@ -139,6 +139,32 @@ window. Three rules:
 ntfy is `true` and has no switch: its endpoint is typed into the settings window by the
 operator, ntfy.sh redirects by design, and there is no per-target row to hang a toggle on.
 
+### A webhook can be narrowed to chosen conversations
+
+A webhook's event list says WHICH events it receives; its chat filter says, for the events
+about a conversation, WHOSE. `webhook.chat_guids` is the column: a JSON array of chat GUIDs, or
+NULL for every conversation. The settings window sets it in a Conversations section that
+appears only while the chosen events include a chat event, and `WebhookTarget.chatScope`
+carries it to `WebhookSink`.
+
+- **The filter narrows chat events and leaves the rest alone.** `EventName.chatScoped` is the
+  set it applies to: the message events (new, updated, send error), the group events, typing,
+  read state and scheduled-message outcomes. A server update or a FindMy location reaches a
+  filtered webhook exactly as it reaches any other.
+- **The chat is read from the event's full payload**, by `ServerEvent.chatGUIDs`, the one
+  place that knows where each event keeps it. The full payload, because the notification
+  projection of `updated-message` leaves its chats out for Firebase's 4 KB cap.
+- **GUIDs are compared with `ChatGUID.sameChat`.** A filter saved before macOS 26 holds
+  `iMessage;-;…` and the events after the upgrade carry `any;-;…` for the same chat.
+- **Fail closed.** A chat event whose chat cannot be read, and a stored list that cannot be
+  decoded, are withheld from a filtered webhook rather than delivered: a filter that let
+  through what it cannot identify would deliver exactly the conversations it was set up to
+  keep out.
+- **It is not on the v1 wire.** `GET /webhook` does not report it and the create and update
+  routes do not take it, so absent means "leave it", as it does for `followRedirects`: a client
+  re-registering after a reinstall does not widen an endpoint the operator narrowed. Putting it
+  on the wire is an addition to the contract, which `acceptedDifferences` would have to declare.
+
 **Registration is the on-switch.** `EventBus.register(_:)` is what makes a sink active; an
 unconfigured sink is *not registered*, never registered-and-disabled. That distinction is what
 keeps "no Firebase" a valid deployment rather than a warning state.

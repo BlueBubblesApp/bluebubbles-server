@@ -15,10 +15,17 @@
 //  events and see a list that had not grown. The Electron UI refused it outright; this offers
 //  the thing the person probably meant instead.
 //
+//  The conversations section appears only while the chosen events include one about a
+//  conversation (`EventSubscription.includesChatEvents`): a chat filter on an endpoint that
+//  receives server updates and backups would narrow nothing, and asking for one would suggest
+//  it did. When it is hidden the webhook is saved as taking every conversation, so what is
+//  stored is what the sheet showed.
+//
 //  See `.claude/docs/architecture.md`.
 
 import BBAppStore
 import BBCore
+import BBEvents
 import BBInterfaces
 import BlueBubblesServerCore
 import SwiftUI
@@ -37,6 +44,7 @@ struct WebhookEditor: View {
 
   @State private var url = ""
   @State private var subscription = EventSubscription()
+  @State private var chats = WebhookChatSelection()
   @State private var isSaving = false
   @State private var error: String?
   /// The webhook being edited. Seeded from `initial`, and changed by "Edit That One" when
@@ -61,6 +69,9 @@ struct WebhookEditor: View {
     ) {
       endpointSection
       eventsSection
+      if subscription.includesChatEvents {
+        chatsSection
+      }
     }
     .onAppear(perform: loadInitial)
   }
@@ -138,6 +149,19 @@ struct WebhookEditor: View {
     }
   }
 
+  private var chatsSection: some View {
+    SettingsSection(
+      "Conversations",
+      subtitle: "Which conversations this endpoint is sent message, typing, read and group "
+        + "events for. Events that are not about a conversation are sent either way."
+    ) {
+      WebhookChatPicker(model: model, selection: $chats)
+    } trailing: {
+      Text(chats.isAllChats ? "All" : "\(chats.selected.count) selected")
+        .font(.callout).foregroundStyle(.tertiary)
+    }
+  }
+
   // MARK: - Duplicates
 
   /// A different webhook already registered for the URL being typed.
@@ -153,6 +177,7 @@ struct WebhookEditor: View {
     target = hook
     url = hook.url
     subscription = EventSubscription(wireValues: hook.subscribedEvents)
+    chats = WebhookChatSelection(scope: hook.chatScope)
     followRedirects = hook.followRedirects
     error = nil
   }
@@ -165,6 +190,7 @@ struct WebhookEditor: View {
     // it is silent and lossy, so there is nothing useful on the other side of "save
     // anyway" that "Edit That One Instead" does not do better.
     return subscription.isValid && conflict == nil
+      && (!subscription.includesChatEvents || chats.isValid)
   }
 
   private func loadInitial() {
@@ -176,6 +202,7 @@ struct WebhookEditor: View {
     target = initial
     url = initial.url
     subscription = EventSubscription(wireValues: initial.subscribedEvents)
+    chats = WebhookChatSelection(scope: initial.chatScope)
     followRedirects = initial.followRedirects
   }
 
@@ -190,18 +217,23 @@ struct WebhookEditor: View {
 
     let address = url.trimmingCharacters(in: .whitespaces)
     let events = subscription.wireValues
+    // Every conversation when the section is not showing; see the file header.
+    let chatScope = subscription.includesChatEvents ? chats.scope : .allChats
 
     do {
       // Passed on BOTH paths, and never left to default. The interface reads nil as "no
       // opinion" so a client that has never heard of the switch cannot disarm it by
-      // omission; this sheet always has an opinion, because the switch is on screen.
+      // omission; this sheet always has an opinion, because the switch is on screen. The
+      // chat filter follows the same rule.
       if let id = target?.id {
         _ = try await serverAdmin.updateWebhook(
-          id: id, url: address, events: events, followRedirects: followRedirects
+          id: id, url: address, events: events, followRedirects: followRedirects,
+          chatScope: chatScope
         )
       } else {
         _ = try await serverAdmin.createWebhook(
-          url: address, events: events, followRedirects: followRedirects
+          url: address, events: events, followRedirects: followRedirects,
+          chatScope: chatScope
         )
       }
       onDone()

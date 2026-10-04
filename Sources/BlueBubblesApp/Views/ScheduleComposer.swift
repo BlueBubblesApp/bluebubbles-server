@@ -56,10 +56,28 @@ struct ScheduleComposer: View {
 
   /// Nil when the message database is not readable, which leaves the screen idle rather
   /// than failed: the server is not refusing, it has nothing to answer with yet.
+  ///
+  /// Shared with `WebhookChatPicker`, so both pickers offer the same conversations.
   @MainActor
-  private static func readChats(_ model: AppModel) async throws -> [ChatInterface.ChatSummary]? {
+  static func readChats(_ model: AppModel) async throws -> [ChatInterface.ChatSummary]? {
     guard let interfaces = await model.messaging.interfaces() else { return nil }
     return try await interfaces.chat.summaries(limit: 500)
+  }
+
+  /// Address -> contact name for everyone in `chats`, or empty when none can be resolved.
+  ///
+  /// `try?`, and deliberately: a name that could not be resolved falls back to the formatted
+  /// address, which is what a picker shows anyway when contact access was never granted.
+  /// There is nothing here for a person to act on, unlike a conversation list that could not
+  /// be read at all.
+  @MainActor
+  static func resolveContactNames(
+    for chats: [ChatInterface.ChatSummary], model: AppModel
+  ) async -> [String: String] {
+    guard let interfaces = await model.messaging.interfaces() else { return [:] }
+    let addresses = Array(Set(chats.flatMap(Self.addresses(in:))))
+    guard !addresses.isEmpty else { return [:] }
+    return (try? await interfaces.contact.displayNames(for: addresses)) ?? [:]
   }
 
   @Environment(\.dismiss) private var dismiss
@@ -353,7 +371,8 @@ struct ScheduleComposer: View {
     return min(CGFloat(rows) * Self.rowHeight, CGFloat(6) * Self.rowHeight) + 4
   }
 
-  private static let rowHeight: CGFloat = 26
+  /// One `ConversationRow`, which both pickers size their results box by.
+  static let rowHeight: CGFloat = 26
 
   @ViewBuilder
   private var emptyResults: some View {
@@ -580,15 +599,9 @@ struct ScheduleComposer: View {
     // few hundred indexed probes and normally finishes before anyone opens the menu, but
     // whatever it costs it must not hold the conversation list back: an unlabelled list
     // is a perfectly usable one.
-    //
-    // Still `try?`, and deliberately: a name that could not be resolved falls back to the
-    // formatted address, which is what this shows anyway when contact access was never
-    // granted. There is nothing here for a person to act on, unlike a conversation list
-    // that could not be read at all.
-    guard let interfaces = await model.messaging.interfaces() else { return }
-    let addresses = Array(Set(chats.flatMap(Self.addresses(in:))))
-    guard !addresses.isEmpty else { return }
-    contactNames = (try? await interfaces.contact.displayNames(for: addresses)) ?? [:]
+    let names = await Self.resolveContactNames(for: chats, model: model)
+    guard !names.isEmpty else { return }
+    contactNames = names
     // The second pass: the same rows, now labelled.
     rebuildChoices()
   }
@@ -647,11 +660,12 @@ struct ScheduleComposer: View {
   }
 }
 
-/// One conversation in the results list.
+/// One conversation in a results list: the composer's, where pressing it chooses the one
+/// conversation, and `WebhookChatPicker`'s, where it ticks or unticks one of several.
 ///
 /// Its own view for the hover state: `@State` per row is what makes hover a row-local fact
 /// rather than one more piece of the composer's state that every keystroke would invalidate.
-private struct ConversationRow: View {
+struct ConversationRow: View {
 
   let label: ScheduleComposer.ChatLabel
   let isSelected: Bool
@@ -690,6 +704,9 @@ private struct ConversationRow: View {
       .background(background, in: RoundedRectangle(cornerRadius: 6))
     }
     .buttonStyle(.plain)
+    // The checkmark is drawn at zero opacity rather than removed, so VoiceOver cannot hear
+    // the difference from it; the trait is what says which rows are chosen.
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
     .onHover { isHovering = $0 }
   }
 

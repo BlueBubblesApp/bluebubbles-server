@@ -14,6 +14,7 @@
 
 import BBAppStore
 import BBDiagnostics
+import BBEvents
 import BBHTTPAPI
 import BBMedia
 import BBPersistence
@@ -246,5 +247,104 @@ struct WebhookRegistrationTests {
     await #expect(throws: InterfaceError.self) {
       _ = try await server.updateWebhook(id: id, url: "ftp://example.com/hook", events: nil)
     }
+  }
+
+  // MARK: - The chat filter
+
+  private static let direct = "iMessage;-;+12025550143"
+  private static let group = "iMessage;+;chat100000000000000001"
+
+  @Test("A new webhook takes every conversation")
+  func newWebhookTakesEveryChat() async throws {
+    let admin = try await makeInterface()
+    let hook = try await admin.createWebhook(url: "https://example.com/a", events: ["*"])
+    #expect(hook.chatScope == .allChats)
+    #expect(hook.chatGUIDs == nil)
+  }
+
+  @Test("A chosen set of conversations survives a round trip, and clearing it works")
+  func chatScopeRoundTrips() async throws {
+    let admin = try await makeInterface()
+    let created = try await admin.createWebhook(
+      url: "https://example.com/a", events: ["new-message"],
+      chatScope: .only([Self.direct, Self.group]))
+    #expect(created.chatScope == .only([Self.direct, Self.group]))
+    // What a later read returns, not just what the create echoed.
+    #expect(try await admin.webhooks().first?.chatScope == .only([Self.direct, Self.group]))
+
+    let id = try #require(created.id)
+    let narrowed = try await admin.updateWebhook(
+      id: id, url: nil, events: nil, chatScope: .only([Self.group]))
+    #expect(narrowed.chatScope == .only([Self.group]))
+
+    let cleared = try await admin.updateWebhook(
+      id: id, url: nil, events: nil, chatScope: .allChats)
+    #expect(cleared.chatScope == .allChats)
+    #expect(cleared.chatGUIDs == nil)
+    // Read back, because clearing is a write of NULL, and a record that encoded nil by
+    // leaving the column out would echo `.allChats` here while the row kept the old list.
+    #expect(try await admin.webhooks().first?.chatScope == .allChats)
+  }
+
+  /// **Absent means "leave it".** A v1 client has never heard of the filter, so a re-register
+  /// after a reinstall, or an edit of the URL or events, must not widen an endpoint the
+  /// operator narrowed to two conversations back to all of them.
+  @Test("A create or update that says nothing leaves the chat filter alone")
+  func silentWritesKeepTheChatFilter() async throws {
+    let admin = try await makeInterface()
+    _ = try await admin.createWebhook(
+      url: "https://example.com/a", events: ["*"], chatScope: .only([Self.direct]))
+
+    let again = try await admin.createWebhook(
+      url: "https://example.com/a", events: ["new-message"])
+    #expect(again.chatScope == .only([Self.direct]))
+
+    let id = try #require(again.id)
+    let edited = try await admin.updateWebhook(
+      id: id, url: "https://example.com/b", events: ["typing-indicator"])
+    #expect(edited.chatScope == .only([Self.direct]))
+  }
+
+  @Test("The chat filter reaches the delivery target")
+  func chatScopeReachesTheTarget() async throws {
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
+    let store = WebhookRepository(database: database)
+    _ = try await store.upsert(url: "https://example.com/a", events: ["*"])
+    _ = try await store.upsert(
+      url: "https://example.com/b", events: ["*"], chatScope: .only([Self.group]))
+
+    let targets = try await store.targets().sorted { $0.url < $1.url }
+    #expect(targets.map(\.chatScope) == [.allChats, .only([Self.group])])
+  }
+
+  @Test("A row that predates the column takes every conversation")
+  func migratedRowsTakeEveryChat() async throws {
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
+    try await database.write { db in
+      try db.execute(
+        sql: "INSERT INTO webhook (url, events, created_at) VALUES (?, ?, ?)",
+        arguments: ["https://legacy.example.com/hook", "[\"*\"]", Date()]
+      )
+    }
+    let rows = try await WebhookRepository(database: database).all()
+    #expect(rows.first?.chatScope == .allChats)
+  }
+
+  /// Fail closed, as an unreadable `events` column does: an endpoint narrowed to some
+  /// conversations must not start receiving all of them because its list broke.
+  @Test("A chat filter that cannot be read withholds every conversation")
+  func unreadableChatFilterIsEmpty() async throws {
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
+    try await database.write { db in
+      try db.execute(
+        sql: """
+          INSERT INTO webhook (url, events, created_at, follow_redirects, chat_guids)
+          VALUES (?, ?, ?, 0, ?)
+          """,
+        arguments: ["https://example.com/hook", "[\"*\"]", Date(), "not json"]
+      )
+    }
+    let rows = try await WebhookRepository(database: database).all()
+    #expect(rows.first?.chatScope == .only([]))
   }
 }

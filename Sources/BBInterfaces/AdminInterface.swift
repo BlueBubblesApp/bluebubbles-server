@@ -8,6 +8,7 @@
 import BBAppStore
 import BBCore
 import BBDiagnostics
+import BBEvents
 import BBIMessage
 import BBPersistence
 import BBSerialization
@@ -212,30 +213,33 @@ public struct AdminInterface: Sendable {
   ///   distinction is load-bearing here rather than tidy: this upserts on the URL, so a client
   ///   re-registering after a reinstall sends the two fields it has always sent, and reading
   ///   that as "off" would silently disarm an endpoint the operator had turned it on for.
+  /// - Parameter chatScope: nil means "no opinion" by the same rule: every conversation on a
+  ///   new webhook, and whatever an existing one had. No v1 client sends one.
   public func createWebhook(
-    url: String, events: [String], followRedirects: Bool? = nil
+    url: String, events: [String], followRedirects: Bool? = nil, chatScope: ChatScope? = nil
   ) async throws -> Webhook {
     try Self.validate(url: url)
     let webhook = try await webhookStore.upsert(
-      url: url, events: events, followRedirects: followRedirects
+      url: url, events: events, followRedirects: followRedirects, chatScope: chatScope
     )
     logWebhook(
       "Webhook created", id: webhook.id, url: url, events: events,
-      followRedirects: webhook.followRedirects
+      followRedirects: webhook.followRedirects, chatScope: webhook.chatScope
     )
     return webhook
   }
 
   public func updateWebhook(
-    id: Int64, url: String?, events: [String]?, followRedirects: Bool? = nil
+    id: Int64, url: String?, events: [String]?, followRedirects: Bool? = nil,
+    chatScope: ChatScope? = nil
   ) async throws -> Webhook {
     if let url { try Self.validate(url: url) }
     let webhook = try await webhookStore.update(
-      id: id, url: url, events: events, followRedirects: followRedirects
+      id: id, url: url, events: events, followRedirects: followRedirects, chatScope: chatScope
     )
     logWebhook(
       "Webhook updated", id: id, url: webhook.url, events: webhook.subscribedEvents,
-      followRedirects: webhook.followRedirects
+      followRedirects: webhook.followRedirects, chatScope: webhook.chatScope
     )
     return webhook
   }
@@ -244,10 +248,18 @@ public struct AdminInterface: Sendable {
   ///
   /// `followRedirects` is logged because it changes where the server will send message
   /// content, and a change to it is the kind of thing an operator needs to be able to find
-  /// afterwards.
+  /// afterwards. The chat filter is logged as a COUNT for the same reason: a chat GUID names
+  /// the people in the chat, and how many conversations an endpoint is narrowed to is what
+  /// explains an event that did not arrive.
   private func logWebhook(
-    _ what: String, id: Int64?, url: String, events: [String], followRedirects: Bool
+    _ what: String, id: Int64?, url: String, events: [String], followRedirects: Bool,
+    chatScope: ChatScope
   ) {
+    let chatCount: String =
+      switch chatScope {
+      case .allChats: "all"
+      case .only(let guids): String(guids.count)
+      }
     logger.info(
       "\(what)",
       metadata: [
@@ -255,6 +267,7 @@ public struct AdminInterface: Sendable {
         "url": .string(Redaction.url(url)),
         "events": .string(events.joined(separator: ",")),
         "followRedirects": .stringConvertible(followRedirects),
+        "chatCount": .string(chatCount),
       ])
   }
 

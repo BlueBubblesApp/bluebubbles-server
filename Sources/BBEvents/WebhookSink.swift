@@ -40,16 +40,27 @@ public struct WebhookTarget: Sendable, Identifiable {
   /// so it is a switch rather than a prohibition. See `InterfacesSchema`'s migration for why
   /// webhooks that predate the column are `true`.
   public let followRedirects: Bool
+  /// Which conversations' events this endpoint receives. Narrows the chat events that
+  /// `events` already admits and leaves every other event alone; see `ChatScope`.
+  public let chatScope: ChatScope
 
   public init(
     id: Int64, url: String, events: [String], codecs: Set<CodecIdentifier> = [.legacyV1],
-    followRedirects: Bool = false
+    followRedirects: Bool = false, chatScope: ChatScope = .allChats
   ) {
     self.id = id
     self.url = url
     self.events = events
     self.codecs = codecs
     self.followRedirects = followRedirects
+    self.chatScope = chatScope
+  }
+
+  /// Whether this endpoint is sent an event: subscribed to its name, and, for an event about
+  /// a conversation, to that conversation. `chatGUIDs` is `event.chatGUIDs`, passed in so a
+  /// sink checking one event against every target reads the payload once.
+  func receives(_ event: ServerEvent, chatGUIDs: [String]?) -> Bool {
+    matches(event.name) && chatScope.admits(chatGUIDs: chatGUIDs)
   }
 
   func matches(_ name: EventName) -> Bool {
@@ -99,11 +110,13 @@ public actor WebhookSink: CustomEventSink {
   }
 
   public func accepts(_ event: ServerEvent) async -> Bool {
-    await targets().contains { $0.matches(event.name) }
+    let chats = event.chatGUIDs
+    return await targets().contains { $0.receives(event, chatGUIDs: chats) }
   }
 
   public func deliver(_ event: ServerEvent) async throws {
-    let matching = await targets().filter { $0.matches(event.name) }
+    let chats = event.chatGUIDs
+    let matching = await targets().filter { $0.receives(event, chatGUIDs: chats) }
     guard !matching.isEmpty else { return }
 
     // Bounded concurrency rather than one task per target: a user with fifty webhooks

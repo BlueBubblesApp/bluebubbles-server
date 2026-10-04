@@ -61,6 +61,7 @@ struct SchemaContributionTests {
     "addAlertDurability",
     "interfaces.addScheduledMessageAnchor",
     "interfaces.addWebhookRedirectPolicy",
+    "interfaces.addWebhookChatFilter",
     // BBAuth
     "createAccessControl",
     "addBlockOffenceCount",
@@ -92,6 +93,7 @@ struct SchemaContributionTests {
         // The first one written after the seam, so the first that carries the namespace.
         "interfaces.addScheduledMessageAnchor",
         "interfaces.addWebhookRedirectPolicy",
+        "interfaces.addWebhookChatFilter",
       ])
     #expect(
       AccessControlSchema.migrationIdentifiers() == [

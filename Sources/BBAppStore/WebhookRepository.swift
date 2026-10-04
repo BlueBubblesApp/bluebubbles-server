@@ -4,7 +4,8 @@
 //  One decoder for the table: the CRUD the API exposes and the delivery path both read
 //  through here. Two decoders would be one place for them to disagree, and the `events`
 //  column (a JSON array stored as text) is exactly the sort of column they would disagree
-//  about. Parsing `events` happens once, in `subscribedEvents`.
+//  about. Parsing `events` happens once, in `subscribedEvents`, and parsing `chat_guids` once,
+//  in `chatScope`.
 
 import BBEvents
 import BBPersistence
@@ -25,11 +26,16 @@ public struct Webhook: Sendable, Codable, FetchableRecord, PersistableRecord {
   /// Whether delivery may follow a 3xx. See `InterfacesSchema`'s migration for why this is
   /// `true` on a row that predates the column and `false` on a new one.
   public var followRedirects: Bool
+  /// A JSON array of chat GUIDs, stored as text, or nil for every conversation. Narrows the
+  /// chat events `events` admits; see `ChatScope`. Not on the v1 wire: it is set from the
+  /// settings window, and a client registering over the API leaves it as it was.
+  public var chatGUIDs: String? = nil
 
   enum CodingKeys: String, CodingKey {
     case id, url, events
     case createdAt = "created_at"
     case followRedirects = "follow_redirects"
+    case chatGUIDs = "chat_guids"
   }
 
   /// What a webhook created with no opinion gets. Named rather than written as a literal at
@@ -49,6 +55,18 @@ public struct Webhook: Sendable, Codable, FetchableRecord, PersistableRecord {
   /// it to nothing rather than to everything: the page says why, and editing the webhook
   /// rewrites the column.
   public var subscribedEvents: [String] { decodedEvents ?? [] }
+
+  /// The `chat_guids` column decoded. The one place that column is interpreted.
+  ///
+  /// NULL is every conversation. A column that cannot be read is NO conversation, the same
+  /// fail-closed reading `subscribedEvents` gives an unreadable `events`: an endpoint someone
+  /// narrowed to two chats must not start receiving all of them because the list broke.
+  public var chatScope: ChatScope {
+    guard let chatGUIDs else { return .allChats }
+    let decoded = (try? JSONValue.parse(Data(chatGUIDs.utf8)))?.arrayValue?
+      .compactMap(\.stringValue)
+    return .only(decoded ?? [])
+  }
 
   public var json: JSONValue {
     .object([
@@ -74,6 +92,16 @@ public struct Webhook: Sendable, Codable, FetchableRecord, PersistableRecord {
     let data = (try? JSONValue.array(events.map(JSONValue.string)).serialize()) ?? Data()
     let encoded = String(decoding: data, as: UTF8.self)
     return encoded.isEmpty ? "[\"*\"]" : encoded
+  }
+
+  /// A chat scope as the stored column: nil for every conversation, otherwise the GUIDs as a
+  /// JSON array.
+  public static func encode(chatScope: ChatScope) -> String? {
+    guard case .only(let guids) = chatScope else { return nil }
+    let data = (try? JSONValue.array(guids.map(JSONValue.string)).serialize()) ?? Data()
+    // An encoding failure stores an empty list, which withholds every chat event, rather
+    // than nil, which would widen the endpoint to every conversation.
+    return data.isEmpty ? "[]" : String(decoding: data, as: UTF8.self)
   }
 }
 
@@ -127,7 +155,7 @@ public struct WebhookRepository: Sendable {
       try Webhook.order(Column("id")).fetchAll(db).map {
         WebhookTarget(
           id: $0.id ?? 0, url: $0.url, events: $0.subscribedEvents,
-          followRedirects: $0.followRedirects
+          followRedirects: $0.followRedirects, chatScope: $0.chatScope
         )
       }
     }
@@ -143,12 +171,20 @@ public struct WebhookRepository: Sendable {
   /// upserts: a client re-registering a webhook after a reinstall sends the same two fields
   /// it always has, and that must not silently flip an endpoint the operator had turned
   /// redirect-following ON for. A row that does not exist yet takes `defaultFollowRedirects`.
+  /// `chatScope` follows the same rule for the same reason, and a new row takes every chat.
   public func upsert(
-    url: String, events: [String], followRedirects: Bool? = nil
+    url: String, events: [String], followRedirects: Bool? = nil, chatScope: ChatScope? = nil
   ) async throws -> Webhook {
     let encoded = Webhook.encode(events: events)
     return try await database.write { db in
       let existing = try Webhook.filter(Column("url") == url).fetchOne(db)
+      // nil leaves the stored list as it was; `.allChats` encodes to nil and clears it.
+      let chatGUIDs: String?
+      if let chatScope {
+        chatGUIDs = Webhook.encode(chatScope: chatScope)
+      } else {
+        chatGUIDs = existing?.chatGUIDs
+      }
       var record = Webhook(
         id: existing?.id,
         url: url,
@@ -156,7 +192,8 @@ public struct WebhookRepository: Sendable {
         createdAt: Date(),
         followRedirects: followRedirects
           ?? existing?.followRedirects
-          ?? Webhook.defaultFollowRedirects
+          ?? Webhook.defaultFollowRedirects,
+        chatGUIDs: chatGUIDs
       )
       try record.save(db)
       if record.id == nil { record.id = db.lastInsertedRowID }
@@ -164,13 +201,15 @@ public struct WebhookRepository: Sendable {
     }
   }
 
-  /// Changes an endpoint's URL, its subscriptions, or both.
+  /// Changes an endpoint's URL, its subscriptions, or both. Each nil argument leaves that
+  /// part as it was.
   ///
   /// Separate from `upsert` even though that one upserts, because the upsert is keyed on
   /// the URL: editing an endpoint's address through it would leave the old address
   /// registered and still being called, which is the opposite of what editing it means.
   public func update(
-    id: Int64, url: String?, events: [String]?, followRedirects: Bool? = nil
+    id: Int64, url: String?, events: [String]?, followRedirects: Bool? = nil,
+    chatScope: ChatScope? = nil
   ) async throws -> Webhook {
     let encoded = events.map(Webhook.encode(events:))
     return try await database.write { db in
@@ -190,6 +229,7 @@ public struct WebhookRepository: Sendable {
       }
       if let encoded { record.events = encoded }
       if let followRedirects { record.followRedirects = followRedirects }
+      if let chatScope { record.chatGUIDs = Webhook.encode(chatScope: chatScope) }
       try record.update(db)
       return record
     }

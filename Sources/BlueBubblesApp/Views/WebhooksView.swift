@@ -312,6 +312,15 @@ struct WebhooksView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+          // Only beside events it narrows; the editor saves every conversation otherwise.
+          if EventSubscription(wireValues: events).includesChatEvents,
+            let chats = WebhookChatSelection.summary(for: hook.chatScope)
+          {
+            Label(chats, systemImage: "bubble.left.and.bubble.right")
+              .font(.caption)
+              .foregroundStyle(hook.chatScope == .only([]) ? Color.orange : Color.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
         } else {
           // The stored event list could not be read, so this endpoint receives nothing.
           // Said here rather than rendered as "no events", which looks like a choice.
