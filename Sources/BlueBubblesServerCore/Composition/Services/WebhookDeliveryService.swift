@@ -43,6 +43,9 @@ actor WebhookDeliveryService: Service {
   /// one is holding all of them.
   private let webhooks: WebhookDirectory
   private let logger = Logger(label: "bluebubbles.webhooks")
+  /// Held so `stop` can end its retries: an unregistered sink is no longer fed events, but
+  /// its outboxes would otherwise go on posting on their own timer.
+  private var sink: WebhookSink?
 
   init(host: Host) {
     self.alerts = host.alerts
@@ -57,22 +60,34 @@ actor WebhookDeliveryService: Service {
     // `WebhookDirectory` is a Sendable struct over the repository, so this closure holds
     // nothing that points back at the container.
     let directory = webhooks
-    await events.register(
-      WebhookSink(
-        targets: { await directory.targets() },
-        negotiator: codecs,
-        alerts: alerts,
-        // Shared with the context so delivery history outlives a restart of this
-        // service, and so the settings page has something to read.
-        deliveries: directory.deliveries
-      )
+    let sink = WebhookSink(
+      targets: { await directory.targets() },
+      negotiator: codecs,
+      alerts: alerts,
+      // Shared with the context so delivery history outlives a restart of this
+      // service, and so the settings page has something to read.
+      deliveries: directory.deliveries
     )
+    self.sink = sink
+    await events.register(sink)
 
     let registered = await directory.targets().count
     logger.info("Webhook delivery ready", metadata: ["webhooks": .stringConvertible(registered)])
   }
 
+  /// Retries end here, BEFORE the lane is finished: an event still queued on the lane is
+  /// given its one attempt, and nothing it fails opens an outbox that would outlive us.
+  ///
+  /// The outboxes are in memory, so what was waiting is lost; the count is logged, at
+  /// warning, because those are events the endpoints will never receive.
   func stop() async {
+    let discarded = await sink?.stopRetrying() ?? 0
+    sink = nil
+    if discarded > 0 {
+      logger.warning(
+        "Webhook delivery stopped with events still waiting to be retried",
+        metadata: ["events": .stringConvertible(discarded)])
+    }
     await events.unregister(.webhook)
   }
 

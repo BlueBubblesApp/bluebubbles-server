@@ -53,15 +53,22 @@ public struct WebhookDeliveryState: Sendable, Equatable {
   public let event: String
   /// What this outcome was recorded against; see the file comment on reused row ids.
   public let url: String
+  /// Events waiting in this endpoint's retry outbox. Zero when it is not backing off.
+  public let waiting: Int
+  /// When the outbox next sends, or nil when nothing is waiting or it is sending now.
+  public let nextAttemptAt: Date?
 
   public init(
-    outcome: Outcome, at: Date, consecutiveFailures: Int, event: String, url: String
+    outcome: Outcome, at: Date, consecutiveFailures: Int, event: String, url: String,
+    waiting: Int = 0, nextAttemptAt: Date? = nil
   ) {
     self.outcome = outcome
     self.at = at
     self.consecutiveFailures = consecutiveFailures
     self.event = event
     self.url = url
+    self.waiting = waiting
+    self.nextAttemptAt = nextAttemptAt
   }
 
   /// A short reason for a delivery error.
@@ -121,25 +128,55 @@ public actor WebhookDeliveryTracker {
   /// The count lives here rather than in the sink so that every path that delivers (real
   /// dispatch and the test send) moves the same counter. A successful test send clearing
   /// the failure streak is correct: the endpoint just answered.
+  ///
+  /// `waiting` and `nextAttemptAt` describe the endpoint's retry outbox as it stands after
+  /// this attempt. A nil `waiting` means the caller does not know (the test send, which posts
+  /// outside the sink) and both are carried over from the previous state, so pressing Test
+  /// does not make a backlog vanish from the row while it is still waiting.
   @discardableResult
   public func record(
     id: Int64,
     url: String,
     event: String,
     outcome: WebhookDeliveryState.Outcome,
-    at: Date = Date()
+    at: Date = Date(),
+    waiting: Int? = nil,
+    nextAttemptAt: Date? = nil
   ) -> Int {
     let previous = states[id]
     // A previous outcome recorded against a different URL belongs to a webhook that no
     // longer exists at this id, so its failure streak does not carry over.
-    let carried = previous?.url == url ? (previous?.consecutiveFailures ?? 0) : 0
+    let sameEndpoint = previous?.url == url
+    let carried = sameEndpoint ? (previous?.consecutiveFailures ?? 0) : 0
     let failures = outcome.isFailure ? carried + 1 : 0
+    let backlog: (waiting: Int, next: Date?)
+    if let waiting {
+      backlog = (waiting, nextAttemptAt)
+    } else if sameEndpoint, let previous {
+      backlog = (previous.waiting, previous.nextAttemptAt)
+    } else {
+      backlog = (0, nil)
+    }
 
     states[id] = WebhookDeliveryState(
-      outcome: outcome, at: at, consecutiveFailures: failures, event: event, url: url
+      outcome: outcome, at: at, consecutiveFailures: failures, event: event, url: url,
+      waiting: backlog.waiting, nextAttemptAt: backlog.next
     )
     publish()
     return failures
+  }
+
+  /// Updates how many events are waiting for an endpoint without recording an attempt:
+  /// an event queued behind a failure, or an outbox discarded. A state recorded against
+  /// another URL is left alone, as `record` leaves its streak.
+  public func noteBacklog(id: Int64, url: String, waiting: Int, nextAttemptAt: Date?) {
+    guard let previous = states[id], previous.url == url else { return }
+    states[id] = WebhookDeliveryState(
+      outcome: previous.outcome, at: previous.at,
+      consecutiveFailures: previous.consecutiveFailures, event: previous.event, url: url,
+      waiting: waiting, nextAttemptAt: nextAttemptAt
+    )
+    publish()
   }
 
   public func state(for id: Int64) -> WebhookDeliveryState? { states[id] }
@@ -156,18 +193,31 @@ public actor WebhookDeliveryTracker {
 
 public enum WebhookDelivery {
 
+  /// The same on every attempt at one event, so a receiver can drop a duplicate: the case a
+  /// retry cannot avoid is a response lost after the endpoint had already done the work.
+  public static let deliveryIDHeader = "X-BlueBubbles-Delivery-Id"
+  /// 1 for the first attempt, 2 for the first retry, and so on.
+  public static let attemptHeader = "X-BlueBubbles-Delivery-Attempt"
+
   /// Encodes one event for one target and POSTs it.
   ///
   /// Shared by `WebhookSink` and the test send. The subscription is NOT consulted here:
   /// the caller decides who gets this event, which is what lets a test send reach an
   /// endpoint that is subscribed to something narrow without pretending it is subscribed to
   /// the test.
+  ///
+  /// - Parameters:
+  ///   - deliveryID: what identifies this event to this endpoint across attempts. A fresh
+  ///     one for a send that will never be retried, which is the test send.
+  ///   - attempt: which attempt this is, from 1.
   public static func send(
     _ event: ServerEvent,
     to target: WebhookTarget,
     negotiator: CodecNegotiator,
     transport: any HTTPPosting,
-    projection: PayloadProjection = .notification
+    projection: PayloadProjection = .notification,
+    deliveryID: UUID = UUID(),
+    attempt: Int = 1
   ) async throws {
     let capabilities = TargetCapabilities(supportedCodecs: target.codecs)
     let codec = negotiator.resolve(for: capabilities)
@@ -181,7 +231,14 @@ public enum WebhookDelivery {
     ]).serialize()
 
     try await transport.post(
-      url: target.url, body: body, followRedirects: target.followRedirects
+      url: target.url,
+      body: body,
+      headers: [
+        "Content-Type": "application/json",
+        deliveryIDHeader: deliveryID.uuidString.lowercased(),
+        attemptHeader: String(attempt),
+      ],
+      followRedirects: target.followRedirects
     )
   }
 

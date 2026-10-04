@@ -158,5 +158,17 @@ public enum InterfacesSchema: SchemaContributor {
         table.add(column: "chat_guids", .text)
       }
     }
+
+    // A webhook's retry policy: how many times a failed delivery is retried, and the wait
+    // before the first retry. Existing rows get zero retries, which is what they have always
+    // had; an upgrade does not start sending an endpoint second attempts it never asked for.
+    // A new row is written with `Webhook.defaultRetryPolicy` explicitly, so the DDL default
+    // only ever backfills.
+    migrator.registerMigration("interfaces.addWebhookRetryPolicy") { db in
+      try db.alter(table: "webhook") { table in
+        table.add(column: "retry_limit", .integer).notNull().defaults(to: 0)
+        table.add(column: "retry_delay_seconds", .integer).notNull().defaults(to: 30)
+      }
+    }
   }
 }

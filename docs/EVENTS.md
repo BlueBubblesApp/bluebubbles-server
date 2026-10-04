@@ -165,6 +165,43 @@ carries it to `WebhookSink`.
   re-registering after a reinstall does not widen an endpoint the operator narrowed. Putting it
   on the wire is an addition to the contract, which `acceptedDifferences` would have to declare.
 
+### A webhook retries failed deliveries, in order, off the lane
+
+`webhook.retry_limit` and `webhook.retry_delay_seconds` are the policy (`WebhookRetryPolicy`):
+how many retries one event gets after its first attempt, and the wait before the first retry,
+doubling after each failure up to an hour, with jitter of a fifth either way. A new webhook
+gets `Webhook.defaultRetryPolicy` (five retries from 30 seconds, about a quarter of an hour in
+all); a webhook that predates the columns gets none, because an upgrade does not start sending
+an endpoint second attempts it never asked for. Absent in a write means "leave it", as for the
+redirect policy, and like the chat filter it is set from the settings window and is not on the
+v1 wire.
+
+- **Retries never run in the lane.** The bus delivers to `WebhookSink` one event at a time, so
+  the lane only ever makes a first attempt. A retryable failure opens that endpoint's outbox
+  (`WebhookOutboxes`), and the outboxes are drained by their own tasks, one per endpoint, woken
+  by a single timer set for whichever is due first.
+- **An endpoint with an open outbox is not sent new events directly.** They queue behind the
+  failed one, so the endpoint receives events in the order they happened, is not sent a burst
+  while it is down, and an endpoint that hangs costs one 15-second timeout rather than one per
+  event. When the head gets through, the rest follow at once. Other endpoints are unaffected.
+- **Only what a later attempt could change is retried**: timeouts, connection failures, HTTP
+  408, 425, 429 and 5xx. Any other response says the request itself was refused, and the event
+  is given up on at once without moving the backoff. A typing indicator is never retried or
+  queued, because it is stale by the time a retry could land.
+- **Every attempt carries two headers.** `X-BlueBubbles-Delivery-Id` is the same on every
+  attempt at one event, so a receiver can drop a duplicate (the one a retry cannot avoid: the
+  work was done and the response was lost); `X-BlueBubbles-Delivery-Attempt` counts from 1.
+  Headers rather than a body field, because the body is `{"type", "data"}` and consumers parse
+  it.
+- **Bounded and in memory.** An outbox holds at most 500 events and drops the oldest past that,
+  saying so once. A service stop discards every outbox and logs how many events were waiting.
+- **The webhooks page says what is waiting.** `WebhookDeliveryState.waiting` and
+  `nextAttemptAt` put "3 events waiting to retry, next attempt in 2 minutes" on the row. The
+  persistent-failure alert counts attempts, retries included.
+
+Not done: honouring `Retry-After` on a 429 or 503 (the transport reports the status alone), and
+keeping outboxes across a restart.
+
 **Registration is the on-switch.** `EventBus.register(_:)` is what makes a sink active; an
 unconfigured sink is *not registered*, never registered-and-disabled. That distinction is what
 keeps "no Firebase" a valid deployment rather than a warning state.

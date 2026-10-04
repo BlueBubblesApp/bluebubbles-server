@@ -34,9 +34,10 @@ enum WebhookDeliverySummary {
   /// itself belongs to `formatted` and the locale.
   static func describe(_ state: WebhookDeliveryState) -> String {
     let when = state.at.formatted(.relative(presentation: .numeric))
+    let line: String
     switch state.outcome {
     case .delivered:
-      return "Delivered \(when)"
+      line = "Delivered \(when)"
     case .failed(let reason):
       // The streak is what separates "the endpoint blipped" from "this has been dead all
       // afternoon", and it is the same counter the alert fires on. Suppressed at one,
@@ -45,7 +46,22 @@ enum WebhookDeliverySummary {
         state.consecutiveFailures > 1
         ? " · \(state.consecutiveFailures) in a row"
         : ""
-      return "Failed \(when): \(reason)\(streak)"
+      line = "Failed \(when): \(reason)\(streak)"
     }
+    guard let backlog = backlog(state) else { return line }
+    return "\(line) · \(backlog)"
+  }
+
+  /// What the endpoint's retry outbox holds, or nil when it holds nothing.
+  ///
+  /// Said on the row because it is the difference between "this failed and the event is
+  /// gone" and "this failed and the event is coming", which is the question someone looking
+  /// at a failing endpoint is asking. A delivered row can carry one too: the backlog drains
+  /// one event at a time once the endpoint answers again.
+  static func backlog(_ state: WebhookDeliveryState) -> String? {
+    guard state.waiting > 0 else { return nil }
+    let waiting = "\(state.waiting.counted("event")) waiting to retry"
+    guard let next = state.nextAttemptAt else { return "\(waiting), sending now" }
+    return "\(waiting), next attempt \(next.formatted(.relative(presentation: .named)))"
   }
 }

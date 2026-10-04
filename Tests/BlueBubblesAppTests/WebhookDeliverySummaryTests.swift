@@ -23,7 +23,7 @@ struct WebhookDeliverySummaryTests {
     let idField = id.map { "\"id\": \($0)," } ?? ""
     let json = """
       {\(idField) "url": "\(url)", "events": "[\\"*\\"]", "created_at": \(created),
-       "follow_redirects": false}
+       "follow_redirects": false, "retry_limit": 0, "retry_delay_seconds": 30}
       """
     return try JSONDecoder().decode(Webhook.self, from: Data(json.utf8))
   }
@@ -98,5 +98,30 @@ struct WebhookDeliverySummaryTests {
     let repeated = WebhookDeliverySummary.describe(
       state(url: "https://example.com/hook", outcome: .failed("HTTP 500"), failures: 7))
     #expect(repeated.contains("7 in a row"))
+  }
+
+  // MARK: - The retry outbox
+
+  private func backlogged(waiting: Int, next: Date?) -> WebhookDeliveryState {
+    WebhookDeliveryState(
+      outcome: .failed("HTTP 503"), at: Date(timeIntervalSince1970: 1_800_000_000),
+      consecutiveFailures: 1, event: "new-message", url: "https://example.com/hook",
+      waiting: waiting, nextAttemptAt: next)
+  }
+
+  /// "Failed, and the event is gone" and "failed, and the event is coming" have to read
+  /// differently, or the second looks like the first.
+  @Test("Events waiting to be retried are named on the row, and nothing is said when none are")
+  func backlog() {
+    #expect(WebhookDeliverySummary.backlog(backlogged(waiting: 0, next: nil)) == nil)
+    #expect(!WebhookDeliverySummary.describe(backlogged(waiting: 0, next: nil)).contains("retry"))
+
+    let scheduled = WebhookDeliverySummary.describe(
+      backlogged(waiting: 3, next: Date(timeIntervalSince1970: 1_800_000_120)))
+    #expect(scheduled.contains("3 events waiting to retry"))
+    #expect(scheduled.contains("next attempt"))
+
+    let sending = WebhookDeliverySummary.describe(backlogged(waiting: 1, next: nil))
+    #expect(sending.contains("1 event waiting to retry, sending now"))
   }
 }

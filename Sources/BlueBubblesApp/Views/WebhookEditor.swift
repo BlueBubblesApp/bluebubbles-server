@@ -21,6 +21,11 @@
 //  it did. When it is hidden the webhook is saved as taking every conversation, so what is
 //  stored is what the sheet showed.
 //
+//  Retries open on `Webhook.defaultRetryPolicy` for a new endpoint, and on the stored policy
+//  for an existing one. The schedule is spelt out under the controls (`WebhookRetryChoice`)
+//  because "first retry after 30 seconds, doubling" is arithmetic nobody should have to do to
+//  find out how long an event is held.
+//
 //  See `.claude/docs/architecture.md`.
 
 import BBAppStore
@@ -45,6 +50,7 @@ struct WebhookEditor: View {
   @State private var url = ""
   @State private var subscription = EventSubscription()
   @State private var chats = WebhookChatSelection()
+  @State private var retry = WebhookRetryChoice(policy: Webhook.defaultRetryPolicy)
   @State private var isSaving = false
   @State private var error: String?
   /// The webhook being edited. Seeded from `initial`, and changed by "Edit That One" when
@@ -72,6 +78,7 @@ struct WebhookEditor: View {
       if subscription.includesChatEvents {
         chatsSection
       }
+      retrySection
     }
     .onAppear(perform: loadInitial)
   }
@@ -162,6 +169,76 @@ struct WebhookEditor: View {
     }
   }
 
+  private var retrySection: some View {
+    SettingsSection(
+      "Retries",
+      subtitle: "What happens when this endpoint cannot be reached, or answers with an error."
+    ) {
+      SettingsRow(
+        title: "Retry Failed Deliveries",
+        help: "Timeouts, connection failures, HTTP 408, 425 and 429, and any 5xx response are "
+          + "retried. Any other response means the request itself was refused, and sending it "
+          + "again would be refused the same way."
+      ) {
+        Toggle("", isOn: $retry.isEnabled)
+          .labelsHidden()
+          .toggleStyle(.switch)
+      }
+
+      SettingsDivider()
+
+      if retry.isEnabled {
+        SettingsRow(
+          title: "Retries",
+          help: "How many more times one event is tried after its first attempt fails."
+        ) {
+          Stepper(
+            retry.retries.counted("retry", "retries"),
+            value: $retry.retries,
+            in: WebhookRetryChoice.retryRange
+          )
+        }
+
+        SettingsDivider()
+
+        SettingsRow(
+          title: "First Retry After",
+          help: "Each later retry waits twice as long as the one before, up to an hour."
+        ) {
+          Picker("", selection: $retry.initialDelaySeconds) {
+            ForEach(retry.delayOptions, id: \.self) { seconds in
+              Text(WebhookRetryChoice.label(seconds: seconds)).tag(seconds)
+            }
+          }
+          .labelsHidden()
+          .controlSize(.large)
+          .frame(maxWidth: 200)
+        }
+
+        SettingsDivider()
+
+        VStack(alignment: .leading, spacing: 6) {
+          SettingsFootnote(text: retry.schedule, symbol: "clock.arrow.circlepath")
+          SettingsFootnote(
+            text: "While this endpoint is failing, newer events wait behind the failed one, "
+              + "so they arrive in order once it recovers. Typing indicators are not held.",
+            symbol: "list.number"
+          )
+          SettingsFootnote(
+            text: "Every attempt carries an X-BlueBubbles-Delivery-Id header, the same on each "
+              + "retry of one event, and an X-BlueBubbles-Delivery-Attempt header counting from "
+              + "1. Use the ID to ignore an event you have already handled.",
+            symbol: "info.circle"
+          )
+        }
+        .padding(.vertical, 4)
+      } else {
+        SettingsFootnote(text: retry.schedule, symbol: "info.circle")
+          .padding(.vertical, 4)
+      }
+    }
+  }
+
   // MARK: - Duplicates
 
   /// A different webhook already registered for the URL being typed.
@@ -178,6 +255,7 @@ struct WebhookEditor: View {
     url = hook.url
     subscription = EventSubscription(wireValues: hook.subscribedEvents)
     chats = WebhookChatSelection(scope: hook.chatScope)
+    retry = WebhookRetryChoice(policy: hook.retryPolicy)
     followRedirects = hook.followRedirects
     error = nil
   }
@@ -203,6 +281,7 @@ struct WebhookEditor: View {
     url = initial.url
     subscription = EventSubscription(wireValues: initial.subscribedEvents)
     chats = WebhookChatSelection(scope: initial.chatScope)
+    retry = WebhookRetryChoice(policy: initial.retryPolicy)
     followRedirects = initial.followRedirects
   }
 
@@ -224,16 +303,16 @@ struct WebhookEditor: View {
       // Passed on BOTH paths, and never left to default. The interface reads nil as "no
       // opinion" so a client that has never heard of the switch cannot disarm it by
       // omission; this sheet always has an opinion, because the switch is on screen. The
-      // chat filter follows the same rule.
+      // chat filter and the retry policy follow the same rule.
       if let id = target?.id {
         _ = try await serverAdmin.updateWebhook(
           id: id, url: address, events: events, followRedirects: followRedirects,
-          chatScope: chatScope
+          chatScope: chatScope, retryPolicy: retry.policy
         )
       } else {
         _ = try await serverAdmin.createWebhook(
           url: address, events: events, followRedirects: followRedirects,
-          chatScope: chatScope
+          chatScope: chatScope, retryPolicy: retry.policy
         )
       }
       onDone()

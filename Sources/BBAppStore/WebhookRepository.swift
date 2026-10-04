@@ -30,12 +30,33 @@ public struct Webhook: Sendable, Codable, FetchableRecord, PersistableRecord {
   /// chat events `events` admits; see `ChatScope`. Not on the v1 wire: it is set from the
   /// settings window, and a client registering over the API leaves it as it was.
   public var chatGUIDs: String? = nil
+  /// Retries after a failed delivery; zero is none. See `retryPolicy`.
+  public var retryLimit: Int = 0
+  /// The wait before the first retry, in seconds.
+  public var retryDelaySeconds: Int = WebhookRetryPolicy.off.initialDelaySeconds
 
   enum CodingKeys: String, CodingKey {
     case id, url, events
     case createdAt = "created_at"
     case followRedirects = "follow_redirects"
     case chatGUIDs = "chat_guids"
+    case retryLimit = "retry_limit"
+    case retryDelaySeconds = "retry_delay_seconds"
+  }
+
+  /// What a webhook created with no opinion gets: the API, a client re-registering, or the
+  /// settings window before anyone touches the control. On, because an endpoint that is
+  /// restarting when a message arrives should still get the message. Rows that predate the
+  /// columns are off; see the migration.
+  public static let defaultRetryPolicy = WebhookRetryPolicy.standard
+
+  /// The two retry columns as a policy, clamped into range by `WebhookRetryPolicy`.
+  public var retryPolicy: WebhookRetryPolicy {
+    get { WebhookRetryPolicy(maxRetries: retryLimit, initialDelaySeconds: retryDelaySeconds) }
+    set {
+      retryLimit = newValue.maxRetries
+      retryDelaySeconds = newValue.initialDelaySeconds
+    }
   }
 
   /// What a webhook created with no opinion gets. Named rather than written as a literal at
@@ -155,7 +176,8 @@ public struct WebhookRepository: Sendable {
       try Webhook.order(Column("id")).fetchAll(db).map {
         WebhookTarget(
           id: $0.id ?? 0, url: $0.url, events: $0.subscribedEvents,
-          followRedirects: $0.followRedirects, chatScope: $0.chatScope
+          followRedirects: $0.followRedirects, chatScope: $0.chatScope,
+          retryPolicy: $0.retryPolicy
         )
       }
     }
@@ -171,9 +193,11 @@ public struct WebhookRepository: Sendable {
   /// upserts: a client re-registering a webhook after a reinstall sends the same two fields
   /// it always has, and that must not silently flip an endpoint the operator had turned
   /// redirect-following ON for. A row that does not exist yet takes `defaultFollowRedirects`.
-  /// `chatScope` follows the same rule for the same reason, and a new row takes every chat.
+  /// `chatScope` and `retryPolicy` follow the same rule for the same reason; a new row takes
+  /// every chat and `Webhook.defaultRetryPolicy`.
   public func upsert(
-    url: String, events: [String], followRedirects: Bool? = nil, chatScope: ChatScope? = nil
+    url: String, events: [String], followRedirects: Bool? = nil, chatScope: ChatScope? = nil,
+    retryPolicy: WebhookRetryPolicy? = nil
   ) async throws -> Webhook {
     let encoded = Webhook.encode(events: events)
     return try await database.write { db in
@@ -195,6 +219,7 @@ public struct WebhookRepository: Sendable {
           ?? Webhook.defaultFollowRedirects,
         chatGUIDs: chatGUIDs
       )
+      record.retryPolicy = retryPolicy ?? existing?.retryPolicy ?? Webhook.defaultRetryPolicy
       try record.save(db)
       if record.id == nil { record.id = db.lastInsertedRowID }
       return record
@@ -209,7 +234,7 @@ public struct WebhookRepository: Sendable {
   /// registered and still being called, which is the opposite of what editing it means.
   public func update(
     id: Int64, url: String?, events: [String]?, followRedirects: Bool? = nil,
-    chatScope: ChatScope? = nil
+    chatScope: ChatScope? = nil, retryPolicy: WebhookRetryPolicy? = nil
   ) async throws -> Webhook {
     let encoded = events.map(Webhook.encode(events:))
     return try await database.write { db in
@@ -230,6 +255,7 @@ public struct WebhookRepository: Sendable {
       if let encoded { record.events = encoded }
       if let followRedirects { record.followRedirects = followRedirects }
       if let chatScope { record.chatGUIDs = Webhook.encode(chatScope: chatScope) }
+      if let retryPolicy { record.retryPolicy = retryPolicy }
       try record.update(db)
       return record
     }

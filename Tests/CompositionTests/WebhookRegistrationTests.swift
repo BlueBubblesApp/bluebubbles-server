@@ -347,4 +347,67 @@ struct WebhookRegistrationTests {
     let rows = try await WebhookRepository(database: database).all()
     #expect(rows.first?.chatScope == .only([]))
   }
+
+  // MARK: - The retry policy
+
+  @Test("A new webhook retries on the default policy")
+  func newWebhookRetries() async throws {
+    let admin = try await makeInterface()
+    let hook = try await admin.createWebhook(url: "https://example.com/a", events: ["*"])
+    #expect(hook.retryPolicy == Webhook.defaultRetryPolicy)
+    #expect(hook.retryPolicy.isEnabled)
+  }
+
+  @Test("A chosen retry policy survives a round trip, off included")
+  func retryPolicyRoundTrips() async throws {
+    let admin = try await makeInterface()
+    let chosen = WebhookRetryPolicy(maxRetries: 8, initialDelaySeconds: 300)
+    let created = try await admin.createWebhook(
+      url: "https://example.com/a", events: ["*"], retryPolicy: chosen)
+    #expect(try await admin.webhooks().first?.retryPolicy == chosen)
+
+    let id = try #require(created.id)
+    _ = try await admin.updateWebhook(id: id, url: nil, events: nil, retryPolicy: .off)
+    #expect(try await admin.webhooks().first?.retryPolicy == .off)
+  }
+
+  /// The same "absent means leave it" as the redirect policy: a client re-registering after
+  /// a reinstall must not switch off retries the operator had turned on, or on for one they
+  /// had turned off.
+  @Test("A create or update that says nothing leaves the retry policy alone")
+  func silentWritesKeepTheRetryPolicy() async throws {
+    let admin = try await makeInterface()
+    _ = try await admin.createWebhook(
+      url: "https://example.com/a", events: ["*"], retryPolicy: .off)
+
+    let again = try await admin.createWebhook(url: "https://example.com/a", events: ["*"])
+    #expect(again.retryPolicy == .off)
+
+    let id = try #require(again.id)
+    let edited = try await admin.updateWebhook(id: id, url: "https://example.com/b", events: nil)
+    #expect(edited.retryPolicy == .off)
+  }
+
+  @Test("The retry policy reaches the delivery target")
+  func retryPolicyReachesTheTarget() async throws {
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
+    let store = WebhookRepository(database: database)
+    let chosen = WebhookRetryPolicy(maxRetries: 2, initialDelaySeconds: 10)
+    _ = try await store.upsert(url: "https://example.com/a", events: ["*"], retryPolicy: chosen)
+    #expect(try await store.targets().first?.retryPolicy == chosen)
+  }
+
+  /// An upgrade does not start sending an endpoint second attempts it never asked for.
+  @Test("A row that predates the columns does not retry")
+  func migratedRowsDoNotRetry() async throws {
+    let database = try AppDatabase.inMemory(contributors: AppSchema.contributors)
+    try await database.write { db in
+      try db.execute(
+        sql: "INSERT INTO webhook (url, events, created_at) VALUES (?, ?, ?)",
+        arguments: ["https://legacy.example.com/hook", "[\"*\"]", Date()]
+      )
+    }
+    let rows = try await WebhookRepository(database: database).all()
+    #expect(rows.first?.retryPolicy.isEnabled == false)
+  }
 }

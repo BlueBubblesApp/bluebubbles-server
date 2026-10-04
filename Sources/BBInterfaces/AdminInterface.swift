@@ -215,32 +215,31 @@ public struct AdminInterface: Sendable {
   ///   that as "off" would silently disarm an endpoint the operator had turned it on for.
   /// - Parameter chatScope: nil means "no opinion" by the same rule: every conversation on a
   ///   new webhook, and whatever an existing one had. No v1 client sends one.
+  /// - Parameter retryPolicy: nil means "no opinion" too: `Webhook.defaultRetryPolicy` on a
+  ///   new webhook, and whatever an existing one had.
   public func createWebhook(
-    url: String, events: [String], followRedirects: Bool? = nil, chatScope: ChatScope? = nil
+    url: String, events: [String], followRedirects: Bool? = nil, chatScope: ChatScope? = nil,
+    retryPolicy: WebhookRetryPolicy? = nil
   ) async throws -> Webhook {
     try Self.validate(url: url)
     let webhook = try await webhookStore.upsert(
-      url: url, events: events, followRedirects: followRedirects, chatScope: chatScope
+      url: url, events: events, followRedirects: followRedirects, chatScope: chatScope,
+      retryPolicy: retryPolicy
     )
-    logWebhook(
-      "Webhook created", id: webhook.id, url: url, events: events,
-      followRedirects: webhook.followRedirects, chatScope: webhook.chatScope
-    )
+    logWebhook("Webhook created", webhook, events: events)
     return webhook
   }
 
   public func updateWebhook(
     id: Int64, url: String?, events: [String]?, followRedirects: Bool? = nil,
-    chatScope: ChatScope? = nil
+    chatScope: ChatScope? = nil, retryPolicy: WebhookRetryPolicy? = nil
   ) async throws -> Webhook {
     if let url { try Self.validate(url: url) }
     let webhook = try await webhookStore.update(
-      id: id, url: url, events: events, followRedirects: followRedirects, chatScope: chatScope
+      id: id, url: url, events: events, followRedirects: followRedirects, chatScope: chatScope,
+      retryPolicy: retryPolicy
     )
-    logWebhook(
-      "Webhook updated", id: id, url: webhook.url, events: webhook.subscribedEvents,
-      followRedirects: webhook.followRedirects, chatScope: webhook.chatScope
-    )
+    logWebhook("Webhook updated", webhook, events: webhook.subscribedEvents)
     return webhook
   }
 
@@ -250,24 +249,24 @@ public struct AdminInterface: Sendable {
   /// content, and a change to it is the kind of thing an operator needs to be able to find
   /// afterwards. The chat filter is logged as a COUNT for the same reason: a chat GUID names
   /// the people in the chat, and how many conversations an endpoint is narrowed to is what
-  /// explains an event that did not arrive.
-  private func logWebhook(
-    _ what: String, id: Int64?, url: String, events: [String], followRedirects: Bool,
-    chatScope: ChatScope
-  ) {
+  /// explains an event that did not arrive. The retry policy is logged because it decides
+  /// whether an endpoint can be sent the same event twice.
+  private func logWebhook(_ what: String, _ webhook: Webhook, events: [String]) {
     let chatCount: String =
-      switch chatScope {
+      switch webhook.chatScope {
       case .allChats: "all"
       case .only(let guids): String(guids.count)
       }
     logger.info(
       "\(what)",
       metadata: [
-        "id": .stringConvertible(id ?? 0),
-        "url": .string(Redaction.url(url)),
+        "id": .stringConvertible(webhook.id ?? 0),
+        "url": .string(Redaction.url(webhook.url)),
         "events": .string(events.joined(separator: ",")),
-        "followRedirects": .stringConvertible(followRedirects),
+        "followRedirects": .stringConvertible(webhook.followRedirects),
         "chatCount": .string(chatCount),
+        "retryLimit": .stringConvertible(webhook.retryLimit),
+        "retryDelaySeconds": .stringConvertible(webhook.retryDelaySeconds),
       ])
   }
 

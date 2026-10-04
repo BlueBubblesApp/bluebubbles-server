@@ -62,6 +62,7 @@ struct SchemaContributionTests {
     "interfaces.addScheduledMessageAnchor",
     "interfaces.addWebhookRedirectPolicy",
     "interfaces.addWebhookChatFilter",
+    "interfaces.addWebhookRetryPolicy",
     // BBAuth
     "createAccessControl",
     "addBlockOffenceCount",
@@ -94,6 +95,7 @@ struct SchemaContributionTests {
         "interfaces.addScheduledMessageAnchor",
         "interfaces.addWebhookRedirectPolicy",
         "interfaces.addWebhookChatFilter",
+        "interfaces.addWebhookRetryPolicy",
       ])
     #expect(
       AccessControlSchema.migrationIdentifiers() == [

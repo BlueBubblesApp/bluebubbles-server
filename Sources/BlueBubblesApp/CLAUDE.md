@@ -412,7 +412,8 @@ over built-in ids. `IntegrationCatalogTests` refuses a second lookup.
 ## Policy lives off the view
 
 `IntegrationCatalog`, `ConnectionMethodChoices`, `NetworkAddressChoices`,
-`AlertActionRouting`, `WebhookEventCatalog`, `WebhookChatSelection`, `OnboardingFlow`,
+`AlertActionRouting`, `WebhookEventCatalog`, `WebhookChatSelection`, `WebhookRetryChoice`,
+`OnboardingFlow`,
 `SendLaterGuidance`, `UpdaterPolicy`, `InstallWindow`, `WhatsNew`, `ScheduledMessageRow`, `ServiceFormLayout`,
 `LogFiltering` (with `LogLevelFilter`), `LogDocumentUpdate`, `FirebaseDetail`,
 `NotificationDeliveryRouting`, `BlockedClientSummary`,
@@ -457,6 +458,7 @@ to feel constrained by this, the answer is a plain note value the view renders, 
 `WhatsNewTests`, `ScheduledMessageRowTests`, `ServiceFormLayoutTests`, `LogFilteringTests`,
 `LogDocumentUpdateTests`, `NotificationDeliveryRoutingTests`, `BlockedClientSummaryTests`,
 `ChatPickerNavigationTests`, `SettingRowStateTests`,
-`WebhookDeliverySummaryTests`, `WebhookChatSelectionTests`, `DeviceRowSummaryTests`,
+`WebhookDeliverySummaryTests`, `WebhookChatSelectionTests`, `WebhookRetryChoiceTests`,
+`DeviceRowSummaryTests`,
 `HTTPListenerSummaryTests`, `APIDocsRelayPolicyTests`, `PermissionGuidanceTests`. `AppBehaviourPolicy` is asserted from `CompositionTests/ScopedSettingsTests`
 and the setting-dependency declarations from `BBSettingsTests/SettingDependencyTests`.
