@@ -4,8 +4,7 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
 
 ## Pre-requisites
 
--   NodeJS **20.11.x** (the version named in `devEngines`): https://nodejs.org/en/
--   Python with `distutils` available for `node-gyp` (Python 3.11 or older, or a newer Python with `setuptools` installed)
+-   NodeJS: https://nodejs.org/en/
 -   Git: https://git-scm.com/
 
 **Warning**: Yarn may not work for this project. You may run into build errors.
@@ -20,23 +19,6 @@ This is the back-end server for the BlueBubbles App. It allows you to forward yo
     - `npm install`
 4. Run the dev server (this will start both the renderer and server)
     - `npm run start`
-
-### Native module build errors
-
-`node-mac-permissions` and `node-mac-contacts` are compiled from source during `npm install` (`better-sqlite3` normally downloads a prebuilt binary). Two toolchain mismatches commonly break that step:
-
--   **`ModuleNotFoundError: No module named 'distutils'`**: `@electron/rebuild` (run by the server package's `postinstall`) uses `node-gyp` 9, which needs `distutils`, removed in Python 3.12. Point npm at a Python that has it, for example a virtualenv with `setuptools`:
-
-    ```bash
-    python3 -m venv .gyp-venv && .gyp-venv/bin/pip install setuptools
-    export npm_config_python="$PWD/.gyp-venv/bin/python"
-    ```
-
--   **`no matching function for call to 'napi_add_finalizer'`** while compiling `node-mac-contacts`: you are on Node 20.12 or newer (Homebrew's `node@20`, for example, is 20.20). Those headers declare `napi_add_finalizer` with a finalizer type that the `node-addon-api` 3 nested under `node-mac-contacts` predates. Use Node 20.11.x, e.g. with nvm:
-
-    ```bash
-    nvm install 20.11 && nvm use 20.11
-    ```
 
 ### Building a local app (macOS)
 
