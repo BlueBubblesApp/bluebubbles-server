@@ -1185,8 +1185,6 @@ let package = Package(
                 // The two modules split out of `BBInterfaces`: the upload store a send body
                 // names a file in, and the app-database repositories a handler reads.
                 "BBMedia", "BBAppStore",
-                // `TranscriptResponseShapeTests` builds the transcript's own values.
-                "BBTranscript",
                 // The webhook event catalog a create is validated against.
                 "BBEvents",
             ],

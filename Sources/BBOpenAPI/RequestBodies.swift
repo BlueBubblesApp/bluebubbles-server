@@ -500,8 +500,7 @@ public enum RequestBodies {
         + "without its attachments. Answers with the file itself.",
       properties: [
         Property(
-          "chat_guid", .string,
-          "The conversation to export. Find one with `GET /api/v2/transcript/chat`.",
+          "chat_guid", .string, "The conversation to export, by its chat GUID.",
           required: true),
         Property(
           "format", .string,

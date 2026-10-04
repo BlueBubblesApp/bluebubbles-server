@@ -1,11 +1,11 @@
 //  TranscriptHandlers
-//  Exporting a conversation as a file, and finding the conversation to export.
+//  Exporting a conversation as a file.
 //
-//  Two routes under `/api/v2/transcript`. `GET chat` is the picker: a caller that knows a
-//  person's name but not a chat GUID asks here and gets candidates with names resolved.
-//  `POST export` writes the transcript to this server's export folder and answers with the
-//  file itself, streamed, under a `Content-Disposition` naming it, so `curl -OJ` and a
-//  browser both save it as "Team-20240101-20240301.zip".
+//  One route, `POST /api/v2/transcript/export`. It takes the conversation by GUID, which a
+//  client already holds, writes the transcript to this server's export folder and answers
+//  with the file itself, streamed, under a `Content-Disposition` naming it, so `curl -OJ`
+//  and a browser both save it as "Team-20240101-20240301.zip". Finding a conversation by a
+//  person's name is the app's Export page's job, not the API's.
 //
 //  The body is this server's own (`snake_case`, per `docs/NAMING.md`) and is read in one
 //  place, `exportRequest`, so the OpenAPI declaration in `RequestBodies` and the handler can
@@ -29,21 +29,6 @@ public enum TranscriptHandlers {
     context: some InterfaceProviding & TranscriptExportStoring
   ) {
 
-    /// Conversations matching `?query=`, newest first, with names from this server's
-    /// contacts. An empty query lists the most recent ones.
-    registry.register(.transcriptChats) { request in
-      let interfaces = try await context.requireInterfaces()
-      let query = request.queryParameters["query"] ?? ""
-      let limit = min(max(request.integer("limit") ?? 50, 1), 500)
-      let includeArchived =
-        request.has("include_archived") ? request.truthy("include_archived") : true
-      let candidates = try await interfaces.transcript.searchChats(
-        matching: query, limit: limit, includeArchived: includeArchived)
-      return .data(
-        .array(candidates.map(Self.serialize)),
-        metadata: .object(["count": .int(candidates.count), "limit": .int(limit)]))
-    }
-
     /// The export. Answers with the file, not with JSON about it.
     registry.register(.transcriptExport) { request in
       let interfaces = try await context.requireInterfaces()
@@ -60,7 +45,8 @@ public enum TranscriptHandlers {
 
   // MARK: - The request
 
-  /// Reads the export body. Every key here is also declared in `RequestBodies`.
+  /// Reads the export body. Every key here is also declared in `RequestBodies`;
+  /// `TranscriptRequestShapeTests` holds the two together.
   static func exportRequest(_ values: RequestValues) throws -> TranscriptInterface.ExportRequest {
     let chatGUID = try values.requireString("chat_guid")
     let format = try enumeration(
@@ -143,38 +129,5 @@ public enum TranscriptHandlers {
     formatter.timeZone = .current
     formatter.dateFormat = "yyyy-MM-dd"
     return formatter.date(from: text)
-  }
-
-  // MARK: - The response
-
-  /// One candidate, as `GET transcript/chat` lists it. `ResponseBodies` declares the same
-  /// keys; `TranscriptResponseShapeTests` holds the two together.
-  static func serialize(_ candidate: TranscriptInterface.ChatCandidate) -> JSONValue {
-    let chat = candidate.chat
-    return .object([
-      "guid": .string(chat.guid),
-      "title": .string(chat.title),
-      "display_name": chat.displayName.map(JSONValue.string) ?? .null,
-      "is_group": .bool(chat.isGroup),
-      "is_archived": .bool(candidate.isArchived),
-      "service": chat.service.map(JSONValue.string) ?? .null,
-      "last_message_date": candidate.lastMessageDate.map { .int64(Self.milliseconds($0)) }
-        ?? .null,
-      "participants": .array(chat.participants.map(Self.serialize)),
-    ])
-  }
-
-  static func serialize(_ participant: Transcript.Participant) -> JSONValue {
-    .object([
-      "address": .string(participant.address),
-      "service": participant.service.map(JSONValue.string) ?? .null,
-      "name": participant.name.map(JSONValue.string) ?? .null,
-      "name_source": .string(participant.nameSource.rawValue),
-      "display_name": .string(participant.displayName),
-    ])
-  }
-
-  private static func milliseconds(_ date: Date) -> Int64 {
-    Int64((date.timeIntervalSince1970 * 1000).rounded(.towardZero))
   }
 }

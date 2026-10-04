@@ -1,69 +1,20 @@
-//  TranscriptResponseShapeTests
-//  What `GET /api/v2/transcript/chat` emits, held against what the document declares.
+//  TranscriptRequestShapeTests
+//  The export request as the handler reads it, held against what the document declares.
 //
-//  Same check as `StickerResponseShapeTests`, for the same reason: `ResponseBodies` is
-//  hand-written for a route no fixture covers, and every other test over it compares the
-//  declaration to itself. Executing the serializer and comparing key sets is the one check
-//  that can catch a declared field the handler never writes, or a written one the document
-//  never promises.
-//
-//  Key sets only. The values are the interface's business and are covered in
-//  `TranscriptInterfaceTests`.
+//  `RequestBodies` is hand-written for a route no fixture covers, so the one check that can
+//  catch a promised field the route ignores is to run the parser and look for every
+//  declared name in the file that reads them.
 
 import BBHTTPAPI
-import BBInterfaces
 import BBOpenAPI
 import BBSerialization
-import BBTranscript
 import Foundation
 import Testing
 
 @testable import BBHandlers
 
-@Suite("The transcript chat listing matches what the document declares")
-struct TranscriptResponseShapeTests {
-
-  private func keys(of value: JSONValue) -> Set<String> {
-    guard case .object(let members) = value else {
-      Issue.record("expected a JSON object")
-      return []
-    }
-    return Set(members.keys)
-  }
-
-  private var candidate: TranscriptInterface.ChatCandidate {
-    TranscriptInterface.ChatCandidate(
-      chat: Transcript.Chat(
-        guid: "iMessage;+;chat123456789", displayName: "Team", isGroup: true,
-        service: "iMessage",
-        participants: [
-          Transcript.Participant(
-            address: "+15555550101", service: "iMessage", name: "Alice Example",
-            nameSource: .contacts)
-        ]),
-      lastMessageDate: Date(timeIntervalSince1970: 1_788_396_119), isArchived: false)
-  }
-
-  @Test("A conversation emits exactly the declared fields")
-  func chatShapeMatches() throws {
-    let body = try #require(ResponseBodies.byHandler[.transcriptChats])
-    let declared = try #require(body.variants.first).properties
-    let emitted = keys(of: TranscriptHandlers.serialize(candidate))
-    #expect(emitted == Set(declared.map(\.name)))
-  }
-
-  @Test("A participant emits exactly the declared fields")
-  func participantShapeMatches() throws {
-    let body = try #require(ResponseBodies.byHandler[.transcriptChats])
-    let declared = try #require(body.variants.first).properties
-    let participants = try #require(declared.first { $0.name == "participants" })
-    guard case .array(of: .object(let nested)) = participants.schema else {
-      Issue.record("participants should be declared as an array of objects")
-      return
-    }
-    let emitted = keys(of: TranscriptHandlers.serialize(candidate.chat.participants[0]))
-    #expect(emitted == Set(nested.map(\.name)))
-  }
+@Suite("The transcript export request matches what the document declares")
+struct TranscriptRequestShapeTests {
 
   @Test("The export body reads every field the document declares")
   func exportBodyFieldsAreRead() throws {

@@ -243,21 +243,6 @@ public enum QueryParameters {
         allowed: ["facetime", "all"], defaultValue: "facetime")
     ],
 
-    // Transcripts
-    .transcriptChats: [
-      Parameter(
-        "query", "string",
-        "What to look for: a group's name, a participant's contact name, an address, or a "
-          + "chat GUID. Case-insensitive, and a mostly-numeric query also matches the digits "
-          + "of a phone number. Empty lists the most recent conversations."),
-      Parameter(
-        "limit", "integer", "Maximum conversations to return. Clamped to 1...500.",
-        defaultValue: "50"),
-      Parameter(
-        "include_archived", "boolean", "Whether archived conversations are included.",
-        defaultValue: "true"),
-    ],
-
     // Webhooks
     .webhookList: [
       Parameter("url", "string", "Return only the webhook with this URL."),

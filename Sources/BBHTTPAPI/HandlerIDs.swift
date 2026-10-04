@@ -210,7 +210,6 @@ extension HandlerID {
   public static let serverStatTotals = HandlerID("server.statTotals")
 
   // MARK: - transcript
-  public static let transcriptChats = HandlerID("transcript.chats")
   public static let transcriptExport = HandlerID("transcript.export")
 
   // MARK: - ui

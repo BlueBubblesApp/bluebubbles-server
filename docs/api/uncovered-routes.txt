@@ -18,10 +18,9 @@
 # Node" was the reason given here before, and it was wrong: it is true of v1 and
 # of nothing else.
 #
-# 13 of 168 routes.
+# 12 of 167 routes.
 
 DELETE /api/v2/message/send-later/:guid  # needs a scheduled message to cancel, which means scheduling one first
-GET /api/v2/transcript/chat  # the transcript picker was added after the v2 recording and its names depend on this Mac's contacts
 POST /api/v2/message/app  # sends an iMessage app balloon to a real conversation
 POST /api/v2/message/game-pigeon  # sends a Game Pigeon invite to a real conversation
 POST /api/v2/message/poll  # sends a poll to a real conversation

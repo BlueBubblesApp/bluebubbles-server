@@ -1,7 +1,7 @@
 # Transcript export
 
 Exporting one conversation as a file: from the app's Export page, or over
-`/api/v2/transcript`. Everything here describes this server's own behaviour; the Node
+`POST /api/v2/transcript/export`. Everything here describes this server's own behaviour; the Node
 reference has no counterpart to any of it.
 
 ---
@@ -100,22 +100,14 @@ JSON `date_iso` strings carry the offset so they stay unambiguous.
 
 ## Finding the conversation
 
-The API takes a chat GUID. A person does not have one, so `GET /api/v2/transcript/chat` finds
-conversations by what a person knows:
+The API takes a chat GUID and nothing else identifies the conversation: a client has the GUID
+in hand and its own contacts to show the person a name. There is deliberately no search route.
 
-```
-GET /api/v2/transcript/chat?query=alice
-GET /api/v2/transcript/chat?query=555%200143
-GET /api/v2/transcript/chat?query=Weekend%20Plans
-```
-
-The query matches, case-insensitively, the group's name, each participant's contact name and
-address, and the GUID; a mostly-numeric query also matches the digits of a phone number. An
-empty query lists the most recent conversations. Each candidate carries its `title` (the group's
-name, else its participants named in order), its participants with names resolved, and
-`last_message_date`. `?limit=` (default 50) and `?include_archived=` (default true) narrow it.
-
-The app's Export page is the same search over the same list, with arrow keys.
+The app's Export page is where a person without a GUID finds a conversation, the same way the
+Scheduled page's composer does: the search matches, case-insensitively, the group's name, each
+participant's contact name and address, and the GUID; a mostly-numeric query also matches the
+digits of a phone number (`TranscriptInterface.searchChats`, `TranscriptChatFilter`). The list
+is newest first, with arrow keys.
 
 ---
 
@@ -170,13 +162,13 @@ two cannot drift.
 |---|---|
 | The model, the sentences, the three writers, the ZIP writer | `Sources/BBTranscript/` |
 | Finding a chat, filling the model from `chat.db` and the contact index | `Sources/BBInterfaces/TranscriptInterface.swift` |
-| The two routes and the request body | `Sources/BBHandlers/TranscriptHandlers.swift`, `AdditiveRoutes.transcripts` |
+| The route and its request body | `Sources/BBHandlers/TranscriptHandlers.swift`, `AdditiveRoutes.transcripts` |
 | Where an API export waits to be downloaded | `Sources/BBMedia/TranscriptExportStore.swift` |
 | The app page, its decisions, and the run it hands off | `Views/TranscriptExportView.swift`, `TranscriptExportOptions.swift`, `Models/TranscriptExportModel.swift` |
 | The decoders the export needed from `chat.db` | `AppMessagePayload.layout`, `RichLinkPayload`, `MessageEditHistory` in `Sources/BBIMessage/` |
 
 Tests: `Tests/BBTranscriptTests` (every sentence, every format, the archive verified with
 `unzip`), `Tests/BBInterfacesTests/TranscriptInterfaceTests.swift` (the export over a real
-fixture database), `Tests/BBHandlersTests/TranscriptResponseShapeTests.swift` (the wire shape
+fixture database), `Tests/BBHandlersTests/TranscriptRequestShapeTests.swift` (the request body
 against the OpenAPI declaration), `Tests/BlueBubblesAppTests/TranscriptExportOptionsTests.swift`
 and `Tests/CompositionTests/TranscriptWiringTests.swift`.

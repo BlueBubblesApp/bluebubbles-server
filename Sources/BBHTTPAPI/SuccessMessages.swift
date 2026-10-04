@@ -54,9 +54,6 @@ public enum SuccessMessages {
     .findmyRefreshDevices: "Successfully refreshed Find My device locations!",
     .findmyRefreshFriends: "Successfully refreshed Find My friends locations!",
 
-    // Transcripts (this server's own; v2 strings are not transcribed from anywhere)
-    .transcriptChats: "Successfully fetched conversations!",
-
     // Messages
     .messageQuery: "Successfully fetched messages!",
     .messageSendText: "Message sent!",

@@ -1,10 +1,10 @@
 //  TranscriptInterface
 //  Exporting a conversation as a file: finding the chat, then streaming it out.
 //
-//  Two operations. `searchChats` is how a person who does not know a chat GUID finds a
-//  conversation: by the group's name, by a participant's contact name, or by an address,
-//  which is what the app's export page offers and what `GET /api/v2/transcript/chat`
-//  answers. `export` writes the transcript, and it is built around one constraint: the
+//  Two operations. `searchChats` is how a person at the Mac, who does not know a chat GUID,
+//  finds a conversation: by the group's name, by a participant's contact name, or by an
+//  address. It serves the app's Export page and no route: a client has the GUID and its own
+//  contacts. `export` writes the transcript, and it is built around one constraint: the
 //  conversation is read a page at a time and written as it is read, so a chat of any
 //  length costs one page of rows plus whatever attachment is being copied at that moment.
 //  Nothing here holds the conversation.
@@ -200,7 +200,8 @@ public struct TranscriptInterface: Sendable {
     return Array(matches.prefix(max(1, limit)))
   }
 
-  /// One conversation by GUID, with names resolved, for the API's own confirmation step.
+  /// One conversation by GUID, with names resolved, which is how the export route names
+  /// its file before writing it.
   public func chat(guid: String) async throws -> ChatCandidate {
     guard let row = try await repository.chat(guid: guid) else {
       throw InterfaceError.notFound("that conversation does not exist on this server")
