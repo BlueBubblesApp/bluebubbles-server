@@ -454,6 +454,17 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
 
+        // A chat transcript as a value and as a file: the model, the sentences the client
+        // renders a reaction, a group event or an app balloon as, three streaming writers
+        // (JSON, plain text, HTML) and a ZIP writer. A leaf on purpose: the interface layer
+        // fills the model from chat.db, and nothing here knows where a row came from, which
+        // is what lets every rendering rule be tested from a handful of values.
+        .target(
+            name: "BBTranscript",
+            dependencies: ["BBCore"],
+            swiftSettings: swiftSettings
+        ),
+
         // The `app.db` repositories: scheduled messages, alerts, webhooks, devices, backups,
         // and the schema they contribute. Split out of `BBInterfaces` for the same reason as
         // `BBMedia`: these are storage, not domain logic, and while they lived there the
@@ -480,6 +491,8 @@ let package = Package(
                 "BBPrivateAPI", "BBPrivateAPIContract", "BBAppleScript", "BBShortcuts",
                 "BBSystem", "BBSettings", "BBPushKit", "BBEvents", "BBDiagnostics", "BBMedia",
                 "BBAppStore",
+                // `TranscriptInterface` fills the transcript model and drives its writers.
+                "BBTranscript",
                 // `UpdateInstalling` names `AppcastItem`; the app conforms, a handler consumes.
                 "BBUpdates",
                 // `Capabilities.swift` names the FaceTime coordinator. The auth, tooling and
@@ -510,6 +523,8 @@ let package = Package(
                 "BBContacts", "BBPrivateAPI", "BBPrivateAPIContract", "BBSystem",
                 "BBDiagnostics", "BBEvents", "BBPushKit", "BBUpdates",
                 "BBPersistence",
+                // `TranscriptHandlers` parses the export's format and attachment mode.
+                "BBTranscript",
                 // `SendCache` is a `BoundedCache` with a TTL; see `AsyncPrimitives`.
                 "BBCore",
             ],
@@ -732,6 +747,17 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
 
+        // The transcript's rendering rules, writers and archive, asserted from values: every
+        // sentence the client would show for a reaction, a group event or a balloon, the
+        // three file shapes, and a ZIP that a reader can walk back.
+        .testTarget(
+            name: "BBTranscriptTests",
+            // `BBCore` for `Subprocess`: the archive test verifies with the system's own
+            // `unzip` rather than a reader that would share the writer's mistakes.
+            dependencies: ["BBTranscript", "BBCore"],
+            swiftSettings: swiftSettings
+        ),
+
         // The wiring. What the composition root is responsible for is exactly the thing
         // no unit test of a module can check: which routes exist, which services start, and
         // in what order.
@@ -775,6 +801,8 @@ let package = Package(
                 "BBTestSupport",
                 "BBInterfaces", "BBIMessage", "BBPersistence", "BBSerialization",
                 "BBPrivateAPIContract", "BBContacts", "BBCore", "BBDiagnostics",
+                // `TranscriptInterfaceTests` reads the transcript model back.
+                "BBTranscript",
                 // `ScreenUnknownSendersGateTests` asserts the gate reads its floor from the
                 // capability rather than from a version literal, which means naming the
                 // capability.
@@ -869,6 +897,8 @@ let package = Package(
                 // The contacts screen renders `ContactRecord` values rather than the wire
                 // JSON, so the record type has to be nameable here.
                 "BBContacts",
+                // The export page offers the transcript formats and attachment modes.
+                "BBTranscript",
                 // For the webhook event vocabulary: the picker offers what
                 // `EventName.webhookSubscribable` declares rather than a second list of
                 // strings that can drift from the events actually emitted.
@@ -1155,6 +1185,8 @@ let package = Package(
                 // The two modules split out of `BBInterfaces`: the upload store a send body
                 // names a file in, and the app-database repositories a handler reads.
                 "BBMedia", "BBAppStore",
+                // `TranscriptResponseShapeTests` builds the transcript's own values.
+                "BBTranscript",
                 // The webhook event catalog a create is validated against.
                 "BBEvents",
             ],
@@ -1185,6 +1217,8 @@ let package = Package(
                 // filtering is asserted against real records rather than a stand-in, because
                 // what a row makes searchable is exactly the part that was wrong.
                 "BBContacts",
+                // `TranscriptExportOptionsTests` names the transcript formats and modes.
+                "BBTranscript",
                 // `LogFilteringTests` names `Logger.Level` in its own signatures: the log
                 // viewer filters on the level the handler logged at, not on the line's text.
                 .product(name: "Logging", package: "swift-log"),

@@ -11,6 +11,7 @@
 //  app implements and a handler consumes is exactly what `Capabilities.swift` is for.
 
 import BBAuth
+import BBMedia
 import Foundation
 
 public protocol AccessControlProviding: Sendable {
@@ -19,4 +20,10 @@ public protocol AccessControlProviding: Sendable {
 
 public protocol TokenAuthProviding: Sendable {
   var tokenAuth: TokenAuthService { get }
+}
+
+/// Where an export produced for an API download is written. Composed by the transcript
+/// routes alone: the app writes its exports where the person chose.
+public protocol TranscriptExportStoring: Sendable {
+  var transcriptExports: TranscriptExportStore { get }
 }

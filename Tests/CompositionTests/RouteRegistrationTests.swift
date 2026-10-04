@@ -35,6 +35,7 @@ struct RouteRegistrationTests {
   static let alwaysMounted: Set<String> = [
     "Security", "Alerts", "Contact Avatar", "Chat Pinning", "Stickers", "Sticker Library",
     "Send Later", "Polls", "App Messages", "Webhook Editing", "Chat Controls", "Contact Card",
+    "Transcripts",
   ]
 
   /// Group names beyond the always-mounted baseline.

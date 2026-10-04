@@ -266,6 +266,62 @@ public enum ResponseBodies {
       required: true),
   ]
 
+  /// One conversation, as the transcript picker lists it.
+  ///
+  /// Shared with `TranscriptHandlers.serialize` by `TranscriptResponseShapeTests`, which
+  /// holds the declared key set against the serialised one.
+  static let transcriptParticipantProperties: [Property] = [
+    Property("address", .string, "The handle: an E.164 number or an email.", required: true),
+    Property("service", .string, "`iMessage`, `SMS` or `RCS`, when known."),
+    Property("name", .string, "A contact name, or null when this server has none."),
+    Property(
+      "name_source", .string,
+      "`contacts` when this server's address book named them, `none` otherwise.",
+      required: true),
+    Property(
+      "display_name", .string,
+      "What a reader sees: the name, else the formatted address.", required: true),
+  ]
+
+  static let transcriptChatProperties: [Property] = [
+    Property("guid", .string, "The chat GUID, to send back as `chat_guid`.", required: true),
+    Property(
+      "title", .string,
+      "The group's name, else its participants named in order.", required: true),
+    Property("display_name", .string, "The name the group was given, or null."),
+    Property("is_group", .boolean, "Whether it is a group conversation.", required: true),
+    Property("is_archived", .boolean, "Whether Messages has it archived.", required: true),
+    Property("service", .string, "`iMessage`, `SMS` or `RCS`."),
+    Property(
+      "last_message_date", .integer,
+      "When the newest message arrived, epoch MILLISECONDS; null for an empty conversation."),
+    Property(
+      "participants", .array(of: .object(properties: transcriptParticipantProperties)),
+      "Everyone in it other than this Mac's own account.", required: true),
+  ]
+
+  static let transcriptChatExample: OrderedJSON = .obj([
+    ("guid", .string("iMessage;+;chat123456789")),
+    ("title", .string("Team")),
+    ("display_name", .string("Team")),
+    ("is_group", .bool(true)),
+    ("is_archived", .bool(false)),
+    ("service", .string("iMessage")),
+    ("last_message_date", .int(1_788_393_987_536)),
+    (
+      "participants",
+      .array([
+        .obj([
+          ("address", .string("+15555550101")),
+          ("service", .string("iMessage")),
+          ("name", .string("Alice Example")),
+          ("name_source", .string("contacts")),
+          ("display_name", .string("Alice Example")),
+        ])
+      ])
+    ),
+  ])
+
   public static let byHandler: [HandlerID: Body] = [
 
     .stickerSave: Body(
@@ -382,6 +438,11 @@ public enum ResponseBodies {
     .securityDisallow: .empty("Nothing. That entry is no longer allowlisted."),
 
     // MARK: Reads this server added
+
+    .transcriptChats: Body(
+      summary: "Conversations matching the query, newest first, with names resolved.",
+      kind: .list(transcriptChatProperties),
+      example: .array([transcriptChatExample])),
 
     // MARK: FaceTime
 

@@ -50,6 +50,7 @@ and knows nothing about the whole.
 | `BBInterfaces` | The domain layer: what an operation MEANS. **Does not depend on BBHTTPAPI** |
 | `BBMedia` | Attachment conversion, the upload store, blurhash, the conversion gate, transcript backgrounds. Infrastructure the domain layer calls, not domain logic |
 | `BBAppStore` | The `app.db` repositories — scheduled messages, alerts, webhooks, devices, backups — and the schema they contribute |
+| `BBTranscript` | A conversation export as a value and as a file: the transcript model, the sentences the client renders each row as, the JSON, text and HTML writers, and a streaming ZIP writer. A leaf; `TranscriptInterface` fills it from `chat.db` |
 | `BBHandlers` | The HTTP controllers. Parse, call one interface, serialize, return |
 | `BBOpenAPI` | Generates `docs/api/openapi.json` from the route table |
 | `BBParity` | Replays recorded response fixtures and diffs them against live output |

@@ -148,3 +148,53 @@ public struct AppMessageError: Error, CustomStringConvertible, Equatable, Sendab
   public let description: String
   public init(_ description: String) { self.description = description }
 }
+
+extension AppMessagePayload {
+
+  /// The template layout an app balloon carries: what a device shows when it cannot
+  /// render the balloon itself, and what a transcript shows for the same reason.
+  ///
+  /// Every field is optional because each extension fills in what it likes: Apple Pay puts
+  /// the amount in `subcaption`, Game Pigeon names the game in `caption`, a YouTube card
+  /// uses `imageTitle`. The key spellings are `MSMessageTemplateLayout`'s own, read off the
+  /// `userInfo` dictionary `-[MSMessage _payloadDataFromAppIconData:…]` writes (see
+  /// `encode`, which writes the same six).
+  public struct Layout: Equatable, Sendable {
+    public let caption: String?
+    public let subcaption: String?
+    public let secondarySubcaption: String?
+    public let tertiarySubcaption: String?
+    public let imageTitle: String?
+    public let imageSubtitle: String?
+
+    public init(
+      caption: String? = nil, subcaption: String? = nil, secondarySubcaption: String? = nil,
+      tertiarySubcaption: String? = nil, imageTitle: String? = nil, imageSubtitle: String? = nil
+    ) {
+      self.caption = caption
+      self.subcaption = subcaption
+      self.secondarySubcaption = secondarySubcaption
+      self.tertiarySubcaption = tertiarySubcaption
+      self.imageTitle = imageTitle
+      self.imageSubtitle = imageSubtitle
+    }
+  }
+
+  /// The layout out of `payload_data`, or nil when the blob is not an app-message archive
+  /// or carries no layout. Empty strings read as absent: the encoder writes `""` for a
+  /// field the sender left blank, and a transcript has no use for a blank caption.
+  public static func layout(from data: Data?) -> Layout? {
+    guard let root = root(of: data), let info = root["userInfo"] as? [String: Any] else {
+      return nil
+    }
+    func field(_ key: String) -> String? {
+      guard let value = info[key] as? String, !value.isEmpty else { return nil }
+      return value
+    }
+    return Layout(
+      caption: field("caption"), subcaption: field("subcaption"),
+      secondarySubcaption: field("secondary-subcaption"),
+      tertiarySubcaption: field("tertiary-subcaption"),
+      imageTitle: field("image-title"), imageSubtitle: field("image-subtitle"))
+  }
+}

@@ -707,6 +707,20 @@ public enum AdditiveRoutes {
       .init(.post, "", .stickerSave, scope: .messagesWrite, requires: .privateAPI),
     ])
 
+  /// Exporting a conversation as a file: `docs/TRANSCRIPT_EXPORT.md`.
+  ///
+  /// `chat` finds a conversation by name, contact or address for a caller that has no GUID
+  /// in hand; `export` writes the transcript and answers with the file. Under its own
+  /// prefix rather than `chat/`, where `:guid` catches everything and the export's body
+  /// names its conversation anyway. The export can copy every attachment in a long
+  /// conversation, so its timeout is the attachment download's rather than the default.
+  public static let transcripts = RouteGroup(
+    "Transcripts", prefix: "transcript", apiVersion: RouteTable.latestVersion,
+    routes: [
+      .init(.get, "chat", .transcriptChats),
+      .init(.post, "export", .transcriptExport, responseTimeout: .seconds(3600)),
+    ])
+
   /// Pinning a conversation. The helper has always been able to do this and the v1 surface
   /// server never exposed it, so it is additive by definition: a default table that
   /// carried it would no longer match.

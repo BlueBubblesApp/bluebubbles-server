@@ -493,6 +493,66 @@ public enum RequestBodies {
       ],
       example: .obj([("callUUID", .string("9E3C0B77-1A44-4D2E-8F51-7C2B9D6E0A13"))])),
 
+    // MARK: Transcripts
+
+    .transcriptExport: Body(
+      summary: "Exports one conversation as a file: JSON, plain text or an HTML page, with or "
+        + "without its attachments. Answers with the file itself.",
+      properties: [
+        Property(
+          "chat_guid", .string,
+          "The conversation to export. Find one with `GET /api/v2/transcript/chat`.",
+          required: true),
+        Property(
+          "format", .string,
+          "`json` (every field, for a program), `txt` (one line per message) or `html` (a "
+            + "self-contained page with bubbles). Default `json`."),
+        Property(
+          "after", .string,
+          "Only messages at or after this instant: epoch MILLISECONDS, or an ISO 8601 date "
+            + "or date-time. Inclusive, like `after` on `/message/query`."),
+        Property(
+          "before", .string,
+          "Only messages at or before this instant, in the same spellings. Inclusive."),
+        Property(
+          "attachments", .string,
+          "`none` counts them (`1 Photo`), `metadata` adds names, types and sizes, `files` "
+            + "copies them into a ZIP beside the transcript. Default `metadata`."),
+        Property(
+          "archive", .boolean,
+          "Answer with a ZIP even for a single transcript file. Always true when "
+            + "`attachments` is `files`."),
+        Property(
+          "participants", .object(properties: []),
+          "Names you know for addresses, as `{\"+15555550101\": \"Alice\"}`. They win over "
+            + "this server's contacts, which is how a client with the phone's address book "
+            + "names people this Mac cannot."),
+        Property(
+          "me_label", .string,
+          "How this Mac's own messages are labelled. Default `Me`."),
+        Property(
+          "time_zone", .string,
+          "IANA zone for every readable date, like `America/New_York`. Default: this Mac's."),
+        Property(
+          "convert_attachments", .boolean,
+          "Copy HEIC as JPEG and CAF as M4A, as the attachment routes serve them, so the HTML "
+            + "page opens its pictures anywhere. Default true; false keeps the originals."),
+        Property(
+          "download_purged_attachments", .boolean,
+          "Ask iCloud, through the Private API, for an attachment that has been offloaded "
+            + "before reporting it missing. Slow per file. Default false."),
+      ],
+      example: .obj([
+        ("chat_guid", .string("iMessage;+;chat123456789")),
+        ("format", .string("html")),
+        ("after", .string("2024-01-01")),
+        ("before", .string("2024-03-31T23:59:59Z")),
+        ("attachments", .string("files")),
+        ("participants", .obj([("+15555550101", .string("Alice Example"))])),
+        ("me_label", .string("Me")),
+        ("time_zone", .string("America/New_York")),
+      ])),
+
     // MARK: Enrollment
 
     .authRevoke: Body(

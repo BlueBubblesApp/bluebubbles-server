@@ -90,6 +90,7 @@ public enum RouteCatalog {
         CatalogEntry(group: AdditiveRoutes.appMessages, availability: .always),
         CatalogEntry(group: AdditiveRoutes.webhookEditing, availability: .always),
         CatalogEntry(group: AdditiveRoutes.chatControls, availability: .always),
+        CatalogEntry(group: AdditiveRoutes.transcripts, availability: .always),
         CatalogEntry(group: AdditiveRoutes.findMy, availability: .findMy),
         CatalogEntry(group: AdditiveRoutes.findMySharing, availability: .findMySharing),
         CatalogEntry(group: AdditiveRoutes.faceTime, availability: .faceTimeSetting),

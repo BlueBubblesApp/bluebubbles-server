@@ -84,6 +84,7 @@ struct RouteTableTests {
       AdditiveRoutes.security, AdditiveRoutes.contactAvatar, AdditiveRoutes.hydration,
       AdditiveRoutes.chatPinning, AdditiveRoutes.webhookEditing, AdditiveRoutes.findMy,
       AdditiveRoutes.findMySharing, AdditiveRoutes.faceTime, AdditiveRoutes.auth,
+      AdditiveRoutes.transcripts,
     ]
     for group in additive {
       #expect(
@@ -110,7 +111,7 @@ struct RouteTableTests {
     for group in [
       AdditiveRoutes.security, AdditiveRoutes.contactAvatar,
       AdditiveRoutes.hydration, AdditiveRoutes.chatPinning,
-      AdditiveRoutes.webhookEditing,
+      AdditiveRoutes.webhookEditing, AdditiveRoutes.transcripts,
       AdditiveRoutes.findMy, AdditiveRoutes.findMySharing,
       AdditiveRoutes.faceTime, AdditiveRoutes.auth,
     ] {

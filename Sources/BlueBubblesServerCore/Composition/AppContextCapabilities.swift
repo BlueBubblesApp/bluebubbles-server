@@ -32,6 +32,7 @@ extension AppContext: NetworkPathProviding {}
 extension AppContext: StickerLibraryProviding {}
 extension AppContext: AttachmentConverting {}
 extension AppContext: UploadStoring {}
+extension AppContext: TranscriptExportStoring {}
 extension AppContext: ApplicationRestarting {}
 extension AppContext: PermissionsProviding {}
 extension AppContext: PushSetupProviding {}

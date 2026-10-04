@@ -62,6 +62,13 @@ public enum NonJSONResponses {
         + "holds for that representation. `?role=` picks which one; omitted serves the "
         + "preferred representation."
     ),
+    .transcriptExport: (
+      "application/octet-stream",
+      "The transcript itself, under a `Content-Disposition` naming the file. The actual "
+        + "Content-Type follows `format`: `application/json`, `text/plain` or `text/html`, "
+        + "each UTF-8, or `application/zip` when `archive` is set or attachments are "
+        + "included."
+    ),
     .uiIndex: (
       "text/html",
       "The landing page. HTML, not JSON: this is the route a person opens in a browser to "

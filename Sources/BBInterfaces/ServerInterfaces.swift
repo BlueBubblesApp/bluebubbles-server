@@ -1,5 +1,5 @@
 //  ServerInterfaces
-//  The five interfaces that read the message database, as one value.
+//  The six interfaces that read the message database, as one value.
 //
 //  Split out of `HandlerCapabilities` when the handler and interface layers became separate
 //  targets: the capability protocols describe what a HANDLER may reach, and belong with the
@@ -25,18 +25,23 @@ public struct ServerInterfaces: Sendable {
   public let handle: HandleInterface
   public let attachment: AttachmentInterface
   public let contact: ContactInterface
+  /// Exporting a conversation as a file. Built over the same repository and the contact
+  /// index, which is why it is in here rather than beside `admin` and `schedule`.
+  public let transcript: TranscriptInterface
 
   public init(
     message: MessageInterface,
     chat: ChatInterface,
     handle: HandleInterface,
     attachment: AttachmentInterface,
-    contact: ContactInterface
+    contact: ContactInterface,
+    transcript: TranscriptInterface
   ) {
     self.message = message
     self.chat = chat
     self.handle = handle
     self.attachment = attachment
     self.contact = contact
+    self.transcript = transcript
   }
 }

@@ -827,6 +827,8 @@ public struct ServerComposition {
     groups.append(AdditiveRoutes.chatControls)
     // The shared contact card, with the handle and shared-state v1 cannot carry.
     groups.append(AdditiveRoutes.contactCard)
+    // Transcript export: a conversation as a JSON, text or HTML file, with its attachments.
+    groups.append(AdditiveRoutes.transcripts)
 
     // Feature flags, each independently off by default. Unlike v2 as a whole, these are
     // about a capability not being ready to be reachable at all, rather than about which
@@ -887,6 +889,7 @@ public struct ServerComposition {
     SystemHandlers.register(into: &registry, context: context, logSink: logSink)
     MediaHandlers.register(into: &registry, context: context)
     StickerHandlers.register(into: &registry, context: context)
+    TranscriptHandlers.register(into: &registry, context: context)
     PushHandlers.register(into: &registry, context: context)
     UploadHandlers.register(into: &registry, context: context)
     UpdateHandlers.register(into: &registry, context: context)

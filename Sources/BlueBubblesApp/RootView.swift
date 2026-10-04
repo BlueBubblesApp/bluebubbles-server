@@ -28,6 +28,9 @@ enum Destination: CaseIterable, Identifiable, Hashable {
   /// Not a docs link: it reads live state, because every question it answers is about THIS
   /// machine.
   case guides
+  /// Exporting a conversation as a file. After Guides so the pages before it keep their
+  /// Go-menu shortcuts.
+  case exports
   case settings
 
   var id: Self { self }
@@ -42,6 +45,7 @@ enum Destination: CaseIterable, Identifiable, Hashable {
     case .firebase: "Firebase"
     case .logs: "Logs"
     case .guides: "Guides"
+    case .exports: "Export"
     case .settings: "Settings"
     }
   }
@@ -56,6 +60,7 @@ enum Destination: CaseIterable, Identifiable, Hashable {
     case .firebase: "bell.badge"
     case .logs: "doc.plaintext"
     case .guides: "book"
+    case .exports: "square.and.arrow.up"
     case .settings: "gearshape"
     }
   }
@@ -239,6 +244,7 @@ struct RootView: View {
     case .firebase: FirebaseView(model: model)
     case .logs: LogsView(model: model)
     case .guides: GuidesView(model: model)
+    case .exports: TranscriptExportView(model: model)
     case .settings: SettingsView(model: model)
     }
   }

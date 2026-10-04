@@ -58,6 +58,8 @@ SDK_MODULES = {
     "AVFoundation", "AppKit", "Carbon", "Contacts", "CoreGraphics", "CoreLocation",
     "CoreServices", "CryptoKit", "Darwin", "Dispatch", "Foundation", "FoundationNetworking",
     "IOKit",
+    # Compression: the transcript export's ZIP writer streams DEFLATE through it.
+    "Compression",
     "ImageIO", "Network", "Metal", "ObjectiveC", "Observation", "Security", "ServiceManagement", "SwiftUI",
     "Testing", "UniformTypeIdentifiers", "UserNotifications", "WebKit", "fcntl", "os",
 }

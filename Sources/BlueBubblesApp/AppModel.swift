@@ -195,6 +195,9 @@ final class AppModel {
   /// it with its progress intact.
   let firebaseSetup = FirebaseSetupModel()
 
+  /// A transcript export in flight, for the same reason: the run outlives the page.
+  let transcriptExport = TranscriptExportModel()
+
   /// The whole container. PRIVATE, and the accessors below are why.
   ///
   /// `HandlerCapabilities` exists because handing a component the whole `AppContext` is an

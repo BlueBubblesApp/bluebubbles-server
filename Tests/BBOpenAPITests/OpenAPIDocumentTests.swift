@@ -163,7 +163,7 @@ struct RouteCatalogTests {
       AdditiveRoutes.security, AdditiveRoutes.alerts, AdditiveRoutes.contactAvatar,
       AdditiveRoutes.chatPinning, AdditiveRoutes.stickers, AdditiveRoutes.sendLater,
       AdditiveRoutes.polls, AdditiveRoutes.appMessages,
-      AdditiveRoutes.webhookEditing,
+      AdditiveRoutes.webhookEditing, AdditiveRoutes.transcripts,
       AdditiveRoutes.chatControls, AdditiveRoutes.findMy, AdditiveRoutes.findMySharing,
       AdditiveRoutes.faceTime, AdditiveRoutes.faceTimeIncoming, AdditiveRoutes.auth,
       AdditiveRoutes.hydration,

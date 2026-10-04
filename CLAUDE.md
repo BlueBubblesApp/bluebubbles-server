@@ -143,6 +143,7 @@ Ten rules override anything you would otherwise infer from the code.
 | Routes, envelopes, auth, v1 vs v2, OpenAPI, sockets | [`.claude/docs/api.md`](.claude/docs/api.md) |
 | Chat GUIDs, attributedBody/typedstream, the send backends, AppleScript | [`.claude/docs/imessage.md`](.claude/docs/imessage.md) |
 | Group chat creation without the Private API; the Shortcuts boundary | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) |
+| Exporting a conversation as a file: the formats, who is who, the window, the ZIP | [`docs/TRANSCRIPT_EXPORT.md`](docs/TRANSCRIPT_EXPORT.md) |
 | Injection, the sandbox/container, helper transport, selectors, swizzling | [`.claude/docs/private-api.md`](.claude/docs/private-api.md) |
 | Memory budgets, child processes, async traps | [`.claude/docs/performance.md`](.claude/docs/performance.md) |
 | Event routing, sinks, payload codecs, socket delivery | [`docs/EVENTS.md`](docs/EVENTS.md) |
@@ -395,6 +396,7 @@ code, and the `CLAUDE.md` for the module, are part of the change; see the non-ne
 | [`docs/EVENTS.md`](docs/EVENTS.md) | ~16 KB | Event routing, sinks, payload codecs, socket delivery |
 | [`docs/AUTH.md`](docs/AUTH.md) | ~21 KB | Auth modes, enrollment, access control, permissions |
 | [`docs/SHORTCUTS.md`](docs/SHORTCUTS.md) | ~13 KB | Why AppleScript cannot create group chats, and what Shortcuts can and cannot do |
+| [`docs/TRANSCRIPT_EXPORT.md`](docs/TRANSCRIPT_EXPORT.md) | ~9 KB | Exporting a conversation: the three formats, name resolution, the window, attachments and the ZIP |
 
 **Source file headers are the primary documentation.** Most files open with 10–25 lines
 explaining the design and the failure it prevents. Read the header before changing the file.

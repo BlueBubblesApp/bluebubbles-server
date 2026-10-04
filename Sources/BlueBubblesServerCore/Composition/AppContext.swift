@@ -129,6 +129,9 @@ public actor AppContext {
   public nonisolated let attachmentConversion = AttachmentConversion()
   /// Where uploaded bytes land before a send. A value over a directory; see `UploadStore`.
   public nonisolated let uploads = UploadStore()
+  /// Where a transcript exported over the API waits to be downloaded; see
+  /// `TranscriptExportStore`.
+  public nonisolated let transcriptExports = TranscriptExportStore()
   /// Which `tempGuid`s have a send in flight, so a client's retry does not send twice. One
   /// per server, because the point is that two REQUESTS can see each other; see `SendCache`.
   public nonisolated let sendCache = SendCache()
@@ -426,6 +429,17 @@ public actor AppContext {
         isEnabled: { [settings] in
           await ServiceEnablement.isEnabled(BuiltInManifests.ID.contacts, settings: settings)
         }
+      ),
+      // The same closure, for the same reason: an export asks whether Contacts is on at
+      // the moment it runs.
+      transcript: TranscriptInterface(
+        repository: messages, serializer: serializer,
+        attachments: AttachmentInterface(repository: messages, privateAPI: published.privateAPI),
+        contacts: contacts,
+        contactsEnabled: { [settings] in
+          await ServiceEnablement.isEnabled(BuiltInManifests.ID.contacts, settings: settings)
+        },
+        conversion: attachmentConversion
       )
     )
     cachedInterfaces = built
