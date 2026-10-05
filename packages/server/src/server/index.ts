@@ -38,7 +38,7 @@ import { runTerminalScript, openSystemPreferences, startMessages } from "@server
 
 import { ActionHandler } from "./api/apple/actions";
 import { insertChatParticipants, isEmpty, isNotEmpty, waitMs } from "./helpers/utils";
-import { isMinBigSur, isMinCatalina, isMinHighSierra, isMinMojave, isMinMonterey, isMinSierra } from "./env";
+import { isMinBigSur, isMinCatalina, isMinMojave, isMinMonterey, isMinSierra } from "./env";
 import { Proxy } from "./services/proxyServices/proxy";
 import { PrivateApiService } from "./api/privateApi/PrivateApiService";
 import { OutgoingMessageManager } from "./managers/outgoingMessageManager";
@@ -47,6 +47,7 @@ import { AlertsInterface } from "./api/interfaces/alertsInterface";
 import { MessageSerializer } from "./api/serializers/MessageSerializer";
 import {
     CHAT_READ_STATUS_CHANGED,
+    CHAT_DELETED,
     GROUP_ICON_CHANGED,
     GROUP_ICON_REMOVED,
     GROUP_NAME_CHANGE,
@@ -65,9 +66,14 @@ import { FindMyFriendsCache } from "./api/lib/findmy/FindMyFriendsCache";
 import { ScheduledService } from "./lib/ScheduledService";
 import { getLogger } from "./lib/logging/Loggable";
 import { IMessageListener } from "./databases/imessage/listeners/IMessageListener";
-import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
 import { IMessageCache } from "./databases/imessage/pollers";
 import { MessagePoller } from "./databases/imessage/pollers/MessagePoller";
+import { ChatUpdatePoller } from "./databases/imessage/pollers/ChatChangePoller";
+import { loadChatReadStates } from "./databases/imessage/pollers/IncomingReadEventDetector";
+import {
+    loadChatStateSnapshot,
+    type ChatStateSnapshotResult
+} from "./databases/imessage/snapshot/ChatStateSnapshot";
 import { obfuscatedHandle } from "./utils/StringUtils";
 import { AutoStartMethods } from "./databases/server/constants";
 import { MacOsInterface } from "./api/interfaces/macosInterface";
@@ -1153,6 +1159,80 @@ class BlueBubblesServer extends EventEmitter {
     }
 
     /**
+     * Re-syncs every chat's read state to match what Apple currently shows.
+     *
+     * The forward read detector seeds a baseline on startup and only emits when
+     * a read advances past it, so chats whose state changed before the detector
+     * deployed (or while the server was down) stay stale on the client. This
+     * one-shot emits each chat's actual current state -- read or unread -- so
+     * clients converge on Apple's view instead of drifting further.
+     *
+     * Emitting the real per-chat value matters: a backfill that only emits
+     * `read: true` marks genuinely unread chats as read, and one that blindly
+     * inverts invents unread badges. Both were observed here. Socket-only (no
+     * FCM) to avoid a push flood, and idempotent.
+     */
+    async backfillReadState(): Promise<{ total: number; read: number; unread: number }> {
+        if (!this.iMessageRepo?.db) {
+            throw new Error("iMessage repository is not initialized");
+        }
+
+        const rows = await loadChatReadStates(this.iMessageRepo.db);
+        let read = 0;
+        let unread = 0;
+        for (const [index, row] of rows.entries()) {
+            await this.emitMessage(
+                CHAT_READ_STATUS_CHANGED,
+                { chatGuid: row.guid, read: row.read },
+                "normal",
+                false,
+                true
+            );
+            if (row.read) {
+                read++;
+            } else {
+                unread++;
+            }
+
+            if (index < rows.length - 1) {
+                await waitMs(25);
+            }
+        }
+
+        this.logger.info(`Re-synced read state for ${rows.length} chats (${read} read, ${unread} unread)`);
+        return { total: rows.length, read, unread };
+    }
+
+    /**
+     * Serves the complete Apple-side chat list with each chat's current read
+     * state, for a client to reconcile against.
+     *
+     * The live read events and the delete APIs cover changes that happen while a
+     * client is connected. Nothing covers a client that was offline, so the
+     * device silently keeps chats Apple no longer has and read states it never
+     * received. This is the recovery half of that: a full statement of what
+     * exists now, rather than a replay of what changed.
+     *
+     * `complete` is what licenses the client to delete. It is only true when the
+     * entire query succeeded, so a failure, timeout or unavailable database
+     * cannot be read as "Apple has no chats" and wipe the device.
+     */
+    async getChatStateSnapshot(): Promise<ChatStateSnapshotResult> {
+        if (!this.iMessageRepo?.db) {
+            throw new Error("iMessage repository is not initialized");
+        }
+
+        const snapshot = await loadChatStateSnapshot(this.iMessageRepo.db);
+        const unread = snapshot.chats.filter(chat => !chat.read).length;
+        this.logger.info(
+            `Served chat state snapshot: ${snapshot.chats.length} chats ` +
+                `(${snapshot.chats.length - unread} read, ${unread} unread)`
+        );
+
+        return snapshot;
+    }
+
+    /**
      * Emits a notification to to your connected devices over FCM and socket
      *
      * @param type The type of notification
@@ -1304,15 +1384,31 @@ class BlueBubblesServer extends EventEmitter {
 
         this.iMessageListener.addPoller(new MessagePoller(this.iMessageRepo, cache));
 
-        if (isMinHighSierra) {
-            this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));
-        }
+        // Reads are detected by a dedicated poller. The message poller's query
+        // is capped at 100 rows ordered by date created, so a message read now
+        // but created earlier never appears in its result set.
+        this.iMessageListener.addPoller(new ChatUpdatePoller(this.iMessageRepo, cache));
 
-        this.iMessageListener.on(CHAT_READ_STATUS_CHANGED, async (item: Chat) => {
-            this.logger.info(`Chat read [${item.guid}]`);
+        this.iMessageListener.on(CHAT_READ_STATUS_CHANGED, async (item: { guid: string; read: boolean }) => {
+            // Preserve the detector's transition decision verbatim. On Monterey,
+            // Mark as Unread moves the chat-level read pointer backward while the
+            // message rows remain read; re-querying those rows would erase the
+            // unread transition and incorrectly emit read: true.
+            this.logger.info(`Chat read state changed [${item.guid}]: ${item.read ? "read" : "unread"}`);
             await Server().emitMessage(CHAT_READ_STATUS_CHANGED, {
                 chatGuid: item.guid,
-                read: true
+                read: item.read
+            });
+        });
+
+        this.iMessageListener.on(CHAT_DELETED, async (item: { guid: string }) => {
+            // A chat Apple previously held with messages is now empty or absent.
+            // The detector already enforces forward-only semantics (it only fires
+            // for chats previously observed non-empty), so this can be trusted to
+            // mirror Apple's deletion without re-checking the database.
+            this.logger.info(`Chat deleted on Apple [${item.guid}]`);
+            await Server().emitMessage(CHAT_DELETED, {
+                chatGuid: item.guid
             });
         });
 
