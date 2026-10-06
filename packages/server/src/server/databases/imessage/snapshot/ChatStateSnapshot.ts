@@ -23,11 +23,87 @@ export type ChatSnapshotRow = {
     read_pointer: string | null;
 };
 
+export type ChatTransitionEntry = {
+    guid: string;
+    messageCount: number;
+    readPointer: string;
+    sourceRowIds: string[];
+};
+
+export type ChatTransitionRow = {
+    guid: string;
+    has_messages: number | null;
+    read_pointer: string | null;
+    row_id: string | null;
+};
+
 /** Compare non-negative decimal integers without converting them to JS Number. */
 export function compareDecimalStrings(a: string, b: string): number {
     if (a.length !== b.length) return a.length < b.length ? -1 : 1;
     if (a === b) return 0;
     return a < b ? -1 : 1;
+}
+
+/**
+ * Lightweight state used by the live poller. It deliberately avoids joining
+ * the message table; the listener can run every 500ms, so unread rows are
+ * queried only for chats whose read pointer actually advanced.
+ */
+export function buildChatTransitionQuery(): string {
+    return `
+        SELECT
+            c.guid AS guid,
+            CAST(c.ROWID AS TEXT) AS row_id,
+            EXISTS(
+                SELECT 1
+                FROM chat_message_join j
+                WHERE j.chat_id = c.ROWID
+                LIMIT 1
+            ) AS has_messages,
+            CAST(COALESCE(c.last_read_message_timestamp, 0) AS TEXT) AS read_pointer
+        FROM chat c
+    `;
+}
+
+export function parseChatTransitionRows(rows: ChatTransitionRow[]): ChatTransitionEntry[] {
+    const byGuid = new Map<string, ChatTransitionEntry>();
+    for (const row of rows) {
+        if (row?.guid == null) continue;
+        const readPointer = row.read_pointer ?? "0";
+        if (!/^\d+$/.test(readPointer)) {
+            throw new Error(`Invalid read pointer for chat ${row.guid}`);
+        }
+        const hasMessages = Number(row.has_messages ?? 0);
+        if (hasMessages !== 0 && hasMessages !== 1) {
+            throw new Error(`Invalid message-existence flag for chat ${row.guid}`);
+        }
+
+        const rowId = row.row_id ?? "";
+        if (!/^\d+$/.test(rowId)) {
+            throw new Error(`Invalid source row ID for chat ${row.guid}`);
+        }
+        const existing = byGuid.get(row.guid);
+        if (existing) {
+            existing.messageCount = Math.max(existing.messageCount, hasMessages);
+            if (compareDecimalStrings(readPointer, existing.readPointer) > 0) {
+                existing.readPointer = readPointer;
+            }
+            existing.sourceRowIds.push(rowId);
+            existing.sourceRowIds.sort();
+        } else {
+            byGuid.set(row.guid, {
+                guid: row.guid,
+                messageCount: hasMessages,
+                readPointer,
+                sourceRowIds: [rowId]
+            });
+        }
+    }
+    return [...byGuid.values()];
+}
+
+export async function loadChatTransitionState(db: DataSource): Promise<ChatTransitionEntry[]> {
+    return parseChatTransitionRows(await db.query(buildChatTransitionQuery()));
 }
 
 /**

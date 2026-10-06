@@ -146,11 +146,6 @@ export class HttpRoutes {
                         controller: ServerRouter.getInfo
                     },
                     {
-                        method: HttpMethod.POST,
-                        path: "backfill/read-state",
-                        controller: ServerRouter.backfillReadState
-                    },
-                    {
                         method: HttpMethod.GET,
                         path: "chat-state/snapshot",
                         controller: ServerRouter.getChatStateSnapshot

@@ -16,21 +16,6 @@ export class ServerRouter {
         return new Success(ctx, { data: await GeneralInterface.getServerMetadata() }).send();
     }
 
-    static async backfillReadState(ctx: RouterContext, _: Next) {
-        try {
-            const result = await Server().backfillReadState();
-            return new Success(ctx, {
-                message: `Re-synced read state for ${result.total} chats (${result.read} read, ${result.unread} unread)`,
-                data: result
-            }).send();
-        } catch (ex: any) {
-            throw new ServerError({
-                message: "Failed to backfill read state!",
-                error: ex?.message ?? ex.toString()
-            });
-        }
-    }
-
     static async getChatStateSnapshot(ctx: RouterContext, _: Next) {
         try {
             const result = await Server().getChatStateSnapshot();
